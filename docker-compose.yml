@@ -1,0 +1,14 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: wealthview
+      POSTGRES_USER: wv_app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-wv_dev_pass}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata:
