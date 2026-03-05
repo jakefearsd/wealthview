@@ -4,11 +4,13 @@ import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
+import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,6 +48,9 @@ class DashboardServiceTest {
     @Mock
     private TransactionRepository transactionRepository;
 
+    @Mock
+    private PropertyRepository propertyRepository;
+
     @InjectMocks
     private DashboardService dashboardService;
 
@@ -67,9 +72,9 @@ class DashboardServiceTest {
                 new BigDecimal("10"), new BigDecimal("1500"));
         var price = new PriceEntity("AAPL", LocalDate.now(), new BigDecimal("200"), "manual");
 
-        when(accountRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(account)));
-        when(holdingRepository.findByTenantId(tenantId)).thenReturn(List.of(holding));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of(holding));
         when(priceRepository.findFirstBySymbolOrderByDateDesc("AAPL"))
                 .thenReturn(Optional.of(price));
 
@@ -86,9 +91,9 @@ class DashboardServiceTest {
         var holding = new HoldingEntity(account, tenant, "VTI",
                 new BigDecimal("5"), new BigDecimal("1000"));
 
-        when(accountRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(account)));
-        when(holdingRepository.findByTenantId(tenantId)).thenReturn(List.of(holding));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of(holding));
         when(priceRepository.findFirstBySymbolOrderByDateDesc("VTI"))
                 .thenReturn(Optional.empty());
 
@@ -106,10 +111,10 @@ class DashboardServiceTest {
         var withdrawal = new TransactionEntity(bank, tenant, LocalDate.now(), "withdrawal",
                 null, null, new BigDecimal("1000"));
 
-        when(accountRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(bank)));
-        when(holdingRepository.findByTenantId(tenantId)).thenReturn(Collections.emptyList());
-        when(transactionRepository.findByAccountIdAndTenantId(any(), eq(tenantId), any()))
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(Collections.emptyList());
+        when(transactionRepository.findByAccount_IdAndTenant_Id(any(), eq(tenantId), any()))
                 .thenReturn(new PageImpl<>(List.of(deposit, withdrawal)));
 
         var result = dashboardService.getSummary(tenantId);
@@ -119,15 +124,64 @@ class DashboardServiceTest {
     }
 
     @Test
-    void getSummary_emptyTenant_returnsZeros() {
-        when(accountRepository.findByTenantId(eq(tenantId), any(Pageable.class)))
+    void getSummary_withProperties_includesPropertyEquityInNetWorth() {
+        var property = new PropertyEntity(tenant, "123 Main St",
+                new BigDecimal("300000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("350000"), new BigDecimal("200000"));
+
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
-        when(holdingRepository.findByTenantId(tenantId)).thenReturn(Collections.emptyList());
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(Collections.emptyList());
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
+
+        var result = dashboardService.getSummary(tenantId);
+
+        assertThat(result.totalPropertyEquity()).isEqualByComparingTo("150000");
+        assertThat(result.netWorth()).isEqualByComparingTo("150000");
+        assertThat(result.accounts()).hasSize(1);
+        assertThat(result.accounts().get(0).name()).isEqualTo("123 Main St");
+        assertThat(result.accounts().get(0).type()).isEqualTo("property");
+        assertThat(result.accounts().get(0).balance()).isEqualByComparingTo("150000");
+        assertThat(result.allocation()).anyMatch(a -> a.category().equals("property"));
+    }
+
+    @Test
+    void getSummary_withInvestmentsAndProperties_combinesNetWorth() {
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        TestEntityHelper.setId(account, UUID.randomUUID());
+        var holding = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        var property = new PropertyEntity(tenant, "456 Oak Ave",
+                new BigDecimal("250000"), LocalDate.of(2021, 6, 15),
+                new BigDecimal("280000"), new BigDecimal("180000"));
+
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(account)));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of(holding));
+        when(priceRepository.findFirstBySymbolOrderByDateDesc("AAPL"))
+                .thenReturn(Optional.empty());
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
+
+        var result = dashboardService.getSummary(tenantId);
+
+        assertThat(result.totalInvestments()).isEqualByComparingTo("1500");
+        assertThat(result.totalPropertyEquity()).isEqualByComparingTo("100000");
+        assertThat(result.netWorth()).isEqualByComparingTo("101500");
+        assertThat(result.accounts()).hasSize(2);
+    }
+
+    @Test
+    void getSummary_emptyTenant_returnsZeros() {
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(Collections.emptyList());
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(Collections.emptyList());
 
         var result = dashboardService.getSummary(tenantId);
 
         assertThat(result.netWorth()).isEqualByComparingTo("0");
         assertThat(result.totalInvestments()).isEqualByComparingTo("0");
         assertThat(result.totalCash()).isEqualByComparingTo("0");
+        assertThat(result.totalPropertyEquity()).isEqualByComparingTo("0");
     }
 }

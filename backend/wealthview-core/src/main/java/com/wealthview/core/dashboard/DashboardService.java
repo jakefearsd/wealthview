@@ -7,6 +7,7 @@ import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
+import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -26,21 +27,24 @@ public class DashboardService {
     private final HoldingRepository holdingRepository;
     private final PriceRepository priceRepository;
     private final TransactionRepository transactionRepository;
+    private final PropertyRepository propertyRepository;
 
     public DashboardService(AccountRepository accountRepository,
                             HoldingRepository holdingRepository,
                             PriceRepository priceRepository,
-                            TransactionRepository transactionRepository) {
+                            TransactionRepository transactionRepository,
+                            PropertyRepository propertyRepository) {
         this.accountRepository = accountRepository;
         this.holdingRepository = holdingRepository;
         this.priceRepository = priceRepository;
         this.transactionRepository = transactionRepository;
+        this.propertyRepository = propertyRepository;
     }
 
     @Transactional(readOnly = true)
     public DashboardSummaryResponse getSummary(UUID tenantId) {
-        var accounts = accountRepository.findByTenantId(tenantId, Pageable.unpaged());
-        var holdings = holdingRepository.findByTenantId(tenantId);
+        var accounts = accountRepository.findByTenant_Id(tenantId, Pageable.unpaged());
+        var holdings = holdingRepository.findByTenant_Id(tenantId);
 
         var totalInvestments = BigDecimal.ZERO;
         var totalCash = BigDecimal.ZERO;
@@ -51,7 +55,7 @@ public class DashboardService {
             var accountBalance = BigDecimal.ZERO;
 
             if ("bank".equals(account.getType())) {
-                var transactions = transactionRepository.findByAccountIdAndTenantId(
+                var transactions = transactionRepository.findByAccount_IdAndTenant_Id(
                         account.getId(), tenantId, Pageable.unpaged());
                 for (var txn : transactions) {
                     if ("deposit".equals(txn.getType())) {
@@ -77,13 +81,23 @@ public class DashboardService {
             allocationMap.merge(account.getType(), accountBalance, BigDecimal::add);
         }
 
-        var netWorth = totalInvestments.add(totalCash);
+        var totalPropertyEquity = BigDecimal.ZERO;
+        var properties = propertyRepository.findByTenant_Id(tenantId);
+        for (var property : properties) {
+            var equity = property.getEquity();
+            totalPropertyEquity = totalPropertyEquity.add(equity);
+            accountSummaries.add(new AccountSummary(
+                    property.getAddress(), "property", equity));
+            allocationMap.merge("property", equity, BigDecimal::add);
+        }
+
+        var netWorth = totalInvestments.add(totalCash).add(totalPropertyEquity);
 
         var allocation = buildAllocation(allocationMap, netWorth);
 
         return new DashboardSummaryResponse(
                 netWorth, totalInvestments, totalCash,
-                BigDecimal.ZERO, accountSummaries, allocation);
+                totalPropertyEquity, accountSummaries, allocation);
     }
 
     private BigDecimal getHoldingValue(HoldingEntity holding) {
