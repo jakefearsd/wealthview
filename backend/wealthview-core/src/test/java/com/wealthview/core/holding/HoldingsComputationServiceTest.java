@@ -58,8 +58,8 @@ class HoldingsComputationServiceTest {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
@@ -77,8 +77,8 @@ class HoldingsComputationServiceTest {
         var sell = new TransactionEntity(account, tenant, LocalDate.now(), "sell", "AAPL",
                 new BigDecimal("3"), new BigDecimal("600.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(buy, sell));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(buy, sell));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
@@ -95,8 +95,8 @@ class HoldingsComputationServiceTest {
         var buy2 = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("2000.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(buy1, buy2));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(buy1, buy2));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
@@ -114,8 +114,8 @@ class HoldingsComputationServiceTest {
         var sell = new TransactionEntity(account, tenant, LocalDate.now(), "sell", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1800.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(buy, sell));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(buy, sell));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
 
@@ -128,11 +128,11 @@ class HoldingsComputationServiceTest {
                 new BigDecimal("100"), new BigDecimal("15000"));
         override.setManualOverride(true);
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.of(override));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.of(override));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
 
-        verify(transactionRepository, never()).findByAccountIdAndSymbol(any(), any());
+        verify(transactionRepository, never()).findByAccount_IdAndSymbol(any(), any());
         verify(holdingRepository, never()).save(any());
     }
 
@@ -143,8 +143,8 @@ class HoldingsComputationServiceTest {
         var div = new TransactionEntity(account, tenant, LocalDate.now(), "dividend", "AAPL",
                 null, new BigDecimal("50.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(buy, div));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(buy, div));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
@@ -159,7 +159,7 @@ class HoldingsComputationServiceTest {
         service.recomputeForAccountAndSymbol(account, tenant, null);
 
         verify(holdingRepository, never()).save(any());
-        verify(transactionRepository, never()).findByAccountIdAndSymbol(any(), any());
+        verify(transactionRepository, never()).findByAccount_IdAndSymbol(any(), any());
     }
 
     @Test
@@ -167,8 +167,8 @@ class HoldingsComputationServiceTest {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
@@ -179,14 +179,31 @@ class HoldingsComputationServiceTest {
     }
 
     @Test
+    void recomputeHoldings_withOpeningBalance_calculatesQuantityAndCostBasis() {
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "opening_balance", "VOO",
+                new BigDecimal("20"), new BigDecimal("9000.0000"));
+
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "VOO");
+
+        var captor = ArgumentCaptor.forClass(HoldingEntity.class);
+        verify(holdingRepository).save(captor.capture());
+        assertThat(captor.getValue().getQuantity()).isEqualByComparingTo("20");
+        assertThat(captor.getValue().getCostBasis()).isEqualByComparingTo("9000.0000");
+    }
+
+    @Test
     void recomputeForAccountAndSymbol_existingHolding_doesNotPublishEvent() {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
         var existing = new HoldingEntity(account, tenant, "AAPL",
                 new BigDecimal("5"), new BigDecimal("750.0000"));
-        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.of(existing));
-        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.of(existing));
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
         when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
