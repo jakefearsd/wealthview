@@ -26,12 +26,12 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public List<UserEntity> getUsersForTenant(UUID tenantId) {
-        return userRepository.findByTenantId(tenantId);
+        return userRepository.findByTenant_Id(tenantId);
     }
 
     @Transactional
     public UserEntity updateUserRole(UUID tenantId, UUID userId, String newRole) {
-        var user = userRepository.findByTenantIdAndId(tenantId, userId)
+        var user = userRepository.findByTenant_IdAndId(tenantId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         user.setRole(newRole);
@@ -42,7 +42,7 @@ public class UserManagementService {
 
     @Transactional
     public void deleteUser(UUID tenantId, UUID userId) {
-        var user = userRepository.findByTenantIdAndId(tenantId, userId)
+        var user = userRepository.findByTenant_IdAndId(tenantId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         userRepository.delete(user);

@@ -10,13 +10,13 @@ import java.util.UUID;
 
 public interface HoldingRepository extends JpaRepository<HoldingEntity, UUID> {
 
-    Optional<HoldingEntity> findByAccountIdAndSymbol(UUID accountId, String symbol);
+    Optional<HoldingEntity> findByAccount_IdAndSymbol(UUID accountId, String symbol);
 
-    List<HoldingEntity> findByAccountIdAndTenantId(UUID accountId, UUID tenantId);
+    List<HoldingEntity> findByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 
-    List<HoldingEntity> findByTenantId(UUID tenantId);
+    List<HoldingEntity> findByTenant_Id(UUID tenantId);
 
-    Optional<HoldingEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+    Optional<HoldingEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);
 
     @Query("SELECT DISTINCT h.symbol FROM HoldingEntity h WHERE h.quantity > 0")
     List<String> findDistinctSymbols();

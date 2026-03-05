@@ -8,5 +8,5 @@ import java.util.UUID;
 
 public interface ImportJobRepository extends JpaRepository<ImportJobEntity, UUID> {
 
-    List<ImportJobEntity> findByTenantId(UUID tenantId);
+    List<ImportJobEntity> findByTenant_Id(UUID tenantId);
 }

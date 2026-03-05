@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public interface AccountRepository extends JpaRepository<AccountEntity, UUID> {
 
-    Page<AccountEntity> findByTenantId(UUID tenantId, Pageable pageable);
+    Page<AccountEntity> findByTenant_Id(UUID tenantId, Pageable pageable);
 
-    Optional<AccountEntity> findByTenantIdAndId(UUID tenantId, UUID id);
+    Optional<AccountEntity> findByTenant_IdAndId(UUID tenantId, UUID id);
 }

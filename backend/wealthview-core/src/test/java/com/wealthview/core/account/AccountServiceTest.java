@@ -62,7 +62,7 @@ class AccountServiceTest {
     void list_tenantScoped_returnsPageResponse() {
         var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
         var page = new PageImpl<>(List.of(account));
-        when(accountRepository.findByTenantId(tenantId, PageRequest.of(0, 25))).thenReturn(page);
+        when(accountRepository.findByTenant_Id(tenantId, PageRequest.of(0, 25))).thenReturn(page);
 
         var result = accountService.list(tenantId, PageRequest.of(0, 25));
 
@@ -74,7 +74,7 @@ class AccountServiceTest {
     void get_existingAccount_returnsResponse() {
         var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "401k", "401k", "Employer");
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
 
         var result = accountService.get(tenantId, accountId);
@@ -85,7 +85,7 @@ class AccountServiceTest {
     @Test
     void get_wrongTenant_throwsNotFound() {
         var accountId = UUID.randomUUID();
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> accountService.get(tenantId, accountId))
@@ -96,7 +96,7 @@ class AccountServiceTest {
     void update_existingAccount_updatesFields() {
         var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "Old Name", "brokerage", "Old");
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -111,7 +111,7 @@ class AccountServiceTest {
     void delete_existingAccount_deletesSuccessfully() {
         var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "Delete Me", "bank", null);
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
 
         accountService.delete(tenantId, accountId);

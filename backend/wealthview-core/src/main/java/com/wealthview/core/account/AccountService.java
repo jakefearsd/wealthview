@@ -42,20 +42,20 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public PageResponse<AccountResponse> list(UUID tenantId, Pageable pageable) {
-        var page = accountRepository.findByTenantId(tenantId, pageable);
+        var page = accountRepository.findByTenant_Id(tenantId, pageable);
         return PageResponse.from(page, AccountResponse::from);
     }
 
     @Transactional(readOnly = true)
     public AccountResponse get(UUID tenantId, UUID accountId) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
         return AccountResponse.from(account);
     }
 
     @Transactional
     public AccountResponse update(UUID tenantId, UUID accountId, AccountRequest request) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         account.setName(request.name());
@@ -68,7 +68,7 @@ public class AccountService {
 
     @Transactional
     public void delete(UUID tenantId, UUID accountId) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
         accountRepository.delete(account);
         log.info("Account {} deleted for tenant {}", accountId, tenantId);

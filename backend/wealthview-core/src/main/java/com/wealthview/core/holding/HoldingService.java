@@ -31,21 +31,21 @@ public class HoldingService {
 
     @Transactional(readOnly = true)
     public List<HoldingResponse> listByAccount(UUID tenantId, UUID accountId) {
-        return holdingRepository.findByAccountIdAndTenantId(accountId, tenantId).stream()
+        return holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId).stream()
                 .map(HoldingResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<HoldingResponse> listByTenant(UUID tenantId) {
-        return holdingRepository.findByTenantId(tenantId).stream()
+        return holdingRepository.findByTenant_Id(tenantId).stream()
                 .map(HoldingResponse::from)
                 .toList();
     }
 
     @Transactional
     public HoldingResponse createManual(UUID tenantId, HoldingRequest request) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, request.accountId())
+        var account = accountRepository.findByTenant_IdAndId(tenantId, request.accountId())
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         var holding = new HoldingEntity(account, account.getTenant(),
@@ -60,7 +60,7 @@ public class HoldingService {
 
     @Transactional
     public HoldingResponse update(UUID tenantId, UUID holdingId, HoldingRequest request) {
-        var holding = holdingRepository.findByIdAndTenantId(holdingId, tenantId)
+        var holding = holdingRepository.findByIdAndTenant_Id(holdingId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Holding not found"));
 
         holding.setQuantity(request.quantity());

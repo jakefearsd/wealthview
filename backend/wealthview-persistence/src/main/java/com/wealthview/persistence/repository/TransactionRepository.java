@@ -11,11 +11,11 @@ import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<TransactionEntity, UUID> {
 
-    Page<TransactionEntity> findByAccountIdAndTenantId(UUID accountId, UUID tenantId, Pageable pageable);
+    Page<TransactionEntity> findByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId, Pageable pageable);
 
-    List<TransactionEntity> findByAccountIdAndSymbol(UUID accountId, String symbol);
+    List<TransactionEntity> findByAccount_IdAndSymbol(UUID accountId, String symbol);
 
-    Optional<TransactionEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+    Optional<TransactionEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);
 
-    boolean existsByTenantIdAndAccountIdAndImportHash(UUID tenantId, UUID accountId, String importHash);
+    boolean existsByTenant_IdAndAccount_IdAndImportHash(UUID tenantId, UUID accountId, String importHash);
 }

@@ -64,6 +64,6 @@ public class TenantService {
 
     @Transactional(readOnly = true)
     public List<InviteCodeEntity> getInviteCodes(UUID tenantId) {
-        return inviteCodeRepository.findByTenantId(tenantId);
+        return inviteCodeRepository.findByTenant_Id(tenantId);
     }
 }
