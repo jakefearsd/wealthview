@@ -1,5 +1,6 @@
 package com.wealthview.core.holding;
 
+import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -10,9 +11,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -35,7 +36,9 @@ class HoldingsComputationServiceTest {
     @Mock
     private HoldingRepository holdingRepository;
 
-    @InjectMocks
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private HoldingsComputationService service;
 
     private TenantEntity tenant;
@@ -44,6 +47,7 @@ class HoldingsComputationServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new HoldingsComputationService(transactionRepository, holdingRepository, eventPublisher);
         tenant = new TenantEntity("Test");
         account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
         accountId = UUID.randomUUID();
@@ -156,5 +160,37 @@ class HoldingsComputationServiceTest {
 
         verify(holdingRepository, never()).save(any());
         verify(transactionRepository, never()).findByAccountIdAndSymbol(any(), any());
+    }
+
+    @Test
+    void recomputeForAccountAndSymbol_newHolding_publishesEvent() {
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.0000"));
+
+        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
+
+        var captor = ArgumentCaptor.forClass(NewHoldingCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().symbol()).isEqualTo("AAPL");
+    }
+
+    @Test
+    void recomputeForAccountAndSymbol_existingHolding_doesNotPublishEvent() {
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.0000"));
+
+        var existing = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("5"), new BigDecimal("750.0000"));
+        when(holdingRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(Optional.of(existing));
+        when(transactionRepository.findByAccountIdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
+
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }

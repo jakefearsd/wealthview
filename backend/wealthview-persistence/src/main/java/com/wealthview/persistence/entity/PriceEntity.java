@@ -62,6 +62,10 @@ public class PriceEntity {
         return source;
     }
 
+    public void setSource(String source) {
+        this.source = source;
+    }
+
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }

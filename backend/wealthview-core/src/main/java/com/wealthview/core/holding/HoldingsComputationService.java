@@ -1,5 +1,6 @@
 package com.wealthview.core.holding;
 
+import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -8,6 +9,7 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,11 +26,14 @@ public class HoldingsComputationService {
 
     private final TransactionRepository transactionRepository;
     private final HoldingRepository holdingRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public HoldingsComputationService(TransactionRepository transactionRepository,
-                                      HoldingRepository holdingRepository) {
+                                      HoldingRepository holdingRepository,
+                                      ApplicationEventPublisher eventPublisher) {
         this.transactionRepository = transactionRepository;
         this.holdingRepository = holdingRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -84,6 +89,7 @@ public class HoldingsComputationService {
         } else if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
             var holding = new HoldingEntity(account, tenant, symbol, netQuantity, totalCost);
             holdingRepository.save(holding);
+            eventPublisher.publishEvent(new NewHoldingCreatedEvent(symbol));
         }
     }
 }
