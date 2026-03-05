@@ -8,6 +8,7 @@ import com.wealthview.core.importservice.dto.CsvParseResult;
 import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -26,23 +27,48 @@ public class ImportService {
 
     private final ImportJobRepository importJobRepository;
     private final AccountRepository accountRepository;
+    private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
     private final CsvParser csvParser;
+    private final java.util.Map<String, CsvParser> namedParsers;
 
     public ImportService(ImportJobRepository importJobRepository,
                          AccountRepository accountRepository,
+                         TransactionRepository transactionRepository,
                          TransactionService transactionService,
-                         CsvParser csvParser) {
+                         CsvParser csvParser,
+                         java.util.Map<String, CsvParser> namedParsers) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
+        this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
         this.csvParser = csvParser;
+        this.namedParsers = namedParsers;
     }
 
     @Transactional
     public ImportJobResponse importCsv(UUID tenantId, UUID accountId, InputStream inputStream) throws IOException {
         var parseResult = csvParser.parse(inputStream);
         return processCsvImport(tenantId, accountId, parseResult);
+    }
+
+    @Transactional
+    public ImportJobResponse importCsv(UUID tenantId, UUID accountId, InputStream inputStream, String format) throws IOException {
+        var parser = resolveParser(format);
+        var parseResult = parser.parse(inputStream);
+        return processCsvImport(tenantId, accountId, parseResult);
+    }
+
+    private CsvParser resolveParser(String format) {
+        if (format == null || format.isBlank() || "generic".equals(format)) {
+            return csvParser;
+        }
+        var parserName = format + "CsvParser";
+        var parser = namedParsers.get(parserName);
+        if (parser == null) {
+            throw new IllegalArgumentException("Unknown CSV format: " + format);
+        }
+        return parser;
     }
 
     @Transactional
@@ -56,12 +82,23 @@ public class ImportService {
         job = importJobRepository.save(job);
 
         int successCount = 0;
+        int skippedDuplicates = 0;
         for (var parsed : parseResult.transactions()) {
             try {
+                var hash = TransactionHashUtil.computeHash(
+                        parsed.date(), parsed.type(), parsed.symbol(),
+                        parsed.quantity(), parsed.amount());
+
+                if (transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+                        tenantId, accountId, hash)) {
+                    skippedDuplicates++;
+                    continue;
+                }
+
                 var request = new TransactionRequest(
                         parsed.date(), parsed.type(), parsed.symbol(),
                         parsed.quantity(), parsed.amount());
-                transactionService.create(tenantId, accountId, request);
+                transactionService.createWithHash(tenantId, accountId, request, hash);
                 successCount++;
             } catch (Exception e) {
                 log.warn("Failed to import transaction: {}", e.getMessage());
@@ -69,10 +106,17 @@ public class ImportService {
         }
 
         job.setSuccessfulRows(successCount);
-        job.setFailedRows(parseResult.errors().size() + (parseResult.transactions().size() - successCount));
+        job.setFailedRows(parseResult.errors().size() + (parseResult.transactions().size() - successCount - skippedDuplicates));
         job.setStatus("completed");
+        var messages = new java.util.ArrayList<String>();
         if (!parseResult.errors().isEmpty()) {
-            job.setErrorMessage(parseResult.errors().size() + " rows had parse errors");
+            messages.add(parseResult.errors().size() + " rows had parse errors");
+        }
+        if (skippedDuplicates > 0) {
+            messages.add(skippedDuplicates + " duplicate transactions skipped");
+        }
+        if (!messages.isEmpty()) {
+            job.setErrorMessage(String.join("; ", messages));
         }
         job.setUpdatedAt(OffsetDateTime.now());
         job = importJobRepository.save(job);

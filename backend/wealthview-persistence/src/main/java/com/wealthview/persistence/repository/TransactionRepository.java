@@ -16,4 +16,6 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     List<TransactionEntity> findByAccountIdAndSymbol(UUID accountId, String symbol);
 
     Optional<TransactionEntity> findByIdAndTenantId(UUID id, UUID tenantId);
+
+    boolean existsByTenantIdAndAccountIdAndImportHash(UUID tenantId, UUID accountId, String importHash);
 }

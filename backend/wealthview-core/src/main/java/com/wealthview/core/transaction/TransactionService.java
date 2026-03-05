@@ -50,6 +50,24 @@ public class TransactionService {
         return TransactionResponse.from(txn);
     }
 
+    @Transactional
+    public TransactionResponse createWithHash(UUID tenantId, UUID accountId,
+                                              TransactionRequest request, String importHash) {
+        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+
+        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
+                request.type(), request.symbol(), request.quantity(), request.amount());
+        txn.setImportHash(importHash);
+        txn = transactionRepository.save(txn);
+
+        holdingsComputationService.recomputeForAccountAndSymbol(
+                account, account.getTenant(), request.symbol());
+
+        log.info("Transaction {} created for account {} with import hash", txn.getId(), accountId);
+        return TransactionResponse.from(txn);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccount(UUID tenantId, UUID accountId, Pageable pageable) {
         var page = transactionRepository.findByAccountIdAndTenantId(accountId, tenantId, pageable);

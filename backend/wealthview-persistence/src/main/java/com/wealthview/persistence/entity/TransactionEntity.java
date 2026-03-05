@@ -45,6 +45,9 @@ public class TransactionEntity {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
+    @Column(name = "import_hash")
+    private String importHash;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -135,5 +138,13 @@ public class TransactionEntity {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getImportHash() {
+        return importHash;
+    }
+
+    public void setImportHash(String importHash) {
+        this.importHash = importHash;
     }
 }

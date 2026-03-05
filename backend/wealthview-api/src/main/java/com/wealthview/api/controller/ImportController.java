@@ -30,10 +30,12 @@ public class ImportController {
     public ResponseEntity<ImportJobResponse> importCsv(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @RequestParam UUID accountId,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String format) {
         try {
-            var result = importService.importCsv(
-                    principal.tenantId(), accountId, file.getInputStream());
+            var result = (format != null && !format.isBlank())
+                    ? importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format)
+                    : importService.importCsv(principal.tenantId(), accountId, file.getInputStream());
             return ResponseEntity.status(HttpStatus.CREATED).body(result);
         } catch (Exception e) {
             throw new RuntimeException("Failed to process CSV file: " + e.getMessage(), e);
