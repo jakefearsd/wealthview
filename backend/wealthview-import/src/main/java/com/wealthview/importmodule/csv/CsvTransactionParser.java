@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Set;
 
 @Component
+@org.springframework.context.annotation.Primary
 public class CsvTransactionParser implements CsvParser {
 
     private static final Set<String> VALID_TYPES = Set.of(
