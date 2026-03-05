@@ -1,0 +1,10 @@
+app:
+  cors:
+    allowed-origins: http://localhost
+  super-admin:
+    email: admin@wealthview.local
+    password: ${SUPER_ADMIN_PASSWORD:admin123}
+
+logging:
+  level:
+    com.wealthview: INFO
