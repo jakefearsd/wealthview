@@ -9,4 +9,6 @@ import java.util.Optional;
 public interface PriceRepository extends JpaRepository<PriceEntity, PriceId> {
 
     Optional<PriceEntity> findFirstBySymbolOrderByDateDesc(String symbol);
+
+    boolean existsBySymbol(String symbol);
 }
