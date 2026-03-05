@@ -1,0 +1,89 @@
+package com.wealthview.core.holding;
+
+import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.repository.HoldingRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Service
+public class HoldingsComputationService {
+
+    private static final Logger log = LoggerFactory.getLogger(HoldingsComputationService.class);
+
+    private final TransactionRepository transactionRepository;
+    private final HoldingRepository holdingRepository;
+
+    public HoldingsComputationService(TransactionRepository transactionRepository,
+                                      HoldingRepository holdingRepository) {
+        this.transactionRepository = transactionRepository;
+        this.holdingRepository = holdingRepository;
+    }
+
+    @Transactional
+    public void recomputeForAccountAndSymbol(AccountEntity account, TenantEntity tenant, String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return;
+        }
+
+        var existingHolding = holdingRepository.findByAccountIdAndSymbol(account.getId(), symbol);
+
+        if (existingHolding.isPresent() && existingHolding.get().isManualOverride()) {
+            log.warn("Skipping recomputation for account {} symbol {} — manual override exists",
+                    account.getId(), symbol);
+            return;
+        }
+
+        var transactions = transactionRepository.findByAccountIdAndSymbol(account.getId(), symbol);
+
+        var netQuantity = BigDecimal.ZERO;
+        var totalCost = BigDecimal.ZERO;
+
+        for (var txn : transactions) {
+            switch (txn.getType()) {
+                case "buy" -> {
+                    netQuantity = netQuantity.add(txn.getQuantity());
+                    totalCost = totalCost.add(txn.getAmount());
+                }
+                case "sell" -> {
+                    if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
+                        var avgCost = totalCost.divide(netQuantity, 4, RoundingMode.HALF_UP);
+                        netQuantity = netQuantity.subtract(txn.getQuantity());
+                        totalCost = netQuantity.multiply(avgCost).setScale(4, RoundingMode.HALF_UP);
+                    }
+                }
+                default -> {
+                    // dividend, deposit, withdrawal don't affect quantity
+                }
+            }
+        }
+
+        if (netQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+            netQuantity = BigDecimal.ZERO;
+            totalCost = BigDecimal.ZERO;
+        }
+
+        if (existingHolding.isPresent()) {
+            var holding = existingHolding.get();
+            holding.setQuantity(netQuantity);
+            holding.setCostBasis(totalCost);
+            holding.setAsOfDate(LocalDate.now());
+            holding.setUpdatedAt(OffsetDateTime.now());
+            holdingRepository.save(holding);
+        } else if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
+            var holding = new HoldingEntity(account, tenant, symbol, netQuantity, totalCost);
+            holdingRepository.save(holding);
+        }
+    }
+}
