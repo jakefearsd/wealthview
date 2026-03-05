@@ -38,6 +38,7 @@ Thumbs.db
 .env.*
 *.pem
 *.key
+.keys
 
 # Docker
 docker-compose.override.yml
@@ -47,3 +48,6 @@ spring-shell.log
 
 # Flyway
 flyway.conf
+
+# Test data
+testdata/
