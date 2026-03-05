@@ -59,7 +59,7 @@ class TransactionServiceTest {
     void create_buyTransaction_triggersRecompute() {
         var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -75,7 +75,7 @@ class TransactionServiceTest {
     void create_depositTransaction_triggersRecomputeWithNull() {
         var request = new TransactionRequest(LocalDate.now(), "deposit", null,
                 null, new BigDecimal("5000"));
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -90,7 +90,7 @@ class TransactionServiceTest {
     void delete_existingTransaction_recomputesHoldings() {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
-        when(transactionRepository.findByIdAndTenantId(any(), eq(tenantId)))
+        when(transactionRepository.findByIdAndTenant_Id(any(), eq(tenantId)))
                 .thenReturn(Optional.of(txn));
 
         transactionService.delete(tenantId, UUID.randomUUID());
@@ -103,7 +103,7 @@ class TransactionServiceTest {
     @Test
     void delete_nonExistent_throwsNotFound() {
         var txnId = UUID.randomUUID();
-        when(transactionRepository.findByIdAndTenantId(txnId, tenantId))
+        when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> transactionService.delete(tenantId, txnId))

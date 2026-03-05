@@ -64,21 +64,21 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public List<PropertyResponse> list(UUID tenantId) {
-        return propertyRepository.findByTenantId(tenantId).stream()
+        return propertyRepository.findByTenant_Id(tenantId).stream()
                 .map(PropertyResponse::from)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public PropertyResponse get(UUID tenantId, UUID propertyId) {
-        var property = propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
         return PropertyResponse.from(property);
     }
 
     @Transactional
     public PropertyResponse update(UUID tenantId, UUID propertyId, PropertyRequest request) {
-        var property = propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         property.setAddress(request.address());
@@ -94,7 +94,7 @@ public class PropertyService {
 
     @Transactional
     public void delete(UUID tenantId, UUID propertyId) {
-        var property = propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
         propertyRepository.delete(property);
         log.info("Property {} deleted for tenant {}", propertyId, tenantId);
@@ -102,7 +102,7 @@ public class PropertyService {
 
     @Transactional
     public void addIncome(UUID tenantId, UUID propertyId, PropertyIncomeRequest request) {
-        var property = propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var income = new PropertyIncomeEntity(property, property.getTenant(),
@@ -112,7 +112,7 @@ public class PropertyService {
 
     @Transactional
     public void addExpense(UUID tenantId, UUID propertyId, PropertyExpenseRequest request) {
-        var property = propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var expense = new PropertyExpenseEntity(property, property.getTenant(),
@@ -123,14 +123,14 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {
-        propertyRepository.findByTenantIdAndId(tenantId, propertyId)
+        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var fromDate = from.atDay(1);
         var toDate = to.atEndOfMonth();
 
-        var incomes = incomeRepository.findByPropertyIdAndDateBetween(propertyId, fromDate, toDate);
-        var expenses = expenseRepository.findByPropertyIdAndDateBetween(propertyId, fromDate, toDate);
+        var incomes = incomeRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
+        var expenses = expenseRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
 
         var entries = new ArrayList<MonthlyCashFlowEntry>();
         var current = from;

@@ -56,7 +56,7 @@ class UserRepositoryIntegrationTest extends AbstractIntegrationTest {
         userRepository.save(new UserEntity(tenant, "user1@example.com", "hash", "admin"));
         userRepository.save(new UserEntity(tenant, "user2@example.com", "hash", "member"));
 
-        var users = userRepository.findByTenantId(tenant.getId());
+        var users = userRepository.findByTenant_Id(tenant.getId());
 
         assertThat(users).hasSize(2);
     }

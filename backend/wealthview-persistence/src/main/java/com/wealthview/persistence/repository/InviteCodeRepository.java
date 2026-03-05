@@ -11,5 +11,5 @@ public interface InviteCodeRepository extends JpaRepository<InviteCodeEntity, UU
 
     Optional<InviteCodeEntity> findByCode(String code);
 
-    List<InviteCodeEntity> findByTenantId(UUID tenantId);
+    List<InviteCodeEntity> findByTenant_Id(UUID tenantId);
 }

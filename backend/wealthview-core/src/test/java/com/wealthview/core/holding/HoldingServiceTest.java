@@ -53,7 +53,7 @@ class HoldingServiceTest {
     void listByAccount_returnsHoldings() {
         var holding = new HoldingEntity(account, tenant, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
-        when(holdingRepository.findByAccountIdAndTenantId(accountId, tenantId))
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
                 .thenReturn(List.of(holding));
 
         var result = holdingService.listByAccount(tenantId, accountId);
@@ -64,7 +64,7 @@ class HoldingServiceTest {
 
     @Test
     void createManual_setsOverrideFlag() {
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(holdingRepository.save(any(HoldingEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -82,7 +82,7 @@ class HoldingServiceTest {
         var holdingId = UUID.randomUUID();
         var holding = new HoldingEntity(account, tenant, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
-        when(holdingRepository.findByIdAndTenantId(holdingId, tenantId))
+        when(holdingRepository.findByIdAndTenant_Id(holdingId, tenantId))
                 .thenReturn(Optional.of(holding));
         when(holdingRepository.save(any(HoldingEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -98,7 +98,7 @@ class HoldingServiceTest {
     @Test
     void update_nonExistent_throwsNotFound() {
         var holdingId = UUID.randomUUID();
-        when(holdingRepository.findByIdAndTenantId(holdingId, tenantId))
+        when(holdingRepository.findByIdAndTenant_Id(holdingId, tenantId))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> holdingService.update(tenantId, holdingId,

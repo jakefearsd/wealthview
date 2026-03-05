@@ -9,7 +9,7 @@ import java.util.UUID;
 
 public interface PropertyRepository extends JpaRepository<PropertyEntity, UUID> {
 
-    List<PropertyEntity> findByTenantId(UUID tenantId);
+    List<PropertyEntity> findByTenant_Id(UUID tenantId);
 
-    Optional<PropertyEntity> findByTenantIdAndId(UUID tenantId, UUID id);
+    Optional<PropertyEntity> findByTenant_IdAndId(UUID tenantId, UUID id);
 }

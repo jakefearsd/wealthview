@@ -73,7 +73,7 @@ public class ImportService {
 
     @Transactional
     public ImportJobResponse processCsvImport(UUID tenantId, UUID accountId, CsvParseResult parseResult) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         var job = new ImportJobEntity(account.getTenant(), account, "csv");
@@ -89,7 +89,7 @@ public class ImportService {
                         parsed.date(), parsed.type(), parsed.symbol(),
                         parsed.quantity(), parsed.amount());
 
-                if (transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+                if (transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                         tenantId, accountId, hash)) {
                     skippedDuplicates++;
                     continue;
@@ -128,7 +128,7 @@ public class ImportService {
 
     @Transactional(readOnly = true)
     public List<ImportJobResponse> listJobs(UUID tenantId) {
-        return importJobRepository.findByTenantId(tenantId).stream()
+        return importJobRepository.findByTenant_Id(tenantId).stream()
                 .map(ImportJobResponse::from)
                 .toList();
     }

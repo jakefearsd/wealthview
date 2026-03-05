@@ -58,7 +58,7 @@ class InviteCodeRepositoryIntegrationTest extends AbstractIntegrationTest {
         inviteCodeRepository.save(new InviteCodeEntity(tenant, "CODE2", admin,
                 OffsetDateTime.now().plusDays(7)));
 
-        var codes = inviteCodeRepository.findByTenantId(tenant.getId());
+        var codes = inviteCodeRepository.findByTenant_Id(tenant.getId());
 
         assertThat(codes).hasSize(2);
     }

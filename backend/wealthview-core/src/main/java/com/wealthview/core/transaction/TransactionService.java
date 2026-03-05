@@ -36,7 +36,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponse create(UUID tenantId, UUID accountId, TransactionRequest request) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
@@ -53,7 +53,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse createWithHash(UUID tenantId, UUID accountId,
                                               TransactionRequest request, String importHash) {
-        var account = accountRepository.findByTenantIdAndId(tenantId, accountId)
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
@@ -70,13 +70,13 @@ public class TransactionService {
 
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccount(UUID tenantId, UUID accountId, Pageable pageable) {
-        var page = transactionRepository.findByAccountIdAndTenantId(accountId, tenantId, pageable);
+        var page = transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, pageable);
         return PageResponse.from(page, TransactionResponse::from);
     }
 
     @Transactional
     public TransactionResponse update(UUID tenantId, UUID transactionId, TransactionRequest request) {
-        var txn = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
+        var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Transaction not found"));
 
         var oldSymbol = txn.getSymbol();
@@ -100,7 +100,7 @@ public class TransactionService {
 
     @Transactional
     public void delete(UUID tenantId, UUID transactionId) {
-        var txn = transactionRepository.findByIdAndTenantId(transactionId, tenantId)
+        var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Transaction not found"));
 
         var account = txn.getAccount();

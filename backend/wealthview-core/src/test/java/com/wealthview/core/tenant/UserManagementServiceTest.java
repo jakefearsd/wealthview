@@ -41,7 +41,7 @@ class UserManagementServiceTest {
 
     @Test
     void getUsersForTenant_returnsList() {
-        when(userRepository.findByTenantId(tenantId))
+        when(userRepository.findByTenant_Id(tenantId))
                 .thenReturn(List.of(
                         new UserEntity(tenant, "a@test.com", "hash", "admin"),
                         new UserEntity(tenant, "b@test.com", "hash", "member")));
@@ -55,7 +55,7 @@ class UserManagementServiceTest {
     void updateUserRole_validUser_updatesRole() {
         var userId = UUID.randomUUID();
         var user = new UserEntity(tenant, "user@test.com", "hash", "member");
-        when(userRepository.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = service.updateUserRole(tenantId, userId, "admin");
@@ -66,7 +66,7 @@ class UserManagementServiceTest {
     @Test
     void updateUserRole_nonExistent_throwsNotFound() {
         var userId = UUID.randomUUID();
-        when(userRepository.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.empty());
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.updateUserRole(tenantId, userId, "admin"))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -76,7 +76,7 @@ class UserManagementServiceTest {
     void deleteUser_validUser_deletesUser() {
         var userId = UUID.randomUUID();
         var user = new UserEntity(tenant, "user@test.com", "hash", "member");
-        when(userRepository.findByTenantIdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
 
         service.deleteUser(tenantId, userId);
 

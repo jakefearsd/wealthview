@@ -65,7 +65,7 @@ class ImportServiceTest {
         setField(tenant, "id", tenantId);
         var account = new AccountEntity(tenant, "Test Account", "brokerage", "Test Bank");
         setField(account, "id", accountId);
-        when(accountRepository.findByTenantIdAndId(tenantId, accountId))
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
         when(importJobRepository.save(any(ImportJobEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -74,7 +74,7 @@ class ImportServiceTest {
     @Test
     void processCsvImport_newTransactions_createsAllWithHashes() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                 any(), any(), anyString())).thenReturn(false);
 
         var transactions = List.of(
@@ -95,7 +95,7 @@ class ImportServiceTest {
     @Test
     void processCsvImport_duplicateTransactions_skipsAll() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                 any(), any(), anyString())).thenReturn(true);
 
         var transactions = List.of(
@@ -122,9 +122,9 @@ class ImportServiceTest {
                 LocalDate.of(2024, 1, 16), "sell", "GOOG",
                 new BigDecimal("5"), new BigDecimal("750"));
 
-        when(transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                 tenantId, accountId, buyHash)).thenReturn(true);
-        when(transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                 tenantId, accountId, sellHash)).thenReturn(false);
 
         var transactions = List.of(
@@ -145,7 +145,7 @@ class ImportServiceTest {
     @Test
     void processCsvImport_hashPassedToCreateWithHash() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenantIdAndAccountIdAndImportHash(
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                 any(), any(), anyString())).thenReturn(false);
 
         var transactions = List.of(
