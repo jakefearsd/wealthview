@@ -42,7 +42,7 @@ public class HoldingsComputationService {
             return;
         }
 
-        var existingHolding = holdingRepository.findByAccountIdAndSymbol(account.getId(), symbol);
+        var existingHolding = holdingRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
 
         if (existingHolding.isPresent() && existingHolding.get().isManualOverride()) {
             log.warn("Skipping recomputation for account {} symbol {} — manual override exists",
@@ -50,14 +50,14 @@ public class HoldingsComputationService {
             return;
         }
 
-        var transactions = transactionRepository.findByAccountIdAndSymbol(account.getId(), symbol);
+        var transactions = transactionRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
 
         var netQuantity = BigDecimal.ZERO;
         var totalCost = BigDecimal.ZERO;
 
         for (var txn : transactions) {
             switch (txn.getType()) {
-                case "buy" -> {
+                case "buy", "opening_balance" -> {
                     netQuantity = netQuantity.add(txn.getQuantity());
                     totalCost = totalCost.add(txn.getAmount());
                 }
