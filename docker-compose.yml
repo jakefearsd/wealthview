@@ -10,5 +10,28 @@ services:
     ports:
       - "5432:5432"
 
+  app:
+    build: .
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wealthview
+      SPRING_DATASOURCE_USERNAME: wv_app
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-wv_dev_pass}
+      SPRING_PROFILES_ACTIVE: dev
+      JWT_SECRET: ${JWT_SECRET:-production-secret-key-must-be-at-least-32-characters}
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+
+  nginx:
+    image: nginx:alpine
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend/dist:/usr/share/nginx/html
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+
 volumes:
   pgdata:

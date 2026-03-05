@@ -10,6 +10,8 @@ logging:
     com.wealthview: DEBUG
 
 app:
+  cors:
+    allowed-origins: http://localhost:5173
   super-admin:
     email: admin@wealthview.local
     password: admin123
