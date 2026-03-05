@@ -6,8 +6,8 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -16,7 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Service
-@ConditionalOnBean(PriceFeedClient.class)
+@ConditionalOnExpression("!'${app.finnhub.api-key:}'.isEmpty()")
 public class PriceSyncService {
 
     private static final Logger log = LoggerFactory.getLogger(PriceSyncService.class);
