@@ -13,17 +13,31 @@ public record PropertyResponse(
         LocalDate purchaseDate,
         BigDecimal currentValue,
         BigDecimal mortgageBalance,
-        BigDecimal equity
+        BigDecimal equity,
+        BigDecimal loanAmount,
+        BigDecimal annualInterestRate,
+        Integer loanTermMonths,
+        LocalDate loanStartDate,
+        boolean hasLoanDetails,
+        boolean useComputedBalance
+        // TODO: accumulatedDepreciation, bookValue
 ) {
-    public static PropertyResponse from(PropertyEntity entity) {
+    public static PropertyResponse from(PropertyEntity entity, BigDecimal effectiveMortgageBalance) {
+        var equity = entity.getCurrentValue().subtract(effectiveMortgageBalance);
         return new PropertyResponse(
                 entity.getId(),
                 entity.getAddress(),
                 entity.getPurchasePrice(),
                 entity.getPurchaseDate(),
                 entity.getCurrentValue(),
-                entity.getMortgageBalance(),
-                entity.getEquity()
+                effectiveMortgageBalance,
+                equity,
+                entity.getLoanAmount(),
+                entity.getAnnualInterestRate(),
+                entity.getLoanTermMonths(),
+                entity.getLoanStartDate(),
+                entity.hasLoanDetails(),
+                entity.isUseComputedBalance()
         );
     }
 }

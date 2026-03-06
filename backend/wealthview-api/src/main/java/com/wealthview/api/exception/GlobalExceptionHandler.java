@@ -56,6 +56,12 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("FORBIDDEN", ex.getMessage(), 403));
     }
 
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST", ex.getMessage(), 400));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         var message = ex.getBindingResult().getFieldErrors().stream()

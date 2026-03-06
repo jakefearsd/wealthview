@@ -65,11 +65,93 @@ class PropertyServiceTest {
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.address()).isEqualTo("123 Main St");
         assertThat(result.equity()).isEqualByComparingTo("150000");
+    }
+
+    @Test
+    void create_withLoanDetails_computesMortgageBalance() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("300000"), new BigDecimal("6.5"), 360,
+                LocalDate.of(2020, 1, 1), true);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.hasLoanDetails()).isTrue();
+        assertThat(result.useComputedBalance()).isTrue();
+        // Balance should be computed, not the manual 200000
+        assertThat(result.mortgageBalance()).isNotEqualByComparingTo("200000");
+    }
+
+    @Test
+    void create_withPartialLoanDetails_throwsValidation() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("300000"), null, null, null, null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Loan details must be provided in full");
+    }
+
+    @Test
+    void update_toggleUseComputedBalance_switchesBehavior() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("6.5"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        property.setUseComputedBalance(false);
+
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Toggle to computed
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("300000"), new BigDecimal("6.5"), 360,
+                LocalDate.of(2020, 1, 1), true);
+        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+
+        assertThat(result.useComputedBalance()).isTrue();
+        // Should use computed balance, not manual 200000
+        assertThat(result.mortgageBalance()).isNotEqualByComparingTo("200000");
+    }
+
+    @Test
+    void list_mixedProperties_correctEquityForEach() {
+        var manual = new PropertyEntity(tenant, "Manual Property", new BigDecimal("200000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("250000"), new BigDecimal("100000"));
+
+        var computed = new PropertyEntity(tenant, "Computed Property", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        computed.setLoanAmount(new BigDecimal("300000"));
+        computed.setAnnualInterestRate(new BigDecimal("6.5"));
+        computed.setLoanTermMonths(360);
+        computed.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        computed.setUseComputedBalance(true);
+
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(manual, computed));
+
+        var result = propertyService.list(tenantId);
+
+        assertThat(result).hasSize(2);
+        // Manual: equity = 250000 - 100000 = 150000
+        assertThat(result.get(0).equity()).isEqualByComparingTo("150000");
+        // Computed: equity uses amortization, should differ from manual balance
+        assertThat(result.get(1).useComputedBalance()).isTrue();
+        assertThat(result.get(1).mortgageBalance()).isNotEqualByComparingTo("200000");
     }
 
     @Test
