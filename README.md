@@ -13,7 +13,8 @@ WealthView consolidates financial visibility across brokerage accounts, rental p
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation pie chart.
 - **Multi-Format Import** -- Fidelity, Vanguard, and Schwab CSV parsers plus OFX/QFX import. Content-hash deduplication prevents duplicate transactions across imports.
 - **Live Price Feeds** -- Finnhub API integration with historical backfill and scheduled daily sync. Seed data covers major tickers (AAPL, AMZN, GOOG, MSFT, NVDA, VOO, VTI, and more).
-- **Retirement Projections** -- Deterministic year-by-year projection engine with three withdrawal strategies (Fixed Percentage, Dynamic Percentage, Vanguard Dynamic Spending), per-pool balance tracking (traditional/roth/taxable), Roth conversion modeling with data-driven federal tax brackets, and scenario comparison.
+- **Retirement Projections** -- Deterministic year-by-year projection engine with three withdrawal strategies (Fixed Percentage, Dynamic Percentage, Vanguard Dynamic Spending), per-pool balance tracking (traditional/roth/taxable), Roth conversion modeling with data-driven federal tax brackets, scenario comparison, and editable scenarios with save-and-rerun workflow.
+- **Spending Profiles & Viability Analysis** -- Define essential and discretionary spending categories with income streams (Social Security, pensions, part-time work). Link a spending profile to a scenario to see whether your withdrawal strategy covers your actual spending needs. The engine computes inflation-adjusted spending vs withdrawal per year, with shortfalls absorbed by discretionary spending first.
 - **Multi-Tenant** -- JWT-based auth with tenant isolation; invite code registration system with role-based access (admin/user).
 - **Self-Hosted** -- Single Docker Compose command to deploy; no third-party SaaS dependencies.
 
@@ -160,7 +161,8 @@ npx tsc --noEmit
 | `/prices`                | Prices                  | Stock price lookup and history                                 |
 | `/projections`           | Projections List        | Scenario card grid with create form, strategy selector         |
 | `/projections/compare`   | Scenario Comparison     | Compare up to 3 scenarios with overlay chart and summary table |
-| `/projections/:id`       | Projection Detail       | Config summary, run projection, tabbed results visualization   |
+| `/projections/:id`       | Projection Detail       | Config summary, edit mode, run projection, tabbed results with spending analysis |
+| `/spending-profiles`     | Spending Profiles       | Create and manage spending profiles with income streams        |
 | `/properties`            | Properties List         | Rental properties overview                                     |
 | `/properties/:id`        | Property Detail         | Income/expenses, monthly cash flow chart                       |
 | `/settings`              | Settings                | Invite codes, user management (admin)                          |
@@ -169,13 +171,31 @@ npx tsc --noEmit
 
 ### Projection Features
 
-The projection engine supports three visualization modes via a tabbed interface:
+The projection engine supports four visualization modes via a tabbed interface:
 
 - **Balance Over Time** -- Area chart showing projected portfolio balance. When pool data is present (traditional/roth/taxable accounts), displays stacked areas by account type. Includes cumulative contributions overlay and reference lines for retirement year and depletion year.
 - **Annual Flows** -- Bar chart breaking down yearly contributions (green), investment growth (blue), and withdrawals (red).
-- **Data Table** -- Year-by-year tabular data with the retirement transition row highlighted. Includes pool breakdown columns (traditional, roth, taxable balances), Roth conversion amounts, and tax liability when applicable.
+- **Spending Analysis** -- Stacked area chart comparing withdrawals against spending needs. Shows essential expenses, discretionary spending (after any cuts), withdrawal line, and income streams overlay. Only appears when the scenario has a linked spending profile.
+- **Data Table** -- Year-by-year tabular data with the retirement transition row highlighted. Includes pool breakdown columns (traditional, roth, taxable balances), Roth conversion amounts, tax liability, and spending viability columns (essential, discretionary, income, net need, surplus/deficit) when a spending profile is linked.
 
 Result summary cards show Final Balance, Years in Retirement, Peak Balance (with year), and Depletion Year. A milestone strip provides an at-a-glance overview of key projection milestones.
+
+#### Scenario Editing
+
+Scenarios are fully editable. On the projection detail page, click **Edit** to switch into form mode. All fields (name, dates, accounts, strategy, spending profile) can be modified. Click **Save & Re-run** to persist changes and immediately re-run the projection with updated inputs.
+
+#### Spending Profiles
+
+Spending profiles are shared entities managed on the `/spending-profiles` page. Each profile defines:
+
+- **Essential Expenses** -- Non-negotiable annual spending (housing, food, healthcare). Inflates annually at the scenario's inflation rate.
+- **Discretionary Expenses** -- Flexible annual spending (travel, entertainment). Absorbs 100% of any shortfall when withdrawals don't cover total spending.
+- **Income Streams** -- Named income sources with annual amount, start age, and optional end age. Examples: Social Security (starts at 67, no end), part-time work (age 60-67). Income reduces the withdrawal needed from the portfolio.
+
+Link a spending profile to a scenario via the dropdown in the scenario form. The engine computes viability per year:
+- `net_spending_need = (essential + discretionary) - income_streams` (inflation-adjusted)
+- `surplus = withdrawal - net_spending_need` (positive = surplus, negative = deficit)
+- When there's a deficit, essential expenses are fully covered first; discretionary absorbs the shortfall (floored at zero).
 
 #### Withdrawal Strategies
 
@@ -244,9 +264,16 @@ All endpoints are under `/api/v1/` and require JWT authentication (except `/api/
 | Endpoint                        | Method | Description                                        |
 |---------------------------------|--------|----------------------------------------------------|
 | `/api/v1/projections`           | GET, POST | List or create scenarios                        |
-| `/api/v1/projections/{id}`      | GET, DELETE | Get or delete scenario                        |
+| `/api/v1/projections/{id}`      | GET, PUT, DELETE | Get, update, or delete scenario            |
 | `/api/v1/projections/{id}/run`  | GET    | Run projection, get year-by-year results           |
 | `/api/v1/projections/compare`   | POST   | Compare 2-3 scenarios side-by-side                 |
+
+### Spending Profiles
+
+| Endpoint                           | Method         | Description                    |
+|------------------------------------|----------------|--------------------------------|
+| `/api/v1/spending-profiles`        | GET, POST      | List or create profiles        |
+| `/api/v1/spending-profiles/{id}`   | GET, PUT, DELETE | Profile CRUD                 |
 
 ### Dashboard & Tenant Management
 
@@ -310,6 +337,8 @@ Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/m
 | V011      | Opening balance transaction type                         |
 | V012      | Account type column on projection accounts               |
 | V013      | Tax brackets table                                       |
+| V014      | Spending profiles table (essential/discretionary/income streams) |
+| V015      | Add spending_profile_id FK to projection scenarios       |
 | R__seed_stock_prices  | Repeatable seed data for stock prices           |
 | R__seed_tax_brackets  | Repeatable seed data for 2022-2025 federal tax brackets |
 
@@ -553,14 +582,73 @@ Open the frontend in a browser (typically http://localhost:5173).
 
 ---
 
-### 17. Delete a Scenario
+### 17. Create a Spending Profile
+
+1. Navigate to **Spending Profiles** in the sidebar (`/spending-profiles`).
+2. Click **New Profile**.
+3. Fill in:
+   - **Name:** `Moderate Retirement`
+   - **Essential Expenses:** `40000`
+   - **Discretionary Expenses:** `20000`
+4. Add an income stream:
+   - **Name:** `Social Security`, **Annual Amount:** `24000`, **Start Age:** `67`, **End Age:** (leave blank)
+5. Click **Create**.
+6. **Verify:** The profile card appears showing essential ($40,000), discretionary ($20,000), and the Social Security income stream.
+7. Optionally add a second income stream (e.g., `Part-time Work`, $30,000, ages 60-67) by editing the profile.
+
+---
+
+### 18. Link a Spending Profile to a Scenario
+
+1. Navigate to **Projections** and open the **Basic 4% Rule** scenario detail page.
+2. Click **Edit**.
+3. In the **Spending Profile** dropdown, select `Moderate Retirement`.
+4. Click **Save & Re-run**.
+5. **Verify:**
+   - A spending profile summary card appears on the detail page.
+   - A fourth tab **Spending Analysis** appears in the results tabs.
+   - Click **Spending Analysis** to see the stacked area chart with essential expenses (red), discretionary after cuts (amber), withdrawal line, and income streams line.
+   - The **Data Table** now includes additional columns: Essential, Discretionary, Income, Net Need, Surplus/Deficit, and Discretionary After Cuts.
+   - In early retirement years before Social Security starts (if applicable), the net spending need is higher because there's no income offset.
+   - After Social Security kicks in at age 67, the net need drops and surplus increases.
+
+---
+
+### 19. Edit a Scenario
+
+1. Open any scenario detail page.
+2. Click **Edit** to enter edit mode.
+3. Modify any fields -- e.g., change the withdrawal strategy from Fixed Percentage to Dynamic Percentage, add a second account, or change the end age.
+4. Click **Save & Re-run**.
+5. **Verify:** The scenario updates are saved, the projection re-runs automatically with the new parameters, and the results reflect the changes.
+6. Click **Cancel** during editing to discard changes and return to the read-only view.
+
+---
+
+### 20. Verify Spending Viability with Shortfall
+
+1. Create a scenario with low initial balance and high spending:
+   - **Name:** `Shortfall Test`
+   - **Account 1:** Initial Balance `200000`, Contribution `5000`, Return `0.05`
+   - **Spending Profile:** `Moderate Retirement`
+   - **Retirement Date:** 5 years from now
+2. Run the projection.
+3. **Verify:**
+   - In the **Data Table**, some retirement years show a negative Surplus/Deficit value, meaning withdrawals don't cover spending.
+   - The **Discretionary After Cuts** column shows reduced discretionary spending (below the original $20,000 inflated amount) in deficit years.
+   - Essential expenses are always fully covered -- shortfalls come entirely from discretionary.
+   - The **Spending Analysis** chart visually shows the gap between withdrawals and spending needs.
+
+---
+
+### 21. Delete a Scenario
 
 1. From the **Projections** list, click the delete button on one of the test scenarios.
 2. **Verify:** The scenario is removed from the list.
 
 ---
 
-### 18. Invite a New User (Admin)
+### 22. Invite a New User (Admin)
 
 1. Navigate to **Settings** (`/settings`).
 2. Under **Invite Codes**, click **Generate Invite Code**.
@@ -572,18 +660,19 @@ Open the frontend in a browser (typically http://localhost:5173).
 
 ---
 
-### 19. Verify Backward Compatibility
+### 23. Verify Backward Compatibility
 
 1. Log back in as admin.
-2. If pre-existing scenarios were created before the Phase 3 updates (withdrawal strategies, account types), open one and run it.
+2. If pre-existing scenarios were created before spending profiles were added, open one and run it.
 3. **Verify:**
    - The projection runs without errors.
-   - Pool breakdown columns are absent (null) -- the scenario uses the legacy single-pool path.
+   - Pool breakdown columns are absent (null) for legacy single-pool scenarios.
+   - Spending viability columns are absent (null) for scenarios without a spending profile.
    - The default Fixed Percentage strategy is applied.
 
 ---
 
-### 20. Check the Dashboard with Full Data
+### 24. Check the Dashboard with Full Data
 
 1. Navigate back to the **Dashboard** (`/`).
 2. **Verify:** Net worth now includes:
@@ -614,7 +703,11 @@ Open the frontend in a browser (typically http://localhost:5173).
 | 14 | Roth conversion | Pool tracking, tax computed, stacked chart |
 | 15 | All-Roth portfolio | Zero tax liability on withdrawals |
 | 16 | Compare scenarios | Overlay chart, summary table, 2-3 scenarios |
-| 17 | Delete scenario | Removed from list |
-| 18 | Invite + register | New user joins tenant |
-| 19 | Backward compat | Old scenarios run without errors |
-| 20 | Dashboard with data | All assets reflected in net worth |
+| 17 | Spending profiles | Create profile with essential/discretionary/income streams |
+| 18 | Link spending profile | Spending analysis tab and viability columns appear |
+| 19 | Edit scenario | Save & re-run updates scenario and reruns projection |
+| 20 | Spending shortfall | Discretionary absorbs deficit, essential fully covered |
+| 21 | Delete scenario | Removed from list |
+| 22 | Invite + register | New user joins tenant |
+| 23 | Backward compat | Old scenarios run without errors, spending fields null |
+| 24 | Dashboard with data | All assets reflected in net worth |
