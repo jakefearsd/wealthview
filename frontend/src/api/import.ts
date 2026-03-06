@@ -13,6 +13,16 @@ export async function importCsv(accountId: string, file: File, format?: string):
     return data;
 }
 
+export async function importOfx(accountId: string, file: File): Promise<ImportJob> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await client.post<ImportJob>('/import/ofx', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params: { accountId },
+    });
+    return data;
+}
+
 export async function listImportJobs(): Promise<ImportJob[]> {
     const { data } = await client.get<ImportJob[]>('/import/jobs');
     return data;

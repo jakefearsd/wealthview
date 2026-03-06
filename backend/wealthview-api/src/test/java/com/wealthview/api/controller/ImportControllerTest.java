@@ -62,6 +62,25 @@ class ImportControllerTest {
     }
 
     @Test
+    void importOfx_validFile_returns201() throws Exception {
+        var jobResponse = new ImportJobResponse(UUID.randomUUID(), "ofx", "completed",
+                3, 3, 0, null, OffsetDateTime.now());
+        when(importService.importOfx(eq(TENANT_ID), eq(ACCOUNT_ID), any()))
+                .thenReturn(jobResponse);
+
+        var file = new MockMultipartFile("file", "transactions.ofx",
+                "application/x-ofx", "<OFX>test</OFX>".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/import/ofx")
+                        .file(file)
+                        .param("accountId", ACCOUNT_ID.toString())
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.source").value("ofx"))
+                .andExpect(jsonPath("$.successful_rows").value(3));
+    }
+
+    @Test
     void listJobs_returns200() throws Exception {
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "csv", "completed",
                 5, 5, 0, null, OffsetDateTime.now());

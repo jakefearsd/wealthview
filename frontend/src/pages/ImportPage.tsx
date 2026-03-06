@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { importCsv, listImportJobs } from '../api/import';
+import { importCsv, importOfx, listImportJobs } from '../api/import';
 import { useApiQuery } from '../hooks/useApiQuery';
 import toast from 'react-hot-toast';
 
@@ -19,7 +19,10 @@ export default function ImportPage() {
         if (!file || !accountId) return;
         setUploading(true);
         try {
-            const result = await importCsv(accountId, file, format === 'generic' ? undefined : format);
+            const isOfx = format === 'ofx';
+            const result = isOfx
+                ? await importOfx(accountId, file)
+                : await importCsv(accountId, file, format === 'generic' ? undefined : format);
             toast.success(`Imported: ${result.successful_rows} successful, ${result.failed_rows} failed`);
             setFile(null);
             refetch();
@@ -38,7 +41,7 @@ export default function ImportPage() {
             <h2 style={{ marginBottom: '1.5rem' }}>Import Transactions</h2>
 
             <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                <h3 style={{ marginBottom: '1rem' }}>Upload CSV</h3>
+                <h3 style={{ marginBottom: '1rem' }}>Upload File</h3>
                 <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
                     <select value={format} onChange={(e) => setFormat(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}>
                         <option value="generic">Generic CSV</option>
@@ -46,8 +49,9 @@ export default function ImportPage() {
                         <option value="fidelityPositions">Fidelity Positions</option>
                         <option value="vanguard">Vanguard</option>
                         <option value="schwab">Schwab</option>
+                        <option value="ofx">OFX / QFX</option>
                     </select>
-                    <input type="file" accept=".csv" onChange={handleFileChange} />
+                    <input type="file" accept={format === 'ofx' ? '.ofx,.qfx' : '.csv'} onChange={handleFileChange} />
                     <button onClick={handleUpload} disabled={!file || uploading} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                         {uploading ? 'Uploading...' : 'Upload'}
                     </button>
