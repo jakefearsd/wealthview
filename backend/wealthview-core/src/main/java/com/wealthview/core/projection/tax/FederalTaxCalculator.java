@@ -1,0 +1,73 @@
+package com.wealthview.core.projection.tax;
+
+import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.TaxBracketRepository;
+import org.springframework.stereotype.Component;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+@Component
+public class FederalTaxCalculator {
+
+    private static final int SCALE = 4;
+    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
+
+    private final TaxBracketRepository taxBracketRepository;
+    private final Map<String, List<TaxBracketEntity>> bracketCache = new HashMap<>();
+
+    public FederalTaxCalculator(TaxBracketRepository taxBracketRepository) {
+        this.taxBracketRepository = taxBracketRepository;
+    }
+
+    public BigDecimal computeTax(BigDecimal taxableIncome, int taxYear, FilingStatus status) {
+        if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        var brackets = loadBrackets(taxYear, status);
+        if (brackets.isEmpty()) {
+            Integer maxYear = taxBracketRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                brackets = loadBrackets(maxYear, status);
+            }
+        }
+        if (brackets.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal remaining = taxableIncome;
+
+        for (var bracket : brackets) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+
+            BigDecimal bracketWidth;
+            if (bracket.getBracketCeiling() != null) {
+                bracketWidth = bracket.getBracketCeiling().subtract(bracket.getBracketFloor());
+            } else {
+                bracketWidth = remaining;
+            }
+
+            BigDecimal taxableInBracket = remaining.min(bracketWidth);
+            totalTax = totalTax.add(taxableInBracket.multiply(bracket.getRate()));
+            remaining = remaining.subtract(taxableInBracket);
+        }
+
+        return totalTax.setScale(SCALE, ROUNDING);
+    }
+
+    public void clearCache() {
+        bracketCache.clear();
+    }
+
+    private List<TaxBracketEntity> loadBrackets(int taxYear, FilingStatus status) {
+        String key = taxYear + ":" + status.value();
+        return bracketCache.computeIfAbsent(key,
+                k -> taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        taxYear, status.value()));
+    }
+}
