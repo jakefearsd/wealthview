@@ -4,6 +4,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.TaxBracketRepository;
@@ -490,6 +491,212 @@ class DeterministicProjectionEngineTest {
             if (yearData.taxLiability() != null) {
                 assertThat(yearData.taxLiability()).isEqualByComparingTo(BigDecimal.ZERO);
             }
+        }
+    }
+
+    @Test
+    void run_withSpendingProfile_computesViabilityFields() {
+        // Already retired, $1M, 4% withdrawal = $40k first year
+        // Essential: $30k, Discretionary: $15k, no income streams
+        // Net need = 45k, withdrawal = 40k (after growth), surplus = withdrawal - 45k
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        var profile = new SpendingProfileEntity(
+                tenant, "Test Profile",
+                new BigDecimal("30000"), new BigDecimal("15000"), "[]");
+        scenario.setSpendingProfile(profile);
+
+        var result = engine.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.essentialExpenses()).isNotNull();
+        assertThat(year1.essentialExpenses()).isEqualByComparingTo(new BigDecimal("30000"));
+        assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(new BigDecimal("15000"));
+        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.netSpendingNeed()).isEqualByComparingTo(new BigDecimal("45000"));
+        // Withdrawal = 40000 (fixed 4% of start), surplus = 40000 - 45000 = -5000
+        assertThat(year1.spendingSurplus()).isEqualByComparingTo(new BigDecimal("-5000.0000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_shortfallCutsDiscretionary() {
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        // Essential: 30k, Discretionary: 15k, Withdrawal: 40k
+        // Shortfall = 45k - 40k = 5k => discretionary after cuts = 15k - 5k = 10k
+        var profile = new SpendingProfileEntity(
+                tenant, "Test Profile",
+                new BigDecimal("30000"), new BigDecimal("15000"), "[]");
+        scenario.setSpendingProfile(profile);
+
+        var result = engine.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(new BigDecimal("10000.0000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_incomeStreamReducesNeed() {
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        // Essential: 30k, Discretionary: 15k, Income: 20k (active at age 66)
+        // Net need = 45k - 20k = 25k
+        var profile = new SpendingProfileEntity(
+                tenant, "Test Profile",
+                new BigDecimal("30000"), new BigDecimal("15000"),
+                """
+                [{"name":"Social Security","annualAmount":20000,"startAge":60,"endAge":null}]
+                """);
+        scenario.setSpendingProfile(profile);
+
+        var result = engine.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(new BigDecimal("20000"));
+        assertThat(year1.netSpendingNeed()).isEqualByComparingTo(new BigDecimal("25000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_incomeStreamStartsLater() {
+        // Age 66, SS starts at 67
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                80,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        var profile = new SpendingProfileEntity(
+                tenant, "Test Profile",
+                new BigDecimal("30000"), new BigDecimal("15000"),
+                """
+                [{"name":"Social Security","annualAmount":24000,"startAge":67,"endAge":null}]
+                """);
+        scenario.setSpendingProfile(profile);
+
+        var result = engine.run(scenario);
+
+        // Year 1 (age 66): SS not yet active
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Year 2 (age 67): SS active
+        var year2 = result.yearlyData().get(1);
+        assertThat(year2.incomeStreamsTotal()).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_incomeStreamEndsAtEndAge() {
+        // Part-time work from 66 to 68 (endAge=68, so active at 66 and 67, not 68)
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                80,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        var profile = new SpendingProfileEntity(
+                tenant, "Test Profile",
+                new BigDecimal("30000"), new BigDecimal("15000"),
+                """
+                [{"name":"Part-time","annualAmount":30000,"startAge":66,"endAge":68}]
+                """);
+        scenario.setSpendingProfile(profile);
+
+        var result = engine.run(scenario);
+
+        // Year 1 (age 66): active
+        assertThat(result.yearlyData().getFirst().incomeStreamsTotal())
+                .isEqualByComparingTo(new BigDecimal("30000"));
+        // Year 2 (age 67): active
+        assertThat(result.yearlyData().get(1).incomeStreamsTotal())
+                .isEqualByComparingTo(new BigDecimal("30000"));
+        // Year 3 (age 68): ended
+        assertThat(result.yearlyData().get(2).incomeStreamsTotal())
+                .isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_withoutSpendingProfile_viabilityFieldsNull() {
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var account = new ProjectionAccountEntity(
+                scenario, null,
+                new BigDecimal("1000000.0000"),
+                BigDecimal.ZERO,
+                new BigDecimal("0.0500"));
+        scenario.addAccount(account);
+
+        var result = engine.run(scenario);
+
+        for (var yearData : result.yearlyData()) {
+            assertThat(yearData.essentialExpenses()).isNull();
+            assertThat(yearData.discretionaryExpenses()).isNull();
+            assertThat(yearData.incomeStreamsTotal()).isNull();
+            assertThat(yearData.netSpendingNeed()).isNull();
+            assertThat(yearData.spendingSurplus()).isNull();
+            assertThat(yearData.discretionaryAfterCuts()).isNull();
         }
     }
 

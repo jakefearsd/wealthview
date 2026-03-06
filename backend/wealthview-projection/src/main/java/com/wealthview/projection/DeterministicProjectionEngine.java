@@ -14,6 +14,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -63,16 +64,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : BigDecimal.ZERO;
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
+        SpendingData spendingData = loadSpendingData(scenario.getSpendingProfile());
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
 
         if (hasMultiplePools) {
             return runWithPools(scenario, accounts, params, strategy, currentYear, birthYear,
-                    retirementYear, endYear, inflationRate);
+                    retirementYear, endYear, inflationRate, spendingData);
         }
 
         return runSimple(scenario, accounts, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate);
+                retirementYear, endYear, inflationRate, spendingData);
     }
 
     private ProjectionResultResponse runSimple(
@@ -80,7 +82,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             List<ProjectionAccountEntity> accounts,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate) {
+            BigDecimal inflationRate, SpendingData spendingData) {
 
         BigDecimal balance = sumInitialBalances(accounts);
         BigDecimal totalContributions = sumContributions(accounts);
@@ -125,8 +127,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 balance = BigDecimal.ZERO;
             }
 
-            yearlyData.add(ProjectionYearDto.simple(
-                    year, age, startBalance, contributions, growth, withdrawals, balance, retired));
+            var yearDto = ProjectionYearDto.simple(
+                    year, age, startBalance, contributions, growth, withdrawals, balance, retired);
+            yearlyData.add(applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate));
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
@@ -145,7 +148,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             ScenarioParams params,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate) {
+            BigDecimal inflationRate, SpendingData spendingData) {
 
         Map<String, List<ProjectionAccountEntity>> grouped = accounts.stream()
                 .collect(Collectors.groupingBy(ProjectionAccountEntity::getAccountType));
@@ -279,11 +282,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             BigDecimal endAgg = tradBalance.add(rothBalance).add(taxableBalance);
 
-            yearlyData.add(new ProjectionYearDto(
+            var yearDto = new ProjectionYearDto(
                     year, age, startAgg, contributions, totalGrowth, withdrawals, endAgg, retired,
                     tradBalance, rothBalance, taxableBalance,
                     conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null,
-                    taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null));
+                    taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
+                    null, null, null, null, null, null);
+            yearlyData.add(applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate));
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
@@ -392,5 +397,97 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             String filingStatus,
             BigDecimal otherIncome,
             BigDecimal annualRothConversion) {
+    }
+
+    private record IncomeStreamData(
+            String name,
+            BigDecimal annualAmount,
+            int startAge,
+            Integer endAge) {
+    }
+
+    private record SpendingData(
+            BigDecimal essentialExpenses,
+            BigDecimal discretionaryExpenses,
+            List<IncomeStreamData> incomeStreams) {
+    }
+
+    private SpendingData loadSpendingData(SpendingProfileEntity profile) {
+        if (profile == null) {
+            return null;
+        }
+        List<IncomeStreamData> streams = List.of();
+        try {
+            if (profile.getIncomeStreams() != null && !profile.getIncomeStreams().isBlank()
+                    && !"[]".equals(profile.getIncomeStreams().trim())) {
+                var node = objectMapper.readTree(profile.getIncomeStreams());
+                var list = new ArrayList<IncomeStreamData>();
+                for (var item : node) {
+                    BigDecimal amount = BigDecimal.ZERO;
+                    if (item.has("annualAmount") && !item.get("annualAmount").isNull()) {
+                        amount = new BigDecimal(item.get("annualAmount").asText());
+                    } else if (item.has("annual_amount") && !item.get("annual_amount").isNull()) {
+                        amount = new BigDecimal(item.get("annual_amount").asText());
+                    }
+                    int startAge = 0;
+                    if (item.has("startAge") && !item.get("startAge").isNull()) {
+                        startAge = item.get("startAge").asInt();
+                    } else if (item.has("start_age") && !item.get("start_age").isNull()) {
+                        startAge = item.get("start_age").asInt();
+                    }
+                    Integer endAge = null;
+                    if (item.has("endAge") && !item.get("endAge").isNull()) {
+                        endAge = item.get("endAge").asInt();
+                    } else if (item.has("end_age") && !item.get("end_age").isNull()) {
+                        endAge = item.get("end_age").asInt();
+                    }
+                    list.add(new IncomeStreamData(
+                            item.has("name") ? item.get("name").asText() : "",
+                            amount, startAge, endAge));
+                }
+                streams = list;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse income_streams: {}", e.getMessage());
+        }
+        return new SpendingData(profile.getEssentialExpenses(), profile.getDiscretionaryExpenses(), streams);
+    }
+
+    private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
+                                              int age, int yearsInRetirement, BigDecimal inflationRate) {
+        if (spending == null || !base.retired()) {
+            return base;
+        }
+
+        BigDecimal inflationFactor = yearsInRetirement > 1
+                ? BigDecimal.ONE.add(inflationRate).pow(yearsInRetirement - 1)
+                : BigDecimal.ONE;
+
+        BigDecimal essential = spending.essentialExpenses().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        BigDecimal discretionary = spending.discretionaryExpenses().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+
+        BigDecimal activeIncome = BigDecimal.ZERO;
+        for (var stream : spending.incomeStreams()) {
+            if (age >= stream.startAge() && (stream.endAge() == null || age < stream.endAge())) {
+                activeIncome = activeIncome.add(stream.annualAmount());
+            }
+        }
+
+        BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
+        BigDecimal surplus = base.withdrawals().subtract(netNeed);
+
+        BigDecimal discAfterCuts;
+        if (surplus.compareTo(BigDecimal.ZERO) < 0) {
+            discAfterCuts = discretionary.add(surplus).max(BigDecimal.ZERO);
+        } else {
+            discAfterCuts = discretionary;
+        }
+
+        return new ProjectionYearDto(
+                base.year(), base.age(), base.startBalance(), base.contributions(),
+                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
+                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
+                base.rothConversionAmount(), base.taxLiability(),
+                essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts);
     }
 }
