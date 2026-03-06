@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -37,6 +38,7 @@ public class PriceSyncService {
         this.rateLimitMs = rateLimitMs;
     }
 
+    @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyPrices() {
         var symbols = holdingRepository.findDistinctSymbols();
         log.info("Starting daily price sync for {} symbols", symbols.size());
