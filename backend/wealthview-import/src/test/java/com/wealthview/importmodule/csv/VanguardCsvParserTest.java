@@ -24,6 +24,9 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(10);
         assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).symbol()).isEqualTo("VTSAX");
+        assertThat(result.transactions().get(7).type()).isEqualTo("withdrawal");
     }
 
     @Test
@@ -51,7 +54,12 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("sell");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("sell");
+        assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 20));
+        assertThat(txn.symbol()).isEqualTo("AAPL");
+        assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("10.000"));
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("1955.00"));
     }
 
     @Test
@@ -107,7 +115,10 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("32.10"));
+        assertThat(txn.quantity()).isNull();
     }
 
     @Test
@@ -134,7 +145,10 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("withdrawal");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("withdrawal");
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("2000.00"));
+        assertThat(txn.symbol()).isNull();
     }
 
     @Test
@@ -181,5 +195,91 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).isEmpty();
         assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_invalidDate_skipsRowWithError() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                not-a-date,Buy,TEST FUND,TEST,1.000,$100.00,$100.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0).message()).contains("Invalid date");
+    }
+
+    @Test
+    void parse_blankDateRow_skipped() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                ,Buy,TEST FUND,TEST,1.000,$100.00,$100.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_malformedAmount_skipsRowWithError() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                01/10/2025,Buy,TEST FUND,TEST,abc,$100.00,$100.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0).message()).contains("Error parsing row");
+    }
+
+    @Test
+    void parse_sweepIn_mapsToDeposit() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                03/15/2025,Sweep in,VANGUARD FEDERAL MONEY MARKET,VMFXX,,,$500.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("500.00"));
+    }
+
+    @Test
+    void parse_sweepOut_mapsToWithdrawal() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                03/20/2025,Sweep out,VANGUARD FEDERAL MONEY MARKET,VMFXX,,,$300.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.transactions().get(0).type()).isEqualTo("withdrawal");
+        assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("300.00"));
+    }
+
+    @Test
+    void parse_preambleBeforeHeader_skipsNonHeaderLines() throws IOException {
+        var csv = """
+                This is a preamble line from Vanguard
+                Another junk line with account info
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                01/10/2025,Buy,TEST FUND,TEST,1.000,$100.00,$100.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).symbol()).isEqualTo("TEST");
     }
 }

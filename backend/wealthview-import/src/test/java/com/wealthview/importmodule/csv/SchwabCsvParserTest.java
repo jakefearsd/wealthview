@@ -24,6 +24,10 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(8);
         assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).symbol()).isEqualTo("AAPL");
+        assertThat(result.transactions().get(2).type()).isEqualTo("dividend");
+        assertThat(result.transactions().get(6).type()).isEqualTo("deposit");
     }
 
     @Test
@@ -37,7 +41,10 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).symbol()).isEqualTo("AAPL");
+        var txn = result.transactions().get(0);
+        assertThat(txn.symbol()).isEqualTo("AAPL");
+        assertThat(txn.type()).isEqualTo("buy");
+        assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 10));
     }
 
     @Test
@@ -65,7 +72,12 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("sell");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("sell");
+        assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 15));
+        assertThat(txn.symbol()).isEqualTo("MSFT");
+        assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("5"));
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("2100.00"));
     }
 
     @Test
@@ -104,7 +116,11 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("24.50"));
+        assertThat(txn.quantity()).isNull();
+        assertThat(txn.symbol()).isEqualTo("AAPL");
     }
 
     @Test
@@ -131,7 +147,10 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("buy");
+        assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("0.1"));
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("25.20"));
     }
 
     @Test
@@ -144,7 +163,10 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        var txn = result.transactions().get(0);
+        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("3.75"));
+        assertThat(txn.symbol()).isNull();
     }
 
     @Test
@@ -186,6 +208,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
+        assertThat(result.errors()).isEmpty();
     }
 
     @Test
@@ -232,5 +255,59 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).isEmpty();
         assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_invalidDate_skipsRowSilently() throws IOException {
+        var csv = """
+                "Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"
+                "bad-date","Buy","AAPL","APPLE INC","10","$195.50","","-$1,955.00"
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_blankDateRow_skipped() throws IOException {
+        var csv = """
+                "Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"
+                "","Buy","AAPL","APPLE INC","10","$195.50","","-$1,955.00"
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).isEmpty();
+    }
+
+    @Test
+    void parse_malformedAmount_skipsRowWithError() throws IOException {
+        var csv = """
+                "Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"
+                "01/10/2025","Buy","AAPL","APPLE INC","10","$195.50","","abc"
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0).message()).contains("Error parsing row");
+    }
+
+    @Test
+    void parse_wireFundsDeposit_mapsToDeposit() throws IOException {
+        var csv = """
+                "Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"
+                "03/05/2025","Wire Funds","","WIRE TRANSFER RECEIVED","","","","$10,000.00"
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("10000.00"));
     }
 }
