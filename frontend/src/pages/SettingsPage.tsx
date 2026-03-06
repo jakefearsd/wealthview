@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { generateInviteCode, listInviteCodes, listUsers, updateUserRole, deleteUser } from '../api/tenant';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { cardStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -46,7 +47,7 @@ export default function SettingsPage() {
         <div>
             <h2 style={{ marginBottom: '1.5rem' }}>Settings</h2>
 
-            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '2rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={{ ...cardStyle, marginBottom: '2rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3>Invite Codes</h3>
                     <button onClick={handleGenerateCode} disabled={generating} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
@@ -77,7 +78,7 @@ export default function SettingsPage() {
                 </table>
             </div>
 
-            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Users</h3>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                     <thead>

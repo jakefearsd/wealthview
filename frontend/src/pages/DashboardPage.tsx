@@ -1,12 +1,10 @@
 import { getDashboardSummary } from '../api/dashboard';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { formatCurrency } from '../utils/format';
+import { cardStyle } from '../utils/styles';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
-
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 export default function DashboardPage() {
     const { data, loading, error } = useApiQuery(getDashboardSummary);
@@ -20,26 +18,26 @@ export default function DashboardPage() {
             <h2 style={{ marginBottom: '1.5rem' }}>Dashboard</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <div style={{ color: '#666', fontSize: '0.85rem' }}>Net Worth</div>
                     <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1a1a2e' }}>{formatCurrency(data.net_worth)}</div>
                 </div>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <div style={{ color: '#666', fontSize: '0.85rem' }}>Investments</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_investments)}</div>
                 </div>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_cash)}</div>
                 </div>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <div style={{ color: '#666', fontSize: '0.85rem' }}>Property Equity</div>
                     <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_property_equity)}</div>
                 </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <h3 style={{ marginBottom: '1rem' }}>Accounts</h3>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
@@ -61,7 +59,7 @@ export default function DashboardPage() {
                     </table>
                 </div>
 
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <h3 style={{ marginBottom: '1rem' }}>Allocation</h3>
                     {data.allocation.length > 0 ? (
                         <ResponsiveContainer width="100%" height={250}>

@@ -20,12 +20,19 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Map;
 
 @Component("fidelityCsvParser")
 public class FidelityCsvParser implements CsvParser {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
     private static final String HEADER_MARKER = "Run Date";
+    private static final Map<String, String> ACTION_MAP = Map.of(
+            "YOU BOUGHT", "buy",
+            "REINVESTMENT", "buy",
+            "YOU SOLD", "sell",
+            "DIVIDEND RECEIVED", "dividend"
+    );
 
     @Override
     public CsvParseResult parse(InputStream inputStream) throws IOException {
@@ -124,21 +131,15 @@ public class FidelityCsvParser implements CsvParser {
         if (action == null) return null;
         var upper = action.trim().toUpperCase();
 
-        if (upper.equals("YOU BOUGHT") || upper.equals("REINVESTMENT")) {
-            return "buy";
+        var mapped = ACTION_MAP.get(upper);
+        if (mapped != null) {
+            return mapped;
         }
-        if (upper.equals("YOU SOLD")) {
-            return "sell";
+
+        if ("ELECTRONIC FUNDS TRANSFER".equals(upper)) {
+            return (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) ? "withdrawal" : "deposit";
         }
-        if (upper.equals("DIVIDEND RECEIVED")) {
-            return "dividend";
-        }
-        if (upper.equals("ELECTRONIC FUNDS TRANSFER")) {
-            if (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) {
-                return "withdrawal";
-            }
-            return "deposit";
-        }
+
         return null;
     }
 

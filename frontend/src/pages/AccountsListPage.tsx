@@ -4,6 +4,7 @@ import { listAccounts, createAccount, deleteAccount } from '../api/accounts';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import type { AccountRequest } from '../types/account';
+import { cardStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
 
 export default function AccountsListPage() {
@@ -51,7 +52,7 @@ export default function AccountsListPage() {
             </div>
 
             {showCreate && (
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Create Account</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                         <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
@@ -73,7 +74,7 @@ export default function AccountsListPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
                 {data?.data.map((account) => (
-                    <div key={account.id} style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                    <div key={account.id} style={cardStyle}>
                         <Link to={`/accounts/${account.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                             <h3 style={{ marginBottom: '0.5rem' }}>{account.name}</h3>
                             <div style={{ color: '#666', fontSize: '0.9rem' }}>{account.type} {account.institution ? `- ${account.institution}` : ''}</div>
