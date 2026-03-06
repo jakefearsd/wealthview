@@ -7,11 +7,14 @@ import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.PropertyService;
+import com.wealthview.core.property.PropertyValuationService;
+import com.wealthview.core.property.PropertyValuationSyncService;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
+import com.wealthview.core.property.dto.PropertyValuationResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -53,6 +56,12 @@ class PropertyControllerTest {
     private PropertyService propertyService;
 
     @MockBean
+    private PropertyValuationService valuationService;
+
+    @MockBean(name = "propertyValuationSyncService")
+    private PropertyValuationSyncService syncService;
+
+    @MockBean
     private JwtTokenProvider jwtTokenProvider;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();
@@ -61,7 +70,8 @@ class PropertyControllerTest {
         return new PropertyResponse(PROPERTY_ID, "123 Main St",
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
                 new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("150000"));
+                new BigDecimal("150000"),
+                null, null, null, null, false, false);
     }
 
     @Test
@@ -180,5 +190,28 @@ class PropertyControllerTest {
                         .param("to", "2025-12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].total_income").value(2500));
+    }
+
+    @Test
+    void getValuations_returns200() throws Exception {
+        var valuation = new PropertyValuationResponse(UUID.randomUUID(),
+                LocalDate.of(2025, 3, 1), new BigDecimal("400000"), "zillow");
+        when(valuationService.getHistory(TENANT_ID, PROPERTY_ID))
+                .thenReturn(List.of(valuation));
+
+        mockMvc.perform(get("/api/v1/properties/{id}/valuations", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].source").value("zillow"))
+                .andExpect(jsonPath("$[0].value").value(400000));
+    }
+
+    @Test
+    void refreshValuation_returns202() throws Exception {
+        doNothing().when(syncService).syncSingleProperty(TENANT_ID, PROPERTY_ID);
+
+        mockMvc.perform(post("/api/v1/properties/{id}/valuations/refresh", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isAccepted());
     }
 }
