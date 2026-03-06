@@ -1,0 +1,4 @@
+date,type,symbol,quantity,amount
+2024-01-15,buy,AAPL,10,1500.00
+2024-02-01,buy,GOOG,5,7000.00
+2024-03-10,sell,AAPL,3,500.00
