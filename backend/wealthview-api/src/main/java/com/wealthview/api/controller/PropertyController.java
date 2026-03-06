@@ -2,14 +2,18 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.property.PropertyService;
+import com.wealthview.core.property.PropertyValuationService;
+import com.wealthview.core.property.PropertyValuationSyncService;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
+import com.wealthview.core.property.dto.PropertyValuationResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,9 +34,15 @@ import java.util.UUID;
 public class PropertyController {
 
     private final PropertyService propertyService;
+    private final PropertyValuationService valuationService;
+    private final @Nullable PropertyValuationSyncService syncService;
 
-    public PropertyController(PropertyService propertyService) {
+    public PropertyController(PropertyService propertyService,
+                              PropertyValuationService valuationService,
+                              @Nullable PropertyValuationSyncService syncService) {
         this.propertyService = propertyService;
+        this.valuationService = valuationService;
+        this.syncService = syncService;
     }
 
     @PostMapping
@@ -101,5 +111,23 @@ public class PropertyController {
         var cashFlow = propertyService.getMonthlyCashFlow(
                 principal.tenantId(), id, fromMonth, toMonth);
         return ResponseEntity.ok(cashFlow);
+    }
+
+    @GetMapping("/{id}/valuations")
+    public ResponseEntity<List<PropertyValuationResponse>> getValuations(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(valuationService.getHistory(principal.tenantId(), id));
+    }
+
+    @PostMapping("/{id}/valuations/refresh")
+    public ResponseEntity<Void> refreshValuation(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        if (syncService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        syncService.syncSingleProperty(principal.tenantId(), id);
+        return ResponseEntity.accepted().build();
     }
 }
