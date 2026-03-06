@@ -1,0 +1,42 @@
+package com.wealthview.core.projection.dto;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public record SpendingProfileResponse(
+        UUID id,
+        String name,
+        BigDecimal essentialExpenses,
+        BigDecimal discretionaryExpenses,
+        List<IncomeStreamResponse> incomeStreams,
+        OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    public static SpendingProfileResponse from(SpendingProfileEntity entity) {
+        List<IncomeStreamResponse> streams = List.of();
+        try {
+            if (entity.getIncomeStreams() != null && !entity.getIncomeStreams().isBlank()) {
+                streams = MAPPER.readValue(entity.getIncomeStreams(),
+                        new TypeReference<List<IncomeStreamResponse>>() {});
+            }
+        } catch (Exception e) {
+            // fall through with empty list
+        }
+        return new SpendingProfileResponse(
+                entity.getId(),
+                entity.getName(),
+                entity.getEssentialExpenses(),
+                entity.getDiscretionaryExpenses(),
+                streams,
+                entity.getCreatedAt(),
+                entity.getUpdatedAt());
+    }
+}

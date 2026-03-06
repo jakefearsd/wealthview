@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -62,7 +63,7 @@ class ProjectionControllerTest {
                 SCENARIO_ID, "Retirement Plan",
                 LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.0300"), null,
-                List.of(), OffsetDateTime.now(), OffsetDateTime.now());
+                List.of(), null, OffsetDateTime.now(), OffsetDateTime.now());
     }
 
     @Test
@@ -152,6 +153,52 @@ class ProjectionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.results").isArray())
                 .andExpect(jsonPath("$.results.length()").value(2));
+    }
+
+    @Test
+    void update_validInput_returns200() throws Exception {
+        when(projectionService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
+                .thenReturn(sampleScenario());
+
+        mockMvc.perform(put("/api/v1/projections/{id}", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "Retirement Plan",
+                                    "retirement_date": "2055-01-01",
+                                    "end_age": 90,
+                                    "inflation_rate": 0.03,
+                                    "birth_year": 1990,
+                                    "accounts": [{
+                                        "initial_balance": 100000,
+                                        "annual_contribution": 10000,
+                                        "expected_return": 0.07
+                                    }]
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Retirement Plan"));
+    }
+
+    @Test
+    void update_notFound_returns404() throws Exception {
+        when(projectionService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
+                .thenThrow(new EntityNotFoundException("Scenario not found"));
+
+        mockMvc.perform(put("/api/v1/projections/{id}", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "Plan",
+                                    "retirement_date": "2055-01-01",
+                                    "end_age": 90,
+                                    "inflation_rate": 0.03,
+                                    "accounts": []
+                                }
+                                """))
+                .andExpect(status().isNotFound());
     }
 
     @Test

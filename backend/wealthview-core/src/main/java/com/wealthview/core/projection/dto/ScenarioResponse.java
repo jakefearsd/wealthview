@@ -16,6 +16,7 @@ public record ScenarioResponse(
         BigDecimal inflationRate,
         String paramsJson,
         List<ProjectionAccountResponse> accounts,
+        SpendingProfileResponse spendingProfile,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
@@ -23,6 +24,9 @@ public record ScenarioResponse(
         var accounts = entity.getAccounts().stream()
                 .map(ProjectionAccountResponse::from)
                 .toList();
+        var profile = entity.getSpendingProfile() != null
+                ? SpendingProfileResponse.from(entity.getSpendingProfile())
+                : null;
         return new ScenarioResponse(
                 entity.getId(),
                 entity.getName(),
@@ -31,6 +35,7 @@ public record ScenarioResponse(
                 entity.getInflationRate(),
                 entity.getParamsJson(),
                 accounts,
+                profile,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());
     }

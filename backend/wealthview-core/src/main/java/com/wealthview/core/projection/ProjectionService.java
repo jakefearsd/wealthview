@@ -8,14 +8,17 @@ import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
+import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -25,16 +28,19 @@ public class ProjectionService {
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantRepository tenantRepository;
     private final AccountRepository accountRepository;
+    private final SpendingProfileRepository spendingProfileRepository;
     private final ProjectionEngine projectionEngine;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
                              TenantRepository tenantRepository,
                              AccountRepository accountRepository,
+                             SpendingProfileRepository spendingProfileRepository,
                              ProjectionEngine projectionEngine) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
+        this.spendingProfileRepository = spendingProfileRepository;
         this.projectionEngine = projectionEngine;
     }
 
@@ -43,11 +49,20 @@ public class ProjectionService {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
 
-        String paramsJson = buildParamsJson(request);
+        String paramsJson = buildParamsJson(
+                request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
+                request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
+                request.otherIncome(), request.annualRothConversion());
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
                 request.endAge(), request.inflationRate(), paramsJson);
+
+        if (request.spendingProfileId() != null) {
+            var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
+                    .orElse(null);
+            scenario.setSpendingProfile(profile);
+        }
 
         if (request.accounts() != null) {
             for (var acctReq : request.accounts()) {
@@ -85,6 +100,50 @@ public class ProjectionService {
     }
 
     @Transactional
+    public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, UpdateScenarioRequest request) {
+        var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
+                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+
+        scenario.setName(request.name());
+        scenario.setRetirementDate(request.retirementDate());
+        scenario.setEndAge(request.endAge());
+        scenario.setInflationRate(request.inflationRate());
+        scenario.setParamsJson(buildParamsJson(
+                request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
+                request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
+                request.otherIncome(), request.annualRothConversion()));
+        scenario.setUpdatedAt(OffsetDateTime.now());
+
+        if (request.spendingProfileId() != null) {
+            var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
+                    .orElse(null);
+            scenario.setSpendingProfile(profile);
+        } else {
+            scenario.setSpendingProfile(null);
+        }
+
+        scenario.getAccounts().clear();
+        if (request.accounts() != null) {
+            for (var acctReq : request.accounts()) {
+                var linkedAccount = acctReq.linkedAccountId() != null
+                        ? accountRepository.findByTenant_IdAndId(tenantId, acctReq.linkedAccountId())
+                                .orElse(null)
+                        : null;
+                var projAcct = new ProjectionAccountEntity(
+                        scenario, linkedAccount,
+                        acctReq.initialBalance(),
+                        acctReq.annualContribution(),
+                        acctReq.expectedReturn(),
+                        acctReq.accountType());
+                scenario.addAccount(projAcct);
+            }
+        }
+
+        var saved = scenarioRepository.save(scenario);
+        return ScenarioResponse.from(saved);
+    }
+
+    @Transactional
     public void deleteScenario(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
@@ -109,39 +168,42 @@ public class ProjectionService {
         return projectionEngine.run(scenario);
     }
 
-    private String buildParamsJson(CreateScenarioRequest request) {
+    private String buildParamsJson(Integer birthYear, java.math.BigDecimal withdrawalRate,
+                                     String withdrawalStrategy, java.math.BigDecimal dynamicCeiling,
+                                     java.math.BigDecimal dynamicFloor, String filingStatus,
+                                     java.math.BigDecimal otherIncome, java.math.BigDecimal annualRothConversion) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
-        if (request.birthYear() != null) {
-            node.put("birth_year", request.birthYear());
+        if (birthYear != null) {
+            node.put("birth_year", birthYear);
             hasContent = true;
         }
-        if (request.withdrawalRate() != null) {
-            node.put("withdrawal_rate", request.withdrawalRate());
+        if (withdrawalRate != null) {
+            node.put("withdrawal_rate", withdrawalRate);
             hasContent = true;
         }
-        if (request.withdrawalStrategy() != null) {
-            node.put("withdrawal_strategy", request.withdrawalStrategy());
+        if (withdrawalStrategy != null) {
+            node.put("withdrawal_strategy", withdrawalStrategy);
             hasContent = true;
         }
-        if (request.dynamicCeiling() != null) {
-            node.put("dynamic_ceiling", request.dynamicCeiling());
+        if (dynamicCeiling != null) {
+            node.put("dynamic_ceiling", dynamicCeiling);
             hasContent = true;
         }
-        if (request.dynamicFloor() != null) {
-            node.put("dynamic_floor", request.dynamicFloor());
+        if (dynamicFloor != null) {
+            node.put("dynamic_floor", dynamicFloor);
             hasContent = true;
         }
-        if (request.filingStatus() != null) {
-            node.put("filing_status", request.filingStatus());
+        if (filingStatus != null) {
+            node.put("filing_status", filingStatus);
             hasContent = true;
         }
-        if (request.otherIncome() != null) {
-            node.put("other_income", request.otherIncome());
+        if (otherIncome != null) {
+            node.put("other_income", otherIncome);
             hasContent = true;
         }
-        if (request.annualRothConversion() != null) {
-            node.put("annual_roth_conversion", request.annualRothConversion());
+        if (annualRothConversion != null) {
+            node.put("annual_roth_conversion", annualRothConversion);
             hasContent = true;
         }
         return hasContent ? node.toString() : null;

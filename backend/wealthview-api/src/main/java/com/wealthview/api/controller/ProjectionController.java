@@ -7,7 +7,10 @@ import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
+import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,6 +30,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projections")
 public class ProjectionController {
 
+    private static final Logger log = LoggerFactory.getLogger(ProjectionController.class);
+
     private final ProjectionService projectionService;
 
     public ProjectionController(ProjectionService projectionService) {
@@ -36,6 +42,8 @@ public class ProjectionController {
     public ResponseEntity<ScenarioResponse> create(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @RequestBody CreateScenarioRequest request) {
+        log.info("Creating projection scenario '{}' for tenant {} with {} accounts",
+                request.name(), principal.tenantId(), request.accounts() != null ? request.accounts().size() : 0);
         var result = projectionService.createScenario(principal.tenantId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
@@ -58,6 +66,14 @@ public class ProjectionController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
         return ResponseEntity.ok(projectionService.getScenario(principal.tenantId(), id));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ScenarioResponse> update(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestBody UpdateScenarioRequest request) {
+        return ResponseEntity.ok(projectionService.updateScenario(principal.tenantId(), id, request));
     }
 
     @DeleteMapping("/{id}")
