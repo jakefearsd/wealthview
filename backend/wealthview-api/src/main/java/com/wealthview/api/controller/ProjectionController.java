@@ -2,9 +2,12 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.projection.ProjectionService;
+import com.wealthview.core.projection.dto.CompareRequest;
+import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -41,6 +44,13 @@ public class ProjectionController {
     public ResponseEntity<List<ScenarioResponse>> list(
             @AuthenticationPrincipal TenantUserPrincipal principal) {
         return ResponseEntity.ok(projectionService.listScenarios(principal.tenantId()));
+    }
+
+    @PostMapping("/compare")
+    public ResponseEntity<CompareResponse> compare(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @Valid @RequestBody CompareRequest request) {
+        return ResponseEntity.ok(projectionService.compareScenarios(principal.tenantId(), request));
     }
 
     @GetMapping("/{id}")

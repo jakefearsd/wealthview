@@ -7,5 +7,6 @@ public record CreateProjectionAccountRequest(
         UUID linkedAccountId,
         BigDecimal initialBalance,
         BigDecimal annualContribution,
-        BigDecimal expectedReturn) {
+        BigDecimal expectedReturn,
+        String accountType) {
 }

@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
@@ -70,11 +71,14 @@ class ProjectionServiceTest {
                 new BigDecimal("0.0300"),
                 1990,
                 new BigDecimal("0.04"),
+                null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
-                        new BigDecimal("0.07"))));
+                        new BigDecimal("0.07"),
+                        null)));
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -91,6 +95,74 @@ class ProjectionServiceTest {
         var saved = captor.getValue();
         assertThat(saved.getParamsJson()).contains("\"birth_year\":1990");
         assertThat(saved.getParamsJson()).contains("\"withdrawal_rate\":0.04");
+    }
+
+    @Test
+    void createScenario_withDynamicStrategy_persistsInParamsJson() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new CreateScenarioRequest(
+                "Dynamic Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                "vanguard_dynamic_spending",
+                new BigDecimal("0.05"),
+                new BigDecimal("-0.025"),
+                null, null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        null,
+                        new BigDecimal("100000"),
+                        new BigDecimal("10000"),
+                        new BigDecimal("0.07"),
+                        null)));
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getParamsJson()).contains("\"withdrawal_strategy\":\"vanguard_dynamic_spending\"");
+        assertThat(saved.getParamsJson()).contains("\"dynamic_ceiling\"");
+        assertThat(saved.getParamsJson()).contains("\"dynamic_floor\"");
+    }
+
+    @Test
+    void createScenario_withAccountTypes_persistsTypes() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new CreateScenarioRequest(
+                "Multi-Pool Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                null, null, null,
+                null, null, null,
+                List.of(
+                        new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
+                                new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
+                        new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
+                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")));
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.accounts()).hasSize(2);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getAccounts().get(0).getAccountType()).isEqualTo("traditional");
+        assertThat(saved.getAccounts().get(1).getAccountType()).isEqualTo("roth");
     }
 
     @Test
@@ -143,6 +215,41 @@ class ProjectionServiceTest {
     }
 
     @Test
+    void compareScenarios_validIds_runsAllAndReturnsResults() {
+        var id1 = UUID.randomUUID();
+        var id2 = UUID.randomUUID();
+        var scenario1 = new ProjectionScenarioEntity(tenant, "Plan A",
+                LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        var scenario2 = new ProjectionScenarioEntity(tenant, "Plan B",
+                LocalDate.of(2060, 1, 1), 90, new BigDecimal("0.03"), null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, id1))
+                .thenReturn(Optional.of(scenario1));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, id2))
+                .thenReturn(Optional.of(scenario2));
+
+        var result1 = new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0);
+        var result2 = new ProjectionResultResponse(id2, List.of(), BigDecimal.ZERO, 0);
+        when(projectionEngine.run(scenario1)).thenReturn(result1);
+        when(projectionEngine.run(scenario2)).thenReturn(result2);
+
+        var response = service.compareScenarios(tenantId, new CompareRequest(List.of(id1, id2)));
+
+        assertThat(response.results()).hasSize(2);
+    }
+
+    @Test
+    void compareScenarios_notFound_throwsEntityNotFoundException() {
+        var id1 = UUID.randomUUID();
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, id1))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.compareScenarios(tenantId,
+                new CompareRequest(List.of(id1, UUID.randomUUID()))))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
     void runProjection_exists_delegatesToEngine() {
         var scenario = new ProjectionScenarioEntity(
                 tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
@@ -152,7 +259,7 @@ class ProjectionServiceTest {
 
         var engineResult = new ProjectionResultResponse(
                 scenarioId,
-                List.of(new ProjectionYearDto(2026, 36, BigDecimal.ZERO,
+                List.of(ProjectionYearDto.simple(2026, 36, BigDecimal.ZERO,
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, false)),
                 BigDecimal.ZERO, 0);

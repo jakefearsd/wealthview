@@ -10,7 +10,8 @@ public record ProjectionAccountResponse(
         UUID linkedAccountId,
         BigDecimal initialBalance,
         BigDecimal annualContribution,
-        BigDecimal expectedReturn) {
+        BigDecimal expectedReturn,
+        String accountType) {
 
     public static ProjectionAccountResponse from(ProjectionAccountEntity entity) {
         return new ProjectionAccountResponse(
@@ -18,6 +19,7 @@ public record ProjectionAccountResponse(
                 entity.getLinkedAccount() != null ? entity.getLinkedAccount().getId() : null,
                 entity.getInitialBalance(),
                 entity.getAnnualContribution(),
-                entity.getExpectedReturn());
+                entity.getExpectedReturn(),
+                entity.getAccountType());
     }
 }
