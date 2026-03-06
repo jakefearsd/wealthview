@@ -1,0 +1,111 @@
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import ProjectionDetailPage from './ProjectionDetailPage';
+import type { Scenario } from '../types/projection';
+
+const mockScenario: Scenario = {
+    id: 'abc-123',
+    name: 'Test Plan',
+    retirement_date: '2045-01-01',
+    end_age: 90,
+    inflation_rate: 0.03,
+    params_json: null,
+    accounts: [
+        { id: 'a1', linked_account_id: null, initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07 },
+    ],
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+};
+
+vi.mock('../api/projections', () => ({
+    getScenario: vi.fn(),
+    runProjection: vi.fn(),
+}));
+
+vi.mock('../hooks/useApiQuery', () => ({
+    useApiQuery: vi.fn(),
+}));
+
+vi.mock('../components/ProjectionChart', () => ({
+    default: ({ mode }: { mode: string }) => <div data-testid={`chart-${mode}`}>Chart: {mode}</div>,
+}));
+
+vi.mock('../components/MilestoneStrip', () => ({
+    default: () => <div data-testid="milestone-strip">Milestones</div>,
+}));
+
+import { useApiQuery } from '../hooks/useApiQuery';
+const mockUseApiQuery = vi.mocked(useApiQuery);
+
+function renderPage() {
+    return render(
+        <MemoryRouter initialEntries={['/projections/abc-123']}>
+            <Routes>
+                <Route path="/projections/:id" element={<ProjectionDetailPage />} />
+            </Routes>
+        </MemoryRouter>
+    );
+}
+
+describe('ProjectionDetailPage', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('renders breadcrumb and scenario title', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        expect(screen.getByRole('link', { name: 'Projections' })).toHaveAttribute('href', '/projections');
+        expect(screen.getByRole('heading', { name: 'Test Plan' })).toBeInTheDocument();
+    });
+
+    it('renders config summary cards', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        expect(screen.getByText('Retirement Date')).toBeInTheDocument();
+        expect(screen.getByText('2045-01-01')).toBeInTheDocument();
+        expect(screen.getByText('End Age')).toBeInTheDocument();
+        expect(screen.getByText('90')).toBeInTheDocument();
+    });
+
+    it('shows run button', () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        expect(screen.getByRole('button', { name: /run projection/i })).toBeInTheDocument();
+    });
+
+    it('switches tabs when clicked', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        // Simulate result by importing and calling runProjection mock
+        const { runProjection } = await import('../api/projections');
+        const mockRun = vi.mocked(runProjection);
+        mockRun.mockResolvedValue({
+            scenario_id: 'abc-123',
+            yearly_data: [
+                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false },
+            ],
+            final_balance: 117700,
+            years_in_retirement: 0,
+        });
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        // Default tab is chart (balance)
+        expect(screen.getByTestId('chart-balance')).toBeInTheDocument();
+
+        // Click flows tab
+        await userEvent.click(screen.getByRole('button', { name: /annual flows/i }));
+        expect(screen.getByTestId('chart-flows')).toBeInTheDocument();
+
+        // Click data table tab
+        await userEvent.click(screen.getByRole('button', { name: /data table/i }));
+        expect(screen.getByText('Year')).toBeInTheDocument();
+    });
+});
