@@ -49,6 +49,10 @@ public class ProjectionScenarioEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     private String paramsJson;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "spending_profile_id")
+    private SpendingProfileEntity spendingProfile;
+
     @OneToMany(mappedBy = "scenario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProjectionAccountEntity> accounts = new ArrayList<>();
 
@@ -84,6 +88,8 @@ public class ProjectionScenarioEntity {
     public void setInflationRate(BigDecimal inflationRate) { this.inflationRate = inflationRate; }
     public String getParamsJson() { return paramsJson; }
     public void setParamsJson(String paramsJson) { this.paramsJson = paramsJson; }
+    public SpendingProfileEntity getSpendingProfile() { return spendingProfile; }
+    public void setSpendingProfile(SpendingProfileEntity spendingProfile) { this.spendingProfile = spendingProfile; }
     public List<ProjectionAccountEntity> getAccounts() { return accounts; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

@@ -6,10 +6,13 @@ import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.UpdateScenarioRequest;
+import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,6 +45,9 @@ class ProjectionServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private SpendingProfileRepository spendingProfileRepository;
 
     @Mock
     private ProjectionEngine projectionEngine;
@@ -78,7 +84,8 @@ class ProjectionServiceTest {
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        null)));
+                        null)),
+                null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -117,7 +124,8 @@ class ProjectionServiceTest {
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
-                        null)));
+                        null)),
+                null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -149,7 +157,8 @@ class ProjectionServiceTest {
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
-                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")));
+                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
+                null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -247,6 +256,95 @@ class ProjectionServiceTest {
         assertThatThrownBy(() -> service.compareScenarios(tenantId,
                 new CompareRequest(List.of(id1, UUID.randomUUID()))))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void updateScenario_validRequest_updatesFieldsAndReturns() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Old Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var oldAccount = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("50000"),
+                new BigDecimal("5000"), new BigDecimal("0.06"), "taxable");
+        scenario.addAccount(oldAccount);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateScenarioRequest(
+                "Updated Plan",
+                LocalDate.of(2060, 6, 15),
+                95,
+                new BigDecimal("0.0250"),
+                1985,
+                new BigDecimal("0.035"),
+                "dynamic_percentage",
+                null, null, null, null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("200000"),
+                        new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
+                null);
+
+        var result = service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(result.name()).isEqualTo("Updated Plan");
+        assertThat(result.retirementDate()).isEqualTo(LocalDate.of(2060, 6, 15));
+        assertThat(result.endAge()).isEqualTo(95);
+        assertThat(result.inflationRate()).isEqualByComparingTo(new BigDecimal("0.0250"));
+        assertThat(result.accounts()).hasSize(1);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getParamsJson()).contains("\"birth_year\":1985");
+        assertThat(saved.getParamsJson()).contains("\"withdrawal_strategy\":\"dynamic_percentage\"");
+    }
+
+    @Test
+    void updateScenario_notFound_throwsEntityNotFoundException() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.empty());
+
+        var request = new UpdateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, List.of(), null);
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void updateScenario_replacesAccounts() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var oldAccount = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
+        scenario.addAccount(oldAccount);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null,
+                List.of(
+                        new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
+                                new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
+                        new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
+                                new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
+                null);
+
+        var result = service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(result.accounts()).hasSize(2);
     }
 
     @Test
