@@ -11,6 +11,11 @@ public record PropertyRequest(
         @NotNull BigDecimal purchasePrice,
         @NotNull LocalDate purchaseDate,
         @NotNull BigDecimal currentValue,
-        BigDecimal mortgageBalance
+        BigDecimal mortgageBalance,
+        BigDecimal loanAmount,
+        BigDecimal annualInterestRate,
+        Integer loanTermMonths,
+        LocalDate loanStartDate,
+        Boolean useComputedBalance
 ) {
 }

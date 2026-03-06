@@ -54,20 +54,23 @@ public class PropertyService {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
 
+        validateLoanDetails(request);
+
         var mortgageBalance = request.mortgageBalance() != null
                 ? request.mortgageBalance() : BigDecimal.ZERO;
 
         var property = new PropertyEntity(tenant, request.address(), request.purchasePrice(),
                 request.purchaseDate(), request.currentValue(), mortgageBalance);
+        applyLoanFields(property, request);
         property = propertyRepository.save(property);
         log.info("Property {} created for tenant {}", property.getId(), tenantId);
-        return PropertyResponse.from(property);
+        return buildResponse(property);
     }
 
     @Transactional(readOnly = true)
     public List<PropertyResponse> list(UUID tenantId) {
         return propertyRepository.findByTenant_Id(tenantId).stream()
-                .map(PropertyResponse::from)
+                .map(this::buildResponse)
                 .toList();
     }
 
@@ -75,7 +78,7 @@ public class PropertyService {
     public PropertyResponse get(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
-        return PropertyResponse.from(property);
+        return buildResponse(property);
     }
 
     @Transactional
@@ -83,15 +86,18 @@ public class PropertyService {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
+        validateLoanDetails(request);
+
         property.setAddress(request.address());
         property.setPurchasePrice(request.purchasePrice());
         property.setPurchaseDate(request.purchaseDate());
         property.setCurrentValue(request.currentValue());
         property.setMortgageBalance(request.mortgageBalance() != null
                 ? request.mortgageBalance() : BigDecimal.ZERO);
+        applyLoanFields(property, request);
         property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
-        return PropertyResponse.from(property);
+        return buildResponse(property);
     }
 
     @Transactional
@@ -122,6 +128,7 @@ public class PropertyService {
         expenseRepository.save(expense);
     }
 
+    // TODO: depreciation as non-cash expense could be factored in here
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {
@@ -163,5 +170,43 @@ public class PropertyService {
         }
 
         return entries;
+    }
+
+    BigDecimal computeEffectiveBalance(PropertyEntity property) {
+        if (property.isUseComputedBalance() && property.hasLoanDetails()) {
+            return AmortizationCalculator.remainingBalance(
+                    property.getLoanAmount(),
+                    property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(),
+                    property.getLoanStartDate(),
+                    LocalDate.now());
+        }
+        return property.getMortgageBalance();
+    }
+
+    private PropertyResponse buildResponse(PropertyEntity property) {
+        var effectiveBalance = computeEffectiveBalance(property);
+        return PropertyResponse.from(property, effectiveBalance);
+    }
+
+    private void applyLoanFields(PropertyEntity property, PropertyRequest request) {
+        property.setLoanAmount(request.loanAmount());
+        property.setAnnualInterestRate(request.annualInterestRate());
+        property.setLoanTermMonths(request.loanTermMonths());
+        property.setLoanStartDate(request.loanStartDate());
+        property.setUseComputedBalance(
+                request.useComputedBalance() != null && request.useComputedBalance());
+    }
+
+    private void validateLoanDetails(PropertyRequest request) {
+        boolean hasAny = request.loanAmount() != null || request.annualInterestRate() != null
+                || request.loanTermMonths() != null || request.loanStartDate() != null;
+        boolean hasAll = request.loanAmount() != null && request.annualInterestRate() != null
+                && request.loanTermMonths() != null && request.loanStartDate() != null;
+
+        if (hasAny && !hasAll) {
+            throw new IllegalArgumentException(
+                    "Loan details must be provided in full (loanAmount, annualInterestRate, loanTermMonths, loanStartDate) or not at all");
+        }
     }
 }
