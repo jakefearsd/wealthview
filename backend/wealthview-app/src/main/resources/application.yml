@@ -31,3 +31,8 @@ app:
     api-key: ${FINNHUB_API_KEY:}
     base-url: https://finnhub.io
     rate-limit-ms: 1100
+  zillow:
+    enabled: false
+    timeout-ms: 10000
+    rate-limit-ms: 5000
+    sync-cron: "0 0 6 * * SUN"
