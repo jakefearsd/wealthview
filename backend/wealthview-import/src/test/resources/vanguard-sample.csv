@@ -1,0 +1,11 @@
+Account Number,Trade Date,Settlement Date,Transaction Type,Transaction Description,Investment Name,Symbol,Shares,Share Price,Principal Amount,Commission Fees,Net Amount,Accrued Interest
+12345678,01/10/2025,01/14/2025,Buy,Buy,VANGUARD TOTAL STOCK MKT IDX ADM,VTSAX,5.000,$250.00,"$1,250.00",$0.00,"$1,250.00",
+12345678,01/20/2025,01/22/2025,Sell,Sell,APPLE INC,AAPL,10.000,$195.50,"$1,955.00",$0.00,"$1,955.00",
+12345678,01/25/2025,,Dividend,Dividend,APPLE INC,AAPL,,,,$0.00,$48.50,
+12345678,02/01/2025,02/03/2025,Reinvestment,Reinvestment,VANGUARD TOTAL STOCK MKT IDX ADM,VTSAX,0.200,$250.00,$50.00,$0.00,$50.00,
+12345678,02/15/2025,,Capital gain (LT),Long-term capital gain,VANGUARD 500 INDEX ADMIRAL,VFIAX,,,,$0.00,$125.75,
+12345678,02/20/2025,,Capital gain (ST),Short-term capital gain,VANGUARD 500 INDEX ADMIRAL,VFIAX,,,,$0.00,$32.10,
+12345678,03/01/2025,03/03/2025,Transfer (incoming),Transfer from bank,,,,,,$0.00,"$5,000.00",
+12345678,03/10/2025,03/12/2025,Transfer (outgoing),Transfer to bank,,,,,,$0.00,"$2,000.00",
+12345678,03/15/2025,,Sweep in,Sweep from settlement fund,VANGUARD FEDERAL MONEY MARKET,VMFXX,,,,$0.00,$500.00,
+12345678,03/20/2025,,Sweep out,Sweep to settlement fund,VANGUARD FEDERAL MONEY MARKET,VMFXX,,,,$0.00,$300.00,
