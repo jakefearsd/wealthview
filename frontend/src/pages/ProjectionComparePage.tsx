@@ -6,6 +6,7 @@ import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import toast from 'react-hot-toast';
+import { extractErrorMessage } from '../utils/errorMessage';
 import type { CompareResponse } from '../types/projection';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -38,8 +39,8 @@ export default function ProjectionComparePage() {
         try {
             const data = await compareScenarios(ids);
             setResult(data);
-        } catch {
-            toast.error('Failed to compare scenarios');
+        } catch (err: unknown) {
+            toast.error(extractErrorMessage(err));
         } finally {
             setRunning(false);
         }
