@@ -39,6 +39,9 @@ public class ProjectionAccountEntity {
     @Column(name = "expected_return", nullable = false, precision = 5, scale = 4)
     private BigDecimal expectedReturn = new BigDecimal("0.0700");
 
+    @Column(name = "account_type", nullable = false)
+    private String accountType = "taxable";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -58,6 +61,13 @@ public class ProjectionAccountEntity {
         this.expectedReturn = expectedReturn;
     }
 
+    public ProjectionAccountEntity(ProjectionScenarioEntity scenario, AccountEntity linkedAccount,
+                                    BigDecimal initialBalance, BigDecimal annualContribution,
+                                    BigDecimal expectedReturn, String accountType) {
+        this(scenario, linkedAccount, initialBalance, annualContribution, expectedReturn);
+        this.accountType = accountType != null ? accountType : "taxable";
+    }
+
     public UUID getId() { return id; }
     public ProjectionScenarioEntity getScenario() { return scenario; }
     public void setScenario(ProjectionScenarioEntity scenario) { this.scenario = scenario; }
@@ -68,6 +78,8 @@ public class ProjectionAccountEntity {
     public void setAnnualContribution(BigDecimal annualContribution) { this.annualContribution = annualContribution; }
     public BigDecimal getExpectedReturn() { return expectedReturn; }
     public void setExpectedReturn(BigDecimal expectedReturn) { this.expectedReturn = expectedReturn; }
+    public String getAccountType() { return accountType; }
+    public void setAccountType(String accountType) { this.accountType = accountType; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
