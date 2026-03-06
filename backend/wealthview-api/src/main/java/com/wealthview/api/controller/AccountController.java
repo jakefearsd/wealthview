@@ -5,6 +5,8 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.common.PageResponse;
+import com.wealthview.core.portfolio.TheoreticalPortfolioService;
+import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
@@ -27,9 +29,12 @@ import java.util.UUID;
 public class AccountController {
 
     private final AccountService accountService;
+    private final TheoreticalPortfolioService theoreticalPortfolioService;
 
-    public AccountController(AccountService accountService) {
+    public AccountController(AccountService accountService,
+                             TheoreticalPortfolioService theoreticalPortfolioService) {
         this.accountService = accountService;
+        this.theoreticalPortfolioService = theoreticalPortfolioService;
     }
 
     @PostMapping
@@ -72,5 +77,13 @@ public class AccountController {
             @PathVariable UUID id) {
         accountService.delete(principal.tenantId(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/theoretical-history")
+    public ResponseEntity<PortfolioHistoryResponse> getTheoreticalHistory(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        var response = theoreticalPortfolioService.computeHistory(principal.tenantId(), id);
+        return ResponseEntity.ok(response);
     }
 }
