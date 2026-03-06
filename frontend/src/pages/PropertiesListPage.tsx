@@ -19,6 +19,26 @@ export default function PropertiesListPage() {
     const [purchaseDate, setPurchaseDate] = useState('');
     const [currentValue, setCurrentValue] = useState('');
     const [mortgageBalance, setMortgageBalance] = useState('');
+    const [showLoanDetails, setShowLoanDetails] = useState(false);
+    const [loanAmount, setLoanAmount] = useState('');
+    const [annualInterestRate, setAnnualInterestRate] = useState('');
+    const [loanTermMonths, setLoanTermMonths] = useState('');
+    const [loanStartDate, setLoanStartDate] = useState('');
+    const [useComputedBalance, setUseComputedBalance] = useState(false);
+
+    function resetForm() {
+        setAddress('');
+        setPurchasePrice('');
+        setPurchaseDate('');
+        setCurrentValue('');
+        setMortgageBalance('');
+        setShowLoanDetails(false);
+        setLoanAmount('');
+        setAnnualInterestRate('');
+        setLoanTermMonths('');
+        setLoanStartDate('');
+        setUseComputedBalance(false);
+    }
 
     async function handleCreate() {
         try {
@@ -28,14 +48,17 @@ export default function PropertiesListPage() {
                 purchase_date: purchaseDate,
                 current_value: parseFloat(currentValue),
                 mortgage_balance: mortgageBalance ? parseFloat(mortgageBalance) : undefined,
+                ...(showLoanDetails && loanAmount ? {
+                    loan_amount: parseFloat(loanAmount),
+                    annual_interest_rate: parseFloat(annualInterestRate),
+                    loan_term_months: parseInt(loanTermMonths),
+                    loan_start_date: loanStartDate,
+                    use_computed_balance: useComputedBalance,
+                } : {}),
             });
             toast.success('Property created');
             setShowCreate(false);
-            setAddress('');
-            setPurchasePrice('');
-            setPurchaseDate('');
-            setCurrentValue('');
-            setMortgageBalance('');
+            resetForm();
             refetch();
         } catch {
             toast.error('Failed to create property');
@@ -56,6 +79,8 @@ export default function PropertiesListPage() {
     if (loading) return <div>Loading properties...</div>;
     if (error) return <div style={{ color: '#d32f2f' }}>Error: {error}</div>;
 
+    const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' };
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
@@ -67,15 +92,41 @@ export default function PropertiesListPage() {
                 <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Create Property</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <input placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                        <input placeholder="Purchase Price" type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                        <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                        <input placeholder="Current Value" type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                        <input placeholder="Mortgage Balance" type="number" value={mortgageBalance} onChange={(e) => setMortgageBalance(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                        <input placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} style={inputStyle} />
+                        <input placeholder="Purchase Price" type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} style={inputStyle} />
+                        <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} style={inputStyle} />
+                        <input placeholder="Current Value" type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} style={inputStyle} />
+                        <input placeholder="Mortgage Balance" type="number" value={mortgageBalance} onChange={(e) => setMortgageBalance(e.target.value)} style={inputStyle} />
                     </div>
+
+                    <div style={{ marginTop: '1rem' }}>
+                        <button
+                            onClick={() => setShowLoanDetails(!showLoanDetails)}
+                            style={{ padding: '0.4rem 0.8rem', background: 'none', border: '1px solid #999', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}
+                        >
+                            {showLoanDetails ? 'Hide' : 'Show'} Loan Details
+                        </button>
+                    </div>
+
+                    {showLoanDetails && (
+                        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                            <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Loan Details</h4>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                <input placeholder="Loan Amount" type="number" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} style={inputStyle} />
+                                <input placeholder="Annual Interest Rate (%)" type="number" step="0.01" value={annualInterestRate} onChange={(e) => setAnnualInterestRate(e.target.value)} style={inputStyle} />
+                                <input placeholder="Loan Term (months)" type="number" value={loanTermMonths} onChange={(e) => setLoanTermMonths(e.target.value)} style={inputStyle} />
+                                <input type="date" value={loanStartDate} onChange={(e) => setLoanStartDate(e.target.value)} style={inputStyle} />
+                            </div>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.9rem' }}>
+                                <input type="checkbox" checked={useComputedBalance} onChange={(e) => setUseComputedBalance(e.target.checked)} />
+                                Use computed mortgage balance (amortization)
+                            </label>
+                        </div>
+                    )}
+
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                         <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Create</button>
-                        <button onClick={() => setShowCreate(false)} style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                        <button onClick={() => { setShowCreate(false); resetForm(); }} style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
                     </div>
                 </div>
             )}
@@ -89,6 +140,9 @@ export default function PropertiesListPage() {
                                 <div><span style={{ color: '#666' }}>Value:</span> {formatCurrency(p.current_value)}</div>
                                 <div><span style={{ color: '#666' }}>Equity:</span> {formatCurrency(p.equity)}</div>
                             </div>
+                            {p.use_computed_balance && (
+                                <span style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.15rem 0.5rem', background: '#e3f2fd', color: '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>Computed Balance</span>
+                            )}
                         </Link>
                         {canWrite && (
                             <button onClick={() => handleDelete(p.id)} style={{ marginTop: '1rem', padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>

@@ -5,6 +5,7 @@ import type {
     PropertyIncomeRequest,
     PropertyExpenseRequest,
     MonthlyCashFlowEntry,
+    PropertyValuation,
 } from '../types/property';
 
 export async function listProperties(): Promise<Property[]> {
@@ -55,4 +56,15 @@ export async function getCashFlow(
         { params: { from, to } }
     );
     return data;
+}
+
+export async function getValuationHistory(propertyId: string): Promise<PropertyValuation[]> {
+    const { data } = await client.get<PropertyValuation[]>(
+        `/properties/${propertyId}/valuations`
+    );
+    return data;
+}
+
+export async function refreshValuation(propertyId: string): Promise<void> {
+    await client.post(`/properties/${propertyId}/valuations/refresh`);
 }
