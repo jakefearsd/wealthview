@@ -1,6 +1,7 @@
 import client from './client';
 import type { Account, AccountRequest } from '../types/account';
 import type { PageResponse } from '../types/common';
+import type { PortfolioHistory } from '../types/portfolio';
 
 export async function listAccounts(page = 0, size = 25): Promise<PageResponse<Account>> {
     const { data } = await client.get<PageResponse<Account>>('/accounts', {
@@ -26,4 +27,9 @@ export async function updateAccount(id: string, request: AccountRequest): Promis
 
 export async function deleteAccount(id: string): Promise<void> {
     await client.delete(`/accounts/${id}`);
+}
+
+export async function getTheoreticalHistory(accountId: string): Promise<PortfolioHistory> {
+    const { data } = await client.get<PortfolioHistory>(`/accounts/${accountId}/theoretical-history`);
+    return data;
 }

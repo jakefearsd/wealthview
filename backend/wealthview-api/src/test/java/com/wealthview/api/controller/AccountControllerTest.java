@@ -10,6 +10,9 @@ import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.portfolio.TheoreticalPortfolioService;
+import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
+import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -18,6 +21,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -49,6 +54,9 @@ class AccountControllerTest {
 
     @MockBean
     private AccountService accountService;
+
+    @MockBean
+    private TheoreticalPortfolioService theoreticalPortfolioService;
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
@@ -157,5 +165,36 @@ class AccountControllerTest {
     void list_unauthenticated_returns403() throws Exception {
         mockMvc.perform(get("/api/v1/accounts"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void getTheoreticalHistory_validAccount_returns200() throws Exception {
+        var dataPoints = List.of(
+                new PortfolioDataPointDto(LocalDate.of(2025, 1, 3), new BigDecimal("1500.0000")),
+                new PortfolioDataPointDto(LocalDate.of(2025, 1, 10), new BigDecimal("1550.0000"))
+        );
+        var response = new PortfolioHistoryResponse(ACCOUNT_ID, dataPoints, List.of("AAPL"), 2);
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID))
+                .thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/accounts/{id}/theoretical-history", ACCOUNT_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.account_id").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.data_points").isArray())
+                .andExpect(jsonPath("$.data_points[0].total_value").value(1500.0000))
+                .andExpect(jsonPath("$.symbols[0]").value("AAPL"))
+                .andExpect(jsonPath("$.weeks").value(2));
+    }
+
+    @Test
+    void getTheoreticalHistory_notFound_returns404() throws Exception {
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID))
+                .thenThrow(new EntityNotFoundException("Account not found"));
+
+        mockMvc.perform(get("/api/v1/accounts/{id}/theoretical-history", ACCOUNT_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 }
