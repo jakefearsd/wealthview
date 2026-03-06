@@ -9,7 +9,7 @@ WealthView consolidates financial visibility across brokerage accounts, rental p
 ### Key Features
 
 - **Investment Portfolio Tracking** -- Accounts, holdings, transactions with automatic cost basis and quantity computation. Theoretical portfolio history charts with historical price data.
-- **Rental Property Management** -- Property records with income/expense tracking and monthly cash flow reports.
+- **Rental Property Management** -- Property records with income/expense tracking, monthly cash flow reports, loan amortization-based mortgage balance computation, and automated Zillow valuation scraping with history tracking.
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation pie chart.
 - **Multi-Format Import** -- Fidelity, Vanguard, and Schwab CSV parsers plus OFX/QFX import. Content-hash deduplication prevents duplicate transactions across imports.
 - **Live Price Feeds** -- Finnhub API integration with historical backfill and scheduled daily sync. Seed data covers major tickers (AAPL, AMZN, GOOG, MSFT, NVDA, VOO, VTI, and more).
@@ -45,7 +45,7 @@ The backend is organized as a Maven multi-module project:
 | `wealthview-api`         | REST controllers, security config, exception handlers    |
 | `wealthview-core`        | Services, business logic, domain DTOs                    |
 | `wealthview-persistence` | JPA entities, repositories, Flyway migrations            |
-| `wealthview-import`      | CSV/OFX parsers, Finnhub price feed client               |
+| `wealthview-import`      | CSV/OFX parsers, Finnhub price feed client, Zillow scraper |
 | `wealthview-projection`  | Deterministic retirement modeling engine                  |
 | `wealthview-app`         | Spring Boot main class, profile configs, JAR packaging   |
 
@@ -82,6 +82,7 @@ Both accounts are created automatically on first startup. The demo user comes wi
 | `JWT_SECRET`           | `production-secret-key-must-be-at-least-32-characters` | JWT signing key                 |
 | `SUPER_ADMIN_PASSWORD` | `admin123`                                             | Initial admin password          |
 | `FINNHUB_API_KEY`      | *(empty -- price sync disabled)*                       | Finnhub API key for live prices |
+| `ZILLOW_ENABLED`       | `false`                                                | Enable Zillow property valuation scraping |
 
 For production, set `JWT_SECRET` and `DB_PASSWORD` to strong random values:
 
@@ -248,6 +249,8 @@ All endpoints are under `/api/v1/` and require JWT authentication (except `/api/
 | `/api/v1/properties/{id}/income`      | POST   | Add rental income         |
 | `/api/v1/properties/{id}/expenses`    | POST   | Add property expense      |
 | `/api/v1/properties/{id}/cashflow`    | GET    | Monthly cash flow report  |
+| `/api/v1/properties/{id}/valuations`  | GET    | Valuation history         |
+| `/api/v1/properties/{id}/valuations/refresh` | POST | Trigger Zillow valuation scrape (202 Accepted) |
 
 ### Import & Prices
 
@@ -339,6 +342,8 @@ Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/m
 | V013      | Tax brackets table                                       |
 | V014      | Spending profiles table (essential/discretionary/income streams) |
 | V015      | Add spending_profile_id FK to projection scenarios       |
+| V016      | Loan detail columns on properties (amortization support) |
+| V017      | Property valuations history table                        |
 | R__seed_stock_prices  | Repeatable seed data for stock prices           |
 | R__seed_tax_brackets  | Repeatable seed data for 2022-2025 federal tax brackets |
 
@@ -463,30 +468,151 @@ Open the frontend in a browser (typically http://localhost:5173).
 
 ---
 
-### 9. Create a Rental Property
+### 9. Create a Rental Property (Manual Balance)
 
 1. Navigate to **Properties** in the sidebar (`/properties`).
-2. Click **Add Property**.
+2. Click **New Property**.
 3. Fill in:
    - **Address:** `123 Oak Street`
    - **Purchase Price:** `350000`
+   - **Purchase Date:** `2020-06-01`
    - **Current Value:** `400000`
    - **Mortgage Balance:** `280000`
-4. Click **Create**.
-5. **Verify:** The property appears in the properties list with equity displayed ($400,000 - $280,000 = $120,000).
+4. Leave the **Loan Details** section collapsed (do not provide loan fields).
+5. Click **Create**.
+6. **Verify:** The property appears in the properties list with equity displayed ($400,000 - $280,000 = $120,000). No "Computed Balance" badge.
 
 ---
 
 ### 10. Add Rental Income and Expenses
 
 1. Click on **123 Oak Street** to open the property detail page.
-2. Add income:
+2. **Verify:** The mortgage shows a **Manual** badge.
+3. Add income:
    - **Date:** `2025-01-01`, **Amount:** `2200`, **Category:** `rent`
-3. Add an expense:
+4. Add an expense:
    - **Date:** `2025-01-15`, **Amount:** `1500`, **Category:** `mortgage`
-4. Add another expense:
+5. Add another expense:
    - **Date:** `2025-01-20`, **Amount:** `150`, **Category:** `insurance`
-5. **Verify:** The cash flow chart shows January with $2,200 income and $1,650 expenses, yielding $550 net cash flow. The Dashboard net worth now includes property equity.
+6. **Verify:** The cash flow chart shows January with $2,200 income and $1,650 expenses, yielding $550 net cash flow. The Dashboard net worth now includes property equity.
+
+---
+
+### 10a. Create a Property with Loan Details (Computed Balance)
+
+1. Go back to **Properties** (`/properties`).
+2. Click **New Property**.
+3. Fill in the basic fields:
+   - **Address:** `456 Elm Avenue`
+   - **Purchase Price:** `300000`
+   - **Purchase Date:** `2020-01-01`
+   - **Current Value:** `350000`
+   - **Mortgage Balance:** `250000`
+4. Click **Show Loan Details** to expand the loan section.
+5. Fill in:
+   - **Loan Amount:** `280000`
+   - **Annual Interest Rate:** `6.5`
+   - **Loan Term (months):** `360`
+   - **Loan Start Date:** `2020-01-01`
+   - Check **Use computed mortgage balance (amortization)**
+6. Click **Create**.
+7. **Verify:**
+   - The property appears with a **Computed Balance** badge in the list.
+   - The mortgage balance is NOT $250,000 (the manual value); it is the amortization-computed remaining balance (approximately $257,034 as of March 2026, depending on current date).
+   - Equity = Current Value minus the computed balance.
+
+---
+
+### 10b. View Loan Details on Property Detail Page
+
+1. Click on **456 Elm Avenue** to open the detail page.
+2. **Verify:**
+   - The mortgage row shows a **Computed** badge (blue).
+   - A **Loan Details** panel appears below the summary showing: Amount ($280,000), Rate (6.5%), Term (360 months), Start (2020-01-01).
+   - The mortgage balance and equity are computed from amortization, not the manual $250,000.
+
+---
+
+### 10c. Toggle Between Computed and Manual Balance
+
+1. Using the API (or by editing the property in a future edit form), update the property to set `use_computed_balance: false`:
+   ```bash
+   curl -X PUT http://localhost:8080/api/v1/properties/{id} \
+     -H "Authorization: Bearer $TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"address":"456 Elm Avenue","purchase_price":300000,"purchase_date":"2020-01-01",
+          "current_value":350000,"mortgage_balance":250000,
+          "loan_amount":280000,"annual_interest_rate":6.5,"loan_term_months":360,
+          "loan_start_date":"2020-01-01","use_computed_balance":false}'
+   ```
+2. **Verify:** The mortgage balance reverts to $250,000 (manual) and equity becomes $100,000.
+3. Toggle back to `use_computed_balance: true` and verify the computed balance returns.
+
+---
+
+### 10d. Partial Loan Details Validation
+
+1. Using the API, try to create a property with only some loan fields:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/properties \
+     -H "Authorization: Bearer $TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"address":"Bad Property","purchase_price":200000,"purchase_date":"2023-01-01",
+          "current_value":210000,"loan_amount":180000}'
+   ```
+2. **Verify:** Returns **400 Bad Request** with message "Loan details must be provided in full (loanAmount, annualInterestRate, loanTermMonths, loanStartDate) or not at all".
+
+---
+
+### 10e. Fully Paid-Off Loan
+
+1. Create a property with a loan that started 30+ years ago:
+   ```bash
+   curl -X POST http://localhost:8080/api/v1/properties \
+     -H "Authorization: Bearer $TOKEN" \
+     -H 'Content-Type: application/json' \
+     -d '{"address":"700 Paid Off Circle","purchase_price":150000,"purchase_date":"1990-01-01",
+          "current_value":400000,"mortgage_balance":0,
+          "loan_amount":120000,"annual_interest_rate":8.0,"loan_term_months":360,
+          "loan_start_date":"1990-01-01","use_computed_balance":true}'
+   ```
+2. **Verify:** Mortgage balance is $0 and equity equals the full current value ($400,000). The amortization calculator returns zero for loans past their term.
+
+---
+
+### 10f. Valuation History (Empty State)
+
+1. Open any property's detail page.
+2. **Verify:** If no valuations have been recorded, the page shows "No valuation history yet" with a **Refresh Valuation** button.
+
+---
+
+### 10g. Valuation Refresh (Zillow Disabled)
+
+1. Click the **Refresh Valuation** button on any property detail page.
+2. **Verify:** A toast error appears because Zillow scraping is disabled by default (503 Service Unavailable). This is expected behavior.
+
+---
+
+### 10h. Valuation Refresh (Zillow Enabled)
+
+To test with Zillow enabled:
+
+1. Set `app.zillow.enabled=true` in `application.yml` (or via environment variable) and restart the backend.
+2. Navigate to a property detail page and click **Refresh Valuation**.
+3. **Verify:** If the address is found on Zillow, a valuation is recorded and the history chart and table appear. The property's current value is updated to the Zestimate.
+4. **Note:** Zillow may block or rate-limit scraping. Empty results are handled gracefully (no crash, warning logged server-side).
+
+---
+
+### 10i. Dashboard Reflects Computed Balances
+
+1. Navigate to the **Dashboard** (`/`).
+2. **Verify:**
+   - Properties with `use_computed_balance: true` show equity computed from amortization (not the manual mortgage balance).
+   - Properties with `use_computed_balance: false` show equity from the manual mortgage balance.
+   - Net worth correctly sums all property equity, investment holdings, and cash.
+   - The allocation pie chart includes a "property" slice.
 
 ---
 
@@ -695,8 +821,17 @@ Open the frontend in a browser (typically http://localhost:5173).
 | 6 | CSV import | Transactions imported, dedup works |
 | 7 | OFX import | Transactions parsed correctly |
 | 8 | Portfolio history | Chart renders with historical prices |
-| 9 | Create property | Equity calculated correctly |
+| 9 | Create property (manual) | Equity = current value - manual mortgage balance |
 | 10 | Rental income/expenses | Cash flow chart and net calculation |
+| 10a | Property with loan details | Computed balance via amortization, "Computed Balance" badge |
+| 10b | Loan details display | Loan panel on detail page, Computed badge on mortgage |
+| 10c | Toggle computed/manual | Balance switches between amortization and manual on toggle |
+| 10d | Partial loan validation | 400 error when only some loan fields provided |
+| 10e | Paid-off loan | Zero balance for loans past their term |
+| 10f | Valuation history empty | "No valuation history" placeholder with refresh button |
+| 10g | Valuation refresh (disabled) | 503 when Zillow disabled |
+| 10h | Valuation refresh (enabled) | Zestimate recorded, chart and table appear |
+| 10i | Dashboard computed balances | Net worth uses computed balance for flagged properties |
 | 11 | Fixed % projection | Balance chart, flows, data table, summary cards |
 | 12 | Dynamic % projection | Withdrawals track current balance, never depletes |
 | 13 | Vanguard dynamic | Withdrawal changes capped at ceiling/floor |
