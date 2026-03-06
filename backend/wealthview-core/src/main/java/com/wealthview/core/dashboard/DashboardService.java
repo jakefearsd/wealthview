@@ -3,8 +3,10 @@ package com.wealthview.core.dashboard;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
+import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -109,7 +112,9 @@ public class DashboardService {
         var totalPropertyEquity = BigDecimal.ZERO;
         var properties = propertyRepository.findByTenant_Id(tenantId);
         for (var property : properties) {
-            var equity = property.getEquity();
+            // TODO: depreciation affects book value vs market value
+            var effectiveBalance = computeEffectiveBalance(property);
+            var equity = property.getCurrentValue().subtract(effectiveBalance);
             totalPropertyEquity = totalPropertyEquity.add(equity);
             accountSummaries.add(new AccountSummary(
                     property.getAddress(), "property", equity));
@@ -123,6 +128,18 @@ public class DashboardService {
                 .map(price -> holding.getQuantity().multiply(price.getClosePrice())
                         .setScale(4, RoundingMode.HALF_UP))
                 .orElse(holding.getCostBasis());
+    }
+
+    private BigDecimal computeEffectiveBalance(PropertyEntity property) {
+        if (property.isUseComputedBalance() && property.hasLoanDetails()) {
+            return AmortizationCalculator.remainingBalance(
+                    property.getLoanAmount(),
+                    property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(),
+                    property.getLoanStartDate(),
+                    LocalDate.now());
+        }
+        return property.getMortgageBalance();
     }
 
     private List<AllocationEntry> buildAllocation(HashMap<String, BigDecimal> map, BigDecimal total) {
