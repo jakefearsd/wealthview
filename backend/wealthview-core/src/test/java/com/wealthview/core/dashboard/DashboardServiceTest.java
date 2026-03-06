@@ -171,6 +171,29 @@ class DashboardServiceTest {
     }
 
     @Test
+    void getSummary_withComputedMortgageBalance_usesAmortization() {
+        var property = new PropertyEntity(tenant, "789 Elm St",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("450000"), new BigDecimal("300000"));
+        property.setLoanAmount(new BigDecimal("350000"));
+        property.setAnnualInterestRate(new BigDecimal("6.5"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        property.setUseComputedBalance(true);
+
+        when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(Collections.emptyList()));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(Collections.emptyList());
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
+
+        var result = dashboardService.getSummary(tenantId);
+
+        // Should NOT use the manual 300000 balance
+        assertThat(result.totalPropertyEquity()).isNotEqualByComparingTo("150000");
+        assertThat(result.totalPropertyEquity()).isPositive();
+    }
+
+    @Test
     void getSummary_emptyTenant_returnsZeros() {
         when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(Collections.emptyList()));
