@@ -1,0 +1,196 @@
+package com.wealthview.core.portfolio;
+
+import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
+import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.PriceEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.HoldingRepository;
+import com.wealthview.persistence.repository.PriceRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.math.BigDecimal;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class TheoreticalPortfolioServiceTest {
+
+    @Mock
+    private AccountRepository accountRepository;
+
+    @Mock
+    private HoldingRepository holdingRepository;
+
+    @Mock
+    private PriceRepository priceRepository;
+
+    @InjectMocks
+    private TheoreticalPortfolioService service;
+
+    private UUID tenantId;
+    private UUID accountId;
+    private TenantEntity tenant;
+    private AccountEntity brokerageAccount;
+    private AccountEntity bankAccount;
+
+    @BeforeEach
+    void setUp() {
+        tenantId = UUID.randomUUID();
+        accountId = UUID.randomUUID();
+        tenant = new TenantEntity("Test");
+        brokerageAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        bankAccount = new AccountEntity(tenant, "Checking", "bank", "Chase");
+    }
+
+    @Test
+    void computeHistory_accountNotFound_throwsEntityNotFoundException() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.computeHistory(tenantId, accountId))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void computeHistory_bankAccount_returnsEmptyDataPoints() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(bankAccount));
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        assertThat(result.dataPoints()).isEmpty();
+        assertThat(result.accountId()).isEqualTo(accountId);
+    }
+
+    @Test
+    void computeHistory_noHoldings_returnsEmptyDataPoints() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of());
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        assertThat(result.dataPoints()).isEmpty();
+        assertThat(result.symbols()).isEmpty();
+    }
+
+    @Test
+    void computeHistory_singleHoldingWithPrices_computesWeeklyValues() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding));
+
+        // Create prices for two consecutive Fridays
+        var friday1 = LocalDate.of(2025, 1, 3); // A Friday
+        var friday2 = LocalDate.of(2025, 1, 10); // Next Friday
+        var prices = List.of(
+                new PriceEntity("AAPL", friday1, new BigDecimal("150.0000"), "seed"),
+                new PriceEntity("AAPL", friday2, new BigDecimal("155.0000"), "seed")
+        );
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(prices);
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        assertThat(result.symbols()).containsExactly("AAPL");
+        assertThat(result.dataPoints()).isNotEmpty();
+
+        // Find the data points matching our price dates
+        var point1 = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday1)).findFirst();
+        var point2 = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday2)).findFirst();
+
+        assertThat(point1).isPresent();
+        assertThat(point1.get().totalValue()).isEqualByComparingTo(new BigDecimal("1500.0000"));
+        assertThat(point2).isPresent();
+        assertThat(point2.get().totalValue()).isEqualByComparingTo(new BigDecimal("1550.0000"));
+    }
+
+    @Test
+    void computeHistory_multipleHoldings_sumsAcrossSymbols() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding1 = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        var holding2 = new HoldingEntity(brokerageAccount, tenant, "GOOG",
+                new BigDecimal("5"), BigDecimal.ZERO);
+        // Zero-quantity holding should be filtered out
+        var holding3 = new HoldingEntity(brokerageAccount, tenant, "MSFT",
+                BigDecimal.ZERO, BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding1, holding2, holding3));
+
+        var friday = LocalDate.of(2025, 1, 3);
+        var prices = List.of(
+                new PriceEntity("AAPL", friday, new BigDecimal("150.0000"), "seed"),
+                new PriceEntity("GOOG", friday, new BigDecimal("100.0000"), "seed")
+        );
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                any(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(prices);
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        assertThat(result.symbols()).containsExactlyInAnyOrder("AAPL", "GOOG");
+
+        var point = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday)).findFirst();
+        assertThat(point).isPresent();
+        // 10 * 150 + 5 * 100 = 2000
+        assertThat(point.get().totalValue()).isEqualByComparingTo(new BigDecimal("2000.0000"));
+    }
+
+    @Test
+    void computeHistory_missingPriceForFriday_usesClosestPriorPrice() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding));
+
+        // Price on Thursday, not Friday
+        var thursday = LocalDate.of(2025, 1, 2); // Thursday
+        var friday = LocalDate.of(2025, 1, 3); // Friday with no price
+        var prices = List.of(
+                new PriceEntity("AAPL", thursday, new BigDecimal("148.0000"), "seed")
+        );
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(prices);
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        // Friday data point should use Thursday's price via floorEntry
+        var point = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday)).findFirst();
+        assertThat(point).isPresent();
+        assertThat(point.get().totalValue()).isEqualByComparingTo(new BigDecimal("1480.0000"));
+    }
+}

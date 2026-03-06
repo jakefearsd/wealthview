@@ -1,16 +1,15 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAccount } from '../api/accounts';
-import { listTransactions, createTransaction, deleteTransaction } from '../api/transactions';
+import { listTransactions, deleteTransaction } from '../api/transactions';
 import { listHoldings } from '../api/holdings';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
-import type { TransactionRequest } from '../types/transaction';
+import { formatCurrency } from '../utils/format';
+import { cardStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
-
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
+import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
+import TransactionForm from '../components/TransactionForm';
 
 export default function AccountDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -22,33 +21,6 @@ export default function AccountDetailPage() {
     const { data: txnPage, loading: txnLoading, refetch: refetchTxns } = useApiQuery(() => listTransactions(id!, 0, 50));
 
     const [showAdd, setShowAdd] = useState(false);
-    const [txnDate, setTxnDate] = useState('');
-    const [txnType, setTxnType] = useState('buy');
-    const [txnSymbol, setTxnSymbol] = useState('');
-    const [txnQuantity, setTxnQuantity] = useState('');
-    const [txnAmount, setTxnAmount] = useState('');
-
-    async function handleAddTransaction() {
-        const request: TransactionRequest = {
-            date: txnDate,
-            type: txnType,
-            symbol: txnSymbol || undefined,
-            quantity: txnQuantity ? parseFloat(txnQuantity) : undefined,
-            amount: parseFloat(txnAmount),
-        };
-        try {
-            await createTransaction(id!, request);
-            toast.success('Transaction added');
-            setShowAdd(false);
-            setTxnDate('');
-            setTxnSymbol('');
-            setTxnQuantity('');
-            setTxnAmount('');
-            refetchTxns();
-        } catch {
-            toast.error('Failed to add transaction');
-        }
-    }
 
     async function handleDeleteTxn(txnId: string) {
         try {
@@ -71,7 +43,7 @@ export default function AccountDetailPage() {
             <div style={{ color: '#666', marginBottom: '2rem' }}>{account?.type} {account?.institution ? `- ${account.institution}` : ''}</div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                <div style={cardStyle}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h3>Holdings</h3>
                     </div>
@@ -107,32 +79,22 @@ export default function AccountDetailPage() {
                 </div>
             </div>
 
-            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+            {account && account.type !== 'bank' && (
+                <TheoreticalPortfolioChart accountId={id!} accountType={account.type} />
+            )}
+
+            <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3>Transactions</h3>
                     {canWrite && <button onClick={() => setShowAdd(true)} style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Add Transaction</button>}
                 </div>
 
                 {showAdd && (
-                    <div style={{ padding: '1rem', background: '#f9f9f9', borderRadius: '4px', marginBottom: '1rem' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
-                            <input type="date" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} style={{ padding: '0.4rem' }} />
-                            <select value={txnType} onChange={(e) => setTxnType(e.target.value)} style={{ padding: '0.4rem' }}>
-                                <option value="buy">Buy</option>
-                                <option value="sell">Sell</option>
-                                <option value="dividend">Dividend</option>
-                                <option value="deposit">Deposit</option>
-                                <option value="withdrawal">Withdrawal</option>
-                            </select>
-                            <input placeholder="Symbol" value={txnSymbol} onChange={(e) => setTxnSymbol(e.target.value)} style={{ padding: '0.4rem' }} />
-                            <input placeholder="Quantity" type="number" value={txnQuantity} onChange={(e) => setTxnQuantity(e.target.value)} style={{ padding: '0.4rem' }} />
-                            <input placeholder="Amount" type="number" step="0.01" value={txnAmount} onChange={(e) => setTxnAmount(e.target.value)} style={{ padding: '0.4rem' }} />
-                        </div>
-                        <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
-                            <button onClick={handleAddTransaction} style={{ padding: '0.4rem 0.8rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
-                            <button onClick={() => setShowAdd(false)} style={{ padding: '0.4rem 0.8rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
-                        </div>
-                    </div>
+                    <TransactionForm
+                        accountId={id!}
+                        onSuccess={() => { setShowAdd(false); refetchTxns(); }}
+                        onCancel={() => setShowAdd(false)}
+                    />
                 )}
 
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>

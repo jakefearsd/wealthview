@@ -25,7 +25,9 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class PropertyService {
@@ -132,24 +134,26 @@ public class PropertyService {
         var incomes = incomeRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
         var expenses = expenseRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
 
+        Map<YearMonth, BigDecimal> incomeByMonth = incomes.stream()
+                .collect(Collectors.groupingBy(
+                        i -> YearMonth.from(i.getDate()),
+                        Collectors.reducing(BigDecimal.ZERO, PropertyIncomeEntity::getAmount, BigDecimal::add)));
+
+        Map<YearMonth, BigDecimal> expenseByMonth = expenses.stream()
+                .collect(Collectors.groupingBy(
+                        e -> YearMonth.from(e.getDate()),
+                        Collectors.reducing(BigDecimal.ZERO, PropertyExpenseEntity::getAmount, BigDecimal::add)));
+
         var entries = new ArrayList<MonthlyCashFlowEntry>();
         var current = from;
         var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
         while (!current.isAfter(to)) {
-            var month = current;
-            var monthIncome = incomes.stream()
-                    .filter(i -> YearMonth.from(i.getDate()).equals(month))
-                    .map(PropertyIncomeEntity::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-            var monthExpense = expenses.stream()
-                    .filter(e -> YearMonth.from(e.getDate()).equals(month))
-                    .map(PropertyExpenseEntity::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
+            var monthExpense = expenseByMonth.getOrDefault(current, BigDecimal.ZERO);
 
             entries.add(new MonthlyCashFlowEntry(
-                    month.format(formatter),
+                    current.format(formatter),
                     monthIncome,
                     monthExpense,
                     monthIncome.subtract(monthExpense)

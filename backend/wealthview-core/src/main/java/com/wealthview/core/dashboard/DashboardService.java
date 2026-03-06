@@ -3,6 +3,7 @@ package com.wealthview.core.dashboard;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
+import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -52,35 +53,59 @@ public class DashboardService {
         var allocationMap = new HashMap<String, BigDecimal>();
 
         for (var account : accounts) {
-            var accountBalance = BigDecimal.ZERO;
+            var accountBalance = "bank".equals(account.getType())
+                    ? computeBankBalance(account, tenantId)
+                    : computeInvestmentValue(account, holdings);
 
             if ("bank".equals(account.getType())) {
-                var transactions = transactionRepository.findByAccount_IdAndTenant_Id(
-                        account.getId(), tenantId, Pageable.unpaged());
-                for (var txn : transactions) {
-                    if ("deposit".equals(txn.getType())) {
-                        accountBalance = accountBalance.add(txn.getAmount());
-                    } else if ("withdrawal".equals(txn.getType())) {
-                        accountBalance = accountBalance.subtract(txn.getAmount());
-                    }
-                }
                 totalCash = totalCash.add(accountBalance);
             } else {
-                var accountHoldings = holdings.stream()
-                        .filter(h -> account.getId().equals(h.getAccountId()))
-                        .toList();
-                for (var holding : accountHoldings) {
-                    accountBalance = accountBalance.add(getHoldingValue(holding));
-                }
                 totalInvestments = totalInvestments.add(accountBalance);
             }
 
             accountSummaries.add(new AccountSummary(
                     account.getName(), account.getType(), accountBalance));
-
             allocationMap.merge(account.getType(), accountBalance, BigDecimal::add);
         }
 
+        var totalPropertyEquity = computePropertySummaries(tenantId, accountSummaries, allocationMap);
+
+        var netWorth = totalInvestments.add(totalCash).add(totalPropertyEquity);
+        var allocation = buildAllocation(allocationMap, netWorth);
+
+        return new DashboardSummaryResponse(
+                netWorth, totalInvestments, totalCash,
+                totalPropertyEquity, accountSummaries, allocation);
+    }
+
+    private BigDecimal computeBankBalance(AccountEntity account, UUID tenantId) {
+        var transactions = transactionRepository.findByAccount_IdAndTenant_Id(
+                account.getId(), tenantId, Pageable.unpaged());
+        var balance = BigDecimal.ZERO;
+        for (var txn : transactions) {
+            if ("deposit".equals(txn.getType())) {
+                balance = balance.add(txn.getAmount());
+            } else if ("withdrawal".equals(txn.getType())) {
+                balance = balance.subtract(txn.getAmount());
+            }
+        }
+        return balance;
+    }
+
+    private BigDecimal computeInvestmentValue(AccountEntity account, List<HoldingEntity> holdings) {
+        var value = BigDecimal.ZERO;
+        var accountHoldings = holdings.stream()
+                .filter(h -> account.getId().equals(h.getAccountId()))
+                .toList();
+        for (var holding : accountHoldings) {
+            value = value.add(getHoldingValue(holding));
+        }
+        return value;
+    }
+
+    private BigDecimal computePropertySummaries(UUID tenantId,
+                                                 List<AccountSummary> accountSummaries,
+                                                 HashMap<String, BigDecimal> allocationMap) {
         var totalPropertyEquity = BigDecimal.ZERO;
         var properties = propertyRepository.findByTenant_Id(tenantId);
         for (var property : properties) {
@@ -90,14 +115,7 @@ public class DashboardService {
                     property.getAddress(), "property", equity));
             allocationMap.merge("property", equity, BigDecimal::add);
         }
-
-        var netWorth = totalInvestments.add(totalCash).add(totalPropertyEquity);
-
-        var allocation = buildAllocation(allocationMap, netWorth);
-
-        return new DashboardSummaryResponse(
-                netWorth, totalInvestments, totalCash,
-                totalPropertyEquity, accountSummaries, allocation);
+        return totalPropertyEquity;
     }
 
     private BigDecimal getHoldingValue(HoldingEntity holding) {
