@@ -15,6 +15,7 @@ import PropertyDetailPage from './pages/PropertyDetailPage';
 import ProjectionsPage from './pages/ProjectionsPage';
 import ProjectionComparePage from './pages/ProjectionComparePage';
 import ProjectionDetailPage from './pages/ProjectionDetailPage';
+import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -35,6 +36,7 @@ export default function App() {
                         <Route path="projections" element={<ProjectionsPage />} />
                         <Route path="projections/compare" element={<ProjectionComparePage />} />
                         <Route path="projections/:id" element={<ProjectionDetailPage />} />
+                        <Route path="spending-profiles" element={<SpendingProfilesPage />} />
                         <Route path="properties" element={<PropertiesListPage />} />
                         <Route path="properties/:id" element={<PropertyDetailPage />} />
                         <Route path="settings" element={<SettingsPage />} />

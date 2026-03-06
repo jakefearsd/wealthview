@@ -1,5 +1,5 @@
 import client from './client';
-import type { Scenario, ProjectionResult, CreateScenarioRequest, CompareResponse } from '../types/projection';
+import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse } from '../types/projection';
 
 export async function listScenarios(): Promise<Scenario[]> {
     const { data } = await client.get<Scenario[]>('/projections');
@@ -13,6 +13,11 @@ export async function getScenario(id: string): Promise<Scenario> {
 
 export async function createScenario(request: CreateScenarioRequest): Promise<Scenario> {
     const { data } = await client.post<Scenario>('/projections', request);
+    return data;
+}
+
+export async function updateScenario(id: string, request: UpdateScenarioRequest): Promise<Scenario> {
+    const { data } = await client.put<Scenario>(`/projections/${id}`, request);
     return data;
 }
 
