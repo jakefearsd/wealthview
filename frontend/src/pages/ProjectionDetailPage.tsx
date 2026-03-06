@@ -47,6 +47,14 @@ export default function ProjectionDetailPage() {
     if (!scenario) return <div>Scenario not found</div>;
 
     const retirementYear = scenario.retirement_date ? new Date(scenario.retirement_date).getFullYear() : null;
+    const hasPoolData = result?.yearly_data.some(y => y.traditional_balance !== null) ?? false;
+    const parsedParams = scenario.params_json ? JSON.parse(scenario.params_json) : {};
+    const strategyLabels: Record<string, string> = {
+        fixed_percentage: 'Fixed Percentage',
+        dynamic_percentage: 'Dynamic Percentage',
+        vanguard_dynamic_spending: 'Vanguard Dynamic Spending',
+    };
+    const strategyLabel = strategyLabels[parsedParams.withdrawal_strategy] || 'Fixed Percentage';
     const peak = result ? findPeakBalance(result.yearly_data) : null;
     const depletion = result ? findDepletionYear(result.yearly_data) : null;
 
@@ -71,6 +79,7 @@ export default function ProjectionDetailPage() {
                 <SummaryCard label="Retirement Date" value={scenario.retirement_date} />
                 <SummaryCard label="End Age" value={String(scenario.end_age)} />
                 <SummaryCard label="Inflation Rate" value={`${(scenario.inflation_rate * 100).toFixed(1)}%`} />
+                <SummaryCard label="Strategy" value={strategyLabel} />
                 <SummaryCard label="Accounts" value={String(scenario.accounts.length)} />
             </div>
 
@@ -80,6 +89,7 @@ export default function ProjectionDetailPage() {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
                                 <th style={{ textAlign: 'right', padding: '0.5rem' }}>Initial Balance</th>
                                 <th style={{ textAlign: 'right', padding: '0.5rem' }}>Annual Contribution</th>
                                 <th style={{ textAlign: 'right', padding: '0.5rem' }}>Expected Return</th>
@@ -88,6 +98,7 @@ export default function ProjectionDetailPage() {
                         <tbody>
                             {scenario.accounts.map(a => (
                                 <tr key={a.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{(a.expected_return * 100).toFixed(1)}%</td>
@@ -160,6 +171,15 @@ export default function ProjectionDetailPage() {
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Withdrawals</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>End</th>
                                             <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
+                                            {hasPoolData && (
+                                                <>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Traditional</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Roth</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Taxable</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Conversion</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax</th>
+                                                </>
+                                            )}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -182,6 +202,15 @@ export default function ProjectionDetailPage() {
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawals > 0 ? formatCurrency(y.withdrawals) : '-'}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
+                                                    {hasPoolData && (
+                                                        <>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>{y.traditional_balance != null ? formatCurrency(y.traditional_balance) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.roth_balance != null ? formatCurrency(y.roth_balance) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#1976d2' }}>{y.taxable_balance != null ? formatCurrency(y.taxable_balance) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.roth_conversion_amount ? formatCurrency(y.roth_conversion_amount) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_liability ? formatCurrency(y.tax_liability) : '-'}</td>
+                                                        </>
+                                                    )}
                                                 </tr>
                                             );
                                         })}

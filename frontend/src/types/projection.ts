@@ -4,6 +4,7 @@ export interface ProjectionAccount {
     initial_balance: number;
     annual_contribution: number;
     expected_return: number;
+    account_type: string;
 }
 
 export interface Scenario {
@@ -27,6 +28,11 @@ export interface ProjectionYear {
     withdrawals: number;
     end_balance: number;
     retired: boolean;
+    traditional_balance: number | null;
+    roth_balance: number | null;
+    taxable_balance: number | null;
+    roth_conversion_amount: number | null;
+    tax_liability: number | null;
 }
 
 export interface ProjectionResult {
@@ -36,6 +42,10 @@ export interface ProjectionResult {
     years_in_retirement: number;
 }
 
+export interface CompareResponse {
+    results: ProjectionResult[];
+}
+
 export interface CreateScenarioRequest {
     name: string;
     retirement_date: string;
@@ -43,10 +53,17 @@ export interface CreateScenarioRequest {
     inflation_rate: number;
     birth_year: number | null;
     withdrawal_rate: number | null;
+    withdrawal_strategy?: string | null;
+    dynamic_ceiling?: number | null;
+    dynamic_floor?: number | null;
+    filing_status?: string | null;
+    other_income?: number | null;
+    annual_roth_conversion?: number | null;
     accounts: {
         linked_account_id: string | null;
         initial_balance: number;
         annual_contribution: number;
         expected_return: number;
+        account_type?: string;
     }[];
 }

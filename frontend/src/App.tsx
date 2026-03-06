@@ -13,6 +13,7 @@ import PricesPage from './pages/PricesPage';
 import PropertiesListPage from './pages/PropertiesListPage';
 import PropertyDetailPage from './pages/PropertyDetailPage';
 import ProjectionsPage from './pages/ProjectionsPage';
+import ProjectionComparePage from './pages/ProjectionComparePage';
 import ProjectionDetailPage from './pages/ProjectionDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -32,6 +33,7 @@ export default function App() {
                         <Route path="accounts/:id/import" element={<ImportPage />} />
                         <Route path="prices" element={<PricesPage />} />
                         <Route path="projections" element={<ProjectionsPage />} />
+                        <Route path="projections/compare" element={<ProjectionComparePage />} />
                         <Route path="projections/:id" element={<ProjectionDetailPage />} />
                         <Route path="properties" element={<PropertiesListPage />} />
                         <Route path="properties/:id" element={<PropertyDetailPage />} />

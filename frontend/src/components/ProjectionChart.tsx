@@ -46,6 +46,7 @@ export default function ProjectionChart({ data, retirementYear, mode }: Projecti
     const cumulative = computeCumulativeContributions(data);
     const chartData = data.map((row, i) => ({ ...row, cumulative_contributions: cumulative[i] }));
     const depletion = findDepletionYear(data);
+    const hasPoolData = data.some(d => d.traditional_balance !== null);
 
     return (
         <ResponsiveContainer width="100%" height={450}>
@@ -78,22 +79,33 @@ export default function ProjectionChart({ data, retirementYear, mode }: Projecti
                 />
                 {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
                 {depletion && <ReferenceLine x={depletion.year} stroke="#d32f2f" strokeDasharray="5 5" label="Depleted" />}
-                <Area
-                    type="monotone"
-                    dataKey="cumulative_contributions"
-                    stroke="#81c784"
-                    strokeWidth={1}
-                    fill="url(#colorContributions)"
-                    name="Total Contributions"
-                />
-                <Area
-                    type="monotone"
-                    dataKey="end_balance"
-                    stroke="#1976d2"
-                    strokeWidth={2}
-                    fill="url(#colorBalance)"
-                    name="Balance"
-                />
+                {!hasPoolData && (
+                    <Area
+                        type="monotone"
+                        dataKey="cumulative_contributions"
+                        stroke="#81c784"
+                        strokeWidth={1}
+                        fill="url(#colorContributions)"
+                        name="Total Contributions"
+                    />
+                )}
+                {!hasPoolData && (
+                    <Area
+                        type="monotone"
+                        dataKey="end_balance"
+                        stroke="#1976d2"
+                        strokeWidth={2}
+                        fill="url(#colorBalance)"
+                        name="Balance"
+                    />
+                )}
+                {hasPoolData && (
+                    <>
+                        <Area type="monotone" dataKey="traditional_balance" stackId="pools" stroke="#e65100" fill="#e65100" fillOpacity={0.3} name="Traditional" />
+                        <Area type="monotone" dataKey="roth_balance" stackId="pools" stroke="#2e7d32" fill="#2e7d32" fillOpacity={0.3} name="Roth" />
+                        <Area type="monotone" dataKey="taxable_balance" stackId="pools" stroke="#1976d2" fill="#1976d2" fillOpacity={0.3} name="Taxable" />
+                    </>
+                )}
             </AreaChart>
         </ResponsiveContainer>
     );
