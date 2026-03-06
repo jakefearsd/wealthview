@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -33,14 +34,14 @@ public class ImportService {
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
     private final CsvParser csvParser;
-    private final java.util.Map<String, CsvParser> namedParsers;
+    private final Map<String, CsvParser> namedParsers;
 
     public ImportService(ImportJobRepository importJobRepository,
                          AccountRepository accountRepository,
                          TransactionRepository transactionRepository,
                          TransactionService transactionService,
                          CsvParser csvParser,
-                         java.util.Map<String, CsvParser> namedParsers) {
+                         Map<String, CsvParser> namedParsers) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
@@ -75,11 +76,26 @@ public class ImportService {
     }
 
     @Transactional
+    public ImportJobResponse importOfx(UUID tenantId, UUID accountId, InputStream inputStream) throws IOException {
+        var ofxParser = namedParsers.get("ofxParser");
+        if (ofxParser == null) {
+            throw new IllegalStateException("OFX parser not available");
+        }
+        var parseResult = ofxParser.parse(inputStream);
+        return processImport(tenantId, accountId, parseResult, "ofx");
+    }
+
+    @Transactional
     public ImportJobResponse processCsvImport(UUID tenantId, UUID accountId, CsvParseResult parseResult) {
+        return processImport(tenantId, accountId, parseResult, "csv");
+    }
+
+    private ImportJobResponse processImport(UUID tenantId, UUID accountId,
+                                             CsvParseResult parseResult, String source) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
-        var job = new ImportJobEntity(account.getTenant(), account, "csv");
+        var job = new ImportJobEntity(account.getTenant(), account, source);
         job.setStatus("processing");
         job.setTotalRows(parseResult.transactions().size() + parseResult.errors().size());
         job = importJobRepository.save(job);
@@ -87,8 +103,8 @@ public class ImportService {
         var result = importTransactions(parseResult.transactions(), tenantId, accountId);
         finalizeJob(job, result, parseResult.errors().size());
 
-        log.info("CSV import completed for account {}: {} successful, {} failed",
-                accountId, result.successCount(), job.getFailedRows());
+        log.info("{} import completed for account {}: {} successful, {} failed",
+                source.toUpperCase(), accountId, result.successCount(), job.getFailedRows());
         return ImportJobResponse.from(job);
     }
 
