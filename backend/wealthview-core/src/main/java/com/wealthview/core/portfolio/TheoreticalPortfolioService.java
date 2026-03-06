@@ -78,13 +78,31 @@ public class TheoreticalPortfolioService {
                 symbols, startDate, endDate);
 
         var priceMap = buildPriceMap(prices);
+
+        // Filter to only symbols that have price data
+        var pricedSymbols = symbols.stream()
+                .filter(priceMap::containsKey)
+                .toList();
+
+        if (pricedSymbols.isEmpty()) {
+            log.info("No price data available for any holdings of account {}", accountId);
+            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0);
+        }
+
+        if (pricedSymbols.size() < symbols.size()) {
+            var missing = symbols.stream()
+                    .filter(s -> !priceMap.containsKey(s))
+                    .toList();
+            log.info("Skipping symbols without price data for account {}: {}", accountId, missing);
+        }
+
         var fridays = generateFridays(startDate, endDate);
-        var dataPoints = computeWeeklyValues(fridays, symbols, quantityBySymbol, priceMap);
+        var dataPoints = computeWeeklyValues(fridays, pricedSymbols, quantityBySymbol, priceMap);
 
         log.info("Computed {} weekly data points for account {} with {} symbols",
-                dataPoints.size(), accountId, symbols.size());
+                dataPoints.size(), accountId, pricedSymbols.size());
 
-        return new PortfolioHistoryResponse(accountId, dataPoints, symbols, dataPoints.size());
+        return new PortfolioHistoryResponse(accountId, dataPoints, pricedSymbols, dataPoints.size());
     }
 
     private Map<String, TreeMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {

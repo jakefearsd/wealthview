@@ -166,6 +166,39 @@ class TheoreticalPortfolioServiceTest {
     }
 
     @Test
+    void computeHistory_someSymbolsWithoutPrices_skipsMissingSymbolsAndComputesRest() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding1 = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        var holding2 = new HoldingEntity(brokerageAccount, tenant, "SPAXX",
+                new BigDecimal("2500"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding1, holding2));
+
+        var friday = LocalDate.of(2025, 1, 3);
+        // Only AAPL has prices, SPAXX does not
+        var prices = List.of(
+                new PriceEntity("AAPL", friday, new BigDecimal("150.0000"), "seed")
+        );
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                any(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(prices);
+
+        var result = service.computeHistory(tenantId, accountId);
+
+        // Should still return data points using AAPL only
+        assertThat(result.symbols()).containsExactly("AAPL");
+        assertThat(result.dataPoints()).isNotEmpty();
+
+        var point = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday)).findFirst();
+        assertThat(point).isPresent();
+        assertThat(point.get().totalValue()).isEqualByComparingTo(new BigDecimal("1500.0000"));
+    }
+
+    @Test
     void computeHistory_missingPriceForFriday_usesClosestPriorPrice() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(brokerageAccount));
