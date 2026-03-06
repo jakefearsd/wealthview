@@ -73,7 +73,7 @@ export default function AccountDetailPage() {
                 <div>
                     {canWrite && (
                         <Link to={`/accounts/${id}/import`} style={{ display: 'inline-block', padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', borderRadius: '4px', textDecoration: 'none', marginBottom: '1rem' }}>
-                            Import CSV
+                            Import Transactions
                         </Link>
                     )}
                 </div>
