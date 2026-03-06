@@ -44,6 +44,8 @@ export default function ImportPage() {
                         <option value="generic">Generic CSV</option>
                         <option value="fidelity">Fidelity</option>
                         <option value="fidelityPositions">Fidelity Positions</option>
+                        <option value="vanguard">Vanguard</option>
+                        <option value="schwab">Schwab</option>
                     </select>
                     <input type="file" accept=".csv" onChange={handleFileChange} />
                     <button onClick={handleUpload} disabled={!file || uploading} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
