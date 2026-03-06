@@ -3,6 +3,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import SummaryCard from '../components/SummaryCard';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
 
@@ -18,22 +19,10 @@ export default function DashboardPage() {
             <h2 style={{ marginBottom: '1.5rem' }}>Dashboard</h2>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Net Worth</div>
-                    <div style={{ fontSize: '1.75rem', fontWeight: 700, color: '#1a1a2e' }}>{formatCurrency(data.net_worth)}</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Investments</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_investments)}</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_cash)}</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Property Equity</div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(data.total_property_equity)}</div>
-                </div>
+                <SummaryCard label="Net Worth" value={formatCurrency(data.net_worth)} large />
+                <SummaryCard label="Investments" value={formatCurrency(data.total_investments)} />
+                <SummaryCard label="Cash" value={formatCurrency(data.total_cash)} />
+                <SummaryCard label="Property Equity" value={formatCurrency(data.total_property_equity)} />
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
