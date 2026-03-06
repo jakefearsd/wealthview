@@ -11,6 +11,11 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         withdrawals: 0,
         end_balance: 0,
         retired: false,
+        traditional_balance: null,
+        roth_balance: null,
+        taxable_balance: null,
+        roth_conversion_amount: null,
+        tax_liability: null,
         ...overrides,
     };
 }

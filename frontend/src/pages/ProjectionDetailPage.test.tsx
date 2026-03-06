@@ -13,7 +13,7 @@ const mockScenario: Scenario = {
     inflation_rate: 0.03,
     params_json: null,
     accounts: [
-        { id: 'a1', linked_account_id: null, initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07 },
+        { id: 'a1', linked_account_id: null, initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07, account_type: 'taxable' },
     ],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -89,7 +89,7 @@ describe('ProjectionDetailPage', () => {
         mockRun.mockResolvedValue({
             scenario_id: 'abc-123',
             yearly_data: [
-                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false },
+                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null },
             ],
             final_balance: 117700,
             years_in_retirement: 0,
