@@ -7,6 +7,8 @@ import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.ProjectionService;
+import com.wealthview.core.projection.dto.CompareRequest;
+import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioResponse;
@@ -132,10 +134,31 @@ class ProjectionControllerTest {
     }
 
     @Test
+    void compare_twoScenarios_returns200() throws Exception {
+        var id1 = UUID.randomUUID();
+        var id2 = UUID.randomUUID();
+        var response = new CompareResponse(List.of(
+                new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0),
+                new ProjectionResultResponse(id2, List.of(), BigDecimal.ZERO, 0)));
+        when(projectionService.compareScenarios(eq(TENANT_ID), any(CompareRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/projections/compare")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"scenario_ids": ["%s", "%s"]}
+                                """.formatted(id1, id2)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.results").isArray())
+                .andExpect(jsonPath("$.results.length()").value(2));
+    }
+
+    @Test
     void run_existingScenario_returns200() throws Exception {
         var result = new ProjectionResultResponse(
                 SCENARIO_ID,
-                List.of(new ProjectionYearDto(2026, 36,
+                List.of(ProjectionYearDto.simple(2026, 36,
                         new BigDecimal("100000"), new BigDecimal("10000"),
                         new BigDecimal("7700"), BigDecimal.ZERO,
                         new BigDecimal("117700"), false)),
