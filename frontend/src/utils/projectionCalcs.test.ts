@@ -16,6 +16,12 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         taxable_balance: null,
         roth_conversion_amount: null,
         tax_liability: null,
+        essential_expenses: null,
+        discretionary_expenses: null,
+        income_streams_total: null,
+        net_spending_need: null,
+        spending_surplus: null,
+        discretionary_after_cuts: null,
         ...overrides,
     };
 }

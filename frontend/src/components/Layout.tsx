@@ -5,6 +5,7 @@ const navItems = [
     { to: '/', label: 'Dashboard', adminOnly: false },
     { to: '/accounts', label: 'Accounts', adminOnly: false },
     { to: '/projections', label: 'Projections', adminOnly: false },
+    { to: '/spending-profiles', label: 'Spending Profiles', adminOnly: false },
     { to: '/properties', label: 'Properties', adminOnly: false },
     { to: '/prices', label: 'Prices', adminOnly: false },
     { to: '/settings', label: 'Settings', adminOnly: true },

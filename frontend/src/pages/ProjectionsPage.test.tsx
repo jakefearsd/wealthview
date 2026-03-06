@@ -14,6 +14,7 @@ const mockScenarios: Scenario[] = [
         inflation_rate: 0.03,
         params_json: null,
         accounts: [],
+        spending_profile: null,
         created_at: '2024-01-01T00:00:00Z',
         updated_at: '2024-01-01T00:00:00Z',
     },
@@ -25,6 +26,7 @@ const mockScenarios: Scenario[] = [
         inflation_rate: 0.025,
         params_json: null,
         accounts: [],
+        spending_profile: null,
         created_at: '2024-02-01T00:00:00Z',
         updated_at: '2024-02-01T00:00:00Z',
     },
@@ -34,6 +36,10 @@ vi.mock('../api/projections', () => ({
     listScenarios: vi.fn(),
     createScenario: vi.fn(),
     deleteScenario: vi.fn(),
+}));
+
+vi.mock('../api/spendingProfiles', () => ({
+    listSpendingProfiles: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../hooks/useApiQuery', () => ({
