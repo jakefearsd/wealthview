@@ -135,39 +135,46 @@ export default function ProjectionsPage() {
                 </div>
             )}
 
-            <div style={cardStyle}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Retirement Date</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>End Age</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>Inflation</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Created</th>
-                            <th style={{ padding: '0.5rem' }}></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {scenarios?.map(s => (
-                            <tr key={s.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                <td style={{ padding: '0.5rem' }}>
-                                    <Link to={`/projections/${s.id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>{s.name}</Link>
-                                </td>
-                                <td style={{ padding: '0.5rem' }}>{s.retirement_date}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{s.end_age}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{(s.inflation_rate * 100).toFixed(1)}%</td>
-                                <td style={{ padding: '0.5rem' }}>{new Date(s.created_at).toLocaleDateString()}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                    <button onClick={() => handleDelete(s.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>Delete</button>
-                                </td>
-                            </tr>
-                        ))}
-                        {scenarios?.length === 0 && (
-                            <tr><td colSpan={6} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No scenarios yet. Create one to get started.</td></tr>
-                        )}
-                    </tbody>
-                </table>
-            </div>
+            {scenarios?.length === 0 ? (
+                <div style={{ ...cardStyle, textAlign: 'center', padding: '3rem' }}>
+                    <div style={{ color: '#999', fontSize: '1.1rem' }}>No scenarios yet. Create one to get started.</div>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+                    {scenarios?.map(s => (
+                        <div key={s.id} style={cardStyle}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                                <Link
+                                    to={`/projections/${s.id}`}
+                                    style={{ color: '#1976d2', textDecoration: 'none', fontWeight: 600, fontSize: '1.1rem' }}
+                                >
+                                    {s.name}
+                                </Link>
+                                <button
+                                    onClick={() => handleDelete(s.id)}
+                                    style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem', padding: '0' }}
+                                >
+                                    Delete
+                                </button>
+                            </div>
+                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>
+                                <div><span style={{ color: '#999' }}>Retire:</span> {s.retirement_date}</div>
+                                <div><span style={{ color: '#999' }}>End Age:</span> {s.end_age}</div>
+                                <div><span style={{ color: '#999' }}>Inflation:</span> {(s.inflation_rate * 100).toFixed(1)}%</div>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#999' }}>
+                                <span>Created {new Date(s.created_at).toLocaleDateString()}</span>
+                                <Link
+                                    to={`/projections/${s.id}`}
+                                    style={{ color: '#1976d2', textDecoration: 'none', fontWeight: 500 }}
+                                >
+                                    View Details &rarr;
+                                </Link>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
