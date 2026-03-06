@@ -1,18 +1,35 @@
 import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { getScenario, runProjection } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
+import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
+import SummaryCard from '../components/SummaryCard';
+import ProjectionChart from '../components/ProjectionChart';
+import MilestoneStrip from '../components/MilestoneStrip';
 import toast from 'react-hot-toast';
 import type { ProjectionResult } from '../types/projection';
+
+type TabId = 'chart' | 'flows' | 'table';
+
+const tabButtonStyle = (active: boolean) => ({
+    padding: '0.5rem 1rem',
+    background: 'none',
+    border: 'none',
+    borderBottom: `2px solid ${active ? '#1976d2' : 'transparent'}`,
+    color: active ? '#1976d2' : '#666',
+    fontWeight: active ? 600 as const : 400 as const,
+    cursor: 'pointer' as const,
+    fontSize: '0.95rem',
+});
 
 export default function ProjectionDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { data: scenario, loading } = useApiQuery(() => getScenario(id!));
     const [result, setResult] = useState<ProjectionResult | null>(null);
     const [running, setRunning] = useState(false);
+    const [activeTab, setActiveTab] = useState<TabId>('chart');
 
     async function handleRun() {
         setRunning(true);
@@ -30,6 +47,8 @@ export default function ProjectionDetailPage() {
     if (!scenario) return <div>Scenario not found</div>;
 
     const retirementYear = scenario.retirement_date ? new Date(scenario.retirement_date).getFullYear() : null;
+    const peak = result ? findPeakBalance(result.yearly_data) : null;
+    const depletion = result ? findDepletionYear(result.yearly_data) : null;
 
     return (
         <div>
@@ -49,22 +68,10 @@ export default function ProjectionDetailPage() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Retirement Date</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{scenario.retirement_date}</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>End Age</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{scenario.end_age}</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Inflation Rate</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{(scenario.inflation_rate * 100).toFixed(1)}%</div>
-                </div>
-                <div style={cardStyle}>
-                    <div style={{ color: '#666', fontSize: '0.85rem' }}>Accounts</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>{scenario.accounts.length}</div>
-                </div>
+                <SummaryCard label="Retirement Date" value={scenario.retirement_date} />
+                <SummaryCard label="End Age" value={String(scenario.end_age)} />
+                <SummaryCard label="Inflation Rate" value={`${(scenario.inflation_rate * 100).toFixed(1)}%`} />
+                <SummaryCard label="Accounts" value={String(scenario.accounts.length)} />
             </div>
 
             {scenario.accounts.length > 0 && (
@@ -93,86 +100,95 @@ export default function ProjectionDetailPage() {
 
             {result && (
                 <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
-                        <div style={cardStyle}>
-                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Final Balance</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 600, color: result.final_balance > 0 ? '#2e7d32' : '#d32f2f' }}>
-                                {formatCurrency(result.final_balance)}
-                            </div>
-                        </div>
-                        <div style={cardStyle}>
-                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Years in Retirement</div>
-                            <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{result.years_in_retirement}</div>
-                        </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <SummaryCard
+                            label="Final Balance"
+                            value={formatCurrency(result.final_balance)}
+                            valueColor={result.final_balance > 0 ? '#2e7d32' : '#d32f2f'}
+                        />
+                        <SummaryCard
+                            label="Years in Retirement"
+                            value={String(result.years_in_retirement)}
+                        />
+                        <SummaryCard
+                            label="Peak Balance"
+                            value={formatCurrency(peak!.balance)}
+                            subtext={`(year ${peak!.year})`}
+                        />
+                        <SummaryCard
+                            label="Depletion Year"
+                            value={depletion ? `${depletion.year} (age ${depletion.age})` : 'Never'}
+                            valueColor={depletion ? '#d32f2f' : '#2e7d32'}
+                        />
                     </div>
 
-                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                        <h3 style={{ marginBottom: '1rem' }}>Balance Over Time</h3>
-                        <ResponsiveContainer width="100%" height={400}>
-                            <AreaChart data={result.yearly_data} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
-                                <defs>
-                                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#1976d2" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#1976d2" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                                <YAxis
-                                    tickFormatter={(v: number) => v >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`}
-                                    tick={{ fontSize: 12 }}
-                                    width={70}
-                                />
-                                <Tooltip
-                                    formatter={(value: number, name: string) => [formatCurrency(value), name === 'end_balance' ? 'Balance' : name]}
-                                    labelFormatter={(year: number) => {
-                                        const d = result.yearly_data.find(y => y.year === year);
-                                        return d ? `${year} (age ${d.age})` : String(year);
-                                    }}
-                                />
-                                {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
-                                <Area
-                                    type="monotone"
-                                    dataKey="end_balance"
-                                    stroke="#1976d2"
-                                    strokeWidth={2}
-                                    fill="url(#colorBalance)"
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <MilestoneStrip result={result} retirementYear={retirementYear} />
                     </div>
 
                     <div style={cardStyle}>
-                        <h3 style={{ marginBottom: '1rem' }}>Year-by-Year Data</h3>
-                        <div style={{ maxHeight: '400px', overflow: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Year</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Age</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Start</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Contributions</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Growth</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Withdrawals</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>End</th>
-                                        <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {result.yearly_data.map(y => (
-                                        <tr key={y.year} style={{ borderBottom: '1px solid #f0f0f0', background: y.retired ? '#fff8e1' : 'transparent' }}>
-                                            <td style={{ padding: '0.5rem' }}>{y.year}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(y.start_balance)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.contributions > 0 ? formatCurrency(y.contributions) : '-'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: y.growth >= 0 ? '#2e7d32' : '#d32f2f' }}>{formatCurrency(y.growth)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawals > 0 ? formatCurrency(y.withdrawals) : '-'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div style={{ borderBottom: '1px solid #e0e0e0', marginBottom: '1rem', display: 'flex', gap: '0.25rem' }}>
+                            <button style={tabButtonStyle(activeTab === 'chart')} onClick={() => setActiveTab('chart')}>
+                                Balance Over Time
+                            </button>
+                            <button style={tabButtonStyle(activeTab === 'flows')} onClick={() => setActiveTab('flows')}>
+                                Annual Flows
+                            </button>
+                            <button style={tabButtonStyle(activeTab === 'table')} onClick={() => setActiveTab('table')}>
+                                Data Table
+                            </button>
                         </div>
+
+                        {activeTab === 'chart' && (
+                            <ProjectionChart data={result.yearly_data} retirementYear={retirementYear} mode="balance" />
+                        )}
+
+                        {activeTab === 'flows' && (
+                            <ProjectionChart data={result.yearly_data} retirementYear={retirementYear} mode="flows" />
+                        )}
+
+                        {activeTab === 'table' && (
+                            <div style={{ maxHeight: '450px', overflow: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                            <th style={{ textAlign: 'left', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Year</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Age</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Start</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Contributions</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Growth</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Withdrawals</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>End</th>
+                                            <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.yearly_data.map((y, i) => {
+                                            const isRetirementTransition = y.retired && i > 0 && !result.yearly_data[i - 1].retired;
+                                            return (
+                                                <tr
+                                                    key={y.year}
+                                                    style={{
+                                                        borderBottom: '1px solid #f0f0f0',
+                                                        borderTop: isRetirementTransition ? '3px solid #ff9800' : undefined,
+                                                        background: y.retired ? '#fff8e1' : 'transparent',
+                                                    }}
+                                                >
+                                                    <td style={{ padding: '0.5rem' }}>{y.year}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(y.start_balance)}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.contributions > 0 ? formatCurrency(y.contributions) : '-'}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: y.growth >= 0 ? '#2e7d32' : '#d32f2f' }}>{formatCurrency(y.growth)}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawals > 0 ? formatCurrency(y.withdrawals) : '-'}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
