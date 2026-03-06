@@ -63,8 +63,18 @@ public class GlobalExceptionHandler {
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("Validation failed");
 
+        log.warn("Validation failed: {}", message);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST", message, 400));
+    }
+
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleUnreadable(
+            org.springframework.http.converter.HttpMessageNotReadableException ex) {
+        log.warn("Request body not readable: {}", ex.getMostSpecificCause().getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST",
+                        "Invalid request body: " + ex.getMostSpecificCause().getMessage(), 400));
     }
 
     @ExceptionHandler(Exception.class)
