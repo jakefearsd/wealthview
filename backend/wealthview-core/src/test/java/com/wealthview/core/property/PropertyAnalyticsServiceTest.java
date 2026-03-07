@@ -151,7 +151,7 @@ class PropertyAnalyticsServiceTest {
                 createIncome(property, LocalDate.now().minusMonths(3), "2500"),
                 createIncome(property, LocalDate.now().minusMonths(1), "2500")
         );
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(incomes);
 
         // Mock operating expenses (non-mortgage): $500 tax, $200 insurance
@@ -159,8 +159,8 @@ class PropertyAnalyticsServiceTest {
                 createExpense(property, LocalDate.now().minusMonths(6), "500", "tax"),
                 createExpense(property, LocalDate.now().minusMonths(3), "200", "insurance")
         );
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(opExpenses);
 
         // Mock all expenses (including mortgage): add mortgage on top
@@ -170,7 +170,7 @@ class PropertyAnalyticsServiceTest {
                 createExpense(property, LocalDate.now().minusMonths(6), "1800", "mortgage"),
                 createExpense(property, LocalDate.now().minusMonths(3), "1800", "mortgage")
         );
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(allExpenses);
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
@@ -190,12 +190,12 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
@@ -211,12 +211,12 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), 2024);
@@ -281,12 +281,12 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
@@ -335,16 +335,16 @@ class PropertyAnalyticsServiceTest {
         var incomes = List.of(
                 createIncome(property, LocalDate.now().minusMonths(1), "24000")
         );
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(incomes);
 
         var opExpenses = List.of(
                 createExpense(property, LocalDate.now().minusMonths(1), "6000", "tax")
         );
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(opExpenses);
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(opExpenses);
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
@@ -405,14 +405,14 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(List.of(createIncome(property, LocalDate.now().minusMonths(1), "30000")));
 
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(List.of(createExpense(property, LocalDate.now().minusMonths(1), "6000", "tax")));
 
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(List.of(
                         createExpense(property, LocalDate.now().minusMonths(1), "6000", "tax"),
                         createExpense(property, LocalDate.now().minusMonths(1), "18000", "mortgage")
@@ -434,33 +434,120 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetweenAndCategoryNot(
-                eq(property.getId()), any(), any(), eq("mortgage")))
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
-        when(expenseRepository.findByProperty_IdAndDateBetween(eq(property.getId()), any(), any()))
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         analyticsService.getAnalytics(tenantId, property.getId(), 2024);
 
-        // Verify repository was called with Jan 1 to Dec 31 of 2024
-        verify(incomeRepository).findByProperty_IdAndDateBetween(
-                eq(property.getId()),
-                eq(LocalDate.of(2024, 1, 1)),
-                eq(LocalDate.of(2024, 12, 31))
-        );
-        verify(expenseRepository).findByProperty_IdAndDateBetweenAndCategoryNot(
+        // Verify repository was called with Jan 1 to Dec 31 of 2024, annual from = Feb 1 2023
+        verify(incomeRepository).findOverlapping(
                 eq(property.getId()),
                 eq(LocalDate.of(2024, 1, 1)),
                 eq(LocalDate.of(2024, 12, 31)),
-                eq("mortgage")
+                eq(LocalDate.of(2023, 2, 1))
         );
-        verify(expenseRepository).findByProperty_IdAndDateBetween(
+        verify(expenseRepository).findOverlappingExcludingCategory(
                 eq(property.getId()),
                 eq(LocalDate.of(2024, 1, 1)),
-                eq(LocalDate.of(2024, 12, 31))
+                eq(LocalDate.of(2024, 12, 31)),
+                eq(LocalDate.of(2023, 2, 1)),
+                eq("mortgage")
         );
+        verify(expenseRepository).findOverlapping(
+                eq(property.getId()),
+                eq(LocalDate.of(2024, 1, 1)),
+                eq(LocalDate.of(2024, 12, 31)),
+                eq(LocalDate.of(2023, 2, 1))
+        );
+    }
+
+    @Test
+    void getAnalytics_investmentWithAnnualExpense_proratesCorrectly() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        // Annual income of $30,000 starting Jan 2025, analysis year = 2025
+        // Full 12 months overlap → full amount used
+        var annualIncome = createIncome(property, LocalDate.of(2025, 1, 1), "30000", "annual");
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(List.of(annualIncome));
+
+        // Annual tax of $6,000 starting Jan 2025 — fully overlaps
+        var annualTax = createExpense(property, LocalDate.of(2025, 1, 1), "6000", "tax", "annual");
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
+                .thenReturn(List.of(annualTax));
+
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(List.of(annualTax));
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), 2025);
+
+        // NOI = 30000 - 6000 = 24000
+        assertThat(result.annualNoi()).isEqualByComparingTo("24000");
+        // Cap rate = (24000 / 400000) * 100 = 6.0000
+        assertThat(result.capRate()).isEqualByComparingTo("6.0000");
+    }
+
+    @Test
+    void getAnalytics_annualExpensePartialOverlap_proratedCorrectly() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        // Annual insurance of $12,000 starting Jul 2025 — covers Jul 2025 to Jun 2026
+        // Analysis year = 2025 (Jan-Dec): 6 months overlap (Jul-Dec)
+        // Prorated amount = 12000 * 6/12 = 6000
+        var annualInsurance = createExpense(property, LocalDate.of(2025, 7, 1), "12000", "insurance", "annual");
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
+                .thenReturn(List.of(annualInsurance));
+
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(List.of(annualInsurance));
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), 2025);
+
+        // NOI = 0 - 6000 = -6000
+        assertThat(result.annualNoi()).isEqualByComparingTo("-6000");
+        // Net cash flow = 0 - 6000 = -6000
+        assertThat(result.annualNetCashFlow()).isEqualByComparingTo("-6000");
+    }
+
+    @Test
+    void getAnalytics_mixedMonthlyAndAnnual_sumsCorrectly() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        // Monthly income entries + annual entry
+        var monthlyIncome = createIncome(property, LocalDate.now().minusMonths(1), "2000");
+        var annualIncome = createIncome(property, LocalDate.of(2025, 1, 1), "12000", "annual");
+        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(List.of(monthlyIncome, annualIncome));
+
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), 2025);
+
+        // Total income = 2000 (monthly) + 12000 (annual, full overlap) = 14000
+        assertThat(result.annualNoi()).isEqualByComparingTo("14000");
     }
 
     // --- Helper methods ---
@@ -486,8 +573,17 @@ class PropertyAnalyticsServiceTest {
         return new PropertyIncomeEntity(property, tenant, date, new BigDecimal(amount), "rent", null);
     }
 
+    private PropertyIncomeEntity createIncome(PropertyEntity property, LocalDate date, String amount, String frequency) {
+        return new PropertyIncomeEntity(property, tenant, date, new BigDecimal(amount), "rent", null, frequency);
+    }
+
     private PropertyExpenseEntity createExpense(PropertyEntity property, LocalDate date,
                                                  String amount, String category) {
         return new PropertyExpenseEntity(property, tenant, date, new BigDecimal(amount), category, null);
+    }
+
+    private PropertyExpenseEntity createExpense(PropertyEntity property, LocalDate date,
+                                                 String amount, String category, String frequency) {
+        return new PropertyExpenseEntity(property, tenant, date, new BigDecimal(amount), category, null, frequency);
     }
 }

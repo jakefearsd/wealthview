@@ -42,6 +42,9 @@ public class PropertyIncomeEntity {
 
     private String description;
 
+    @Column(nullable = false)
+    private String frequency = "monthly";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -53,12 +56,19 @@ public class PropertyIncomeEntity {
 
     public PropertyIncomeEntity(PropertyEntity property, TenantEntity tenant,
                                 LocalDate date, BigDecimal amount, String category, String description) {
+        this(property, tenant, date, amount, category, description, "monthly");
+    }
+
+    public PropertyIncomeEntity(PropertyEntity property, TenantEntity tenant,
+                                LocalDate date, BigDecimal amount, String category,
+                                String description, String frequency) {
         this.property = property;
         this.tenant = tenant;
         this.date = date;
         this.amount = amount;
         this.category = category;
         this.description = description;
+        this.frequency = frequency;
     }
 
     public UUID getId() { return id; }
@@ -67,5 +77,6 @@ public class PropertyIncomeEntity {
     public BigDecimal getAmount() { return amount; }
     public String getCategory() { return category; }
     public String getDescription() { return description; }
+    public String getFrequency() { return frequency; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
 }

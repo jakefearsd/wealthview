@@ -10,6 +10,7 @@ public record PropertyExpenseRequest(
         @NotNull LocalDate date,
         @NotNull BigDecimal amount,
         @NotNull @Pattern(regexp = "mortgage|tax|insurance|maintenance|capex|hoa|mgmt_fee") String category,
-        String description
+        String description,
+        @Pattern(regexp = "monthly|annual") String frequency
 ) {
 }

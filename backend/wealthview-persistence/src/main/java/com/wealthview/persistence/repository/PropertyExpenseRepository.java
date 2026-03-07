@@ -2,6 +2,8 @@ package com.wealthview.persistence.repository;
 
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -13,4 +15,34 @@ public interface PropertyExpenseRepository extends JpaRepository<PropertyExpense
 
     List<PropertyExpenseEntity> findByProperty_IdAndDateBetweenAndCategoryNot(
             UUID propertyId, LocalDate from, LocalDate to, String category);
+
+    @Query("""
+            SELECT e FROM PropertyExpenseEntity e
+            WHERE e.property.id = :propertyId
+            AND (
+                (e.frequency = 'monthly' AND e.date BETWEEN :from AND :to)
+                OR (e.frequency = 'annual' AND e.date BETWEEN :annualFrom AND :to)
+            )
+            """)
+    List<PropertyExpenseEntity> findOverlapping(
+            @Param("propertyId") UUID propertyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("annualFrom") LocalDate annualFrom);
+
+    @Query("""
+            SELECT e FROM PropertyExpenseEntity e
+            WHERE e.property.id = :propertyId
+            AND e.category <> :excludeCategory
+            AND (
+                (e.frequency = 'monthly' AND e.date BETWEEN :from AND :to)
+                OR (e.frequency = 'annual' AND e.date BETWEEN :annualFrom AND :to)
+            )
+            """)
+    List<PropertyExpenseEntity> findOverlappingExcludingCategory(
+            @Param("propertyId") UUID propertyId,
+            @Param("from") LocalDate from,
+            @Param("to") LocalDate to,
+            @Param("annualFrom") LocalDate annualFrom,
+            @Param("excludeCategory") String excludeCategory);
 }

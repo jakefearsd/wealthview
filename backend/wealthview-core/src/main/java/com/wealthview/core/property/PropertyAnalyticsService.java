@@ -23,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Service
 public class PropertyAnalyticsService {
@@ -71,17 +72,18 @@ public class PropertyAnalyticsService {
             var dateRange = computeDateRange(year);
             var rangeFrom = dateRange[0];
             var rangeTo = dateRange[1];
+            var annualFrom = YearMonth.from(rangeFrom).minusMonths(11).atDay(1);
 
-            var incomes = incomeRepository.findByProperty_IdAndDateBetween(propertyId, rangeFrom, rangeTo);
-            var totalIncome = incomes.stream()
-                    .map(PropertyIncomeEntity::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            var incomes = incomeRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
+            var totalIncome = sumWithProration(incomes, rangeFrom, rangeTo,
+                    PropertyIncomeEntity::getAmount, PropertyIncomeEntity::getFrequency,
+                    PropertyIncomeEntity::getDate);
 
             var operatingExpenses = expenseRepository
-                    .findByProperty_IdAndDateBetweenAndCategoryNot(propertyId, rangeFrom, rangeTo, "mortgage");
-            var totalOperatingExpenses = operatingExpenses.stream()
-                    .map(PropertyExpenseEntity::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    .findOverlappingExcludingCategory(propertyId, rangeFrom, rangeTo, annualFrom, "mortgage");
+            var totalOperatingExpenses = sumWithProration(operatingExpenses, rangeFrom, rangeTo,
+                    PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
+                    PropertyExpenseEntity::getDate);
 
             annualNoi = totalIncome.subtract(totalOperatingExpenses);
             capRate = property.getCurrentValue().compareTo(BigDecimal.ZERO) != 0
@@ -89,10 +91,10 @@ public class PropertyAnalyticsService {
                         .divide(property.getCurrentValue(), 4, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            var allExpenses = expenseRepository.findByProperty_IdAndDateBetween(propertyId, rangeFrom, rangeTo);
-            var totalAllExpenses = allExpenses.stream()
-                    .map(PropertyExpenseEntity::getAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            var allExpenses = expenseRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
+            var totalAllExpenses = sumWithProration(allExpenses, rangeFrom, rangeTo,
+                    PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
+                    PropertyExpenseEntity::getDate);
 
             annualNetCashFlow = totalIncome.subtract(totalAllExpenses);
 
@@ -201,6 +203,43 @@ public class PropertyAnalyticsService {
             }
         }
         return fallbackValue;
+    }
+
+    private <T> BigDecimal sumWithProration(List<T> entries, LocalDate rangeFrom, LocalDate rangeTo,
+                                               Function<T, BigDecimal> amountFn,
+                                               Function<T, String> frequencyFn,
+                                               Function<T, LocalDate> dateFn) {
+        var total = BigDecimal.ZERO;
+        var rangeFromMonth = YearMonth.from(rangeFrom);
+        var rangeToMonth = YearMonth.from(rangeTo);
+
+        for (var entry : entries) {
+            total = total.add(computeEffectiveAmount(
+                    amountFn.apply(entry), frequencyFn.apply(entry), dateFn.apply(entry),
+                    rangeFromMonth, rangeToMonth));
+        }
+        return total;
+    }
+
+    private BigDecimal computeEffectiveAmount(BigDecimal amount, String frequency, LocalDate entryDate,
+                                               YearMonth rangeFrom, YearMonth rangeTo) {
+        if (!"annual".equals(frequency)) {
+            return amount;
+        }
+
+        var entryMonth = YearMonth.from(entryDate);
+        var entryEnd = entryMonth.plusMonths(11);
+
+        var overlapStart = entryMonth.isBefore(rangeFrom) ? rangeFrom : entryMonth;
+        var overlapEnd = entryEnd.isAfter(rangeTo) ? rangeTo : entryEnd;
+
+        if (overlapStart.isAfter(overlapEnd)) {
+            return BigDecimal.ZERO;
+        }
+
+        long overlappingMonths = overlapStart.until(overlapEnd, java.time.temporal.ChronoUnit.MONTHS) + 1;
+        return amount.multiply(new BigDecimal(overlappingMonths))
+                .divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
     }
 
     private LocalDate[] computeDateRange(Integer year) {

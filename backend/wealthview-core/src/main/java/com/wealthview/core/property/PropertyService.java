@@ -20,16 +20,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class PropertyService {
@@ -118,8 +119,9 @@ public class PropertyService {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
+        var frequency = request.frequency() != null ? request.frequency() : "monthly";
         var income = new PropertyIncomeEntity(property, property.getTenant(),
-                request.date(), request.amount(), request.category(), request.description());
+                request.date(), request.amount(), request.category(), request.description(), frequency);
         incomeRepository.save(income);
     }
 
@@ -128,8 +130,9 @@ public class PropertyService {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
+        var frequency = request.frequency() != null ? request.frequency() : "monthly";
         var expense = new PropertyExpenseEntity(property, property.getTenant(),
-                request.date(), request.amount(), request.category(), request.description());
+                request.date(), request.amount(), request.category(), request.description(), frequency);
         expenseRepository.save(expense);
     }
 
@@ -141,19 +144,22 @@ public class PropertyService {
 
         var fromDate = from.atDay(1);
         var toDate = to.atEndOfMonth();
+        var annualFromDate = from.minusMonths(11).atDay(1);
 
-        var incomes = incomeRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
-        var expenses = expenseRepository.findByProperty_IdAndDateBetween(propertyId, fromDate, toDate);
+        var incomes = incomeRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
 
-        Map<YearMonth, BigDecimal> incomeByMonth = incomes.stream()
-                .collect(Collectors.groupingBy(
-                        i -> YearMonth.from(i.getDate()),
-                        Collectors.reducing(BigDecimal.ZERO, PropertyIncomeEntity::getAmount, BigDecimal::add)));
+        Map<YearMonth, BigDecimal> incomeByMonth = new HashMap<>();
+        for (var income : incomes) {
+            spreadEntry(income.getDate(), income.getAmount(), income.getFrequency(),
+                    from, to, incomeByMonth);
+        }
 
-        Map<YearMonth, BigDecimal> expenseByMonth = expenses.stream()
-                .collect(Collectors.groupingBy(
-                        e -> YearMonth.from(e.getDate()),
-                        Collectors.reducing(BigDecimal.ZERO, PropertyExpenseEntity::getAmount, BigDecimal::add)));
+        Map<YearMonth, BigDecimal> expenseByMonth = new HashMap<>();
+        for (var expense : expenses) {
+            spreadEntry(expense.getDate(), expense.getAmount(), expense.getFrequency(),
+                    from, to, expenseByMonth);
+        }
 
         var entries = new ArrayList<MonthlyCashFlowEntry>();
         var current = from;
@@ -174,6 +180,26 @@ public class PropertyService {
         }
 
         return entries;
+    }
+
+    private void spreadEntry(LocalDate entryDate, BigDecimal amount, String frequency,
+                              YearMonth rangeFrom, YearMonth rangeTo,
+                              Map<YearMonth, BigDecimal> bucket) {
+        if ("annual".equals(frequency)) {
+            var monthlyAmount = amount.divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
+            var entryMonth = YearMonth.from(entryDate);
+            for (int i = 0; i < 12; i++) {
+                var month = entryMonth.plusMonths(i);
+                if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
+                    bucket.merge(month, monthlyAmount, BigDecimal::add);
+                }
+            }
+        } else {
+            var month = YearMonth.from(entryDate);
+            if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
+                bucket.merge(month, amount, BigDecimal::add);
+            }
+        }
     }
 
     BigDecimal computeEffectiveBalance(PropertyEntity property) {

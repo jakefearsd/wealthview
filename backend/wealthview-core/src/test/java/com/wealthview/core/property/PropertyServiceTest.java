@@ -1,9 +1,11 @@
 package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
+import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
@@ -13,6 +15,7 @@ import com.wealthview.persistence.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -174,7 +177,7 @@ class PropertyServiceTest {
         when(incomeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         propertyService.addIncome(tenantId, UUID.randomUUID(),
-                new PropertyIncomeRequest(LocalDate.now(), new BigDecimal("2000"), "rent", "Monthly rent"));
+                new PropertyIncomeRequest(LocalDate.now(), new BigDecimal("2000"), "rent", "Monthly rent", null));
 
         verify(incomeRepository).save(any(PropertyIncomeEntity.class));
     }
@@ -189,9 +192,9 @@ class PropertyServiceTest {
 
         var income = new PropertyIncomeEntity(property, tenant,
                 LocalDate.of(2025, 1, 15), new BigDecimal("2000"), "rent", null);
-        when(incomeRepository.findByProperty_IdAndDateBetween(any(), any(), any()))
+        when(incomeRepository.findOverlapping(any(), any(), any(), any()))
                 .thenReturn(List.of(income));
-        when(expenseRepository.findByProperty_IdAndDateBetween(any(), any(), any()))
+        when(expenseRepository.findOverlapping(any(), any(), any(), any()))
                 .thenReturn(Collections.emptyList());
 
         var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
@@ -267,5 +270,160 @@ class PropertyServiceTest {
 
         assertThatThrownBy(() -> propertyService.delete(tenantId, propertyId))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void addIncome_withAnnualFrequency_savesWithFrequency() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        propertyService.addIncome(tenantId, UUID.randomUUID(),
+                new PropertyIncomeRequest(LocalDate.of(2025, 1, 1), new BigDecimal("12000"), "rent", null, "annual"));
+
+        var captor = ArgumentCaptor.forClass(PropertyIncomeEntity.class);
+        verify(incomeRepository).save(captor.capture());
+        assertThat(captor.getValue().getFrequency()).isEqualTo("annual");
+    }
+
+    @Test
+    void addIncome_withNullFrequency_defaultsToMonthly() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        propertyService.addIncome(tenantId, UUID.randomUUID(),
+                new PropertyIncomeRequest(LocalDate.of(2025, 1, 1), new BigDecimal("2000"), "rent", null, null));
+
+        var captor = ArgumentCaptor.forClass(PropertyIncomeEntity.class);
+        verify(incomeRepository).save(captor.capture());
+        assertThat(captor.getValue().getFrequency()).isEqualTo("monthly");
+    }
+
+    @Test
+    void addExpense_withAnnualFrequency_savesWithFrequency() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(expenseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        propertyService.addExpense(tenantId, UUID.randomUUID(),
+                new PropertyExpenseRequest(LocalDate.of(2025, 1, 1), new BigDecimal("6000"), "tax", null, "annual"));
+
+        var captor = ArgumentCaptor.forClass(PropertyExpenseEntity.class);
+        verify(expenseRepository).save(captor.capture());
+        assertThat(captor.getValue().getFrequency()).isEqualTo("annual");
+    }
+
+    @Test
+    void getMonthlyCashFlow_annualIncome_spreadsAcrossMonths() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var annualIncome = new PropertyIncomeEntity(property, tenant,
+                LocalDate.of(2025, 1, 1), new BigDecimal("12000"), "rent", null, "annual");
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(annualIncome));
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 12));
+
+        assertThat(result).hasSize(12);
+        for (var entry : result) {
+            assertThat(entry.totalIncome()).isEqualByComparingTo("1000");
+        }
+    }
+
+    @Test
+    void getMonthlyCashFlow_annualExpense_spreadsAcrossMonths() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var annualExpense = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 1), new BigDecimal("6000"), "tax", null, "annual");
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(annualExpense));
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 12));
+
+        assertThat(result).hasSize(12);
+        for (var entry : result) {
+            assertThat(entry.totalExpenses()).isEqualByComparingTo("500");
+        }
+    }
+
+    @Test
+    void getMonthlyCashFlow_annualEntryPartialOverlap_onlySpreadsOverlappingMonths() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        // Annual income starting Jul 2025 — covers Jul 2025 through Jun 2026
+        var annualIncome = new PropertyIncomeEntity(property, tenant,
+                LocalDate.of(2025, 7, 1), new BigDecimal("12000"), "rent", null, "annual");
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(annualIncome));
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        // Query range: Jan 2025 - Dec 2025 — only Jul-Dec overlap
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 12));
+
+        assertThat(result).hasSize(12);
+        // Jan-Jun should have zero income
+        for (int i = 0; i < 6; i++) {
+            assertThat(result.get(i).totalIncome()).isEqualByComparingTo("0");
+        }
+        // Jul-Dec should have 1000 each
+        for (int i = 6; i < 12; i++) {
+            assertThat(result.get(i).totalIncome()).isEqualByComparingTo("1000");
+        }
+    }
+
+    @Test
+    void getMonthlyCashFlow_mixedMonthlyAndAnnual_accumulatesCorrectly() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var monthlyIncome = new PropertyIncomeEntity(property, tenant,
+                LocalDate.of(2025, 3, 15), new BigDecimal("2500"), "rent", null, "monthly");
+        var annualIncome = new PropertyIncomeEntity(property, tenant,
+                LocalDate.of(2025, 1, 1), new BigDecimal("12000"), "other", null, "annual");
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(monthlyIncome, annualIncome));
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 6));
+
+        assertThat(result).hasSize(6);
+        // March: 2500 (monthly) + 1000 (annual spread) = 3500
+        assertThat(result.get(2).totalIncome()).isEqualByComparingTo("3500");
+        // Other months: just 1000 from annual spread
+        assertThat(result.get(0).totalIncome()).isEqualByComparingTo("1000");
     }
 }

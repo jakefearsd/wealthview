@@ -10,6 +10,7 @@ public record PropertyIncomeRequest(
         @NotNull LocalDate date,
         @NotNull BigDecimal amount,
         @NotNull @Pattern(regexp = "rent|other") String category,
-        String description
+        String description,
+        @Pattern(regexp = "monthly|annual") String frequency
 ) {
 }
