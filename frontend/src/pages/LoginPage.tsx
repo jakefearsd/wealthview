@@ -8,6 +8,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     const navigate = useNavigate();
     const { loginSuccess } = useAuth();
 
@@ -40,8 +41,15 @@ export default function LoginPage() {
                 </div>
                 <div style={{ marginBottom: '1.5rem' }}>
                     <label htmlFor="password" style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 500 }}>Password</label>
-                    <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                        style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                    <div style={{ position: 'relative' }}>
+                        <input id="password" type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required
+                            style={{ width: '100%', padding: '0.5rem', paddingRight: '3.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                        <button type="button" onClick={() => setShowPassword(!showPassword)}
+                            aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#666', fontSize: '0.85rem' }}>
+                            {showPassword ? 'Hide' : 'Show'}
+                        </button>
+                    </div>
                 </div>
                 <button type="submit" disabled={loading}
                     style={{ width: '100%', padding: '0.75rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
