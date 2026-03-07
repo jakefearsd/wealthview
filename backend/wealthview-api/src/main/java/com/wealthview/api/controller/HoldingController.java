@@ -37,6 +37,14 @@ public class HoldingController {
         return ResponseEntity.ok(holdings);
     }
 
+    @GetMapping("/holdings/{id}")
+    public ResponseEntity<HoldingResponse> getById(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        var response = holdingService.getById(principal.tenantId(), id);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/holdings")
     public ResponseEntity<HoldingResponse> createManual(
             @AuthenticationPrincipal TenantUserPrincipal principal,

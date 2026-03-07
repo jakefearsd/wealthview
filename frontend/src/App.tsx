@@ -16,6 +16,7 @@ import ProjectionsPage from './pages/ProjectionsPage';
 import ProjectionComparePage from './pages/ProjectionComparePage';
 import ProjectionDetailPage from './pages/ProjectionDetailPage';
 import SpendingProfilesPage from './pages/SpendingProfilesPage';
+import HoldingDetailPage from './pages/HoldingDetailPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -32,6 +33,7 @@ export default function App() {
                         <Route path="accounts" element={<AccountsListPage />} />
                         <Route path="accounts/:id" element={<AccountDetailPage />} />
                         <Route path="accounts/:id/import" element={<ImportPage />} />
+                        <Route path="holdings/:id" element={<HoldingDetailPage />} />
                         <Route path="prices" element={<PricesPage />} />
                         <Route path="projections" element={<ProjectionsPage />} />
                         <Route path="projections/compare" element={<ProjectionComparePage />} />

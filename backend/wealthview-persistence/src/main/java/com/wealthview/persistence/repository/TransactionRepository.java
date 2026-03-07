@@ -13,6 +13,8 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
 
     Page<TransactionEntity> findByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId, Pageable pageable);
 
+    Page<TransactionEntity> findByAccount_IdAndTenant_IdAndSymbol(UUID accountId, UUID tenantId, String symbol, Pageable pageable);
+
     List<TransactionEntity> findByAccount_IdAndSymbol(UUID accountId, String symbol);
 
     Optional<TransactionEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);

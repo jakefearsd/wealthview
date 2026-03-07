@@ -1,6 +1,11 @@
 import client from './client';
 import type { Holding, HoldingRequest } from '../types/holding';
 
+export async function getHolding(id: string): Promise<Holding> {
+    const { data } = await client.get<Holding>(`/holdings/${id}`);
+    return data;
+}
+
 export async function listHoldings(accountId: string): Promise<Holding[]> {
     const { data } = await client.get<Holding[]>(`/accounts/${accountId}/holdings`);
     return data;

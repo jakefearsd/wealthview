@@ -96,6 +96,30 @@ class HoldingServiceTest {
     }
 
     @Test
+    void getById_found_returnsHolding() {
+        var holdingId = UUID.randomUUID();
+        var holding = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        when(holdingRepository.findByIdAndTenant_Id(holdingId, tenantId))
+                .thenReturn(Optional.of(holding));
+
+        var result = holdingService.getById(tenantId, holdingId);
+
+        assertThat(result.symbol()).isEqualTo("AAPL");
+        assertThat(result.quantity()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void getById_notFound_throwsEntityNotFoundException() {
+        var holdingId = UUID.randomUUID();
+        when(holdingRepository.findByIdAndTenant_Id(holdingId, tenantId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> holdingService.getById(tenantId, holdingId))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
     void update_nonExistent_throwsNotFound() {
         var holdingId = UUID.randomUUID();
         when(holdingRepository.findByIdAndTenant_Id(holdingId, tenantId))
