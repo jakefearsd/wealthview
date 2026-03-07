@@ -18,3 +18,17 @@ export interface AllocationEntry {
     value: number;
     percentage: number;
 }
+
+export interface CombinedPortfolioDataPoint {
+    date: string;
+    total_value: number;
+    investment_value: number;
+    property_equity: number;
+}
+
+export interface CombinedPortfolioHistory {
+    data_points: CombinedPortfolioDataPoint[];
+    weeks: number;
+    investment_account_count: number;
+    property_count: number;
+}
