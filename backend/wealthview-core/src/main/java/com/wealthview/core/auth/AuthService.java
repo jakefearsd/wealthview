@@ -47,6 +47,10 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
 
+        if (!user.getTenant().isActive()) {
+            throw new BadCredentialsException("Account disabled — contact your administrator");
+        }
+
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         return buildAuthResponse(user);
     }

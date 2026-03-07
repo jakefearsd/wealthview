@@ -150,6 +150,17 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_disabledTenant_throwsBadCredentials() {
+        tenant.setActive(false);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "password")))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    @Test
     void refresh_validToken_returnsNewAuthResponse() {
         var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
