@@ -9,7 +9,7 @@ import java.time.LocalDate;
 
 public record TransactionRequest(
         @NotNull LocalDate date,
-        @NotBlank @Pattern(regexp = "buy|sell|dividend|deposit|withdrawal") String type,
+        @NotBlank @Pattern(regexp = "buy|sell|dividend|deposit|withdrawal|opening_balance") String type,
         String symbol,
         BigDecimal quantity,
         @NotNull BigDecimal amount

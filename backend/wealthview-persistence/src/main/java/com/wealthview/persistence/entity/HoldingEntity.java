@@ -43,6 +43,12 @@ public class HoldingEntity {
     @Column(name = "is_manual_override", nullable = false)
     private boolean isManualOverride = false;
 
+    @Column(name = "is_money_market", nullable = false)
+    private boolean isMoneyMarket = false;
+
+    @Column(name = "money_market_rate", precision = 7, scale = 4)
+    private BigDecimal moneyMarketRate;
+
     @Column(name = "as_of_date", nullable = false)
     private LocalDate asOfDate = LocalDate.now();
 
@@ -106,6 +112,22 @@ public class HoldingEntity {
 
     public void setManualOverride(boolean manualOverride) {
         isManualOverride = manualOverride;
+    }
+
+    public boolean isMoneyMarket() {
+        return isMoneyMarket;
+    }
+
+    public void setMoneyMarket(boolean moneyMarket) {
+        isMoneyMarket = moneyMarket;
+    }
+
+    public BigDecimal getMoneyMarketRate() {
+        return moneyMarketRate;
+    }
+
+    public void setMoneyMarketRate(BigDecimal moneyMarketRate) {
+        this.moneyMarketRate = moneyMarketRate;
     }
 
     public LocalDate getAsOfDate() {

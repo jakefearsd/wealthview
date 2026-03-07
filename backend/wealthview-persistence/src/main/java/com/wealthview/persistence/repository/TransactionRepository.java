@@ -18,4 +18,6 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
     Optional<TransactionEntity> findByIdAndTenant_Id(UUID id, UUID tenantId);
 
     boolean existsByTenant_IdAndAccount_IdAndImportHash(UUID tenantId, UUID accountId, String importHash);
+
+    void deleteByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 }
