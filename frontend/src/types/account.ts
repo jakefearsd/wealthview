@@ -3,6 +3,7 @@ export interface Account {
     name: string;
     type: string;
     institution: string | null;
+    balance: number;
     created_at: string;
 }
 

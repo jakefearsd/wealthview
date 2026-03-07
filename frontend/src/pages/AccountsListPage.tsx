@@ -77,6 +77,9 @@ export default function AccountsListPage() {
                     <div key={account.id} style={cardStyle}>
                         <Link to={`/accounts/${account.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                             <h3 style={{ marginBottom: '0.5rem' }}>{account.name}</h3>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                ${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
                             <div style={{ color: '#666', fontSize: '0.9rem' }}>{account.type} {account.institution ? `- ${account.institution}` : ''}</div>
                         </Link>
                         {canWrite && (
