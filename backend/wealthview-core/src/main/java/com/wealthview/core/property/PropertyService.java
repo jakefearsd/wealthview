@@ -128,7 +128,6 @@ public class PropertyService {
         expenseRepository.save(expense);
     }
 
-    // TODO: depreciation as non-cash expense could be factored in here
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {

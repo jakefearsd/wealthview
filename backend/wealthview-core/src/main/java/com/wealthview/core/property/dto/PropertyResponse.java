@@ -20,7 +20,6 @@ public record PropertyResponse(
         LocalDate loanStartDate,
         boolean hasLoanDetails,
         boolean useComputedBalance
-        // TODO: accumulatedDepreciation, bookValue
 ) {
     public static PropertyResponse from(PropertyEntity entity, BigDecimal effectiveMortgageBalance) {
         var equity = entity.getCurrentValue().subtract(effectiveMortgageBalance);
