@@ -7,6 +7,7 @@ import type {
     MonthlyCashFlowEntry,
     PropertyValuation,
     PropertyAnalyticsResponse,
+    ValuationRefreshResponse,
 } from '../types/property';
 
 export async function listProperties(): Promise<Property[]> {
@@ -66,8 +67,19 @@ export async function getValuationHistory(propertyId: string): Promise<PropertyV
     return data;
 }
 
-export async function refreshValuation(propertyId: string): Promise<void> {
-    await client.post(`/properties/${propertyId}/valuations/refresh`);
+export async function refreshValuation(propertyId: string): Promise<ValuationRefreshResponse> {
+    const { data } = await client.post<ValuationRefreshResponse>(
+        `/properties/${propertyId}/valuations/refresh`
+    );
+    return data;
+}
+
+export async function selectZpid(propertyId: string, zpid: string): Promise<ValuationRefreshResponse> {
+    const { data } = await client.post<ValuationRefreshResponse>(
+        `/properties/${propertyId}/valuations/select-zpid`,
+        { zpid }
+    );
+    return data;
 }
 
 export async function getPropertyAnalytics(

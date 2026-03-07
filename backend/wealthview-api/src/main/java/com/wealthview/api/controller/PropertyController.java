@@ -12,6 +12,8 @@ import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
+import com.wealthview.core.property.dto.SelectZpidRequest;
+import com.wealthview.core.property.dto.ValuationRefreshResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -134,13 +136,25 @@ public class PropertyController {
     }
 
     @PostMapping("/{id}/valuations/refresh")
-    public ResponseEntity<Void> refreshValuation(
+    public ResponseEntity<ValuationRefreshResponse> refreshValuation(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
         if (syncService == null) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
         }
-        syncService.syncSingleProperty(principal.tenantId(), id);
-        return ResponseEntity.accepted().build();
+        var result = syncService.refreshProperty(principal.tenantId(), id);
+        return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/{id}/valuations/select-zpid")
+    public ResponseEntity<ValuationRefreshResponse> selectZpid(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody SelectZpidRequest request) {
+        if (syncService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        var result = syncService.selectZpid(principal.tenantId(), id, request.zpid());
+        return ResponseEntity.ok(result);
     }
 }

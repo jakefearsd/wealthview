@@ -496,6 +496,29 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
+    @Test
+    void refreshValuation_zillowDisabled_returns503() {
+        var propertyId = createPropertyAndGetId();
+
+        var response = restTemplate.exchange(
+                "/api/v1/properties/" + propertyId + "/valuations/refresh",
+                HttpMethod.POST, authHelper.authEntity(authHelper.adminToken()), Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @Test
+    void selectZpid_zillowDisabled_returns503() {
+        var propertyId = createPropertyAndGetId();
+        var body = Map.of("zpid", "12345");
+
+        var response = restTemplate.exchange(
+                "/api/v1/properties/" + propertyId + "/valuations/select-zpid",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), Void.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
     private String createPropertyAndGetId() {
         var body = Map.of(
                 "address", "123 Main St",

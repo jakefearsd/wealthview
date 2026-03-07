@@ -19,3 +19,5 @@ app:
     secret: dev-secret-key-min-32-chars-long-for-hs256
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
+  zillow:
+    enabled: true

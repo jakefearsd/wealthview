@@ -54,6 +54,77 @@ class ZillowScraperClientTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    void extractSearchResults_singlePropertyPage_returnsSingleResult() {
+        var html = """
+                <html><head><title>123 Main St - Zillow</title></head><body>
+                <script type="application/json">
+                {"property":{"zpid":"12345","streetAddress":"123 Main St","city":"Springfield",
+                "state":"IL","zipcode":"62701","zestimate":450000}}
+                </script></body></html>
+                """;
+        var doc = Jsoup.parse(html);
+
+        var results = client.extractSearchResults(doc);
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).zpid()).isEqualTo("12345");
+        assertThat(results.get(0).address()).isEqualTo("123 Main St, Springfield, IL 62701");
+        assertThat(results.get(0).zestimate()).isEqualByComparingTo("450000");
+    }
+
+    @Test
+    void extractSearchResults_multipleResults_returnsAll() {
+        var html = """
+                <html><head><title>Search Results</title></head><body>
+                <script type="application/json">
+                {"results":[
+                  {"zpid":"111","address":"123 Main St Unit A","zestimate":350000},
+                  {"zpid":"222","address":"123 Main St Unit B","zestimate":375000}
+                ]}
+                </script></body></html>
+                """;
+        var doc = Jsoup.parse(html);
+
+        var results = client.extractSearchResults(doc);
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).zpid()).isEqualTo("111");
+        assertThat(results.get(1).zpid()).isEqualTo("222");
+    }
+
+    @Test
+    void extractSearchResults_duplicateZpids_deduplicates() {
+        var html = """
+                <html><head><title>Test</title></head><body>
+                <script type="application/json">
+                {"results":[
+                  {"zpid":"111","address":"123 Main St","zestimate":350000},
+                  {"zpid":"111","address":"123 Main St","zestimate":350000}
+                ]}
+                </script></body></html>
+                """;
+        var doc = Jsoup.parse(html);
+
+        var results = client.extractSearchResults(doc);
+
+        assertThat(results).hasSize(1);
+    }
+
+    @Test
+    void extractSearchResults_noData_returnsEmptyList() {
+        var html = """
+                <html><head><title>No Results</title></head><body>
+                <p>No properties found</p>
+                </body></html>
+                """;
+        var doc = Jsoup.parse(html);
+
+        var results = client.extractSearchResults(doc);
+
+        assertThat(results).isEmpty();
+    }
+
     private String loadFixture(String path) throws IOException {
         try (var stream = getClass().getClassLoader().getResourceAsStream(path)) {
             if (stream == null) {

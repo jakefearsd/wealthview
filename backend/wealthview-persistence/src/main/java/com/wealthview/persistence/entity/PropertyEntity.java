@@ -61,6 +61,9 @@ public class PropertyEntity {
     @Column(name = "property_type", nullable = false)
     private String propertyType = "primary_residence";
 
+    @Column(name = "zillow_zpid")
+    private String zillowZpid;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -105,6 +108,9 @@ public class PropertyEntity {
     public void setUseComputedBalance(boolean useComputedBalance) { this.useComputedBalance = useComputedBalance; }
     public String getPropertyType() { return propertyType; }
     public void setPropertyType(String propertyType) { this.propertyType = propertyType; }
+
+    public String getZillowZpid() { return zillowZpid; }
+    public void setZillowZpid(String zillowZpid) { this.zillowZpid = zillowZpid; }
 
     public boolean hasLoanDetails() {
         return loanAmount != null && annualInterestRate != null
