@@ -184,31 +184,31 @@ All `id` columns are **UUID**. All tables except `tenants` and `prices` include 
 
 ### Phase 1 — Foundation (MVP)
 
-- [ ] **Project scaffolding** — Monorepo structure, Maven multi-module backend, Vite React frontend, Docker Compose for Postgres, Flyway baseline migration.
-- [ ] **Tenant & auth system** — Super-admin seeded on first startup; tenant creation with invite code generation; self-registration via invite code; JWT login/refresh; Spring Security filter for tenant-scoped row-level isolation; role-based endpoint authorization (admin/member/viewer).
-- [ ] **Account management** — CRUD for financial accounts (brokerage, IRA, 401k, Roth, bank); each account scoped to a tenant.
-- [ ] **Transaction entry** — CRUD for transactions (buy, sell, dividend, deposit, withdrawal); on create/update/delete, auto-recompute affected holdings.
-- [ ] **Holdings management** — Auto-computed holdings from transactions; manual create/override with `is_manual_override` flag; warning when transactions conflict with a manual override.
-- [ ] **Manual price entry** — Users can enter a current price per symbol; stored in `prices` table with `source = manual`; dashboard uses most recent price for valuation, falls back to cost basis if no price exists.
-- [ ] **CSV import (brokerage-specific)** — Upload a CSV file; brokerage-specific parsers (Fidelity, Vanguard, Schwab) handle each institution's format natively; parse and create transactions in bulk; basic error reporting (row-level errors).
-- [ ] **Dashboard** — Net worth summary (sum of holdings × latest price + property equity + cash accounts); account balances table; allocation pie chart (by account type or asset class).
-- [ ] **Rental property tracker** — CRUD for properties (address, purchase price, current value, mortgage balance); CRUD for income and expense line items; monthly cash flow summary view.
+- [x] **Project scaffolding** — Monorepo structure, Maven multi-module backend, Vite React frontend, Docker Compose for Postgres, Flyway baseline migration.
+- [x] **Tenant & auth system** — Super-admin seeded on first startup; tenant creation with invite code generation; self-registration via invite code; JWT login/refresh; Spring Security filter for tenant-scoped row-level isolation; role-based endpoint authorization (admin/member/viewer).
+- [x] **Account management** — CRUD for financial accounts (brokerage, IRA, 401k, Roth, bank); each account scoped to a tenant.
+- [x] **Transaction entry** — CRUD for transactions (buy, sell, dividend, deposit, withdrawal); on create/update/delete, auto-recompute affected holdings.
+- [x] **Holdings management** — Auto-computed holdings from transactions; manual create/override with `is_manual_override` flag; warning when transactions conflict with a manual override.
+- [x] **Manual price entry** — Users can enter a current price per symbol; stored in `prices` table with `source = manual`; dashboard uses most recent price for valuation, falls back to cost basis if no price exists.
+- [x] **CSV import (brokerage-specific)** — Upload a CSV file; brokerage-specific parsers (Fidelity, Vanguard, Schwab) handle each institution's format natively; parse and create transactions in bulk; basic error reporting (row-level errors).
+- [x] **Dashboard** — Net worth summary (sum of holdings × latest price + property equity + cash accounts); account balances table; allocation pie chart (by account type or asset class).
+- [x] **Rental property tracker** — CRUD for properties (address, purchase price, current value, mortgage balance); CRUD for income and expense line items; monthly cash flow summary view.
 
 ### Phase 2 — File Import & Price Feed
 
 - [x] ~~**CSV column mapping UI**~~ — Replaced by brokerage-specific import parsers (Fidelity, Vanguard, Schwab) that handle each institution's CSV format natively.
 - [x] **OFX/QFX import** — Parse OFX files (standard bank/brokerage download format) using OFX4J; single parser covers most US institutions.
-- [ ] **Import deduplication** — Detect and skip duplicate transactions across repeated imports based on date, amount, and description hashing.
-- [ ] **Finnhub price feed** — Daily @Scheduled job to fetch close prices for all held symbols via Finnhub free API (60 req/min); replaces manual price entry as the primary valuation source.
-- [ ] **Historical price backfill** — On first symbol addition, backfill daily close prices for the trailing 1–2 years.
+- [x] **Import deduplication** — Detect and skip duplicate transactions across repeated imports based on date, amount, and description hashing (SHA-256 via TransactionHashUtil, `import_hash` column).
+- [x] **Finnhub price feed** — Daily @Scheduled job to fetch close prices for all held symbols via Finnhub free API (60 req/min); replaces manual price entry as the primary valuation source.
+- [x] **Historical price backfill** — On first symbol addition (via NewHoldingCreatedEvent), backfill daily close prices for the trailing 2 years.
 
 ### Phase 3 — Projections & Analytics
 
-- [ ] **Retirement projection engine** — Monte Carlo and deterministic projection modes.
-- [ ] **Scenario comparison** — Side-by-side comparison of multiple retirement scenarios.
-- [ ] **Roth conversion modeling** — Year-by-year Roth conversion ladder with tax impact estimates.
-- [ ] **Withdrawal strategy simulator** — Model different drawdown orders (taxable → tax-deferred → Roth).
-- [ ] **Property ROI analysis** — Cap rate, cash-on-cash return, and equity growth over time.
+- [x] **Retirement projection engine** — Deterministic year-by-year projection with contributions, growth, and inflation-adjusted withdrawals.
+- [x] **Scenario comparison** — Side-by-side comparison of multiple retirement scenarios.
+- [x] **Roth conversion modeling** — Year-by-year Roth conversion ladder with tax impact estimates.
+- [x] **Withdrawal strategy simulator** — Model different drawdown orders (taxable → tax-deferred → Roth).
+- [x] **Property ROI analysis** — Cap rate, cash-on-cash return, and equity growth over time.
 
 ### Phase 4 — Polish & Operations
 
