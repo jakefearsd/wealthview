@@ -190,14 +190,14 @@ All `id` columns are **UUID**. All tables except `tenants` and `prices` include 
 - [ ] **Transaction entry** — CRUD for transactions (buy, sell, dividend, deposit, withdrawal); on create/update/delete, auto-recompute affected holdings.
 - [ ] **Holdings management** — Auto-computed holdings from transactions; manual create/override with `is_manual_override` flag; warning when transactions conflict with a manual override.
 - [ ] **Manual price entry** — Users can enter a current price per symbol; stored in `prices` table with `source = manual`; dashboard uses most recent price for valuation, falls back to cost basis if no price exists.
-- [ ] **CSV import (basic)** — Upload a CSV file with a standard expected column format; parse and create transactions in bulk; basic error reporting (row-level errors). Configurable column mapping UI deferred to Phase 2.
+- [ ] **CSV import (brokerage-specific)** — Upload a CSV file; brokerage-specific parsers (Fidelity, Vanguard, Schwab) handle each institution's format natively; parse and create transactions in bulk; basic error reporting (row-level errors).
 - [ ] **Dashboard** — Net worth summary (sum of holdings × latest price + property equity + cash accounts); account balances table; allocation pie chart (by account type or asset class).
 - [ ] **Rental property tracker** — CRUD for properties (address, purchase price, current value, mortgage balance); CRUD for income and expense line items; monthly cash flow summary view.
 
 ### Phase 2 — File Import & Price Feed
 
-- [ ] **CSV column mapping UI** — Upgrade Phase 1's fixed-format CSV import: let users define reusable mappings per institution (column → field assignment, date format, delimiter, header row detection). Stored in a `csv_mappings` table.
-- [ ] **OFX/QFX import** — Parse OFX files (standard bank/brokerage download format) using OFX4J; single parser covers most US institutions.
+- [x] ~~**CSV column mapping UI**~~ — Replaced by brokerage-specific import parsers (Fidelity, Vanguard, Schwab) that handle each institution's CSV format natively.
+- [x] **OFX/QFX import** — Parse OFX files (standard bank/brokerage download format) using OFX4J; single parser covers most US institutions.
 - [ ] **Import deduplication** — Detect and skip duplicate transactions across repeated imports based on date, amount, and description hashing.
 - [ ] **Finnhub price feed** — Daily @Scheduled job to fetch close prices for all held symbols via Finnhub free API (60 req/min); replaces manual price entry as the primary valuation source.
 - [ ] **Historical price backfill** — On first symbol addition, backfill daily close prices for the trailing 1–2 years.
@@ -267,8 +267,8 @@ GET    /api/v1/prices/{symbol}/latest
 # File Import
 POST   /api/v1/import/csv               (multipart upload)
 POST   /api/v1/import/ofx               (multipart upload, OFX/QFX — Phase 2)
-GET    /api/v1/import/mappings           (saved CSV column mappings — Phase 2)
-POST   /api/v1/import/mappings           (create/update a column mapping — Phase 2)
+GET    /api/v1/import/mappings           (removed — replaced by brokerage-specific parsers)
+POST   /api/v1/import/mappings           (removed — replaced by brokerage-specific parsers)
 GET    /api/v1/import/jobs               (import history)
 
 # Properties
