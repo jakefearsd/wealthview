@@ -29,6 +29,29 @@ const STRATEGY_OPTIONS = [
     },
 ] as const;
 
+const WITHDRAWAL_ORDER_OPTIONS = [
+    {
+        value: 'taxable_first',
+        title: 'Taxable First',
+        description: 'Draw from taxable accounts first, then traditional, then Roth. Preserves tax-advantaged growth longest.',
+    },
+    {
+        value: 'traditional_first',
+        title: 'Traditional First',
+        description: 'Draw from traditional accounts first. Reduces future RMDs but triggers early tax.',
+    },
+    {
+        value: 'roth_first',
+        title: 'Roth First',
+        description: 'Draw from Roth first. Unusual but useful for specific tax planning scenarios.',
+    },
+    {
+        value: 'pro_rata',
+        title: 'Pro Rata',
+        description: 'Withdraw proportionally from all pools based on balance. Smooths tax impact across years.',
+    },
+] as const;
+
 const ACCOUNT_TYPE_HELP: Record<string, string> = {
     taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
     traditional: 'Pre-tax contributions reduce taxable income now. Withdrawals in retirement taxed as ordinary income.',
@@ -78,6 +101,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [filingStatus, setFilingStatus] = useState(parsedParams.filing_status ?? 'single');
     const [otherIncome, setOtherIncome] = useState<number>(parsedParams.other_income ?? 0);
     const [annualRothConversion, setAnnualRothConversion] = useState<number>(parsedParams.annual_roth_conversion ?? 0);
+    const [rothConversionStrategy, setRothConversionStrategy] = useState(parsedParams.roth_conversion_strategy ?? 'fixed_amount');
+    const [targetBracketRate, setTargetBracketRate] = useState<number>(parsedParams.target_bracket_rate ?? 0.12);
+    const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
     const [spendingProfileId, setSpendingProfileId] = useState<string>(initialValues?.spending_profile?.id ?? '');
     const [accounts, setAccounts] = useState<ScenarioAccountInput[]>(
         initialValues?.accounts?.map(a => ({
@@ -131,9 +157,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 withdrawal_strategy: withdrawalStrategy,
                 dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling : null,
                 dynamic_floor: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicFloor : null,
-                filing_status: annualRothConversion > 0 ? filingStatus : null,
-                other_income: annualRothConversion > 0 ? otherIncome : null,
-                annual_roth_conversion: annualRothConversion > 0 ? annualRothConversion : null,
+                filing_status: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? filingStatus : null,
+                other_income: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? otherIncome : null,
+                annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
+                withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
+                roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
+                target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate : null,
                 spending_profile_id: spendingProfileId || null,
                 accounts,
             };
@@ -220,16 +249,84 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 </div>
             )}
 
+            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Order</label>
+            <InfoSection prompt="What is withdrawal order?">
+                When you withdraw from your portfolio in retirement, this determines which accounts are drawn from first. Different orders have different tax consequences — for example, drawing from traditional accounts first triggers income tax earlier but preserves Roth growth.
+            </InfoSection>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                {WITHDRAWAL_ORDER_OPTIONS.map(opt => (
+                    <div
+                        key={opt.value}
+                        onClick={() => setWithdrawalOrder(opt.value)}
+                        style={{
+                            border: `2px solid ${withdrawalOrder === opt.value ? '#1976d2' : '#e0e0e0'}`,
+                            background: withdrawalOrder === opt.value ? '#e3f2fd' : '#fff',
+                            cursor: 'pointer',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                        }}
+                    >
+                        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{opt.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>{opt.description}</div>
+                    </div>
+                ))}
+            </div>
+
             <h4 style={{ marginBottom: '0.5rem' }}>Roth Conversion</h4>
             <InfoSection prompt="What is Roth conversion?">
-                Moving pre-tax retirement funds (Traditional IRA/401k) to a Roth account. You pay income tax on the converted amount now, but all future growth and withdrawals are tax-free. A conversion ladder spreads conversions over multiple years to stay in lower tax brackets. Set to $0 to skip.
+                Moving pre-tax retirement funds (Traditional IRA/401k) to a Roth account. You pay income tax on the converted amount now, but all future growth and withdrawals are tax-free. A conversion ladder spreads conversions over multiple years to stay in lower tax brackets.
             </InfoSection>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                    <label style={labelStyle}>Annual Roth Conversion</label>
-                    <input style={inputStyle} type="number" value={annualRothConversion} onChange={e => setAnnualRothConversion(Number(e.target.value))} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                <div
+                    onClick={() => setRothConversionStrategy('fixed_amount')}
+                    style={{
+                        border: `2px solid ${rothConversionStrategy === 'fixed_amount' ? '#1976d2' : '#e0e0e0'}`,
+                        background: rothConversionStrategy === 'fixed_amount' ? '#e3f2fd' : '#fff',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                    }}
+                >
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Fixed Amount</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>Convert a fixed dollar amount from traditional to Roth each year. Set to $0 to skip conversions.</div>
                 </div>
-                {annualRothConversion > 0 && (
+                <div
+                    onClick={() => setRothConversionStrategy('fill_bracket')}
+                    style={{
+                        border: `2px solid ${rothConversionStrategy === 'fill_bracket' ? '#1976d2' : '#e0e0e0'}`,
+                        background: rothConversionStrategy === 'fill_bracket' ? '#e3f2fd' : '#fff',
+                        cursor: 'pointer',
+                        borderRadius: '8px',
+                        padding: '1rem',
+                    }}
+                >
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>Fill Tax Bracket</div>
+                    <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>Automatically convert enough to fill up to a target tax bracket each year. Optimizes conversions to minimize lifetime taxes.</div>
+                </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                {rothConversionStrategy === 'fixed_amount' && (
+                    <div>
+                        <label style={labelStyle}>Annual Roth Conversion</label>
+                        <input style={inputStyle} type="number" value={annualRothConversion} onChange={e => setAnnualRothConversion(Number(e.target.value))} />
+                        <HelpText>Fixed dollar amount to convert each year. Set to $0 to skip.</HelpText>
+                    </div>
+                )}
+                {rothConversionStrategy === 'fill_bracket' && (
+                    <div>
+                        <label style={labelStyle}>Target Tax Bracket</label>
+                        <select style={inputStyle} value={targetBracketRate} onChange={e => setTargetBracketRate(Number(e.target.value))}>
+                            <option value={0.10}>10%</option>
+                            <option value={0.12}>12%</option>
+                            <option value={0.22}>22%</option>
+                            <option value={0.24}>24%</option>
+                            <option value={0.32}>32%</option>
+                            <option value={0.35}>35%</option>
+                        </select>
+                        <HelpText>Convert enough to fill income up to the top of this bracket each year.</HelpText>
+                    </div>
+                )}
+                {(rothConversionStrategy !== 'fixed_amount' || annualRothConversion > 0) && (
                     <>
                         <div>
                             <label style={labelStyle}>Filing Status</label>
