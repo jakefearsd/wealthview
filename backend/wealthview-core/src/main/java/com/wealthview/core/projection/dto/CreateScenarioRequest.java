@@ -18,6 +18,9 @@ public record CreateScenarioRequest(
         String filingStatus,
         BigDecimal otherIncome,
         BigDecimal annualRothConversion,
+        String withdrawalOrder,
+        String rothConversionStrategy,
+        BigDecimal targetBracketRate,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId) {
 }

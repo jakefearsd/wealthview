@@ -57,7 +57,8 @@ public class ProjectionService {
         String paramsJson = buildParamsJson(
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
-                request.otherIncome(), request.annualRothConversion());
+                request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
+                request.rothConversionStrategy(), request.targetBracketRate());
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -116,7 +117,8 @@ public class ProjectionService {
         scenario.setParamsJson(buildParamsJson(
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
-                request.otherIncome(), request.annualRothConversion()));
+                request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
+                request.rothConversionStrategy(), request.targetBracketRate()));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -187,7 +189,9 @@ public class ProjectionService {
     private String buildParamsJson(Integer birthYear, java.math.BigDecimal withdrawalRate,
                                      String withdrawalStrategy, java.math.BigDecimal dynamicCeiling,
                                      java.math.BigDecimal dynamicFloor, String filingStatus,
-                                     java.math.BigDecimal otherIncome, java.math.BigDecimal annualRothConversion) {
+                                     java.math.BigDecimal otherIncome, java.math.BigDecimal annualRothConversion,
+                                     String withdrawalOrder,
+                                     String rothConversionStrategy, java.math.BigDecimal targetBracketRate) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
         if (birthYear != null) {
@@ -220,6 +224,18 @@ public class ProjectionService {
         }
         if (annualRothConversion != null) {
             node.put("annual_roth_conversion", annualRothConversion);
+            hasContent = true;
+        }
+        if (withdrawalOrder != null) {
+            node.put("withdrawal_order", withdrawalOrder);
+            hasContent = true;
+        }
+        if (rothConversionStrategy != null) {
+            node.put("roth_conversion_strategy", rothConversionStrategy);
+            hasContent = true;
+        }
+        if (targetBracketRate != null) {
+            node.put("target_bracket_rate", targetBracketRate);
             hasContent = true;
         }
         return hasContent ? node.toString() : null;

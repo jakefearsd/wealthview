@@ -84,7 +84,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null,
+                null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -124,7 +124,7 @@ class ProjectionServiceTest {
                 "vanguard_dynamic_spending",
                 new BigDecimal("0.05"),
                 new BigDecimal("-0.025"),
-                null, null, null,
+                null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -158,7 +158,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null,
+                null, null, null, null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
@@ -178,6 +178,73 @@ class ProjectionServiceTest {
         var saved = captor.getValue();
         assertThat(saved.getAccounts().get(0).getAccountType()).isEqualTo("traditional");
         assertThat(saved.getAccounts().get(1).getAccountType()).isEqualTo("roth");
+    }
+
+    @Test
+    void createScenario_withWithdrawalOrder_persistsInParamsJson() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new CreateScenarioRequest(
+                "Traditional First Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                null, null, null,
+                null, null, null,
+                "traditional_first", null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        null,
+                        new BigDecimal("100000"),
+                        new BigDecimal("10000"),
+                        new BigDecimal("0.07"),
+                        "traditional")),
+                null);
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getParamsJson()).contains("\"withdrawal_order\":\"traditional_first\"");
+    }
+
+    @Test
+    void createScenario_withFillBracketStrategy_persistsInParamsJson() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new CreateScenarioRequest(
+                "Fill Bracket Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                null, null, null,
+                "single", null, null, null,
+                "fill_bracket", new BigDecimal("0.12"),
+                List.of(new CreateProjectionAccountRequest(
+                        null,
+                        new BigDecimal("200000"),
+                        new BigDecimal("10000"),
+                        new BigDecimal("0.07"),
+                        "traditional")),
+                null);
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getParamsJson()).contains("\"roth_conversion_strategy\":\"fill_bracket\"");
+        assertThat(saved.getParamsJson()).contains("\"target_bracket_rate\":0.12");
     }
 
     @Test
@@ -287,7 +354,7 @@ class ProjectionServiceTest {
                 1985,
                 new BigDecimal("0.035"),
                 "dynamic_percentage",
-                null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
@@ -316,7 +383,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, List.of(), null);
+                null, null, null, null, null, null, List.of(), null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -340,7 +407,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null,
+                null, null, null, null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
