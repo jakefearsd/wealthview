@@ -95,9 +95,14 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
                 </div>
             ) : (
                 <>
-                    <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                    <div style={{ color: '#999', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                         What your current holdings ({data.symbols.join(', ')}) would have been worth over the past {selectedLabel.toLowerCase()}
                     </div>
+                    {data.has_money_market_holdings && (
+                        <div style={{ color: '#7b6900', fontSize: '0.8rem', marginBottom: '1rem', background: '#fffde7', padding: '0.4rem 0.6rem', borderRadius: '4px', display: 'inline-block' }}>
+                            Money market holdings are projected at constant $1.00/share in historical views.
+                        </div>
+                    )}
                     <ResponsiveContainer width="100%" height={350}>
                         <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                             <defs>

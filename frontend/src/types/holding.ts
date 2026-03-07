@@ -5,6 +5,8 @@ export interface Holding {
     quantity: number;
     cost_basis: number;
     is_manual_override: boolean;
+    is_money_market: boolean;
+    money_market_rate: number | null;
     as_of_date: string;
 }
 
