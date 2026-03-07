@@ -20,4 +20,6 @@ public interface HoldingRepository extends JpaRepository<HoldingEntity, UUID> {
 
     @Query("SELECT DISTINCT h.symbol FROM HoldingEntity h WHERE h.quantity > 0")
     List<String> findDistinctSymbols();
+
+    void deleteByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 }

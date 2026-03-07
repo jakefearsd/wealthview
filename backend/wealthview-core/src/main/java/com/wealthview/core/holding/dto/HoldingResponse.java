@@ -13,6 +13,8 @@ public record HoldingResponse(
         BigDecimal quantity,
         BigDecimal costBasis,
         boolean isManualOverride,
+        boolean isMoneyMarket,
+        BigDecimal moneyMarketRate,
         LocalDate asOfDate
 ) {
     public static HoldingResponse from(HoldingEntity entity) {
@@ -23,6 +25,8 @@ public record HoldingResponse(
                 entity.getQuantity(),
                 entity.getCostBasis(),
                 entity.isManualOverride(),
+                entity.isMoneyMarket(),
+                entity.getMoneyMarketRate(),
                 entity.getAsOfDate()
         );
     }
