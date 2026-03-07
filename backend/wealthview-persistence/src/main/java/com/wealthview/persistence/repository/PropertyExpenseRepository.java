@@ -10,4 +10,7 @@ import java.util.UUID;
 public interface PropertyExpenseRepository extends JpaRepository<PropertyExpenseEntity, UUID> {
 
     List<PropertyExpenseEntity> findByProperty_IdAndDateBetween(UUID propertyId, LocalDate from, LocalDate to);
+
+    List<PropertyExpenseEntity> findByProperty_IdAndDateBetweenAndCategoryNot(
+            UUID propertyId, LocalDate from, LocalDate to, String category);
 }

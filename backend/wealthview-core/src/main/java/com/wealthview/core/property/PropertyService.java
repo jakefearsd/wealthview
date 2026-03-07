@@ -26,6 +26,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 public class PropertyService {
 
     private static final Logger log = LoggerFactory.getLogger(PropertyService.class);
+    private static final Set<String> VALID_PROPERTY_TYPES = Set.of("primary_residence", "investment", "vacation");
 
     private final PropertyRepository propertyRepository;
     private final PropertyIncomeRepository incomeRepository;
@@ -62,6 +64,7 @@ public class PropertyService {
         var property = new PropertyEntity(tenant, request.address(), request.purchasePrice(),
                 request.purchaseDate(), request.currentValue(), mortgageBalance);
         applyLoanFields(property, request);
+        applyPropertyType(property, request.propertyType());
         property = propertyRepository.save(property);
         log.info("Property {} created for tenant {}", property.getId(), tenantId);
         return buildResponse(property);
@@ -95,6 +98,7 @@ public class PropertyService {
         property.setMortgageBalance(request.mortgageBalance() != null
                 ? request.mortgageBalance() : BigDecimal.ZERO);
         applyLoanFields(property, request);
+        applyPropertyType(property, request.propertyType());
         property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
         return buildResponse(property);
@@ -196,6 +200,17 @@ public class PropertyService {
         property.setLoanStartDate(request.loanStartDate());
         property.setUseComputedBalance(
                 request.useComputedBalance() != null && request.useComputedBalance());
+    }
+
+    private void applyPropertyType(PropertyEntity property, String propertyType) {
+        if (propertyType == null) {
+            property.setPropertyType("primary_residence");
+        } else if (VALID_PROPERTY_TYPES.contains(propertyType)) {
+            property.setPropertyType(propertyType);
+        } else {
+            throw new IllegalArgumentException(
+                    "Invalid property type: " + propertyType + ". Must be one of: " + VALID_PROPERTY_TYPES);
+        }
     }
 
     private void validateLoanDetails(PropertyRequest request) {
