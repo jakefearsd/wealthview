@@ -19,4 +19,9 @@ describe('SummaryCard', () => {
         render(<SummaryCard label="Peak" value="$1,000,000" subtext="(year 2045)" />);
         expect(screen.getByText('(year 2045)')).toBeInTheDocument();
     });
+
+    it('renders optional description', () => {
+        render(<SummaryCard label="Final Balance" value="$500,000" description="Portfolio value at the end." />);
+        expect(screen.getByText('Portfolio value at the end.')).toBeInTheDocument();
+    });
 });

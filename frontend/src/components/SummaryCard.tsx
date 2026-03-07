@@ -5,10 +5,11 @@ interface SummaryCardProps {
     value: string;
     valueColor?: string;
     subtext?: string;
+    description?: string;
     large?: boolean;
 }
 
-export default function SummaryCard({ label, value, valueColor, subtext, large }: SummaryCardProps) {
+export default function SummaryCard({ label, value, valueColor, subtext, description, large }: SummaryCardProps) {
     return (
         <div style={cardStyle}>
             <div style={{ color: '#666', fontSize: '0.85rem' }}>{label}</div>
@@ -16,6 +17,7 @@ export default function SummaryCard({ label, value, valueColor, subtext, large }
                 {value}
             </div>
             {subtext && <div style={{ color: '#999', fontSize: '0.75rem', marginTop: '0.25rem' }}>{subtext}</div>}
+            {description && <div style={{ color: '#888', fontSize: '0.7rem', marginTop: '0.25rem', lineHeight: 1.3 }}>{description}</div>}
         </div>
     );
 }
