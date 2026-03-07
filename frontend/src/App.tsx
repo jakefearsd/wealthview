@@ -17,6 +17,7 @@ import ProjectionComparePage from './pages/ProjectionComparePage';
 import ProjectionDetailPage from './pages/ProjectionDetailPage';
 import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import HoldingDetailPage from './pages/HoldingDetailPage';
+import AdminPage from './pages/AdminPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -41,6 +42,7 @@ export default function App() {
                         <Route path="spending-profiles" element={<SpendingProfilesPage />} />
                         <Route path="properties" element={<PropertiesListPage />} />
                         <Route path="properties/:id" element={<PropertyDetailPage />} />
+                        <Route path="admin" element={<AdminPage />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Route>
