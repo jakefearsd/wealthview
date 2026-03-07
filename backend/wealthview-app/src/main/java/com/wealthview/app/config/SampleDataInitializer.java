@@ -232,25 +232,31 @@ public class SampleDataInitializer implements ApplicationRunner {
                 LocalDate.of(2025, 7, 5), new BigDecimal("850.00"),
                 "maintenance", "Plumbing repair"));
 
-        // Rental property 2
-        var rental2 = propertyRepository.save(new PropertyEntity(tenant,
-                "1600 Pennsylvania Ave, Washington DC",
-                new BigDecimal("425000.00"), LocalDate.of(2021, 3, 1),
-                new BigDecimal("485000.00"), new BigDecimal("310000.00")));
+        // Rental property 2 — real test case
+        var rental2 = new PropertyEntity(tenant,
+                "2020 Beryl Street, San Diego CA 92109",
+                new BigDecimal("1300000.00"), LocalDate.of(2020, 9, 1),
+                new BigDecimal("1300000.00"), new BigDecimal("905000.00"));
+        rental2.setLoanAmount(new BigDecimal("905000.00"));
+        rental2.setAnnualInterestRate(new BigDecimal("2.75"));
+        rental2.setLoanTermMonths(360);
+        rental2.setLoanStartDate(LocalDate.of(2020, 9, 1));
+        rental2.setUseComputedBalance(true);
+        rental2 = propertyRepository.save(rental2);
 
         for (int month = 1; month <= 12; month++) {
             incomeRepository.save(new PropertyIncomeEntity(rental2, tenant,
-                    LocalDate.of(2025, month, 1), new BigDecimal("3100.00"),
+                    LocalDate.of(2025, month, 1), new BigDecimal("4200.00"),
                     "rent", "Monthly rent"));
         }
         expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 2, 1), new BigDecimal("4500.00"),
+                LocalDate.of(2025, 2, 1), new BigDecimal("6200.00"),
                 "insurance", "Annual homeowners insurance"));
         expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 5, 15), new BigDecimal("5100.00"),
+                LocalDate.of(2025, 4, 10), new BigDecimal("7800.00"),
                 "tax", "Property tax - H1"));
         expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 9, 8), new BigDecimal("2800.00"),
-                "maintenance", "Roof repair"));
+                LocalDate.of(2025, 8, 15), new BigDecimal("1500.00"),
+                "maintenance", "Landscaping and irrigation repair"));
     }
 }
