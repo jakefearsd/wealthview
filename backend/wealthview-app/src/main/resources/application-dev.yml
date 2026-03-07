@@ -19,3 +19,5 @@ app:
     secret: LOCAL_DEV_HS256_SIGNING_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_DEVELOPMENT
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
+  zillow:
+    enabled: true

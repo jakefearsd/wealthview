@@ -16,6 +16,8 @@ import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
+import com.wealthview.core.property.dto.ValuationRefreshResponse;
+import com.wealthview.core.property.dto.ZillowSearchResult;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -258,11 +260,46 @@ class PropertyControllerTest {
     }
 
     @Test
-    void refreshValuation_returns202() throws Exception {
-        doNothing().when(syncService).syncSingleProperty(TENANT_ID, PROPERTY_ID);
+    void refreshValuation_updated_returns200() throws Exception {
+        when(syncService.refreshProperty(TENANT_ID, PROPERTY_ID))
+                .thenReturn(ValuationRefreshResponse.updated(new BigDecimal("400000")));
 
         mockMvc.perform(post("/api/v1/properties/{id}/valuations/refresh", PROPERTY_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isAccepted());
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("updated"))
+                .andExpect(jsonPath("$.value").value(400000));
+    }
+
+    @Test
+    void refreshValuation_multipleMatches_returnsCandidates() throws Exception {
+        var candidates = java.util.List.of(
+                new ZillowSearchResult("111", "123 Main St Unit A", new BigDecimal("350000")),
+                new ZillowSearchResult("222", "123 Main St Unit B", new BigDecimal("375000"))
+        );
+        when(syncService.refreshProperty(TENANT_ID, PROPERTY_ID))
+                .thenReturn(ValuationRefreshResponse.multipleMatches(candidates));
+
+        mockMvc.perform(post("/api/v1/properties/{id}/valuations/refresh", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("multiple_matches"))
+                .andExpect(jsonPath("$.candidates").isArray())
+                .andExpect(jsonPath("$.candidates.length()").value(2));
+    }
+
+    @Test
+    void selectZpid_returns200() throws Exception {
+        when(syncService.selectZpid(TENANT_ID, PROPERTY_ID, "12345"))
+                .thenReturn(ValuationRefreshResponse.updated(new BigDecimal("400000")));
+
+        mockMvc.perform(post("/api/v1/properties/{id}/valuations/select-zpid", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"zpid": "12345"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("updated"));
     }
 }

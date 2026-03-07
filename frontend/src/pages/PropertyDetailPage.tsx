@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, getPropertyAnalytics } from '../api/properties';
+import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics } from '../api/properties';
+import type { ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -41,6 +42,7 @@ export default function PropertyDetailPage() {
     const canWrite = role === 'admin' || role === 'member';
     const range = useMemo(getDefaultRange, []);
     const [refreshing, setRefreshing] = useState(false);
+    const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
 
     const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
@@ -70,12 +72,44 @@ export default function PropertyDetailPage() {
     async function handleRefreshValuation() {
         setRefreshing(true);
         try {
-            await refreshValuation(id!);
-            toast.success('Valuation refresh requested');
-            refetchValuations();
-            refetchProperty();
-        } catch {
+            const result = await refreshValuation(id!);
+            if (result.status === 'updated') {
+                toast.success(`Valuation updated: $${result.value?.toLocaleString()}`);
+                refetchValuations();
+                refetchProperty();
+            } else if (result.status === 'multiple_matches') {
+                setZillowCandidates(result.candidates);
+            } else {
+                toast.error('No Zillow results found for this address');
+            }
+        } catch (err: unknown) {
+            if (err && typeof err === 'object' && 'response' in err) {
+                const axiosErr = err as { response?: { status?: number } };
+                if (axiosErr.response?.status === 503) {
+                    toast.error('Valuation service is not enabled. Set app.zillow.enabled=true to use this feature.');
+                    return;
+                }
+            }
             toast.error('Failed to refresh valuation');
+        } finally {
+            setRefreshing(false);
+        }
+    }
+
+    async function handleSelectZpid(zpid: string) {
+        setZillowCandidates(null);
+        setRefreshing(true);
+        try {
+            const result = await selectZpid(id!, zpid);
+            if (result.status === 'updated') {
+                toast.success(`Valuation updated: $${result.value?.toLocaleString()}`);
+                refetchValuations();
+                refetchProperty();
+            } else {
+                toast.error('Could not fetch valuation for the selected property');
+            }
+        } catch {
+            toast.error('Failed to select property');
         } finally {
             setRefreshing(false);
         }
@@ -350,6 +384,51 @@ export default function PropertyDetailPage() {
                         onSubmit={handleAddExpense}
                         buttonColor="#d32f2f"
                     />
+                </div>
+            )}
+
+            {zillowCandidates && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.5)', display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+                }}>
+                    <div style={{ ...cardStyle, maxWidth: '600px', width: '90%', maxHeight: '80vh', overflow: 'auto' }}>
+                        <h3 style={{ marginBottom: '0.5rem' }}>Multiple Properties Found</h3>
+                        <p style={{ color: '#666', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                            Zillow found multiple properties matching this address. Please select the correct one:
+                        </p>
+                        <div style={{ display: 'grid', gap: '0.75rem' }}>
+                            {zillowCandidates.map((c) => (
+                                <button
+                                    key={c.zpid}
+                                    onClick={() => handleSelectZpid(c.zpid)}
+                                    style={{
+                                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                        padding: '1rem', background: '#f9f9f9', border: '1px solid #ddd',
+                                        borderRadius: '8px', cursor: 'pointer', textAlign: 'left', width: '100%',
+                                    }}
+                                >
+                                    <div>
+                                        <div style={{ fontWeight: 600 }}>{c.address}</div>
+                                        <div style={{ fontSize: '0.8rem', color: '#888' }}>ZPID: {c.zpid}</div>
+                                    </div>
+                                    <div style={{ fontWeight: 600, color: '#2e7d32', fontSize: '1.1rem' }}>
+                                        {formatCurrency(c.zestimate)}
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setZillowCandidates(null)}
+                            style={{
+                                marginTop: '1rem', padding: '0.5rem 1rem', background: '#eee',
+                                border: 'none', borderRadius: '4px', cursor: 'pointer', width: '100%',
+                            }}
+                        >
+                            Cancel
+                        </button>
+                    </div>
                 </div>
             )}
         </div>

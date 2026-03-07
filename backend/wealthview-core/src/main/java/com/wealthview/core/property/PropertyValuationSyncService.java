@@ -1,13 +1,17 @@
 package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.property.dto.ValuationRefreshResponse;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Service
@@ -57,18 +61,59 @@ public class PropertyValuationSyncService {
         log.info("Property valuation sync complete: {} updated, {} skipped", success, skipped);
     }
 
-    public void syncSingleProperty(UUID tenantId, UUID propertyId) {
+    @Transactional
+    public ValuationRefreshResponse refreshProperty(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
-        var resultOpt = valuationClient.getValuation(property.getAddress());
+        if (property.getZillowZpid() != null) {
+            return fetchByZpid(tenantId, propertyId, property.getZillowZpid());
+        }
+
+        var candidates = valuationClient.searchProperties(property.getAddress());
+
+        if (candidates.isEmpty()) {
+            log.warn("No Zillow results for property {} (address: {})", propertyId, property.getAddress());
+            return ValuationRefreshResponse.noResults();
+        }
+
+        if (candidates.size() == 1) {
+            var candidate = candidates.get(0);
+            storeZpid(property, candidate.zpid());
+            return fetchByZpid(tenantId, propertyId, candidate.zpid());
+        }
+
+        log.info("Multiple Zillow matches for property {} (address: {}): {} candidates",
+                propertyId, property.getAddress(), candidates.size());
+        return ValuationRefreshResponse.multipleMatches(candidates);
+    }
+
+    @Transactional
+    public ValuationRefreshResponse selectZpid(UUID tenantId, UUID propertyId, String zpid) {
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+
+        storeZpid(property, zpid);
+        return fetchByZpid(tenantId, propertyId, zpid);
+    }
+
+    private ValuationRefreshResponse fetchByZpid(UUID tenantId, UUID propertyId, String zpid) {
+        var resultOpt = valuationClient.getValuationByZpid(zpid);
         if (resultOpt.isPresent()) {
             var result = resultOpt.orElseThrow();
             valuationService.recordValuation(tenantId, propertyId,
                     result.date(), result.value(), "zillow");
             log.info("Synced valuation for property {}: {}", propertyId, result.value());
-        } else {
-            log.warn("No valuation available for property {}", propertyId);
+            return ValuationRefreshResponse.updated(result.value());
         }
+
+        log.warn("No valuation available for property {} (zpid: {})", propertyId, zpid);
+        return ValuationRefreshResponse.noResults();
+    }
+
+    private void storeZpid(PropertyEntity property, String zpid) {
+        property.setZillowZpid(zpid);
+        property.setUpdatedAt(OffsetDateTime.now());
+        propertyRepository.save(property);
     }
 }

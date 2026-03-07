@@ -75,6 +75,18 @@ export interface EquityGrowthPoint {
     mortgage_balance: number;
 }
 
+export interface ZillowSearchResult {
+    zpid: string;
+    address: string;
+    zestimate: number;
+}
+
+export interface ValuationRefreshResponse {
+    status: 'updated' | 'multiple_matches' | 'no_results';
+    value: number | null;
+    candidates: ZillowSearchResult[] | null;
+}
+
 export interface PropertyAnalyticsResponse {
     property_type: string;
     total_appreciation: number;
