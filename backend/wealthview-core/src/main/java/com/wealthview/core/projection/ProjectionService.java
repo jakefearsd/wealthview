@@ -3,6 +3,7 @@ package com.wealthview.core.projection;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
@@ -47,7 +48,7 @@ public class ProjectionService {
     @Transactional
     public ScenarioResponse createScenario(UUID tenantId, CreateScenarioRequest request) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
         String paramsJson = buildParamsJson(
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),

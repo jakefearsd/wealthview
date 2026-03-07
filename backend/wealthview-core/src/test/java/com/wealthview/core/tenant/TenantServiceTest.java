@@ -1,6 +1,6 @@
 package com.wealthview.core.tenant;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
@@ -81,6 +81,6 @@ class TenantServiceTest {
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> tenantService.generateInviteCode(tenantId, UUID.randomUUID()))
-                .isInstanceOf(EntityNotFoundException.class);
+                .isInstanceOf(InvalidSessionException.class);
     }
 }

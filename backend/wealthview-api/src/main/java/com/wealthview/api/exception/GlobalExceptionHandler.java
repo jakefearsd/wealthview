@@ -4,6 +4,7 @@ import com.wealthview.api.dto.ErrorResponse;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.exception.TenantAccessDeniedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,8 +23,16 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(EntityNotFoundException ex) {
+        log.warn("Entity not found: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("NOT_FOUND", ex.getMessage(), 404));
+    }
+
+    @ExceptionHandler(InvalidSessionException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidSession(InvalidSessionException ex) {
+        log.warn("Invalid session: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ErrorResponse("UNAUTHORIZED", ex.getMessage(), 401));
     }
 
     @ExceptionHandler(DuplicateEntityException.class)
