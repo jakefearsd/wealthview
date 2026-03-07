@@ -1,0 +1,14 @@
+﻿Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+X54411566,Individual - TOD,FCASH**,HELD IN FCASH,,,,$704.82,,,,,0.09%,,,Cash,
+X54411566,Individual - TOD,AMZN,AMAZON.COM INC,1100,$216.82,+$8.09,$238502.00,+$8899.00,+3.87%,+$126177.26,+112.33%,31.28%,$112324.74,$102.11,Cash,
+X54411566,Individual - TOD,NVDA,NVIDIA CORPORATION COM,25,$183.04,+$2.99,$4576.00,+$74.75,+1.66%,+$2851.50,+165.35%,0.60%,$1724.50,$68.98,Cash,
+X54411566,Individual - TOD,SCHD,SCHWAB US DIVIDEND EQUITY ETF,601.007,$31.54,-$0.05,$18955.76,-$29.51,-0.16%,+$1810.16,+10.55%,2.49%,$17145.60,$28.53,Cash,
+X54411566,Individual - TOD,SPAXX,FIDELITY GOVERNMENT MONEY MARKET,196049.86,$1.00,$0.00,$196049.86,--,--,--,--,25.71%,--,--,Cash,
+X54411566,Individual - TOD,VOO,VANGUARD INDEX FUNDS S&P 500 ETF USD,483,$630.18,+$4.46,$304376.94,+$2154.18,+0.71%,+$552.62,+0.18%,39.92%,$303824.32,$629.04,Cash,
+X54411566,Individual - TOD,Pending activity,,,,,-$699.99,,,,,,,,,
+
+"The data and information in this spreadsheet is provided to you solely for your use and is not for distribution. The spreadsheet is provided for informational purposes only, and is not intended to provide advice, nor should it be construed as an offer to sell, a solicitation of an offer to buy or a recommendation for any security by Fidelity or any third party. Data and information shown is based on information known to Fidelity as of the date it was exported and is subject to change. It should not be used in place of your account statements or trade confirmations and is not intended for tax reporting purposes. For more information on the data included in this spreadsheet, including any limitations thereof, go to Fidelity.com."
+
+"Brokerage services are provided by Fidelity Brokerage Services LLC (FBS), 900 Salem Street, Smithfield, RI 02917. Custody and other services provided by National Financial Services LLC (NFS). Both are Fidelity Investment companies and members SIPC, NYSE. Neither FBS nor NFS offer crypto as a direct investment nor provide trading or custody services for such assets."
+
+"Date downloaded Mar-05-2026 6:49 a.m ET"
