@@ -82,8 +82,9 @@ public class AccountController {
     @GetMapping("/{id}/theoretical-history")
     public ResponseEntity<PortfolioHistoryResponse> getTheoreticalHistory(
             @AuthenticationPrincipal TenantUserPrincipal principal,
-            @PathVariable UUID id) {
-        var response = theoreticalPortfolioService.computeHistory(principal.tenantId(), id);
+            @PathVariable UUID id,
+            @RequestParam(defaultValue = "2") int years) {
+        var response = theoreticalPortfolioService.computeHistory(principal.tenantId(), id, years);
         return ResponseEntity.ok(response);
     }
 }
