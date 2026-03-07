@@ -18,38 +18,25 @@ WealthView consolidates financial visibility across brokerage accounts, rental p
 - **Multi-Tenant** -- JWT-based auth with tenant isolation; invite code registration system with role-based access (admin/user).
 - **Self-Hosted** -- Single Docker Compose command to deploy; no third-party SaaS dependencies.
 
-## Tech Stack
+---
 
-| Layer     | Technology                                                |
-|-----------|-----------------------------------------------------------|
-| Frontend  | React 18, TypeScript, Vite, React Router, Recharts, Axios |
-| Backend   | Java 21, Spring Boot 3.3, Spring Security, JPA            |
-| Database  | PostgreSQL 16 with Flyway migrations                      |
-| Build     | Maven multi-module (backend), npm (frontend)              |
-| Testing   | JUnit 5, Mockito, Testcontainers, Vitest, React Testing Library |
-| Deploy    | Docker Compose (multi-stage build)                        |
+## Table of Contents
 
-## Architecture
+- [Quick Start (Docker Compose)](#quick-start-docker-compose)
+- [Production Deployment](#production-deployment)
+- [Configuration Reference](#configuration-reference)
+- [Development Setup](#development-setup)
+- [Running Tests](#running-tests)
+- [Code Quality](#code-quality)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Project Structure](#project-structure)
+- [Database Migrations](#database-migrations)
+- [API Reference](#api-reference)
+- [Frontend Pages](#frontend-pages)
+- [Feature Walkthrough](#feature-walkthrough)
 
-```
-React SPA  <-->  Spring Boot REST API  <-->  PostgreSQL
-                      |
-                  Finnhub API
-                  (stock prices)
-```
-
-The backend is organized as a Maven multi-module project:
-
-| Module                   | Responsibility                                           |
-|--------------------------|----------------------------------------------------------|
-| `wealthview-api`         | REST controllers, security config, exception handlers    |
-| `wealthview-core`        | Services, business logic, domain DTOs                    |
-| `wealthview-persistence` | JPA entities, repositories, Flyway migrations            |
-| `wealthview-import`      | CSV/OFX parsers, Finnhub price feed client, Zillow scraper |
-| `wealthview-projection`  | Deterministic retirement modeling engine                  |
-| `wealthview-app`         | Spring Boot main class, profile configs, JAR packaging   |
-
-Module dependencies flow strictly downward: `api -> core -> persistence`. The `import` and `projection` modules depend on `core`. The `app` module assembles everything.
+---
 
 ## Quick Start (Docker Compose)
 
@@ -74,21 +61,159 @@ This builds a multi-stage Docker image (frontend + backend) and starts PostgreSQ
 
 Both accounts are created automatically on first startup. The demo user comes with sample investment accounts (Fidelity brokerage and 401k with holdings in AAPL, NVDA, GOOG, VOO, FXAIX, SCHD, VXUS), a bank account, and two rental properties with income/expense history.
 
-### Environment Variables
-
-| Variable               | Default                                                | Description                     |
-|------------------------|--------------------------------------------------------|---------------------------------|
-| `DB_PASSWORD`          | `wv_dev_pass`                                          | PostgreSQL password             |
-| `JWT_SECRET`           | `production-secret-key-must-be-at-least-32-characters` | JWT signing key                 |
-| `SUPER_ADMIN_PASSWORD` | `admin123`                                             | Initial admin password          |
-| `FINNHUB_API_KEY`      | *(empty -- price sync disabled)*                       | Finnhub API key for live prices |
-| `ZILLOW_ENABLED`       | `false`                                                | Enable Zillow property valuation scraping |
-
-For production, set `JWT_SECRET` and `DB_PASSWORD` to strong random values:
+### Stopping
 
 ```bash
-JWT_SECRET=$(openssl rand -base64 48) DB_PASSWORD=$(openssl rand -base64 24) docker compose up --build -d
+docker compose down        # Stop containers, preserve data
+docker compose down -v     # Stop containers and delete database volume
 ```
+
+---
+
+## Production Deployment
+
+### Security Checklist
+
+1. **Set strong secrets** -- never deploy with default values:
+   ```bash
+   export JWT_SECRET=$(openssl rand -base64 48)
+   export DB_PASSWORD=$(openssl rand -base64 24)
+   export SUPER_ADMIN_PASSWORD=$(openssl rand -base64 16)
+   docker compose up --build -d
+   ```
+
+2. **Put a reverse proxy in front** -- the application listens on plain HTTP (port 8080 inside the container, mapped to 80 on the host). Use nginx, Caddy, or Traefik to terminate TLS:
+   ```nginx
+   # Example nginx config
+   server {
+       listen 443 ssl;
+       server_name finance.example.com;
+
+       ssl_certificate     /etc/ssl/certs/finance.example.com.pem;
+       ssl_certificate_key /etc/ssl/private/finance.example.com.key;
+
+       location / {
+           proxy_pass http://127.0.0.1:80;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+
+3. **Restrict network access** -- bind Docker's published port to localhost if using a reverse proxy on the same host:
+   ```yaml
+   # docker-compose.override.yml
+   services:
+     app:
+       ports:
+         - "127.0.0.1:80:8080"
+   ```
+
+4. **Change the super-admin password** after first login or set `SUPER_ADMIN_PASSWORD` to a strong value before first start.
+
+5. **Finnhub API key** -- sign up at [finnhub.io](https://finnhub.io) for a free API key. Without it, the daily price sync job is disabled and you must enter prices manually.
+
+### Backup and Restore
+
+The database volume (`pgdata`) holds all application state. Back it up regularly.
+
+**Dump the database:**
+```bash
+docker compose exec db pg_dump -U wv_app wealthview > backup_$(date +%Y%m%d).sql
+```
+
+**Restore from dump:**
+```bash
+docker compose exec -T db psql -U wv_app wealthview < backup_20260307.sql
+```
+
+**Volume-level backup** (alternative):
+```bash
+docker compose down
+docker run --rm -v wealthview_pgdata:/data -v $(pwd):/backup alpine \
+  tar czf /backup/pgdata_backup.tar.gz -C /data .
+docker compose up -d
+```
+
+### Health Check
+
+The PostgreSQL container includes a health check (`pg_isready`). The application container depends on it and will not start until the database is ready. To verify the application is running:
+
+```bash
+curl -s http://localhost/api/v1/auth/login | head -c 100
+# Should return a JSON error (no credentials), not a connection refused
+```
+
+### Upgrading
+
+1. Pull the latest code or release.
+2. Back up the database (see above).
+3. Rebuild and restart:
+   ```bash
+   docker compose up --build -d
+   ```
+   Flyway automatically applies any new migrations on startup. Migrations are immutable once released -- you never need to manually run SQL.
+
+### Resource Requirements
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| CPU       | 1 core  | 2+ cores    |
+| RAM       | 1 GB    | 2+ GB       |
+| Disk      | 1 GB    | 10+ GB (grows with price history and import data) |
+| Docker    | 20.10+  | Latest stable |
+
+---
+
+## Configuration Reference
+
+All configuration is via environment variables passed through `docker-compose.yml` or set in the shell for development.
+
+### Core Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_PASSWORD` | `wv_dev_pass` | PostgreSQL password (used by both the database and the application) |
+| `JWT_SECRET` | `production-secret-key-must-be-at-least-32-characters` | HMAC-SHA256 signing key for JWT tokens. **Must be at least 32 characters.** |
+| `SUPER_ADMIN_PASSWORD` | `admin123` | Password for the auto-created `admin@wealthview.local` account |
+| `FINNHUB_API_KEY` | *(empty)* | Finnhub API key for live stock prices. When empty, the scheduled price sync is disabled. |
+| `ZILLOW_ENABLED` | `false` | Enable Zillow property valuation scraping. When `true`, a weekly job (Sunday 6 AM) scrapes Zestimates for all properties. |
+
+### JWT Token Lifetimes
+
+Configured in `application.yml` (not typically overridden via env vars):
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `app.jwt.access-token-expiration` | `3600000` (1 hour) | Access token lifetime in milliseconds |
+| `app.jwt.refresh-token-expiration` | `86400000` (24 hours) | Refresh token lifetime in milliseconds |
+
+### Finnhub Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `app.finnhub.base-url` | `https://finnhub.io` | Finnhub API base URL |
+| `app.finnhub.rate-limit-ms` | `1100` | Delay between API calls (free tier: 60 req/min) |
+
+### Zillow Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `app.zillow.enabled` | `false` | Enable/disable Zillow valuation scraping |
+| `app.zillow.timeout-ms` | `10000` | HTTP timeout for Zillow requests |
+| `app.zillow.rate-limit-ms` | `5000` | Delay between scrape requests |
+| `app.zillow.sync-cron` | `0 0 6 * * SUN` | Cron schedule for automatic valuation sync |
+
+### Spring Profiles
+
+| Profile | Activated By | Behavior |
+|---------|-------------|----------|
+| `dev` | Default when running from IDE/CLI | Debug logging, formatted SQL output, CORS allows `localhost:5173` |
+| `docker` | `docker-compose.yml` | INFO logging, CORS allows `localhost`, super-admin auto-created |
+
+---
 
 ## Development Setup
 
@@ -98,6 +223,7 @@ JWT_SECRET=$(openssl rand -base64 48) DB_PASSWORD=$(openssl rand -base64 24) doc
 - Maven 3.9+
 - Node.js 20+
 - PostgreSQL 16 (local or via Docker)
+- Docker (required for integration tests via Testcontainers)
 
 ### Database
 
@@ -127,167 +253,134 @@ npm run dev                               # Dev server at http://localhost:5173
 
 The Vite dev server proxies `/api` requests to the backend on port 8080.
 
-### Running Tests
+---
+
+## Running Tests
+
+### Backend
 
 ```bash
-# Backend -- all modules (Testcontainers integration tests require Docker)
 cd backend
+
+# All tests (unit + integration; integration tests require Docker for Testcontainers)
 mvn test
 
-# Backend -- unit tests only (no Docker required)
+# Unit tests only (no Docker required)
 mvn test -pl wealthview-core,wealthview-api,wealthview-import,wealthview-projection
 
-# Backend -- single test class
+# Integration tests only (wealthview-app module, uses Failsafe + Testcontainers)
+mvn verify -pl wealthview-app
+
+# Persistence integration tests (repository + Flyway tests against real PostgreSQL)
+mvn test -pl wealthview-persistence
+
+# Skip integration tests during verify
+mvn verify -DskipITs
+
+# Single test class
 mvn test -Dtest=AccountServiceTest
 
-# Frontend -- all tests
-cd frontend
-npm run test
-
-# Frontend -- specific test file
-npx vitest run src/utils/projectionCalcs.test.ts
-
-# TypeScript type check
-npx tsc --noEmit
+# Single test method
+mvn test -Dtest="AccountServiceTest#methodName"
 ```
 
-## Frontend Pages
+**Test infrastructure:**
+- Unit tests use JUnit 5 + Mockito with AssertJ assertions
+- Integration tests use Testcontainers with PostgreSQL 16 (never H2)
+- The `wealthview-app` module has 56 API-level integration tests across 11 test classes
+- The `wealthview-persistence` module has 13 integration tests covering Flyway migrations and repository CRUD
 
-| Route                    | Page                    | Description                                                    |
-|--------------------------|-------------------------|----------------------------------------------------------------|
-| `/`                      | Dashboard               | Net worth, allocation pie chart, account balances              |
-| `/accounts`              | Accounts List           | All investment accounts with balances                          |
-| `/accounts/:id`          | Account Detail          | Holdings, transactions, theoretical portfolio history chart    |
-| `/accounts/:id/import`   | Import                  | CSV/OFX file upload with format selection                      |
-| `/prices`                | Prices                  | Stock price lookup and history                                 |
-| `/projections`           | Projections List        | Scenario card grid with create form, strategy selector         |
-| `/projections/compare`   | Scenario Comparison     | Compare up to 3 scenarios with overlay chart and summary table |
-| `/projections/:id`       | Projection Detail       | Config summary, edit mode, run projection, tabbed results with spending analysis |
-| `/spending-profiles`     | Spending Profiles       | Create and manage spending profiles with income streams        |
-| `/properties`            | Properties List         | Rental properties overview                                     |
-| `/properties/:id`        | Property Detail         | Income/expenses, monthly cash flow chart                       |
-| `/settings`              | Settings                | Invite codes, user management (admin)                          |
-| `/login`                 | Login                   | Email/password authentication                                  |
-| `/register`              | Register                | New user registration with invite code                         |
+### Frontend
 
-### Projection Features
+```bash
+cd frontend
 
-The projection engine supports four visualization modes via a tabbed interface:
+npm run test                              # All tests (Vitest)
+npx vitest run src/utils/projectionCalcs.test.ts  # Specific test file
+npm run lint                              # ESLint check
+npx tsc --noEmit                          # TypeScript type check
+```
 
-- **Balance Over Time** -- Area chart showing projected portfolio balance. When pool data is present (traditional/roth/taxable accounts), displays stacked areas by account type. Includes cumulative contributions overlay and reference lines for retirement year and depletion year.
-- **Annual Flows** -- Bar chart breaking down yearly contributions (green), investment growth (blue), and withdrawals (red).
-- **Spending Analysis** -- Stacked area chart comparing withdrawals against spending needs. Shows essential expenses, discretionary spending (after any cuts), withdrawal line, and income streams overlay. Only appears when the scenario has a linked spending profile.
-- **Data Table** -- Year-by-year tabular data with the retirement transition row highlighted. Includes pool breakdown columns (traditional, roth, taxable balances), Roth conversion amounts, tax liability, and spending viability columns (essential, discretionary, income, net need, surplus/deficit) when a spending profile is linked.
+---
 
-Result summary cards show Final Balance, Years in Retirement, Peak Balance (with year), and Depletion Year. A milestone strip provides an at-a-glance overview of key projection milestones.
+## Code Quality
 
-#### Scenario Editing
+The backend build includes static analysis and coverage tools, configured in the `wealthview-app` module POM:
 
-Scenarios are fully editable. On the projection detail page, click **Edit** to switch into form mode. All fields (name, dates, accounts, strategy, spending profile) can be modified. Click **Save & Re-run** to persist changes and immediately re-run the projection with updated inputs.
+| Tool | Purpose | Report Location |
+|------|---------|----------------|
+| **Checkstyle** | Enforces coding style and formatting rules | `target/checkstyle-result.xml` |
+| **SpotBugs** | Detects common bug patterns (null deref, resource leaks, etc.) | `target/spotbugsXml.xml` |
+| **JaCoCo** | Measures test code coverage | `target/site/jacoco/index.html` |
 
-#### Spending Profiles
+All three run automatically as part of `mvn verify`. To generate a human-readable JaCoCo coverage report:
 
-Spending profiles are shared entities managed on the `/spending-profiles` page. Each profile defines:
+```bash
+cd backend
+mvn verify
+open wealthview-app/target/site/jacoco/index.html    # macOS
+xdg-open wealthview-app/target/site/jacoco/index.html # Linux
+```
 
-- **Essential Expenses** -- Non-negotiable annual spending (housing, food, healthcare). Inflates annually at the scenario's inflation rate.
-- **Discretionary Expenses** -- Flexible annual spending (travel, entertainment). Absorbs 100% of any shortfall when withdrawals don't cover total spending.
-- **Income Streams** -- Named income sources with annual amount, start age, and optional end age. Examples: Social Security (starts at 67, no end), part-time work (age 60-67). Income reduces the withdrawal needed from the portfolio.
+### Coverage Targets
 
-Link a spending profile to a scenario via the dropdown in the scenario form. The engine computes viability per year:
-- `net_spending_need = (essential + discretionary) - income_streams` (inflation-adjusted)
-- `surplus = withdrawal - net_spending_need` (positive = surplus, negative = deficit)
-- When there's a deficit, essential expenses are fully covered first; discretionary absorbs the shortfall (floored at zero).
+| Module | Target |
+|--------|--------|
+| `wealthview-core` | 90%+ line coverage |
+| `wealthview-projection` | 90%+ line coverage |
+| `wealthview-api` | 80%+ line coverage |
+| `wealthview-import` | 80%+ line coverage |
 
-#### Withdrawal Strategies
+---
 
-| Strategy | Behavior |
-|----------|----------|
-| **Fixed Percentage** (default) | Year 1: `balance * rate`. Subsequent years: previous withdrawal adjusted for inflation. The classic "4% rule". |
-| **Dynamic Percentage** | Every year: `current_balance * rate`. Withdrawals rise and fall with the portfolio -- never depletes to zero. |
-| **Vanguard Dynamic Spending** | Year 1: `balance * rate`. Subsequent years: recalculated from current balance, but year-over-year change capped at a ceiling (+5% default) and floored (-2.5% default). Smooths spending volatility. |
+## Tech Stack
 
-#### Account Pool Tracking and Roth Conversion
+| Layer     | Technology                                                |
+|-----------|-----------------------------------------------------------|
+| Frontend  | React 18, TypeScript, Vite, React Router, Recharts, Axios |
+| Backend   | Java 21, Spring Boot 3.3, Spring Security, JPA/Hibernate  |
+| Database  | PostgreSQL 16 with Flyway migrations                      |
+| Build     | Maven multi-module (backend), npm (frontend)              |
+| Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest, React Testing Library |
+| Analysis  | Checkstyle, SpotBugs, JaCoCo                              |
+| Deploy    | Docker Compose (multi-stage build)                        |
 
-When a scenario includes accounts with different types (traditional, roth, taxable), the engine tracks each pool separately:
+---
 
-- **Pre-retirement:** Contributions go to their respective pools. Growth applies per-pool.
-- **Roth conversion:** Each year, moves up to the configured annual amount from traditional to roth. Federal tax is computed on the conversion amount (plus other income) using progressive bracket data stored in the database (2022-2025 brackets for single and married filing jointly). Tax is deducted from the taxable pool first, then traditional.
-- **Retirement withdrawals:** Drawn in tax-efficient order -- taxable first, then traditional (taxed), then roth (tax-free).
-- **Scenario comparison:** Compare up to 3 scenarios side-by-side on the `/projections/compare` page with an overlay chart and summary table.
+## Architecture
 
-## API Reference
+```
+React SPA  <-->  Spring Boot REST API  <-->  PostgreSQL
+                      |
+                  Finnhub API        Zillow
+                  (stock prices)     (property valuations)
+```
 
-All endpoints are under `/api/v1/` and require JWT authentication (except `/api/v1/auth/**`).
+The backend is organized as a Maven multi-module project:
 
-### Authentication
+| Module                   | Responsibility                                           |
+|--------------------------|----------------------------------------------------------|
+| `wealthview-api`         | REST controllers, security config, exception handlers    |
+| `wealthview-core`        | Services, business logic, domain DTOs                    |
+| `wealthview-persistence` | JPA entities, repositories, Flyway migrations            |
+| `wealthview-import`      | CSV/OFX parsers, Finnhub price feed client, Zillow scraper |
+| `wealthview-projection`  | Deterministic retirement modeling engine                  |
+| `wealthview-app`         | Spring Boot main class, profile configs, JAR packaging   |
 
-| Endpoint                 | Method | Description              |
-|--------------------------|--------|--------------------------|
-| `/api/v1/auth/login`     | POST   | Login, returns JWT tokens |
-| `/api/v1/auth/register`  | POST   | Register with invite code |
-| `/api/v1/auth/refresh`   | POST   | Refresh access token      |
+### Module Dependency Rules
 
-### Accounts & Holdings
+```
+wealthview-app  -->  all modules (assembles the application)
+wealthview-api  -->  wealthview-core
+wealthview-core -->  wealthview-persistence
+wealthview-import      -->  wealthview-core
+wealthview-projection  -->  wealthview-core
+wealthview-persistence -->  nothing (leaf module)
+```
 
-| Endpoint                              | Method         | Description                   |
-|---------------------------------------|----------------|-------------------------------|
-| `/api/v1/accounts`                    | GET, POST      | List or create accounts       |
-| `/api/v1/accounts/{id}`               | GET, PUT, DELETE | Account CRUD               |
-| `/api/v1/accounts/{id}/transactions`  | GET, POST      | Transactions for account      |
-| `/api/v1/accounts/{id}/holdings`      | GET            | Holdings for account          |
-| `/api/v1/accounts/{id}/theoretical-history` | GET      | Theoretical portfolio history |
-| `/api/v1/holdings`                    | GET, POST      | All holdings / create manual  |
-| `/api/v1/holdings/{id}`               | PUT            | Update holding                |
-| `/api/v1/transactions/{id}`           | PUT, DELETE    | Update or delete transaction  |
+`wealthview-api` never depends directly on `wealthview-persistence`, `wealthview-import`, or `wealthview-projection`. Controllers call services; services call repositories.
 
-### Properties
-
-| Endpoint                              | Method | Description              |
-|---------------------------------------|--------|--------------------------|
-| `/api/v1/properties`                  | GET, POST | List or create properties |
-| `/api/v1/properties/{id}`             | GET, PUT, DELETE | Property CRUD     |
-| `/api/v1/properties/{id}/income`      | POST   | Add rental income         |
-| `/api/v1/properties/{id}/expenses`    | POST   | Add property expense      |
-| `/api/v1/properties/{id}/cashflow`    | GET    | Monthly cash flow report  |
-| `/api/v1/properties/{id}/valuations`  | GET    | Valuation history         |
-| `/api/v1/properties/{id}/valuations/refresh` | POST | Trigger Zillow valuation scrape (202 Accepted) |
-
-### Import & Prices
-
-| Endpoint                       | Method | Description                     |
-|--------------------------------|--------|---------------------------------|
-| `/api/v1/import/csv`           | POST   | Upload CSV for import           |
-| `/api/v1/import/ofx`           | POST   | Upload OFX/QFX for import       |
-| `/api/v1/import/jobs`          | GET    | List import job history         |
-| `/api/v1/prices`               | POST   | Add stock price                 |
-| `/api/v1/prices/{symbol}/latest` | GET  | Latest price for symbol         |
-
-### Projections
-
-| Endpoint                        | Method | Description                                        |
-|---------------------------------|--------|----------------------------------------------------|
-| `/api/v1/projections`           | GET, POST | List or create scenarios                        |
-| `/api/v1/projections/{id}`      | GET, PUT, DELETE | Get, update, or delete scenario            |
-| `/api/v1/projections/{id}/run`  | GET    | Run projection, get year-by-year results           |
-| `/api/v1/projections/compare`   | POST   | Compare 2-3 scenarios side-by-side                 |
-
-### Spending Profiles
-
-| Endpoint                           | Method         | Description                    |
-|------------------------------------|----------------|--------------------------------|
-| `/api/v1/spending-profiles`        | GET, POST      | List or create profiles        |
-| `/api/v1/spending-profiles/{id}`   | GET, PUT, DELETE | Profile CRUD                 |
-
-### Dashboard & Tenant Management
-
-| Endpoint                          | Method | Description                   |
-|-----------------------------------|--------|-------------------------------|
-| `/api/v1/dashboard/summary`       | GET    | Net worth and allocation      |
-| `/api/v1/tenant/invite-codes`     | GET, POST | Manage invite codes (admin) |
-| `/api/v1/tenant/users`            | GET    | List tenant users (admin)     |
-| `/api/v1/tenant/users/{id}/role`  | PUT    | Update user role (admin)      |
-| `/api/v1/tenant/users/{id}`       | DELETE | Remove user (admin)           |
-| `/api/v1/admin/tenants`           | GET, POST | Super-admin tenant management |
+---
 
 ## Project Structure
 
@@ -321,9 +414,11 @@ wealthview/
 └── PROJECT.md                             (full architecture spec)
 ```
 
+---
+
 ## Database Migrations
 
-Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/migration/`:
+Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/migration/`. They run automatically on application startup.
 
 | Migration | Description                                              |
 |-----------|----------------------------------------------------------|
@@ -347,9 +442,119 @@ Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/m
 | R__seed_stock_prices  | Repeatable seed data for stock prices           |
 | R__seed_tax_brackets  | Repeatable seed data for 2022-2025 federal tax brackets |
 
-## License
+**Important:** Migrations are immutable once released. Never edit a committed migration file -- create a new one instead.
 
-Private -- all rights reserved.
+---
+
+## API Reference
+
+All endpoints are under `/api/v1/` and require JWT authentication (except `/api/v1/auth/**`).
+
+### Authentication
+
+| Endpoint                 | Method | Description              |
+|--------------------------|--------|--------------------------|
+| `/api/v1/auth/login`     | POST   | Login, returns JWT tokens |
+| `/api/v1/auth/register`  | POST   | Register with invite code |
+| `/api/v1/auth/refresh`   | POST   | Refresh access token      |
+
+**Login request:**
+```json
+{ "email": "user@example.com", "password": "yourpassword" }
+```
+
+**Login response:**
+```json
+{ "access_token": "eyJ...", "refresh_token": "eyJ...", "email": "user@example.com", "role": "admin" }
+```
+
+Include the access token in subsequent requests:
+```
+Authorization: Bearer eyJ...
+```
+
+### Accounts & Holdings
+
+| Endpoint                              | Method         | Description                   |
+|---------------------------------------|----------------|-------------------------------|
+| `/api/v1/accounts`                    | GET, POST      | List or create accounts       |
+| `/api/v1/accounts/{id}`               | GET, PUT, DELETE | Account CRUD               |
+| `/api/v1/accounts/{id}/transactions`  | GET, POST      | Transactions for account      |
+| `/api/v1/accounts/{id}/holdings`      | GET            | Holdings for account          |
+| `/api/v1/accounts/{id}/theoretical-history` | GET      | Theoretical portfolio history |
+| `/api/v1/holdings`                    | GET, POST      | All holdings / create manual  |
+| `/api/v1/holdings/{id}`               | PUT            | Update holding                |
+| `/api/v1/transactions/{id}`           | PUT, DELETE    | Update or delete transaction  |
+
+### Properties
+
+| Endpoint                              | Method | Description              |
+|---------------------------------------|--------|--------------------------|
+| `/api/v1/properties`                  | GET, POST | List or create properties |
+| `/api/v1/properties/{id}`             | GET, PUT, DELETE | Property CRUD     |
+| `/api/v1/properties/{id}/income`      | POST   | Add rental income         |
+| `/api/v1/properties/{id}/expenses`    | POST   | Add property expense      |
+| `/api/v1/properties/{id}/cashflow`    | GET    | Monthly cash flow report  |
+| `/api/v1/properties/{id}/valuations`  | GET    | Valuation history         |
+| `/api/v1/properties/{id}/valuations/refresh` | POST | Trigger Zillow valuation scrape (202 Accepted) |
+
+### Import & Prices
+
+| Endpoint                       | Method | Description                     |
+|--------------------------------|--------|---------------------------------|
+| `/api/v1/import/csv`           | POST   | Upload CSV for import (multipart; `format` param: fidelity, vanguard, schwab) |
+| `/api/v1/import/ofx`           | POST   | Upload OFX/QFX for import (multipart) |
+| `/api/v1/import/jobs`          | GET    | List import job history         |
+| `/api/v1/prices`               | POST   | Add stock price                 |
+| `/api/v1/prices/{symbol}/latest` | GET  | Latest price for symbol         |
+
+### Projections
+
+| Endpoint                        | Method | Description                                        |
+|---------------------------------|--------|----------------------------------------------------|
+| `/api/v1/projections`           | GET, POST | List or create scenarios                        |
+| `/api/v1/projections/{id}`      | GET, PUT, DELETE | Get, update, or delete scenario            |
+| `/api/v1/projections/{id}/run`  | GET    | Run projection, get year-by-year results           |
+| `/api/v1/projections/compare`   | POST   | Compare 2-3 scenarios side-by-side                 |
+
+### Spending Profiles
+
+| Endpoint                           | Method         | Description                    |
+|------------------------------------|----------------|--------------------------------|
+| `/api/v1/spending-profiles`        | GET, POST      | List or create profiles        |
+| `/api/v1/spending-profiles/{id}`   | GET, PUT, DELETE | Profile CRUD                 |
+
+### Dashboard & Tenant Management
+
+| Endpoint                          | Method | Description                   |
+|-----------------------------------|--------|-------------------------------|
+| `/api/v1/dashboard/summary`       | GET    | Net worth and allocation      |
+| `/api/v1/tenant/invite-codes`     | GET, POST | Manage invite codes (admin) |
+| `/api/v1/tenant/users`            | GET    | List tenant users (admin)     |
+| `/api/v1/tenant/users/{id}/role`  | PUT    | Update user role (admin)      |
+| `/api/v1/tenant/users/{id}`       | DELETE | Remove user (admin)           |
+| `/api/v1/admin/tenants`           | GET, POST | Super-admin tenant management |
+
+---
+
+## Frontend Pages
+
+| Route                    | Page                    | Description                                                    |
+|--------------------------|-------------------------|----------------------------------------------------------------|
+| `/`                      | Dashboard               | Net worth, allocation pie chart, account balances              |
+| `/accounts`              | Accounts List           | All investment accounts with balances                          |
+| `/accounts/:id`          | Account Detail          | Holdings, transactions, theoretical portfolio history chart    |
+| `/accounts/:id/import`   | Import                  | CSV/OFX file upload with format selection                      |
+| `/prices`                | Prices                  | Stock price lookup and history                                 |
+| `/projections`           | Projections List        | Scenario card grid with create form, strategy selector         |
+| `/projections/compare`   | Scenario Comparison     | Compare up to 3 scenarios with overlay chart and summary table |
+| `/projections/:id`       | Projection Detail       | Config summary, edit mode, run projection, tabbed results with spending analysis |
+| `/spending-profiles`     | Spending Profiles       | Create and manage spending profiles with income streams        |
+| `/properties`            | Properties List         | Rental properties overview                                     |
+| `/properties/:id`        | Property Detail         | Income/expenses, monthly cash flow chart                       |
+| `/settings`              | Settings                | Invite codes, user management (admin)                          |
+| `/login`                 | Login                   | Email/password authentication                                  |
+| `/register`              | Register                | New user registration with invite code                         |
 
 ---
 
@@ -518,7 +723,7 @@ Open the frontend in a browser (typically http://localhost:5173).
 6. Click **Create**.
 7. **Verify:**
    - The property appears with a **Computed Balance** badge in the list.
-   - The mortgage balance is NOT $250,000 (the manual value); it is the amortization-computed remaining balance (approximately $257,034 as of March 2026, depending on current date).
+   - The mortgage balance is NOT $250,000 (the manual value); it is the amortization-computed remaining balance.
    - Equity = Current Value minus the computed balance.
 
 ---
@@ -535,7 +740,7 @@ Open the frontend in a browser (typically http://localhost:5173).
 
 ### 10c. Toggle Between Computed and Manual Balance
 
-1. Using the API (or by editing the property in a future edit form), update the property to set `use_computed_balance: false`:
+1. Using the API, update the property to set `use_computed_balance: false`:
    ```bash
    curl -X PUT http://localhost:8080/api/v1/properties/{id} \
      -H "Authorization: Bearer $TOKEN" \
@@ -846,3 +1051,9 @@ To test with Zillow enabled:
 | 22 | Invite + register | New user joins tenant |
 | 23 | Backward compat | Old scenarios run without errors, spending fields null |
 | 24 | Dashboard with data | All assets reflected in net worth |
+
+---
+
+## License
+
+Private -- all rights reserved.
