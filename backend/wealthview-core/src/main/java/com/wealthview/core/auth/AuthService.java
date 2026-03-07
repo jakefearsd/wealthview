@@ -1,5 +1,6 @@
 package com.wealthview.core.auth;
 
+import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.auth.dto.AuthResponse;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
@@ -11,12 +12,14 @@ import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,15 +31,18 @@ public class AuthService {
     private final InviteCodeRepository inviteCodeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
+                       JwtTokenProvider jwtTokenProvider,
+                       ApplicationEventPublisher eventPublisher) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.eventPublisher = eventPublisher;
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -52,6 +58,8 @@ public class AuthService {
         }
 
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
+        eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
+                user.getId(), Map.of("email", user.getEmail())));
         return buildAuthResponse(user);
     }
 
@@ -85,6 +93,8 @@ public class AuthService {
         inviteCodeRepository.save(inviteCode);
 
         log.info("User {} registered for tenant {}", user.getId(), user.getTenantId());
+        eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "REGISTER", "user",
+                user.getId(), Map.of("email", request.email())));
         return buildAuthResponse(user);
     }
 

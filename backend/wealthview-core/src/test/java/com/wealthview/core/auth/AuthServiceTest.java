@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -41,6 +42,9 @@ class AuthServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
+
     private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
 
@@ -53,7 +57,7 @@ class AuthServiceTest {
                 "test-secret-key-that-is-at-least-32-characters-long",
                 3600000, 86400000);
         authService = new AuthService(userRepository, inviteCodeRepository,
-                passwordEncoder, jwtTokenProvider);
+                passwordEncoder, jwtTokenProvider, eventPublisher);
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());

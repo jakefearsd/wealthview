@@ -1,5 +1,6 @@
 package com.wealthview.core.tenant;
 
+import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
@@ -12,11 +13,13 @@ import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,21 +31,26 @@ public class TenantService {
     private final InviteCodeRepository inviteCodeRepository;
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public TenantService(TenantRepository tenantRepository,
                          InviteCodeRepository inviteCodeRepository,
                          UserRepository userRepository,
-                         AccountRepository accountRepository) {
+                         AccountRepository accountRepository,
+                         ApplicationEventPublisher eventPublisher) {
         this.tenantRepository = tenantRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
     public TenantEntity createTenant(String name) {
         var tenant = tenantRepository.save(new TenantEntity(name));
         log.info("Tenant created: {} ({})", name, tenant.getId());
+        eventPublisher.publishEvent(new AuditEvent(tenant.getId(), null, "CREATE", "tenant",
+                tenant.getId(), Map.of("name", name)));
         return tenant;
     }
 
@@ -72,6 +80,8 @@ public class TenantService {
         tenant.setActive(active);
         tenantRepository.save(tenant);
         log.info("Tenant {} set active={}", tenantId, active);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "SET_ACTIVE", "tenant",
+                tenantId, Map.of("active", active)));
     }
 
     private TenantDetailResponse toDetailResponse(TenantEntity tenant) {

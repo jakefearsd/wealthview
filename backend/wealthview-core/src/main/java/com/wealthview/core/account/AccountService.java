@@ -1,6 +1,7 @@
 package com.wealthview.core.account;
 
 import com.wealthview.core.account.dto.AccountRequest;
+import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.exception.EntityNotFoundException;
@@ -14,6 +15,7 @@ import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -33,15 +36,17 @@ public class AccountService {
     private final HoldingRepository holdingRepository;
     private final TransactionRepository transactionRepository;
     private final PriceRepository priceRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public AccountService(AccountRepository accountRepository, TenantRepository tenantRepository,
                           HoldingRepository holdingRepository, TransactionRepository transactionRepository,
-                          PriceRepository priceRepository) {
+                          PriceRepository priceRepository, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
         this.tenantRepository = tenantRepository;
         this.holdingRepository = holdingRepository;
         this.transactionRepository = transactionRepository;
         this.priceRepository = priceRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -52,6 +57,8 @@ public class AccountService {
         var account = new AccountEntity(tenant, request.name(), request.type(), request.institution());
         account = accountRepository.save(account);
         log.info("Account {} created for tenant {}", account.getId(), tenantId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "account",
+                account.getId(), Map.of("name", request.name(), "type", request.type())));
         return AccountResponse.from(account, BigDecimal.ZERO);
     }
 
@@ -87,6 +94,8 @@ public class AccountService {
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
         accountRepository.delete(account);
         log.info("Account {} deleted for tenant {}", accountId, tenantId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "account",
+                accountId, Map.of()));
     }
 
     public BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
