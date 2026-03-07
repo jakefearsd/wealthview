@@ -89,7 +89,7 @@ public class AccountService {
         log.info("Account {} deleted for tenant {}", accountId, tenantId);
     }
 
-    private BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
+    public BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
         if ("bank".equals(account.getType())) {
             return computeBankBalance(account, tenantId);
         }

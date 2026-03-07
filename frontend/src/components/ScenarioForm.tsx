@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
+import { formatCurrency } from '../utils/format';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
+import type { Account } from '../types/account';
 import type { Scenario, CreateScenarioRequest, ScenarioAccountInput } from '../types/projection';
 
 const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
@@ -48,8 +51,18 @@ function defaultAccount(): ScenarioAccountInput {
     };
 }
 
+function mapAccountType(realType: string): string {
+    switch (realType) {
+        case 'roth': return 'roth';
+        case '401k': case 'traditional_ira': return 'traditional';
+        default: return 'taxable';
+    }
+}
+
 export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: ScenarioFormProps) {
     const { data: profiles } = useApiQuery(listSpendingProfiles);
+    const { data: accountsPage } = useApiQuery(() => listAccounts(0, 100));
+    const existingAccounts: Account[] = accountsPage?.data ?? [];
 
     const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
 
@@ -83,6 +96,22 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
     function addAccount() {
         setAccounts(prev => [...prev, defaultAccount()]);
+    }
+
+    function linkAccount(index: number, accountId: string) {
+        if (!accountId) {
+            updateAccount(index, 'linked_account_id', null);
+            return;
+        }
+        const acct = existingAccounts.find(a => a.id === accountId);
+        if (acct) {
+            setAccounts(prev => prev.map((a, i) => i === index ? {
+                ...a,
+                linked_account_id: acct.id,
+                initial_balance: acct.balance,
+                account_type: mapAccountType(acct.type),
+            } : a));
+        }
     }
 
     function removeAccount(index: number) {
@@ -232,37 +261,67 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 Each account represents a pool of investments with its own tax treatment, growth rate, and contribution schedule.
             </div>
             {accounts.map((acct, idx) => (
-                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
-                    <div>
-                        <label style={labelStyle}>Account Type</label>
-                        <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
-                            <option value="taxable">Taxable</option>
-                            <option value="traditional">Traditional (Pre-tax)</option>
-                            <option value="roth">Roth</option>
-                        </select>
-                        <HelpText>{ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}</HelpText>
-                    </div>
-                    <div>
-                        <label style={labelStyle}>Initial Balance</label>
-                        <input style={inputStyle} type="number" value={acct.initial_balance} onChange={e => updateAccount(idx, 'initial_balance', Number(e.target.value))} />
-                    </div>
-                    <div>
-                        <label style={labelStyle}>Annual Contribution</label>
-                        <input style={inputStyle} type="number" value={acct.annual_contribution} onChange={e => updateAccount(idx, 'annual_contribution', Number(e.target.value))} />
-                    </div>
-                    <div>
-                        <label style={labelStyle}>Expected Return</label>
-                        <input style={inputStyle} type="number" step="0.01" value={acct.expected_return} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
-                    </div>
-                    <div>
-                        {accounts.length > 1 && (
-                            <button
-                                onClick={() => removeAccount(idx)}
-                                style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                <div key={idx} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
+                        <div>
+                            <label style={labelStyle}>Link Existing Account</label>
+                            <select
+                                style={inputStyle}
+                                value={acct.linked_account_id ?? ''}
+                                onChange={e => linkAccount(idx, e.target.value)}
                             >
-                                Remove
-                            </button>
-                        )}
+                                <option value="">Manual Entry</option>
+                                {existingAccounts.map(a => (
+                                    <option key={a.id} value={a.id}>
+                                        {a.name} ({a.institution ?? a.type}) — {formatCurrency(a.balance)}
+                                    </option>
+                                ))}
+                            </select>
+                            <HelpText>
+                                {acct.linked_account_id
+                                    ? 'Balance updates automatically each time the projection runs.'
+                                    : 'Enter values manually, or select an existing account above.'}
+                            </HelpText>
+                        </div>
+                        <div>
+                            {accounts.length > 1 && (
+                                <button
+                                    onClick={() => removeAccount(idx)}
+                                    style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                >
+                                    Remove
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+                        <div>
+                            <label style={labelStyle}>Account Type</label>
+                            <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
+                                <option value="taxable">Taxable</option>
+                                <option value="traditional">Traditional (Pre-tax)</option>
+                                <option value="roth">Roth</option>
+                            </select>
+                            <HelpText>{ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}</HelpText>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Initial Balance{acct.linked_account_id ? ' (live)' : ''}</label>
+                            <input
+                                style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
+                                type="number"
+                                value={acct.initial_balance}
+                                onChange={e => updateAccount(idx, 'initial_balance', Number(e.target.value))}
+                                readOnly={!!acct.linked_account_id}
+                            />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Annual Contribution</label>
+                            <input style={inputStyle} type="number" value={acct.annual_contribution} onChange={e => updateAccount(idx, 'annual_contribution', Number(e.target.value))} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Expected Return</label>
+                            <input style={inputStyle} type="number" step="0.01" value={acct.expected_return} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
+                        </div>
                     </div>
                 </div>
             ))}

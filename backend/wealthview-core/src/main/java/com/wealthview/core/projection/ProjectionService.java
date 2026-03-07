@@ -2,6 +2,7 @@ package com.wealthview.core.projection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CompareRequest;
@@ -31,18 +32,21 @@ public class ProjectionService {
     private final AccountRepository accountRepository;
     private final SpendingProfileRepository spendingProfileRepository;
     private final ProjectionEngine projectionEngine;
+    private final AccountService accountService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
                              TenantRepository tenantRepository,
                              AccountRepository accountRepository,
                              SpendingProfileRepository spendingProfileRepository,
-                             ProjectionEngine projectionEngine) {
+                             ProjectionEngine projectionEngine,
+                             AccountService accountService) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
         this.spendingProfileRepository = spendingProfileRepository;
         this.projectionEngine = projectionEngine;
+        this.accountService = accountService;
     }
 
     @Transactional
@@ -157,6 +161,7 @@ public class ProjectionService {
         for (var scenarioId : request.scenarioIds()) {
             var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                     .orElseThrow(() -> new EntityNotFoundException("Scenario not found: " + scenarioId));
+            resolveLinkedAccountBalances(scenario, tenantId);
             results.add(projectionEngine.run(scenario));
         }
         return new CompareResponse(results);
@@ -166,7 +171,17 @@ public class ProjectionService {
     public ProjectionResultResponse runProjection(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+        resolveLinkedAccountBalances(scenario, tenantId);
         return projectionEngine.run(scenario);
+    }
+
+    private void resolveLinkedAccountBalances(ProjectionScenarioEntity scenario, UUID tenantId) {
+        for (var projAcct : scenario.getAccounts()) {
+            if (projAcct.getLinkedAccount() != null) {
+                var currentBalance = accountService.computeBalance(projAcct.getLinkedAccount(), tenantId);
+                projAcct.setInitialBalance(currentBalance);
+            }
+        }
     }
 
     private String buildParamsJson(Integer birthYear, java.math.BigDecimal withdrawalRate,

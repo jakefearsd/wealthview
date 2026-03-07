@@ -1,5 +1,7 @@
 package com.wealthview.core.projection;
 
+import com.wealthview.core.account.AccountService;
+import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
@@ -7,6 +9,7 @@ import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
+import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -51,6 +54,9 @@ class ProjectionServiceTest {
 
     @Mock
     private ProjectionEngine projectionEngine;
+
+    @Mock
+    private AccountService accountService;
 
     @InjectMocks
     private ProjectionService service;
@@ -367,5 +373,63 @@ class ProjectionServiceTest {
 
         assertThat(result).isEqualTo(engineResult);
         verify(projectionEngine).run(scenario);
+    }
+
+    @Test
+    void runProjection_withLinkedAccount_resolvesCurrentBalance() {
+        var linkedAccountId = UUID.randomUUID();
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, linkedAccount, new BigDecimal("100000"),
+                new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
+        scenario.addAccount(projAcct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var currentBalance = new BigDecimal("150000.00");
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(currentBalance);
+
+        var engineResult = new ProjectionResultResponse(
+                scenarioId, List.of(), BigDecimal.ZERO, 0);
+        when(projectionEngine.run(scenario)).thenReturn(engineResult);
+
+        service.runProjection(tenantId, scenarioId);
+
+        assertThat(projAcct.getInitialBalance()).isEqualByComparingTo(currentBalance);
+        verify(projectionEngine).run(scenario);
+    }
+
+    @Test
+    void compareScenarios_withLinkedAccount_resolvesCurrentBalance() {
+        var linkedAccountId = UUID.randomUUID();
+        var linkedAccount = new AccountEntity(tenant, "401k", "401k", "Fidelity");
+
+        var id1 = UUID.randomUUID();
+        var scenario1 = new ProjectionScenarioEntity(tenant, "Plan A",
+                LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario1, linkedAccount, new BigDecimal("50000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "traditional");
+        scenario1.addAccount(projAcct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, id1))
+                .thenReturn(Optional.of(scenario1));
+
+        var currentBalance = new BigDecimal("75000.00");
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(currentBalance);
+
+        var result1 = new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0);
+        when(projectionEngine.run(scenario1)).thenReturn(result1);
+
+        service.compareScenarios(tenantId, new CompareRequest(List.of(id1)));
+
+        assertThat(projAcct.getInitialBalance()).isEqualByComparingTo(currentBalance);
     }
 }
