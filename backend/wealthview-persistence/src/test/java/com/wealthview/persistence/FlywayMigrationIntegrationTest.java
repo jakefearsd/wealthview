@@ -16,6 +16,6 @@ class FlywayMigrationIntegrationTest extends AbstractIntegrationTest {
         var appliedMigrations = flyway.info().applied();
 
         assertThat(appliedMigrations).hasSizeGreaterThan(0);
-        assertThat(appliedMigrations[0].getVersion().toString()).isEqualTo("1");
+        assertThat(appliedMigrations[0].getVersion().toString()).isEqualTo("001");
     }
 }
