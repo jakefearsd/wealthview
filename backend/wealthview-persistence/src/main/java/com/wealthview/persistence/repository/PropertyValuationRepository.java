@@ -15,4 +15,6 @@ public interface PropertyValuationRepository extends JpaRepository<PropertyValua
 
     Optional<PropertyValuationEntity> findByProperty_IdAndSourceAndValuationDate(
             UUID propertyId, String source, LocalDate valuationDate);
+
+    List<PropertyValuationEntity> findByTenant_IdOrderByValuationDateAsc(UUID tenantId);
 }
