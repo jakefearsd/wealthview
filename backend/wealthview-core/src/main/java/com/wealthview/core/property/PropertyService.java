@@ -1,5 +1,6 @@
 package com.wealthview.core.property;
 
+import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
@@ -16,6 +17,7 @@ import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,15 +44,18 @@ public class PropertyService {
     private final PropertyIncomeRepository incomeRepository;
     private final PropertyExpenseRepository expenseRepository;
     private final TenantRepository tenantRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     public PropertyService(PropertyRepository propertyRepository,
                            PropertyIncomeRepository incomeRepository,
                            PropertyExpenseRepository expenseRepository,
-                           TenantRepository tenantRepository) {
+                           TenantRepository tenantRepository,
+                           ApplicationEventPublisher eventPublisher) {
         this.propertyRepository = propertyRepository;
         this.incomeRepository = incomeRepository;
         this.expenseRepository = expenseRepository;
         this.tenantRepository = tenantRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -69,6 +74,8 @@ public class PropertyService {
         applyPropertyType(property, request.propertyType());
         property = propertyRepository.save(property);
         log.info("Property {} created for tenant {}", property.getId(), tenantId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "property",
+                property.getId(), Map.of("address", request.address())));
         return buildResponse(property);
     }
 
@@ -112,6 +119,8 @@ public class PropertyService {
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
         propertyRepository.delete(property);
         log.info("Property {} deleted for tenant {}", propertyId, tenantId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "property",
+                propertyId, Map.of()));
     }
 
     @Transactional

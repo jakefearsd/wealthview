@@ -1,5 +1,6 @@
 package com.wealthview.core.transaction;
 
+import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
@@ -10,11 +11,13 @@ import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -25,13 +28,16 @@ public class TransactionService {
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
     private final HoldingsComputationService holdingsComputationService;
+    private final ApplicationEventPublisher eventPublisher;
 
     public TransactionService(TransactionRepository transactionRepository,
                               AccountRepository accountRepository,
-                              HoldingsComputationService holdingsComputationService) {
+                              HoldingsComputationService holdingsComputationService,
+                              ApplicationEventPublisher eventPublisher) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.holdingsComputationService = holdingsComputationService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -47,6 +53,8 @@ public class TransactionService {
                 account, account.getTenant(), request.symbol());
 
         log.info("Transaction {} created for account {}", txn.getId(), accountId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "transaction",
+                txn.getId(), txnDetails(request)));
         return TransactionResponse.from(txn);
     }
 
@@ -102,6 +110,8 @@ public class TransactionService {
             holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, oldSymbol);
         }
 
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "UPDATE", "transaction",
+                txn.getId(), txnDetails(request)));
         return TransactionResponse.from(txn);
     }
 
@@ -118,5 +128,14 @@ public class TransactionService {
 
         holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, symbol);
         log.info("Transaction {} deleted", transactionId);
+        eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "transaction",
+                transactionId, symbol != null ? Map.of("symbol", symbol) : Map.of()));
+    }
+
+    private Map<String, Object> txnDetails(TransactionRequest request) {
+        var details = new java.util.HashMap<String, Object>();
+        details.put("type", request.type());
+        if (request.symbol() != null) details.put("symbol", request.symbol());
+        return details;
     }
 }
