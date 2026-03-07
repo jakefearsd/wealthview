@@ -37,6 +37,13 @@ public class HoldingService {
     }
 
     @Transactional(readOnly = true)
+    public HoldingResponse getById(UUID tenantId, UUID holdingId) {
+        return holdingRepository.findByIdAndTenant_Id(holdingId, tenantId)
+                .map(HoldingResponse::from)
+                .orElseThrow(() -> new EntityNotFoundException("Holding not found"));
+    }
+
+    @Transactional(readOnly = true)
     public List<HoldingResponse> listByTenant(UUID tenantId) {
         return holdingRepository.findByTenant_Id(tenantId).stream()
                 .map(HoldingResponse::from)

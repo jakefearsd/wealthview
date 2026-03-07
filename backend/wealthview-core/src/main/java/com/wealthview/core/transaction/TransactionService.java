@@ -74,6 +74,13 @@ public class TransactionService {
         return PageResponse.from(page, TransactionResponse::from);
     }
 
+    @Transactional(readOnly = true)
+    public PageResponse<TransactionResponse> listByAccountAndSymbol(UUID tenantId, UUID accountId,
+                                                                     String symbol, Pageable pageable) {
+        var page = transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(accountId, tenantId, symbol, pageable);
+        return PageResponse.from(page, TransactionResponse::from);
+    }
+
     @Transactional
     public TransactionResponse update(UUID tenantId, UUID transactionId, TransactionRequest request) {
         var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)

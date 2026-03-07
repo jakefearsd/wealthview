@@ -87,7 +87,9 @@ export default function AccountDetailPage() {
                             {holdings?.map((h) => (
                                 <tr key={h.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                     <td style={{ padding: '0.5rem' }}>
-                                        {h.symbol}
+                                        <Link to={`/holdings/${h.id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
+                                            {h.symbol}
+                                        </Link>
                                         {h.is_money_market && <span style={{ color: '#999', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(Money Market)</span>}
                                     </td>
                                     {editingHoldingId === h.id ? (

@@ -5,11 +5,14 @@ import type { PageResponse } from '../types/common';
 export async function listTransactions(
     accountId: string,
     page = 0,
-    size = 25
+    size = 25,
+    symbol?: string
 ): Promise<PageResponse<Transaction>> {
+    const params: Record<string, string | number> = { page, size };
+    if (symbol) params.symbol = symbol;
     const { data } = await client.get<PageResponse<Transaction>>(
         `/accounts/${accountId}/transactions`,
-        { params: { page, size } }
+        { params }
     );
     return data;
 }

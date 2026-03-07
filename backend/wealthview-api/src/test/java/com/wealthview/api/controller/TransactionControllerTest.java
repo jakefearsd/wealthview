@@ -123,6 +123,19 @@ class TransactionControllerTest {
     }
 
     @Test
+    void listByAccount_withSymbolFilter_returns200() throws Exception {
+        var page = new PageResponse<>(List.of(sampleResponse()), 0, 25, 1L);
+        when(transactionService.listByAccountAndSymbol(eq(TENANT_ID), eq(ACCOUNT_ID), eq("AAPL"), any()))
+                .thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .param("symbol", "AAPL"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].symbol").value("AAPL"));
+    }
+
+    @Test
     void delete_existing_returns204() throws Exception {
         doNothing().when(transactionService).delete(TENANT_ID, TXN_ID);
 

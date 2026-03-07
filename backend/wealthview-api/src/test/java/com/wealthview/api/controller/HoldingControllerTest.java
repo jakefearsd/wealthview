@@ -116,6 +116,29 @@ class HoldingControllerTest {
     }
 
     @Test
+    void getById_found_returns200() throws Exception {
+        when(holdingService.getById(TENANT_ID, HOLDING_ID))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(get("/api/v1/holdings/{id}", HOLDING_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.symbol").value("AAPL"))
+                .andExpect(jsonPath("$.quantity").value(10));
+    }
+
+    @Test
+    void getById_notFound_returns404() throws Exception {
+        when(holdingService.getById(TENANT_ID, HOLDING_ID))
+                .thenThrow(new EntityNotFoundException("Holding not found"));
+
+        mockMvc.perform(get("/api/v1/holdings/{id}", HOLDING_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
     void createManual_missingSymbol_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/holdings")
                         .with(authenticatedAdmin())
