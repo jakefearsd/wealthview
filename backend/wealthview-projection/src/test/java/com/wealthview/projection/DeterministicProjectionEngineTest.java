@@ -700,6 +700,321 @@ class DeterministicProjectionEngineTest {
         }
     }
 
+    @Test
+    void run_withdrawalOrderTaxableFirst_drawsTaxableBeforeTraditional() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "taxable_first"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        // First year: total=600k grows to 630k, withdrawal=4% of 600k = 24000
+        // Taxable first: all 24000 from taxable pool
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.withdrawals()).isGreaterThan(BigDecimal.ZERO);
+        // Taxable should decrease, traditional should not (only taxable drained first)
+        assertThat(year1.taxableBalance()).isLessThan(bd("315000")); // 300k * 1.05 = 315k, minus withdrawal
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000")); // 200k * 1.05, untouched
+    }
+
+    @Test
+    void run_withdrawalOrderTraditionalFirst_drawsTraditionalFirst() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // Traditional drawn first, so traditional should decrease significantly
+        assertThat(year1.traditionalBalance()).isLessThan(bd("210000"));
+        // Taxable is NOT drawn for the withdrawal itself (but tax deduction may hit it)
+        // Key check: traditional decreased more than taxable relative to their post-growth values
+        BigDecimal tradReduction = bd("210000").subtract(year1.traditionalBalance());
+        BigDecimal taxableReduction = bd("315000").subtract(year1.taxableBalance());
+        assertThat(tradReduction).isGreaterThan(taxableReduction);
+    }
+
+    @Test
+    void run_withdrawalOrderRothFirst_drawsRothFirst() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "roth_first"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // Taxable and traditional untouched, roth drains first
+        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("315000.0000"));
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
+        assertThat(year1.rothBalance()).isLessThan(bd("105000"));
+    }
+
+    @Test
+    void run_withdrawalOrderProRata_withdrawsProportionally() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        // 300k taxable, 200k traditional, 100k roth = 600k total
+        // All grow at 5% to 630k, withdrawal = 4% of 600k = 24000
+        // Pro rata: 315/630=50% from taxable, 210/630=33.3% trad, 105/630=16.7% roth
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "pro_rata"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // All three pools should be less than their post-growth values
+        assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
+        assertThat(year1.traditionalBalance()).isLessThan(bd("210000"));
+        assertThat(year1.rothBalance()).isLessThan(bd("105000"));
+    }
+
+    @Test
+    void run_withdrawalOrderProRata_taxOnTraditionalPortion() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "pro_rata"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // Should have tax liability (from traditional portion), but less than all-traditional
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_fillBracketStrategy_convertsToFillBracket() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        // target_bracket_rate=0.12 means fill up to ceiling of 12% bracket = $48,475
+        // other_income=0, so full bracket space available for conversion
+        var scenario = createScenario(
+                LocalDate.now().plusYears(30),
+                90,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(LocalDate.now().getYear() - 35));
+
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("500000.0000"), BigDecimal.ZERO, bd("0.0700"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0700"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // Conversion should be bracket ceiling = $48,475 (minus $0 other income)
+        assertThat(year1.rothConversionAmount()).isNotNull();
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("48475"));
+    }
+
+    @Test
+    void run_fillBracketStrategy_withOtherIncome_reducesConversion() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        // Fill to 12% bracket ceiling ($48,475), other_income=30000
+        // Available space = 48475 - 30000 = 18475
+        var scenario = createScenario(
+                LocalDate.now().plusYears(30),
+                90,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 30000, "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(LocalDate.now().getYear() - 35));
+
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("500000.0000"), BigDecimal.ZERO, bd("0.0700"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0700"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isNotNull();
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("18475"));
+    }
+
+    @Test
+    void run_fillBracketStrategy_traditionalExhausted_convertsOnlyAvailable() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        // Small traditional balance < fill amount
+        // Traditional = 10k, after 7% growth = 10700, bracket fill = 48475
+        // Should convert only 10700
+        var scenario = createScenario(
+                LocalDate.now().plusYears(30),
+                90,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(LocalDate.now().getYear() - 35));
+
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("10000.0000"), BigDecimal.ZERO, bd("0.0700"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0700"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isNotNull();
+        // Should be capped to available traditional balance (10700 after growth)
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("10700.0000"));
+    }
+
+    @Test
+    void run_fixedAmountStrategy_backwardsCompatible() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        // No roth_conversion_strategy param, uses annual_roth_conversion as before
+        var scenario = createScenario(
+                LocalDate.now().plusYears(30),
+                90,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "annual_roth_conversion": 25000}
+                """.formatted(LocalDate.now().getYear() - 35));
+
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("500000.0000"), BigDecimal.ZERO, bd("0.0700"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0700"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("25000"));
+    }
+
+    @Test
+    void run_noWithdrawalOrderParam_defaultsTaxableFirst() {
+        stubSingleBrackets();
+        var engineTax = engineWithTax();
+
+        var scenario = createScenario(
+                LocalDate.now().minusYears(1),
+                75,
+                BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single"}
+                """.formatted(LocalDate.now().getYear() - 66));
+
+        var taxableAcct = new ProjectionAccountEntity(
+                scenario, null, bd("300000.0000"), BigDecimal.ZERO, bd("0.0500"), "taxable");
+        scenario.addAccount(taxableAcct);
+        var tradAcct = new ProjectionAccountEntity(
+                scenario, null, bd("200000.0000"), BigDecimal.ZERO, bd("0.0500"), "traditional");
+        scenario.addAccount(tradAcct);
+        var rothAcct = new ProjectionAccountEntity(
+                scenario, null, bd("100000.0000"), BigDecimal.ZERO, bd("0.0500"), "roth");
+        scenario.addAccount(rothAcct);
+
+        var result = engineTax.run(scenario);
+
+        var year1 = result.yearlyData().getFirst();
+        // Default behavior = taxable first, traditional untouched
+        assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
+    }
+
     private ProjectionScenarioEntity createScenario(LocalDate retirementDate, int endAge,
                                                      BigDecimal inflationRate, String paramsJson) {
         return new ProjectionScenarioEntity(tenant, "Test Scenario",

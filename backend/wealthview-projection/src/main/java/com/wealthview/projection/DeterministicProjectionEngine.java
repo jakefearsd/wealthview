@@ -9,6 +9,7 @@ import com.wealthview.core.projection.strategy.DynamicPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.FixedPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.VanguardDynamicSpendingWithdrawal;
 import com.wealthview.core.projection.strategy.WithdrawalContext;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -191,7 +192,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal totalGrowth = applyGrowth(balances, weightedReturn);
 
             var conversion = executeRothConversion(
-                    balances, annualRothConversion, year, filingStatus, otherIncome);
+                    balances, annualRothConversion, year, filingStatus, otherIncome,
+                    params.rothConversionStrategy(), params.targetBracketRate());
             conversionAmount = conversion.amountConverted();
             taxLiability = conversion.taxLiability();
 
@@ -207,7 +209,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 }
 
                 var withdrawalResult = executeWithdrawals(
-                        balances, withdrawals, year, filingStatus, otherIncome, conversionAmount);
+                        balances, withdrawals, year, filingStatus, otherIncome, conversionAmount,
+                        params.withdrawalOrder());
                 withdrawals = withdrawalResult.totalWithdrawn();
                 taxLiability = taxLiability.add(withdrawalResult.taxLiability());
 
@@ -290,7 +293,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private ScenarioParams parseParams(String paramsJson) {
         if (paramsJson == null || paramsJson.isBlank()) {
-            return new ScenarioParams(null, null, null, null, null, null, null, null);
+            return new ScenarioParams(null, null, null, null, null, null, null, null,
+                    WithdrawalOrder.TAXABLE_FIRST, null, null);
         }
         try {
             JsonNode node = objectMapper.readTree(paramsJson);
@@ -316,11 +320,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal annualRothConversion = node.has("annual_roth_conversion")
                     ? new BigDecimal(node.get("annual_roth_conversion").asText())
                     : null;
+            WithdrawalOrder withdrawalOrder = node.has("withdrawal_order")
+                    ? WithdrawalOrder.fromString(node.get("withdrawal_order").asText())
+                    : WithdrawalOrder.TAXABLE_FIRST;
+            String rothConversionStrategy = node.has("roth_conversion_strategy")
+                    ? node.get("roth_conversion_strategy").asText()
+                    : null;
+            BigDecimal targetBracketRate = node.has("target_bracket_rate")
+                    ? new BigDecimal(node.get("target_bracket_rate").asText())
+                    : null;
             return new ScenarioParams(birthYear, withdrawalRate, withdrawalStrategy,
-                    dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion);
+                    dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion,
+                    withdrawalOrder, rothConversionStrategy, targetBracketRate);
         } catch (Exception e) {
             log.warn("Failed to parse params_json: {}", e.getMessage());
-            return new ScenarioParams(null, null, null, null, null, null, null, null);
+            return new ScenarioParams(null, null, null, null, null, null, null, null,
+                    WithdrawalOrder.TAXABLE_FIRST, null, null);
         }
     }
 
@@ -332,7 +347,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal dynamicFloor,
             String filingStatus,
             BigDecimal otherIncome,
-            BigDecimal annualRothConversion) {
+            BigDecimal annualRothConversion,
+            WithdrawalOrder withdrawalOrder,
+            String rothConversionStrategy,
+            BigDecimal targetBracketRate) {
     }
 
     private static class PoolBalances {
@@ -408,12 +426,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability) {}
 
     private ConversionResult executeRothConversion(PoolBalances balances, BigDecimal conversionLimit,
-                                                    int year, FilingStatus filingStatus, BigDecimal otherIncome) {
-        if (conversionLimit.compareTo(BigDecimal.ZERO) <= 0
+                                                    int year, FilingStatus filingStatus, BigDecimal otherIncome,
+                                                    String rothConversionStrategy, BigDecimal targetBracketRate) {
+        BigDecimal effectiveLimit;
+        if ("fill_bracket".equals(rothConversionStrategy) && targetBracketRate != null && taxCalculator != null) {
+            BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForBracket(targetBracketRate, year, filingStatus);
+            BigDecimal space = bracketCeiling.subtract(otherIncome).max(BigDecimal.ZERO);
+            effectiveLimit = space;
+        } else {
+            effectiveLimit = conversionLimit;
+        }
+
+        if (effectiveLimit.compareTo(BigDecimal.ZERO) <= 0
                 || balances.traditional.compareTo(BigDecimal.ZERO) <= 0) {
             return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO);
         }
-        BigDecimal actual = conversionLimit.min(balances.traditional);
+        BigDecimal actual = effectiveLimit.min(balances.traditional);
         balances.traditional = balances.traditional.subtract(actual);
         balances.roth = balances.roth.add(actual);
 
@@ -428,19 +456,51 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private WithdrawalTaxResult executeWithdrawals(PoolBalances balances, BigDecimal totalNeed,
                                                     int year, FilingStatus filingStatus,
-                                                    BigDecimal otherIncome, BigDecimal rothConversionAmount) {
+                                                    BigDecimal otherIncome, BigDecimal rothConversionAmount,
+                                                    WithdrawalOrder withdrawalOrder) {
         if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
             return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO);
         }
-        BigDecimal remaining = totalNeed;
 
-        BigDecimal fromTaxable = remaining.min(balances.taxable);
+        BigDecimal fromTaxable;
+        BigDecimal fromTraditional;
+        BigDecimal fromRoth;
+
+        if (withdrawalOrder == WithdrawalOrder.PRO_RATA) {
+            BigDecimal total = balances.total();
+            if (total.compareTo(BigDecimal.ZERO) <= 0) {
+                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO);
+            }
+            BigDecimal need = totalNeed.min(total);
+            fromTaxable = need.multiply(balances.taxable).divide(total, SCALE, ROUNDING).min(balances.taxable);
+            fromTraditional = need.multiply(balances.traditional).divide(total, SCALE, ROUNDING).min(balances.traditional);
+            fromRoth = need.subtract(fromTaxable).subtract(fromTraditional).min(balances.roth).max(BigDecimal.ZERO);
+        } else {
+            BigDecimal remaining = totalNeed;
+            // Determine draw order based on WithdrawalOrder
+            BigDecimal[] pools = switch (withdrawalOrder) {
+                case TRADITIONAL_FIRST -> new BigDecimal[]{balances.traditional, balances.taxable, balances.roth};
+                case ROTH_FIRST -> new BigDecimal[]{balances.roth, balances.taxable, balances.traditional};
+                default -> new BigDecimal[]{balances.taxable, balances.traditional, balances.roth};
+            };
+
+            BigDecimal[] drawn = new BigDecimal[3];
+            for (int i = 0; i < 3; i++) {
+                drawn[i] = remaining.min(pools[i]);
+                remaining = remaining.subtract(drawn[i]);
+            }
+
+            // Map drawn amounts back to pool names
+            switch (withdrawalOrder) {
+                case TRADITIONAL_FIRST -> { fromTraditional = drawn[0]; fromTaxable = drawn[1]; fromRoth = drawn[2]; }
+                case ROTH_FIRST -> { fromRoth = drawn[0]; fromTaxable = drawn[1]; fromTraditional = drawn[2]; }
+                default -> { fromTaxable = drawn[0]; fromTraditional = drawn[1]; fromRoth = drawn[2]; }
+            }
+        }
+
         balances.taxable = balances.taxable.subtract(fromTaxable);
-        remaining = remaining.subtract(fromTaxable);
-
-        BigDecimal fromTraditional = remaining.min(balances.traditional);
         balances.traditional = balances.traditional.subtract(fromTraditional);
-        remaining = remaining.subtract(fromTraditional);
+        balances.roth = balances.roth.subtract(fromRoth);
 
         BigDecimal withdrawalTax = BigDecimal.ZERO;
         if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
@@ -448,9 +508,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     fromTraditional.add(otherIncome), year, filingStatus);
             deductFromPools(balances, withdrawalTax);
         }
-
-        BigDecimal fromRoth = remaining.min(balances.roth);
-        balances.roth = balances.roth.subtract(fromRoth);
 
         return new WithdrawalTaxResult(
                 fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax);
