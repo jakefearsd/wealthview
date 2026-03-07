@@ -1,13 +1,39 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { generateInviteCode, listInviteCodes, listUsers, updateUserRole, deleteUser } from '../api/tenant';
+import { getNotificationPreferences, updateNotificationPreferences } from '../api/notifications';
+import type { NotificationPreference } from '../api/notifications';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { cardStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
+
+const NOTIFICATION_LABELS: Record<string, string> = {
+    LARGE_TRANSACTION: 'Large transactions',
+    IMPORT_COMPLETE: 'Import completed',
+    IMPORT_FAILED: 'Import failed',
+};
 
 export default function SettingsPage() {
     const { data: inviteCodes, refetch: refetchCodes } = useApiQuery(listInviteCodes);
     const { data: users, refetch: refetchUsers } = useApiQuery(listUsers);
     const [generating, setGenerating] = useState(false);
+    const [notifPrefs, setNotifPrefs] = useState<NotificationPreference[]>([]);
+
+    useEffect(() => {
+        getNotificationPreferences().then(setNotifPrefs).catch(() => {});
+    }, []);
+
+    async function handleNotifToggle(type: string, enabled: boolean) {
+        const updated = notifPrefs.map((p) =>
+            p.notification_type === type ? { ...p, enabled } : p
+        );
+        setNotifPrefs(updated);
+        try {
+            await updateNotificationPreferences(updated);
+        } catch {
+            toast.error('Failed to update notification preferences');
+            getNotificationPreferences().then(setNotifPrefs).catch(() => {});
+        }
+    }
 
     async function handleGenerateCode() {
         setGenerating(true);
@@ -76,6 +102,21 @@ export default function SettingsPage() {
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+            <div style={{ ...cardStyle, marginBottom: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>Notification Preferences</h3>
+                {notifPrefs.map((pref) => (
+                    <label key={pref.notification_type} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            checked={pref.enabled}
+                            onChange={(e) => handleNotifToggle(pref.notification_type, e.target.checked)}
+                        />
+                        {NOTIFICATION_LABELS[pref.notification_type] ?? pref.notification_type}
+                    </label>
+                ))}
+                {notifPrefs.length === 0 && <div style={{ color: '#999' }}>Loading...</div>}
             </div>
 
             <div style={cardStyle}>
