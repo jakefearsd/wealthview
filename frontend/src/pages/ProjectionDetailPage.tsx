@@ -160,20 +160,24 @@ export default function ProjectionDetailPage() {
                             label="Final Balance"
                             value={formatCurrency(result.final_balance)}
                             valueColor={result.final_balance > 0 ? '#2e7d32' : '#d32f2f'}
+                            description="Portfolio value at the end of your projection period."
                         />
                         <SummaryCard
                             label="Years in Retirement"
                             value={String(result.years_in_retirement)}
+                            description="Years between your retirement date and projection end."
                         />
                         <SummaryCard
                             label="Peak Balance"
                             value={formatCurrency(peak!.balance)}
                             subtext={`(year ${peak!.year})`}
+                            description="Highest portfolio value reached during the projection."
                         />
                         <SummaryCard
                             label="Depletion Year"
                             value={depletion ? `${depletion.year} (age ${depletion.age})` : 'Never'}
                             valueColor={depletion ? '#d32f2f' : '#2e7d32'}
+                            description="The year your portfolio reaches $0. 'Never' means your money outlasts the plan."
                         />
                     </div>
 
