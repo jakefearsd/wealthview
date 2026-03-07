@@ -16,6 +16,7 @@ public record PropertyRequest(
         BigDecimal annualInterestRate,
         Integer loanTermMonths,
         LocalDate loanStartDate,
-        Boolean useComputedBalance
+        Boolean useComputedBalance,
+        String propertyType
 ) {
 }

@@ -58,10 +58,8 @@ public class PropertyEntity {
     @Column(name = "use_computed_balance", nullable = false)
     private boolean useComputedBalance = false;
 
-    // TODO: Future depreciation fields
-    // private String depreciationMethod;
-    // private BigDecimal depreciableBasis;
-    // private LocalDate placedInServiceDate;
+    @Column(name = "property_type", nullable = false)
+    private String propertyType = "primary_residence";
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -105,6 +103,8 @@ public class PropertyEntity {
     public void setLoanStartDate(LocalDate loanStartDate) { this.loanStartDate = loanStartDate; }
     public boolean isUseComputedBalance() { return useComputedBalance; }
     public void setUseComputedBalance(boolean useComputedBalance) { this.useComputedBalance = useComputedBalance; }
+    public String getPropertyType() { return propertyType; }
+    public void setPropertyType(String propertyType) { this.propertyType = propertyType; }
 
     public boolean hasLoanDetails() {
         return loanAmount != null && annualInterestRate != null

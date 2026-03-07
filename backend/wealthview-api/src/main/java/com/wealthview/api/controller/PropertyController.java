@@ -1,10 +1,12 @@
 package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
+import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
@@ -35,13 +37,16 @@ public class PropertyController {
 
     private final PropertyService propertyService;
     private final PropertyValuationService valuationService;
+    private final PropertyAnalyticsService analyticsService;
     private final @Nullable PropertyValuationSyncService syncService;
 
     public PropertyController(PropertyService propertyService,
                               PropertyValuationService valuationService,
+                              PropertyAnalyticsService analyticsService,
                               @Nullable PropertyValuationSyncService syncService) {
         this.propertyService = propertyService;
         this.valuationService = valuationService;
+        this.analyticsService = analyticsService;
         this.syncService = syncService;
     }
 
@@ -111,6 +116,14 @@ public class PropertyController {
         var cashFlow = propertyService.getMonthlyCashFlow(
                 principal.tenantId(), id, fromMonth, toMonth);
         return ResponseEntity.ok(cashFlow);
+    }
+
+    @GetMapping("/{id}/analytics")
+    public ResponseEntity<PropertyAnalyticsResponse> getAnalytics(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestParam(required = false) Integer year) {
+        return ResponseEntity.ok(analyticsService.getAnalytics(principal.tenantId(), id, year));
     }
 
     @GetMapping("/{id}/valuations")
