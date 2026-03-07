@@ -9,7 +9,7 @@ interface CategoryOption {
 interface Props {
     title: string;
     categories: CategoryOption[];
-    onSubmit: (data: { date: string; amount: number; category: string; description?: string }) => Promise<void>;
+    onSubmit: (data: { date: string; amount: number; category: string; description?: string; frequency?: string }) => Promise<void>;
     buttonColor: string;
 }
 
@@ -18,6 +18,7 @@ export default function PropertyTransactionForm({ title, categories, onSubmit, b
     const [amount, setAmount] = useState('');
     const [category, setCategory] = useState(categories[0]?.value ?? '');
     const [description, setDescription] = useState('');
+    const [frequency, setFrequency] = useState('monthly');
 
     async function handleSubmit() {
         await onSubmit({
@@ -25,10 +26,12 @@ export default function PropertyTransactionForm({ title, categories, onSubmit, b
             amount: parseFloat(amount),
             category,
             description: description || undefined,
+            frequency,
         });
         setDate('');
         setAmount('');
         setDescription('');
+        setFrequency('monthly');
     }
 
     return (
@@ -41,6 +44,10 @@ export default function PropertyTransactionForm({ title, categories, onSubmit, b
                     {categories.map((c) => (
                         <option key={c.value} value={c.value}>{c.label}</option>
                     ))}
+                </select>
+                <select value={frequency} onChange={(e) => setFrequency(e.target.value)} style={{ padding: '0.4rem' }}>
+                    <option value="monthly">Monthly</option>
+                    <option value="annual">Annual</option>
                 </select>
                 <input placeholder="Description" value={description} onChange={(e) => setDescription(e.target.value)} style={{ padding: '0.4rem' }} />
                 <button onClick={handleSubmit} style={{ padding: '0.5rem', background: buttonColor, color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{title}</button>

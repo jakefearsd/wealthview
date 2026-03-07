@@ -47,7 +47,7 @@ export default function PropertyDetailPage() {
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
     const { data: analytics } = useApiQuery(() => getPropertyAnalytics(id!));
 
-    async function handleAddIncome(data: { date: string; amount: number; category: string; description?: string }) {
+    async function handleAddIncome(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
         try {
             await addPropertyIncome(id!, data);
             toast.success('Income added');
@@ -57,7 +57,7 @@ export default function PropertyDetailPage() {
         }
     }
 
-    async function handleAddExpense(data: { date: string; amount: number; category: string; description?: string }) {
+    async function handleAddExpense(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
         try {
             await addPropertyExpense(id!, data);
             toast.success('Expense added');

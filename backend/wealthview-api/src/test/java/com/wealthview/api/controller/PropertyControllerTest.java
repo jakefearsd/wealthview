@@ -142,6 +142,23 @@ class PropertyControllerTest {
     }
 
     @Test
+    void update_notFound_returns404() throws Exception {
+        when(propertyService.update(eq(TENANT_ID), eq(PROPERTY_ID), any(PropertyRequest.class)))
+                .thenThrow(new EntityNotFoundException("Property not found"));
+
+        mockMvc.perform(put("/api/v1/properties/{id}", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"address": "123 Main St", "purchase_price": 300000,
+                                 "purchase_date": "2020-06-01", "current_value": 375000,
+                                 "mortgage_balance": 195000}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
     void delete_existing_returns204() throws Exception {
         doNothing().when(propertyService).delete(TENANT_ID, PROPERTY_ID);
 
@@ -176,6 +193,36 @@ class PropertyControllerTest {
                         .content("""
                                 {"date": "2025-01-01", "amount": 1800, "category": "mortgage",
                                  "description": "January mortgage"}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void addIncome_withAnnualFrequency_returns201() throws Exception {
+        doNothing().when(propertyService).addIncome(eq(TENANT_ID), eq(PROPERTY_ID),
+                any(PropertyIncomeRequest.class));
+
+        mockMvc.perform(post("/api/v1/properties/{id}/income", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-01", "amount": 12000, "category": "rent",
+                                 "frequency": "annual"}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void addExpense_withAnnualFrequency_returns201() throws Exception {
+        doNothing().when(propertyService).addExpense(eq(TENANT_ID), eq(PROPERTY_ID),
+                any(PropertyExpenseRequest.class));
+
+        mockMvc.perform(post("/api/v1/properties/{id}/expenses", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-01", "amount": 6000, "category": "tax",
+                                 "frequency": "annual"}
                                 """))
                 .andExpect(status().isCreated());
     }

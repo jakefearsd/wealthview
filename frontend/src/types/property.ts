@@ -34,6 +34,7 @@ export interface PropertyIncomeRequest {
     amount: number;
     category: string;
     description?: string;
+    frequency?: string;
 }
 
 export interface PropertyExpenseRequest {
@@ -41,6 +42,7 @@ export interface PropertyExpenseRequest {
     amount: number;
     category: string;
     description?: string;
+    frequency?: string;
 }
 
 export interface MonthlyCashFlowEntry {
