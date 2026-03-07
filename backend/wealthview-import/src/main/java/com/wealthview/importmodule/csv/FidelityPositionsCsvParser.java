@@ -57,6 +57,8 @@ public class FidelityPositionsCsvParser implements CsvParser {
                 .setSkipHeaderRecord(true)
                 .setTrim(true)
                 .setIgnoreEmptyLines(true)
+                .setTrailingDelimiter(true)
+                .setIgnoreHeaderCase(true)
                 .build();
 
         try (var parser = new CSVParser(new StringReader(csvContent), format)) {
@@ -74,6 +76,11 @@ public class FidelityPositionsCsvParser implements CsvParser {
                         continue;
                     }
                     if (description != null && description.contains("HELD IN FCASH")) {
+                        var currentValueStr = record.get("Current Value");
+                        if (currentValueStr != null && !currentValueStr.isBlank()) {
+                            BigDecimal cashAmount = parseAmount(currentValueStr);
+                            transactions.add(new ParsedTransaction(snapshotDate, "deposit", null, null, cashAmount));
+                        }
                         continue;
                     }
 
@@ -103,10 +110,23 @@ public class FidelityPositionsCsvParser implements CsvParser {
     private ArrayList<String> readAllLines(BufferedReader reader) throws IOException {
         var lines = new ArrayList<String>();
         String line;
+        boolean first = true;
         while ((line = reader.readLine()) != null) {
+            line = line.replace("\r", "");
+            if (first) {
+                line = stripBom(line);
+                first = false;
+            }
             lines.add(line);
         }
         return lines;
+    }
+
+    private String stripBom(String line) {
+        if (line != null && !line.isEmpty() && line.charAt(0) == '\uFEFF') {
+            return line.substring(1);
+        }
+        return line;
     }
 
     private String extractCsvContent(ArrayList<String> lines) {
@@ -131,7 +151,8 @@ public class FidelityPositionsCsvParser implements CsvParser {
     }
 
     LocalDate extractDateFromFooter(ArrayList<String> lines) {
-        for (var line : lines) {
+        for (var rawLine : lines) {
+            var line = rawLine.replace("\"", "");
             var matcher = DATE_PATTERN.matcher(line);
             if (matcher.find()) {
                 try {
