@@ -9,7 +9,7 @@ WealthView consolidates financial visibility across brokerage accounts, rental p
 ### Key Features
 
 - **Investment Portfolio Tracking** -- Accounts, holdings, transactions with automatic cost basis and quantity computation. Theoretical portfolio history charts with historical price data.
-- **Rental Property Management** -- Property records with income/expense tracking, monthly cash flow reports, loan amortization-based mortgage balance computation, and automated Zillow valuation scraping with history tracking.
+- **Rental Property Management** -- Property records with income/expense tracking, monthly cash flow reports, loan amortization-based mortgage balance computation, automated Zillow valuation scraping with history tracking, and investment analytics (cap rate, cash-on-cash return, equity growth, mortgage progress) with property type classification.
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation pie chart.
 - **Multi-Format Import** -- Fidelity, Vanguard, and Schwab CSV parsers plus OFX/QFX import. Content-hash deduplication prevents duplicate transactions across imports.
 - **Live Price Feeds** -- Finnhub API integration with historical backfill and scheduled daily sync. Seed data covers major tickers (AAPL, AMZN, GOOG, MSFT, NVDA, VOO, VTI, and more).
@@ -287,7 +287,7 @@ mvn test -Dtest="AccountServiceTest#methodName"
 **Test infrastructure:**
 - Unit tests use JUnit 5 + Mockito with AssertJ assertions
 - Integration tests use Testcontainers with PostgreSQL 16 (never H2)
-- The `wealthview-app` module has 56 API-level integration tests across 11 test classes
+- The `wealthview-app` module has 66 API-level integration tests across 11 test classes
 - The `wealthview-persistence` module has 13 integration tests covering Flyway migrations and repository CRUD
 
 ### Frontend
@@ -305,7 +305,7 @@ npx tsc --noEmit                          # TypeScript type check
 
 ## Code Quality
 
-The backend build includes static analysis and coverage tools, configured in the `wealthview-app` module POM:
+The backend build includes static analysis and coverage tools, configured in the parent POM (`backend/pom.xml`):
 
 | Tool | Purpose | Report Location |
 |------|---------|----------------|
@@ -313,7 +313,7 @@ The backend build includes static analysis and coverage tools, configured in the
 | **SpotBugs** | Detects common bug patterns (null deref, resource leaks, etc.) | `target/spotbugsXml.xml` |
 | **JaCoCo** | Measures test code coverage | `target/site/jacoco/index.html` |
 
-All three run automatically as part of `mvn verify`. To generate a human-readable JaCoCo coverage report:
+JaCoCo runs automatically as part of `mvn verify`. Checkstyle and SpotBugs are available via `pluginManagement` but not enforced by default -- invoke them explicitly with `mvn checkstyle:check` or `mvn spotbugs:check`. To generate a human-readable JaCoCo coverage report:
 
 ```bash
 cd backend
@@ -401,7 +401,7 @@ wealthview/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                           (Axios client, API call functions)
-│   │   ├── components/                    (SummaryCard, ProjectionChart, MilestoneStrip, etc.)
+│   │   ├── components/                    (SummaryCard, ProjectionChart, MilestoneStrip, HelpText, InfoSection, etc.)
 │   │   ├── context/                       (auth, tenant providers)
 │   │   ├── hooks/                         (custom React hooks)
 │   │   ├── pages/                         (route-level views)
@@ -439,6 +439,7 @@ Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/m
 | V015      | Add spending_profile_id FK to projection scenarios       |
 | V016      | Loan detail columns on properties (amortization support) |
 | V017      | Property valuations history table                        |
+| V018      | Add property_type column to properties (primary_residence, investment, vacation) |
 | R__seed_stock_prices  | Repeatable seed data for stock prices           |
 | R__seed_tax_brackets  | Repeatable seed data for 2022-2025 federal tax brackets |
 
@@ -482,7 +483,7 @@ Authorization: Bearer eyJ...
 | `/api/v1/accounts/{id}/transactions`  | GET, POST      | Transactions for account      |
 | `/api/v1/accounts/{id}/holdings`      | GET            | Holdings for account          |
 | `/api/v1/accounts/{id}/theoretical-history` | GET      | Theoretical portfolio history |
-| `/api/v1/holdings`                    | GET, POST      | All holdings / create manual  |
+| `/api/v1/holdings`                    | POST           | Create manual holding         |
 | `/api/v1/holdings/{id}`               | PUT            | Update holding                |
 | `/api/v1/transactions/{id}`           | PUT, DELETE    | Update or delete transaction  |
 
@@ -497,6 +498,7 @@ Authorization: Bearer eyJ...
 | `/api/v1/properties/{id}/cashflow`    | GET    | Monthly cash flow report  |
 | `/api/v1/properties/{id}/valuations`  | GET    | Valuation history         |
 | `/api/v1/properties/{id}/valuations/refresh` | POST | Trigger Zillow valuation scrape (202 Accepted) |
+| `/api/v1/properties/{id}/analytics`  | GET    | Property analytics (cap rate, cash-on-cash return, equity growth, mortgage progress). Optional `year` query param. |
 
 ### Import & Prices
 
@@ -551,7 +553,7 @@ Authorization: Bearer eyJ...
 | `/projections/:id`       | Projection Detail       | Config summary, edit mode, run projection, tabbed results with spending analysis |
 | `/spending-profiles`     | Spending Profiles       | Create and manage spending profiles with income streams        |
 | `/properties`            | Properties List         | Rental properties overview                                     |
-| `/properties/:id`        | Property Detail         | Income/expenses, monthly cash flow chart                       |
+| `/properties/:id`        | Property Detail         | Income/expenses, monthly cash flow chart, investment analytics panel with metric explanations |
 | `/settings`              | Settings                | Invite codes, user management (admin)                          |
 | `/login`                 | Login                   | Email/password authentication                                  |
 | `/register`              | Register                | New user registration with invite code                         |
@@ -821,6 +823,20 @@ To test with Zillow enabled:
 
 ---
 
+### 10j. Property Analytics
+
+1. Open the detail page for a property that has income, expenses, and loan details configured.
+2. **Verify:** The **Investment Analytics** panel displays:
+   - **Cap Rate** -- annual net operating income as a percentage of property value.
+   - **Cash-on-Cash Return** -- annual cash flow relative to total cash invested.
+   - **Equity Growth** -- change in equity over the selected period.
+   - **Mortgage Progress** -- principal paid, remaining balance, and payoff percentage.
+3. Each metric has an explanatory help icon or info section describing how it is calculated.
+4. Optionally change the `year` parameter (if the UI exposes it) to see analytics for a specific year.
+5. **Verify:** Properties without loan details show analytics where applicable and omit mortgage progress gracefully.
+
+---
+
 ### 11. Create a Basic Retirement Projection
 
 1. Navigate to **Projections** in the sidebar (`/projections`).
@@ -1037,6 +1053,7 @@ To test with Zillow enabled:
 | 10g | Valuation refresh (disabled) | 503 when Zillow disabled |
 | 10h | Valuation refresh (enabled) | Zestimate recorded, chart and table appear |
 | 10i | Dashboard computed balances | Net worth uses computed balance for flagged properties |
+| 10j | Property analytics | Cap rate, cash-on-cash, equity growth, mortgage progress |
 | 11 | Fixed % projection | Balance chart, flows, data table, summary cards |
 | 12 | Dynamic % projection | Withdrawals track current balance, never depletes |
 | 13 | Vanguard dynamic | Withdrawal changes capped at ceiling/floor |
