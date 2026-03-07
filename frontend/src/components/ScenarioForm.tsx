@@ -1,10 +1,36 @@
 import { useState } from 'react';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listSpendingProfiles } from '../api/spendingProfiles';
+import HelpText from './HelpText';
+import InfoSection from './InfoSection';
 import type { Scenario, CreateScenarioRequest, ScenarioAccountInput } from '../types/projection';
 
 const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
 const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
+
+const STRATEGY_OPTIONS = [
+    {
+        value: 'fixed_percentage',
+        title: 'Fixed Percentage (4% Rule)',
+        description: 'Year 1 withdrawal is balance \u00d7 rate. Each subsequent year adjusts for inflation, not recalculated from balance. Predictable income that doesn\'t adapt to market performance.',
+    },
+    {
+        value: 'dynamic_percentage',
+        title: 'Dynamic Percentage',
+        description: 'Every year, withdraw current balance \u00d7 rate. Income fluctuates with markets. Portfolio cannot mathematically deplete to zero, but income can drop significantly in downturns.',
+    },
+    {
+        value: 'vanguard_dynamic_spending',
+        title: 'Vanguard Dynamic Spending',
+        description: 'Year 1 is balance \u00d7 rate. Subsequent years recalculate from current balance, but year-over-year change is clamped between a floor and ceiling. Balances adaptability with income stability.',
+    },
+] as const;
+
+const ACCOUNT_TYPE_HELP: Record<string, string> = {
+    taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
+    traditional: 'Pre-tax contributions reduce taxable income now. Withdrawals in retirement taxed as ordinary income.',
+    roth: 'After-tax contributions. Growth and qualified withdrawals in retirement are completely tax-free.',
+};
 
 interface ScenarioFormProps {
     initialValues?: Scenario | null;
@@ -102,39 +128,23 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 <div>
                     <label style={labelStyle}>Birth Year</label>
                     <input style={inputStyle} type="number" value={birthYear} onChange={e => setBirthYear(Number(e.target.value))} />
+                    <HelpText>Used to calculate your age at each projection year.</HelpText>
                 </div>
                 <div>
                     <label style={labelStyle}>End Age</label>
                     <input style={inputStyle} type="number" value={endAge} onChange={e => setEndAge(Number(e.target.value))} />
+                    <HelpText>Age at which the projection ends. Plan beyond your expected lifespan for safety.</HelpText>
                 </div>
                 <div>
                     <label style={labelStyle}>Inflation Rate</label>
                     <input style={inputStyle} type="number" step="0.01" value={inflationRate} onChange={e => setInflationRate(Number(e.target.value))} />
+                    <HelpText>Annual rate of price increases. 3% is the historical U.S. average.</HelpText>
                 </div>
                 <div>
                     <label style={labelStyle}>Withdrawal Rate</label>
                     <input style={inputStyle} type="number" step="0.01" value={withdrawalRate} onChange={e => setWithdrawalRate(Number(e.target.value))} />
+                    <HelpText>Percentage of portfolio to withdraw annually in retirement.</HelpText>
                 </div>
-                <div>
-                    <label style={labelStyle}>Withdrawal Strategy</label>
-                    <select style={inputStyle} value={withdrawalStrategy} onChange={e => setWithdrawalStrategy(e.target.value)}>
-                        <option value="fixed_percentage">Fixed Percentage (4% Rule)</option>
-                        <option value="dynamic_percentage">Dynamic Percentage</option>
-                        <option value="vanguard_dynamic_spending">Vanguard Dynamic Spending</option>
-                    </select>
-                </div>
-                {withdrawalStrategy === 'vanguard_dynamic_spending' && (
-                    <>
-                        <div>
-                            <label style={labelStyle}>Ceiling (max increase)</label>
-                            <input style={inputStyle} type="number" step="0.01" value={dynamicCeiling} onChange={e => setDynamicCeiling(Number(e.target.value))} />
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Floor (max decrease)</label>
-                            <input style={inputStyle} type="number" step="0.01" value={dynamicFloor} onChange={e => setDynamicFloor(Number(e.target.value))} />
-                        </div>
-                    </>
-                )}
                 <div>
                     <label style={labelStyle}>Spending Profile</label>
                     <select style={inputStyle} value={spendingProfileId} onChange={e => setSpendingProfileId(e.target.value)}>
@@ -143,10 +153,48 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                     </select>
+                    <HelpText>Optional. Defines your expected retirement expenses and non-portfolio income. When linked, the projection shows whether your withdrawals can cover your spending plan.</HelpText>
                 </div>
             </div>
 
+            <label style={{ ...labelStyle, marginBottom: '0.5rem' }}>Withdrawal Strategy</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                {STRATEGY_OPTIONS.map(opt => (
+                    <div
+                        key={opt.value}
+                        onClick={() => setWithdrawalStrategy(opt.value)}
+                        style={{
+                            border: `2px solid ${withdrawalStrategy === opt.value ? '#1976d2' : '#e0e0e0'}`,
+                            background: withdrawalStrategy === opt.value ? '#e3f2fd' : '#fff',
+                            cursor: 'pointer',
+                            borderRadius: '8px',
+                            padding: '1rem',
+                        }}
+                    >
+                        <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{opt.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: '#666', lineHeight: 1.4 }}>{opt.description}</div>
+                    </div>
+                ))}
+            </div>
+            {withdrawalStrategy === 'vanguard_dynamic_spending' && (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    <div>
+                        <label style={labelStyle}>Ceiling (max increase)</label>
+                        <input style={inputStyle} type="number" step="0.01" value={dynamicCeiling} onChange={e => setDynamicCeiling(Number(e.target.value))} />
+                        <HelpText>Maximum year-over-year spending increase (e.g., 0.05 = 5%)</HelpText>
+                    </div>
+                    <div>
+                        <label style={labelStyle}>Floor (max decrease)</label>
+                        <input style={inputStyle} type="number" step="0.01" value={dynamicFloor} onChange={e => setDynamicFloor(Number(e.target.value))} />
+                        <HelpText>Maximum year-over-year spending decrease (e.g., -0.025 = 2.5%)</HelpText>
+                    </div>
+                </div>
+            )}
+
             <h4 style={{ marginBottom: '0.5rem' }}>Roth Conversion</h4>
+            <InfoSection prompt="What is Roth conversion?">
+                Moving pre-tax retirement funds (Traditional IRA/401k) to a Roth account. You pay income tax on the converted amount now, but all future growth and withdrawals are tax-free. A conversion ladder spreads conversions over multiple years to stay in lower tax brackets. Set to $0 to skip.
+            </InfoSection>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <div>
                     <label style={labelStyle}>Annual Roth Conversion</label>
@@ -160,10 +208,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 <option value="single">Single</option>
                                 <option value="married_filing_jointly">Married Filing Jointly</option>
                             </select>
+                            <HelpText>Your tax filing status, used to determine the tax bracket for conversion amounts.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Other Income</label>
                             <input style={inputStyle} type="number" value={otherIncome} onChange={e => setOtherIncome(Number(e.target.value))} />
+                            <HelpText>Non-retirement income (salary, rental income) that affects which tax bracket your conversions fall into.</HelpText>
                         </div>
                     </>
                 )}
@@ -178,6 +228,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                     + Add Account
                 </button>
             </div>
+            <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.75rem' }}>
+                Each account represents a pool of investments with its own tax treatment, growth rate, and contribution schedule.
+            </div>
             {accounts.map((acct, idx) => (
                 <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
                     <div>
@@ -187,6 +240,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <option value="traditional">Traditional (Pre-tax)</option>
                             <option value="roth">Roth</option>
                         </select>
+                        <HelpText>{ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}</HelpText>
                     </div>
                     <div>
                         <label style={labelStyle}>Initial Balance</label>
