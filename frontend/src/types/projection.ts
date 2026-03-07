@@ -74,6 +74,9 @@ export interface CreateScenarioRequest {
     filing_status?: string | null;
     other_income?: number | null;
     annual_roth_conversion?: number | null;
+    withdrawal_order?: string | null;
+    roth_conversion_strategy?: string | null;
+    target_bracket_rate?: number | null;
     spending_profile_id?: string | null;
     accounts: ScenarioAccountInput[];
 }
