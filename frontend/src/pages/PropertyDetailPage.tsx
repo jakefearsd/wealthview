@@ -7,6 +7,8 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContai
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import PropertyTransactionForm from '../components/PropertyTransactionForm';
+import HelpText from '../components/HelpText';
+import InfoSection from '../components/InfoSection';
 import toast from 'react-hot-toast';
 
 const INCOME_CATEGORIES = [
@@ -218,31 +220,39 @@ export default function PropertyDetailPage() {
 
             {analytics && analytics.property_type === 'investment' && analytics.cap_rate !== null && (
                 <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Investment Metrics</h3>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Investment Metrics</h3>
+                    <InfoSection prompt="How to read these metrics">
+                        Cap Rate and NOI measure the property's operating performance independent of financing. Cash-on-Cash Return measures your actual return based on the cash you invested, factoring in leverage from your mortgage. A higher cap rate or cash-on-cash return indicates a stronger investment.
+                    </InfoSection>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Cap Rate</div>
                             <div style={{ fontWeight: 600, fontSize: '1.2rem' }}>{analytics.cap_rate!.toFixed(2)}%</div>
+                            <HelpText>Annual NOI ÷ property value. Measures return independent of financing.</HelpText>
                         </div>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash-on-Cash Return</div>
                             <div style={{ fontWeight: 600, fontSize: '1.2rem', color: analytics.cash_on_cash_return! >= 0 ? '#2e7d32' : '#d32f2f' }}>
                                 {analytics.cash_on_cash_return!.toFixed(2)}%
                             </div>
+                            <HelpText>Annual net cash flow ÷ cash invested. Your actual return accounting for leverage.</HelpText>
                         </div>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Annual NOI</div>
                             <div style={{ fontWeight: 600 }}>{formatCurrency(analytics.annual_noi!)}</div>
+                            <HelpText>Net Operating Income: rental income minus operating expenses, excluding mortgage.</HelpText>
                         </div>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Net Cash Flow</div>
                             <div style={{ fontWeight: 600, color: analytics.annual_net_cash_flow! >= 0 ? '#2e7d32' : '#d32f2f' }}>
                                 {formatCurrency(analytics.annual_net_cash_flow!)}
                             </div>
+                            <HelpText>Cash remaining after all expenses including mortgage payments.</HelpText>
                         </div>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash Invested</div>
                             <div style={{ fontWeight: 600 }}>{formatCurrency(analytics.total_cash_invested!)}</div>
+                            <HelpText>Your out-of-pocket investment: purchase price minus loan amount.</HelpText>
                         </div>
                     </div>
                 </div>
