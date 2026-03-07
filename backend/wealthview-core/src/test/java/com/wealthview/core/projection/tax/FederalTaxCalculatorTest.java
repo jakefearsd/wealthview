@@ -140,6 +140,46 @@ class FederalTaxCalculatorTest {
         assertThat(tax).isEqualByComparingTo(bd("5914.0000"));
     }
 
+    @Test
+    void computeMaxIncomeForBracket_targetRate12_returnsTopOf12Bracket() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1200"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ceiling).isEqualByComparingTo(bd("48475"));
+    }
+
+    @Test
+    void computeMaxIncomeForBracket_targetRate22_returnsTopOf22Bracket() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.2200"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ceiling).isEqualByComparingTo(bd("103350"));
+    }
+
+    @Test
+    void computeMaxIncomeForBracket_unknownRate_returnsZero() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1500"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ceiling).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void computeMaxIncomeForBracket_highestBracket_returnsZero() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.3700"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ceiling).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     private static BigDecimal bd(String val) {
         return new BigDecimal(val);
     }
