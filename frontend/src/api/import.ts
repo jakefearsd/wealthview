@@ -23,6 +23,18 @@ export async function importOfx(accountId: string, file: File): Promise<ImportJo
     return data;
 }
 
+export async function importPositions(accountId: string, file: File, format?: string): Promise<ImportJob> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const params: Record<string, string> = { accountId };
+    if (format) params.format = format;
+    const { data } = await client.post<ImportJob>('/import/positions', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        params,
+    });
+    return data;
+}
+
 export async function listImportJobs(): Promise<ImportJob[]> {
     const { data } = await client.get<ImportJob[]>('/import/jobs');
     return data;

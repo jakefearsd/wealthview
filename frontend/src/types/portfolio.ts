@@ -8,4 +8,6 @@ export interface PortfolioHistory {
     data_points: PortfolioDataPoint[];
     symbols: string[];
     weeks: number;
+    has_money_market_holdings: boolean;
+    money_market_total: number | null;
 }

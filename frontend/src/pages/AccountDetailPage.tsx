@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getAccount } from '../api/accounts';
 import { listTransactions, deleteTransaction } from '../api/transactions';
-import { listHoldings } from '../api/holdings';
+import { listHoldings, updateHolding } from '../api/holdings';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
@@ -17,10 +17,14 @@ export default function AccountDetailPage() {
     const canWrite = role === 'admin' || role === 'member';
 
     const { data: account, loading: acctLoading } = useApiQuery(() => getAccount(id!));
-    const { data: holdings, loading: holdLoading } = useApiQuery(() => listHoldings(id!));
+    const { data: holdings, loading: holdLoading, refetch: refetchHoldings } = useApiQuery(() => listHoldings(id!));
     const { data: txnPage, loading: txnLoading, refetch: refetchTxns } = useApiQuery(() => listTransactions(id!, 0, 50));
 
     const [showAdd, setShowAdd] = useState(false);
+    const [editingTxnId, setEditingTxnId] = useState<string | null>(null);
+    const [editingHoldingId, setEditingHoldingId] = useState<string | null>(null);
+    const [editQty, setEditQty] = useState('');
+    const [editCostBasis, setEditCostBasis] = useState('');
 
     async function handleDeleteTxn(txnId: string) {
         try {
@@ -29,6 +33,28 @@ export default function AccountDetailPage() {
             refetchTxns();
         } catch {
             toast.error('Failed to delete transaction');
+        }
+    }
+
+    function startEditHolding(h: { id: string; quantity: number; cost_basis: number }) {
+        setEditingHoldingId(h.id);
+        setEditQty(String(h.quantity));
+        setEditCostBasis(String(h.cost_basis));
+    }
+
+    async function handleSaveHolding(holdingId: string, symbol: string) {
+        try {
+            await updateHolding(holdingId, {
+                account_id: id!,
+                symbol,
+                quantity: parseFloat(editQty),
+                cost_basis: parseFloat(editCostBasis),
+            });
+            toast.success('Holding updated');
+            setEditingHoldingId(null);
+            refetchHoldings();
+        } catch {
+            toast.error('Failed to update holding');
         }
     }
 
@@ -54,18 +80,45 @@ export default function AccountDetailPage() {
                                 <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
                                 <th style={{ textAlign: 'right', padding: '0.5rem' }}>Cost Basis</th>
                                 <th style={{ textAlign: 'center', padding: '0.5rem' }}>Override</th>
+                                {canWrite && <th style={{ padding: '0.5rem' }}></th>}
                             </tr>
                         </thead>
                         <tbody>
                             {holdings?.map((h) => (
                                 <tr key={h.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{h.symbol}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{h.quantity}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                    <td style={{ padding: '0.5rem' }}>
+                                        {h.symbol}
+                                        {h.is_money_market && <span style={{ color: '#999', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(Money Market)</span>}
+                                    </td>
+                                    {editingHoldingId === h.id ? (
+                                        <>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
+                                            </td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                <input type="number" step="0.01" value={editCostBasis} onChange={(e) => setEditCostBasis(e.target.value)} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
+                                            </td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                <button onClick={() => handleSaveHolding(h.id, h.symbol)} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: 'pointer', marginRight: '0.25rem' }}>Save</button>
+                                                <button onClick={() => setEditingHoldingId(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Cancel</button>
+                                            </td>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{h.quantity}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            {canWrite && (
+                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                    <button onClick={() => startEditHolding(h)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer' }}>Edit</button>
+                                                </td>
+                                            )}
+                                        </>
+                                    )}
                                 </tr>
                             ))}
-                            {holdings?.length === 0 && <tr><td colSpan={4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No holdings</td></tr>}
+                            {holdings?.length === 0 && <tr><td colSpan={canWrite ? 5 : 4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No holdings</td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -73,7 +126,7 @@ export default function AccountDetailPage() {
                 <div>
                     {canWrite && (
                         <Link to={`/accounts/${id}/import`} style={{ display: 'inline-block', padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', borderRadius: '4px', textDecoration: 'none', marginBottom: '1rem' }}>
-                            Import Transactions
+                            Import
                         </Link>
                     )}
                 </div>
@@ -92,7 +145,7 @@ export default function AccountDetailPage() {
                 {showAdd && (
                     <TransactionForm
                         accountId={id!}
-                        onSuccess={() => { setShowAdd(false); refetchTxns(); }}
+                        onSuccess={() => { setShowAdd(false); refetchTxns(); refetchHoldings(); }}
                         onCancel={() => setShowAdd(false)}
                     />
                 )}
@@ -110,18 +163,32 @@ export default function AccountDetailPage() {
                     </thead>
                     <tbody>
                         {txnPage?.data.map((txn) => (
-                            <tr key={txn.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                <td style={{ padding: '0.5rem' }}>{txn.date}</td>
-                                <td style={{ padding: '0.5rem' }}>{txn.type}</td>
-                                <td style={{ padding: '0.5rem' }}>{txn.symbol || '-'}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
-                                {canWrite && (
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                                        <button onClick={() => handleDeleteTxn(txn.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>Delete</button>
+                            editingTxnId === txn.id ? (
+                                <tr key={txn.id}>
+                                    <td colSpan={canWrite ? 6 : 5} style={{ padding: 0 }}>
+                                        <TransactionForm
+                                            accountId={id!}
+                                            initialValues={txn}
+                                            onSuccess={() => { setEditingTxnId(null); refetchTxns(); refetchHoldings(); }}
+                                            onCancel={() => setEditingTxnId(null)}
+                                        />
                                     </td>
-                                )}
-                            </tr>
+                                </tr>
+                            ) : (
+                                <tr key={txn.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <td style={{ padding: '0.5rem' }}>{txn.date}</td>
+                                    <td style={{ padding: '0.5rem' }}>{txn.type}</td>
+                                    <td style={{ padding: '0.5rem' }}>{txn.symbol || '-'}</td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
+                                    {canWrite && (
+                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                            <button onClick={() => setEditingTxnId(txn.id)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', marginRight: '0.5rem' }}>Edit</button>
+                                            <button onClick={() => handleDeleteTxn(txn.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>Delete</button>
+                                        </td>
+                                    )}
+                                </tr>
+                            )
                         ))}
                         {txnPage?.data.length === 0 && <tr><td colSpan={canWrite ? 6 : 5} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No transactions</td></tr>}
                     </tbody>
