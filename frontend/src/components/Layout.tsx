@@ -9,6 +9,7 @@ const navItems: { to: string; label: string; requiredRole?: string }[] = [
     { to: '/properties', label: 'Properties' },
     { to: '/prices', label: 'Prices' },
     { to: '/settings', label: 'Settings', requiredRole: 'admin' },
+    { to: '/audit-log', label: 'Audit Log', requiredRole: 'admin' },
     { to: '/admin', label: 'Admin', requiredRole: 'super_admin' },
 ];
 
