@@ -85,11 +85,20 @@ public class HoldingsComputationService {
             holding.setCostBasis(totalCost);
             holding.setAsOfDate(LocalDate.now());
             holding.setUpdatedAt(OffsetDateTime.now());
+            applyMoneyMarketFlag(holding, symbol);
             holdingRepository.save(holding);
         } else if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
             var holding = new HoldingEntity(account, tenant, symbol, netQuantity, totalCost);
+            applyMoneyMarketFlag(holding, symbol);
             holdingRepository.save(holding);
             eventPublisher.publishEvent(new NewHoldingCreatedEvent(symbol));
+        }
+    }
+
+    private void applyMoneyMarketFlag(HoldingEntity holding, String symbol) {
+        if (MoneyMarketDetector.isMoneyMarket(symbol)) {
+            holding.setMoneyMarket(true);
+            holding.setMoneyMarketRate(MoneyMarketDetector.defaultRate());
         }
     }
 }

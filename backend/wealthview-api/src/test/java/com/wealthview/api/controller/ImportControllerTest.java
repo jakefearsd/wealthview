@@ -81,6 +81,26 @@ class ImportControllerTest {
     }
 
     @Test
+    void importPositions_validFile_returns201() throws Exception {
+        var jobResponse = new ImportJobResponse(UUID.randomUUID(), "positions", "completed",
+                5, 5, 0, null, OffsetDateTime.now());
+        when(importService.importPositions(eq(TENANT_ID), eq(ACCOUNT_ID), any(), eq("fidelityPositions")))
+                .thenReturn(jobResponse);
+
+        var file = new MockMultipartFile("file", "positions.csv",
+                "text/csv", "Account Number,Symbol\nX123,AMZN".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/import/positions")
+                        .file(file)
+                        .param("accountId", ACCOUNT_ID.toString())
+                        .param("format", "fidelityPositions")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.source").value("positions"))
+                .andExpect(jsonPath("$.successful_rows").value(5));
+    }
+
+    @Test
     void listJobs_returns200() throws Exception {
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "csv", "completed",
                 5, 5, 0, null, OffsetDateTime.now());

@@ -9,6 +9,7 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +19,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import jakarta.persistence.EntityManager;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +53,10 @@ class ImportServiceTest {
     private TransactionService transactionService;
     @Mock
     private CsvParser csvParser;
+    @Mock
+    private HoldingRepository holdingRepository;
+    @Mock
+    private EntityManager entityManager;
 
     private ImportService importService;
 
@@ -57,7 +67,8 @@ class ImportServiceTest {
     void setUp() {
         importService = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
-                transactionService, csvParser, Map.of());
+                transactionService, csvParser, Map.of(),
+                holdingRepository, entityManager);
     }
 
     private void setupAccountAndJobMocks() {
@@ -163,6 +174,49 @@ class ImportServiceTest {
                 LocalDate.of(2024, 1, 15), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         assertThat(hashCaptor.getValue()).isEqualTo(expectedHash);
+    }
+
+    @Test
+    void importPositions_clearsExistingTransactionsAndHoldings() throws IOException {
+        setupAccountAndJobMocks();
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
+                any(), any(), anyString())).thenReturn(false);
+
+        var transactions = List.of(
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), "opening_balance", "AMZN",
+                        new BigDecimal("1100"), new BigDecimal("112324.74")));
+        var parseResult = new CsvParseResult(transactions, List.of());
+        when(csvParser.parse(any())).thenReturn(parseResult);
+
+        importService.importPositions(tenantId, accountId,
+                new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8)), "generic");
+
+        verify(transactionRepository).deleteByAccount_IdAndTenant_Id(accountId, tenantId);
+        verify(holdingRepository).deleteByAccount_IdAndTenant_Id(accountId, tenantId);
+        verify(entityManager).flush();
+    }
+
+    @Test
+    void importPositions_importsNewOpeningBalanceTransactions() throws IOException {
+        setupAccountAndJobMocks();
+        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
+                any(), any(), anyString())).thenReturn(false);
+
+        var transactions = List.of(
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), "opening_balance", "AMZN",
+                        new BigDecimal("1100"), new BigDecimal("112324.74")),
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), "deposit", null,
+                        null, new BigDecimal("704.82")));
+        var parseResult = new CsvParseResult(transactions, List.of());
+        when(csvParser.parse(any())).thenReturn(parseResult);
+
+        var result = importService.importPositions(tenantId, accountId,
+                new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8)), "generic");
+
+        verify(transactionService, times(2)).createWithHash(
+                eq(tenantId), eq(accountId), any(TransactionRequest.class), anyString());
+        assertThat(result.successfulRows()).isEqualTo(2);
+        assertThat(result.source()).isEqualTo("positions");
     }
 
     private static void setField(Object target, String fieldName, Object value) {

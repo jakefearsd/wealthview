@@ -39,6 +39,18 @@ public class ImportController {
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
+    @PostMapping("/positions")
+    public ResponseEntity<ImportJobResponse> importPositions(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @RequestParam UUID accountId,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) String format) throws IOException {
+        var result = importService.importPositions(
+                principal.tenantId(), accountId, file.getInputStream(),
+                format != null ? format : "fidelityPositions");
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
     @PostMapping("/ofx")
     public ResponseEntity<ImportJobResponse> importOfx(
             @AuthenticationPrincipal TenantUserPrincipal principal,

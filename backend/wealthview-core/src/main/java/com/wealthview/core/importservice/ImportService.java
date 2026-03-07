@@ -9,8 +9,10 @@ import com.wealthview.core.transaction.TransactionService;
 import com.wealthview.core.transaction.dto.TransactionRequest;
 import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -35,19 +37,25 @@ public class ImportService {
     private final TransactionService transactionService;
     private final CsvParser csvParser;
     private final Map<String, CsvParser> namedParsers;
+    private final HoldingRepository holdingRepository;
+    private final EntityManager entityManager;
 
     public ImportService(ImportJobRepository importJobRepository,
                          AccountRepository accountRepository,
                          TransactionRepository transactionRepository,
                          TransactionService transactionService,
                          CsvParser csvParser,
-                         Map<String, CsvParser> namedParsers) {
+                         Map<String, CsvParser> namedParsers,
+                         HoldingRepository holdingRepository,
+                         EntityManager entityManager) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
         this.csvParser = csvParser;
         this.namedParsers = namedParsers;
+        this.holdingRepository = holdingRepository;
+        this.entityManager = entityManager;
     }
 
     @Transactional
@@ -83,6 +91,32 @@ public class ImportService {
         }
         var parseResult = ofxParser.parse(inputStream);
         return processImport(tenantId, accountId, parseResult, "ofx");
+    }
+
+    @Transactional
+    public ImportJobResponse importPositions(UUID tenantId, UUID accountId,
+                                              InputStream inputStream, String format) throws IOException {
+        var parser = resolveParser(format);
+        var parseResult = parser.parse(inputStream);
+
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
+                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+
+        transactionRepository.deleteByAccount_IdAndTenant_Id(accountId, tenantId);
+        holdingRepository.deleteByAccount_IdAndTenant_Id(accountId, tenantId);
+        entityManager.flush();
+
+        var job = new ImportJobEntity(account.getTenant(), account, "positions");
+        job.setStatus("processing");
+        job.setTotalRows(parseResult.transactions().size() + parseResult.errors().size());
+        job = importJobRepository.save(job);
+
+        var result = importTransactions(parseResult.transactions(), tenantId, accountId);
+        finalizeJob(job, result, parseResult.errors().size());
+
+        log.info("Positions import completed for account {}: {} successful, {} failed",
+                accountId, result.successCount(), job.getFailedRows());
+        return ImportJobResponse.from(job);
     }
 
     @Transactional

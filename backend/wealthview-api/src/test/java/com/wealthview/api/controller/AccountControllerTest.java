@@ -142,6 +142,21 @@ class AccountControllerTest {
     }
 
     @Test
+    void update_notFound_returns404() throws Exception {
+        when(accountService.update(eq(TENANT_ID), eq(ACCOUNT_ID), any(AccountRequest.class)))
+                .thenThrow(new EntityNotFoundException("Account not found"));
+
+        mockMvc.perform(put("/api/v1/accounts/{id}", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Brokerage", "type": "brokerage", "institution": "Fidelity"}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
     void delete_existing_returns204() throws Exception {
         doNothing().when(accountService).delete(TENANT_ID, ACCOUNT_ID);
 
@@ -173,7 +188,7 @@ class AccountControllerTest {
                 new PortfolioDataPointDto(LocalDate.of(2025, 1, 3), new BigDecimal("1500.0000")),
                 new PortfolioDataPointDto(LocalDate.of(2025, 1, 10), new BigDecimal("1550.0000"))
         );
-        var response = new PortfolioHistoryResponse(ACCOUNT_ID, dataPoints, List.of("AAPL"), 2);
+        var response = new PortfolioHistoryResponse(ACCOUNT_ID, dataPoints, List.of("AAPL"), 2, false, null);
         when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID, 2))
                 .thenReturn(response);
 
