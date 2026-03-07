@@ -5,6 +5,7 @@ import { cardStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
+import HelpText from '../components/HelpText';
 import type { SpendingProfile, CreateSpendingProfileRequest, IncomeStream } from '../types/projection';
 
 const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
@@ -91,7 +92,12 @@ export default function SpendingProfilesPage() {
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>Spending Profiles</h2>
+                <div>
+                    <h2>Spending Profiles</h2>
+                    <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.25rem' }}>
+                        Spending profiles define your retirement cost of living. Attach one to a projection scenario to see whether your portfolio can sustain your planned lifestyle.
+                    </div>
+                </div>
                 <button
                     onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
                     style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
@@ -111,15 +117,20 @@ export default function SpendingProfilesPage() {
                         <div>
                             <label style={labelStyle}>Essential Expenses (annual)</label>
                             <input style={inputStyle} type="number" value={essentialExpenses} onChange={e => setEssentialExpenses(Number(e.target.value))} />
+                            <HelpText>Non-negotiable annual costs: housing, food, healthcare, insurance. Always fully funded — never reduced.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Discretionary Expenses (annual)</label>
                             <input style={inputStyle} type="number" value={discretionaryExpenses} onChange={e => setDiscretionaryExpenses(Number(e.target.value))} />
+                            <HelpText>Flexible annual spending: travel, entertainment, dining out. Reduced first if withdrawals fall short.</HelpText>
                         </div>
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                        <h4>Income Streams</h4>
+                        <div>
+                            <h4>Income Streams</h4>
+                            <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.15rem' }}>Non-portfolio income sources that reduce how much you need to withdraw from investments.</div>
+                        </div>
                         <button
                             onClick={() => setIncomeStreams(prev => [...prev, defaultIncomeStream()])}
                             style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
@@ -140,10 +151,12 @@ export default function SpendingProfilesPage() {
                             <div>
                                 <label style={labelStyle}>Start Age</label>
                                 <input style={inputStyle} type="number" value={stream.start_age} onChange={e => updateStream(idx, 'start_age', Number(e.target.value))} />
+                                <HelpText>Age when this income begins (e.g., 67 for Social Security).</HelpText>
                             </div>
                             <div>
                                 <label style={labelStyle}>End Age (blank = forever)</label>
                                 <input style={inputStyle} type="number" value={stream.end_age ?? ''} onChange={e => updateStream(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
+                                <HelpText>Leave blank if this income continues for life.</HelpText>
                             </div>
                             <div>
                                 <button
