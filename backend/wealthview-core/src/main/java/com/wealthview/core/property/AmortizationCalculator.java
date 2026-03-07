@@ -9,6 +9,8 @@ import java.time.temporal.ChronoUnit;
 public final class AmortizationCalculator {
 
     private static final MathContext MC = MathContext.DECIMAL128;
+    static final int MONTHS_PER_YEAR = 12;
+    private static final BigDecimal MONTHLY_RATE_DIVISOR = new BigDecimal(MONTHS_PER_YEAR * 100);
 
     private AmortizationCalculator() {
     }
@@ -44,7 +46,7 @@ public final class AmortizationCalculator {
             return remaining.max(BigDecimal.ZERO);
         }
 
-        var monthlyRate = annualRate.divide(new BigDecimal("1200"), MC);
+        var monthlyRate = annualRate.divide(MONTHLY_RATE_DIVISOR, MC);
         var onePlusR = BigDecimal.ONE.add(monthlyRate);
 
         var onePlusRtoN = pow(onePlusR, termMonths);

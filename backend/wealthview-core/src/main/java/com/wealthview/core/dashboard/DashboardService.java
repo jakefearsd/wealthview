@@ -112,7 +112,6 @@ public class DashboardService {
         var totalPropertyEquity = BigDecimal.ZERO;
         var properties = propertyRepository.findByTenant_Id(tenantId);
         for (var property : properties) {
-            // TODO: depreciation affects book value vs market value
             var effectiveBalance = computeEffectiveBalance(property);
             var equity = property.getCurrentValue().subtract(effectiveBalance);
             totalPropertyEquity = totalPropertyEquity.add(equity);
