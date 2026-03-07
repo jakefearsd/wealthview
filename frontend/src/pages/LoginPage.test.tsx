@@ -23,7 +23,7 @@ describe('LoginPage', () => {
     it('renders login form', () => {
         renderLoginPage();
         expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+        expect(screen.getByLabelText('Password')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
     });
 
@@ -37,13 +37,27 @@ describe('LoginPage', () => {
         const user = userEvent.setup();
 
         const emailInput = screen.getByLabelText(/email/i);
-        const passwordInput = screen.getByLabelText(/password/i);
+        const passwordInput = screen.getByLabelText('Password');
 
         await user.type(emailInput, 'test@example.com');
         await user.type(passwordInput, 'password123');
 
         expect(emailInput).toHaveValue('test@example.com');
         expect(passwordInput).toHaveValue('password123');
+    });
+
+    it('toggles password visibility', async () => {
+        renderLoginPage();
+        const user = userEvent.setup();
+
+        const passwordInput = screen.getByLabelText('Password');
+        expect(passwordInput).toHaveAttribute('type', 'password');
+
+        await user.click(screen.getByRole('button', { name: /show password/i }));
+        expect(passwordInput).toHaveAttribute('type', 'text');
+
+        await user.click(screen.getByRole('button', { name: /hide password/i }));
+        expect(passwordInput).toHaveAttribute('type', 'password');
     });
 
     it('shows error on failed login', async () => {
@@ -56,7 +70,7 @@ describe('LoginPage', () => {
         const user = userEvent.setup();
 
         await user.type(screen.getByLabelText(/email/i), 'test@example.com');
-        await user.type(screen.getByLabelText(/password/i), 'wrong');
+        await user.type(screen.getByLabelText('Password'), 'wrong');
         await user.click(screen.getByRole('button', { name: /sign in/i }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Invalid credentials');
