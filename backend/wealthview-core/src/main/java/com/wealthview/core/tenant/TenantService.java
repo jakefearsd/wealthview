@@ -2,9 +2,11 @@ package com.wealthview.core.tenant;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.UserRepository;
@@ -25,13 +27,16 @@ public class TenantService {
     private final TenantRepository tenantRepository;
     private final InviteCodeRepository inviteCodeRepository;
     private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
 
     public TenantService(TenantRepository tenantRepository,
                          InviteCodeRepository inviteCodeRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository,
+                         AccountRepository accountRepository) {
         this.tenantRepository = tenantRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.userRepository = userRepository;
+        this.accountRepository = accountRepository;
     }
 
     @Transactional
@@ -44,6 +49,37 @@ public class TenantService {
     @Transactional(readOnly = true)
     public List<TenantEntity> getAllTenants() {
         return tenantRepository.findAll();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TenantDetailResponse> getAllTenantDetails() {
+        return tenantRepository.findAll().stream()
+                .map(this::toDetailResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public TenantDetailResponse getTenantDetail(UUID tenantId) {
+        var tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+        return toDetailResponse(tenant);
+    }
+
+    @Transactional
+    public void setTenantActive(UUID tenantId, boolean active) {
+        var tenant = tenantRepository.findById(tenantId)
+                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+        tenant.setActive(active);
+        tenantRepository.save(tenant);
+        log.info("Tenant {} set active={}", tenantId, active);
+    }
+
+    private TenantDetailResponse toDetailResponse(TenantEntity tenant) {
+        var userCount = userRepository.countByTenant_Id(tenant.getId());
+        var accountCount = accountRepository.countByTenant_Id(tenant.getId());
+        return new TenantDetailResponse(
+                tenant.getId(), tenant.getName(), tenant.isActive(),
+                userCount, accountCount, tenant.getCreatedAt());
     }
 
     @Transactional
