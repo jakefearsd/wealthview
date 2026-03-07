@@ -12,6 +12,7 @@ export interface Property {
     loan_start_date: string | null;
     has_loan_details: boolean;
     use_computed_balance: boolean;
+    property_type: string;
 }
 
 export interface PropertyRequest {
@@ -25,6 +26,7 @@ export interface PropertyRequest {
     loan_term_months?: number;
     loan_start_date?: string;
     use_computed_balance?: boolean;
+    property_type?: string;
 }
 
 export interface PropertyIncomeRequest {
@@ -53,4 +55,33 @@ export interface PropertyValuation {
     valuation_date: string;
     value: number;
     source: string;
+}
+
+export interface MortgageProgress {
+    original_loan_amount: number;
+    current_balance: number;
+    principal_paid: number;
+    percent_paid_off: number;
+    estimated_payoff_date: string;
+    months_remaining: number;
+}
+
+export interface EquityGrowthPoint {
+    month: string;
+    equity: number;
+    property_value: number;
+    mortgage_balance: number;
+}
+
+export interface PropertyAnalyticsResponse {
+    property_type: string;
+    total_appreciation: number;
+    appreciation_percent: number;
+    mortgage_progress: MortgageProgress | null;
+    equity_growth: EquityGrowthPoint[];
+    cap_rate: number | null;
+    annual_noi: number | null;
+    cash_on_cash_return: number | null;
+    annual_net_cash_flow: number | null;
+    total_cash_invested: number | null;
 }

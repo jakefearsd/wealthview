@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation } from '../api/properties';
+import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, getPropertyAnalytics } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -43,6 +43,7 @@ export default function PropertyDetailPage() {
     const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
+    const { data: analytics } = useApiQuery(() => getPropertyAnalytics(id!));
 
     async function handleAddIncome(data: { date: string; amount: number; category: string; description?: string }) {
         try {
@@ -105,7 +106,15 @@ export default function PropertyDetailPage() {
 
             {property && (
                 <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-                    <h2 style={{ marginBottom: '1rem' }}>{property.address}</h2>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+                        <h2>{property.address}</h2>
+                        <span style={badgeStyle(
+                            property.property_type === 'investment' ? '#e65100' : property.property_type === 'vacation' ? '#1b5e20' : '#1565c0',
+                            property.property_type === 'investment' ? '#fff3e0' : property.property_type === 'vacation' ? '#e8f5e9' : '#e3f2fd'
+                        )}>
+                            {property.property_type === 'primary_residence' ? 'Primary Residence' : property.property_type === 'investment' ? 'Investment' : 'Vacation'}
+                        </span>
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                         <div><div style={{ color: '#666', fontSize: '0.85rem' }}>Purchase Price</div><div style={{ fontWeight: 600 }}>{formatCurrency(property.purchase_price)}</div></div>
                         <div><div style={{ color: '#666', fontSize: '0.85rem' }}>Current Value</div><div style={{ fontWeight: 600 }}>{formatCurrency(property.current_value)}</div></div>
@@ -132,6 +141,110 @@ export default function PropertyDetailPage() {
                             </div>
                         </div>
                     )}
+                </div>
+            )}
+
+            {analytics && (
+                <div style={{ ...cardStyle, marginBottom: '2rem' }}>
+                    <h3 style={{ marginBottom: '1rem' }}>Property Overview</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Total Appreciation</div>
+                            <div style={{ fontWeight: 600, color: analytics.total_appreciation >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                {formatCurrency(analytics.total_appreciation)}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Appreciation %</div>
+                            <div style={{ fontWeight: 600, color: analytics.appreciation_percent >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                {analytics.appreciation_percent.toFixed(2)}%
+                            </div>
+                        </div>
+                        {analytics.mortgage_progress && (
+                            <div>
+                                <div style={{ color: '#666', fontSize: '0.85rem' }}>Months Remaining</div>
+                                <div style={{ fontWeight: 600 }}>{analytics.mortgage_progress.months_remaining}</div>
+                            </div>
+                        )}
+                    </div>
+
+                    {analytics.mortgage_progress && (
+                        <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                            <h4 style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>Mortgage Payoff Progress</h4>
+                            <div style={{ background: '#e0e0e0', borderRadius: '4px', height: '24px', marginBottom: '0.75rem', position: 'relative' as const }}>
+                                <div style={{
+                                    background: '#1976d2',
+                                    height: '100%',
+                                    borderRadius: '4px',
+                                    width: `${Math.min(analytics.mortgage_progress.percent_paid_off, 100)}%`,
+                                    transition: 'width 0.3s',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: '#fff',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                }}>
+                                    {analytics.mortgage_progress.percent_paid_off.toFixed(1)}%
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', fontSize: '0.85rem' }}>
+                                <div><span style={{ color: '#666' }}>Principal Paid:</span> {formatCurrency(analytics.mortgage_progress.principal_paid)}</div>
+                                <div><span style={{ color: '#666' }}>Balance:</span> {formatCurrency(analytics.mortgage_progress.current_balance)}</div>
+                                <div><span style={{ color: '#666' }}>Payoff Date:</span> {analytics.mortgage_progress.estimated_payoff_date}</div>
+                                <div><span style={{ color: '#666' }}>Remaining:</span> {analytics.mortgage_progress.months_remaining} months</div>
+                            </div>
+                        </div>
+                    )}
+
+                    {analytics.equity_growth.length > 0 && (
+                        <div>
+                            <h4 style={{ marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>Equity Growth</h4>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={analytics.equity_growth}>
+                                    <XAxis dataKey="month" />
+                                    <YAxis />
+                                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="equity" name="Equity" stroke="#2e7d32" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="property_value" name="Property Value" stroke="#1976d2" strokeWidth={1} strokeDasharray="5 5" dot={false} />
+                                    <Line type="monotone" dataKey="mortgage_balance" name="Mortgage" stroke="#d32f2f" strokeWidth={1} strokeDasharray="5 5" dot={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {analytics && analytics.property_type === 'investment' && analytics.cap_rate !== null && (
+                <div style={{ ...cardStyle, marginBottom: '2rem' }}>
+                    <h3 style={{ marginBottom: '1rem' }}>Investment Metrics</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem' }}>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Cap Rate</div>
+                            <div style={{ fontWeight: 600, fontSize: '1.2rem' }}>{analytics.cap_rate!.toFixed(2)}%</div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash-on-Cash Return</div>
+                            <div style={{ fontWeight: 600, fontSize: '1.2rem', color: analytics.cash_on_cash_return! >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                {analytics.cash_on_cash_return!.toFixed(2)}%
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Annual NOI</div>
+                            <div style={{ fontWeight: 600 }}>{formatCurrency(analytics.annual_noi!)}</div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Net Cash Flow</div>
+                            <div style={{ fontWeight: 600, color: analytics.annual_net_cash_flow! >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                {formatCurrency(analytics.annual_net_cash_flow!)}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ color: '#666', fontSize: '0.85rem' }}>Cash Invested</div>
+                            <div style={{ fontWeight: 600 }}>{formatCurrency(analytics.total_cash_invested!)}</div>
+                        </div>
+                    </div>
                 </div>
             )}
 
