@@ -4,6 +4,7 @@ import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import SummaryCard from '../components/SummaryCard';
+import CombinedPortfolioChart from '../components/CombinedPortfolioChart';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
 
@@ -24,6 +25,8 @@ export default function DashboardPage() {
                 <SummaryCard label="Cash" value={formatCurrency(data.total_cash)} />
                 <SummaryCard label="Property Equity" value={formatCurrency(data.total_property_equity)} />
             </div>
+
+            <CombinedPortfolioChart />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div style={cardStyle}>
