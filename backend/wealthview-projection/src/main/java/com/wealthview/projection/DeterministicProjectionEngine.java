@@ -153,16 +153,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         Map<String, List<ProjectionAccountEntity>> grouped = accounts.stream()
                 .collect(Collectors.groupingBy(ProjectionAccountEntity::getAccountType));
 
-        BigDecimal tradBalance = sumInitialBalances(grouped.getOrDefault("traditional", List.of()));
-        BigDecimal rothBalance = sumInitialBalances(grouped.getOrDefault("roth", List.of()));
-        BigDecimal taxableBalance = sumInitialBalances(grouped.getOrDefault("taxable", List.of()));
+        var balances = new PoolBalances(
+                sumInitialBalances(grouped.getOrDefault("taxable", List.of())),
+                sumInitialBalances(grouped.getOrDefault("traditional", List.of())),
+                sumInitialBalances(grouped.getOrDefault("roth", List.of())));
 
         BigDecimal tradContrib = sumContributions(grouped.getOrDefault("traditional", List.of()));
         BigDecimal rothContrib = sumContributions(grouped.getOrDefault("roth", List.of()));
         BigDecimal taxableContrib = sumContributions(grouped.getOrDefault("taxable", List.of()));
 
-        BigDecimal totalBalance = tradBalance.add(rothBalance).add(taxableBalance);
-        BigDecimal weightedReturn = computeWeightedReturn(accounts, totalBalance);
+        BigDecimal weightedReturn = computeWeightedReturn(accounts, balances.total());
 
         FilingStatus filingStatus = params.filingStatus != null
                 ? FilingStatus.fromString(params.filingStatus) : FilingStatus.SINGLE;
@@ -177,114 +177,50 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         for (int year = currentYear; year < endYear; year++) {
             int age = year - birthYear;
             boolean retired = year >= retirementYear;
-            BigDecimal startAgg = tradBalance.add(rothBalance).add(taxableBalance);
+            BigDecimal startAgg = balances.total();
 
             BigDecimal contributions = BigDecimal.ZERO;
             BigDecimal withdrawals = BigDecimal.ZERO;
             BigDecimal conversionAmount = BigDecimal.ZERO;
             BigDecimal taxLiability = BigDecimal.ZERO;
 
-            // Pre-retirement contributions
             if (!retired) {
-                tradBalance = tradBalance.add(tradContrib);
-                rothBalance = rothBalance.add(rothContrib);
-                taxableBalance = taxableBalance.add(taxableContrib);
-                contributions = tradContrib.add(rothContrib).add(taxableContrib);
+                contributions = applyContributions(balances, tradContrib, rothContrib, taxableContrib);
             }
 
-            // Growth per pool
-            BigDecimal tradGrowth = tradBalance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            BigDecimal rothGrowth = rothBalance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            BigDecimal taxableGrowth = taxableBalance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            tradBalance = tradBalance.add(tradGrowth);
-            rothBalance = rothBalance.add(rothGrowth);
-            taxableBalance = taxableBalance.add(taxableGrowth);
-            BigDecimal totalGrowth = tradGrowth.add(rothGrowth).add(taxableGrowth);
+            BigDecimal totalGrowth = applyGrowth(balances, weightedReturn);
 
-            // Roth conversion
-            if (annualRothConversion.compareTo(BigDecimal.ZERO) > 0 && tradBalance.compareTo(BigDecimal.ZERO) > 0) {
-                conversionAmount = annualRothConversion.min(tradBalance);
-                tradBalance = tradBalance.subtract(conversionAmount);
-                rothBalance = rothBalance.add(conversionAmount);
+            var conversion = executeRothConversion(
+                    balances, annualRothConversion, year, filingStatus, otherIncome);
+            conversionAmount = conversion.amountConverted();
+            taxLiability = conversion.taxLiability();
 
-                // Tax on conversion + other income
-                if (taxCalculator != null) {
-                    BigDecimal taxableIncome = conversionAmount.add(otherIncome);
-                    taxLiability = taxCalculator.computeTax(taxableIncome, year, filingStatus);
-
-                    // Deduct tax from taxable pool first, then traditional if insufficient
-                    if (taxableBalance.compareTo(taxLiability) >= 0) {
-                        taxableBalance = taxableBalance.subtract(taxLiability);
-                    } else {
-                        BigDecimal shortfall = taxLiability.subtract(taxableBalance);
-                        taxableBalance = BigDecimal.ZERO;
-                        tradBalance = tradBalance.subtract(shortfall).max(BigDecimal.ZERO);
-                    }
-                }
-            }
-
-            // Withdrawals in retirement
             if (retired) {
                 yearsInRetirement++;
-                BigDecimal aggBalance = tradBalance.add(rothBalance).add(taxableBalance);
+                BigDecimal aggBalance = balances.total();
                 var ctx = new WithdrawalContext(
                         aggBalance, startAgg, previousWithdrawal, weightedReturn,
                         inflationRate, yearsInRetirement);
                 withdrawals = strategy.computeWithdrawal(ctx);
-
                 if (withdrawals.compareTo(aggBalance) > 0) {
                     withdrawals = aggBalance;
                 }
 
-                // Withdrawal ordering: taxable -> traditional -> roth
-                BigDecimal remaining = withdrawals;
-
-                BigDecimal fromTaxable = remaining.min(taxableBalance);
-                taxableBalance = taxableBalance.subtract(fromTaxable);
-                remaining = remaining.subtract(fromTaxable);
-
-                BigDecimal fromTraditional = remaining.min(tradBalance);
-                tradBalance = tradBalance.subtract(fromTraditional);
-                remaining = remaining.subtract(fromTraditional);
-
-                // Tax on traditional withdrawals
-                if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                    BigDecimal withdrawalTax = taxCalculator.computeTax(
-                            fromTraditional.add(otherIncome), year, filingStatus);
-                    taxLiability = taxLiability.add(withdrawalTax);
-
-                    // Deduct withdrawal tax from taxable, then traditional, then roth
-                    if (taxableBalance.compareTo(withdrawalTax) >= 0) {
-                        taxableBalance = taxableBalance.subtract(withdrawalTax);
-                    } else {
-                        BigDecimal shortfall = withdrawalTax.subtract(taxableBalance);
-                        taxableBalance = BigDecimal.ZERO;
-                        if (tradBalance.compareTo(shortfall) >= 0) {
-                            tradBalance = tradBalance.subtract(shortfall);
-                        } else {
-                            shortfall = shortfall.subtract(tradBalance);
-                            tradBalance = BigDecimal.ZERO;
-                            rothBalance = rothBalance.subtract(shortfall).max(BigDecimal.ZERO);
-                        }
-                    }
-                }
-
-                BigDecimal fromRoth = remaining.min(rothBalance);
-                rothBalance = rothBalance.subtract(fromRoth);
+                var withdrawalResult = executeWithdrawals(
+                        balances, withdrawals, year, filingStatus, otherIncome, conversionAmount);
+                withdrawals = withdrawalResult.totalWithdrawn();
+                taxLiability = taxLiability.add(withdrawalResult.taxLiability());
 
                 previousWithdrawal = withdrawals;
             }
 
-            // Floor at zero
-            tradBalance = tradBalance.max(BigDecimal.ZERO);
-            rothBalance = rothBalance.max(BigDecimal.ZERO);
-            taxableBalance = taxableBalance.max(BigDecimal.ZERO);
+            balances.floorAtZero();
 
-            BigDecimal endAgg = tradBalance.add(rothBalance).add(taxableBalance);
+            BigDecimal endAgg = balances.total();
 
             var yearDto = new ProjectionYearDto(
                     year, age, startAgg, contributions, totalGrowth, withdrawals, endAgg, retired,
-                    tradBalance, rothBalance, taxableBalance,
+                    balances.traditional, balances.roth, balances.taxable,
                     conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null,
                     taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
                     null, null, null, null, null, null);
@@ -292,7 +228,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
-                ? tradBalance.add(rothBalance).add(taxableBalance)
+                ? balances.total()
                 : yearlyData.getLast().endBalance();
 
         log.info("Projection with pools for scenario '{}': {} years, final balance {}",
@@ -399,6 +335,28 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal annualRothConversion) {
     }
 
+    private static class PoolBalances {
+        BigDecimal taxable;
+        BigDecimal traditional;
+        BigDecimal roth;
+
+        PoolBalances(BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
+            this.taxable = taxable;
+            this.traditional = traditional;
+            this.roth = roth;
+        }
+
+        BigDecimal total() {
+            return taxable.add(traditional).add(roth);
+        }
+
+        void floorAtZero() {
+            taxable = taxable.max(BigDecimal.ZERO);
+            traditional = traditional.max(BigDecimal.ZERO);
+            roth = roth.max(BigDecimal.ZERO);
+        }
+    }
+
     private record IncomeStreamData(
             String name,
             BigDecimal annualAmount,
@@ -411,6 +369,94 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal discretionaryExpenses,
             List<IncomeStreamData> incomeStreams) {
     }
+
+    private BigDecimal applyContributions(PoolBalances balances,
+                                          BigDecimal tradContrib, BigDecimal rothContrib, BigDecimal taxableContrib) {
+        balances.traditional = balances.traditional.add(tradContrib);
+        balances.roth = balances.roth.add(rothContrib);
+        balances.taxable = balances.taxable.add(taxableContrib);
+        return tradContrib.add(rothContrib).add(taxableContrib);
+    }
+
+    private BigDecimal applyGrowth(PoolBalances balances, BigDecimal weightedReturn) {
+        BigDecimal tradGrowth = balances.traditional.multiply(weightedReturn).setScale(SCALE, ROUNDING);
+        BigDecimal rothGrowth = balances.roth.multiply(weightedReturn).setScale(SCALE, ROUNDING);
+        BigDecimal taxableGrowth = balances.taxable.multiply(weightedReturn).setScale(SCALE, ROUNDING);
+        balances.traditional = balances.traditional.add(tradGrowth);
+        balances.roth = balances.roth.add(rothGrowth);
+        balances.taxable = balances.taxable.add(taxableGrowth);
+        return tradGrowth.add(rothGrowth).add(taxableGrowth);
+    }
+
+    private void deductFromPools(PoolBalances balances, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal remaining = amount;
+
+        BigDecimal fromTaxable = remaining.min(balances.taxable);
+        balances.taxable = balances.taxable.subtract(fromTaxable);
+        remaining = remaining.subtract(fromTaxable);
+
+        BigDecimal fromTraditional = remaining.min(balances.traditional);
+        balances.traditional = balances.traditional.subtract(fromTraditional);
+        remaining = remaining.subtract(fromTraditional);
+
+        balances.roth = balances.roth.subtract(remaining);
+    }
+
+    private record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability) {}
+
+    private ConversionResult executeRothConversion(PoolBalances balances, BigDecimal conversionLimit,
+                                                    int year, FilingStatus filingStatus, BigDecimal otherIncome) {
+        if (conversionLimit.compareTo(BigDecimal.ZERO) <= 0
+                || balances.traditional.compareTo(BigDecimal.ZERO) <= 0) {
+            return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        BigDecimal actual = conversionLimit.min(balances.traditional);
+        balances.traditional = balances.traditional.subtract(actual);
+        balances.roth = balances.roth.add(actual);
+
+        if (taxCalculator != null) {
+            BigDecimal taxableIncome = actual.add(otherIncome);
+            BigDecimal tax = taxCalculator.computeTax(taxableIncome, year, filingStatus);
+            deductFromPools(balances, tax);
+            return new ConversionResult(actual, tax);
+        }
+        return new ConversionResult(actual, BigDecimal.ZERO);
+    }
+
+    private WithdrawalTaxResult executeWithdrawals(PoolBalances balances, BigDecimal totalNeed,
+                                                    int year, FilingStatus filingStatus,
+                                                    BigDecimal otherIncome, BigDecimal rothConversionAmount) {
+        if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
+            return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+        BigDecimal remaining = totalNeed;
+
+        BigDecimal fromTaxable = remaining.min(balances.taxable);
+        balances.taxable = balances.taxable.subtract(fromTaxable);
+        remaining = remaining.subtract(fromTaxable);
+
+        BigDecimal fromTraditional = remaining.min(balances.traditional);
+        balances.traditional = balances.traditional.subtract(fromTraditional);
+        remaining = remaining.subtract(fromTraditional);
+
+        BigDecimal withdrawalTax = BigDecimal.ZERO;
+        if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
+            withdrawalTax = taxCalculator.computeTax(
+                    fromTraditional.add(otherIncome), year, filingStatus);
+            deductFromPools(balances, withdrawalTax);
+        }
+
+        BigDecimal fromRoth = remaining.min(balances.roth);
+        balances.roth = balances.roth.subtract(fromRoth);
+
+        return new WithdrawalTaxResult(
+                fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax);
+    }
+
+    private record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability) {}
 
     private SpendingData loadSpendingData(SpendingProfileEntity profile) {
         if (profile == null) {
