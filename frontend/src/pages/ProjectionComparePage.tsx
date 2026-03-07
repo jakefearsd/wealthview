@@ -148,7 +148,7 @@ export default function ProjectionComparePage() {
                             </thead>
                             <tbody>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Final Balance</td>
+                                    <td style={{ padding: '0.5rem' }}>Final Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Portfolio value at projection end</span></td>
                                     {result.results.map((r, i) => (
                                         <td key={i} style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: r.final_balance > 0 ? '#2e7d32' : '#d32f2f' }}>
                                             {formatCurrency(r.final_balance)}
@@ -156,7 +156,7 @@ export default function ProjectionComparePage() {
                                     ))}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Peak Balance</td>
+                                    <td style={{ padding: '0.5rem' }}>Peak Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Highest value reached</span></td>
                                     {result.results.map((r, i) => {
                                         const peak = findPeakBalance(r.yearly_data);
                                         return (
@@ -167,7 +167,7 @@ export default function ProjectionComparePage() {
                                     })}
                                 </tr>
                                 <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Depletion Year</td>
+                                    <td style={{ padding: '0.5rem' }}>Depletion Year<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Year portfolio reaches $0</span></td>
                                     {result.results.map((r, i) => {
                                         const depletion = findDepletionYear(r.yearly_data);
                                         return (
@@ -178,7 +178,7 @@ export default function ProjectionComparePage() {
                                     })}
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '0.5rem' }}>Years in Retirement</td>
+                                    <td style={{ padding: '0.5rem' }}>Years in Retirement<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Retirement to projection end</span></td>
                                     {result.results.map((r, i) => (
                                         <td key={i} style={{ padding: '0.5rem', textAlign: 'right' }}>
                                             {r.years_in_retirement}
