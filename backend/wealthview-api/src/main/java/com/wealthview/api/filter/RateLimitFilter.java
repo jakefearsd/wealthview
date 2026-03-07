@@ -1,0 +1,66 @@
+package com.wealthview.api.filter;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
+
+@Component
+public class RateLimitFilter extends OncePerRequestFilter {
+
+    private static final int API_LIMIT = 100;
+    private static final int AUTH_LIMIT = 10;
+    private static final long WINDOW_MS = 60_000;
+
+    private final ConcurrentHashMap<String, RateWindow> windows = new ConcurrentHashMap<>();
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+                                     FilterChain filterChain) throws ServletException, IOException {
+        var path = request.getRequestURI();
+        if (!path.startsWith("/api/")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        var ip = getClientIp(request);
+        var isAuth = path.startsWith("/api/v1/auth/");
+        var key = ip + (isAuth ? ":auth" : ":api");
+        var limit = isAuth ? AUTH_LIMIT : API_LIMIT;
+
+        var window = windows.compute(key, (k, existing) -> {
+            long now = System.currentTimeMillis();
+            if (existing == null || now - existing.startTime > WINDOW_MS) {
+                return new RateWindow(now, new AtomicInteger(1));
+            }
+            existing.count.incrementAndGet();
+            return existing;
+        });
+
+        if (window.count.get() > limit) {
+            response.setStatus(429);
+            response.setContentType("application/json");
+            response.getWriter().write("""
+                    {"error":"RATE_LIMITED","message":"Too many requests","status":429}""");
+            return;
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String getClientIp(HttpServletRequest request) {
+        var forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isEmpty()) {
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
+    }
+
+    private record RateWindow(long startTime, AtomicInteger count) {}
+}
