@@ -29,7 +29,9 @@ export async function deleteAccount(id: string): Promise<void> {
     await client.delete(`/accounts/${id}`);
 }
 
-export async function getTheoreticalHistory(accountId: string): Promise<PortfolioHistory> {
-    const { data } = await client.get<PortfolioHistory>(`/accounts/${accountId}/theoretical-history`);
+export async function getTheoreticalHistory(accountId: string, years = 2): Promise<PortfolioHistory> {
+    const { data } = await client.get<PortfolioHistory>(`/accounts/${accountId}/theoretical-history`, {
+        params: { years },
+    });
     return data;
 }

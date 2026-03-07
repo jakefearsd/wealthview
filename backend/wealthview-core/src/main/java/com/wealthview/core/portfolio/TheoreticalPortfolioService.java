@@ -30,7 +30,8 @@ import java.util.stream.Collectors;
 public class TheoreticalPortfolioService {
 
     private static final Logger log = LoggerFactory.getLogger(TheoreticalPortfolioService.class);
-    private static final int HISTORY_YEARS = 2;
+    private static final int MIN_YEARS = 1;
+    private static final int MAX_YEARS = 10;
 
     private final AccountRepository accountRepository;
     private final HoldingRepository holdingRepository;
@@ -45,7 +46,8 @@ public class TheoreticalPortfolioService {
     }
 
     @Transactional(readOnly = true)
-    public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId) {
+    public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId, int years) {
+        var clampedYears = Math.max(MIN_YEARS, Math.min(MAX_YEARS, years));
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
@@ -72,7 +74,7 @@ public class TheoreticalPortfolioService {
                 .collect(Collectors.toMap(HoldingEntity::getSymbol, HoldingEntity::getQuantity));
 
         var endDate = LocalDate.now();
-        var startDate = endDate.minusYears(HISTORY_YEARS);
+        var startDate = endDate.minusYears(clampedYears);
 
         var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
                 symbols, startDate, endDate);
