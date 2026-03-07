@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listProperties, createProperty, deleteProperty } from '../api/properties';
+import { listProperties, createProperty, updateProperty, deleteProperty } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import PropertyForm from '../components/PropertyForm';
+import type { Property } from '../types/property';
 
 function formatCurrency(value: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -13,7 +15,8 @@ export default function PropertiesListPage() {
     const { role } = useAuth();
     const canWrite = role === 'admin' || role === 'member';
     const { data: properties, loading, error, refetch } = useApiQuery(listProperties);
-    const [showCreate, setShowCreate] = useState(false);
+    const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [address, setAddress] = useState('');
     const [purchasePrice, setPurchasePrice] = useState('');
     const [purchaseDate, setPurchaseDate] = useState('');
@@ -40,31 +43,55 @@ export default function PropertiesListPage() {
         setLoanStartDate('');
         setUseComputedBalance(false);
         setPropertyType('primary_residence');
+        setEditingId(null);
+        setShowForm(false);
     }
 
-    async function handleCreate() {
+    function startEdit(property: Property) {
+        setAddress(property.address);
+        setPurchasePrice(String(property.purchase_price));
+        setPurchaseDate(property.purchase_date);
+        setCurrentValue(String(property.current_value));
+        setMortgageBalance(property.mortgage_balance ? String(property.mortgage_balance) : '');
+        setShowLoanDetails(property.has_loan_details);
+        setLoanAmount(property.loan_amount != null ? String(property.loan_amount) : '');
+        setAnnualInterestRate(property.annual_interest_rate != null ? String(property.annual_interest_rate) : '');
+        setLoanTermMonths(property.loan_term_months != null ? String(property.loan_term_months) : '');
+        setLoanStartDate(property.loan_start_date ?? '');
+        setUseComputedBalance(property.use_computed_balance);
+        setPropertyType(property.property_type);
+        setEditingId(property.id);
+        setShowForm(true);
+    }
+
+    async function handleSave() {
+        const request = {
+            address,
+            purchase_price: parseFloat(purchasePrice),
+            purchase_date: purchaseDate,
+            current_value: parseFloat(currentValue),
+            mortgage_balance: mortgageBalance ? parseFloat(mortgageBalance) : undefined,
+            property_type: propertyType,
+            ...(showLoanDetails && loanAmount ? {
+                loan_amount: parseFloat(loanAmount),
+                annual_interest_rate: parseFloat(annualInterestRate),
+                loan_term_months: parseInt(loanTermMonths),
+                loan_start_date: loanStartDate,
+                use_computed_balance: useComputedBalance,
+            } : {}),
+        };
         try {
-            await createProperty({
-                address,
-                purchase_price: parseFloat(purchasePrice),
-                purchase_date: purchaseDate,
-                current_value: parseFloat(currentValue),
-                mortgage_balance: mortgageBalance ? parseFloat(mortgageBalance) : undefined,
-                property_type: propertyType,
-                ...(showLoanDetails && loanAmount ? {
-                    loan_amount: parseFloat(loanAmount),
-                    annual_interest_rate: parseFloat(annualInterestRate),
-                    loan_term_months: parseInt(loanTermMonths),
-                    loan_start_date: loanStartDate,
-                    use_computed_balance: useComputedBalance,
-                } : {}),
-            });
-            toast.success('Property created');
-            setShowCreate(false);
+            if (editingId) {
+                await updateProperty(editingId, request);
+                toast.success('Property updated');
+            } else {
+                await createProperty(request);
+                toast.success('Property created');
+            }
             resetForm();
             refetch();
         } catch {
-            toast.error('Failed to create property');
+            toast.error(editingId ? 'Failed to update property' : 'Failed to create property');
         }
     }
 
@@ -82,61 +109,32 @@ export default function PropertiesListPage() {
     if (loading) return <div>Loading properties...</div>;
     if (error) return <div style={{ color: '#d32f2f' }}>Error: {error}</div>;
 
-    const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' };
-
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>Properties</h2>
-                {canWrite && <button onClick={() => setShowCreate(true)} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>New Property</button>}
+                {canWrite && <button onClick={() => setShowForm(true)} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>New Property</button>}
             </div>
 
-            {showCreate && (
-                <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Create Property</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <input placeholder="Address" value={address} onChange={(e) => setAddress(e.target.value)} style={inputStyle} />
-                        <input placeholder="Purchase Price" type="number" value={purchasePrice} onChange={(e) => setPurchasePrice(e.target.value)} style={inputStyle} />
-                        <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} style={inputStyle} />
-                        <input placeholder="Current Value" type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} style={inputStyle} />
-                        <input placeholder="Mortgage Balance" type="number" value={mortgageBalance} onChange={(e) => setMortgageBalance(e.target.value)} style={inputStyle} />
-                        <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} style={inputStyle}>
-                            <option value="primary_residence">Primary Residence</option>
-                            <option value="investment">Investment</option>
-                            <option value="vacation">Vacation</option>
-                        </select>
-                    </div>
-
-                    <div style={{ marginTop: '1rem' }}>
-                        <button
-                            onClick={() => setShowLoanDetails(!showLoanDetails)}
-                            style={{ padding: '0.4rem 0.8rem', background: 'none', border: '1px solid #999', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}
-                        >
-                            {showLoanDetails ? 'Hide' : 'Show'} Loan Details
-                        </button>
-                    </div>
-
-                    {showLoanDetails && (
-                        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
-                            <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Loan Details</h4>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                                <input placeholder="Loan Amount" type="number" value={loanAmount} onChange={(e) => setLoanAmount(e.target.value)} style={inputStyle} />
-                                <input placeholder="Annual Interest Rate (%)" type="number" step="0.01" value={annualInterestRate} onChange={(e) => setAnnualInterestRate(e.target.value)} style={inputStyle} />
-                                <input placeholder="Loan Term (months)" type="number" value={loanTermMonths} onChange={(e) => setLoanTermMonths(e.target.value)} style={inputStyle} />
-                                <input type="date" value={loanStartDate} onChange={(e) => setLoanStartDate(e.target.value)} style={inputStyle} />
-                            </div>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.9rem' }}>
-                                <input type="checkbox" checked={useComputedBalance} onChange={(e) => setUseComputedBalance(e.target.checked)} />
-                                Use computed mortgage balance (amortization)
-                            </label>
-                        </div>
-                    )}
-
-                    <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={handleCreate} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Create</button>
-                        <button onClick={() => { setShowCreate(false); resetForm(); }} style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
-                    </div>
-                </div>
+            {showForm && (
+                <PropertyForm
+                    heading={editingId ? 'Edit Property' : 'Create Property'}
+                    submitLabel={editingId ? 'Save' : 'Create'}
+                    address={address} onAddressChange={setAddress}
+                    purchasePrice={purchasePrice} onPurchasePriceChange={setPurchasePrice}
+                    purchaseDate={purchaseDate} onPurchaseDateChange={setPurchaseDate}
+                    currentValue={currentValue} onCurrentValueChange={setCurrentValue}
+                    mortgageBalance={mortgageBalance} onMortgageBalanceChange={setMortgageBalance}
+                    propertyType={propertyType} onPropertyTypeChange={setPropertyType}
+                    showLoanDetails={showLoanDetails} onShowLoanDetailsChange={setShowLoanDetails}
+                    loanAmount={loanAmount} onLoanAmountChange={setLoanAmount}
+                    annualInterestRate={annualInterestRate} onAnnualInterestRateChange={setAnnualInterestRate}
+                    loanTermMonths={loanTermMonths} onLoanTermMonthsChange={setLoanTermMonths}
+                    loanStartDate={loanStartDate} onLoanStartDateChange={setLoanStartDate}
+                    useComputedBalance={useComputedBalance} onUseComputedBalanceChange={setUseComputedBalance}
+                    onSubmit={handleSave}
+                    onCancel={resetForm}
+                />
             )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
@@ -158,7 +156,10 @@ export default function PropertiesListPage() {
                             </div>
                         </Link>
                         {canWrite && (
-                            <button onClick={() => handleDelete(p.id)} style={{ marginTop: '1rem', padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
+                            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                                <button onClick={() => startEdit(p)} style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
+                                <button onClick={() => handleDelete(p.id)} style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
+                            </div>
                         )}
                     </div>
                 ))}

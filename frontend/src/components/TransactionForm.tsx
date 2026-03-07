@@ -1,20 +1,21 @@
 import { useState } from 'react';
-import { createTransaction } from '../api/transactions';
-import type { TransactionRequest } from '../types/transaction';
+import { createTransaction, updateTransaction } from '../api/transactions';
+import type { Transaction, TransactionRequest } from '../types/transaction';
 import toast from 'react-hot-toast';
 
 interface Props {
     accountId: string;
     onSuccess: () => void;
     onCancel: () => void;
+    initialValues?: Transaction;
 }
 
-export default function TransactionForm({ accountId, onSuccess, onCancel }: Props) {
-    const [txnDate, setTxnDate] = useState('');
-    const [txnType, setTxnType] = useState('buy');
-    const [txnSymbol, setTxnSymbol] = useState('');
-    const [txnQuantity, setTxnQuantity] = useState('');
-    const [txnAmount, setTxnAmount] = useState('');
+export default function TransactionForm({ accountId, onSuccess, onCancel, initialValues }: Props) {
+    const [txnDate, setTxnDate] = useState(initialValues?.date ?? '');
+    const [txnType, setTxnType] = useState(initialValues?.type ?? 'buy');
+    const [txnSymbol, setTxnSymbol] = useState(initialValues?.symbol ?? '');
+    const [txnQuantity, setTxnQuantity] = useState(initialValues?.quantity != null ? String(initialValues.quantity) : '');
+    const [txnAmount, setTxnAmount] = useState(initialValues ? String(initialValues.amount) : '');
 
     async function handleSubmit() {
         const request: TransactionRequest = {
@@ -25,11 +26,16 @@ export default function TransactionForm({ accountId, onSuccess, onCancel }: Prop
             amount: parseFloat(txnAmount),
         };
         try {
-            await createTransaction(accountId, request);
-            toast.success('Transaction added');
+            if (initialValues) {
+                await updateTransaction(initialValues.id, request);
+                toast.success('Transaction updated');
+            } else {
+                await createTransaction(accountId, request);
+                toast.success('Transaction added');
+            }
             onSuccess();
         } catch {
-            toast.error('Failed to add transaction');
+            toast.error(initialValues ? 'Failed to update transaction' : 'Failed to add transaction');
         }
     }
 
