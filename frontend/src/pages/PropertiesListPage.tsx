@@ -25,6 +25,7 @@ export default function PropertiesListPage() {
     const [loanTermMonths, setLoanTermMonths] = useState('');
     const [loanStartDate, setLoanStartDate] = useState('');
     const [useComputedBalance, setUseComputedBalance] = useState(false);
+    const [propertyType, setPropertyType] = useState('primary_residence');
 
     function resetForm() {
         setAddress('');
@@ -38,6 +39,7 @@ export default function PropertiesListPage() {
         setLoanTermMonths('');
         setLoanStartDate('');
         setUseComputedBalance(false);
+        setPropertyType('primary_residence');
     }
 
     async function handleCreate() {
@@ -48,6 +50,7 @@ export default function PropertiesListPage() {
                 purchase_date: purchaseDate,
                 current_value: parseFloat(currentValue),
                 mortgage_balance: mortgageBalance ? parseFloat(mortgageBalance) : undefined,
+                property_type: propertyType,
                 ...(showLoanDetails && loanAmount ? {
                     loan_amount: parseFloat(loanAmount),
                     annual_interest_rate: parseFloat(annualInterestRate),
@@ -97,6 +100,11 @@ export default function PropertiesListPage() {
                         <input type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} style={inputStyle} />
                         <input placeholder="Current Value" type="number" value={currentValue} onChange={(e) => setCurrentValue(e.target.value)} style={inputStyle} />
                         <input placeholder="Mortgage Balance" type="number" value={mortgageBalance} onChange={(e) => setMortgageBalance(e.target.value)} style={inputStyle} />
+                        <select value={propertyType} onChange={(e) => setPropertyType(e.target.value)} style={inputStyle}>
+                            <option value="primary_residence">Primary Residence</option>
+                            <option value="investment">Investment</option>
+                            <option value="vacation">Vacation</option>
+                        </select>
                     </div>
 
                     <div style={{ marginTop: '1rem' }}>
@@ -140,9 +148,14 @@ export default function PropertiesListPage() {
                                 <div><span style={{ color: '#666' }}>Value:</span> {formatCurrency(p.current_value)}</div>
                                 <div><span style={{ color: '#666' }}>Equity:</span> {formatCurrency(p.equity)}</div>
                             </div>
-                            {p.use_computed_balance && (
-                                <span style={{ display: 'inline-block', marginTop: '0.5rem', padding: '0.15rem 0.5rem', background: '#e3f2fd', color: '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>Computed Balance</span>
-                            )}
+                            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                <span style={{ padding: '0.15rem 0.5rem', background: p.property_type === 'investment' ? '#fff3e0' : p.property_type === 'vacation' ? '#e8f5e9' : '#e3f2fd', color: p.property_type === 'investment' ? '#e65100' : p.property_type === 'vacation' ? '#2e7d32' : '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>
+                                    {p.property_type === 'primary_residence' ? 'Primary' : p.property_type === 'investment' ? 'Investment' : 'Vacation'}
+                                </span>
+                                {p.use_computed_balance && (
+                                    <span style={{ padding: '0.15rem 0.5rem', background: '#e3f2fd', color: '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>Computed Balance</span>
+                                )}
+                            </div>
                         </Link>
                         {canWrite && (
                             <button onClick={() => handleDelete(p.id)} style={{ marginTop: '1rem', padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>

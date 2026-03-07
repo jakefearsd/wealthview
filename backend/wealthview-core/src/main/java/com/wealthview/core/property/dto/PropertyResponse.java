@@ -19,7 +19,8 @@ public record PropertyResponse(
         Integer loanTermMonths,
         LocalDate loanStartDate,
         boolean hasLoanDetails,
-        boolean useComputedBalance
+        boolean useComputedBalance,
+        String propertyType
 ) {
     public static PropertyResponse from(PropertyEntity entity, BigDecimal effectiveMortgageBalance) {
         var equity = entity.getCurrentValue().subtract(effectiveMortgageBalance);
@@ -36,7 +37,8 @@ public record PropertyResponse(
                 entity.getLoanTermMonths(),
                 entity.getLoanStartDate(),
                 entity.hasLoanDetails(),
-                entity.isUseComputedBalance()
+                entity.isUseComputedBalance(),
+                entity.getPropertyType()
         );
     }
 }

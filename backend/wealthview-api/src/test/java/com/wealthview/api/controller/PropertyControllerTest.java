@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
@@ -58,6 +59,9 @@ class PropertyControllerTest {
     @MockBean
     private PropertyValuationService valuationService;
 
+    @MockBean
+    private PropertyAnalyticsService analyticsService;
+
     @MockBean(name = "propertyValuationSyncService")
     private PropertyValuationSyncService syncService;
 
@@ -71,7 +75,7 @@ class PropertyControllerTest {
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
                 new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("150000"),
-                null, null, null, null, false, false);
+                null, null, null, null, false, false, "primary_residence");
     }
 
     @Test
