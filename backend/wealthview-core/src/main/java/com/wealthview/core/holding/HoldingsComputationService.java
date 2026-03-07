@@ -44,7 +44,7 @@ public class HoldingsComputationService {
 
         var existingHolding = holdingRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
 
-        if (existingHolding.isPresent() && existingHolding.get().isManualOverride()) {
+        if (existingHolding.filter(HoldingEntity::isManualOverride).isPresent()) {
             log.warn("Skipping recomputation for account {} symbol {} — manual override exists",
                     account.getId(), symbol);
             return;
@@ -80,7 +80,7 @@ public class HoldingsComputationService {
         }
 
         if (existingHolding.isPresent()) {
-            var holding = existingHolding.get();
+            var holding = existingHolding.orElseThrow();
             holding.setQuantity(netQuantity);
             holding.setCostBasis(totalCost);
             holding.setAsOfDate(LocalDate.now());

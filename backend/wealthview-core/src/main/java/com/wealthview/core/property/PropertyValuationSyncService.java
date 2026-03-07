@@ -37,11 +37,12 @@ public class PropertyValuationSyncService {
 
         for (var property : properties) {
             try {
-                var result = valuationClient.getValuation(property.getAddress());
-                if (result.isPresent()) {
+                var resultOpt = valuationClient.getValuation(property.getAddress());
+                if (resultOpt.isPresent()) {
+                    var result = resultOpt.orElseThrow();
                     valuationService.recordValuation(
                             property.getTenantId(), property.getId(),
-                            result.get().date(), result.get().value(), "zillow");
+                            result.date(), result.value(), "zillow");
                     success++;
                 } else {
                     skipped++;
@@ -60,11 +61,12 @@ public class PropertyValuationSyncService {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
-        var result = valuationClient.getValuation(property.getAddress());
-        if (result.isPresent()) {
+        var resultOpt = valuationClient.getValuation(property.getAddress());
+        if (resultOpt.isPresent()) {
+            var result = resultOpt.orElseThrow();
             valuationService.recordValuation(tenantId, propertyId,
-                    result.get().date(), result.get().value(), "zillow");
-            log.info("Synced valuation for property {}: {}", propertyId, result.get().value());
+                    result.date(), result.value(), "zillow");
+            log.info("Synced valuation for property {}: {}", propertyId, result.value());
         } else {
             log.warn("No valuation available for property {}", propertyId);
         }
