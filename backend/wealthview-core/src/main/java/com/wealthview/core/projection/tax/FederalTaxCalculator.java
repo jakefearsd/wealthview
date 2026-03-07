@@ -60,6 +60,22 @@ public class FederalTaxCalculator {
         return totalTax.setScale(SCALE, ROUNDING);
     }
 
+    public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        var brackets = loadBrackets(taxYear, status);
+        if (brackets.isEmpty()) {
+            Integer maxYear = taxBracketRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                brackets = loadBrackets(maxYear, status);
+            }
+        }
+        for (var bracket : brackets) {
+            if (bracket.getRate().compareTo(targetRate) == 0) {
+                return bracket.getBracketCeiling() != null ? bracket.getBracketCeiling() : BigDecimal.ZERO;
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
     public void clearCache() {
         bracketCache.clear();
     }
