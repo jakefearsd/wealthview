@@ -41,7 +41,7 @@ public class PropertyValuationService {
 
         PropertyValuationEntity valuation;
         if (existing.isPresent()) {
-            valuation = existing.get();
+            valuation = existing.orElseThrow();
             valuation.setValue(value);
             valuation.setUpdatedAt(OffsetDateTime.now());
             log.info("Updated {} valuation for property {} on {}", source, propertyId, date);

@@ -45,13 +45,14 @@ public class PriceSyncService {
 
         for (var symbol : symbols) {
             try {
-                var quote = priceFeedClient.getQuote(symbol);
-                if (quote.isEmpty()) {
+                var quoteOpt = priceFeedClient.getQuote(symbol);
+                if (quoteOpt.isEmpty()) {
                     log.warn("No quote returned for symbol {}", symbol);
                     continue;
                 }
 
-                upsertPrice(symbol, LocalDate.now(), quote.get().currentPrice(), SOURCE_FINNHUB);
+                var quote = quoteOpt.orElseThrow();
+                upsertPrice(symbol, LocalDate.now(), quote.currentPrice(), SOURCE_FINNHUB);
                 sleepForRateLimit();
             } catch (Exception e) {
                 log.warn("Failed to sync price for symbol {}: {}", symbol, e.getMessage());
@@ -71,13 +72,14 @@ public class PriceSyncService {
         var to = LocalDate.now();
         var from = to.minusYears(2);
 
-        var candles = priceFeedClient.getCandles(symbol, from, to);
-        if (candles.isEmpty()) {
+        var candlesOpt = priceFeedClient.getCandles(symbol, from, to);
+        if (candlesOpt.isEmpty()) {
             log.warn("No candle data returned for symbol {}", symbol);
             return;
         }
 
-        for (var entry : candles.get().entries()) {
+        var candles = candlesOpt.orElseThrow();
+        for (var entry : candles.entries()) {
             try {
                 upsertPrice(symbol, entry.date(), entry.closePrice(), SOURCE_FINNHUB);
             } catch (Exception e) {
@@ -85,7 +87,7 @@ public class PriceSyncService {
             }
         }
 
-        log.info("Historical backfill complete for symbol {}: {} entries", symbol, candles.get().entries().size());
+        log.info("Historical backfill complete for symbol {}: {} entries", symbol, candles.entries().size());
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
@@ -98,7 +100,7 @@ public class PriceSyncService {
         var existing = priceRepository.findById(priceId);
 
         if (existing.isPresent()) {
-            var entity = existing.get();
+            var entity = existing.orElseThrow();
             entity.setClosePrice(closePrice);
             entity.setSource(source);
             priceRepository.save(entity);
