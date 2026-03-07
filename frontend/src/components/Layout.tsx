@@ -1,14 +1,15 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const navItems = [
-    { to: '/', label: 'Dashboard', adminOnly: false },
-    { to: '/accounts', label: 'Accounts', adminOnly: false },
-    { to: '/projections', label: 'Projections', adminOnly: false },
-    { to: '/spending-profiles', label: 'Spending Profiles', adminOnly: false },
-    { to: '/properties', label: 'Properties', adminOnly: false },
-    { to: '/prices', label: 'Prices', adminOnly: false },
-    { to: '/settings', label: 'Settings', adminOnly: true },
+const navItems: { to: string; label: string; requiredRole?: string }[] = [
+    { to: '/', label: 'Dashboard' },
+    { to: '/accounts', label: 'Accounts' },
+    { to: '/projections', label: 'Projections' },
+    { to: '/spending-profiles', label: 'Spending Profiles' },
+    { to: '/properties', label: 'Properties' },
+    { to: '/prices', label: 'Prices' },
+    { to: '/settings', label: 'Settings', requiredRole: 'admin' },
+    { to: '/admin', label: 'Admin', requiredRole: 'super_admin' },
 ];
 
 const navLinkStyle = ({ isActive }: { isActive: boolean }) => ({
@@ -37,7 +38,11 @@ export default function Layout() {
                     <h1 style={{ fontSize: '1.25rem', color: '#fff' }}>WealthView</h1>
                 </div>
                 {navItems
-                    .filter((item) => !item.adminOnly || role === 'admin')
+                    .filter((item) => {
+                        if (!item.requiredRole) return true;
+                        if (item.requiredRole === 'super_admin') return role === 'super_admin';
+                        return role === 'admin' || role === 'super_admin';
+                    })
                     .map((item) => (
                         <NavLink key={item.to} to={item.to} style={navLinkStyle}>
                             {item.label}
