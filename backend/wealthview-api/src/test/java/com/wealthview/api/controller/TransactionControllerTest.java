@@ -5,6 +5,7 @@ import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.transaction.TransactionService;
 import com.wealthview.core.transaction.dto.TransactionRequest;
@@ -28,6 +29,7 @@ import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -102,6 +104,22 @@ class TransactionControllerTest {
                                  "quantity": 10, "amount": 1500.00}
                                 """))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void update_notFound_returns404() throws Exception {
+        when(transactionService.update(eq(TENANT_ID), eq(TXN_ID), any(TransactionRequest.class)))
+                .thenThrow(new EntityNotFoundException("Transaction not found"));
+
+        mockMvc.perform(put("/api/v1/transactions/{id}", TXN_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-15", "type": "buy", "symbol": "AAPL",
+                                 "quantity": 10, "amount": 1500.00}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
     @Test
