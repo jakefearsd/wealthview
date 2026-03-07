@@ -1,6 +1,7 @@
 package com.wealthview.core.tenant;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
@@ -48,7 +49,7 @@ public class TenantService {
     @Transactional
     public InviteCodeEntity generateInviteCode(UUID tenantId, UUID createdByUserId) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found: " + tenantId));
+                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
         var creator = userRepository.findById(createdByUserId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + createdByUserId));

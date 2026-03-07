@@ -1,6 +1,7 @@
 package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
@@ -54,7 +55,7 @@ public class PropertyService {
     @Transactional
     public PropertyResponse create(UUID tenantId, PropertyRequest request) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
         validateLoanDetails(request);
 

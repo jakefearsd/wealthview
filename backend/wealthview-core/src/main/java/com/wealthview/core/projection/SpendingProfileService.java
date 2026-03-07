@@ -2,6 +2,7 @@ package com.wealthview.core.projection;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.IncomeStreamRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
@@ -32,7 +33,7 @@ public class SpendingProfileService {
     @Transactional
     public SpendingProfileResponse createProfile(UUID tenantId, CreateSpendingProfileRequest request) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
         var entity = new SpendingProfileEntity(
                 tenant,

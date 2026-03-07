@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.IncomeStreamRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
@@ -78,7 +79,7 @@ class SpendingProfileServiceTest {
                 "Plan", BigDecimal.ZERO, BigDecimal.ZERO, List.of());
 
         assertThatThrownBy(() -> service.createProfile(tenantId, request))
-                .isInstanceOf(EntityNotFoundException.class);
+                .isInstanceOf(InvalidSessionException.class);
     }
 
     @Test
