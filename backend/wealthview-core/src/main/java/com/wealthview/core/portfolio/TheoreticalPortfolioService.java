@@ -1,6 +1,7 @@
 package com.wealthview.core.portfolio;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.holding.MoneyMarketDetector;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -52,7 +53,7 @@ public class TheoreticalPortfolioService {
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         if ("bank".equals(account.getType())) {
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0);
+            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
         }
 
         var holdings = holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)
@@ -61,10 +62,22 @@ public class TheoreticalPortfolioService {
                 .toList();
 
         if (holdings.isEmpty()) {
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0);
+            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
         }
 
-        var symbols = holdings.stream()
+        // Partition into money market and priced holdings
+        var moneyMarketHoldings = holdings.stream()
+                .filter(HoldingEntity::isMoneyMarket)
+                .toList();
+        var regularHoldings = holdings.stream()
+                .filter(h -> !h.isMoneyMarket())
+                .toList();
+
+        var moneyMarketTotal = moneyMarketHoldings.stream()
+                .map(h -> h.getQuantity().multiply(BigDecimal.ONE))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        var regularSymbols = regularHoldings.stream()
                 .map(HoldingEntity::getSymbol)
                 .distinct()
                 .sorted()
@@ -76,35 +89,55 @@ public class TheoreticalPortfolioService {
         var endDate = LocalDate.now();
         var startDate = endDate.minusYears(clampedYears);
 
-        var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
-                symbols, startDate, endDate);
+        // Build price map for regular symbols
+        final Map<String, TreeMap<LocalDate, BigDecimal>> priceMap;
+        final List<String> pricedSymbols;
+        if (!regularSymbols.isEmpty()) {
+            var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                    regularSymbols, startDate, endDate);
+            priceMap = buildPriceMap(prices);
 
-        var priceMap = buildPriceMap(prices);
+            pricedSymbols = regularSymbols.stream()
+                    .filter(priceMap::containsKey)
+                    .toList();
 
-        // Filter to only symbols that have price data
-        var pricedSymbols = symbols.stream()
-                .filter(priceMap::containsKey)
-                .toList();
-
-        if (pricedSymbols.isEmpty()) {
-            log.info("No price data available for any holdings of account {}", accountId);
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0);
+            if (pricedSymbols.size() < regularSymbols.size()) {
+                var missing = regularSymbols.stream()
+                        .filter(s -> !priceMap.containsKey(s))
+                        .toList();
+                log.info("Skipping symbols without price data for account {}: {}", accountId, missing);
+            }
+        } else {
+            priceMap = new HashMap<>();
+            pricedSymbols = List.of();
         }
 
-        if (pricedSymbols.size() < symbols.size()) {
-            var missing = symbols.stream()
-                    .filter(s -> !priceMap.containsKey(s))
-                    .toList();
-            log.info("Skipping symbols without price data for account {}: {}", accountId, missing);
+        if (pricedSymbols.isEmpty() && moneyMarketHoldings.isEmpty()) {
+            log.info("No price data available for any holdings of account {}", accountId);
+            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
         }
 
         var fridays = generateFridays(startDate, endDate);
-        var dataPoints = computeWeeklyValues(fridays, pricedSymbols, quantityBySymbol, priceMap);
+
+        // Compute weekly values for priced symbols
+        var hasMoneyMarket = !moneyMarketHoldings.isEmpty();
+        var dataPoints = computeWeeklyValuesWithMoneyMarket(
+                fridays, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
+
+        // Build combined symbol list
+        var allSymbols = new ArrayList<>(pricedSymbols);
+        for (var mmh : moneyMarketHoldings) {
+            if (!allSymbols.contains(mmh.getSymbol())) {
+                allSymbols.add(mmh.getSymbol());
+            }
+        }
+        allSymbols.sort(String::compareTo);
 
         log.info("Computed {} weekly data points for account {} with {} symbols",
-                dataPoints.size(), accountId, pricedSymbols.size());
+                dataPoints.size(), accountId, allSymbols.size());
 
-        return new PortfolioHistoryResponse(accountId, dataPoints, pricedSymbols, dataPoints.size());
+        return new PortfolioHistoryResponse(accountId, dataPoints, allSymbols, dataPoints.size(),
+                hasMoneyMarket, hasMoneyMarket ? moneyMarketTotal : null);
     }
 
     private Map<String, TreeMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
@@ -116,15 +149,19 @@ public class TheoreticalPortfolioService {
         return priceMap;
     }
 
-    private List<PortfolioDataPointDto> computeWeeklyValues(
+    private List<PortfolioDataPointDto> computeWeeklyValuesWithMoneyMarket(
             List<LocalDate> fridays,
-            List<String> symbols,
+            List<String> pricedSymbols,
             Map<String, BigDecimal> quantityBySymbol,
-            Map<String, TreeMap<LocalDate, BigDecimal>> priceMap) {
+            Map<String, TreeMap<LocalDate, BigDecimal>> priceMap,
+            BigDecimal moneyMarketTotal) {
         var dataPoints = new ArrayList<PortfolioDataPointDto>();
         for (var friday : fridays) {
-            lookupTotalValue(friday, symbols, quantityBySymbol, priceMap)
-                    .ifPresent(value -> dataPoints.add(new PortfolioDataPointDto(friday, value)));
+            var pricedValue = lookupTotalValue(friday, pricedSymbols, quantityBySymbol, priceMap);
+            if (pricedValue.isPresent() || moneyMarketTotal.compareTo(BigDecimal.ZERO) > 0) {
+                var total = pricedValue.orElse(BigDecimal.ZERO).add(moneyMarketTotal);
+                dataPoints.add(new PortfolioDataPointDto(friday, total));
+            }
         }
         return dataPoints;
     }
@@ -134,6 +171,9 @@ public class TheoreticalPortfolioService {
             List<String> symbols,
             Map<String, BigDecimal> quantityBySymbol,
             Map<String, TreeMap<LocalDate, BigDecimal>> priceMap) {
+        if (symbols.isEmpty()) {
+            return Optional.empty();
+        }
         var totalValue = BigDecimal.ZERO;
         for (var symbol : symbols) {
             var symbolPrices = priceMap.get(symbol);

@@ -196,6 +196,40 @@ class HoldingsComputationServiceTest {
     }
 
     @Test
+    void recomputeForAccountAndSymbol_moneyMarketSymbol_setsMoneyMarketFlag() {
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "opening_balance", "SPAXX",
+                new BigDecimal("196049.86"), new BigDecimal("196049.86"));
+
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "SPAXX");
+
+        var captor = ArgumentCaptor.forClass(HoldingEntity.class);
+        verify(holdingRepository).save(captor.capture());
+        assertThat(captor.getValue().isMoneyMarket()).isTrue();
+        assertThat(captor.getValue().getMoneyMarketRate()).isEqualByComparingTo("4.0000");
+    }
+
+    @Test
+    void recomputeForAccountAndSymbol_regularSymbol_moneyMarketFlagFalse() {
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.0000"));
+
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of(txn));
+        when(holdingRepository.save(any(HoldingEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
+
+        var captor = ArgumentCaptor.forClass(HoldingEntity.class);
+        verify(holdingRepository).save(captor.capture());
+        assertThat(captor.getValue().isMoneyMarket()).isFalse();
+        assertThat(captor.getValue().getMoneyMarketRate()).isNull();
+    }
+
+    @Test
     void recomputeForAccountAndSymbol_existingHolding_doesNotPublishEvent() {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));

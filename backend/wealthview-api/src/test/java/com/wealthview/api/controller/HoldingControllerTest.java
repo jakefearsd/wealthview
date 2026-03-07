@@ -5,6 +5,7 @@ import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingService;
 import com.wealthview.core.holding.dto.HoldingRequest;
 import com.wealthview.core.holding.dto.HoldingResponse;
@@ -53,7 +54,7 @@ class HoldingControllerTest {
 
     private HoldingResponse sampleResponse() {
         return new HoldingResponse(HOLDING_ID, ACCOUNT_ID, "AAPL",
-                new BigDecimal("10"), new BigDecimal("1500.00"), false, LocalDate.now());
+                new BigDecimal("10"), new BigDecimal("1500.00"), false, false, null, LocalDate.now());
     }
 
     @Test
@@ -96,6 +97,22 @@ class HoldingControllerTest {
                                  "quantity": 15, "cost_basis": 2250.00}
                                 """.formatted(ACCOUNT_ID)))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void update_notFound_returns404() throws Exception {
+        when(holdingService.update(eq(TENANT_ID), eq(HOLDING_ID), any(HoldingRequest.class)))
+                .thenThrow(new EntityNotFoundException("Holding not found"));
+
+        mockMvc.perform(put("/api/v1/holdings/{id}", HOLDING_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"account_id": "%s", "symbol": "AAPL",
+                                 "quantity": 15, "cost_basis": 2250.00}
+                                """.formatted(ACCOUNT_ID)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
     @Test

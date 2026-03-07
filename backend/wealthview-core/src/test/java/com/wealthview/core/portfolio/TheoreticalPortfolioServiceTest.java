@@ -241,6 +241,64 @@ class TheoreticalPortfolioServiceTest {
     }
 
     @Test
+    void computeHistory_withMoneyMarketHolding_includesAtConstantValue() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var spaxx = new HoldingEntity(brokerageAccount, tenant, "SPAXX",
+                new BigDecimal("196049.86"), BigDecimal.ZERO);
+        spaxx.setMoneyMarket(true);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(spaxx));
+
+        var result = service.computeHistory(tenantId, accountId, 1);
+
+        assertThat(result.symbols()).containsExactly("SPAXX");
+        assertThat(result.dataPoints()).isNotEmpty();
+        assertThat(result.hasMoneyMarketHoldings()).isTrue();
+        assertThat(result.moneyMarketTotal()).isEqualByComparingTo(new BigDecimal("196049.86"));
+
+        // All data points should have same value
+        for (var dp : result.dataPoints()) {
+            assertThat(dp.totalValue()).isEqualByComparingTo(new BigDecimal("196049.86"));
+        }
+    }
+
+    @Test
+    void computeHistory_mixedPricedAndMoneyMarket_combinesValues() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var aapl = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        var spaxx = new HoldingEntity(brokerageAccount, tenant, "SPAXX",
+                new BigDecimal("5000"), BigDecimal.ZERO);
+        spaxx.setMoneyMarket(true);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(aapl, spaxx));
+
+        var friday = LocalDate.of(2025, 1, 3);
+        var prices = List.of(
+                new PriceEntity("AAPL", friday, new BigDecimal("150.0000"), "seed")
+        );
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                any(), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(prices);
+
+        var result = service.computeHistory(tenantId, accountId, 2);
+
+        assertThat(result.symbols()).containsExactlyInAnyOrder("AAPL", "SPAXX");
+        assertThat(result.hasMoneyMarketHoldings()).isTrue();
+        assertThat(result.moneyMarketTotal()).isEqualByComparingTo(new BigDecimal("5000"));
+
+        var point = result.dataPoints().stream()
+                .filter(dp -> dp.date().equals(friday)).findFirst();
+        assertThat(point).isPresent();
+        // 10 * 150 + 5000 * 1 = 6500
+        assertThat(point.get().totalValue()).isEqualByComparingTo(new BigDecimal("6500.0000"));
+    }
+
+    @Test
     void computeHistory_missingPriceForFriday_usesClosestPriorPrice() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(brokerageAccount));
