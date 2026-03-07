@@ -43,11 +43,12 @@ export default function PropertyDetailPage() {
     const range = useMemo(getDefaultRange, []);
     const [refreshing, setRefreshing] = useState(false);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
+    const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
 
     const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
-    const { data: analytics } = useApiQuery(() => getPropertyAnalytics(id!));
+    const { data: analytics, refetch: refetchAnalytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear));
 
     async function handleAddIncome(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
         try {
@@ -114,6 +115,22 @@ export default function PropertyDetailPage() {
             setRefreshing(false);
         }
     }
+
+    function handleAnalyticsYearChange(value: string) {
+        setAnalyticsYear(value === '' ? undefined : Number(value));
+        setTimeout(refetchAnalytics, 0);
+    }
+
+    const analyticsYearOptions = useMemo(() => {
+        if (!property?.purchase_date) return [];
+        const purchaseYear = new Date(property.purchase_date).getFullYear();
+        const currentYear = new Date().getFullYear();
+        const years: number[] = [];
+        for (let y = purchaseYear; y <= currentYear; y++) {
+            years.push(y);
+        }
+        return years;
+    }, [property?.purchase_date]);
 
     const valuationChartData = useMemo(() => {
         if (!valuations) return [];
@@ -182,7 +199,21 @@ export default function PropertyDetailPage() {
 
             {analytics && (
                 <div style={{ ...cardStyle, marginBottom: '2rem' }}>
-                    <h3 style={{ marginBottom: '1rem' }}>Property Overview</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                        <h3>Property Overview</h3>
+                        {analyticsYearOptions.length > 0 && (
+                            <select
+                                value={analyticsYear ?? ''}
+                                onChange={e => handleAnalyticsYearChange(e.target.value)}
+                                style={{ padding: '0.4rem 0.8rem', border: '1px solid #ccc', borderRadius: '4px', fontSize: '0.85rem' }}
+                            >
+                                <option value="">Trailing 12 Months</option>
+                                {analyticsYearOptions.map(y => (
+                                    <option key={y} value={y}>{y}</option>
+                                ))}
+                            </select>
+                        )}
+                    </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
                         <div>
                             <div style={{ color: '#666', fontSize: '0.85rem' }}>Total Appreciation</div>
