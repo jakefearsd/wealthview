@@ -66,7 +66,7 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null);
+                null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.address()).isEqualTo("123 Main St");
@@ -81,7 +81,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), new BigDecimal("6.5"), 360,
-                LocalDate.of(2020, 1, 1), true);
+                LocalDate.of(2020, 1, 1), true, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.hasLoanDetails()).isTrue();
@@ -96,7 +96,7 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), null, null, null, null);
+                new BigDecimal("300000"), null, null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -121,7 +121,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), new BigDecimal("6.5"), 360,
-                LocalDate.of(2020, 1, 1), true);
+                LocalDate.of(2020, 1, 1), true, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.useComputedBalance()).isTrue();
@@ -200,6 +200,63 @@ class PropertyServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).totalIncome()).isEqualByComparingTo("2000");
         assertThat(result.get(0).netCashFlow()).isEqualByComparingTo("2000");
+    }
+
+    @Test
+    void create_withPropertyType_setsPropertyType() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment");
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.propertyType()).isEqualTo("investment");
+    }
+
+    @Test
+    void create_withoutPropertyType_defaultsToPrimaryResidence() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.propertyType()).isEqualTo("primary_residence");
+    }
+
+    @Test
+    void create_withInvalidPropertyType_throwsIllegalArgument() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "commercial");
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid property type");
+    }
+
+    @Test
+    void update_changesPropertyType() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setPropertyType("primary_residence");
+
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "vacation");
+        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+
+        assertThat(result.propertyType()).isEqualTo("vacation");
     }
 
     @Test
