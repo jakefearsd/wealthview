@@ -19,6 +19,7 @@ import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import HoldingDetailPage from './pages/HoldingDetailPage';
 import AdminPage from './pages/AdminPage';
 import AuditLogPage from './pages/AuditLogPage';
+import DataExportPage from './pages/DataExportPage';
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
@@ -45,6 +46,7 @@ export default function App() {
                         <Route path="properties/:id" element={<PropertyDetailPage />} />
                         <Route path="admin" element={<AdminPage />} />
                         <Route path="audit-log" element={<AuditLogPage />} />
+                        <Route path="export" element={<DataExportPage />} />
                         <Route path="settings" element={<SettingsPage />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Route>
