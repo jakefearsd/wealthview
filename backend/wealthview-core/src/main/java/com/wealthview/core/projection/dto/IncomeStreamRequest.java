@@ -7,5 +7,6 @@ public record IncomeStreamRequest(
         BigDecimal annualAmount,
         int startAge,
         Integer endAge,
-        BigDecimal inflationRate) {
+        BigDecimal inflationRate,
+        Boolean oneTime) {
 }

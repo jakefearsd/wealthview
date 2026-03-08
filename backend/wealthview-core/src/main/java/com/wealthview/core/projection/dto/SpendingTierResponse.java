@@ -2,11 +2,10 @@ package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
 
-public record IncomeStreamResponse(
+public record SpendingTierResponse(
         String name,
-        BigDecimal annualAmount,
         int startAge,
         Integer endAge,
-        BigDecimal inflationRate,
-        Boolean oneTime) {
+        BigDecimal essentialExpenses,
+        BigDecimal discretionaryExpenses) {
 }
