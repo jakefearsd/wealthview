@@ -1,13 +1,10 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
-import java.util.UUID;
 
-public record ProjectionAccountResponse(
-        UUID id,
-        UUID linkedAccountId,
+public record HypotheticalAccountInput(
         BigDecimal initialBalance,
         BigDecimal annualContribution,
         BigDecimal expectedReturn,
-        String accountType) {
-}
+        String accountType
+) implements ProjectionAccountInput {}

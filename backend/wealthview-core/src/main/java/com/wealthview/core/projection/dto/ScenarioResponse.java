@@ -1,7 +1,5 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.persistence.entity.ProjectionScenarioEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -19,24 +17,4 @@ public record ScenarioResponse(
         SpendingProfileResponse spendingProfile,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
-
-    public static ScenarioResponse from(ProjectionScenarioEntity entity) {
-        var accounts = entity.getAccounts().stream()
-                .map(ProjectionAccountResponse::from)
-                .toList();
-        var profile = entity.getSpendingProfile() != null
-                ? SpendingProfileResponse.from(entity.getSpendingProfile())
-                : null;
-        return new ScenarioResponse(
-                entity.getId(),
-                entity.getName(),
-                entity.getRetirementDate(),
-                entity.getEndAge(),
-                entity.getInflationRate(),
-                entity.getParamsJson(),
-                accounts,
-                profile,
-                entity.getCreatedAt(),
-                entity.getUpdatedAt());
-    }
 }

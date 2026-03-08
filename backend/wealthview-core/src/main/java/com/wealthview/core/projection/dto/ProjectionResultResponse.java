@@ -8,5 +8,6 @@ public record ProjectionResultResponse(
         UUID scenarioId,
         List<ProjectionYearDto> yearlyData,
         BigDecimal finalBalance,
-        int yearsInRetirement) {
+        int yearsInRetirement,
+        SpendingFeasibilitySummary spendingFeasibility) {
 }

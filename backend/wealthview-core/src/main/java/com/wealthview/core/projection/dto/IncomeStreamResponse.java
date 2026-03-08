@@ -6,5 +6,6 @@ public record IncomeStreamResponse(
         String name,
         BigDecimal annualAmount,
         int startAge,
-        Integer endAge) {
+        Integer endAge,
+        BigDecimal inflationRate) {
 }

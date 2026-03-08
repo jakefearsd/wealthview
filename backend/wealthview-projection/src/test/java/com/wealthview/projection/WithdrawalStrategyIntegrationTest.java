@@ -1,10 +1,10 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import com.wealthview.persistence.entity.ProjectionAccountEntity;
-import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
-import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,6 +13,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -22,12 +23,10 @@ import static org.mockito.Mockito.mock;
 
 class WithdrawalStrategyIntegrationTest {
 
-    private TenantEntity tenant;
     private TaxBracketRepository taxBracketRepository;
 
     @BeforeEach
     void setUp() {
-        tenant = new TenantEntity("Test");
         taxBracketRepository = mock(TaxBracketRepository.class);
         stubSingleBrackets();
     }
@@ -53,16 +52,13 @@ class WithdrawalStrategyIntegrationTest {
     })
     void fixedPercentage_variousBalances_neverNegative(String balance, String rate) {
         var engine = new DeterministicProjectionEngine(null);
-        var scenario = createRetiredScenario(
+        var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": %s, "withdrawal_strategy": "fixed_percentage"}
-                """.formatted(LocalDate.now().getYear() - 70, rate));
+                """.formatted(LocalDate.now().getYear() - 70, rate),
+                List.of(acct(balance, "0", "0.0500")));
 
-        var account = new ProjectionAccountEntity(
-                scenario, null, bd(balance), BigDecimal.ZERO, new BigDecimal("0.0500"));
-        scenario.addAccount(account);
-
-        var result = engine.run(scenario);
+        var result = engine.run(input);
 
         for (var year : result.yearlyData()) {
             assertThat(year.endBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
@@ -77,18 +73,14 @@ class WithdrawalStrategyIntegrationTest {
     })
     void dynamicPercentage_variousBalances_neverDepletes(String balance) {
         var engine = new DeterministicProjectionEngine(null);
-        var scenario = createRetiredScenario(
+        var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "dynamic_percentage"}
-                """.formatted(LocalDate.now().getYear() - 70));
+                """.formatted(LocalDate.now().getYear() - 70),
+                List.of(acct(balance, "0", "0.0500")));
 
-        var account = new ProjectionAccountEntity(
-                scenario, null, bd(balance), BigDecimal.ZERO, new BigDecimal("0.0500"));
-        scenario.addAccount(account);
+        var result = engine.run(input);
 
-        var result = engine.run(scenario);
-
-        // Dynamic percentage never depletes to zero (4% of current balance)
         for (var year : result.yearlyData()) {
             assertThat(year.endBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
         }
@@ -103,17 +95,13 @@ class WithdrawalStrategyIntegrationTest {
     })
     void vanguard_extremeReturns_capsAndFloors(String returnRate) {
         var engine = new DeterministicProjectionEngine(null);
-        var scenario = createRetiredScenario(
+        var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "vanguard_dynamic_spending", "dynamic_ceiling": 0.05, "dynamic_floor": -0.025}
-                """.formatted(LocalDate.now().getYear() - 70));
+                """.formatted(LocalDate.now().getYear() - 70),
+                List.of(acct("1000000.0000", "0", returnRate)));
 
-        var account = new ProjectionAccountEntity(
-                scenario, null, new BigDecimal("1000000.0000"), BigDecimal.ZERO,
-                bd(returnRate));
-        scenario.addAccount(account);
-
-        var result = engine.run(scenario);
+        var result = engine.run(input);
 
         assertThat(result.yearlyData()).isNotEmpty();
         for (var year : result.yearlyData()) {
@@ -131,25 +119,16 @@ class WithdrawalStrategyIntegrationTest {
         var calc = new FederalTaxCalculator(taxBracketRepository);
         var engine = new DeterministicProjectionEngine(calc);
 
-        var scenario = createScenario(
-                LocalDate.now().plusYears(10),
-                80,
-                BigDecimal.ZERO,
+        var input = createInput(
+                LocalDate.now().plusYears(10), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single", "annual_roth_conversion": %s}
-                """.formatted(LocalDate.now().getYear() - 35, conversion));
+                """.formatted(LocalDate.now().getYear() - 35, conversion),
+                List.of(
+                        acct(tradBalance, "0", "0.0700", "traditional"),
+                        acct("50000.0000", "0", "0.0700", "roth")));
 
-        var tradAcct = new ProjectionAccountEntity(
-                scenario, null, bd(tradBalance), BigDecimal.ZERO,
-                new BigDecimal("0.0700"), "traditional");
-        scenario.addAccount(tradAcct);
-
-        var rothAcct = new ProjectionAccountEntity(
-                scenario, null, new BigDecimal("50000.0000"), BigDecimal.ZERO,
-                new BigDecimal("0.0700"), "roth");
-        scenario.addAccount(rothAcct);
-
-        var result = engine.run(scenario);
+        var result = engine.run(input);
 
         assertThat(result.yearlyData()).isNotEmpty();
         for (var year : result.yearlyData()) {
@@ -172,25 +151,16 @@ class WithdrawalStrategyIntegrationTest {
         var calc = new FederalTaxCalculator(taxBracketRepository);
         var engine = new DeterministicProjectionEngine(calc);
 
-        var scenario = createScenario(
-                LocalDate.now().plusYears(10),
-                80,
-                BigDecimal.ZERO,
+        var input = createInput(
+                LocalDate.now().plusYears(10), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single", "other_income": 0, "annual_roth_conversion": %s}
-                """.formatted(LocalDate.now().getYear() - 35, conversion));
+                """.formatted(LocalDate.now().getYear() - 35, conversion),
+                List.of(
+                        acct("500000.0000", "0", "0.0700", "traditional"),
+                        acct("100000.0000", "0", "0.0700", "roth")));
 
-        var tradAcct = new ProjectionAccountEntity(
-                scenario, null, new BigDecimal("500000.0000"), BigDecimal.ZERO,
-                new BigDecimal("0.0700"), "traditional");
-        scenario.addAccount(tradAcct);
-
-        var rothAcct = new ProjectionAccountEntity(
-                scenario, null, new BigDecimal("100000.0000"), BigDecimal.ZERO,
-                new BigDecimal("0.0700"), "roth");
-        scenario.addAccount(rothAcct);
-
-        var result = engine.run(scenario);
+        var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.taxLiability()).isNotNull();
@@ -207,17 +177,13 @@ class WithdrawalStrategyIntegrationTest {
         var calc = new FederalTaxCalculator(taxBracketRepository);
         var engine = new DeterministicProjectionEngine(calc);
 
-        var scenario = createRetiredScenario(
+        var input = createRetiredInput(
                 """
                 {"birth_year": %d, "filing_status": "single"}
-                """.formatted(LocalDate.now().getYear() - 70));
+                """.formatted(LocalDate.now().getYear() - 70),
+                List.of(acct(balance, "0", "0.0500", "roth")));
 
-        var rothAcct = new ProjectionAccountEntity(
-                scenario, null, bd(balance), BigDecimal.ZERO,
-                new BigDecimal("0.0500"), "roth");
-        scenario.addAccount(rothAcct);
-
-        var result = engine.run(scenario);
+        var result = engine.run(input);
 
         for (var year : result.yearlyData()) {
             if (year.taxLiability() != null) {
@@ -226,15 +192,24 @@ class WithdrawalStrategyIntegrationTest {
         }
     }
 
-    private ProjectionScenarioEntity createRetiredScenario(String paramsJson) {
-        return new ProjectionScenarioEntity(tenant, "Test",
-                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO, paramsJson);
+    private ProjectionInput createRetiredInput(String paramsJson, List<ProjectionAccountInput> accounts) {
+        return new ProjectionInput(UUID.randomUUID(), "Test",
+                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO, paramsJson,
+                accounts, null);
     }
 
-    private ProjectionScenarioEntity createScenario(LocalDate retirementDate, int endAge,
-                                                     BigDecimal inflationRate, String paramsJson) {
-        return new ProjectionScenarioEntity(tenant, "Test",
-                retirementDate, endAge, inflationRate, paramsJson);
+    private ProjectionInput createInput(LocalDate retDate, int endAge,
+            BigDecimal inflation, String paramsJson, List<ProjectionAccountInput> accounts) {
+        return new ProjectionInput(UUID.randomUUID(), "Test",
+                retDate, endAge, inflation, paramsJson, accounts, null);
+    }
+
+    private HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn) {
+        return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), "taxable");
+    }
+
+    private HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn, String type) {
+        return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), type);
     }
 
     private static BigDecimal bd(String val) {

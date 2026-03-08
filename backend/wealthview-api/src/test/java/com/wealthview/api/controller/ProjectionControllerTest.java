@@ -139,8 +139,8 @@ class ProjectionControllerTest {
         var id1 = UUID.randomUUID();
         var id2 = UUID.randomUUID();
         var response = new CompareResponse(List.of(
-                new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0),
-                new ProjectionResultResponse(id2, List.of(), BigDecimal.ZERO, 0)));
+                new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0, null),
+                new ProjectionResultResponse(id2, List.of(), BigDecimal.ZERO, 0, null)));
         when(projectionService.compareScenarios(eq(TENANT_ID), any(CompareRequest.class)))
                 .thenReturn(response);
 
@@ -209,7 +209,7 @@ class ProjectionControllerTest {
                         new BigDecimal("100000"), new BigDecimal("10000"),
                         new BigDecimal("7700"), BigDecimal.ZERO,
                         new BigDecimal("117700"), false)),
-                new BigDecimal("117700"), 0);
+                new BigDecimal("117700"), 0, null);
         when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
                 .thenReturn(result);
 
