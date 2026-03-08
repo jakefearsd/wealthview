@@ -5,7 +5,7 @@ import { listTransactions, deleteTransaction } from '../api/transactions';
 import { listHoldings, updateHolding } from '../api/holdings';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
 import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
@@ -98,7 +98,7 @@ export default function AccountDetailPage() {
                                                 <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                                                <input type="number" step="0.01" value={editCostBasis} onChange={(e) => setEditCostBasis(e.target.value)} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
+                                                <input type="text" inputMode="decimal" value={formatCurrencyInput(editCostBasis)} onChange={(e) => setEditCostBasis(parseCurrencyInput(e.target.value))} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
                                             <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'center' }}>
