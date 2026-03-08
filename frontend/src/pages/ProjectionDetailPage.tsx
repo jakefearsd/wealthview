@@ -79,6 +79,7 @@ export default function ProjectionDetailPage() {
     const strategyLabel = strategyLabels[parsedParams.withdrawal_strategy] || 'Fixed Percentage';
     const peak = result ? findPeakBalance(result.yearly_data) : null;
     const depletion = result ? findDepletionYear(result.yearly_data) : null;
+    const feasibility = result?.spending_feasibility ?? null;
 
     return (
         <div>
@@ -155,7 +156,24 @@ export default function ProjectionDetailPage() {
 
             {result && (
                 <>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                    {feasibility && !feasibility.spending_feasible && (
+                        <div style={{
+                            background: '#fff3e0', borderLeft: '4px solid #e65100', padding: '1rem',
+                            marginBottom: '1rem', borderRadius: '4px',
+                        }}>
+                            <strong>Spending Shortfall Detected</strong>
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.9rem', color: '#333' }}>
+                                Your spending plan requires {formatCurrency(feasibility.required_annual_spending)}/yr
+                                but your portfolio can sustain approximately {formatCurrency(feasibility.sustainable_annual_spending)}/yr.
+                                {feasibility.first_shortfall_age != null && (
+                                    <> Shortfall begins at age {feasibility.first_shortfall_age}.</>
+                                )}
+                                {' '}Review the Spending Analysis tab for year-by-year details.
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                         <SummaryCard
                             label="Final Balance"
                             value={formatCurrency(result.final_balance)}
@@ -173,12 +191,44 @@ export default function ProjectionDetailPage() {
                             subtext={`(year ${peak!.year})`}
                             description="Highest portfolio value reached during the projection."
                         />
-                        <SummaryCard
-                            label="Depletion Year"
-                            value={depletion ? `${depletion.year} (age ${depletion.age})` : 'Never'}
-                            valueColor={depletion ? '#d32f2f' : '#2e7d32'}
-                            description="The year your portfolio reaches $0. 'Never' means your money outlasts the plan."
-                        />
+                        {(() => {
+                            const hasProfile = feasibility !== null;
+                            const depletes = depletion !== null;
+                            let outcomeLabel: string, outcomeValue: string, outcomeColor: string, outcomeDesc: string;
+
+                            if (!hasProfile) {
+                                outcomeLabel = "Depletion Year";
+                                outcomeValue = depletes ? `${depletion.year} (age ${depletion.age})` : "Never";
+                                outcomeColor = depletes ? '#d32f2f' : '#2e7d32';
+                                outcomeDesc = depletes
+                                    ? "The year your portfolio reaches $0."
+                                    : "Your money outlasts the plan.";
+                            } else if (depletes) {
+                                outcomeLabel = "Plan Outcome";
+                                outcomeValue = `Depleted at age ${depletion.age}`;
+                                outcomeColor = '#d32f2f';
+                                outcomeDesc = `Portfolio reaches $0 in ${depletion.year}.`;
+                            } else if (feasibility.spending_feasible) {
+                                outcomeLabel = "Plan Outcome";
+                                outcomeValue = "Fully Sustainable";
+                                outcomeColor = '#2e7d32';
+                                outcomeDesc = `Sustains ${formatCurrency(feasibility.sustainable_annual_spending)}/yr; plan requires ${formatCurrency(feasibility.required_annual_spending)}/yr`;
+                            } else {
+                                outcomeLabel = "Plan Outcome";
+                                outcomeValue = `Underfunded at age ${feasibility.first_shortfall_age}`;
+                                outcomeColor = '#d32f2f';
+                                outcomeDesc = `Sustains ${formatCurrency(feasibility.sustainable_annual_spending)}/yr of ${formatCurrency(feasibility.required_annual_spending)}/yr needed`;
+                            }
+
+                            return (
+                                <SummaryCard
+                                    label={outcomeLabel}
+                                    value={outcomeValue}
+                                    valueColor={outcomeColor}
+                                    description={outcomeDesc}
+                                />
+                            );
+                        })()}
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
