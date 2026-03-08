@@ -2,17 +2,21 @@ import { useState } from 'react';
 import { listSpendingProfiles, createSpendingProfile, updateSpendingProfile, deleteSpendingProfile } from '../api/spendingProfiles';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { cardStyle } from '../utils/styles';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import HelpText from '../components/HelpText';
-import type { SpendingProfile, CreateSpendingProfileRequest, IncomeStream } from '../types/projection';
+import type { SpendingProfile, CreateSpendingProfileRequest, IncomeStream, SpendingTier } from '../types/projection';
 
 const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
 const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 function defaultIncomeStream(): IncomeStream {
-    return { name: '', annual_amount: 0, start_age: 65, end_age: null };
+    return { name: '', annual_amount: 0, start_age: 65, end_age: null, inflation_rate: 0 };
+}
+
+function defaultSpendingTier(): SpendingTier {
+    return { name: '', start_age: 55, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
 }
 
 export default function SpendingProfilesPage() {
@@ -25,12 +29,14 @@ export default function SpendingProfilesPage() {
     const [essentialExpenses, setEssentialExpenses] = useState(40000);
     const [discretionaryExpenses, setDiscretionaryExpenses] = useState(20000);
     const [incomeStreams, setIncomeStreams] = useState<IncomeStream[]>([]);
+    const [spendingTiers, setSpendingTiers] = useState<SpendingTier[]>([]);
 
     function resetForm() {
         setName('');
         setEssentialExpenses(40000);
         setDiscretionaryExpenses(20000);
         setIncomeStreams([]);
+        setSpendingTiers([]);
         setEditingId(null);
         setShowForm(false);
     }
@@ -40,12 +46,24 @@ export default function SpendingProfilesPage() {
         setEssentialExpenses(profile.essential_expenses);
         setDiscretionaryExpenses(profile.discretionary_expenses);
         setIncomeStreams(profile.income_streams.length > 0 ? [...profile.income_streams] : []);
+        setSpendingTiers(profile.spending_tiers?.length > 0 ? [...profile.spending_tiers] : []);
         setEditingId(profile.id);
         setShowForm(true);
     }
 
-    function updateStream(index: number, field: keyof IncomeStream, value: string | number | null) {
-        setIncomeStreams(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    function updateStream(index: number, field: keyof IncomeStream, value: string | number | boolean | null) {
+        setIncomeStreams(prev => prev.map((s, i) => {
+            if (i !== index) return s;
+            const updated = { ...s, [field]: value };
+            if (updated.one_time && field === 'start_age' && typeof value === 'number') {
+                updated.end_age = value + 1;
+            }
+            return updated;
+        }));
+    }
+
+    function updateTier(index: number, field: keyof SpendingTier, value: string | number | null) {
+        setSpendingTiers(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
     }
 
     async function handleSave() {
@@ -60,6 +78,7 @@ export default function SpendingProfilesPage() {
                 essential_expenses: essentialExpenses,
                 discretionary_expenses: discretionaryExpenses,
                 income_streams: incomeStreams,
+                spending_tiers: spendingTiers,
             };
             if (editingId) {
                 await updateSpendingProfile(editingId, request);
@@ -116,48 +135,117 @@ export default function SpendingProfilesPage() {
                         </div>
                         <div>
                             <label style={labelStyle}>Essential Expenses (annual)</label>
-                            <input style={inputStyle} type="number" value={essentialExpenses} onChange={e => setEssentialExpenses(Number(e.target.value))} />
-                            <HelpText>Non-negotiable annual costs: housing, food, healthcare, insurance. Always fully funded — never reduced.</HelpText>
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(essentialExpenses)} onChange={e => setEssentialExpenses(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <HelpText>Default non-negotiable annual costs when no spending tier matches the current age.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Discretionary Expenses (annual)</label>
-                            <input style={inputStyle} type="number" value={discretionaryExpenses} onChange={e => setDiscretionaryExpenses(Number(e.target.value))} />
-                            <HelpText>Flexible annual spending: travel, entertainment, dining out. Reduced first if withdrawals fall short.</HelpText>
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(discretionaryExpenses)} onChange={e => setDiscretionaryExpenses(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <HelpText>Default flexible annual spending when no spending tier matches the current age.</HelpText>
                         </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    {/* Spending Tiers Section */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', marginTop: '1rem' }}>
+                        <div>
+                            <h4>Spending Tiers</h4>
+                            <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.15rem' }}>
+                                Define age-based spending phases. When tiers are defined, spending varies by life stage instead of staying flat. Amounts are in today's dollars; inflation is applied automatically.
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setSpendingTiers(prev => [...prev, defaultSpendingTier()])}
+                            style={{ padding: '0.25rem 0.75rem', background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                            + Add Spending Tier
+                        </button>
+                    </div>
+                    {spendingTiers.map((tier, idx) => (
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
+                            <div>
+                                <label style={labelStyle}>Phase Name</label>
+                                <input style={inputStyle} value={tier.name} onChange={e => updateTier(idx, 'name', e.target.value)} placeholder="e.g., Go-Go Years" />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Start Age</label>
+                                <input style={inputStyle} type="number" value={tier.start_age} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>End Age (blank = forever)</label>
+                                <input style={inputStyle} type="number" value={tier.end_age ?? ''} onChange={e => updateTier(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Essential (annual)</label>
+                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(tier.essential_expenses)} onChange={e => updateTier(idx, 'essential_expenses', Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Discretionary (annual)</label>
+                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(tier.discretionary_expenses)} onChange={e => updateTier(idx, 'discretionary_expenses', Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            </div>
+                            <div>
+                                <button
+                                    onClick={() => setSpendingTiers(prev => prev.filter((_, i) => i !== idx))}
+                                    style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                >
+                                    Remove
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+
+                    {/* Income Streams Section */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', marginTop: '1rem' }}>
                         <div>
                             <h4>Income Streams</h4>
                             <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.15rem' }}>Non-portfolio income sources that reduce how much you need to withdraw from investments.</div>
                         </div>
-                        <button
-                            onClick={() => setIncomeStreams(prev => [...prev, defaultIncomeStream()])}
-                            style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                        >
-                            + Add Income Stream
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                                onClick={() => setIncomeStreams(prev => [...prev, defaultIncomeStream()])}
+                                style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                                + Add Income Stream
+                            </button>
+                            <button
+                                onClick={() => setIncomeStreams(prev => [...prev, { name: '', annual_amount: 0, start_age: 65, end_age: 66, inflation_rate: 0, one_time: true }])}
+                                style={{ padding: '0.25rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                                + One-Time Payment
+                            </button>
+                        </div>
                     </div>
                     {incomeStreams.map((stream, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
+                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: stream.one_time ? '1.5fr 1fr 1fr auto' : '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'start' }}>
                             <div>
-                                <label style={labelStyle}>Name</label>
-                                <input style={inputStyle} value={stream.name} onChange={e => updateStream(idx, 'name', e.target.value)} placeholder="Social Security" />
+                                <label style={labelStyle}>
+                                    Name
+                                    {stream.one_time && <span style={{ fontSize: '0.75rem', color: '#ff9800', marginLeft: '0.5rem', fontWeight: 400 }}>(One-Time)</span>}
+                                </label>
+                                <input style={inputStyle} value={stream.name} onChange={e => updateStream(idx, 'name', e.target.value)} placeholder={stream.one_time ? 'Deferred Comp' : 'Social Security'} />
                             </div>
                             <div>
-                                <label style={labelStyle}>Annual Amount</label>
-                                <input style={inputStyle} type="number" value={stream.annual_amount} onChange={e => updateStream(idx, 'annual_amount', Number(e.target.value))} />
+                                <label style={labelStyle}>{stream.one_time ? 'Payment Amount' : 'Annual Amount'}</label>
+                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(stream.annual_amount)} onChange={e => updateStream(idx, 'annual_amount', Number(parseCurrencyInput(e.target.value)) || 0)} />
                             </div>
                             <div>
-                                <label style={labelStyle}>Start Age</label>
+                                <label style={labelStyle}>{stream.one_time ? 'Payment Age' : 'Start Age'}</label>
                                 <input style={inputStyle} type="number" value={stream.start_age} onChange={e => updateStream(idx, 'start_age', Number(e.target.value))} />
-                                <HelpText>Age when this income begins (e.g., 67 for Social Security).</HelpText>
+                                <HelpText>{stream.one_time ? 'Age when this one-time payment occurs.' : 'Age when this income begins (e.g., 67 for Social Security).'}</HelpText>
                             </div>
-                            <div>
-                                <label style={labelStyle}>End Age (blank = forever)</label>
-                                <input style={inputStyle} type="number" value={stream.end_age ?? ''} onChange={e => updateStream(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
-                                <HelpText>Leave blank if this income continues for life.</HelpText>
-                            </div>
+                            {!stream.one_time && (
+                                <div>
+                                    <label style={labelStyle}>End Age (blank = forever)</label>
+                                    <input style={inputStyle} type="number" value={stream.end_age ?? ''} onChange={e => updateStream(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
+                                    <HelpText>Leave blank if this income continues for life.</HelpText>
+                                </div>
+                            )}
+                            {!stream.one_time && (
+                                <div>
+                                    <label style={labelStyle}>Inflation Rate</label>
+                                    <input style={inputStyle} type="number" step="0.001" value={stream.inflation_rate ?? 0} onChange={e => updateStream(idx, 'inflation_rate', Number(e.target.value) || 0)} />
+                                    <HelpText>Annual rate (e.g. 0.02 = 2%)</HelpText>
+                                </div>
+                            )}
                             <div>
                                 <button
                                     onClick={() => setIncomeStreams(prev => prev.filter((_, i) => i !== idx))}
@@ -204,14 +292,30 @@ export default function SpendingProfilesPage() {
                                     </button>
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444' }}>
+                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444', flexWrap: 'wrap' }}>
                                 <div><span style={{ color: '#999' }}>Essential:</span> {formatCurrency(p.essential_expenses)}</div>
                                 <div><span style={{ color: '#999' }}>Discretionary:</span> {formatCurrency(p.discretionary_expenses)}</div>
                             </div>
+                            {p.spending_tiers?.length > 0 && (
+                                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
+                                    <span style={{ color: '#999' }}>Tiers:</span>{' '}
+                                    {p.spending_tiers.map(t =>
+                                        `${t.name} (${t.start_age}-${t.end_age ?? '\u221E'}: ${formatCurrency(t.essential_expenses + t.discretionary_expenses)}/yr)`
+                                    ).join(', ')}
+                                </div>
+                            )}
                             {p.income_streams.length > 0 && (
                                 <div style={{ fontSize: '0.85rem', color: '#666' }}>
                                     <span style={{ color: '#999' }}>Income:</span>{' '}
-                                    {p.income_streams.map(s => `${s.name} (${formatCurrency(s.annual_amount)})`).join(', ')}
+                                    {p.income_streams.map(s => {
+                                        if (s.one_time) {
+                                            return `${s.name} (${formatCurrency(s.annual_amount)}, age ${s.start_age})`;
+                                        }
+                                        const rate = s.inflation_rate ?? 0;
+                                        return rate > 0
+                                            ? `${s.name} (${formatCurrency(s.annual_amount)} @ ${(rate * 100).toFixed(1)}%)`
+                                            : `${s.name} (${formatCurrency(s.annual_amount)})`;
+                                    }).join(', ')}
                                 </div>
                             )}
                         </div>
