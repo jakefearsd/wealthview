@@ -53,3 +53,6 @@ flyway.conf
 testdata/
 .worktrees/
 defectimages/
+
+# Personal docs
+docs/
