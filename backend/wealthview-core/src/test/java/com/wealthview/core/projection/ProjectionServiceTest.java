@@ -87,7 +87,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -127,7 +127,7 @@ class ProjectionServiceTest {
                 "vanguard_dynamic_spending",
                 new BigDecimal("0.05"),
                 new BigDecimal("-0.025"),
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -161,7 +161,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
@@ -196,7 +196,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 null, null, null,
-                "traditional_first", null, null,
+                "traditional_first", null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -229,7 +229,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 "single", null, null, null,
-                "fill_bracket", new BigDecimal("0.12"),
+                "fill_bracket", new BigDecimal("0.12"), null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("200000"),
@@ -266,7 +266,7 @@ class ProjectionServiceTest {
         var request = new CreateScenarioRequest(
                 "Linked Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
@@ -407,7 +407,7 @@ class ProjectionServiceTest {
                 1985,
                 new BigDecimal("0.035"),
                 "dynamic_percentage",
-                null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
@@ -436,7 +436,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, List.of(), null);
+                null, null, null, null, null, null, null, List.of(), null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -460,7 +460,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),

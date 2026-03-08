@@ -1,0 +1,17 @@
+{
+  "scenarioName": "Simple Pre-Retirement",
+  "retirementDate": "2055-01-01",
+  "endAge": 90,
+  "inflationRate": "0.03",
+  "paramsJson": "{\"birth_year\": 1990}",
+  "referenceYear": 2025,
+  "accounts": [
+    {
+      "initialBalance": "500000",
+      "annualContribution": "20000",
+      "expectedReturn": "0.07",
+      "accountType": "taxable"
+    }
+  ],
+  "spendingProfile": null
+}

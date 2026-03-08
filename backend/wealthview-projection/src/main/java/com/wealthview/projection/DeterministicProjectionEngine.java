@@ -50,7 +50,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var accounts = input.accounts();
         var params = parseParams(input.paramsJson());
 
-        int currentYear = LocalDate.now().getYear();
+        int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
         int birthYear = params.birthYear != null ? params.birthYear : currentYear - 35;
         int retirementYear = input.retirementDate() != null
                 ? input.retirementDate().getYear()
@@ -113,16 +113,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             if (retired) {
                 yearsInRetirement++;
-                var ctx = new WithdrawalContext(
-                        balance, startBalance, previousWithdrawal, weightedReturn,
-                        inflationRate, yearsInRetirement);
-                withdrawals = strategy.computeWithdrawal(ctx);
+                BigDecimal activeIncome = computeActiveIncome(spendingData, age, yearsInRetirement);
 
-                if (withdrawals.compareTo(balance) > 0) {
-                    withdrawals = balance;
+                if (spendingData != null) {
+                    BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
+                    BigDecimal portfolioNeed = spendingNeed.subtract(activeIncome).max(BigDecimal.ZERO);
+                    withdrawals = portfolioNeed.min(balance);
+                    previousWithdrawal = withdrawals.add(activeIncome);
+                } else {
+                    var ctx = new WithdrawalContext(
+                            balance, startBalance, previousWithdrawal, weightedReturn,
+                            inflationRate, yearsInRetirement);
+                    withdrawals = strategy.computeWithdrawal(ctx).min(balance);
+                    previousWithdrawal = withdrawals;
                 }
+
                 balance = balance.subtract(withdrawals);
-                previousWithdrawal = withdrawals;
             }
 
             if (balance.compareTo(BigDecimal.ZERO) < 0) {
@@ -194,30 +200,41 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             BigDecimal totalGrowth = applyGrowth(balances, weightedReturn);
 
-            var conversion = executeRothConversion(
-                    balances, annualRothConversion, year, filingStatus, otherIncome,
-                    params.rothConversionStrategy(), params.targetBracketRate());
-            conversionAmount = conversion.amountConverted();
-            taxLiability = conversion.taxLiability();
-
             if (retired) {
                 yearsInRetirement++;
+            }
+            BigDecimal activeIncome = computeActiveIncome(spendingData, age, yearsInRetirement);
+            BigDecimal effectiveOtherIncome = otherIncome.add(activeIncome);
+
+            if (params.rothConversionStartYear() == null || year >= params.rothConversionStartYear()) {
+                var conversion = executeRothConversion(
+                        balances, annualRothConversion, year, filingStatus, effectiveOtherIncome,
+                        params.rothConversionStrategy(), params.targetBracketRate());
+                conversionAmount = conversion.amountConverted();
+                taxLiability = conversion.taxLiability();
+            }
+
+            if (retired) {
                 BigDecimal aggBalance = balances.total();
-                var ctx = new WithdrawalContext(
-                        aggBalance, startAgg, previousWithdrawal, weightedReturn,
-                        inflationRate, yearsInRetirement);
-                withdrawals = strategy.computeWithdrawal(ctx);
-                if (withdrawals.compareTo(aggBalance) > 0) {
-                    withdrawals = aggBalance;
+                BigDecimal portfolioNeed;
+
+                if (spendingData != null) {
+                    BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
+                    portfolioNeed = spendingNeed.subtract(activeIncome).max(BigDecimal.ZERO).min(aggBalance);
+                    previousWithdrawal = portfolioNeed.add(activeIncome);
+                } else {
+                    var ctx = new WithdrawalContext(
+                            aggBalance, startAgg, previousWithdrawal, weightedReturn,
+                            inflationRate, yearsInRetirement);
+                    portfolioNeed = strategy.computeWithdrawal(ctx).min(aggBalance);
+                    previousWithdrawal = portfolioNeed;
                 }
 
                 var withdrawalResult = executeWithdrawals(
-                        balances, withdrawals, year, filingStatus, otherIncome, conversionAmount,
-                        params.withdrawalOrder());
+                        balances, portfolioNeed, year, filingStatus, effectiveOtherIncome,
+                        conversionAmount, params.withdrawalOrder());
                 withdrawals = withdrawalResult.totalWithdrawn();
                 taxLiability = taxLiability.add(withdrawalResult.taxLiability());
-
-                previousWithdrawal = withdrawals;
             }
 
             balances.floorAtZero();
@@ -299,7 +316,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private ScenarioParams parseParams(String paramsJson) {
         if (paramsJson == null || paramsJson.isBlank()) {
             return new ScenarioParams(null, null, null, null, null, null, null, null,
-                    WithdrawalOrder.TAXABLE_FIRST, null, null);
+                    WithdrawalOrder.TAXABLE_FIRST, null, null, null);
         }
         try {
             JsonNode node = objectMapper.readTree(paramsJson);
@@ -334,13 +351,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal targetBracketRate = node.has("target_bracket_rate")
                     ? new BigDecimal(node.get("target_bracket_rate").asText())
                     : null;
+            Integer rothConversionStartYear = node.has("roth_conversion_start_year")
+                    ? node.get("roth_conversion_start_year").asInt() : null;
             return new ScenarioParams(birthYear, withdrawalRate, withdrawalStrategy,
                     dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion,
-                    withdrawalOrder, rothConversionStrategy, targetBracketRate);
+                    withdrawalOrder, rothConversionStrategy, targetBracketRate,
+                    rothConversionStartYear);
         } catch (Exception e) {
             log.warn("Failed to parse params_json: {}", e.getMessage());
             return new ScenarioParams(null, null, null, null, null, null, null, null,
-                    WithdrawalOrder.TAXABLE_FIRST, null, null);
+                    WithdrawalOrder.TAXABLE_FIRST, null, null, null);
         }
     }
 
@@ -355,7 +375,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal annualRothConversion,
             WithdrawalOrder withdrawalOrder,
             String rothConversionStrategy,
-            BigDecimal targetBracketRate) {
+            BigDecimal targetBracketRate,
+            Integer rothConversionStartYear) {
     }
 
     private static class PoolBalances {
@@ -388,10 +409,45 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal inflationRate) {
     }
 
+    private record SpendingTierData(
+            String name,
+            int startAge,
+            Integer endAge,
+            BigDecimal essentialExpenses,
+            BigDecimal discretionaryExpenses) {
+    }
+
     private record SpendingData(
             BigDecimal essentialExpenses,
             BigDecimal discretionaryExpenses,
-            List<IncomeStreamData> incomeStreams) {
+            List<IncomeStreamData> incomeStreams,
+            List<SpendingTierData> spendingTiers) {
+    }
+
+    private record ResolvedSpending(BigDecimal essential, BigDecimal discretionary) {}
+
+    private ResolvedSpending resolveSpending(SpendingData spending, int age) {
+        if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
+            for (var tier : spending.spendingTiers()) {
+                if (age >= tier.startAge() && (tier.endAge() == null || age < tier.endAge())) {
+                    return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
+                }
+            }
+        }
+        return new ResolvedSpending(spending.essentialExpenses(), spending.discretionaryExpenses());
+    }
+
+    private int computeYearsInTier(SpendingData spending, int age, int yearsInRetirement) {
+        if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
+            for (var tier : spending.spendingTiers()) {
+                if (age >= tier.startAge() && (tier.endAge() == null || age < tier.endAge())) {
+                    int retirementStartAge = age - yearsInRetirement + 1;
+                    int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
+                    return age - effectiveTierStart;
+                }
+            }
+        }
+        return -1;
     }
 
     private BigDecimal applyContributions(PoolBalances balances,
@@ -565,8 +621,49 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         } catch (Exception e) {
             log.warn("Failed to parse income_streams: {}", e.getMessage());
         }
+        List<SpendingTierData> tiers = List.of();
+        try {
+            if (profile.spendingTiers() != null && !profile.spendingTiers().isBlank()
+                    && !"[]".equals(profile.spendingTiers().trim())) {
+                var tierNode = objectMapper.readTree(profile.spendingTiers());
+                var tierList = new ArrayList<SpendingTierData>();
+                for (var item : tierNode) {
+                    BigDecimal essExp = BigDecimal.ZERO;
+                    if (item.has("essentialExpenses") && !item.get("essentialExpenses").isNull()) {
+                        essExp = new BigDecimal(item.get("essentialExpenses").asText());
+                    } else if (item.has("essential_expenses") && !item.get("essential_expenses").isNull()) {
+                        essExp = new BigDecimal(item.get("essential_expenses").asText());
+                    }
+                    BigDecimal discExp = BigDecimal.ZERO;
+                    if (item.has("discretionaryExpenses") && !item.get("discretionaryExpenses").isNull()) {
+                        discExp = new BigDecimal(item.get("discretionaryExpenses").asText());
+                    } else if (item.has("discretionary_expenses") && !item.get("discretionary_expenses").isNull()) {
+                        discExp = new BigDecimal(item.get("discretionary_expenses").asText());
+                    }
+                    int startAge = 0;
+                    if (item.has("startAge") && !item.get("startAge").isNull()) {
+                        startAge = item.get("startAge").asInt();
+                    } else if (item.has("start_age") && !item.get("start_age").isNull()) {
+                        startAge = item.get("start_age").asInt();
+                    }
+                    Integer endAge = null;
+                    if (item.has("endAge") && !item.get("endAge").isNull()) {
+                        endAge = item.get("endAge").asInt();
+                    } else if (item.has("end_age") && !item.get("end_age").isNull()) {
+                        endAge = item.get("end_age").asInt();
+                    }
+                    tierList.add(new SpendingTierData(
+                            item.has("name") ? item.get("name").asText() : "",
+                            startAge, endAge, essExp, discExp));
+                }
+                tiers = tierList;
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse spending_tiers: {}", e.getMessage());
+        }
+
         return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(),
-                streams);
+                streams, tiers);
     }
 
     private SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
@@ -629,23 +726,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             return base;
         }
 
-        BigDecimal inflationFactor = yearsInRetirement > 1
-                ? BigDecimal.ONE.add(inflationRate).pow(yearsInRetirement - 1)
-                : BigDecimal.ONE;
+        var resolved = resolveSpending(spending, age);
+        BigDecimal inflationFactor = computeInflationFactor(spending, age, yearsInRetirement, inflationRate);
 
-        BigDecimal essential = spending.essentialExpenses().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        BigDecimal discretionary = spending.discretionaryExpenses().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
 
-        BigDecimal activeIncome = BigDecimal.ZERO;
-        for (var stream : spending.incomeStreams()) {
-            if (age >= stream.startAge() && (stream.endAge() == null || age < stream.endAge())) {
-                BigDecimal streamInflationFactor = yearsInRetirement > 1
-                        ? BigDecimal.ONE.add(stream.inflationRate()).pow(yearsInRetirement - 1)
-                        : BigDecimal.ONE;
-                activeIncome = activeIncome.add(
-                        stream.annualAmount().multiply(streamInflationFactor).setScale(SCALE, ROUNDING));
-            }
-        }
+        BigDecimal activeIncome = computeActiveIncome(spending, age, yearsInRetirement);
 
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
         BigDecimal surplus = base.withdrawals().subtract(netNeed);
@@ -663,5 +750,44 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
                 base.rothConversionAmount(), base.taxLiability(),
                 essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts);
+    }
+
+    private BigDecimal computeInflationFactor(SpendingData spending, int age,
+                                               int yearsInRetirement, BigDecimal inflationRate) {
+        int yearsInTier = computeYearsInTier(spending, age, yearsInRetirement);
+        if (yearsInTier >= 0) {
+            return yearsInTier > 0
+                    ? BigDecimal.ONE.add(inflationRate).pow(yearsInTier)
+                    : BigDecimal.ONE;
+        }
+        return yearsInRetirement > 1
+                ? BigDecimal.ONE.add(inflationRate).pow(yearsInRetirement - 1)
+                : BigDecimal.ONE;
+    }
+
+    private BigDecimal computeSpendingNeed(SpendingData spendingData, int age,
+                                            int yearsInRetirement, BigDecimal inflationRate) {
+        var resolved = resolveSpending(spendingData, age);
+        BigDecimal inflationFactor = computeInflationFactor(spendingData, age, yearsInRetirement, inflationRate);
+        BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        return essential.add(discretionary);
+    }
+
+    private BigDecimal computeActiveIncome(SpendingData spendingData, int age, int yearsInRetirement) {
+        if (spendingData == null || spendingData.incomeStreams().isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal activeIncome = BigDecimal.ZERO;
+        for (var stream : spendingData.incomeStreams()) {
+            if (age >= stream.startAge() && (stream.endAge() == null || age < stream.endAge())) {
+                BigDecimal factor = yearsInRetirement > 1
+                        ? BigDecimal.ONE.add(stream.inflationRate()).pow(yearsInRetirement - 1)
+                        : BigDecimal.ONE;
+                activeIncome = activeIncome.add(
+                        stream.annualAmount().multiply(factor).setScale(SCALE, ROUNDING));
+            }
+        }
+        return activeIncome;
     }
 }
