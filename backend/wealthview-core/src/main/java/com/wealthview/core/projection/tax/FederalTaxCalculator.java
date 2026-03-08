@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.tax;
 
 import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.springframework.stereotype.Component;
 
@@ -17,13 +18,24 @@ public class FederalTaxCalculator {
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final TaxBracketRepository taxBracketRepository;
+    private final StandardDeductionRepository standardDeductionRepository;
     private final Map<String, List<TaxBracketEntity>> bracketCache = new HashMap<>();
+    private final Map<String, BigDecimal> deductionCache = new HashMap<>();
 
-    public FederalTaxCalculator(TaxBracketRepository taxBracketRepository) {
+    public FederalTaxCalculator(TaxBracketRepository taxBracketRepository,
+                                 StandardDeductionRepository standardDeductionRepository) {
         this.taxBracketRepository = taxBracketRepository;
+        this.standardDeductionRepository = standardDeductionRepository;
     }
 
-    public BigDecimal computeTax(BigDecimal taxableIncome, int taxYear, FilingStatus status) {
+    public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+        if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal deduction = loadStandardDeduction(taxYear, status);
+        BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
+
         if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
@@ -68,9 +80,15 @@ public class FederalTaxCalculator {
                 brackets = loadBrackets(maxYear, status);
             }
         }
+
+        BigDecimal deduction = loadStandardDeduction(taxYear, status);
+
         for (var bracket : brackets) {
             if (bracket.getRate().compareTo(targetRate) == 0) {
-                return bracket.getBracketCeiling() != null ? bracket.getBracketCeiling() : BigDecimal.ZERO;
+                if (bracket.getBracketCeiling() != null) {
+                    return bracket.getBracketCeiling().add(deduction);
+                }
+                return BigDecimal.ZERO;
             }
         }
         return BigDecimal.ZERO;
@@ -78,6 +96,24 @@ public class FederalTaxCalculator {
 
     public void clearCache() {
         bracketCache.clear();
+        deductionCache.clear();
+    }
+
+    private BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
+        String key = taxYear + ":" + status.value();
+        return deductionCache.computeIfAbsent(key, k -> {
+            var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());
+            if (entity.isPresent()) {
+                return entity.get().getAmount();
+            }
+            Integer maxYear = standardDeductionRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                return standardDeductionRepository.findByTaxYearAndFilingStatus(maxYear, status.value())
+                        .map(e -> e.getAmount())
+                        .orElse(BigDecimal.ZERO);
+            }
+            return BigDecimal.ZERO;
+        });
     }
 
     private List<TaxBracketEntity> loadBrackets(int taxYear, FilingStatus status) {
