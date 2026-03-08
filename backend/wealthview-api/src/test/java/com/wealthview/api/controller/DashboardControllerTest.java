@@ -65,9 +65,9 @@ class DashboardControllerTest {
     }
 
     @Test
-    void getSummary_unauthenticated_returns403() throws Exception {
+    void getSummary_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/dashboard/summary"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test

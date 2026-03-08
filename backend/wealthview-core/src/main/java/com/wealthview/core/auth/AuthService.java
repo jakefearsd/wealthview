@@ -45,6 +45,7 @@ public class AuthService {
         this.eventPublisher = eventPublisher;
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         var user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
@@ -98,6 +99,7 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse refresh(String refreshToken) {
         if (!jwtTokenProvider.validateToken(refreshToken)) {
             throw new BadCredentialsException("Invalid refresh token");

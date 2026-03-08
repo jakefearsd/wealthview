@@ -101,6 +101,6 @@ class DataExportControllerTest {
     @Test
     void exportJson_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/export/json"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

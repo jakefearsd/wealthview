@@ -5,6 +5,8 @@ import com.wealthview.persistence.repository.AuditLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 @Component
@@ -19,6 +21,7 @@ public class AuditEventListener {
     }
 
     @TransactionalEventListener(fallbackExecution = true)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleAuditEvent(AuditEvent event) {
         var entity = new AuditLogEntity(
                 event.tenantId(), event.userId(), event.action(),

@@ -177,9 +177,9 @@ class AccountControllerTest {
     }
 
     @Test
-    void list_unauthenticated_returns403() throws Exception {
+    void list_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/accounts"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
