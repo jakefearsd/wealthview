@@ -42,11 +42,20 @@ export interface ProjectionYear {
     discretionary_after_cuts: number | null;
 }
 
+export interface SpendingFeasibility {
+    spending_feasible: boolean;
+    first_shortfall_year: number | null;
+    first_shortfall_age: number | null;
+    sustainable_annual_spending: number;
+    required_annual_spending: number;
+}
+
 export interface ProjectionResult {
     scenario_id: string;
     yearly_data: ProjectionYear[];
     final_balance: number;
     years_in_retirement: number;
+    spending_feasibility: SpendingFeasibility | null;
 }
 
 export interface CompareResponse {
@@ -77,6 +86,7 @@ export interface CreateScenarioRequest {
     withdrawal_order?: string | null;
     roth_conversion_strategy?: string | null;
     target_bracket_rate?: number | null;
+    roth_conversion_start_year?: number | null;
     spending_profile_id?: string | null;
     accounts: ScenarioAccountInput[];
 }
@@ -88,6 +98,16 @@ export interface IncomeStream {
     annual_amount: number;
     start_age: number;
     end_age: number | null;
+    inflation_rate?: number;
+    one_time?: boolean;
+}
+
+export interface SpendingTier {
+    name: string;
+    start_age: number;
+    end_age: number | null;
+    essential_expenses: number;
+    discretionary_expenses: number;
 }
 
 export interface SpendingProfile {
@@ -96,6 +116,7 @@ export interface SpendingProfile {
     essential_expenses: number;
     discretionary_expenses: number;
     income_streams: IncomeStream[];
+    spending_tiers: SpendingTier[];
     created_at: string;
     updated_at: string;
 }
@@ -105,6 +126,20 @@ export interface CreateSpendingProfileRequest {
     essential_expenses: number;
     discretionary_expenses: number;
     income_streams: IncomeStream[];
+    spending_tiers: SpendingTier[];
 }
 
 export interface UpdateSpendingProfileRequest extends CreateSpendingProfileRequest {}
+
+export interface ProjectionMonthPoint {
+    label: string;
+    year: number;
+    month: number;
+    age: number;
+    balance: number;
+    traditional_balance: number | null;
+    roth_balance: number | null;
+    taxable_balance: number | null;
+    retired: boolean;
+    roth_conversion_amount: number | null;
+}

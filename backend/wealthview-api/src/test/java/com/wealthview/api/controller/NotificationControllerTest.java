@@ -76,8 +76,8 @@ class NotificationControllerTest {
     }
 
     @Test
-    void getPreferences_unauthenticated_returns403() throws Exception {
+    void getPreferences_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/notifications/preferences"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

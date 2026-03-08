@@ -110,8 +110,8 @@ class PropertyControllerAnalyticsTest {
     }
 
     @Test
-    void getAnalytics_unauthenticated_returns403() throws Exception {
+    void getAnalytics_unauthenticated_returns401() throws Exception {
         mockMvc.perform(get("/api/v1/properties/{id}/analytics", PROPERTY_ID))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 }

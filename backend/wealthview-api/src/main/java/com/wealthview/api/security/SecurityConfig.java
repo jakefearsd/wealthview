@@ -52,6 +52,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(401);
+                            response.setContentType("application/json");
+                            response.getWriter().write("""
+                                    {"error":"UNAUTHORIZED","message":"Authentication required","status":401}""");
+                        })
+                )
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
                         .frameOptions(frame -> frame.deny())

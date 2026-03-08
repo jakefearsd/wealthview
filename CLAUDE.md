@@ -309,25 +309,35 @@ frontend/src/
 
 ## Build & Run Commands
 
-### Database
+### Running the Application (Docker Compose — default for manual testing)
+
+This is the **preferred way** to start the app for manual testing. It builds both frontend and backend into a single Docker image, runs Flyway migrations, and seeds demo data automatically.
+
 ```bash
-docker compose up -d db                          # Start PostgreSQL
-docker compose exec db psql -U wv_app wealthview  # Connect to database
+docker compose up --build -d                       # Build & start (http://localhost:80)
+docker compose down                                # Stop everything
+docker compose logs -f app                         # Tail application logs
+docker compose exec db psql -U wv_app wealthview   # Connect to database
 ```
 
-### Backend
+- **URL:** http://localhost:80
+- **Profile:** `docker` (seeds demo data via SampleDataInitializer)
+- **Credentials:** `demo@wealthview.local` / `demo123`
+- When the user asks to "start the app", "rebuild and relaunch", or "run it for testing", use `docker compose up --build -d`.
+- To stop, use `docker compose down`. Always stop existing instances before starting new ones.
+
+### Backend (development / tests only)
 ```bash
 cd backend
 mvn clean install                                  # Full build + tests
 mvn clean install -DskipTests                      # Build without tests
-mvn -pl wealthview-app spring-boot:run             # Run the application
 mvn test                                           # Run all tests
 mvn -pl wealthview-core test                       # Run tests for one module
 mvn test -Dtest=AccountServiceTest                 # Run a single test class
 mvn test -Dtest="AccountServiceTest#methodName"    # Run a single test method
 ```
 
-### Frontend
+### Frontend (development only)
 ```bash
 cd frontend
 npm install                                        # Install dependencies

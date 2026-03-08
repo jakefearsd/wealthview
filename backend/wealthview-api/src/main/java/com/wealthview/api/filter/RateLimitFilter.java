@@ -4,6 +4,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -14,8 +15,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
-    private static final int API_LIMIT = 100;
-    private static final int AUTH_LIMIT = 10;
+    private static final int API_LIMIT_PER_USER = 300;
+    private static final int AUTH_LIMIT_PER_IP = 60;
     private static final long WINDOW_MS = 60_000;
 
     private final ConcurrentHashMap<String, RateWindow> windows = new ConcurrentHashMap<>();
@@ -31,8 +32,18 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         var ip = getClientIp(request);
         var isAuth = path.startsWith("/api/v1/auth/");
-        var key = ip + (isAuth ? ":auth" : ":api");
-        var limit = isAuth ? AUTH_LIMIT : API_LIMIT;
+
+        String key;
+        int limit;
+        if (isAuth) {
+            key = ip + ":auth";
+            limit = AUTH_LIMIT_PER_IP;
+        } else {
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            var principal = (auth != null && auth.isAuthenticated()) ? auth.getName() : ip;
+            key = principal + ":api";
+            limit = API_LIMIT_PER_USER;
+        }
 
         var window = windows.compute(key, (k, existing) -> {
             long now = System.currentTimeMillis();

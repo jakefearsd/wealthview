@@ -52,3 +52,4 @@ flyway.conf
 # Test data
 testdata/
 .worktrees/
+defectimages/
