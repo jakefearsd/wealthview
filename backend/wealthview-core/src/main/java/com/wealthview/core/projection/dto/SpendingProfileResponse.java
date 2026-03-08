@@ -15,6 +15,7 @@ public record SpendingProfileResponse(
         BigDecimal essentialExpenses,
         BigDecimal discretionaryExpenses,
         List<IncomeStreamResponse> incomeStreams,
+        List<SpendingTierResponse> spendingTiers,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
@@ -30,12 +31,24 @@ public record SpendingProfileResponse(
         } catch (Exception e) {
             // fall through with empty list
         }
+
+        List<SpendingTierResponse> tiers = List.of();
+        try {
+            if (entity.getSpendingTiers() != null && !entity.getSpendingTiers().isBlank()) {
+                tiers = MAPPER.readValue(entity.getSpendingTiers(),
+                        new TypeReference<List<SpendingTierResponse>>() {});
+            }
+        } catch (Exception e) {
+            // fall through with empty list
+        }
+
         return new SpendingProfileResponse(
                 entity.getId(),
                 entity.getName(),
                 entity.getEssentialExpenses(),
                 entity.getDiscretionaryExpenses(),
                 streams,
+                tiers,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());
     }

@@ -7,5 +7,6 @@ public record UpdateSpendingProfileRequest(
         String name,
         BigDecimal essentialExpenses,
         BigDecimal discretionaryExpenses,
-        List<IncomeStreamRequest> incomeStreams) {
+        List<IncomeStreamRequest> incomeStreams,
+        List<SpendingTierRequest> spendingTiers) {
 }

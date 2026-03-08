@@ -6,6 +6,7 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.IncomeStreamRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
+import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
@@ -40,7 +41,8 @@ public class SpendingProfileService {
                 request.name(),
                 request.essentialExpenses(),
                 request.discretionaryExpenses(),
-                serializeIncomeStreams(request.incomeStreams()));
+                serializeIncomeStreams(request.incomeStreams()),
+                serializeSpendingTiers(request.spendingTiers()));
 
         var saved = profileRepository.save(entity);
         return SpendingProfileResponse.from(saved);
@@ -55,6 +57,7 @@ public class SpendingProfileService {
         entity.setEssentialExpenses(request.essentialExpenses());
         entity.setDiscretionaryExpenses(request.discretionaryExpenses());
         entity.setIncomeStreams(serializeIncomeStreams(request.incomeStreams()));
+        entity.setSpendingTiers(serializeSpendingTiers(request.spendingTiers()));
         entity.setUpdatedAt(OffsetDateTime.now());
 
         var saved = profileRepository.save(entity);
@@ -88,6 +91,17 @@ public class SpendingProfileService {
         }
         try {
             return objectMapper.writeValueAsString(streams);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private String serializeSpendingTiers(List<SpendingTierRequest> tiers) {
+        if (tiers == null || tiers.isEmpty()) {
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(tiers);
         } catch (Exception e) {
             return "[]";
         }
