@@ -60,7 +60,7 @@ class SpendingProfileServiceTest {
                 "Retirement Spending",
                 new BigDecimal("40000"),
                 new BigDecimal("20000"),
-                List.of(new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null)));
+                List.of(new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null, null)));
 
         var result = service.createProfile(tenantId, request);
 
@@ -148,6 +148,24 @@ class SpendingProfileServiceTest {
 
         assertThatThrownBy(() -> service.getProfile(tenantId, profileId))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void createProfile_withPerStreamInflationRate_persistsInJson() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(profileRepository.save(any(SpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateSpendingProfileRequest(
+                "With Inflation",
+                new BigDecimal("40000"),
+                new BigDecimal("20000"),
+                List.of(new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null, new BigDecimal("0.02"))));
+
+        var result = service.createProfile(tenantId, request);
+
+        assertThat(result.incomeStreams()).hasSize(1);
+        assertThat(result.incomeStreams().getFirst().inflationRate()).isEqualByComparingTo(new BigDecimal("0.02"));
     }
 
     @Test

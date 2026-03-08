@@ -3,8 +3,12 @@ package com.wealthview.projection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.SpendingFeasibilitySummary;
+import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.strategy.DynamicPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.FixedPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.VanguardDynamicSpendingWithdrawal;
@@ -13,9 +17,6 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
-import com.wealthview.persistence.entity.ProjectionAccountEntity;
-import com.wealthview.persistence.entity.ProjectionScenarioEntity;
-import com.wealthview.persistence.entity.SpendingProfileEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -45,42 +46,42 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     @Override
-    public ProjectionResultResponse run(ProjectionScenarioEntity scenario) {
-        var accounts = scenario.getAccounts();
-        var params = parseParams(scenario.getParamsJson());
+    public ProjectionResultResponse run(ProjectionInput input) {
+        var accounts = input.accounts();
+        var params = parseParams(input.paramsJson());
 
         int currentYear = LocalDate.now().getYear();
         int birthYear = params.birthYear != null ? params.birthYear : currentYear - 35;
-        int retirementYear = scenario.getRetirementDate() != null
-                ? scenario.getRetirementDate().getYear()
+        int retirementYear = input.retirementDate() != null
+                ? input.retirementDate().getYear()
                 : currentYear + 30;
-        int endAge = scenario.getEndAge() != null ? scenario.getEndAge() : 90;
+        int endAge = input.endAge() != null ? input.endAge() : 90;
         int endYear = birthYear + endAge;
 
         BigDecimal withdrawalRate = params.withdrawalRate != null
                 ? params.withdrawalRate
                 : DEFAULT_WITHDRAWAL_RATE;
-        BigDecimal inflationRate = scenario.getInflationRate() != null
-                ? scenario.getInflationRate()
+        BigDecimal inflationRate = input.inflationRate() != null
+                ? input.inflationRate()
                 : BigDecimal.ZERO;
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
-        SpendingData spendingData = loadSpendingData(scenario.getSpendingProfile());
+        SpendingData spendingData = loadSpendingData(input.spendingProfile());
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
 
         if (hasMultiplePools) {
-            return runWithPools(scenario, accounts, params, strategy, currentYear, birthYear,
+            return runWithPools(input, accounts, params, strategy, currentYear, birthYear,
                     retirementYear, endYear, inflationRate, spendingData);
         }
 
-        return runSimple(scenario, accounts, strategy, currentYear, birthYear,
+        return runSimple(input, accounts, strategy, currentYear, birthYear,
                 retirementYear, endYear, inflationRate, spendingData);
     }
 
     private ProjectionResultResponse runSimple(
-            ProjectionScenarioEntity scenario,
-            List<ProjectionAccountEntity> accounts,
+            ProjectionInput input,
+            List<ProjectionAccountInput> accounts,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
             BigDecimal inflationRate, SpendingData spendingData) {
@@ -138,21 +139,23 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : yearlyData.getLast().endBalance();
 
         log.info("Projection for scenario '{}': {} years, final balance {}",
-                scenario.getName(), yearlyData.size(), finalBalance);
+                input.scenarioName(), yearlyData.size(), finalBalance);
 
-        return new ProjectionResultResponse(scenario.getId(), yearlyData, finalBalance, yearsInRetirement);
+        var feasibility = computeFeasibility(yearlyData, spendingData, inflationRate);
+        return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
+                yearsInRetirement, feasibility);
     }
 
     private ProjectionResultResponse runWithPools(
-            ProjectionScenarioEntity scenario,
-            List<ProjectionAccountEntity> accounts,
+            ProjectionInput input,
+            List<ProjectionAccountInput> accounts,
             ScenarioParams params,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
             BigDecimal inflationRate, SpendingData spendingData) {
 
-        Map<String, List<ProjectionAccountEntity>> grouped = accounts.stream()
-                .collect(Collectors.groupingBy(ProjectionAccountEntity::getAccountType));
+        Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
+                .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
 
         var balances = new PoolBalances(
                 sumInitialBalances(grouped.getOrDefault("taxable", List.of())),
@@ -235,30 +238,32 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : yearlyData.getLast().endBalance();
 
         log.info("Projection with pools for scenario '{}': {} years, final balance {}",
-                scenario.getName(), yearlyData.size(), finalBalance);
+                input.scenarioName(), yearlyData.size(), finalBalance);
 
-        return new ProjectionResultResponse(scenario.getId(), yearlyData, finalBalance, yearsInRetirement);
+        var feasibility = computeFeasibility(yearlyData, spendingData, inflationRate);
+        return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
+                yearsInRetirement, feasibility);
     }
 
-    private boolean hasMultipleAccountTypes(List<ProjectionAccountEntity> accounts) {
+    private boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {
         long distinctTypes = accounts.stream()
-                .map(ProjectionAccountEntity::getAccountType)
+                .map(ProjectionAccountInput::accountType)
                 .distinct()
                 .count();
         boolean hasNonTaxable = accounts.stream()
-                .anyMatch(a -> !"taxable".equals(a.getAccountType()));
+                .anyMatch(a -> !"taxable".equals(a.accountType()));
         return distinctTypes > 1 || hasNonTaxable;
     }
 
-    private BigDecimal sumInitialBalances(List<ProjectionAccountEntity> accounts) {
+    private BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
         return accounts.stream()
-                .map(ProjectionAccountEntity::getInitialBalance)
+                .map(ProjectionAccountInput::initialBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private BigDecimal sumContributions(List<ProjectionAccountEntity> accounts) {
+    private BigDecimal sumContributions(List<ProjectionAccountInput> accounts) {
         return accounts.stream()
-                .map(ProjectionAccountEntity::getAnnualContribution)
+                .map(ProjectionAccountInput::annualContribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -279,14 +284,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         };
     }
 
-    private BigDecimal computeWeightedReturn(List<ProjectionAccountEntity> accounts, BigDecimal totalBalance) {
+    private BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts, BigDecimal totalBalance) {
         if (totalBalance.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
         BigDecimal weightedSum = BigDecimal.ZERO;
         for (var account : accounts) {
             weightedSum = weightedSum.add(
-                    account.getInitialBalance().multiply(account.getExpectedReturn()));
+                    account.initialBalance().multiply(account.expectedReturn()));
         }
         return weightedSum.divide(totalBalance, SCALE + 4, ROUNDING);
     }
@@ -379,7 +384,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             String name,
             BigDecimal annualAmount,
             int startAge,
-            Integer endAge) {
+            Integer endAge,
+            BigDecimal inflationRate) {
     }
 
     private record SpendingData(
@@ -515,15 +521,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability) {}
 
-    private SpendingData loadSpendingData(SpendingProfileEntity profile) {
+    private SpendingData loadSpendingData(@Nullable SpendingProfileInput profile) {
         if (profile == null) {
             return null;
         }
         List<IncomeStreamData> streams = List.of();
         try {
-            if (profile.getIncomeStreams() != null && !profile.getIncomeStreams().isBlank()
-                    && !"[]".equals(profile.getIncomeStreams().trim())) {
-                var node = objectMapper.readTree(profile.getIncomeStreams());
+            if (profile.incomeStreams() != null && !profile.incomeStreams().isBlank()
+                    && !"[]".equals(profile.incomeStreams().trim())) {
+                var node = objectMapper.readTree(profile.incomeStreams());
                 var list = new ArrayList<IncomeStreamData>();
                 for (var item : node) {
                     BigDecimal amount = BigDecimal.ZERO;
@@ -544,16 +550,77 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     } else if (item.has("end_age") && !item.get("end_age").isNull()) {
                         endAge = item.get("end_age").asInt();
                     }
+                    BigDecimal inflRate = BigDecimal.ZERO;
+                    if (item.has("inflationRate") && !item.get("inflationRate").isNull()) {
+                        inflRate = new BigDecimal(item.get("inflationRate").asText());
+                    } else if (item.has("inflation_rate") && !item.get("inflation_rate").isNull()) {
+                        inflRate = new BigDecimal(item.get("inflation_rate").asText());
+                    }
                     list.add(new IncomeStreamData(
                             item.has("name") ? item.get("name").asText() : "",
-                            amount, startAge, endAge));
+                            amount, startAge, endAge, inflRate));
                 }
                 streams = list;
             }
         } catch (Exception e) {
             log.warn("Failed to parse income_streams: {}", e.getMessage());
         }
-        return new SpendingData(profile.getEssentialExpenses(), profile.getDiscretionaryExpenses(), streams);
+        return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(),
+                streams);
+    }
+
+    private SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
+                                                           SpendingData spendingData,
+                                                           BigDecimal inflationRate) {
+        if (spendingData == null) {
+            return null;
+        }
+
+        BigDecimal requiredAnnualSpending = spendingData.essentialExpenses()
+                .add(spendingData.discretionaryExpenses());
+
+        Integer firstShortfallYear = null;
+        Integer firstShortfallAge = null;
+        BigDecimal minSustainable = null;
+
+        int retiredYearIndex = 0;
+        for (var year : yearlyData) {
+            if (!year.retired()) {
+                continue;
+            }
+            retiredYearIndex++;
+
+            if (year.spendingSurplus() != null && year.spendingSurplus().compareTo(BigDecimal.ZERO) < 0
+                    && firstShortfallYear == null) {
+                firstShortfallYear = year.year();
+                firstShortfallAge = year.age();
+            }
+
+            BigDecimal availableNominal = year.withdrawals();
+            if (year.incomeStreamsTotal() != null) {
+                availableNominal = availableNominal.add(year.incomeStreamsTotal());
+            }
+
+            BigDecimal expenseInflationFactor = retiredYearIndex > 1
+                    ? BigDecimal.ONE.add(inflationRate).pow(retiredYearIndex - 1)
+                    : BigDecimal.ONE;
+
+            BigDecimal realAvailable = expenseInflationFactor.compareTo(BigDecimal.ZERO) > 0
+                    ? availableNominal.divide(expenseInflationFactor, SCALE, ROUNDING)
+                    : availableNominal;
+
+            if (minSustainable == null || realAvailable.compareTo(minSustainable) < 0) {
+                minSustainable = realAvailable;
+            }
+        }
+
+        if (minSustainable == null) {
+            return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, requiredAnnualSpending);
+        }
+
+        boolean feasible = firstShortfallYear == null;
+        return new SpendingFeasibilitySummary(feasible, firstShortfallYear, firstShortfallAge,
+                minSustainable, requiredAnnualSpending);
     }
 
     private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
@@ -572,7 +639,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal activeIncome = BigDecimal.ZERO;
         for (var stream : spending.incomeStreams()) {
             if (age >= stream.startAge() && (stream.endAge() == null || age < stream.endAge())) {
-                activeIncome = activeIncome.add(stream.annualAmount());
+                BigDecimal streamInflationFactor = yearsInRetirement > 1
+                        ? BigDecimal.ONE.add(stream.inflationRate()).pow(yearsInRetirement - 1)
+                        : BigDecimal.ONE;
+                activeIncome = activeIncome.add(
+                        stream.annualAmount().multiply(streamInflationFactor).setScale(SCALE, ROUNDING));
             }
         }
 

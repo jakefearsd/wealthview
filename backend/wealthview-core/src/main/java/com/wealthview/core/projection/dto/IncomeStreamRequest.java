@@ -6,5 +6,6 @@ public record IncomeStreamRequest(
         String name,
         BigDecimal annualAmount,
         int startAge,
-        Integer endAge) {
+        Integer endAge,
+        BigDecimal inflationRate) {
 }

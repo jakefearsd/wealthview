@@ -30,8 +30,8 @@ public class ProjectionAccountEntity {
     @JoinColumn(name = "linked_account_id")
     private AccountEntity linkedAccount;
 
-    @Column(name = "initial_balance", nullable = false, precision = 19, scale = 4)
-    private BigDecimal initialBalance = BigDecimal.ZERO;
+    @Column(name = "initial_balance", precision = 19, scale = 4)
+    private BigDecimal initialBalance;
 
     @Column(name = "annual_contribution", nullable = false, precision = 19, scale = 4)
     private BigDecimal annualContribution = BigDecimal.ZERO;

@@ -8,8 +8,15 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.LinkedAccountInput;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionAccountResponse;
+import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
+import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -20,6 +27,7 @@ import com.wealthview.persistence.repository.TenantRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -79,7 +87,7 @@ public class ProjectionService {
 
                 var projAcct = new ProjectionAccountEntity(
                         scenario, linkedAccount,
-                        acctReq.initialBalance(),
+                        linkedAccount != null ? null : acctReq.initialBalance(),
                         acctReq.annualContribution(),
                         acctReq.expectedReturn(),
                         acctReq.accountType());
@@ -88,20 +96,20 @@ public class ProjectionService {
         }
 
         var saved = scenarioRepository.save(scenario);
-        return ScenarioResponse.from(saved);
+        return toScenarioResponse(saved, tenantId);
     }
 
     @Transactional(readOnly = true)
     public ScenarioResponse getScenario(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
-        return ScenarioResponse.from(scenario);
+        return toScenarioResponse(scenario, tenantId);
     }
 
     @Transactional(readOnly = true)
     public List<ScenarioResponse> listScenarios(UUID tenantId) {
         return scenarioRepository.findByTenant_IdOrderByCreatedAtDesc(tenantId).stream()
-                .map(ScenarioResponse::from)
+                .map(s -> toScenarioResponse(s, tenantId))
                 .toList();
     }
 
@@ -138,7 +146,7 @@ public class ProjectionService {
                         : null;
                 var projAcct = new ProjectionAccountEntity(
                         scenario, linkedAccount,
-                        acctReq.initialBalance(),
+                        linkedAccount != null ? null : acctReq.initialBalance(),
                         acctReq.annualContribution(),
                         acctReq.expectedReturn(),
                         acctReq.accountType());
@@ -147,7 +155,7 @@ public class ProjectionService {
         }
 
         var saved = scenarioRepository.save(scenario);
-        return ScenarioResponse.from(saved);
+        return toScenarioResponse(saved, tenantId);
     }
 
     @Transactional
@@ -163,8 +171,7 @@ public class ProjectionService {
         for (var scenarioId : request.scenarioIds()) {
             var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                     .orElseThrow(() -> new EntityNotFoundException("Scenario not found: " + scenarioId));
-            resolveLinkedAccountBalances(scenario, tenantId);
-            results.add(projectionEngine.run(scenario));
+            results.add(projectionEngine.run(toProjectionInput(scenario, tenantId)));
         }
         return new CompareResponse(results);
     }
@@ -173,25 +180,73 @@ public class ProjectionService {
     public ProjectionResultResponse runProjection(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
-        resolveLinkedAccountBalances(scenario, tenantId);
-        return projectionEngine.run(scenario);
+        return projectionEngine.run(toProjectionInput(scenario, tenantId));
     }
 
-    private void resolveLinkedAccountBalances(ProjectionScenarioEntity scenario, UUID tenantId) {
-        for (var projAcct : scenario.getAccounts()) {
-            if (projAcct.getLinkedAccount() != null) {
-                var currentBalance = accountService.computeBalance(projAcct.getLinkedAccount(), tenantId);
-                projAcct.setInitialBalance(currentBalance);
-            }
+    private ProjectionInput toProjectionInput(ProjectionScenarioEntity scenario, UUID tenantId) {
+        var accounts = resolveAccounts(scenario, tenantId);
+        var spendingProfile = scenario.getSpendingProfile() != null
+                ? new SpendingProfileInput(
+                        scenario.getSpendingProfile().getEssentialExpenses(),
+                        scenario.getSpendingProfile().getDiscretionaryExpenses(),
+                        scenario.getSpendingProfile().getIncomeStreams())
+                : null;
+        return new ProjectionInput(
+                scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
+                scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
+                accounts, spendingProfile);
+    }
+
+    private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {
+        return scenario.getAccounts().stream()
+                .map(entity -> toAccountInput(entity, tenantId))
+                .toList();
+    }
+
+    private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId) {
+        if (entity.getLinkedAccount() != null) {
+            var liveBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
+            return new LinkedAccountInput(
+                    entity.getLinkedAccount().getId(), liveBalance,
+                    entity.getAnnualContribution(), entity.getExpectedReturn(),
+                    entity.getAccountType());
         }
+        return new HypotheticalAccountInput(
+                entity.getInitialBalance(),
+                entity.getAnnualContribution(), entity.getExpectedReturn(),
+                entity.getAccountType());
     }
 
-    private String buildParamsJson(Integer birthYear, java.math.BigDecimal withdrawalRate,
-                                     String withdrawalStrategy, java.math.BigDecimal dynamicCeiling,
-                                     java.math.BigDecimal dynamicFloor, String filingStatus,
-                                     java.math.BigDecimal otherIncome, java.math.BigDecimal annualRothConversion,
+    private ScenarioResponse toScenarioResponse(ProjectionScenarioEntity scenario, UUID tenantId) {
+        var accounts = scenario.getAccounts().stream()
+                .map(acct -> {
+                    var balance = acct.getLinkedAccount() != null
+                            ? accountService.computeBalance(acct.getLinkedAccount(), tenantId)
+                            : acct.getInitialBalance();
+                    return new ProjectionAccountResponse(
+                            acct.getId(),
+                            acct.getLinkedAccount() != null ? acct.getLinkedAccount().getId() : null,
+                            balance,
+                            acct.getAnnualContribution(),
+                            acct.getExpectedReturn(),
+                            acct.getAccountType());
+                })
+                .toList();
+        var profile = scenario.getSpendingProfile() != null
+                ? SpendingProfileResponse.from(scenario.getSpendingProfile())
+                : null;
+        return new ScenarioResponse(
+                scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
+                scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
+                accounts, profile, scenario.getCreatedAt(), scenario.getUpdatedAt());
+    }
+
+    private String buildParamsJson(Integer birthYear, BigDecimal withdrawalRate,
+                                     String withdrawalStrategy, BigDecimal dynamicCeiling,
+                                     BigDecimal dynamicFloor, String filingStatus,
+                                     BigDecimal otherIncome, BigDecimal annualRothConversion,
                                      String withdrawalOrder,
-                                     String rothConversionStrategy, java.math.BigDecimal targetBracketRate) {
+                                     String rothConversionStrategy, BigDecimal targetBracketRate) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
         if (birthYear != null) {
