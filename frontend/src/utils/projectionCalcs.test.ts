@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findPeakBalance, findDepletionYear, computeCumulativeContributions } from './projectionCalcs';
+import { findPeakBalance, findDepletionYear, computeCumulativeContributions, findCrossoverYear } from './projectionCalcs';
 import type { ProjectionYear } from '../types/projection';
 
 function makeYear(overrides: Partial<ProjectionYear> & { year: number }): ProjectionYear {
@@ -85,5 +85,52 @@ describe('computeCumulativeContributions', () => {
 
     it('returns empty array for empty data', () => {
         expect(computeCumulativeContributions([])).toEqual([]);
+    });
+});
+
+describe('findCrossoverYear', () => {
+    it('returns null when no spending profile is linked', () => {
+        const data = [
+            makeYear({ year: 2024, age: 60, retired: true, growth: 50000, withdrawals: 40000, end_balance: 500000 }),
+            makeYear({ year: 2025, age: 61, retired: true, growth: 45000, withdrawals: 40000, end_balance: 450000 }),
+        ];
+        expect(findCrossoverYear(data)).toBeNull();
+    });
+
+    it('returns null when withdrawals never exceed growth', () => {
+        const data = [
+            makeYear({ year: 2024, age: 60, retired: true, essential_expenses: 30000, growth: 50000, withdrawals: 40000, end_balance: 500000 }),
+            makeYear({ year: 2025, age: 61, retired: true, essential_expenses: 31000, growth: 45000, withdrawals: 40000, end_balance: 510000 }),
+        ];
+        expect(findCrossoverYear(data)).toBeNull();
+    });
+
+    it('returns the first retired year where withdrawals exceed growth', () => {
+        const data = [
+            makeYear({ year: 2024, age: 60, retired: true, essential_expenses: 30000, growth: 50000, withdrawals: 40000, end_balance: 500000 }),
+            makeYear({ year: 2025, age: 61, retired: true, essential_expenses: 35000, growth: 45000, withdrawals: 40000, end_balance: 480000 }),
+            makeYear({ year: 2026, age: 62, retired: true, essential_expenses: 40000, growth: 35000, withdrawals: 40000, end_balance: 440000 }),
+        ];
+        expect(findCrossoverYear(data)).toEqual({ year: 2026, age: 62 });
+    });
+
+    it('skips pre-retirement years where withdrawals exceed growth', () => {
+        const data = [
+            makeYear({ year: 2024, age: 58, retired: false, essential_expenses: 30000, growth: 10000, withdrawals: 20000, end_balance: 300000 }),
+            makeYear({ year: 2025, age: 59, retired: true, essential_expenses: 30000, growth: 50000, withdrawals: 40000, end_balance: 350000 }),
+        ];
+        expect(findCrossoverYear(data)).toBeNull();
+    });
+
+    it('skips depleted years where balance is zero', () => {
+        const data = [
+            makeYear({ year: 2024, age: 60, retired: true, essential_expenses: 30000, growth: 50000, withdrawals: 40000, end_balance: 500000 }),
+            makeYear({ year: 2025, age: 61, retired: true, essential_expenses: 30000, growth: 0, withdrawals: 40000, end_balance: 0 }),
+        ];
+        expect(findCrossoverYear(data)).toBeNull();
+    });
+
+    it('returns null for empty data', () => {
+        expect(findCrossoverYear([])).toBeNull();
     });
 });
