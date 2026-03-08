@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedPortfolioHistory } from '../api/dashboard';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
@@ -122,9 +122,11 @@ export default function CombinedPortfolioChart() {
                                     return `${formatted} — Total: ${formatCurrency(total)}`;
                                 }}
                             />
+                            <Legend />
                             <Area
                                 type="monotone"
                                 dataKey="investmentValue"
+                                name="Investments"
                                 stackId="1"
                                 stroke="#1976d2"
                                 strokeWidth={2}
@@ -133,6 +135,7 @@ export default function CombinedPortfolioChart() {
                             <Area
                                 type="monotone"
                                 dataKey="propertyEquity"
+                                name="Property Equity"
                                 stackId="1"
                                 stroke="#2e7d32"
                                 strokeWidth={2}

@@ -71,6 +71,17 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
     const tickInterval = Math.max(1, Math.floor(chartData.length / 10));
     const selectedLabel = TIME_HORIZONS.find(h => h.value === years)?.label ?? `${years} years`;
 
+    const growthStats = useMemo(() => {
+        if (chartData.length < 2) return null;
+        const startValue = chartData[0].value;
+        const endValue = chartData[chartData.length - 1].value;
+        if (startValue === 0) return null;
+        const totalGrowth = endValue - startValue;
+        const totalReturn = totalGrowth / startValue;
+        const annualizedRate = Math.pow(1 + totalReturn, 1 / years) - 1;
+        return { totalGrowth, annualizedRate };
+    }, [chartData, years]);
+
     return (
         <div style={chartCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
@@ -135,6 +146,20 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
                             />
                         </AreaChart>
                     </ResponsiveContainer>
+                    {growthStats && (
+                        <div style={{ display: 'flex', gap: '2rem', marginTop: '0.75rem', fontSize: '0.85rem', color: '#555' }}>
+                            <span>
+                                Total Growth: <strong style={{ color: growthStats.totalGrowth >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                    {formatCurrency(growthStats.totalGrowth)}
+                                </strong>
+                            </span>
+                            <span>
+                                Avg. Annual Return: <strong style={{ color: growthStats.annualizedRate >= 0 ? '#2e7d32' : '#d32f2f' }}>
+                                    {(growthStats.annualizedRate * 100).toFixed(2)}%
+                                </strong>
+                            </span>
+                        </div>
+                    )}
                 </>
             )}
         </div>
