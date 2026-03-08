@@ -1,11 +1,8 @@
 import { useState } from 'react';
 import { createPrice } from '../api/prices';
 import { useAuth } from '../context/AuthContext';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import toast from 'react-hot-toast';
-
-function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 export default function PricesPage() {
     const { role } = useAuth();
@@ -51,7 +48,7 @@ export default function PricesPage() {
                         </div>
                         <div>
                             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Price</label>
-                            <input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="185.50" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                            <input type="text" inputMode="decimal" value={formatCurrencyInput(price)} onChange={(e) => setPrice(parseCurrencyInput(e.target.value))} placeholder="185.50" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
                         <button onClick={handleAddPrice} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
                     </div>

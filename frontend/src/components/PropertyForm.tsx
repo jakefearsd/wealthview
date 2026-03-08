@@ -1,3 +1,5 @@
+import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+
 interface Props {
     heading: string;
     submitLabel: string;
@@ -17,23 +19,42 @@ interface Props {
     onCancel: () => void;
 }
 
-const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' };
+const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
+const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 export default function PropertyForm(props: Props) {
     return (
         <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
             <h3 style={{ marginBottom: '1rem' }}>{props.heading}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <input placeholder="Address" value={props.address} onChange={(e) => props.onAddressChange(e.target.value)} style={inputStyle} />
-                <input placeholder="Purchase Price" type="number" value={props.purchasePrice} onChange={(e) => props.onPurchasePriceChange(e.target.value)} style={inputStyle} />
-                <input type="date" value={props.purchaseDate} onChange={(e) => props.onPurchaseDateChange(e.target.value)} style={inputStyle} />
-                <input placeholder="Current Value" type="number" value={props.currentValue} onChange={(e) => props.onCurrentValueChange(e.target.value)} style={inputStyle} />
-                <input placeholder="Mortgage Balance" type="number" value={props.mortgageBalance} onChange={(e) => props.onMortgageBalanceChange(e.target.value)} style={inputStyle} />
-                <select value={props.propertyType} onChange={(e) => props.onPropertyTypeChange(e.target.value)} style={inputStyle}>
-                    <option value="primary_residence">Primary Residence</option>
-                    <option value="investment">Investment</option>
-                    <option value="vacation">Vacation</option>
-                </select>
+                <div>
+                    <label style={labelStyle}>Address</label>
+                    <input placeholder="123 Main St" value={props.address} onChange={(e) => props.onAddressChange(e.target.value)} style={inputStyle} />
+                </div>
+                <div>
+                    <label style={labelStyle}>Purchase Price</label>
+                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.purchasePrice)} onChange={(e) => props.onPurchasePriceChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                </div>
+                <div>
+                    <label style={labelStyle}>Purchase Date</label>
+                    <input type="date" value={props.purchaseDate} onChange={(e) => props.onPurchaseDateChange(e.target.value)} style={inputStyle} />
+                </div>
+                <div>
+                    <label style={labelStyle}>Current Value</label>
+                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.currentValue)} onChange={(e) => props.onCurrentValueChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                </div>
+                <div>
+                    <label style={labelStyle}>Mortgage Balance</label>
+                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.mortgageBalance)} onChange={(e) => props.onMortgageBalanceChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                </div>
+                <div>
+                    <label style={labelStyle}>Property Type</label>
+                    <select value={props.propertyType} onChange={(e) => props.onPropertyTypeChange(e.target.value)} style={inputStyle}>
+                        <option value="primary_residence">Primary Residence</option>
+                        <option value="investment">Investment</option>
+                        <option value="vacation">Vacation</option>
+                    </select>
+                </div>
             </div>
 
             <div style={{ marginTop: '1rem' }}>
@@ -49,10 +70,22 @@ export default function PropertyForm(props: Props) {
                 <div style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
                     <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Loan Details</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                        <input placeholder="Loan Amount" type="number" value={props.loanAmount} onChange={(e) => props.onLoanAmountChange(e.target.value)} style={inputStyle} />
-                        <input placeholder="Annual Interest Rate (%)" type="number" step="0.01" value={props.annualInterestRate} onChange={(e) => props.onAnnualInterestRateChange(e.target.value)} style={inputStyle} />
-                        <input placeholder="Loan Term (months)" type="number" value={props.loanTermMonths} onChange={(e) => props.onLoanTermMonthsChange(e.target.value)} style={inputStyle} />
-                        <input type="date" value={props.loanStartDate} onChange={(e) => props.onLoanStartDateChange(e.target.value)} style={inputStyle} />
+                        <div>
+                            <label style={labelStyle}>Loan Amount</label>
+                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.loanAmount)} onChange={(e) => props.onLoanAmountChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Annual Interest Rate (%)</label>
+                            <input type="number" step="0.01" value={props.annualInterestRate} onChange={(e) => props.onAnnualInterestRateChange(e.target.value)} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Loan Term (months)</label>
+                            <input type="number" value={props.loanTermMonths} onChange={(e) => props.onLoanTermMonthsChange(e.target.value)} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Loan Start Date</label>
+                            <input type="date" value={props.loanStartDate} onChange={(e) => props.onLoanStartDateChange(e.target.value)} style={inputStyle} />
+                        </div>
                     </div>
                     <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.75rem', fontSize: '0.9rem' }}>
                         <input type="checkbox" checked={props.useComputedBalance} onChange={(e) => props.onUseComputedBalanceChange(e.target.checked)} />
