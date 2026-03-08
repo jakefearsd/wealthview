@@ -13,5 +13,13 @@ public record ProjectionInput(
         BigDecimal inflationRate,
         String paramsJson,
         List<ProjectionAccountInput> accounts,
-        SpendingProfileInput spendingProfile
-) {}
+        SpendingProfileInput spendingProfile,
+        Integer referenceYear
+) {
+    public ProjectionInput(UUID scenarioId, String scenarioName, LocalDate retirementDate,
+                           Integer endAge, BigDecimal inflationRate, String paramsJson,
+                           List<ProjectionAccountInput> accounts, SpendingProfileInput spendingProfile) {
+        this(scenarioId, scenarioName, retirementDate, endAge, inflationRate,
+                paramsJson, accounts, spendingProfile, null);
+    }
+}

@@ -18,5 +18,27 @@
             <groupId>com.wealthview</groupId>
             <artifactId>wealthview-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.wealthview</groupId>
+            <artifactId>wealthview-core</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.skyscreamer</groupId>
+            <artifactId>jsonassert</artifactId>
+            <version>1.5.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.pitest</groupId>
+                <artifactId>pitest-maven</artifactId>
+            </plugin>
+        </plugins>
+    </build>
 </project>

@@ -66,7 +66,8 @@ public class ProjectionService {
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
-                request.rothConversionStrategy(), request.targetBracketRate());
+                request.rothConversionStrategy(), request.targetBracketRate(),
+                request.rothConversionStartYear());
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -126,7 +127,8 @@ public class ProjectionService {
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
-                request.rothConversionStrategy(), request.targetBracketRate()));
+                request.rothConversionStrategy(), request.targetBracketRate(),
+                request.rothConversionStartYear()));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -189,7 +191,8 @@ public class ProjectionService {
                 ? new SpendingProfileInput(
                         scenario.getSpendingProfile().getEssentialExpenses(),
                         scenario.getSpendingProfile().getDiscretionaryExpenses(),
-                        scenario.getSpendingProfile().getIncomeStreams())
+                        scenario.getSpendingProfile().getIncomeStreams(),
+                        scenario.getSpendingProfile().getSpendingTiers())
                 : null;
         return new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
@@ -246,7 +249,8 @@ public class ProjectionService {
                                      BigDecimal dynamicFloor, String filingStatus,
                                      BigDecimal otherIncome, BigDecimal annualRothConversion,
                                      String withdrawalOrder,
-                                     String rothConversionStrategy, BigDecimal targetBracketRate) {
+                                     String rothConversionStrategy, BigDecimal targetBracketRate,
+                                     Integer rothConversionStartYear) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
         if (birthYear != null) {
@@ -291,6 +295,10 @@ public class ProjectionService {
         }
         if (targetBracketRate != null) {
             node.put("target_bracket_rate", targetBracketRate);
+            hasContent = true;
+        }
+        if (rothConversionStartYear != null) {
+            node.put("roth_conversion_start_year", rothConversionStartYear);
             hasContent = true;
         }
         return hasContent ? node.toString() : null;

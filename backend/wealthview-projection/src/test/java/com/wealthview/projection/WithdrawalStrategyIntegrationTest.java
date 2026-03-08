@@ -1,10 +1,7 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.core.projection.dto.ProjectionInput;
-import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,34 +10,26 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.UUID;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
 class WithdrawalStrategyIntegrationTest {
 
     private TaxBracketRepository taxBracketRepository;
+    private StandardDeductionRepository standardDeductionRepository;
 
     @BeforeEach
     void setUp() {
         taxBracketRepository = mock(TaxBracketRepository.class);
-        stubSingleBrackets();
-    }
-
-    private void stubSingleBrackets() {
-        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
-                .thenReturn(List.of(
-                        new TaxBracketEntity(2025, "single", bd("0"), bd("11925"), bd("0.1000")),
-                        new TaxBracketEntity(2025, "single", bd("11925"), bd("48475"), bd("0.1200")),
-                        new TaxBracketEntity(2025, "single", bd("48475"), bd("103350"), bd("0.2200")),
-                        new TaxBracketEntity(2025, "single", bd("103350"), bd("197300"), bd("0.2400")),
-                        new TaxBracketEntity(2025, "single", bd("197300"), bd("250525"), bd("0.3200")),
-                        new TaxBracketEntity(2025, "single", bd("250525"), bd("626350"), bd("0.3500")),
-                        new TaxBracketEntity(2025, "single", bd("626350"), null, bd("0.3700"))));
+        standardDeductionRepository = mock(StandardDeductionRepository.class);
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
     }
 
     @ParameterizedTest(name = "fixedPercentage with balance={0}, rate={1}")
@@ -116,8 +105,7 @@ class WithdrawalStrategyIntegrationTest {
             "0, 100000"
     })
     void rothConversion_variousAmounts_handledCorrectly(String conversion, String tradBalance) {
-        var calc = new FederalTaxCalculator(taxBracketRepository);
-        var engine = new DeterministicProjectionEngine(calc);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         var input = createInput(
                 LocalDate.now().plusYears(10), 80, BigDecimal.ZERO,
@@ -148,8 +136,7 @@ class WithdrawalStrategyIntegrationTest {
             "100000"
     })
     void zeroOtherIncome_taxOnConversionOnly(String conversion) {
-        var calc = new FederalTaxCalculator(taxBracketRepository);
-        var engine = new DeterministicProjectionEngine(calc);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         var input = createInput(
                 LocalDate.now().plusYears(10), 80, BigDecimal.ZERO,
@@ -174,8 +161,7 @@ class WithdrawalStrategyIntegrationTest {
             "1000000"
     })
     void allRothPortfolio_noTaxOnWithdrawals(String balance) {
-        var calc = new FederalTaxCalculator(taxBracketRepository);
-        var engine = new DeterministicProjectionEngine(calc);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         var input = createRetiredInput(
                 """
@@ -190,29 +176,5 @@ class WithdrawalStrategyIntegrationTest {
                 assertThat(year.taxLiability()).isEqualByComparingTo(BigDecimal.ZERO);
             }
         }
-    }
-
-    private ProjectionInput createRetiredInput(String paramsJson, List<ProjectionAccountInput> accounts) {
-        return new ProjectionInput(UUID.randomUUID(), "Test",
-                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO, paramsJson,
-                accounts, null);
-    }
-
-    private ProjectionInput createInput(LocalDate retDate, int endAge,
-            BigDecimal inflation, String paramsJson, List<ProjectionAccountInput> accounts) {
-        return new ProjectionInput(UUID.randomUUID(), "Test",
-                retDate, endAge, inflation, paramsJson, accounts, null);
-    }
-
-    private HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn) {
-        return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), "taxable");
-    }
-
-    private HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn, String type) {
-        return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), type);
-    }
-
-    private static BigDecimal bd(String val) {
-        return new BigDecimal(val);
     }
 }

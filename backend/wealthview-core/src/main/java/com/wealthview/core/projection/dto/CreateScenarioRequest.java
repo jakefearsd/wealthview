@@ -21,6 +21,7 @@ public record CreateScenarioRequest(
         String withdrawalOrder,
         String rothConversionStrategy,
         BigDecimal targetBracketRate,
+        Integer rothConversionStartYear,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId) {
 }

@@ -1,0 +1,22 @@
+{
+  "scenarioName": "Tiered Spending With Income",
+  "retirementDate": "2024-01-01",
+  "endAge": 85,
+  "inflationRate": "0.03",
+  "paramsJson": "{\"birth_year\": 1960, \"withdrawal_rate\": 0.04}",
+  "referenceYear": 2025,
+  "accounts": [
+    {
+      "initialBalance": "2000000",
+      "annualContribution": "0",
+      "expectedReturn": "0.05",
+      "accountType": "taxable"
+    }
+  ],
+  "spendingProfile": {
+    "essentialExpenses": "50000",
+    "discretionaryExpenses": "25000",
+    "incomeStreams": "[{\"name\":\"Social Security\",\"annualAmount\":30000,\"startAge\":67,\"endAge\":null,\"inflationRate\":0.02}]",
+    "spendingTiers": "[{\"name\":\"Go-Go\",\"startAge\":65,\"endAge\":75,\"essentialExpenses\":120000,\"discretionaryExpenses\":60000},{\"name\":\"Slow-Go\",\"startAge\":75,\"endAge\":85,\"essentialExpenses\":80000,\"discretionaryExpenses\":30000},{\"name\":\"No-Go\",\"startAge\":85,\"endAge\":null,\"essentialExpenses\":60000,\"discretionaryExpenses\":10000}]"
+  }
+}
