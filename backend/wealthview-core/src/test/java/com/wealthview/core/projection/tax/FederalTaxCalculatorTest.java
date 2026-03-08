@@ -1,17 +1,28 @@
 package com.wealthview.core.projection.tax;
 
-import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.mfjDeduction2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.single2022Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.singleDeduction2022;
+import static com.wealthview.core.testutil.TaxBracketFixtures.singleDeduction2025;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -20,110 +31,95 @@ class FederalTaxCalculatorTest {
     @Mock
     private TaxBracketRepository taxBracketRepository;
 
+    @Mock
+    private StandardDeductionRepository standardDeductionRepository;
+
     private FederalTaxCalculator calculator;
 
     @BeforeEach
     void setUp() {
-        calculator = new FederalTaxCalculator(taxBracketRepository);
+        calculator = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
     }
 
-    private List<TaxBracketEntity> single2025Brackets() {
-        return List.of(
-                new TaxBracketEntity(2025, "single", bd("0"), bd("11925"), bd("0.1000")),
-                new TaxBracketEntity(2025, "single", bd("11925"), bd("48475"), bd("0.1200")),
-                new TaxBracketEntity(2025, "single", bd("48475"), bd("103350"), bd("0.2200")),
-                new TaxBracketEntity(2025, "single", bd("103350"), bd("197300"), bd("0.2400")),
-                new TaxBracketEntity(2025, "single", bd("197300"), bd("250525"), bd("0.3200")),
-                new TaxBracketEntity(2025, "single", bd("250525"), bd("626350"), bd("0.3500")),
-                new TaxBracketEntity(2025, "single", bd("626350"), null, bd("0.3700")));
+    private void stubSingleDeduction2025() {
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(singleDeduction2025()));
     }
 
-    private List<TaxBracketEntity> mfj2025Brackets() {
-        return List.of(
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("0"), bd("23850"), bd("0.1000")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("23850"), bd("96950"), bd("0.1200")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("96950"), bd("206700"), bd("0.2200")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("206700"), bd("394600"), bd("0.2400")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("394600"), bd("501050"), bd("0.3200")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("501050"), bd("751600"), bd("0.3500")),
-                new TaxBracketEntity(2025, "married_filing_jointly", bd("751600"), null, bd("0.3700")));
+    private void stubMfjDeduction2025() {
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(mfjDeduction2025()));
     }
 
-    private List<TaxBracketEntity> single2022Brackets() {
-        return List.of(
-                new TaxBracketEntity(2022, "single", bd("0"), bd("10275"), bd("0.1000")),
-                new TaxBracketEntity(2022, "single", bd("10275"), bd("41775"), bd("0.1200")),
-                new TaxBracketEntity(2022, "single", bd("41775"), bd("89075"), bd("0.2200")),
-                new TaxBracketEntity(2022, "single", bd("89075"), bd("170050"), bd("0.2400")),
-                new TaxBracketEntity(2022, "single", bd("170050"), bd("215950"), bd("0.3200")),
-                new TaxBracketEntity(2022, "single", bd("215950"), bd("539900"), bd("0.3500")),
-                new TaxBracketEntity(2022, "single", bd("539900"), null, bd("0.3700")));
+    private void stubSingleDeduction2022() {
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(2022, "single"))
+                .thenReturn(Optional.of(singleDeduction2022()));
+    }
+
+    // === Parameterized single filer 2025 income sweep ===
+
+    @ParameterizedTest(name = "single 2025: income={0} -> tax={1}")
+    @CsvSource({
+            "-5000,    0.0000",
+            "0,        0.0000",
+            "10000,    0.0000",
+            "15000,    0.0000",
+            "15001,    0.1000",
+            "50000,    3961.5000",
+            "700000,   210470.2500"
+    })
+    void computeTax_singleFiler2025_variousIncomes(String income, String expectedTax) {
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
+
+        var tax = calculator.computeTax(bd(income), 2025, FilingStatus.SINGLE);
+
+        assertThat(tax).isEqualByComparingTo(bd(expectedTax));
     }
 
     @Test
-    void computeTax_singleFiler2025_50k_correctBrackets() {
+    void computeMaxIncomeForBracket_includesStandardDeduction() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
 
-        var tax = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1200"), 2025, FilingStatus.SINGLE);
 
-        // 10% on 0-11925 = 1192.50
-        // 12% on 11925-48475 = 4386.00
-        // 22% on 48475-50000 = 335.50
-        // Total = 5914.00
-        assertThat(tax).isEqualByComparingTo(bd("5914.0000"));
+        // 12% bracket ceiling $48,475 + standard deduction $15,000 = $63,475
+        assertThat(ceiling).isEqualByComparingTo(bd("63475"));
     }
 
     @Test
-    void computeTax_marriedFiling2025_150k_correctBrackets() {
+    void computeTax_marriedFilingJointly_usesLargerDeduction() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "married_filing_jointly"))
                 .thenReturn(mfj2025Brackets());
+        stubMfjDeduction2025();
 
         var tax = calculator.computeTax(bd("150000"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
 
+        // Gross $150K - deduction $30K = taxable $120K
         // 10% on 0-23850 = 2385.00
         // 12% on 23850-96950 = 8772.00
-        // 22% on 96950-150000 = 11671.00
-        // Total = 22828.00
-        assertThat(tax).isEqualByComparingTo(bd("22828.0000"));
-    }
-
-    @Test
-    void computeTax_zeroIncome_returnsZero() {
-        var tax = calculator.computeTax(BigDecimal.ZERO, 2025, FilingStatus.SINGLE);
-
-        assertThat(tax).isEqualByComparingTo(BigDecimal.ZERO);
-    }
-
-    @Test
-    void computeTax_topBracket_correctAmount() {
-        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
-                .thenReturn(single2025Brackets());
-
-        var tax = calculator.computeTax(bd("700000"), 2025, FilingStatus.SINGLE);
-
-        // 10% on 0-11925 = 1192.50
-        // 12% on 11925-48475 = 4386.00
-        // 22% on 48475-103350 = 12072.50
-        // 24% on 103350-197300 = 22548.00
-        // 32% on 197300-250525 = 17032.00
-        // 35% on 250525-626350 = 131538.75
-        // 37% on 626350-700000 = 27250.50
-        // Total = 216020.25
-        assertThat(tax).isEqualByComparingTo(bd("216020.2500"));
+        // 22% on 96950-120000 = 5071.00
+        // Total = 16228.00
+        assertThat(tax).isEqualByComparingTo(bd("16228.0000"));
     }
 
     @Test
     void computeTax_2022Brackets_differentFrom2025() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2022, "single"))
                 .thenReturn(single2022Brackets());
+        stubSingleDeduction2022();
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
 
         var tax2022 = calculator.computeTax(bd("50000"), 2022, FilingStatus.SINGLE);
+        calculator.clearCache();
         var tax2025 = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
 
-        // 2022 brackets are narrower, so tax should be slightly higher for same income
+        // 2022: $50K - $12,950 = $37,050. 2025: $50K - $15,000 = $35,000. Different.
         assertThat(tax2022).isNotEqualByComparingTo(tax2025);
     }
 
@@ -134,30 +130,38 @@ class FederalTaxCalculatorTest {
         when(taxBracketRepository.findMaxTaxYear()).thenReturn(2025);
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2040, "single"))
+                .thenReturn(Optional.empty());
+        when(standardDeductionRepository.findMaxTaxYear()).thenReturn(2025);
+        stubSingleDeduction2025();
 
         var tax = calculator.computeTax(bd("50000"), 2040, FilingStatus.SINGLE);
 
-        assertThat(tax).isEqualByComparingTo(bd("5914.0000"));
+        assertThat(tax).isEqualByComparingTo(bd("3961.5000"));
     }
 
     @Test
-    void computeMaxIncomeForBracket_targetRate12_returnsTopOf12Bracket() {
+    void computeMaxIncomeForBracket_targetRate12_returnsTopOf12BracketPlusDeduction() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
 
         var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1200"), 2025, FilingStatus.SINGLE);
 
-        assertThat(ceiling).isEqualByComparingTo(bd("48475"));
+        // $48,475 + $15,000 = $63,475
+        assertThat(ceiling).isEqualByComparingTo(bd("63475"));
     }
 
     @Test
-    void computeMaxIncomeForBracket_targetRate22_returnsTopOf22Bracket() {
+    void computeMaxIncomeForBracket_targetRate22_returnsTopOf22BracketPlusDeduction() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
 
         var ceiling = calculator.computeMaxIncomeForBracket(bd("0.2200"), 2025, FilingStatus.SINGLE);
 
-        assertThat(ceiling).isEqualByComparingTo(bd("103350"));
+        // $103,350 + $15,000 = $118,350
+        assertThat(ceiling).isEqualByComparingTo(bd("118350"));
     }
 
     @Test
@@ -177,10 +181,95 @@ class FederalTaxCalculatorTest {
 
         var ceiling = calculator.computeMaxIncomeForBracket(bd("0.3700"), 2025, FilingStatus.SINGLE);
 
+        // Top bracket has no ceiling -> returns zero (regardless of deduction)
         assertThat(ceiling).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
-    private static BigDecimal bd(String val) {
-        return new BigDecimal(val);
+    @Test
+    void computeTax_noDeductionData_treatsAsZeroDeduction() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.empty());
+        when(standardDeductionRepository.findMaxTaxYear()).thenReturn(null);
+
+        var tax = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+
+        // No deduction data: tax on full $50K
+        // 10% on 0-11925 = 1192.50
+        // 12% on 11925-48475 = 4386.00
+        // 22% on 48475-50000 = 335.50
+        // Total = 5914.00
+        assertThat(tax).isEqualByComparingTo(bd("5914.0000"));
+    }
+
+
+    @Test
+    void computeTax_deductionFallsBackToLatestYear() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2040, "single"))
+                .thenReturn(List.of());
+        when(taxBracketRepository.findMaxTaxYear()).thenReturn(2025);
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2040, "single"))
+                .thenReturn(Optional.empty());
+        when(standardDeductionRepository.findMaxTaxYear()).thenReturn(2025);
+        stubSingleDeduction2025();
+
+        var tax2040 = calculator.computeTax(bd("50000"), 2040, FilingStatus.SINGLE);
+
+        // Falls back to 2025 deduction ($15K) and 2025 brackets
+        assertThat(tax2040).isEqualByComparingTo(bd("3961.5000"));
+    }
+
+    @Test
+    void computeMaxIncomeForBracket_noDeduction_returnsBracketCeilingOnly() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.empty());
+        when(standardDeductionRepository.findMaxTaxYear()).thenReturn(null);
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1200"), 2025, FilingStatus.SINGLE);
+
+        // No deduction: just bracket ceiling $48,475
+        assertThat(ceiling).isEqualByComparingTo(bd("48475"));
+    }
+
+    @Test
+    void computeMaxIncomeForBracket_mfj_includesLargerDeduction() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "married_filing_jointly"))
+                .thenReturn(mfj2025Brackets());
+        stubMfjDeduction2025();
+
+        var ceiling = calculator.computeMaxIncomeForBracket(bd("0.1200"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
+
+        // MFJ 12% bracket ceiling $96,950 + $30,000 deduction = $126,950
+        assertThat(ceiling).isEqualByComparingTo(bd("126950"));
+    }
+
+    @Test
+    void computeTax_cachedDeduction_sameResult() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
+
+        var tax1 = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+        var tax2 = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(tax1).isEqualByComparingTo(tax2);
+    }
+
+    @Test
+    void computeTax_afterClearCache_stillComputes() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
+
+        calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+        calculator.clearCache();
+        var tax = calculator.computeTax(bd("50000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(tax).isEqualByComparingTo(bd("3961.5000"));
     }
 }
