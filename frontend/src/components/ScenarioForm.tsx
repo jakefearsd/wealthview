@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
 import type { Account } from '../types/account';
@@ -103,6 +103,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [annualRothConversion, setAnnualRothConversion] = useState<number>(parsedParams.annual_roth_conversion ?? 0);
     const [rothConversionStrategy, setRothConversionStrategy] = useState(parsedParams.roth_conversion_strategy ?? 'fixed_amount');
     const [targetBracketRate, setTargetBracketRate] = useState<number>(parsedParams.target_bracket_rate ?? 0.12);
+    const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
     const [spendingProfileId, setSpendingProfileId] = useState<string>(initialValues?.spending_profile?.id ?? '');
     const [accounts, setAccounts] = useState<ScenarioAccountInput[]>(
@@ -163,6 +164,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
                 roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
                 target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate : null,
+                roth_conversion_start_year: rothConversionStartYear || null,
                 spending_profile_id: spendingProfileId || null,
                 accounts,
             };
@@ -211,7 +213,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
                     </select>
-                    <HelpText>Optional. Defines your expected retirement expenses and non-portfolio income. When linked, the projection shows whether your withdrawals can cover your spending plan.</HelpText>
+                    <HelpText>Optional. When linked, your spending plan drives portfolio withdrawals — the projection withdraws what you need each year (adjusted for inflation and age-based tiers), minus non-portfolio income.</HelpText>
                 </div>
             </div>
 
@@ -308,7 +310,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 {rothConversionStrategy === 'fixed_amount' && (
                     <div>
                         <label style={labelStyle}>Annual Roth Conversion</label>
-                        <input style={inputStyle} type="number" value={annualRothConversion} onChange={e => setAnnualRothConversion(Number(e.target.value))} />
+                        <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualRothConversion)} onChange={e => setAnnualRothConversion(Number(parseCurrencyInput(e.target.value)) || 0)} />
                         <HelpText>Fixed dollar amount to convert each year. Set to $0 to skip.</HelpText>
                     </div>
                 )}
@@ -329,6 +331,11 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 {(rothConversionStrategy !== 'fixed_amount' || annualRothConversion > 0) && (
                     <>
                         <div>
+                            <label style={labelStyle}>Conversion Start Year</label>
+                            <input style={inputStyle} type="number" value={rothConversionStartYear ?? ''} onChange={e => setRothConversionStartYear(e.target.value ? Number(e.target.value) : null)} placeholder="e.g., 2035" />
+                            <HelpText>Calendar year when Roth conversions begin. Leave blank to start immediately.</HelpText>
+                        </div>
+                        <div>
                             <label style={labelStyle}>Filing Status</label>
                             <select style={inputStyle} value={filingStatus} onChange={e => setFilingStatus(e.target.value)}>
                                 <option value="single">Single</option>
@@ -338,7 +345,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         </div>
                         <div>
                             <label style={labelStyle}>Other Income</label>
-                            <input style={inputStyle} type="number" value={otherIncome} onChange={e => setOtherIncome(Number(e.target.value))} />
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(otherIncome)} onChange={e => setOtherIncome(Number(parseCurrencyInput(e.target.value)) || 0)} />
                             <HelpText>Non-retirement income (salary, rental income) that affects which tax bracket your conversions fall into.</HelpText>
                         </div>
                     </>
@@ -391,7 +398,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             )}
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'end' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'start' }}>
                         <div>
                             <label style={labelStyle}>Account Type</label>
                             <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
@@ -405,15 +412,16 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <label style={labelStyle}>Initial Balance{acct.linked_account_id ? ' (live)' : ''}</label>
                             <input
                                 style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
-                                type="number"
-                                value={acct.initial_balance}
-                                onChange={e => updateAccount(idx, 'initial_balance', Number(e.target.value))}
+                                type="text"
+                                inputMode="decimal"
+                                value={formatCurrencyInput(acct.initial_balance)}
+                                onChange={e => updateAccount(idx, 'initial_balance', Number(parseCurrencyInput(e.target.value)) || 0)}
                                 readOnly={!!acct.linked_account_id}
                             />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Contribution</label>
-                            <input style={inputStyle} type="number" value={acct.annual_contribution} onChange={e => updateAccount(idx, 'annual_contribution', Number(e.target.value))} />
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(acct.annual_contribution)} onChange={e => updateAccount(idx, 'annual_contribution', Number(parseCurrencyInput(e.target.value)) || 0)} />
                         </div>
                         <div>
                             <label style={labelStyle}>Expected Return</label>
