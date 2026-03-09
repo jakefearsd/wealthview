@@ -71,7 +71,10 @@ export default function ProjectionChart({ data, retirementYear, mode }: Projecti
                 withdrawals: 'Withdrawals',
                 income_streams_total: 'Income Streams',
             };
-            const incomeTotal = d?.income_streams_total;
+            const incomeTotal = d?.income_streams_total ?? 0;
+            const withdrawals = d?.withdrawals ?? 0;
+            const totalCashFlow = withdrawals + incomeTotal;
+            const showTotal = d != null && (withdrawals !== 0 || incomeTotal !== 0);
             return (
                 <div style={{ background: '#fff', border: '1px solid #ccc', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
@@ -82,11 +85,11 @@ export default function ProjectionChart({ data, retirementYear, mode }: Projecti
                             {labels[p.dataKey] ?? p.name}: {formatCurrency(p.value)}
                         </div>
                     ))}
-                    {incomeTotal != null && incomeTotal > 0 && (
+                    {showTotal && (
                         <>
                             <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
-                            <div style={{ fontWeight: 600, color: '#555' }}>
-                                Total Cash Flow: {formatCurrency(d!.withdrawals + incomeTotal)}
+                            <div style={{ fontWeight: 600, color: totalCashFlow === 0 ? '#d32f2f' : '#555' }}>
+                                Total Cash Flow: {formatCurrency(totalCashFlow)}
                             </div>
                         </>
                     )}
