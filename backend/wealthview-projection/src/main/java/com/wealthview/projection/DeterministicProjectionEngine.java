@@ -673,12 +673,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             return null;
         }
 
-        BigDecimal requiredAnnualSpending = spendingData.essentialExpenses()
-                .add(spendingData.discretionaryExpenses());
-
         Integer firstShortfallYear = null;
         Integer firstShortfallAge = null;
-        BigDecimal minSustainable = null;
+        BigDecimal minRealSurplus = null;
+        BigDecimal sustainableForWeakest = null;
+        BigDecimal requiredForWeakest = null;
 
         int retiredYearIndex = 0;
         for (var year : yearlyData) {
@@ -698,6 +697,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 availableNominal = availableNominal.add(year.incomeStreamsTotal());
             }
 
+            BigDecimal nominalRequired = BigDecimal.ZERO;
+            if (year.essentialExpenses() != null) {
+                nominalRequired = nominalRequired.add(year.essentialExpenses());
+            }
+            if (year.discretionaryExpenses() != null) {
+                nominalRequired = nominalRequired.add(year.discretionaryExpenses());
+            }
+
             BigDecimal expenseInflationFactor = retiredYearIndex > 1
                     ? BigDecimal.ONE.add(inflationRate).pow(retiredYearIndex - 1)
                     : BigDecimal.ONE;
@@ -706,18 +713,26 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     ? availableNominal.divide(expenseInflationFactor, SCALE, ROUNDING)
                     : availableNominal;
 
-            if (minSustainable == null || realAvailable.compareTo(minSustainable) < 0) {
-                minSustainable = realAvailable;
+            BigDecimal realRequired = expenseInflationFactor.compareTo(BigDecimal.ZERO) > 0
+                    ? nominalRequired.divide(expenseInflationFactor, SCALE, ROUNDING)
+                    : nominalRequired;
+
+            BigDecimal realSurplus = realAvailable.subtract(realRequired);
+
+            if (minRealSurplus == null || realSurplus.compareTo(minRealSurplus) < 0) {
+                minRealSurplus = realSurplus;
+                sustainableForWeakest = realAvailable;
+                requiredForWeakest = realRequired;
             }
         }
 
-        if (minSustainable == null) {
-            return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, requiredAnnualSpending);
+        if (sustainableForWeakest == null) {
+            return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         boolean feasible = firstShortfallYear == null;
         return new SpendingFeasibilitySummary(feasible, firstShortfallYear, firstShortfallAge,
-                minSustainable, requiredAnnualSpending);
+                sustainableForWeakest, requiredForWeakest);
     }
 
     private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
