@@ -407,7 +407,7 @@
     "spendingFeasible" : true,
     "firstShortfallYear" : null,
     "firstShortfallAge" : null,
-    "sustainableAnnualSpending" : 81850.3306,
-    "requiredAnnualSpending" : 75000
+    "sustainableAnnualSpending" : 180000.0000,
+    "requiredAnnualSpending" : 180000.0000
   }
 }

@@ -212,7 +212,7 @@ export default function ProjectionDetailPage() {
                                 outcomeLabel = "Plan Outcome";
                                 outcomeValue = "Fully Sustainable";
                                 outcomeColor = '#2e7d32';
-                                outcomeDesc = `Sustains ${formatCurrency(feasibility.sustainable_annual_spending)}/yr; plan requires ${formatCurrency(feasibility.required_annual_spending)}/yr`;
+                                outcomeDesc = `Tightest year: ${formatCurrency(feasibility.sustainable_annual_spending)}/yr available vs ${formatCurrency(feasibility.required_annual_spending)}/yr needed`;
                             } else {
                                 outcomeLabel = "Plan Outcome";
                                 outcomeValue = `Underfunded at age ${feasibility.first_shortfall_age}`;

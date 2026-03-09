@@ -1716,4 +1716,33 @@ class DeterministicProjectionEngineTest {
         // Year 1 should have a conversion (existing behavior preserved)
         assertThat(result.yearlyData().getFirst().rothConversionAmount()).isNotNull();
     }
+
+    // === Feasibility with tiers bug fix ===
+
+    @Test
+    void run_withSpendingTiers_feasibility_requiredReflectsTieredSpending() {
+        // Base spending: $50k essential + $35k discretionary = $85k
+        // Tier reduces to $40k essential + $20k discretionary = $60k for ages 66+
+        // Portfolio can sustain ~$70k (between $60k tiered and $85k base)
+        // So plan IS feasible, and requiredAnnualSpending should reflect $60k (tiered), not $85k (base)
+        var tierJson = tiers()
+                .tier("Slow-Go", 66, null, "40000", "20000")
+                .build();
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("1500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("50000"), bd("35000"), "[]", tierJson));
+
+        var result = engine.run(input);
+
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        // requiredAnnualSpending should reflect the tiered amount ($60k), not the base ($85k)
+        assertThat(result.spendingFeasibility().requiredAnnualSpending())
+                .isLessThanOrEqualTo(bd("60000"));
+    }
 }
