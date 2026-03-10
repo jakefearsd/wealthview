@@ -197,7 +197,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history",
                 HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

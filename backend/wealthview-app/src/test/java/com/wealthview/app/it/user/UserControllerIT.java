@@ -2,24 +2,21 @@ package com.wealthview.app.it.user;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class UserControllerIT extends AbstractApiIntegrationTest {
 
     @Test
-    @SuppressWarnings("unchecked")
     void listUsers_asAdmin_returnsAll() {
         var response = restTemplate.exchange("/api/v1/tenant/users",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotEmpty();
@@ -32,8 +29,7 @@ class UserControllerIT extends AbstractApiIntegrationTest {
                 "member@test.com", "password123", inviteCode);
 
         var users = restTemplate.exchange("/api/v1/tenant/users",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
         var memberUser = users.getBody().stream()
                 .filter(u -> "member@test.com".equals(u.get("email")))
                 .findFirst().orElseThrow();
@@ -66,8 +62,7 @@ class UserControllerIT extends AbstractApiIntegrationTest {
         // Members (non-admin) should be denied access to user listing
         // SecurityConfig requires ADMIN or SUPER_ADMIN role for GET /api/v1/tenant/users
         var response = restTemplate.exchange("/api/v1/tenant/users",
-                HttpMethod.GET, authHelper.authEntity(memberToken),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+                HttpMethod.GET, authHelper.authEntity(memberToken), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }

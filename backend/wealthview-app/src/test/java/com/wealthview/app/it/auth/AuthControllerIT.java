@@ -2,16 +2,15 @@ package com.wealthview.app.it.auth;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
-import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,21 +104,18 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
     @Test
     void createInviteCode_asAdmin_returns201() {
         var response = restTemplate.exchange("/api/v1/tenant/invite-codes",
-                HttpMethod.POST, authHelper.authEntity(null, authHelper.adminToken()),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+                HttpMethod.POST, authHelper.authEntity(null, authHelper.adminToken()), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).containsKey("code");
     }
 
     @Test
-    @SuppressWarnings("unchecked")
     void listInviteCodes_asAdmin_returnsAll() {
         authHelper.createInviteCode();
 
         var response = restTemplate.exchange("/api/v1/tenant/invite-codes",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotEmpty();

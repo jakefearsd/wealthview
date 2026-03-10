@@ -3,13 +3,12 @@ package com.wealthview.app.it.holding;
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,8 +29,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
         data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(2);
@@ -42,8 +40,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
 
         var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
         var holdingId = (String) holdings.getBody().get(0).get("id");
 
         var overrideBody = Map.of(

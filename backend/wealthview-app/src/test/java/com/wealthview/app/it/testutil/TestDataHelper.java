@@ -17,6 +17,9 @@ public class TestDataHelper {
     public static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
             new ParameterizedTypeReference<>() {};
 
+    public static final ParameterizedTypeReference<List<Map<String, Object>>> LIST_MAP_TYPE =
+            new ParameterizedTypeReference<>() {};
+
     private final TestRestTemplate restTemplate;
     private final AuthHelper authHelper;
 
