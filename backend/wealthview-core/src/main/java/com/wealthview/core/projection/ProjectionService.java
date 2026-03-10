@@ -320,54 +320,26 @@ public class ProjectionService {
                                      Integer rothConversionStartYear) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
-        if (birthYear != null) {
-            node.put("birth_year", birthYear);
-            hasContent = true;
-        }
-        if (withdrawalRate != null) {
-            node.put("withdrawal_rate", withdrawalRate);
-            hasContent = true;
-        }
-        if (withdrawalStrategy != null) {
-            node.put("withdrawal_strategy", withdrawalStrategy);
-            hasContent = true;
-        }
-        if (dynamicCeiling != null) {
-            node.put("dynamic_ceiling", dynamicCeiling);
-            hasContent = true;
-        }
-        if (dynamicFloor != null) {
-            node.put("dynamic_floor", dynamicFloor);
-            hasContent = true;
-        }
-        if (filingStatus != null) {
-            node.put("filing_status", filingStatus);
-            hasContent = true;
-        }
-        if (otherIncome != null) {
-            node.put("other_income", otherIncome);
-            hasContent = true;
-        }
-        if (annualRothConversion != null) {
-            node.put("annual_roth_conversion", annualRothConversion);
-            hasContent = true;
-        }
-        if (withdrawalOrder != null) {
-            node.put("withdrawal_order", withdrawalOrder);
-            hasContent = true;
-        }
-        if (rothConversionStrategy != null) {
-            node.put("roth_conversion_strategy", rothConversionStrategy);
-            hasContent = true;
-        }
-        if (targetBracketRate != null) {
-            node.put("target_bracket_rate", targetBracketRate);
-            hasContent = true;
-        }
-        if (rothConversionStartYear != null) {
-            node.put("roth_conversion_start_year", rothConversionStartYear);
-            hasContent = true;
-        }
+        hasContent |= putIfNotNull(node, "birth_year", birthYear);
+        hasContent |= putIfNotNull(node, "withdrawal_rate", withdrawalRate);
+        hasContent |= putIfNotNull(node, "withdrawal_strategy", withdrawalStrategy);
+        hasContent |= putIfNotNull(node, "dynamic_ceiling", dynamicCeiling);
+        hasContent |= putIfNotNull(node, "dynamic_floor", dynamicFloor);
+        hasContent |= putIfNotNull(node, "filing_status", filingStatus);
+        hasContent |= putIfNotNull(node, "other_income", otherIncome);
+        hasContent |= putIfNotNull(node, "annual_roth_conversion", annualRothConversion);
+        hasContent |= putIfNotNull(node, "withdrawal_order", withdrawalOrder);
+        hasContent |= putIfNotNull(node, "roth_conversion_strategy", rothConversionStrategy);
+        hasContent |= putIfNotNull(node, "target_bracket_rate", targetBracketRate);
+        hasContent |= putIfNotNull(node, "roth_conversion_start_year", rothConversionStartYear);
         return hasContent ? node.toString() : null;
+    }
+
+    private boolean putIfNotNull(ObjectNode node, String key, Object value) {
+        if (value == null) return false;
+        if (value instanceof Integer i) node.put(key, i);
+        else if (value instanceof BigDecimal bd) node.put(key, bd);
+        else if (value instanceof String s) node.put(key, s);
+        return true;
     }
 }

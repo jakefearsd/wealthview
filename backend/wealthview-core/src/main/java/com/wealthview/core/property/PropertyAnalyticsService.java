@@ -29,6 +29,7 @@ import java.util.function.Function;
 public class PropertyAnalyticsService {
 
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final BigDecimal BD_100 = new BigDecimal("100");
 
     private final PropertyRepository propertyRepository;
     private final PropertyIncomeRepository incomeRepository;
@@ -51,10 +52,7 @@ public class PropertyAnalyticsService {
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var totalAppreciation = property.getCurrentValue().subtract(property.getPurchasePrice());
-        var appreciationPercent = property.getPurchasePrice().compareTo(BigDecimal.ZERO) != 0
-                ? totalAppreciation.multiply(new BigDecimal("100"))
-                    .divide(property.getPurchasePrice(), 4, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        var appreciationPercent = percentageOf(totalAppreciation, property.getPurchasePrice());
 
         var mortgageProgress = property.hasLoanDetails() ? computeMortgageProgress(property) : null;
 
@@ -86,10 +84,7 @@ public class PropertyAnalyticsService {
                     PropertyExpenseEntity::getDate);
 
             annualNoi = totalIncome.subtract(totalOperatingExpenses);
-            capRate = property.getCurrentValue().compareTo(BigDecimal.ZERO) != 0
-                    ? annualNoi.multiply(new BigDecimal("100"))
-                        .divide(property.getCurrentValue(), 4, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
+            capRate = percentageOf(annualNoi, property.getCurrentValue());
 
             var allExpenses = expenseRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
             var totalAllExpenses = sumWithProration(allExpenses, rangeFrom, rangeTo,
@@ -102,10 +97,7 @@ public class PropertyAnalyticsService {
                     ? property.getPurchasePrice().subtract(property.getLoanAmount())
                     : property.getPurchasePrice();
 
-            cashOnCashReturn = totalCashInvested.compareTo(BigDecimal.ZERO) != 0
-                    ? annualNetCashFlow.multiply(new BigDecimal("100"))
-                        .divide(totalCashInvested, 4, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
+            cashOnCashReturn = percentageOf(annualNetCashFlow, totalCashInvested);
         }
 
         return new PropertyAnalyticsResponse(
@@ -132,10 +124,7 @@ public class PropertyAnalyticsService {
                 now);
 
         var principalPaid = property.getLoanAmount().subtract(currentBalance);
-        var percentPaidOff = property.getLoanAmount().compareTo(BigDecimal.ZERO) != 0
-                ? principalPaid.multiply(new BigDecimal("100"))
-                    .divide(property.getLoanAmount(), 4, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
+        var percentPaidOff = percentageOf(principalPaid, property.getLoanAmount());
 
         var estimatedPayoffDate = property.getLoanStartDate()
                 .plusMonths(property.getLoanTermMonths());
@@ -240,6 +229,13 @@ public class PropertyAnalyticsService {
         long overlappingMonths = overlapStart.until(overlapEnd, java.time.temporal.ChronoUnit.MONTHS) + 1;
         return amount.multiply(new BigDecimal(overlappingMonths))
                 .divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal percentageOf(BigDecimal numerator, BigDecimal denominator) {
+        if (denominator.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+        return numerator.multiply(BD_100).divide(denominator, 4, RoundingMode.HALF_UP);
     }
 
     private LocalDate[] computeDateRange(Integer year) {
