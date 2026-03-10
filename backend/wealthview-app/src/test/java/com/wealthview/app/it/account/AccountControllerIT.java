@@ -1,27 +1,17 @@
 package com.wealthview.app.it.account;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 import java.util.UUID;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AccountControllerIT extends AbstractApiIntegrationTest {
-
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
-    @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-    }
 
     @Test
     void create_validBrokerageAccount_returns201() {
@@ -39,12 +29,12 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void list_returnsCreatedAccounts() {
-        createAccount("Account 1", "brokerage");
-        createAccount("Account 2", "ira");
+        data.createAccount("Account 1", "brokerage");
+        data.createAccount("Account 2", "ira");
 
         var response = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+                MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var content = (java.util.List<Map<String, Object>>) response.getBody().get("data");
@@ -53,7 +43,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingAccount_returns200() {
-        var accountId = createAccountAndGetId("My IRA", "ira");
+        var accountId = data.createAccountAndGetId("My IRA", "ira");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -72,7 +62,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingAccount_returns200() {
-        var accountId = createAccountAndGetId("Old Name", "brokerage");
+        var accountId = data.createAccountAndGetId("Old Name", "brokerage");
         var updateBody = Map.of("name", "New Name", "type", "brokerage", "institution", "Schwab");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
@@ -85,7 +75,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingAccount_returns204() {
-        var accountId = createAccountAndGetId("To Delete", "brokerage");
+        var accountId = data.createAccountAndGetId("To Delete", "brokerage");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
@@ -95,18 +85,5 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
         var getResponse = restTemplate.exchange("/api/v1/accounts/" + accountId,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    }
-
-    private void createAccount(String name, String type) {
-        var body = Map.of("name", name, "type", type);
-        restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-    }
-
-    private String createAccountAndGetId(String name, String type) {
-        var body = Map.of("name", name, "type", type);
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 }

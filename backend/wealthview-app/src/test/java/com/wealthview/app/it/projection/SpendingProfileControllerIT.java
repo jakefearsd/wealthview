@@ -1,7 +1,6 @@
 package com.wealthview.app.it.projection;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -11,22 +10,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
-    @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-    }
-
     @Test
     void create_validProfile_returns201() {
-        var body = profileBody("Comfortable");
+        var body = data.spendingProfileBody("Comfortable");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles",
                 HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
@@ -37,8 +28,8 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void list_returnsCreatedProfiles() {
-        createProfile("Profile A");
-        createProfile("Profile B");
+        data.createSpendingProfile("Profile A");
+        data.createSpendingProfile("Profile B");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
@@ -50,7 +41,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingProfile_returns200() {
-        var id = createProfileAndGetId("My Profile");
+        var id = data.createSpendingProfileAndGetId("My Profile");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -61,8 +52,8 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingProfile_returns200() {
-        var id = createProfileAndGetId("Old Profile");
-        var updateBody = profileBody("Updated Profile");
+        var id = data.createSpendingProfileAndGetId("Old Profile");
+        var updateBody = data.spendingProfileBody("Updated Profile");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
                 HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
@@ -73,36 +64,12 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingProfile_returns204() {
-        var id = createProfileAndGetId("To Delete");
+        var id = data.createSpendingProfileAndGetId("To Delete");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    }
-
-    private Map<String, Object> profileBody(String name) {
-        return Map.of(
-                "name", name,
-                "essential_expenses", 40000,
-                "discretionary_expenses", 20000,
-                "income_streams", List.of(Map.of(
-                        "name", "Social Security",
-                        "annual_amount", 24000,
-                        "start_age", 67
-                ))
-        );
-    }
-
-    private void createProfile(String name) {
-        restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(profileBody(name), authHelper.adminToken()), MAP_TYPE);
-    }
-
-    private String createProfileAndGetId(String name) {
-        var response = restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(profileBody(name), authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 
     // === Spending Tiers Integration Tests ===
@@ -142,7 +109,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     @SuppressWarnings("unchecked")
     void update_withSpendingTiers_replacesTiers() {
         // Create without tiers
-        var id = createProfileAndGetId("No Tiers");
+        var id = data.createSpendingProfileAndGetId("No Tiers");
 
         // PUT with tiers
         var updateBody = profileBodyWithTiers("With Tiers");

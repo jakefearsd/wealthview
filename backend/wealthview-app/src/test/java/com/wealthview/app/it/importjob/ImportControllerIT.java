@@ -3,7 +3,6 @@ package com.wealthview.app.it.importjob;
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -14,20 +13,18 @@ import org.springframework.util.LinkedMultiValueMap;
 
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ImportControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
     private String accountId;
 
     @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-        accountId = createAccount();
+    @Override
+    protected void setUp() {
+        super.setUp();
+        accountId = data.createAccountAndGetId("Import Test Account", "brokerage");
     }
 
     @Test
@@ -95,12 +92,5 @@ class ImportControllerIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
 
         assertThat(response.getStatusCode().is4xxClientError()).isTrue();
-    }
-
-    private String createAccount() {
-        var body = Map.of("name", "Import Test Account", "type", "brokerage");
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 }

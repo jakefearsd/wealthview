@@ -1,7 +1,6 @@
 package com.wealthview.app.it.property;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
@@ -13,18 +12,10 @@ import java.util.UUID;
 
 import static java.util.Map.entry;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PropertyControllerIT extends AbstractApiIntegrationTest {
-
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
-    @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-    }
 
     @Test
     void create_withoutLoanDetails_returns201WithManualBalance() {
@@ -68,7 +59,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingProperty_returnsLoanFields() {
-        var id = createPropertyAndGetId();
+        var id = data.createPropertyAndGetId();
 
         var response = restTemplate.exchange("/api/v1/properties/" + id,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -79,7 +70,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_toggleComputedBalanceOn_changesEquity() {
-        var id = createPropertyWithLoanAndGetId();
+        var id = data.createPropertyWithLoanAndGetId();
         var updateBody = Map.of(
                 "address", "456 Oak Ave",
                 "purchase_price", 400000,
@@ -101,7 +92,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_toggleComputedBalanceOff_revertsToManual() {
-        var id = createPropertyWithLoanAndGetId();
+        var id = data.createPropertyWithLoanAndGetId();
         var updateBody = Map.of(
                 "address", "456 Oak Ave",
                 "purchase_price", 400000,
@@ -180,7 +171,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void addIncome_validInput_returns201() {
-        var propertyId = createPropertyAndGetId();
+        var propertyId = data.createPropertyAndGetId();
         var body = Map.of(
                 "date", "2024-01-15",
                 "amount", 2000,
@@ -196,7 +187,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void addExpense_validInput_returns201() {
-        var propertyId = createPropertyAndGetId();
+        var propertyId = data.createPropertyAndGetId();
         var body = Map.of(
                 "date", "2024-01-20",
                 "amount", 500,
@@ -212,7 +203,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void getCashFlow_returns200() {
-        var propertyId = createPropertyAndGetId();
+        var propertyId = data.createPropertyAndGetId();
         var incomeBody = Map.of("date", "2024-01-15", "amount", 2000, "category", "rent");
         restTemplate.exchange("/api/v1/properties/" + propertyId + "/income",
                 HttpMethod.POST, authHelper.authEntity(incomeBody, authHelper.adminToken()), Void.class);
@@ -498,7 +489,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void refreshValuation_zillowDisabled_returns503() {
-        var propertyId = createPropertyAndGetId();
+        var propertyId = data.createPropertyAndGetId();
 
         var response = restTemplate.exchange(
                 "/api/v1/properties/" + propertyId + "/valuations/refresh",
@@ -509,7 +500,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void selectZpid_zillowDisabled_returns503() {
-        var propertyId = createPropertyAndGetId();
+        var propertyId = data.createPropertyAndGetId();
         var body = Map.of("zpid", "12345");
 
         var response = restTemplate.exchange(
@@ -517,35 +508,5 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), Void.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
-    }
-
-    private String createPropertyAndGetId() {
-        var body = Map.of(
-                "address", "123 Main St",
-                "purchase_price", 300000,
-                "purchase_date", "2020-06-01",
-                "current_value", 350000,
-                "mortgage_balance", 200000
-        );
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
-    }
-
-    private String createPropertyWithLoanAndGetId() {
-        var body = Map.of(
-                "address", "456 Oak Ave",
-                "purchase_price", 400000,
-                "purchase_date", "2020-01-01",
-                "current_value", 450000,
-                "loan_amount", 320000,
-                "annual_interest_rate", 0.065,
-                "loan_term_months", 360,
-                "loan_start_date", "2020-01-01",
-                "use_computed_balance", false
-        );
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 }

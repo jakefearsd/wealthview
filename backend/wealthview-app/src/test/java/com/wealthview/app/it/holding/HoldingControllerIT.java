@@ -10,26 +10,24 @@ import org.springframework.http.HttpStatus;
 import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HoldingControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
     private String accountId;
 
     @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-        accountId = createAccount();
+    @Override
+    protected void setUp() {
+        super.setUp();
+        accountId = data.createBrokerageAccountAndGetId();
     }
 
     @Test
     void list_afterBuyTransactions_showsComputedHoldings() {
-        createBuyTransaction("AAPL", 10, 1500);
-        createBuyTransaction("GOOG", 5, 7000);
+        data.createBuyTransaction(accountId, "AAPL", 10, 1500);
+        data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
@@ -41,7 +39,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void manualOverride_overridesComputed_returns200() {
-        createBuyTransaction("AAPL", 10, 1500);
+        data.createBuyTransaction(accountId, "AAPL", 10, 1500);
 
         var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
@@ -75,24 +73,5 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("symbol")).isEqualTo("NVDA");
-    }
-
-    private String createAccount() {
-        var body = Map.of("name", "Test Brokerage", "type", "brokerage");
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
-    }
-
-    private void createBuyTransaction(String symbol, int quantity, int amount) {
-        var body = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", symbol,
-                "quantity", quantity,
-                "amount", amount
-        );
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
     }
 }

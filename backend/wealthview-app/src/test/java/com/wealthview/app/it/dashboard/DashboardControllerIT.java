@@ -1,13 +1,14 @@
 package com.wealthview.app.it.dashboard;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.TestDataHelper;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -18,51 +19,34 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DashboardControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
+    @BeforeEach
+    @Override
+    protected void setUp() {
+        // Suppress per-test clean/bootstrap; this class uses @BeforeAll + ordered tests
+    }
 
     @BeforeAll
     void setUpData() {
         databaseCleaner.clean();
         authHelper.bootstrap(restTemplate);
+        var data = new TestDataHelper(restTemplate, authHelper);
 
         // Create an account with transactions
-        var accountBody = Map.of("name", "Dashboard Brokerage", "type", "brokerage");
-        var accountResp = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(accountBody, authHelper.adminToken()), MAP_TYPE);
-        var accountId = (String) accountResp.getBody().get("id");
-
-        var txBody = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", "AAPL",
-                "quantity", 10,
-                "amount", 1500
-        );
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(txBody, authHelper.adminToken()), MAP_TYPE);
+        var accountId = data.createAccountAndGetId("Dashboard Brokerage", "brokerage");
+        data.createBuyTransaction(accountId, "AAPL", 10, 1500);
 
         // Add a VOO transaction — VOO has seed price data, unlike AAPL
-        var vooTxBody = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", "VOO",
-                "quantity", 5,
-                "amount", 2000
-        );
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(vooTxBody, authHelper.adminToken()), MAP_TYPE);
+        data.createBuyTransaction(accountId, "VOO", 5, 2000);
 
         // Create a bank account (should be excluded from investment counts)
-        var bankBody = Map.of("name", "Dashboard Checking", "type", "bank");
-        restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(bankBody, authHelper.adminToken()), MAP_TYPE);
+        data.createAccount("Dashboard Checking", "bank");
 
         // Create a property
         var propertyBody = Map.of(

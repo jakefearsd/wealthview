@@ -1,7 +1,6 @@
 package com.wealthview.app.it.auth;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -13,18 +12,10 @@ import org.springframework.http.MediaType;
 import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthControllerIT extends AbstractApiIntegrationTest {
-
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
-    @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-    }
 
     @Test
     void register_withValidInviteCode_returns201WithTokens() {
