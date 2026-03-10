@@ -3,7 +3,6 @@ package com.wealthview.app.it.importjob;
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -15,34 +14,28 @@ import org.springframework.util.LinkedMultiValueMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
-    @SuppressWarnings("unchecked")
-    private static final ParameterizedTypeReference<Map<String, Object>> PAGE_TYPE =
-            new ParameterizedTypeReference<>() {};
-
     private String accountId;
 
     @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-        accountId = createAccount();
+    @Override
+    protected void setUp() {
+        super.setUp();
+        accountId = data.createAccountAndGetId("Positions Test Account", "brokerage");
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void importPositions_clearsExistingAndImportsNew() {
         // Add a buy transaction first
-        addTransaction(accountId, "buy", "MSFT", "10", "3500.00");
+        data.addTransaction(accountId, "buy", "MSFT", "10", "3500.00");
 
         // Verify the transaction exists
-        var txnsBefore = getTransactions(accountId);
+        var txnsBefore = data.getTransactions(accountId);
         assertThat(txnsBefore).hasSize(1);
 
         // Import positions (should clear existing)
@@ -54,7 +47,7 @@ class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
         assertThat(successfulRows).isEqualTo(6); // FCASH deposit + 5 opening_balance
 
         // Verify old transaction is gone
-        var txnsAfter = getTransactions(accountId);
+        var txnsAfter = data.getTransactions(accountId);
         assertThat(txnsAfter).hasSize(6);
 
         // Verify FCASH created as deposit
@@ -77,7 +70,7 @@ class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
         uploadPositions(accountId);
 
         // Verify holdings
-        var holdings = getHoldings(accountId);
+        var holdings = data.getHoldings(accountId);
         assertThat(holdings).hasSize(5); // AMZN, NVDA, SCHD, SPAXX, VOO (FCASH is deposit, no holding)
 
         // Verify SPAXX is flagged as money market
@@ -124,41 +117,5 @@ class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
 
         return restTemplate.exchange("/api/v1/import/positions",
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
-    }
-
-    private void addTransaction(String acctId, String type, String symbol,
-                                String quantity, String amount) {
-        var body = Map.of(
-                "date", "2025-01-15",
-                "type", type,
-                "symbol", symbol,
-                "quantity", quantity,
-                "amount", amount);
-        restTemplate.exchange("/api/v1/accounts/" + acctId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getTransactions(String acctId) {
-        var response = restTemplate.exchange(
-                "/api/v1/accounts/" + acctId + "/transactions",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
-        return (List<Map<String, Object>>) response.getBody().get("data");
-    }
-
-    @SuppressWarnings("unchecked")
-    private List<Map<String, Object>> getHoldings(String acctId) {
-        var response = restTemplate.exchange(
-                "/api/v1/accounts/" + acctId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-        return response.getBody();
-    }
-
-    private String createAccount() {
-        var body = Map.of("name", "Positions Test Account", "type", "brokerage");
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 }

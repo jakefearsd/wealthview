@@ -9,20 +9,18 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Map;
 
+import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TransactionControllerIT extends AbstractApiIntegrationTest {
 
-    private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
-
     private String accountId;
 
     @BeforeEach
-    void setUp() {
-        databaseCleaner.clean();
-        authHelper.bootstrap(restTemplate);
-        accountId = createAccount();
+    @Override
+    protected void setUp() {
+        super.setUp();
+        accountId = data.createBrokerageAccountAndGetId();
     }
 
     @Test
@@ -45,7 +43,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void create_sellTransaction_updatesHoldings() {
-        createBuyTransaction("GOOG", 5, 7000);
+        data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
         var sellBody = Map.of(
                 "date", "2024-02-01",
@@ -65,8 +63,8 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
     @Test
     @SuppressWarnings("unchecked")
     void list_returnsTransactionsForAccount() {
-        createBuyTransaction("AAPL", 10, 1500);
-        createBuyTransaction("GOOG", 5, 7000);
+        data.createBuyTransaction(accountId, "AAPL", 10, 1500);
+        data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
@@ -79,7 +77,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingTransaction_returns200() {
-        var txId = createBuyTransactionAndGetId("AAPL", 10, 1500);
+        var txId = data.createBuyTransactionAndGetId(accountId, "AAPL", 10, 1500);
         var updateBody = Map.of(
                 "date", "2024-01-20",
                 "type", "buy",
@@ -96,43 +94,11 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingTransaction_returns204() {
-        var txId = createBuyTransactionAndGetId("MSFT", 8, 2400);
+        var txId = data.createBuyTransactionAndGetId(accountId, "MSFT", 8, 2400);
 
         var response = restTemplate.exchange("/api/v1/transactions/" + txId,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
-    }
-
-    private String createAccount() {
-        var body = Map.of("name", "Test Brokerage", "type", "brokerage");
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
-    }
-
-    private void createBuyTransaction(String symbol, int quantity, int amount) {
-        var body = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", symbol,
-                "quantity", quantity,
-                "amount", amount
-        );
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-    }
-
-    private String createBuyTransactionAndGetId(String symbol, int quantity, int amount) {
-        var body = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", symbol,
-                "quantity", quantity,
-                "amount", amount
-        );
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
     }
 }

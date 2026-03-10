@@ -1,9 +1,9 @@
 package com.wealthview.app.it;
 
 import com.wealthview.app.WealthViewApplication;
-import org.springframework.beans.factory.annotation.Autowired;
-import com.wealthview.app.WealthViewApplication;
+import com.wealthview.app.it.testutil.TestDataHelper;
 import jakarta.annotation.PostConstruct;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -46,9 +46,18 @@ public abstract class AbstractApiIntegrationTest {
     @Autowired
     protected DatabaseCleaner databaseCleaner;
 
+    protected TestDataHelper data;
+
     @PostConstruct
     void configureRestTemplate() {
         restTemplate.getRestTemplate().setRequestFactory(
                 new HttpComponentsClientHttpRequestFactory());
+    }
+
+    @BeforeEach
+    protected void setUp() {
+        databaseCleaner.clean();
+        authHelper.bootstrap(restTemplate);
+        data = new TestDataHelper(restTemplate, authHelper);
     }
 }
