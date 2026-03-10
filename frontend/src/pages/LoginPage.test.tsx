@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi } from 'vitest';
+import { renderWithRouter } from '../test-utils';
 import LoginPage from './LoginPage';
 import { AuthProvider } from '../context/AuthContext';
 
@@ -10,11 +10,9 @@ vi.mock('../api/auth', () => ({
 }));
 
 function renderLoginPage() {
-    return render(
+    return renderWithRouter(
         <AuthProvider>
-            <MemoryRouter>
-                <LoginPage />
-            </MemoryRouter>
+            <LoginPage />
         </AuthProvider>
     );
 }

@@ -1,4 +1,5 @@
 import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { inputStyle, labelStyle } from '../utils/styles';
 
 interface Props {
     heading: string;
@@ -18,9 +19,6 @@ interface Props {
     onSubmit: () => void;
     onCancel: () => void;
 }
-
-const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
-const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 export default function PropertyForm(props: Props) {
     return (

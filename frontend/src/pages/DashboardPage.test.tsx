@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithRouter } from '../test-utils';
 import type { DashboardSummary } from '../types/dashboard';
 
 vi.mock('../hooks/useApiQuery', () => ({
@@ -60,28 +60,28 @@ describe('DashboardPage', () => {
 
     it('renders loading state', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByText('Loading dashboard...')).toBeInTheDocument();
     });
 
     it('renders error state', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Network error', refetch: vi.fn() });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByText('Error: Network error')).toBeInTheDocument();
     });
 
     it('returns null when data is null and not loading', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: null, refetch: vi.fn() });
-        const { container } = render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        const { container } = renderWithRouter(<DashboardPage />);
 
         expect(container.innerHTML).toBe('');
     });
 
     it('renders summary cards with formatted values', () => {
         mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByTestId('summary-card-Net Worth')).toHaveTextContent('$500,000');
         expect(screen.getByTestId('summary-card-Investments')).toHaveTextContent('$300,000');
@@ -91,14 +91,14 @@ describe('DashboardPage', () => {
 
     it('renders CombinedPortfolioChart component', () => {
         mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByTestId('combined-portfolio-chart')).toBeInTheDocument();
     });
 
     it('renders accounts table with data', () => {
         mockUseApiQuery.mockReturnValue({ data: mockSummary, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByText('Brokerage')).toBeInTheDocument();
         expect(screen.getByText('IRA')).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe('DashboardPage', () => {
             error: null,
             refetch: vi.fn(),
         });
-        render(<MemoryRouter><DashboardPage /></MemoryRouter>);
+        renderWithRouter(<DashboardPage />);
 
         expect(screen.getByText('No allocation data')).toBeInTheDocument();
     });

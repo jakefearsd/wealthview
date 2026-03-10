@@ -1,15 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { listSpendingProfiles, createSpendingProfile, updateSpendingProfile, deleteSpendingProfile } from '../api/spendingProfiles';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { cardStyle } from '../utils/styles';
+import { useCrudForm } from '../hooks/useCrudForm';
+import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
-import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../utils/errorMessage';
 import HelpText from '../components/HelpText';
 import type { SpendingProfile, CreateSpendingProfileRequest, IncomeStream, SpendingTier } from '../types/projection';
-
-const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
-const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 function defaultIncomeStream(): IncomeStream {
     return { name: '', annual_amount: 0, start_age: 65, end_age: null, inflation_rate: 0 };
@@ -19,94 +15,73 @@ function defaultSpendingTier(): SpendingTier {
     return { name: '', start_age: 55, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
 }
 
+const initialFormData: CreateSpendingProfileRequest = {
+    name: '',
+    essential_expenses: 40000,
+    discretionary_expenses: 20000,
+    income_streams: [],
+    spending_tiers: [],
+};
+
 export default function SpendingProfilesPage() {
     const { data: profiles, loading, refetch } = useApiQuery(listSpendingProfiles);
     const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
 
-    const [name, setName] = useState('');
-    const [essentialExpenses, setEssentialExpenses] = useState(40000);
-    const [discretionaryExpenses, setDiscretionaryExpenses] = useState(20000);
-    const [incomeStreams, setIncomeStreams] = useState<IncomeStream[]>([]);
-    const [spendingTiers, setSpendingTiers] = useState<SpendingTier[]>([]);
-
-    function resetForm() {
-        setName('');
-        setEssentialExpenses(40000);
-        setDiscretionaryExpenses(20000);
-        setIncomeStreams([]);
-        setSpendingTiers([]);
-        setEditingId(null);
+    const onSuccess = useCallback(() => {
         setShowForm(false);
-    }
+        refetch();
+    }, [refetch]);
+
+    const { editingId, formData, setFormData, isSubmitting: saving, handleSave, handleDelete, resetForm: crudReset, startEdit: crudStartEdit } = useCrudForm<SpendingProfile, CreateSpendingProfileRequest>({
+        createFn: createSpendingProfile,
+        updateFn: updateSpendingProfile,
+        deleteFn: deleteSpendingProfile,
+        entityName: 'Profile',
+        initialFormData,
+        onSuccess,
+        validate: (data) => !data.name ? 'Name is required' : undefined,
+    });
+
+    const resetForm = useCallback(() => {
+        crudReset();
+        setShowForm(false);
+    }, [crudReset]);
 
     function startEdit(profile: SpendingProfile) {
-        setName(profile.name);
-        setEssentialExpenses(profile.essential_expenses);
-        setDiscretionaryExpenses(profile.discretionary_expenses);
-        setIncomeStreams(profile.income_streams.length > 0 ? [...profile.income_streams] : []);
-        setSpendingTiers(profile.spending_tiers?.length > 0 ? [...profile.spending_tiers] : []);
-        setEditingId(profile.id);
+        crudStartEdit(profile.id, {
+            name: profile.name,
+            essential_expenses: profile.essential_expenses,
+            discretionary_expenses: profile.discretionary_expenses,
+            income_streams: profile.income_streams.length > 0 ? [...profile.income_streams] : [],
+            spending_tiers: profile.spending_tiers?.length > 0 ? [...profile.spending_tiers] : [],
+        });
         setShowForm(true);
     }
 
     function updateStream(index: number, field: keyof IncomeStream, value: string | number | boolean | null) {
-        setIncomeStreams(prev => prev.map((s, i) => {
-            if (i !== index) return s;
-            const updated = { ...s, [field]: value };
-            if (updated.one_time && field === 'start_age' && typeof value === 'number') {
-                updated.end_age = value + 1;
-            }
-            return updated;
+        setFormData(prev => ({
+            ...prev,
+            income_streams: prev.income_streams.map((s, i) => {
+                if (i !== index) return s;
+                const updated = { ...s, [field]: value };
+                if (updated.one_time && field === 'start_age' && typeof value === 'number') {
+                    updated.end_age = value + 1;
+                }
+                return updated;
+            }),
         }));
     }
 
     function updateTier(index: number, field: keyof SpendingTier, value: string | number | null) {
-        setSpendingTiers(prev => prev.map((t, i) => i === index ? { ...t, [field]: value } : t));
-    }
-
-    async function handleSave() {
-        if (!name) {
-            toast.error('Name is required');
-            return;
-        }
-        setSaving(true);
-        try {
-            const request: CreateSpendingProfileRequest = {
-                name,
-                essential_expenses: essentialExpenses,
-                discretionary_expenses: discretionaryExpenses,
-                income_streams: incomeStreams,
-                spending_tiers: spendingTiers,
-            };
-            if (editingId) {
-                await updateSpendingProfile(editingId, request);
-                toast.success('Profile updated');
-            } else {
-                await createSpendingProfile(request);
-                toast.success('Profile created');
-            }
-            resetForm();
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function handleDelete(id: string) {
-        try {
-            await deleteSpendingProfile(id);
-            toast.success('Profile deleted');
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        }
+        setFormData(prev => ({
+            ...prev,
+            spending_tiers: prev.spending_tiers.map((t, i) => i === index ? { ...t, [field]: value } : t),
+        }));
     }
 
     if (loading) return <div>Loading...</div>;
+
+    const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, income_streams: incomeStreams, spending_tiers: spendingTiers } = formData;
 
     return (
         <div>
@@ -131,16 +106,16 @@ export default function SpendingProfilesPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
                             <label style={labelStyle}>Name</label>
-                            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Retirement Spending" />
+                            <input style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="Retirement Spending" />
                         </div>
                         <div>
                             <label style={labelStyle}>Essential Expenses (annual)</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(essentialExpenses)} onChange={e => setEssentialExpenses(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(essentialExpenses)} onChange={e => setFormData(prev => ({ ...prev, essential_expenses: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
                             <HelpText>Default non-negotiable annual costs when no spending tier matches the current age.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Discretionary Expenses (annual)</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(discretionaryExpenses)} onChange={e => setDiscretionaryExpenses(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(discretionaryExpenses)} onChange={e => setFormData(prev => ({ ...prev, discretionary_expenses: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
                             <HelpText>Default flexible annual spending when no spending tier matches the current age.</HelpText>
                         </div>
                     </div>
@@ -154,7 +129,7 @@ export default function SpendingProfilesPage() {
                             </div>
                         </div>
                         <button
-                            onClick={() => setSpendingTiers(prev => [...prev, defaultSpendingTier()])}
+                            onClick={() => setFormData(prev => ({ ...prev, spending_tiers: [...prev.spending_tiers, defaultSpendingTier()] }))}
                             style={{ padding: '0.25rem 0.75rem', background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                         >
                             + Add Spending Tier
@@ -184,7 +159,7 @@ export default function SpendingProfilesPage() {
                             </div>
                             <div>
                                 <button
-                                    onClick={() => setSpendingTiers(prev => prev.filter((_, i) => i !== idx))}
+                                    onClick={() => setFormData(prev => ({ ...prev, spending_tiers: prev.spending_tiers.filter((_, i) => i !== idx) }))}
                                     style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                                 >
                                     Remove
@@ -201,13 +176,13 @@ export default function SpendingProfilesPage() {
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
-                                onClick={() => setIncomeStreams(prev => [...prev, defaultIncomeStream()])}
+                                onClick={() => setFormData(prev => ({ ...prev, income_streams: [...prev.income_streams, defaultIncomeStream()] }))}
                                 style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                             >
                                 + Add Income Stream
                             </button>
                             <button
-                                onClick={() => setIncomeStreams(prev => [...prev, { name: '', annual_amount: 0, start_age: 65, end_age: 66, inflation_rate: 0, one_time: true }])}
+                                onClick={() => setFormData(prev => ({ ...prev, income_streams: [...prev.income_streams, { name: '', annual_amount: 0, start_age: 65, end_age: 66, inflation_rate: 0, one_time: true }] }))}
                                 style={{ padding: '0.25rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                             >
                                 + One-Time Payment
@@ -248,7 +223,7 @@ export default function SpendingProfilesPage() {
                             )}
                             <div>
                                 <button
-                                    onClick={() => setIncomeStreams(prev => prev.filter((_, i) => i !== idx))}
+                                    onClick={() => setFormData(prev => ({ ...prev, income_streams: prev.income_streams.filter((_, i) => i !== idx) }))}
                                     style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                                 >
                                     Remove

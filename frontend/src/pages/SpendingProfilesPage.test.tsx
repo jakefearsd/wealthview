@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithRouter } from '../test-utils';
 import SpendingProfilesPage from './SpendingProfilesPage';
 import type { SpendingProfile } from '../types/projection';
 
@@ -54,7 +54,7 @@ describe('SpendingProfilesPage', () => {
 
     it('renders profile cards with names and amounts', () => {
         mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         expect(screen.getByText('Conservative')).toBeInTheDocument();
         expect(screen.getByText('Tiered Retirement')).toBeInTheDocument();
@@ -62,14 +62,14 @@ describe('SpendingProfilesPage', () => {
 
     it('shows empty state when no profiles exist', () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         expect(screen.getByText(/no spending profiles yet/i)).toBeInTheDocument();
     });
 
     it('shows create form on New Profile click', async () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
         expect(screen.getByRole('heading', { name: 'Create Profile' })).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('SpendingProfilesPage', () => {
 
     it('cancel button hides the form', async () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
         expect(screen.getByRole('heading', { name: 'Create Profile' })).toBeInTheDocument();
@@ -88,7 +88,7 @@ describe('SpendingProfilesPage', () => {
 
     it('renders tier summary on profile card', () => {
         mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         expect(screen.getByText(/Go-Go/)).toBeInTheDocument();
         expect(screen.getByText(/62-70/)).toBeInTheDocument();
@@ -96,14 +96,14 @@ describe('SpendingProfilesPage', () => {
 
     it('renders income stream summary on profile card', () => {
         mockUseApiQuery.mockReturnValue({ data: mockProfiles, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         expect(screen.getByText(/Social Security/)).toBeInTheDocument();
     });
 
     it('Add Spending Tier button adds a tier row', async () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
         await userEvent.click(screen.getByRole('button', { name: /add spending tier/i }));
@@ -114,7 +114,7 @@ describe('SpendingProfilesPage', () => {
 
     it('Remove button removes a tier row', async () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         await userEvent.click(screen.getByRole('button', { name: /new profile/i }));
         await userEvent.click(screen.getByRole('button', { name: /add spending tier/i }));
@@ -126,7 +126,7 @@ describe('SpendingProfilesPage', () => {
 
     it('loading state shows loading indicator', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><SpendingProfilesPage /></MemoryRouter>);
+        renderWithRouter(<SpendingProfilesPage />);
 
         expect(screen.getByText('Loading...')).toBeInTheDocument();
     });

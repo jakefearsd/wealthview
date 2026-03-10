@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithRoute } from '../test-utils';
 import type { PropertyAnalyticsResponse } from '../types/property';
 
 vi.mock('../hooks/useApiQuery', () => ({
@@ -114,13 +114,10 @@ const mockProperty = {
 };
 
 function renderPage() {
-    return render(
-        <MemoryRouter initialEntries={['/properties/prop-1']}>
-            <Routes>
-                <Route path="/properties/:id" element={<PropertyDetailPage />} />
-            </Routes>
-        </MemoryRouter>
-    );
+    return renderWithRoute(<PropertyDetailPage />, {
+        path: '/properties/:id',
+        entry: '/properties/prop-1',
+    });
 }
 
 describe('PropertyDetailPage', () => {

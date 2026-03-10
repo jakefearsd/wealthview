@@ -1,17 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { listIncomeSources, createIncomeSource, updateIncomeSource, deleteIncomeSource } from '../api/incomeSources';
 import { listProperties } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { cardStyle } from '../utils/styles';
+import { useCrudForm } from '../hooks/useCrudForm';
+import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
-import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../utils/errorMessage';
 import HelpText from '../components/HelpText';
 import InfoSection from '../components/InfoSection';
 import type { IncomeSource, CreateIncomeSourceRequest } from '../types/projection';
-
-const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
-const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 const INCOME_TYPES = [
     { value: 'social_security', label: 'Social Security' },
@@ -75,120 +71,119 @@ function treatmentLabel(treatment: string): string {
     return treatment;
 }
 
+interface IncomeSourceFormData {
+    name: string;
+    income_type: string;
+    annual_amount: number;
+    start_age: number;
+    end_age: number | null;
+    inflation_rate: number;
+    one_time: boolean;
+    tax_treatment: string;
+    property_id: string | null;
+}
+
+const initialFormData: IncomeSourceFormData = {
+    name: '',
+    income_type: 'social_security',
+    annual_amount: 0,
+    start_age: 67,
+    end_age: null,
+    inflation_rate: 0,
+    one_time: false,
+    tax_treatment: 'partially_taxable',
+    property_id: null,
+};
+
 export default function IncomeSourcesPage() {
     const { data: sources, loading, refetch } = useApiQuery(listIncomeSources);
     const { data: properties } = useApiQuery(listProperties);
     const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
 
-    const [name, setName] = useState('');
-    const [incomeType, setIncomeType] = useState('social_security');
-    const [annualAmount, setAnnualAmount] = useState(0);
-    const [startAge, setStartAge] = useState(67);
-    const [endAge, setEndAge] = useState<number | null>(null);
-    const [inflationRate, setInflationRate] = useState(0);
-    const [oneTime, setOneTime] = useState(false);
-    const [taxTreatment, setTaxTreatment] = useState('partially_taxable');
-    const [propertyId, setPropertyId] = useState<string | null>(null);
-
-    function resetForm() {
-        setName('');
-        setIncomeType('social_security');
-        setAnnualAmount(0);
-        setStartAge(67);
-        setEndAge(null);
-        setInflationRate(0);
-        setOneTime(false);
-        setTaxTreatment('partially_taxable');
-        setPropertyId(null);
-        setEditingId(null);
+    const onSuccess = useCallback(() => {
         setShowForm(false);
-    }
+        refetch();
+    }, [refetch]);
+
+    const createFn = useCallback(async (data: IncomeSourceFormData): Promise<IncomeSource> => {
+        const request: CreateIncomeSourceRequest = {
+            name: data.name,
+            income_type: data.income_type,
+            annual_amount: data.annual_amount,
+            start_age: data.start_age,
+            end_age: data.one_time ? data.start_age + 1 : data.end_age,
+            inflation_rate: data.one_time ? 0 : data.inflation_rate,
+            one_time: data.one_time,
+            tax_treatment: data.tax_treatment,
+            property_id: data.income_type === 'rental_property' ? data.property_id : null,
+        };
+        return createIncomeSource(request);
+    }, []);
+
+    const updateFn = useCallback(async (id: string, data: IncomeSourceFormData): Promise<IncomeSource> => {
+        return updateIncomeSource(id, {
+            name: data.name,
+            annual_amount: data.annual_amount,
+            start_age: data.start_age,
+            end_age: data.one_time ? data.start_age + 1 : data.end_age,
+            inflation_rate: data.one_time ? 0 : data.inflation_rate,
+            one_time: data.one_time,
+            tax_treatment: data.tax_treatment,
+            property_id: data.income_type === 'rental_property' ? data.property_id : null,
+        });
+    }, []);
+
+    const { editingId, formData, setFormData, isSubmitting: saving, handleSave, handleDelete, resetForm: crudReset, startEdit: crudStartEdit } = useCrudForm<IncomeSource, IncomeSourceFormData>({
+        createFn,
+        updateFn,
+        deleteFn: deleteIncomeSource,
+        entityName: 'Income source',
+        initialFormData,
+        onSuccess,
+        validate: (data) => {
+            if (!data.name) return 'Name is required';
+            if (data.annual_amount <= 0) return 'Annual amount must be greater than 0';
+            return undefined;
+        },
+    });
+
+    const resetForm = useCallback(() => {
+        crudReset();
+        setShowForm(false);
+    }, [crudReset]);
 
     function startEdit(source: IncomeSource) {
-        setName(source.name);
-        setIncomeType(source.income_type);
-        setAnnualAmount(source.annual_amount);
-        setStartAge(source.start_age);
-        setEndAge(source.end_age);
-        setInflationRate(source.inflation_rate);
-        setOneTime(source.one_time);
-        setTaxTreatment(source.tax_treatment);
-        setPropertyId(source.property_id);
-        setEditingId(source.id);
+        crudStartEdit(source.id, {
+            name: source.name,
+            income_type: source.income_type,
+            annual_amount: source.annual_amount,
+            start_age: source.start_age,
+            end_age: source.end_age,
+            inflation_rate: source.inflation_rate,
+            one_time: source.one_time,
+            tax_treatment: source.tax_treatment,
+            property_id: source.property_id,
+        });
         setShowForm(true);
     }
 
     function handleTypeChange(newType: string) {
-        setIncomeType(newType);
-        setTaxTreatment(defaultTaxTreatment(newType));
-        if (newType !== 'rental_property') {
-            setPropertyId(null);
-        }
-        if (newType === 'social_security') {
-            setStartAge(67);
-            setInflationRate(0.02);
-        } else if (newType === 'rental_property') {
-            setInflationRate(0.02);
-        }
-    }
-
-    async function handleSave() {
-        if (!name) {
-            toast.error('Name is required');
-            return;
-        }
-        if (annualAmount <= 0) {
-            toast.error('Annual amount must be greater than 0');
-            return;
-        }
-        setSaving(true);
-        try {
-            if (editingId) {
-                await updateIncomeSource(editingId, {
-                    name,
-                    annual_amount: annualAmount,
-                    start_age: startAge,
-                    end_age: oneTime ? startAge + 1 : endAge,
-                    inflation_rate: oneTime ? 0 : inflationRate,
-                    one_time: oneTime,
-                    tax_treatment: taxTreatment,
-                    property_id: incomeType === 'rental_property' ? propertyId : null,
-                });
-                toast.success('Income source updated');
-            } else {
-                const request: CreateIncomeSourceRequest = {
-                    name,
-                    income_type: incomeType,
-                    annual_amount: annualAmount,
-                    start_age: startAge,
-                    end_age: oneTime ? startAge + 1 : endAge,
-                    inflation_rate: oneTime ? 0 : inflationRate,
-                    one_time: oneTime,
-                    tax_treatment: taxTreatment,
-                    property_id: incomeType === 'rental_property' ? propertyId : null,
-                };
-                await createIncomeSource(request);
-                toast.success('Income source created');
+        setFormData(prev => {
+            const updates: Partial<IncomeSourceFormData> = {
+                income_type: newType,
+                tax_treatment: defaultTaxTreatment(newType),
+            };
+            if (newType !== 'rental_property') {
+                updates.property_id = null;
             }
-            resetForm();
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    async function handleDelete(id: string) {
-        try {
-            await deleteIncomeSource(id);
-            toast.success('Income source deleted');
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        }
+            if (newType === 'social_security') {
+                updates.start_age = 67;
+                updates.inflation_rate = 0.02;
+            } else if (newType === 'rental_property') {
+                updates.inflation_rate = 0.02;
+            }
+            return { ...prev, ...updates };
+        });
     }
 
     if (loading) return <div>Loading...</div>;
@@ -199,6 +194,7 @@ export default function IncomeSourcesPage() {
         return acc;
     }, {});
 
+    const { name, income_type: incomeType, annual_amount: annualAmount, start_age: startAge, end_age: endAge, inflation_rate: inflationRate, one_time: oneTime, tax_treatment: taxTreatment, property_id: propertyId } = formData;
     const treatments = TAX_TREATMENTS[incomeType] ?? TAX_TREATMENTS.other;
 
     return (
@@ -229,7 +225,7 @@ export default function IncomeSourcesPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
                             <label style={labelStyle}>Name</label>
-                            <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Social Security" />
+                            <input style={inputStyle} value={name} onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))} placeholder="e.g., Social Security" />
                         </div>
                         <div>
                             <label style={labelStyle}>Income Type</label>
@@ -250,7 +246,7 @@ export default function IncomeSourcesPage() {
                         <>
                             <div style={{ marginBottom: '1rem' }}>
                                 <label style={labelStyle}>Link to Property (optional)</label>
-                                <select style={inputStyle} value={propertyId ?? ''} onChange={e => setPropertyId(e.target.value || null)}>
+                                <select style={inputStyle} value={propertyId ?? ''} onChange={e => setFormData(prev => ({ ...prev, property_id: e.target.value || null }))}>
                                     <option value="">No linked property (hypothetical)</option>
                                     {investmentProperties.map(p => (
                                         <option key={p.id} value={p.id}>{p.address} — {formatCurrency(p.current_value)}</option>
@@ -284,7 +280,7 @@ export default function IncomeSourcesPage() {
                             {treatments.map(t => (
                                 <div
                                     key={t.value}
-                                    onClick={() => setTaxTreatment(t.value)}
+                                    onClick={() => setFormData(prev => ({ ...prev, tax_treatment: t.value }))}
                                     style={{
                                         border: `2px solid ${taxTreatment === t.value ? '#1976d2' : '#e0e0e0'}`,
                                         background: taxTreatment === t.value ? '#e3f2fd' : '#fff',
@@ -301,30 +297,30 @@ export default function IncomeSourcesPage() {
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                        <input type="checkbox" id="oneTime" checked={oneTime} onChange={e => setOneTime(e.target.checked)} />
+                        <input type="checkbox" id="oneTime" checked={oneTime} onChange={e => setFormData(prev => ({ ...prev, one_time: e.target.checked }))} />
                         <label htmlFor="oneTime" style={{ fontSize: '0.85rem' }}>One-time payment (e.g., deferred compensation, inheritance)</label>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: oneTime ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Amount' : 'Annual Amount'}</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualAmount)} onChange={e => setAnnualAmount(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualAmount)} onChange={e => setFormData(prev => ({ ...prev, annual_amount: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
                         </div>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>
-                            <input style={inputStyle} type="number" value={startAge} onChange={e => setStartAge(Number(e.target.value))} />
+                            <input style={inputStyle} type="number" value={startAge} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
                             <HelpText>{oneTime ? 'Age when the one-time payment occurs.' : 'Age when this income begins.'}</HelpText>
                         </div>
                         {!oneTime && (
                             <>
                                 <div>
                                     <label style={labelStyle}>End Age (blank = forever)</label>
-                                    <input style={inputStyle} type="number" value={endAge ?? ''} onChange={e => setEndAge(e.target.value ? Number(e.target.value) : null)} />
+                                    <input style={inputStyle} type="number" value={endAge ?? ''} onChange={e => setFormData(prev => ({ ...prev, end_age: e.target.value ? Number(e.target.value) : null }))} />
                                     <HelpText>Leave blank if this income continues for life.</HelpText>
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Inflation Rate</label>
-                                    <input style={inputStyle} type="number" step="0.001" value={inflationRate} onChange={e => setInflationRate(Number(e.target.value) || 0)} />
+                                    <input style={inputStyle} type="number" step="0.001" value={inflationRate} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
                                     <HelpText>Annual adjustment rate (e.g., 0.02 = 2%). SS COLA is typically ~2%.</HelpText>
                                 </div>
                             </>

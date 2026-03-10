@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { listScenarios, compareScenarios } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
@@ -14,8 +14,6 @@ import {
 } from 'recharts';
 
 const COLORS = ['#1976d2', '#2e7d32', '#9c27b0'];
-const inputStyle = { padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', width: '100%' };
-const labelStyle = { display: 'block', marginBottom: '0.25rem', fontWeight: 600 as const, fontSize: '0.85rem' };
 
 export default function ProjectionComparePage() {
     const { data: scenarios, loading } = useApiQuery(listScenarios);
