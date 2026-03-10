@@ -17,6 +17,9 @@ public class DatabaseCleaner {
     public void clean() {
         jdbcTemplate.execute("""
                 TRUNCATE TABLE
+                    scenario_income_sources,
+                    income_sources,
+                    property_depreciation_schedule,
                     spending_profiles,
                     projection_accounts,
                     projection_scenarios,

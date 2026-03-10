@@ -16,10 +16,9 @@ SELECT
     COALESCE((stream->>'one_time')::boolean, (stream->>'oneTime')::boolean, false),
     'taxable'
 FROM spending_profiles sp,
-     jsonb_array_elements(sp.income_streams::jsonb) AS stream
+     jsonb_array_elements(sp.income_streams) AS stream
 WHERE sp.income_streams IS NOT NULL
-  AND sp.income_streams != '[]'
-  AND sp.income_streams != '';
+  AND sp.income_streams != '[]'::jsonb;
 
 -- Step 2: Link migrated income_sources to scenarios that reference those spending profiles
 INSERT INTO scenario_income_sources (scenario_id, income_source_id)
@@ -30,8 +29,7 @@ JOIN income_sources isrc ON isrc.tenant_id = sp.tenant_id
     AND isrc.income_type = 'other'
     AND isrc.created_at >= now() - interval '1 minute'
 WHERE sp.income_streams IS NOT NULL
-  AND sp.income_streams != '[]'
-  AND sp.income_streams != ''
+  AND sp.income_streams != '[]'::jsonb
   AND NOT EXISTS (
       SELECT 1 FROM scenario_income_sources sis
       WHERE sis.scenario_id = ps.id AND sis.income_source_id = isrc.id
