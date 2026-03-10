@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithRoute } from '../test-utils';
 import ProjectionDetailPage from './ProjectionDetailPage';
 import type { Scenario } from '../types/projection';
 
@@ -46,13 +46,10 @@ import { useApiQuery } from '../hooks/useApiQuery';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 function renderPage() {
-    return render(
-        <MemoryRouter initialEntries={['/projections/abc-123']}>
-            <Routes>
-                <Route path="/projections/:id" element={<ProjectionDetailPage />} />
-            </Routes>
-        </MemoryRouter>
-    );
+    return renderWithRoute(<ProjectionDetailPage />, {
+        path: '/projections/:id',
+        entry: '/projections/abc-123',
+    });
 }
 
 describe('ProjectionDetailPage', () => {

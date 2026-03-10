@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderWithRouter } from '../test-utils';
 import ProjectionsPage from './ProjectionsPage';
 import type { Scenario } from '../types/projection';
 
@@ -56,7 +56,7 @@ describe('ProjectionsPage', () => {
 
     it('renders scenario cards with names as links', () => {
         mockUseApiQuery.mockReturnValue({ data: mockScenarios, loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><ProjectionsPage /></MemoryRouter>);
+        renderWithRouter(<ProjectionsPage />);
 
         const link1 = screen.getByRole('link', { name: 'Early Retirement' });
         expect(link1).toHaveAttribute('href', '/projections/1');
@@ -67,14 +67,14 @@ describe('ProjectionsPage', () => {
 
     it('shows empty state when no scenarios', () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><ProjectionsPage /></MemoryRouter>);
+        renderWithRouter(<ProjectionsPage />);
 
         expect(screen.getByText(/no scenarios yet/i)).toBeInTheDocument();
     });
 
     it('shows create form on button click', async () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
-        render(<MemoryRouter><ProjectionsPage /></MemoryRouter>);
+        renderWithRouter(<ProjectionsPage />);
 
         await userEvent.click(screen.getByRole('button', { name: /new scenario/i }));
         expect(screen.getByRole('heading', { name: 'Create Scenario' })).toBeInTheDocument();

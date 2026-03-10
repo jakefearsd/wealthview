@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { listProperties, createProperty, updateProperty, deleteProperty } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
 import PropertyForm from '../components/PropertyForm';
 import type { Property } from '../types/property';
 
@@ -11,99 +11,109 @@ function formatCurrency(value: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
+interface PropertyFormData {
+    address: string;
+    purchasePrice: string;
+    purchaseDate: string;
+    currentValue: string;
+    mortgageBalance: string;
+    showLoanDetails: boolean;
+    loanAmount: string;
+    annualInterestRate: string;
+    loanTermMonths: string;
+    loanStartDate: string;
+    useComputedBalance: boolean;
+    propertyType: string;
+}
+
+const initialFormData: PropertyFormData = {
+    address: '',
+    purchasePrice: '',
+    purchaseDate: '',
+    currentValue: '',
+    mortgageBalance: '',
+    showLoanDetails: false,
+    loanAmount: '',
+    annualInterestRate: '',
+    loanTermMonths: '',
+    loanStartDate: '',
+    useComputedBalance: false,
+    propertyType: 'primary_residence',
+};
+
+function buildRequest(data: PropertyFormData) {
+    return {
+        address: data.address,
+        purchase_price: parseFloat(data.purchasePrice),
+        purchase_date: data.purchaseDate,
+        current_value: parseFloat(data.currentValue),
+        mortgage_balance: data.mortgageBalance ? parseFloat(data.mortgageBalance) : undefined,
+        property_type: data.propertyType,
+        ...(data.showLoanDetails && data.loanAmount ? {
+            loan_amount: parseFloat(data.loanAmount),
+            annual_interest_rate: parseFloat(data.annualInterestRate),
+            loan_term_months: parseInt(data.loanTermMonths),
+            loan_start_date: data.loanStartDate,
+            use_computed_balance: data.useComputedBalance,
+        } : {}),
+    };
+}
+
 export default function PropertiesListPage() {
     const { role } = useAuth();
     const canWrite = role === 'admin' || role === 'member';
     const { data: properties, loading, error, refetch } = useApiQuery(listProperties);
     const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [address, setAddress] = useState('');
-    const [purchasePrice, setPurchasePrice] = useState('');
-    const [purchaseDate, setPurchaseDate] = useState('');
-    const [currentValue, setCurrentValue] = useState('');
-    const [mortgageBalance, setMortgageBalance] = useState('');
-    const [showLoanDetails, setShowLoanDetails] = useState(false);
-    const [loanAmount, setLoanAmount] = useState('');
-    const [annualInterestRate, setAnnualInterestRate] = useState('');
-    const [loanTermMonths, setLoanTermMonths] = useState('');
-    const [loanStartDate, setLoanStartDate] = useState('');
-    const [useComputedBalance, setUseComputedBalance] = useState(false);
-    const [propertyType, setPropertyType] = useState('primary_residence');
 
-    function resetForm() {
-        setAddress('');
-        setPurchasePrice('');
-        setPurchaseDate('');
-        setCurrentValue('');
-        setMortgageBalance('');
-        setShowLoanDetails(false);
-        setLoanAmount('');
-        setAnnualInterestRate('');
-        setLoanTermMonths('');
-        setLoanStartDate('');
-        setUseComputedBalance(false);
-        setPropertyType('primary_residence');
-        setEditingId(null);
+    const onSuccess = useCallback(() => {
         setShowForm(false);
-    }
+        refetch();
+    }, [refetch]);
+
+    const createFn = useCallback(async (data: PropertyFormData): Promise<Property> => {
+        return createProperty(buildRequest(data));
+    }, []);
+
+    const updateFn = useCallback(async (id: string, data: PropertyFormData): Promise<Property> => {
+        return updateProperty(id, buildRequest(data));
+    }, []);
+
+    const { editingId, formData, setFormData, handleSave, handleDelete: crudHandleDelete, resetForm: crudReset, startEdit: crudStartEdit } = useCrudForm<Property, PropertyFormData>({
+        createFn,
+        updateFn,
+        deleteFn: deleteProperty,
+        entityName: 'Property',
+        initialFormData,
+        onSuccess,
+        formatError: (_err, action) => `Failed to ${action} property`,
+    });
+
+    const handleDelete = useCallback(async (id: string) => {
+        if (!confirm('Delete this property?')) return;
+        await crudHandleDelete(id);
+    }, [crudHandleDelete]);
+
+    const resetForm = useCallback(() => {
+        crudReset();
+        setShowForm(false);
+    }, [crudReset]);
 
     function startEdit(property: Property) {
-        setAddress(property.address);
-        setPurchasePrice(String(property.purchase_price));
-        setPurchaseDate(property.purchase_date);
-        setCurrentValue(String(property.current_value));
-        setMortgageBalance(property.mortgage_balance ? String(property.mortgage_balance) : '');
-        setShowLoanDetails(property.has_loan_details);
-        setLoanAmount(property.loan_amount != null ? String(property.loan_amount) : '');
-        setAnnualInterestRate(property.annual_interest_rate != null ? String(property.annual_interest_rate) : '');
-        setLoanTermMonths(property.loan_term_months != null ? String(property.loan_term_months) : '');
-        setLoanStartDate(property.loan_start_date ?? '');
-        setUseComputedBalance(property.use_computed_balance);
-        setPropertyType(property.property_type);
-        setEditingId(property.id);
+        crudStartEdit(property.id, {
+            address: property.address,
+            purchasePrice: String(property.purchase_price),
+            purchaseDate: property.purchase_date,
+            currentValue: String(property.current_value),
+            mortgageBalance: property.mortgage_balance ? String(property.mortgage_balance) : '',
+            showLoanDetails: property.has_loan_details,
+            loanAmount: property.loan_amount != null ? String(property.loan_amount) : '',
+            annualInterestRate: property.annual_interest_rate != null ? String(property.annual_interest_rate) : '',
+            loanTermMonths: property.loan_term_months != null ? String(property.loan_term_months) : '',
+            loanStartDate: property.loan_start_date ?? '',
+            useComputedBalance: property.use_computed_balance,
+            propertyType: property.property_type,
+        });
         setShowForm(true);
-    }
-
-    async function handleSave() {
-        const request = {
-            address,
-            purchase_price: parseFloat(purchasePrice),
-            purchase_date: purchaseDate,
-            current_value: parseFloat(currentValue),
-            mortgage_balance: mortgageBalance ? parseFloat(mortgageBalance) : undefined,
-            property_type: propertyType,
-            ...(showLoanDetails && loanAmount ? {
-                loan_amount: parseFloat(loanAmount),
-                annual_interest_rate: parseFloat(annualInterestRate),
-                loan_term_months: parseInt(loanTermMonths),
-                loan_start_date: loanStartDate,
-                use_computed_balance: useComputedBalance,
-            } : {}),
-        };
-        try {
-            if (editingId) {
-                await updateProperty(editingId, request);
-                toast.success('Property updated');
-            } else {
-                await createProperty(request);
-                toast.success('Property created');
-            }
-            resetForm();
-            refetch();
-        } catch {
-            toast.error(editingId ? 'Failed to update property' : 'Failed to create property');
-        }
-    }
-
-    async function handleDelete(id: string) {
-        if (!confirm('Delete this property?')) return;
-        try {
-            await deleteProperty(id);
-            toast.success('Property deleted');
-            refetch();
-        } catch {
-            toast.error('Failed to delete property');
-        }
     }
 
     if (loading) return <div>Loading properties...</div>;
@@ -120,18 +130,18 @@ export default function PropertiesListPage() {
                 <PropertyForm
                     heading={editingId ? 'Edit Property' : 'Create Property'}
                     submitLabel={editingId ? 'Save' : 'Create'}
-                    address={address} onAddressChange={setAddress}
-                    purchasePrice={purchasePrice} onPurchasePriceChange={setPurchasePrice}
-                    purchaseDate={purchaseDate} onPurchaseDateChange={setPurchaseDate}
-                    currentValue={currentValue} onCurrentValueChange={setCurrentValue}
-                    mortgageBalance={mortgageBalance} onMortgageBalanceChange={setMortgageBalance}
-                    propertyType={propertyType} onPropertyTypeChange={setPropertyType}
-                    showLoanDetails={showLoanDetails} onShowLoanDetailsChange={setShowLoanDetails}
-                    loanAmount={loanAmount} onLoanAmountChange={setLoanAmount}
-                    annualInterestRate={annualInterestRate} onAnnualInterestRateChange={setAnnualInterestRate}
-                    loanTermMonths={loanTermMonths} onLoanTermMonthsChange={setLoanTermMonths}
-                    loanStartDate={loanStartDate} onLoanStartDateChange={setLoanStartDate}
-                    useComputedBalance={useComputedBalance} onUseComputedBalanceChange={setUseComputedBalance}
+                    address={formData.address} onAddressChange={v => setFormData(prev => ({ ...prev, address: v }))}
+                    purchasePrice={formData.purchasePrice} onPurchasePriceChange={v => setFormData(prev => ({ ...prev, purchasePrice: v }))}
+                    purchaseDate={formData.purchaseDate} onPurchaseDateChange={v => setFormData(prev => ({ ...prev, purchaseDate: v }))}
+                    currentValue={formData.currentValue} onCurrentValueChange={v => setFormData(prev => ({ ...prev, currentValue: v }))}
+                    mortgageBalance={formData.mortgageBalance} onMortgageBalanceChange={v => setFormData(prev => ({ ...prev, mortgageBalance: v }))}
+                    propertyType={formData.propertyType} onPropertyTypeChange={v => setFormData(prev => ({ ...prev, propertyType: v }))}
+                    showLoanDetails={formData.showLoanDetails} onShowLoanDetailsChange={v => setFormData(prev => ({ ...prev, showLoanDetails: v }))}
+                    loanAmount={formData.loanAmount} onLoanAmountChange={v => setFormData(prev => ({ ...prev, loanAmount: v }))}
+                    annualInterestRate={formData.annualInterestRate} onAnnualInterestRateChange={v => setFormData(prev => ({ ...prev, annualInterestRate: v }))}
+                    loanTermMonths={formData.loanTermMonths} onLoanTermMonthsChange={v => setFormData(prev => ({ ...prev, loanTermMonths: v }))}
+                    loanStartDate={formData.loanStartDate} onLoanStartDateChange={v => setFormData(prev => ({ ...prev, loanStartDate: v }))}
+                    useComputedBalance={formData.useComputedBalance} onUseComputedBalanceChange={v => setFormData(prev => ({ ...prev, useComputedBalance: v }))}
                     onSubmit={handleSave}
                     onCancel={resetForm}
                 />
