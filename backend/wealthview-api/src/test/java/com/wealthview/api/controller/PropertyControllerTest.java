@@ -77,7 +77,8 @@ class PropertyControllerTest {
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
                 new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("150000"),
-                null, null, null, null, false, false, "primary_residence");
+                null, null, null, null, false, false, "primary_residence",
+                null, null, "none", new BigDecimal("27.5"));
     }
 
     @Test

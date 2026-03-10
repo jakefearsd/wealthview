@@ -73,7 +73,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null);
+                null, null, null, null, null, null,
+                null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.address()).isEqualTo("123 Main St");
@@ -88,7 +89,8 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), new BigDecimal("6.5"), 360,
-                LocalDate.of(2020, 1, 1), true, null);
+                LocalDate.of(2020, 1, 1), true, null,
+                null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.hasLoanDetails()).isTrue();
@@ -103,7 +105,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), null, null, null, null, null);
+                new BigDecimal("300000"), null, null, null, null, null,
+                null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -128,7 +131,8 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), new BigDecimal("6.5"), 360,
-                LocalDate.of(2020, 1, 1), true, null);
+                LocalDate.of(2020, 1, 1), true, null,
+                null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.useComputedBalance()).isTrue();
@@ -216,7 +220,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, "investment");
+                null, null, null, null, null, "investment",
+                null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.propertyType()).isEqualTo("investment");
@@ -229,7 +234,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null);
+                null, null, null, null, null, null,
+                null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.propertyType()).isEqualTo("primary_residence");
@@ -241,7 +247,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, "commercial");
+                null, null, null, null, null, "commercial",
+                null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -260,7 +267,8 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, "vacation");
+                null, null, null, null, null, "vacation",
+                null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.propertyType()).isEqualTo("vacation");
@@ -429,5 +437,50 @@ class PropertyServiceTest {
         assertThat(result.get(2).totalIncome()).isEqualByComparingTo("3500");
         // Other months: just 1000 from annual spread
         assertThat(result.get(0).totalIncome()).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void create_withDepreciationFields_setsDepreciation() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment",
+                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "straight_line", new BigDecimal("27.5"));
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.depreciationMethod()).isEqualTo("straight_line");
+        assertThat(result.inServiceDate()).isEqualTo(LocalDate.of(2020, 6, 15));
+        assertThat(result.landValue()).isEqualByComparingTo("50000");
+        assertThat(result.usefulLifeYears()).isEqualByComparingTo("27.5");
+    }
+
+    @Test
+    void create_withNullDepreciationMethod_defaultsToNone() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, null, null);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.depreciationMethod()).isEqualTo("none");
+    }
+
+    @Test
+    void create_withInvalidDepreciationMethod_throwsIllegalArgument() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, "bogus", null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid depreciation method");
     }
 }

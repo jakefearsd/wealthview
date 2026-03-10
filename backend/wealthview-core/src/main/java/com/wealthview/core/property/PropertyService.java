@@ -39,6 +39,7 @@ public class PropertyService {
 
     private static final Logger log = LoggerFactory.getLogger(PropertyService.class);
     private static final Set<String> VALID_PROPERTY_TYPES = Set.of("primary_residence", "investment", "vacation");
+    private static final Set<String> VALID_DEPRECIATION_METHODS = Set.of("none", "straight_line", "cost_segregation");
 
     private final PropertyRepository propertyRepository;
     private final PropertyIncomeRepository incomeRepository;
@@ -72,6 +73,7 @@ public class PropertyService {
                 request.purchaseDate(), request.currentValue(), mortgageBalance);
         applyLoanFields(property, request);
         applyPropertyType(property, request.propertyType());
+        applyDepreciationFields(property, request);
         property = propertyRepository.save(property);
         log.info("Property {} created for tenant {}", property.getId(), tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "property",
@@ -108,6 +110,7 @@ public class PropertyService {
                 ? request.mortgageBalance() : BigDecimal.ZERO);
         applyLoanFields(property, request);
         applyPropertyType(property, request.propertyType());
+        applyDepreciationFields(property, request);
         property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
         return buildResponse(property);
@@ -245,6 +248,23 @@ public class PropertyService {
         } else {
             throw new IllegalArgumentException(
                     "Invalid property type: " + propertyType + ". Must be one of: " + VALID_PROPERTY_TYPES);
+        }
+    }
+
+    private void applyDepreciationFields(PropertyEntity property, PropertyRequest request) {
+        var method = request.depreciationMethod();
+        if (method == null) {
+            method = "none";
+        }
+        if (!VALID_DEPRECIATION_METHODS.contains(method)) {
+            throw new IllegalArgumentException(
+                    "Invalid depreciation method: " + method + ". Must be one of: " + VALID_DEPRECIATION_METHODS);
+        }
+        property.setDepreciationMethod(method);
+        property.setInServiceDate(request.inServiceDate());
+        property.setLandValue(request.landValue());
+        if (request.usefulLifeYears() != null) {
+            property.setUsefulLifeYears(request.usefulLifeYears());
         }
     }
 

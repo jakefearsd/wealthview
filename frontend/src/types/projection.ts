@@ -40,6 +40,13 @@ export interface ProjectionYear {
     net_spending_need: number | null;
     spending_surplus: number | null;
     discretionary_after_cuts: number | null;
+    rental_income_gross: number | null;
+    rental_expenses_total: number | null;
+    depreciation_total: number | null;
+    rental_loss_applied: number | null;
+    suspended_loss_carryforward: number | null;
+    social_security_taxable: number | null;
+    self_employment_tax: number | null;
 }
 
 export interface SpendingFeasibility {
@@ -142,4 +149,43 @@ export interface ProjectionMonthPoint {
     taxable_balance: number | null;
     retired: boolean;
     roth_conversion_amount: number | null;
+}
+
+export interface IncomeSource {
+    id: string;
+    name: string;
+    income_type: string;
+    annual_amount: number;
+    start_age: number;
+    end_age: number | null;
+    inflation_rate: number;
+    one_time: boolean;
+    tax_treatment: string;
+    property_id: string | null;
+    property_address: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface CreateIncomeSourceRequest {
+    name: string;
+    income_type: string;
+    annual_amount: number;
+    start_age: number;
+    end_age: number | null;
+    inflation_rate: number;
+    one_time: boolean;
+    tax_treatment: string;
+    property_id: string | null;
+}
+
+export interface UpdateIncomeSourceRequest {
+    name: string;
+    annual_amount: number;
+    start_age: number;
+    end_age: number | null;
+    inflation_rate: number;
+    one_time: boolean;
+    tax_treatment: string;
+    property_id: string | null;
 }

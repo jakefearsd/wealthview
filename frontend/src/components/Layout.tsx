@@ -6,6 +6,7 @@ const navItems: { to: string; label: string; requiredRole?: string }[] = [
     { to: '/accounts', label: 'Accounts' },
     { to: '/projections', label: 'Projections' },
     { to: '/spending-profiles', label: 'Spending Profiles' },
+    { to: '/income-sources', label: 'Income Sources' },
     { to: '/properties', label: 'Properties' },
     { to: '/prices', label: 'Prices' },
     { to: '/export', label: 'Export' },

@@ -17,6 +17,10 @@ public record PropertyRequest(
         Integer loanTermMonths,
         LocalDate loanStartDate,
         Boolean useComputedBalance,
-        String propertyType
+        String propertyType,
+        LocalDate inServiceDate,
+        BigDecimal landValue,
+        String depreciationMethod,
+        BigDecimal usefulLifeYears
 ) {
 }

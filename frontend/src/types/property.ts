@@ -13,6 +13,10 @@ export interface Property {
     has_loan_details: boolean;
     use_computed_balance: boolean;
     property_type: string;
+    in_service_date: string | null;
+    land_value: number | null;
+    depreciation_method: string;
+    useful_life_years: number;
 }
 
 export interface PropertyRequest {
@@ -27,6 +31,10 @@ export interface PropertyRequest {
     loan_start_date?: string;
     use_computed_balance?: boolean;
     property_type?: string;
+    in_service_date?: string;
+    land_value?: number;
+    depreciation_method?: string;
+    useful_life_years?: number;
 }
 
 export interface PropertyIncomeRequest {
