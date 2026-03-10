@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
@@ -17,6 +18,9 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.RentalLossCalculator;
+import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
+import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -40,9 +44,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final FederalTaxCalculator taxCalculator;
+    private final SocialSecurityTaxCalculator ssTaxCalculator;
+    private final SelfEmploymentTaxCalculator seTaxCalculator;
+    private final RentalLossCalculator rentalLossCalculator;
 
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator) {
         this.taxCalculator = taxCalculator;
+        this.ssTaxCalculator = new SocialSecurityTaxCalculator();
+        this.seTaxCalculator = new SelfEmploymentTaxCalculator();
+        this.rentalLossCalculator = new RentalLossCalculator();
     }
 
     @Override
@@ -67,16 +77,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
         SpendingData spendingData = loadSpendingData(input.spendingProfile());
+        var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
 
         if (hasMultiplePools) {
             return runWithPools(input, accounts, params, strategy, currentYear, birthYear,
-                    retirementYear, endYear, inflationRate, spendingData);
+                    retirementYear, endYear, inflationRate, spendingData, incomeSources);
         }
 
         return runSimple(input, accounts, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingData);
+                retirementYear, endYear, inflationRate, spendingData, incomeSources);
     }
 
     private ProjectionResultResponse runSimple(
@@ -84,7 +95,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             List<ProjectionAccountInput> accounts,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate, SpendingData spendingData) {
+            BigDecimal inflationRate, SpendingData spendingData,
+            List<ProjectionIncomeSourceInput> incomeSources) {
 
         BigDecimal balance = sumInitialBalances(accounts);
         BigDecimal totalContributions = sumContributions(accounts);
@@ -93,6 +105,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
         BigDecimal previousWithdrawal = BigDecimal.ZERO;
+        BigDecimal suspendedLoss = BigDecimal.ZERO;
 
         for (int year = currentYear; year < endYear; year++) {
             int age = year - birthYear;
@@ -111,15 +124,24 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             growth = balance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
             balance = balance.add(growth);
 
+            IncomeSourceYearResult isResult = null;
+
             if (retired) {
                 yearsInRetirement++;
                 BigDecimal activeIncome = computeActiveIncome(spendingData, age, yearsInRetirement);
 
+                // Process first-class income sources
+                isResult = processIncomeSources(incomeSources, age, yearsInRetirement,
+                        year, BigDecimal.ZERO, "single", suspendedLoss);
+                suspendedLoss = isResult.suspendedLossCarryforward();
+                BigDecimal incomeSourceCash = isResult.totalCashInflow();
+                BigDecimal totalActiveIncome = activeIncome.add(incomeSourceCash);
+
                 if (spendingData != null) {
                     BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
-                    BigDecimal portfolioNeed = spendingNeed.subtract(activeIncome).max(BigDecimal.ZERO);
+                    BigDecimal portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO);
                     withdrawals = portfolioNeed.min(balance);
-                    previousWithdrawal = withdrawals.add(activeIncome);
+                    previousWithdrawal = withdrawals.add(totalActiveIncome);
                 } else {
                     var ctx = new WithdrawalContext(
                             balance, startBalance, previousWithdrawal, weightedReturn,
@@ -137,7 +159,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             var yearDto = ProjectionYearDto.simple(
                     year, age, startBalance, contributions, growth, withdrawals, balance, retired);
-            yearlyData.add(applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate));
+            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate);
+            if (isResult != null) {
+                yearDto = applyIncomeSourceFields(yearDto, isResult);
+            }
+            yearlyData.add(yearDto);
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
@@ -158,7 +184,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             ScenarioParams params,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate, SpendingData spendingData) {
+            BigDecimal inflationRate, SpendingData spendingData,
+            List<ProjectionIncomeSourceInput> incomeSources) {
 
         Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
                 .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
@@ -183,6 +210,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
         BigDecimal previousWithdrawal = BigDecimal.ZERO;
+        BigDecimal suspendedLoss = BigDecimal.ZERO;
 
         for (int year = currentYear; year < endYear; year++) {
             int age = year - birthYear;
@@ -204,7 +232,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 yearsInRetirement++;
             }
             BigDecimal activeIncome = computeActiveIncome(spendingData, age, yearsInRetirement);
-            BigDecimal effectiveOtherIncome = otherIncome.add(activeIncome);
+
+            // Process first-class income sources
+            var isResult = processIncomeSources(incomeSources, age, yearsInRetirement,
+                    year, otherIncome, filingStatus.name().toLowerCase(), suspendedLoss);
+            suspendedLoss = isResult.suspendedLossCarryforward();
+            BigDecimal incomeSourceCash = isResult.totalCashInflow();
+
+            BigDecimal effectiveOtherIncome = otherIncome.add(activeIncome).add(incomeSourceCash);
 
             if (params.rothConversionStartYear() == null || year >= params.rothConversionStartYear()) {
                 var conversion = executeRothConversion(
@@ -217,11 +252,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (retired) {
                 BigDecimal aggBalance = balances.total();
                 BigDecimal portfolioNeed;
+                BigDecimal totalActiveIncome = activeIncome.add(incomeSourceCash);
 
                 if (spendingData != null) {
                     BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
-                    portfolioNeed = spendingNeed.subtract(activeIncome).max(BigDecimal.ZERO).min(aggBalance);
-                    previousWithdrawal = portfolioNeed.add(activeIncome);
+                    portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO).min(aggBalance);
+                    previousWithdrawal = portfolioNeed.add(totalActiveIncome);
                 } else {
                     var ctx = new WithdrawalContext(
                             aggBalance, startAgg, previousWithdrawal, weightedReturn,
@@ -235,6 +271,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                         conversionAmount, params.withdrawalOrder());
                 withdrawals = withdrawalResult.totalWithdrawn();
                 taxLiability = taxLiability.add(withdrawalResult.taxLiability());
+
+                // Add SE tax liability
+                if (isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0) {
+                    taxLiability = taxLiability.add(isResult.selfEmploymentTax());
+                }
             }
 
             balances.floorAtZero();
@@ -246,8 +287,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     balances.traditional, balances.roth, balances.taxable,
                     conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null,
                     taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
-                    null, null, null, null, null, null);
-            yearlyData.add(applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate));
+                    null, null, null, null, null, null,
+                    null, null, null, null, null, null, null);
+            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate);
+            yearDto = applyIncomeSourceFields(yearDto, isResult);
+            yearlyData.add(yearDto);
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
@@ -764,7 +808,34 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
                 base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
                 base.rothConversionAmount(), base.taxLiability(),
-                essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts);
+                essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts,
+                base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
+                base.rentalLossApplied(), base.suspendedLossCarryforward(),
+                base.socialSecurityTaxable(), base.selfEmploymentTax());
+    }
+
+    private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceYearResult isResult) {
+        if (isResult == null) return base;
+
+        // Merge income source cash into incomeStreamsTotal
+        BigDecimal existingIncome = base.incomeStreamsTotal() != null ? base.incomeStreamsTotal() : BigDecimal.ZERO;
+        BigDecimal totalIncome = existingIncome.add(isResult.totalCashInflow());
+
+        return new ProjectionYearDto(
+                base.year(), base.age(), base.startBalance(), base.contributions(),
+                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
+                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
+                base.rothConversionAmount(), base.taxLiability(),
+                base.essentialExpenses(), base.discretionaryExpenses(),
+                totalIncome.compareTo(BigDecimal.ZERO) > 0 ? totalIncome : base.incomeStreamsTotal(),
+                base.netSpendingNeed(), base.spendingSurplus(), base.discretionaryAfterCuts(),
+                isResult.rentalIncomeGross().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalIncomeGross() : null,
+                isResult.rentalExpensesTotal().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalExpensesTotal() : null,
+                isResult.depreciationTotal().compareTo(BigDecimal.ZERO) > 0 ? isResult.depreciationTotal() : null,
+                isResult.rentalLossApplied().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalLossApplied() : null,
+                isResult.suspendedLossCarryforward().compareTo(BigDecimal.ZERO) > 0 ? isResult.suspendedLossCarryforward() : null,
+                isResult.socialSecurityTaxable().compareTo(BigDecimal.ZERO) > 0 ? isResult.socialSecurityTaxable() : null,
+                isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0 ? isResult.selfEmploymentTax() : null);
     }
 
     private BigDecimal computeInflationFactor(SpendingData spending, int age,
@@ -804,5 +875,143 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
         }
         return activeIncome;
+    }
+
+    // --- Income Source Processing ---
+
+    private record IncomeSourceYearResult(
+            BigDecimal totalCashInflow,
+            BigDecimal totalTaxableIncome,
+            BigDecimal rentalIncomeGross,
+            BigDecimal rentalExpensesTotal,
+            BigDecimal depreciationTotal,
+            BigDecimal rentalLossApplied,
+            BigDecimal suspendedLossCarryforward,
+            BigDecimal socialSecurityTaxable,
+            BigDecimal selfEmploymentTax
+    ) {}
+
+    private IncomeSourceYearResult processIncomeSources(
+            List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
+            int taxYear, BigDecimal magi, String filingStatus, BigDecimal priorSuspendedLoss) {
+
+        if (sources == null || sources.isEmpty()) {
+            return new IncomeSourceYearResult(
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO, priorSuspendedLoss, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+
+        BigDecimal totalCashInflow = BigDecimal.ZERO;
+        BigDecimal totalTaxableIncome = BigDecimal.ZERO;
+        BigDecimal rentalIncomeGross = BigDecimal.ZERO;
+        BigDecimal rentalExpensesTotal = BigDecimal.ZERO;
+        BigDecimal depreciationTotal = BigDecimal.ZERO;
+        BigDecimal rentalLossApplied = BigDecimal.ZERO;
+        BigDecimal suspendedLoss = priorSuspendedLoss;
+        BigDecimal ssTaxable = BigDecimal.ZERO;
+        BigDecimal seTax = BigDecimal.ZERO;
+
+        // Collect non-SS income first (needed for SS provisional income calc)
+        BigDecimal nonSSIncome = BigDecimal.ZERO;
+        BigDecimal ssBenefit = BigDecimal.ZERO;
+
+        for (var source : sources) {
+            if (!isActiveForAge(source, age)) continue;
+
+            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
+            if ("social_security".equals(source.incomeType())) {
+                ssBenefit = ssBenefit.add(nominal);
+            } else {
+                nonSSIncome = nonSSIncome.add(nominal);
+            }
+        }
+
+        for (var source : sources) {
+            if (!isActiveForAge(source, age)) continue;
+
+            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
+
+            switch (source.incomeType()) {
+                case "rental_property" -> {
+                    rentalIncomeGross = rentalIncomeGross.add(nominal);
+
+                    BigDecimal opExp = source.annualOperatingExpenses() != null
+                            ? source.annualOperatingExpenses() : BigDecimal.ZERO;
+                    BigDecimal mortInt = source.annualMortgageInterest() != null
+                            ? source.annualMortgageInterest() : BigDecimal.ZERO;
+                    BigDecimal propTax = source.annualPropertyTax() != null
+                            ? source.annualPropertyTax() : BigDecimal.ZERO;
+                    BigDecimal expenses = opExp.add(mortInt).add(propTax);
+                    rentalExpensesTotal = rentalExpensesTotal.add(expenses);
+
+                    BigDecimal depreciation = BigDecimal.ZERO;
+                    if (source.depreciationByYear() != null && source.depreciationMethod() != null
+                            && !"none".equals(source.depreciationMethod())) {
+                        depreciation = source.depreciationByYear()
+                                .getOrDefault(taxYear, BigDecimal.ZERO);
+                    }
+                    depreciationTotal = depreciationTotal.add(depreciation);
+
+                    // Cash flow = rent - expenses (depreciation is non-cash)
+                    BigDecimal cashFlow = nominal.subtract(expenses);
+                    totalCashInflow = totalCashInflow.add(cashFlow);
+
+                    // Taxable = rent - expenses - depreciation
+                    BigDecimal netTaxable = nominal.subtract(expenses).subtract(depreciation);
+
+                    var lossResult = rentalLossCalculator.applyLossRules(
+                            netTaxable, source.taxTreatment(),
+                            BigDecimal.ZERO, magi, suspendedLoss);
+                    rentalLossApplied = rentalLossApplied.add(lossResult.lossAppliedToIncome());
+                    suspendedLoss = lossResult.lossSuspended();
+                    totalTaxableIncome = totalTaxableIncome.add(lossResult.netTaxableIncome());
+                }
+                case "social_security" -> {
+                    totalCashInflow = totalCashInflow.add(nominal);
+                    var taxableAmount = ssTaxCalculator.computeTaxableAmount(
+                            nominal,
+                            nonSSIncome.add(magi),
+                            "married_filing_jointly".equals(filingStatus) ? "married_filing_jointly" : "single");
+                    ssTaxable = ssTaxable.add(taxableAmount);
+                    totalTaxableIncome = totalTaxableIncome.add(taxableAmount);
+                }
+                case "part_time_work" -> {
+                    totalCashInflow = totalCashInflow.add(nominal);
+                    if ("self_employment".equals(source.taxTreatment())) {
+                        var tax = seTaxCalculator.computeSETax(nominal, taxYear);
+                        seTax = seTax.add(tax);
+                        totalTaxableIncome = totalTaxableIncome.add(nominal);
+                    } else {
+                        totalTaxableIncome = totalTaxableIncome.add(nominal);
+                    }
+                }
+                default -> {
+                    // pension, annuity, other — fully taxable unless tax_free
+                    totalCashInflow = totalCashInflow.add(nominal);
+                    if (!"tax_free".equals(source.taxTreatment())) {
+                        totalTaxableIncome = totalTaxableIncome.add(nominal);
+                    }
+                }
+            }
+        }
+
+        return new IncomeSourceYearResult(
+                totalCashInflow, totalTaxableIncome,
+                rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
+                rentalLossApplied, suspendedLoss, ssTaxable, seTax);
+    }
+
+    private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
+        if (age < source.startAge()) return false;
+        if (source.endAge() != null && age >= source.endAge()) return false;
+        return true;
+    }
+
+    private BigDecimal computeNominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
+        if (yearsInRetirement <= 1 || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
+            return source.annualAmount();
+        }
+        BigDecimal factor = BigDecimal.ONE.add(source.inflationRate()).pow(yearsInRetirement - 1);
+        return source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
     }
 }

@@ -15,8 +15,11 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
+import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -60,6 +63,15 @@ class ProjectionServiceTest {
 
     @Mock
     private AccountService accountService;
+
+    @Mock
+    private ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
+
+    @Mock
+    private PropertyDepreciationScheduleRepository depreciationScheduleRepository;
+
+    @Mock
+    private DepreciationCalculator depreciationCalculator;
 
     @InjectMocks
     private ProjectionService service;

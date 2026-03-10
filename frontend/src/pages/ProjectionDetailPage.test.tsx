@@ -95,7 +95,7 @@ describe('ProjectionDetailPage', () => {
         mockRun.mockResolvedValue({
             scenario_id: 'abc-123',
             yearly_data: [
-                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null },
+                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null },
             ],
             final_balance: 117700,
             years_in_retirement: 0,

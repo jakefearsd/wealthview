@@ -22,6 +22,13 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         net_spending_need: null,
         spending_surplus: null,
         discretionary_after_cuts: null,
+        rental_income_gross: null,
+        rental_expenses_total: null,
+        depreciation_total: null,
+        rental_loss_applied: null,
+        suspended_loss_carryforward: null,
+        social_security_taxable: null,
+        self_employment_tax: null,
         ...overrides,
     };
 }

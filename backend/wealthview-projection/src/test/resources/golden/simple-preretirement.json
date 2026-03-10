@@ -19,7 +19,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -39,7 +46,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -59,7 +73,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -79,7 +100,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -99,7 +127,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -119,7 +154,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -139,7 +181,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -159,7 +208,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -179,7 +235,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -199,7 +262,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -219,7 +289,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -239,7 +316,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -259,7 +343,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -279,7 +370,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -299,7 +397,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -319,7 +424,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -339,7 +451,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -359,7 +478,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -379,7 +505,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -399,7 +532,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -419,7 +559,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -439,7 +586,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -459,7 +613,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -479,7 +640,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -499,7 +667,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -519,7 +694,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -539,7 +721,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -559,7 +748,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -579,7 +775,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -599,7 +802,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -619,7 +829,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -639,7 +856,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -659,7 +883,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -679,7 +910,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -699,7 +937,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -719,7 +964,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -739,7 +991,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -759,7 +1018,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -779,7 +1045,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -799,7 +1072,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -819,7 +1099,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -839,7 +1126,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -859,7 +1153,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -879,7 +1180,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -899,7 +1207,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -919,7 +1234,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -939,7 +1261,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -959,7 +1288,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -979,7 +1315,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -999,7 +1342,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -1019,7 +1369,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -1039,7 +1396,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -1059,7 +1423,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -1079,7 +1450,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -1099,7 +1477,14 @@
     "incomeStreamsTotal" : null,
     "netSpendingNeed" : null,
     "spendingSurplus" : null,
-    "discretionaryAfterCuts" : null
+    "discretionaryAfterCuts" : null,
+    "rentalIncomeGross" : null,
+    "rentalExpensesTotal" : null,
+    "depreciationTotal" : null,
+    "rentalLossApplied" : null,
+    "suspendedLossCarryforward" : null,
+    "socialSecurityTaxable" : null,
+    "selfEmploymentTax" : null
   } ],
   "finalBalance" : 12201675.8664,
   "yearsInRetirement" : 25,

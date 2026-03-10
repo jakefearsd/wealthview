@@ -13,7 +13,7 @@ import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import type { ProjectionResult, CreateScenarioRequest } from '../types/projection';
 
-type TabId = 'chart' | 'flows' | 'table' | 'spending';
+type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax';
 
 const tabButtonStyle = (active: boolean) => ({
     padding: '0.5rem 1rem',
@@ -70,6 +70,9 @@ export default function ProjectionDetailPage() {
     const retirementYear = scenario.retirement_date ? new Date(scenario.retirement_date).getFullYear() : null;
     const hasPoolData = result?.yearly_data.some(y => y.traditional_balance !== null) ?? false;
     const hasSpendingData = result?.yearly_data.some(y => y.essential_expenses !== null) ?? false;
+    const hasIncomeSourceData = result?.yearly_data.some(y =>
+        y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
+    ) ?? false;
     const parsedParams = scenario.params_json ? JSON.parse(scenario.params_json) : {};
     const strategyLabels: Record<string, string> = {
         fixed_percentage: 'Fixed Percentage',
@@ -251,6 +254,11 @@ export default function ProjectionDetailPage() {
                                     Spending Analysis
                                 </button>
                             )}
+                            {hasIncomeSourceData && (
+                                <button style={tabButtonStyle(activeTab === 'income_tax')} onClick={() => setActiveTab('income_tax')}>
+                                    Income & Tax
+                                </button>
+                            )}
                         </div>
 
                         {activeTab === 'chart' && (
@@ -263,6 +271,59 @@ export default function ProjectionDetailPage() {
 
                         {activeTab === 'spending' && hasSpendingData && (
                             <ProjectionChart data={result.yearly_data} retirementYear={retirementYear} mode="spending" />
+                        )}
+
+                        {activeTab === 'income_tax' && hasIncomeSourceData && (
+                            <div style={{ maxHeight: '450px', overflow: 'auto' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                    <thead>
+                                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                            <th style={{ textAlign: 'left', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Year</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Age</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Rental Gross</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Rental Exp.</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Depreciation</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Loss Applied</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Suspended Loss</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>SS Taxable</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>SE Tax</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax Liability</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {result.yearly_data.filter(y => y.retired).map(y => (
+                                            <tr key={y.year} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff8e1' }}>
+                                                <td style={{ padding: '0.5rem' }}>{y.year}</td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                    {y.rental_income_gross != null ? formatCurrency(y.rental_income_gross) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                    {y.rental_expenses_total != null ? formatCurrency(y.rental_expenses_total) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#6a1b9a' }}>
+                                                    {y.depreciation_total != null ? formatCurrency(y.depreciation_total) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                    {y.rental_loss_applied != null && y.rental_loss_applied > 0 ? formatCurrency(y.rental_loss_applied) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
+                                                    {y.suspended_loss_carryforward != null && y.suspended_loss_carryforward > 0 ? formatCurrency(y.suspended_loss_carryforward) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                    {y.social_security_taxable != null ? formatCurrency(y.social_security_taxable) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                    {y.self_employment_tax != null && y.self_employment_tax > 0 ? formatCurrency(y.self_employment_tax) : '-'}
+                                                </td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>
+                                                    {y.tax_liability != null ? formatCurrency(y.tax_liability) : '-'}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
 
                         {activeTab === 'table' && (

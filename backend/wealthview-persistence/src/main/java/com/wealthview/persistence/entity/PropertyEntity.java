@@ -64,6 +64,18 @@ public class PropertyEntity {
     @Column(name = "zillow_zpid")
     private String zillowZpid;
 
+    @Column(name = "in_service_date")
+    private LocalDate inServiceDate;
+
+    @Column(name = "land_value", precision = 19, scale = 4)
+    private BigDecimal landValue;
+
+    @Column(name = "depreciation_method", nullable = false)
+    private String depreciationMethod = "none";
+
+    @Column(name = "useful_life_years", nullable = false, precision = 4, scale = 1)
+    private BigDecimal usefulLifeYears = new BigDecimal("27.5");
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -111,6 +123,15 @@ public class PropertyEntity {
 
     public String getZillowZpid() { return zillowZpid; }
     public void setZillowZpid(String zillowZpid) { this.zillowZpid = zillowZpid; }
+
+    public LocalDate getInServiceDate() { return inServiceDate; }
+    public void setInServiceDate(LocalDate inServiceDate) { this.inServiceDate = inServiceDate; }
+    public BigDecimal getLandValue() { return landValue; }
+    public void setLandValue(BigDecimal landValue) { this.landValue = landValue; }
+    public String getDepreciationMethod() { return depreciationMethod; }
+    public void setDepreciationMethod(String depreciationMethod) { this.depreciationMethod = depreciationMethod; }
+    public BigDecimal getUsefulLifeYears() { return usefulLifeYears; }
+    public void setUsefulLifeYears(BigDecimal usefulLifeYears) { this.usefulLifeYears = usefulLifeYears; }
 
     public boolean hasLoanDetails() {
         return loanAmount != null && annualInterestRate != null

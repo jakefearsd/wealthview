@@ -12,16 +12,21 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
+import com.wealthview.core.property.DepreciationCalculator;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.springframework.stereotype.Service;
@@ -29,7 +34,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -41,6 +48,9 @@ public class ProjectionService {
     private final SpendingProfileRepository spendingProfileRepository;
     private final ProjectionEngine projectionEngine;
     private final AccountService accountService;
+    private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
+    private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
+    private final DepreciationCalculator depreciationCalculator;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
@@ -48,13 +58,19 @@ public class ProjectionService {
                              AccountRepository accountRepository,
                              SpendingProfileRepository spendingProfileRepository,
                              ProjectionEngine projectionEngine,
-                             AccountService accountService) {
+                             AccountService accountService,
+                             ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
+                             PropertyDepreciationScheduleRepository depreciationScheduleRepository,
+                             DepreciationCalculator depreciationCalculator) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
         this.spendingProfileRepository = spendingProfileRepository;
         this.projectionEngine = projectionEngine;
         this.accountService = accountService;
+        this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
+        this.depreciationScheduleRepository = depreciationScheduleRepository;
+        this.depreciationCalculator = depreciationCalculator;
     }
 
     @Transactional
@@ -194,10 +210,61 @@ public class ProjectionService {
                         scenario.getSpendingProfile().getIncomeStreams(),
                         scenario.getSpendingProfile().getSpendingTiers())
                 : null;
+        var incomeSources = resolveIncomeSources(scenario.getId());
         return new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, spendingProfile);
+                accounts, spendingProfile, null, incomeSources);
+    }
+
+    private List<ProjectionIncomeSourceInput> resolveIncomeSources(UUID scenarioId) {
+        var scenarioLinks = scenarioIncomeSourceRepository.findByScenario_Id(scenarioId);
+        if (scenarioLinks.isEmpty()) {
+            return List.of();
+        }
+        return scenarioLinks.stream()
+                .map(link -> {
+                    var source = link.getIncomeSource();
+                    var amount = link.getOverrideAnnualAmount() != null
+                            ? link.getOverrideAnnualAmount() : source.getAnnualAmount();
+                    return toIncomeSourceInput(source, amount);
+                })
+                .toList();
+    }
+
+    private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount) {
+        BigDecimal annualOpEx = null;
+        BigDecimal annualMortgageInterest = null;
+        BigDecimal annualPropertyTax = null;
+        String depreciationMethod = null;
+        Map<Integer, BigDecimal> depreciationByYear = null;
+
+        if ("rental_property".equals(source.getIncomeType()) && source.getProperty() != null) {
+            var property = source.getProperty();
+            depreciationMethod = property.getDepreciationMethod();
+
+            if ("cost_segregation".equals(depreciationMethod)) {
+                var scheduleEntries = depreciationScheduleRepository
+                        .findByProperty_IdOrderByTaxYear(property.getId());
+                depreciationByYear = new HashMap<>();
+                for (var entry : scheduleEntries) {
+                    depreciationByYear.put(entry.getTaxYear(), entry.getDepreciationAmount());
+                }
+            } else if ("straight_line".equals(depreciationMethod)
+                    && property.getInServiceDate() != null) {
+                var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
+                depreciationByYear = depreciationCalculator.computeStraightLine(
+                        property.getPurchasePrice(), landValue,
+                        property.getInServiceDate(), property.getUsefulLifeYears());
+            }
+        }
+
+        return new ProjectionIncomeSourceInput(
+                source.getId(), source.getName(), source.getIncomeType(),
+                amount, source.getStartAge(), source.getEndAge(),
+                source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
+                annualOpEx, annualMortgageInterest, annualPropertyTax,
+                depreciationMethod, depreciationByYear);
     }
 
     private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {

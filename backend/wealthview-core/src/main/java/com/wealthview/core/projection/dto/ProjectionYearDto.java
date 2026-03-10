@@ -21,7 +21,14 @@ public record ProjectionYearDto(
         BigDecimal incomeStreamsTotal,
         BigDecimal netSpendingNeed,
         BigDecimal spendingSurplus,
-        BigDecimal discretionaryAfterCuts) {
+        BigDecimal discretionaryAfterCuts,
+        BigDecimal rentalIncomeGross,
+        BigDecimal rentalExpensesTotal,
+        BigDecimal depreciationTotal,
+        BigDecimal rentalLossApplied,
+        BigDecimal suspendedLossCarryforward,
+        BigDecimal socialSecurityTaxable,
+        BigDecimal selfEmploymentTax) {
 
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
@@ -29,6 +36,7 @@ public record ProjectionYearDto(
                                             boolean retired) {
         return new ProjectionYearDto(year, age, startBalance, contributions, growth,
                 withdrawals, endBalance, retired, null, null, null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null,
+                null, null, null, null, null, null, null);
     }
 }

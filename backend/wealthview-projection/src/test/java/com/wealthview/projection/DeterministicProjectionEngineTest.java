@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
@@ -14,6 +15,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
@@ -1744,5 +1747,146 @@ class DeterministicProjectionEngineTest {
         // requiredAnnualSpending should reflect the tiered amount ($60k), not the base ($85k)
         assertThat(result.spendingFeasibility().requiredAnnualSpending())
                 .isLessThanOrEqualTo(bd("60000"));
+    }
+
+    // --- Income Source Integration Tests ---
+
+    @Test
+    void run_withSocialSecurityIncomeSource_reducesWithdrawals() {
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 67; // already retired at 67
+
+        var spending = new SpendingProfileInput(bd("40000"), bd("20000"), "[]");
+
+        var ssSource = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Social Security", "social_security",
+                bd("30000"), 67, null, bd("0.02"), false,
+                "partially_taxable",
+                null, null, null, null, null);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Test Scenario",
+                LocalDate.of(currentYear - 1, 1, 1), 80, bd("0.03"),
+                """
+                {"birth_year": %d}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.05")),
+                spending, currentYear, List.of(ssSource));
+
+        var result = engine.run(input);
+        assertThat(result.yearlyData()).isNotEmpty();
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.retired()).isTrue();
+        // SS provides $30k cash, spending is $60k, so only ~$30k from portfolio
+        assertThat(year1.withdrawals()).isLessThan(bd("35000"));
+        // Income streams total should include SS cash inflow
+        assertThat(year1.incomeStreamsTotal()).isNotNull();
+        assertThat(year1.incomeStreamsTotal()).isGreaterThanOrEqualTo(bd("30000"));
+    }
+
+    @Test
+    void run_withRentalIncomeAndDepreciation_showsDepreciationShield() {
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+
+        var spending = new SpendingProfileInput(bd("50000"), bd("10000"), "[]");
+
+        var depreciationSchedule = Map.of(
+                currentYear, bd("10000"),
+                currentYear + 1, bd("10000"),
+                currentYear + 2, bd("10000"));
+
+        var rentalSource = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental Property", "rental_property",
+                bd("24000"), 60, null, BigDecimal.ZERO, false,
+                "rental_passive",
+                bd("6000"), bd("4000"), bd("3000"),
+                "straight_line", depreciationSchedule);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Test Scenario",
+                LocalDate.of(currentYear - 1, 1, 1), 80, bd("0.03"),
+                """
+                {"birth_year": %d}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.05")),
+                spending, currentYear, List.of(rentalSource));
+
+        var result = engine.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Rental cash flow = 24000 - 6000 - 4000 - 3000 = 11000
+        assertThat(year1.rentalIncomeGross()).isEqualByComparingTo("24000");
+        assertThat(year1.rentalExpensesTotal()).isEqualByComparingTo("13000");
+        assertThat(year1.depreciationTotal()).isEqualByComparingTo("10000");
+    }
+
+    @Test
+    void run_withPartTimeWorkAndSETax_computesSelfEmploymentTax() {
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 63;
+
+        var spending = new SpendingProfileInput(bd("40000"), bd("10000"), "[]");
+
+        var ptSource = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Consulting", "part_time_work",
+                bd("50000"), 60, 70, BigDecimal.ZERO, false,
+                "self_employment",
+                null, null, null, null, null);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Test Scenario",
+                LocalDate.of(currentYear - 1, 1, 1), 80, bd("0.03"),
+                """
+                {"birth_year": %d}
+                """.formatted(birthYear),
+                List.of(acct("300000", "0", "0.05")),
+                spending, currentYear, List.of(ptSource));
+
+        var result = engine.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // SE tax should be calculated on $50k
+        assertThat(year1.selfEmploymentTax()).isNotNull();
+        assertThat(year1.selfEmploymentTax()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_withMultipleIncomeSources_combinesCorrectly() {
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 68;
+
+        var spending = new SpendingProfileInput(bd("50000"), bd("10000"), "[]");
+
+        var ssSource = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "SS", "social_security",
+                bd("24000"), 67, null, bd("0.02"), false,
+                "partially_taxable",
+                null, null, null, null, null);
+
+        var pensionSource = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Pension", "pension",
+                bd("20000"), 65, null, BigDecimal.ZERO, false,
+                "taxable",
+                null, null, null, null, null);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Test Scenario",
+                LocalDate.of(currentYear - 2, 1, 1), 85, bd("0.03"),
+                """
+                {"birth_year": %d}
+                """.formatted(birthYear),
+                List.of(acct("400000", "0", "0.05")),
+                spending, currentYear, List.of(ssSource, pensionSource));
+
+        var result = engine.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Total income should include both SS and pension cash flows
+        assertThat(year1.incomeStreamsTotal()).isNotNull();
+        assertThat(year1.incomeStreamsTotal()).isGreaterThanOrEqualTo(bd("44000"));
+        // With $44k+ income, withdrawals should be minimal for $60k spending
+        assertThat(year1.withdrawals()).isLessThan(bd("20000"));
     }
 }
