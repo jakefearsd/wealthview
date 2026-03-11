@@ -12,6 +12,8 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +28,8 @@ import java.util.UUID;
 
 @Service
 public class DashboardService {
+
+    private static final Logger log = LoggerFactory.getLogger(DashboardService.class);
 
     private final AccountRepository accountRepository;
     private final HoldingRepository holdingRepository;
@@ -47,6 +51,7 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardSummaryResponse getSummary(UUID tenantId) {
+        log.debug("Computing dashboard summary for tenant {}", tenantId);
         var accounts = accountRepository.findByTenant_Id(tenantId, Pageable.unpaged());
         var holdings = holdingRepository.findByTenant_Id(tenantId);
 
@@ -76,6 +81,7 @@ public class DashboardService {
         var netWorth = totalInvestments.add(totalCash).add(totalPropertyEquity);
         var allocation = buildAllocation(allocationMap, netWorth);
 
+        log.info("Dashboard summary for tenant {}: net worth {}", tenantId, netWorth);
         return new DashboardSummaryResponse(
                 netWorth, totalInvestments, totalCash,
                 totalPropertyEquity, accountSummaries, allocation);

@@ -110,6 +110,7 @@ public class TransactionService {
             holdingsComputationService.recomputeForAccountAndSymbol(account, tenant, oldSymbol);
         }
 
+        log.info("Transaction {} updated for account {}", transactionId, txn.getAccountId());
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "UPDATE", "transaction",
                 txn.getId(), txnDetails(request)));
         return TransactionResponse.from(txn);

@@ -11,6 +11,8 @@ import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,8 @@ import java.util.UUID;
 
 @Service
 public class SpendingProfileService {
+
+    private static final Logger log = LoggerFactory.getLogger(SpendingProfileService.class);
 
     private final SpendingProfileRepository profileRepository;
     private final TenantRepository tenantRepository;
@@ -45,6 +49,7 @@ public class SpendingProfileService {
                 serializeSpendingTiers(request.spendingTiers()));
 
         var saved = profileRepository.save(entity);
+        log.info("Spending profile '{}' created for tenant {}", request.name(), tenantId);
         return SpendingProfileResponse.from(saved);
     }
 
@@ -61,6 +66,7 @@ public class SpendingProfileService {
         entity.setUpdatedAt(OffsetDateTime.now());
 
         var saved = profileRepository.save(entity);
+        log.info("Spending profile {} updated for tenant {}", profileId, tenantId);
         return SpendingProfileResponse.from(saved);
     }
 
@@ -83,6 +89,7 @@ public class SpendingProfileService {
         var entity = profileRepository.findByTenant_IdAndId(tenantId, profileId)
                 .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
         profileRepository.delete(entity);
+        log.info("Spending profile {} deleted for tenant {}", profileId, tenantId);
     }
 
     private String serializeIncomeStreams(List<IncomeStreamRequest> streams) {
@@ -92,6 +99,7 @@ public class SpendingProfileService {
         try {
             return objectMapper.writeValueAsString(streams);
         } catch (Exception e) {
+            log.warn("Failed to serialize income streams: {}", e.getMessage());
             return "[]";
         }
     }
@@ -103,6 +111,7 @@ public class SpendingProfileService {
         try {
             return objectMapper.writeValueAsString(tiers);
         } catch (Exception e) {
+            log.warn("Failed to serialize spending tiers: {}", e.getMessage());
             return "[]";
         }
     }

@@ -21,7 +21,9 @@ public class PriceSyncScheduler {
 
     @Scheduled(cron = "0 30 16 * * MON-FRI", zone = "America/New_York")
     public void scheduleDailyPriceSync() {
+        long startTime = System.currentTimeMillis();
         log.info("Scheduled daily price sync triggered");
         priceSyncService.syncDailyPrices();
+        log.info("Scheduled daily price sync completed in {}ms", System.currentTimeMillis() - startTime);
     }
 }

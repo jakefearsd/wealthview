@@ -113,6 +113,7 @@ public class PropertyService {
         applyDepreciationFields(property, request);
         property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
+        log.info("Property {} updated for tenant {}", propertyId, tenantId);
         return buildResponse(property);
     }
 

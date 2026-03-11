@@ -42,6 +42,8 @@ public class HoldingsComputationService {
             return;
         }
 
+        log.debug("Recomputing holdings for account {} symbol {}", account.getId(), symbol);
+
         var existingHolding = holdingRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
 
         if (existingHolding.filter(HoldingEntity::isManualOverride).isPresent()) {
@@ -87,11 +89,15 @@ public class HoldingsComputationService {
             holding.setUpdatedAt(OffsetDateTime.now());
             applyMoneyMarketFlag(holding, symbol);
             holdingRepository.save(holding);
+            log.info("Holdings updated for account {} symbol {}: qty={} cost={}",
+                    account.getId(), symbol, netQuantity, totalCost);
         } else if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
             var holding = new HoldingEntity(account, tenant, symbol, netQuantity, totalCost);
             applyMoneyMarketFlag(holding, symbol);
             holdingRepository.save(holding);
             eventPublisher.publishEvent(new NewHoldingCreatedEvent(symbol));
+            log.info("Holdings created for account {} symbol {}: qty={} cost={}",
+                    account.getId(), symbol, netQuantity, totalCost);
         }
     }
 

@@ -85,6 +85,7 @@ public class AccountService {
         account.setInstitution(request.institution());
         account.setUpdatedAt(OffsetDateTime.now());
         account = accountRepository.save(account);
+        log.info("Account {} updated for tenant {}", accountId, tenantId);
         return AccountResponse.from(account, computeBalance(account, tenantId));
     }
 

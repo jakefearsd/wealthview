@@ -13,6 +13,8 @@ import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +24,8 @@ import java.util.UUID;
 @Service
 @Transactional(readOnly = true)
 public class DataExportService {
+
+    private static final Logger log = LoggerFactory.getLogger(DataExportService.class);
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
@@ -39,6 +43,7 @@ public class DataExportService {
     }
 
     public TenantExportDto exportAsJson(UUID tenantId) {
+        log.info("Starting JSON export for tenant {}", tenantId);
         var accounts = accountRepository.findByTenant_Id(tenantId).stream()
                 .map(a -> AccountResponse.from(a, BigDecimal.ZERO))
                 .toList();
@@ -51,10 +56,13 @@ public class DataExportService {
         var properties = propertyRepository.findByTenant_Id(tenantId).stream()
                 .map(p -> PropertyResponse.from(p, p.getMortgageBalance()))
                 .toList();
+        log.info("JSON export complete for tenant {}: {} accounts, {} transactions, {} holdings, {} properties",
+                tenantId, accounts.size(), transactions.size(), holdings.size(), properties.size());
         return new TenantExportDto(accounts, transactions, holdings, properties);
     }
 
     public String exportAccountsCsv(UUID tenantId) {
+        log.info("Starting accounts CSV export for tenant {}", tenantId);
         var sb = new StringBuilder("id,name,type,institution,created_at\n");
         for (AccountEntity a : accountRepository.findByTenant_Id(tenantId)) {
             sb.append(a.getId()).append(',')
@@ -67,6 +75,7 @@ public class DataExportService {
     }
 
     public String exportTransactionsCsv(UUID tenantId) {
+        log.info("Starting transactions CSV export for tenant {}", tenantId);
         var sb = new StringBuilder("id,account_id,date,type,symbol,quantity,amount,created_at\n");
         for (TransactionEntity t : transactionRepository.findByTenant_Id(tenantId)) {
             sb.append(t.getId()).append(',')
@@ -82,6 +91,7 @@ public class DataExportService {
     }
 
     public String exportHoldingsCsv(UUID tenantId) {
+        log.info("Starting holdings CSV export for tenant {}", tenantId);
         var sb = new StringBuilder("id,account_id,symbol,quantity,cost_basis,is_manual_override,as_of_date\n");
         for (HoldingEntity h : holdingRepository.findByTenant_Id(tenantId)) {
             sb.append(h.getId()).append(',')
@@ -96,6 +106,7 @@ public class DataExportService {
     }
 
     public String exportPropertiesCsv(UUID tenantId) {
+        log.info("Starting properties CSV export for tenant {}", tenantId);
         var sb = new StringBuilder("id,address,purchase_price,purchase_date,current_value,mortgage_balance,property_type\n");
         for (PropertyEntity p : propertyRepository.findByTenant_Id(tenantId)) {
             sb.append(p.getId()).append(',')

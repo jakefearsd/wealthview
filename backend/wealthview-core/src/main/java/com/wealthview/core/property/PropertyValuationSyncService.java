@@ -34,6 +34,7 @@ public class PropertyValuationSyncService {
 
     @Scheduled(cron = "${app.zillow.sync-cron:0 0 6 * * SUN}")
     public void syncAll() {
+        long startTime = System.currentTimeMillis();
         log.info("Starting property valuation sync");
         var properties = propertyRepository.findAll();
         int success = 0;
@@ -58,7 +59,8 @@ public class PropertyValuationSyncService {
             }
         }
 
-        log.info("Property valuation sync complete: {} updated, {} skipped", success, skipped);
+        log.info("Property valuation sync complete: {} updated, {} skipped, {}ms",
+                success, skipped, System.currentTimeMillis() - startTime);
     }
 
     @Transactional

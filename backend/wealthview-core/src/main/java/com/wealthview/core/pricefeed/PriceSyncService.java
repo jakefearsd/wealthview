@@ -40,26 +40,33 @@ public class PriceSyncService {
 
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyPrices() {
+        long startTime = System.currentTimeMillis();
         var symbols = holdingRepository.findDistinctSymbols();
         log.info("Starting daily price sync for {} symbols", symbols.size());
 
+        int successCount = 0;
+        int failCount = 0;
         for (var symbol : symbols) {
             try {
                 var quoteOpt = priceFeedClient.getQuote(symbol);
                 if (quoteOpt.isEmpty()) {
                     log.warn("No quote returned for symbol {}", symbol);
+                    failCount++;
                     continue;
                 }
 
                 var quote = quoteOpt.orElseThrow();
                 upsertPrice(symbol, LocalDate.now(), quote.currentPrice(), SOURCE_FINNHUB);
+                successCount++;
                 sleepForRateLimit();
             } catch (Exception e) {
                 log.warn("Failed to sync price for symbol {}: {}", symbol, e.getMessage());
+                failCount++;
             }
         }
 
-        log.info("Daily price sync complete");
+        log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
+                successCount, failCount, System.currentTimeMillis() - startTime);
     }
 
     public void backfillHistoricalPrices(String symbol) {
@@ -68,6 +75,7 @@ public class PriceSyncService {
             return;
         }
 
+        long startTime = System.currentTimeMillis();
         log.info("Starting historical backfill for symbol {}", symbol);
         var to = LocalDate.now();
         var from = to.minusYears(2);
@@ -87,7 +95,8 @@ public class PriceSyncService {
             }
         }
 
-        log.info("Historical backfill complete for symbol {}: {} entries", symbol, candles.entries().size());
+        log.info("Historical backfill complete for symbol {}: {} entries, {}ms",
+                symbol, candles.entries().size(), System.currentTimeMillis() - startTime);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
