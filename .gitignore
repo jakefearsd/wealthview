@@ -54,5 +54,5 @@ testdata/
 .worktrees/
 defectimages/
 
-# Personal docs
-docs/
+# Database backups
+backups/
