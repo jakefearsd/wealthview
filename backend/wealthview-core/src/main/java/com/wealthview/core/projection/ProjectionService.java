@@ -29,6 +29,8 @@ import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,6 +43,8 @@ import java.util.UUID;
 
 @Service
 public class ProjectionService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProjectionService.class);
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantRepository tenantRepository;
@@ -113,6 +117,8 @@ public class ProjectionService {
         }
 
         var saved = scenarioRepository.save(scenario);
+        log.info("Scenario '{}' created with {} accounts for tenant {}",
+                request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
         return toScenarioResponse(saved, tenantId);
     }
 
@@ -173,6 +179,7 @@ public class ProjectionService {
         }
 
         var saved = scenarioRepository.save(scenario);
+        log.info("Scenario {} updated for tenant {}", scenarioId, tenantId);
         return toScenarioResponse(saved, tenantId);
     }
 
@@ -181,10 +188,12 @@ public class ProjectionService {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
         scenarioRepository.delete(scenario);
+        log.info("Scenario {} deleted for tenant {}", scenarioId, tenantId);
     }
 
     @Transactional(readOnly = true)
     public CompareResponse compareScenarios(UUID tenantId, CompareRequest request) {
+        log.info("Comparing {} scenarios for tenant {}", request.scenarioIds().size(), tenantId);
         var results = new java.util.ArrayList<ProjectionResultResponse>();
         for (var scenarioId : request.scenarioIds()) {
             var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
@@ -196,6 +205,7 @@ public class ProjectionService {
 
     @Transactional(readOnly = true)
     public ProjectionResultResponse runProjection(UUID tenantId, UUID scenarioId) {
+        log.info("Running projection for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
         return projectionEngine.run(toProjectionInput(scenario, tenantId));

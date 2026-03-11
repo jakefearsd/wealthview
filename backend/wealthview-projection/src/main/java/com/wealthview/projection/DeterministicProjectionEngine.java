@@ -60,6 +60,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var accounts = input.accounts();
         var params = parseParams(input.paramsJson());
 
+        log.info("Starting projection for scenario '{}': {} accounts, retirement year {}, end age {}",
+                input.scenarioName(), accounts.size(),
+                input.retirementDate() != null ? input.retirementDate().getYear() : "default",
+                input.endAge() != null ? input.endAge() : 90);
+
         int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
         int birthYear = params.birthYear != null ? params.birthYear : currentYear - 35;
         int retirementYear = input.retirementDate() != null

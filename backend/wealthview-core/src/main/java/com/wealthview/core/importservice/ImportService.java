@@ -126,6 +126,9 @@ public class ImportService {
 
     private ImportJobResponse processImport(UUID tenantId, UUID accountId,
                                              CsvParseResult parseResult, String source) {
+        log.info("Starting {} import for account {}: {} transactions parsed, {} parse errors",
+                source.toUpperCase(), accountId, parseResult.transactions().size(), parseResult.errors().size());
+
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
@@ -137,8 +140,8 @@ public class ImportService {
         var result = importTransactions(parseResult.transactions(), tenantId, accountId);
         finalizeJob(job, result, parseResult.errors().size());
 
-        log.info("{} import completed for account {}: {} successful, {} failed",
-                source.toUpperCase(), accountId, result.successCount(), job.getFailedRows());
+        log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
+                source.toUpperCase(), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
         return ImportJobResponse.from(job);
     }
 
@@ -155,6 +158,7 @@ public class ImportService {
 
                 if (transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
                         tenantId, accountId, hash)) {
+                    log.debug("Skipped duplicate transaction: hash={}", hash);
                     skippedDuplicates++;
                     continue;
                 }

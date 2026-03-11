@@ -1,9 +1,12 @@
 package com.wealthview.core.auth;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +17,8 @@ import java.util.UUID;
 
 @Component
 public class JwtTokenProvider {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
     private final SecretKey key;
     private final long accessTokenExpiration;
@@ -80,7 +85,11 @@ public class JwtTokenProvider {
         try {
             getClaims(token);
             return true;
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT token expired");
+            return false;
         } catch (JwtException | IllegalArgumentException e) {
+            log.warn("JWT token invalid: {}", e.getMessage());
             return false;
         }
     }
