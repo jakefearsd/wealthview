@@ -1,5 +1,5 @@
 import { useState, type ChangeEvent } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { importCsv, importOfx, importPositions, listImportJobs } from '../api/import';
 import { useApiQuery } from '../hooks/useApiQuery';
 import toast from 'react-hot-toast';

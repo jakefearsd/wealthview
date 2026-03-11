@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics } from '../api/properties';
 import type { ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';

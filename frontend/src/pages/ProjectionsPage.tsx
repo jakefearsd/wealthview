@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { listScenarios, createScenario, deleteScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { cardStyle } from '../utils/styles';

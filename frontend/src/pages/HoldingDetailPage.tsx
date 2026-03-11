@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router';
 import { getHolding, updateHolding } from '../api/holdings';
 import { listTransactions } from '../api/transactions';
 import { useApiQuery } from '../hooks/useApiQuery';
