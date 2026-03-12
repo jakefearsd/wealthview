@@ -56,3 +56,12 @@ defectimages/
 
 # Database backups
 backups/
+
+# Claude Code
+.claude/
+
+# Test artifacts
+frontend/test-results/
+
+# Infrastructure (local)
+infra/
