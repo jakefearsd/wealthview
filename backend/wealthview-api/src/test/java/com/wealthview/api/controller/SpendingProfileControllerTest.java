@@ -57,7 +57,7 @@ class SpendingProfileControllerTest {
         return new SpendingProfileResponse(
                 PROFILE_ID, "Retirement Spending",
                 new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), List.of(), OffsetDateTime.now(), OffsetDateTime.now());
+                List.of(), OffsetDateTime.now(), OffsetDateTime.now());
     }
 
     @Test
@@ -72,8 +72,7 @@ class SpendingProfileControllerTest {
                                 {
                                     "name": "Retirement Spending",
                                     "essential_expenses": 40000,
-                                    "discretionary_expenses": 20000,
-                                    "income_streams": []
+                                    "discretionary_expenses": 20000
                                 }
                                 """))
                 .andExpect(status().isCreated())
@@ -125,8 +124,7 @@ class SpendingProfileControllerTest {
                                 {
                                     "name": "Retirement Spending",
                                     "essential_expenses": 40000,
-                                    "discretionary_expenses": 20000,
-                                    "income_streams": []
+                                    "discretionary_expenses": 20000
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -153,7 +151,7 @@ class SpendingProfileControllerTest {
         return new SpendingProfileResponse(
                 PROFILE_ID, "Phased Retirement",
                 new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), tiers, OffsetDateTime.now(), OffsetDateTime.now());
+                tiers, OffsetDateTime.now(), OffsetDateTime.now());
     }
 
     @Test
@@ -169,7 +167,7 @@ class SpendingProfileControllerTest {
                                     "name": "Phased Retirement",
                                     "essential_expenses": 40000,
                                     "discretionary_expenses": 20000,
-                                    "income_streams": [],
+
                                     "spending_tiers": [
                                         {"name": "Conservation", "start_age": 54, "end_age": 62,
                                          "essential_expenses": 96000, "discretionary_expenses": 0},
@@ -226,7 +224,7 @@ class SpendingProfileControllerTest {
                                     "name": "Phased Retirement",
                                     "essential_expenses": 40000,
                                     "discretionary_expenses": 20000,
-                                    "income_streams": [],
+
                                     "spending_tiers": [
                                         {"name": "Conservation", "start_age": 54, "end_age": 62,
                                          "essential_expenses": 96000, "discretionary_expenses": 0}
@@ -249,8 +247,7 @@ class SpendingProfileControllerTest {
                                 {
                                     "name": "Simple Profile",
                                     "essential_expenses": 40000,
-                                    "discretionary_expenses": 20000,
-                                    "income_streams": []
+                                    "discretionary_expenses": 20000
                                 }
                                 """))
                 .andExpect(status().isCreated())

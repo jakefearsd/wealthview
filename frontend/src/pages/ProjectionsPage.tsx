@@ -91,12 +91,20 @@ export default function ProjectionsPage() {
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', color: '#999' }}>
                                 <span>Created {new Date(s.created_at).toLocaleDateString()}</span>
-                                <Link
-                                    to={`/projections/${s.id}`}
-                                    style={{ color: '#1976d2', textDecoration: 'none', fontWeight: 500 }}
-                                >
-                                    View Details &rarr;
-                                </Link>
+                                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                                    <Link
+                                        to={`/projections/${s.id}?run=true`}
+                                        style={{ color: '#fff', background: '#1976d2', textDecoration: 'none', fontWeight: 500, padding: '0.25rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem' }}
+                                    >
+                                        Run
+                                    </Link>
+                                    <Link
+                                        to={`/projections/${s.id}`}
+                                        style={{ color: '#1976d2', textDecoration: 'none', fontWeight: 500 }}
+                                    >
+                                        View Details &rarr;
+                                    </Link>
+                                </div>
                             </div>
                         </div>
                     ))}

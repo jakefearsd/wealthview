@@ -5,11 +5,7 @@ import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import HelpText from '../components/HelpText';
-import type { SpendingProfile, CreateSpendingProfileRequest, IncomeStream, SpendingTier } from '../types/projection';
-
-function defaultIncomeStream(): IncomeStream {
-    return { name: '', annual_amount: 0, start_age: 65, end_age: null, inflation_rate: 0 };
-}
+import type { SpendingProfile, CreateSpendingProfileRequest, SpendingTier } from '../types/projection';
 
 function defaultSpendingTier(): SpendingTier {
     return { name: '', start_age: 55, end_age: null, essential_expenses: 0, discretionary_expenses: 0 };
@@ -19,7 +15,6 @@ const initialFormData: CreateSpendingProfileRequest = {
     name: '',
     essential_expenses: 40000,
     discretionary_expenses: 20000,
-    income_streams: [],
     spending_tiers: [],
 };
 
@@ -52,24 +47,9 @@ export default function SpendingProfilesPage() {
             name: profile.name,
             essential_expenses: profile.essential_expenses,
             discretionary_expenses: profile.discretionary_expenses,
-            income_streams: profile.income_streams.length > 0 ? [...profile.income_streams] : [],
             spending_tiers: profile.spending_tiers?.length > 0 ? [...profile.spending_tiers] : [],
         });
         setShowForm(true);
-    }
-
-    function updateStream(index: number, field: keyof IncomeStream, value: string | number | boolean | null) {
-        setFormData(prev => ({
-            ...prev,
-            income_streams: prev.income_streams.map((s, i) => {
-                if (i !== index) return s;
-                const updated = { ...s, [field]: value };
-                if (updated.one_time && field === 'start_age' && typeof value === 'number') {
-                    updated.end_age = value + 1;
-                }
-                return updated;
-            }),
-        }));
     }
 
     function updateTier(index: number, field: keyof SpendingTier, value: string | number | null) {
@@ -81,7 +61,7 @@ export default function SpendingProfilesPage() {
 
     if (loading) return <div>Loading...</div>;
 
-    const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, income_streams: incomeStreams, spending_tiers: spendingTiers } = formData;
+    const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, spending_tiers: spendingTiers } = formData;
 
     return (
         <div>
@@ -168,70 +148,6 @@ export default function SpendingProfilesPage() {
                         </div>
                     ))}
 
-                    {/* Income Streams Section */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', marginTop: '1rem' }}>
-                        <div>
-                            <h4>Income Streams</h4>
-                            <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.15rem' }}>Non-portfolio income sources that reduce how much you need to withdraw from investments.</div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button
-                                onClick={() => setFormData(prev => ({ ...prev, income_streams: [...prev.income_streams, defaultIncomeStream()] }))}
-                                style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                            >
-                                + Add Income Stream
-                            </button>
-                            <button
-                                onClick={() => setFormData(prev => ({ ...prev, income_streams: [...prev.income_streams, { name: '', annual_amount: 0, start_age: 65, end_age: 66, inflation_rate: 0, one_time: true }] }))}
-                                style={{ padding: '0.25rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                            >
-                                + One-Time Payment
-                            </button>
-                        </div>
-                    </div>
-                    {incomeStreams.map((stream, idx) => (
-                        <div key={idx} style={{ display: 'grid', gridTemplateColumns: stream.one_time ? '1.5fr 1fr 1fr auto' : '1.5fr 1fr 1fr 1fr 1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'start' }}>
-                            <div>
-                                <label style={labelStyle}>
-                                    Name
-                                    {stream.one_time && <span style={{ fontSize: '0.75rem', color: '#ff9800', marginLeft: '0.5rem', fontWeight: 400 }}>(One-Time)</span>}
-                                </label>
-                                <input style={inputStyle} value={stream.name} onChange={e => updateStream(idx, 'name', e.target.value)} placeholder={stream.one_time ? 'Deferred Comp' : 'Social Security'} />
-                            </div>
-                            <div>
-                                <label style={labelStyle}>{stream.one_time ? 'Payment Amount' : 'Annual Amount'}</label>
-                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(stream.annual_amount)} onChange={e => updateStream(idx, 'annual_amount', Number(parseCurrencyInput(e.target.value)) || 0)} />
-                            </div>
-                            <div>
-                                <label style={labelStyle}>{stream.one_time ? 'Payment Age' : 'Start Age'}</label>
-                                <input style={inputStyle} type="number" value={stream.start_age} onChange={e => updateStream(idx, 'start_age', Number(e.target.value))} />
-                                <HelpText>{stream.one_time ? 'Age when this one-time payment occurs.' : 'Age when this income begins (e.g., 67 for Social Security).'}</HelpText>
-                            </div>
-                            {!stream.one_time && (
-                                <div>
-                                    <label style={labelStyle}>End Age (blank = forever)</label>
-                                    <input style={inputStyle} type="number" value={stream.end_age ?? ''} onChange={e => updateStream(idx, 'end_age', e.target.value ? Number(e.target.value) : null)} />
-                                    <HelpText>Leave blank if this income continues for life.</HelpText>
-                                </div>
-                            )}
-                            {!stream.one_time && (
-                                <div>
-                                    <label style={labelStyle}>Inflation Rate</label>
-                                    <input style={inputStyle} type="number" step="0.001" value={stream.inflation_rate ?? 0} onChange={e => updateStream(idx, 'inflation_rate', Number(e.target.value) || 0)} />
-                                    <HelpText>Annual rate (e.g. 0.02 = 2%)</HelpText>
-                                </div>
-                            )}
-                            <div>
-                                <button
-                                    onClick={() => setFormData(prev => ({ ...prev, income_streams: prev.income_streams.filter((_, i) => i !== idx) }))}
-                                    style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                                >
-                                    Remove
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-
                     <button
                         onClick={handleSave}
                         disabled={saving}
@@ -277,20 +193,6 @@ export default function SpendingProfilesPage() {
                                     {p.spending_tiers.map(t =>
                                         `${t.name} (${t.start_age}-${t.end_age ?? '\u221E'}: ${formatCurrency(t.essential_expenses + t.discretionary_expenses)}/yr)`
                                     ).join(', ')}
-                                </div>
-                            )}
-                            {p.income_streams.length > 0 && (
-                                <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                                    <span style={{ color: '#999' }}>Income:</span>{' '}
-                                    {p.income_streams.map(s => {
-                                        if (s.one_time) {
-                                            return `${s.name} (${formatCurrency(s.annual_amount)}, age ${s.start_age})`;
-                                        }
-                                        const rate = s.inflation_rate ?? 0;
-                                        return rate > 0
-                                            ? `${s.name} (${formatCurrency(s.annual_amount)} @ ${(rate * 100).toFixed(1)}%)`
-                                            : `${s.name} (${formatCurrency(s.annual_amount)})`;
-                                    }).join(', ')}
                                 </div>
                             )}
                         </div>

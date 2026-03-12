@@ -14,7 +14,6 @@ public record SpendingProfileResponse(
         String name,
         BigDecimal essentialExpenses,
         BigDecimal discretionaryExpenses,
-        List<IncomeStreamResponse> incomeStreams,
         List<SpendingTierResponse> spendingTiers,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
@@ -22,16 +21,6 @@ public record SpendingProfileResponse(
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static SpendingProfileResponse from(SpendingProfileEntity entity) {
-        List<IncomeStreamResponse> streams = List.of();
-        try {
-            if (entity.getIncomeStreams() != null && !entity.getIncomeStreams().isBlank()) {
-                streams = MAPPER.readValue(entity.getIncomeStreams(),
-                        new TypeReference<List<IncomeStreamResponse>>() {});
-            }
-        } catch (Exception e) {
-            // fall through with empty list
-        }
-
         List<SpendingTierResponse> tiers = List.of();
         try {
             if (entity.getSpendingTiers() != null && !entity.getSpendingTiers().isBlank()) {
@@ -47,7 +36,6 @@ public record SpendingProfileResponse(
                 entity.getName(),
                 entity.getEssentialExpenses(),
                 entity.getDiscretionaryExpenses(),
-                streams,
                 tiers,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());

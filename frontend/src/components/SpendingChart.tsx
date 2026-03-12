@@ -1,5 +1,5 @@
 import {
-    AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
+    AreaChart, Area, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
     Legend, CartesianGrid,
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
@@ -15,9 +15,19 @@ export default function SpendingChart({ data }: SpendingChartProps) {
 
     const spendingData = data.filter(d => d.essential_expenses != null);
 
+    const chartData = spendingData.map(d => ({
+        ...d,
+        disc_cut_line:
+            d.discretionary_expenses != null &&
+            d.discretionary_after_cuts != null &&
+            d.discretionary_after_cuts < d.discretionary_expenses
+                ? (d.essential_expenses ?? 0) + d.discretionary_after_cuts
+                : null,
+    }));
+
     return (
         <ResponsiveContainer width="100%" height={450}>
-            <AreaChart data={spendingData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+            <AreaChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                 <defs>
                     <linearGradient id="colorEssential" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#ef5350" stopOpacity={0.4} />
@@ -51,6 +61,18 @@ export default function SpendingChart({ data }: SpendingChartProps) {
                 <Area type="monotone" dataKey="discretionary_after_cuts" stackId="spending" stroke="#ffa726" fill="url(#colorDiscretionary)" name="Discretionary (After Cuts)" />
                 <Area type="monotone" dataKey="withdrawals" stroke="#1976d2" strokeWidth={2} fill="none" name="Withdrawal" />
                 <Area type="monotone" dataKey="income_streams_total" stroke="#2e7d32" strokeWidth={2} fill="none" strokeDasharray="5 5" name="Income Streams" />
+                <Line
+                    type="monotone"
+                    dataKey="disc_cut_line"
+                    stroke="#d32f2f"
+                    strokeWidth={2}
+                    strokeDasharray="6 3"
+                    dot={false}
+                    activeDot={false}
+                    legendType="none"
+                    tooltipType="none"
+                    isAnimationActive={false}
+                />
             </AreaChart>
         </ResponsiveContainer>
     );

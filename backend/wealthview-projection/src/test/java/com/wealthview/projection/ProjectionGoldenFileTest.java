@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -83,14 +84,33 @@ class ProjectionGoldenFileTest {
             spendingProfile = new SpendingProfileInput(
                     new BigDecimal(sp.get("essentialExpenses").asText()),
                     new BigDecimal(sp.get("discretionaryExpenses").asText()),
-                    sp.get("incomeStreams").asText(),
                     sp.has("spendingTiers") ? sp.get("spendingTiers").asText() : null
             );
         }
 
+        List<ProjectionIncomeSourceInput> incomeSources = List.of();
+        if (node.has("incomeSources") && node.get("incomeSources").isArray()) {
+            var sourceList = new java.util.ArrayList<ProjectionIncomeSourceInput>();
+            for (var item : node.get("incomeSources")) {
+                sourceList.add(new ProjectionIncomeSourceInput(
+                        UUID.fromString(item.get("id").asText()),
+                        item.get("name").asText(),
+                        item.get("incomeType").asText(),
+                        new BigDecimal(item.get("annualAmount").asText()),
+                        item.get("startAge").asInt(),
+                        item.has("endAge") && !item.get("endAge").isNull() ? item.get("endAge").asInt() : null,
+                        new BigDecimal(item.get("inflationRate").asText()),
+                        item.get("oneTime").asBoolean(),
+                        item.get("taxTreatment").asText(),
+                        null, null, null, null, null
+                ));
+            }
+            incomeSources = sourceList;
+        }
+
         return new ProjectionInput(UUID.nameUUIDFromBytes(scenarioName.getBytes()), scenarioName,
                 retirementDate, endAge, inflationRate, paramsJson, accounts, spendingProfile,
-                referenceYear);
+                referenceYear, incomeSources);
     }
 
     private List<ProjectionAccountInput> parseAccounts(JsonNode accountsNode) {

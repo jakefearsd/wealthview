@@ -15,6 +15,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
@@ -23,7 +24,9 @@ import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
@@ -55,6 +58,7 @@ public class ProjectionService {
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
     private final DepreciationCalculator depreciationCalculator;
+    private final IncomeSourceRepository incomeSourceRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
@@ -65,7 +69,8 @@ public class ProjectionService {
                              AccountService accountService,
                              ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                              PropertyDepreciationScheduleRepository depreciationScheduleRepository,
-                             DepreciationCalculator depreciationCalculator) {
+                             DepreciationCalculator depreciationCalculator,
+                             IncomeSourceRepository incomeSourceRepository) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
@@ -75,6 +80,7 @@ public class ProjectionService {
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.depreciationScheduleRepository = depreciationScheduleRepository;
         this.depreciationCalculator = depreciationCalculator;
+        this.incomeSourceRepository = incomeSourceRepository;
     }
 
     @Transactional
@@ -117,6 +123,9 @@ public class ProjectionService {
         }
 
         var saved = scenarioRepository.save(scenario);
+
+        saveIncomeSourceLinks(saved, tenantId, request.incomeSources());
+
         log.info("Scenario '{}' created with {} accounts for tenant {}",
                 request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
         return toScenarioResponse(saved, tenantId);
@@ -178,6 +187,9 @@ public class ProjectionService {
             }
         }
 
+        scenarioIncomeSourceRepository.deleteByScenario_Id(scenarioId);
+        saveIncomeSourceLinks(scenario, tenantId, request.incomeSources());
+
         var saved = scenarioRepository.save(scenario);
         log.info("Scenario {} updated for tenant {}", scenarioId, tenantId);
         return toScenarioResponse(saved, tenantId);
@@ -217,7 +229,6 @@ public class ProjectionService {
                 ? new SpendingProfileInput(
                         scenario.getSpendingProfile().getEssentialExpenses(),
                         scenario.getSpendingProfile().getDiscretionaryExpenses(),
-                        scenario.getSpendingProfile().getIncomeStreams(),
                         scenario.getSpendingProfile().getSpendingTiers())
                 : null;
         var incomeSources = resolveIncomeSources(scenario.getId());
@@ -315,10 +326,36 @@ public class ProjectionService {
         var profile = scenario.getSpendingProfile() != null
                 ? SpendingProfileResponse.from(scenario.getSpendingProfile())
                 : null;
+        var incomeSources = scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()).stream()
+                .map(link -> {
+                    var src = link.getIncomeSource();
+                    var effective = link.getOverrideAnnualAmount() != null
+                            ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
+                    return new ScenarioIncomeSourceResponse(
+                            src.getId(), src.getName(), src.getIncomeType(),
+                            src.getAnnualAmount(), link.getOverrideAnnualAmount(), effective,
+                            src.getStartAge(), src.getEndAge(),
+                            src.getInflationRate(), src.isOneTime());
+                })
+                .toList();
         return new ScenarioResponse(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, profile, scenario.getCreatedAt(), scenario.getUpdatedAt());
+                accounts, profile, incomeSources, scenario.getCreatedAt(), scenario.getUpdatedAt());
+    }
+
+    private void saveIncomeSourceLinks(ProjectionScenarioEntity scenario, UUID tenantId,
+                                       java.util.List<com.wealthview.core.projection.dto.ScenarioIncomeSourceInput> incomeSources) {
+        if (incomeSources == null) {
+            return;
+        }
+        for (var isReq : incomeSources) {
+            var incomeSource = incomeSourceRepository.findByTenant_IdAndId(tenantId, isReq.incomeSourceId())
+                    .orElseThrow(() -> new EntityNotFoundException(
+                            "Income source not found: " + isReq.incomeSourceId()));
+            scenarioIncomeSourceRepository.save(
+                    new ScenarioIncomeSourceEntity(scenario, incomeSource, isReq.overrideAnnualAmount()));
+        }
     }
 
     private String buildParamsJson(Integer birthYear, BigDecimal withdrawalRate,

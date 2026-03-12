@@ -10,13 +10,17 @@ import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
@@ -73,6 +77,9 @@ class ProjectionServiceTest {
     @Mock
     private DepreciationCalculator depreciationCalculator;
 
+    @Mock
+    private IncomeSourceRepository incomeSourceRepository;
+
     @InjectMocks
     private ProjectionService service;
 
@@ -106,7 +113,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         null)),
-                null);
+                null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -146,7 +153,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         null)),
-                null);
+                null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -179,7 +186,7 @@ class ProjectionServiceTest {
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
                                 new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null);
+                null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -215,7 +222,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         "traditional")),
-                null);
+                null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -248,7 +255,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         "traditional")),
-                null);
+                null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -282,7 +289,7 @@ class ProjectionServiceTest {
                 List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
-                null);
+                null, null);
 
         service.createScenario(tenantId, request);
 
@@ -423,7 +430,7 @@ class ProjectionServiceTest {
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
-                null);
+                null, null);
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -448,7 +455,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, List.of(), null);
+                null, null, null, null, null, null, null, List.of(), null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -478,7 +485,7 @@ class ProjectionServiceTest {
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
                                 new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null);
+                null, null);
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -618,5 +625,125 @@ class ProjectionServiceTest {
 
         assertThat(result.getFirst().accounts().getFirst().initialBalance())
                 .isEqualByComparingTo(new BigDecimal("75000.00"));
+    }
+
+    @Test
+    void createScenario_withIncomeSources_linksIncomeSources() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var incomeSourceId = UUID.randomUUID();
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Social Security", "social_security",
+                new BigDecimal("24000"), 67, null,
+                BigDecimal.ZERO, false, "taxable");
+
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId))
+                .thenReturn(Optional.of(incomeSource));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateScenarioRequest(
+                "Plan with Income", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
+                null, null, null, null, null, null, null, null, null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"),
+                        new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
+                null,
+                List.of(new ScenarioIncomeSourceInput(incomeSourceId, new BigDecimal("30000"))));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ScenarioIncomeSourceEntity.class);
+        verify(scenarioIncomeSourceRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getIncomeSource()).isEqualTo(incomeSource);
+        assertThat(saved.getOverrideAnnualAmount()).isEqualByComparingTo(new BigDecimal("30000"));
+    }
+
+    @Test
+    void createScenario_withInvalidIncomeSourceId_throwsEntityNotFound() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var badId = UUID.randomUUID();
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, badId))
+                .thenReturn(Optional.empty());
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                List.of(), null,
+                List.of(new ScenarioIncomeSourceInput(badId, null)));
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(badId.toString());
+    }
+
+    @Test
+    void updateScenario_replacesIncomeSources() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var incomeSourceId = UUID.randomUUID();
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Pension", "pension",
+                new BigDecimal("36000"), 65, null,
+                BigDecimal.ZERO, false, "taxable");
+
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId))
+                .thenReturn(Optional.of(incomeSource));
+
+        var request = new UpdateScenarioRequest(
+                "Updated Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                List.of(), null,
+                List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        verify(scenarioIncomeSourceRepository).deleteByScenario_Id(scenarioId);
+        var captor = ArgumentCaptor.forClass(ScenarioIncomeSourceEntity.class);
+        verify(scenarioIncomeSourceRepository).save(captor.capture());
+        assertThat(captor.getValue().getIncomeSource()).isEqualTo(incomeSource);
+        assertThat(captor.getValue().getOverrideAnnualAmount()).isNull();
+    }
+
+    @Test
+    void toScenarioResponse_includesIncomeSources() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Social Security", "social_security",
+                new BigDecimal("24000"), 67, null,
+                BigDecimal.ZERO, false, "taxable");
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, new BigDecimal("28000"));
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        var isResp = result.incomeSources().getFirst();
+        assertThat(isResp.name()).isEqualTo("Social Security");
+        assertThat(isResp.incomeType()).isEqualTo("social_security");
+        assertThat(isResp.annualAmount()).isEqualByComparingTo(new BigDecimal("24000"));
+        assertThat(isResp.overrideAnnualAmount()).isEqualByComparingTo(new BigDecimal("28000"));
+        assertThat(isResp.effectiveAmount()).isEqualByComparingTo(new BigDecimal("28000"));
     }
 }

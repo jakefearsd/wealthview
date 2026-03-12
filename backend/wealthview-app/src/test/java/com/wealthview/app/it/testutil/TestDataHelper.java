@@ -174,12 +174,7 @@ public class TestDataHelper {
         return Map.of(
                 "name", name,
                 "essential_expenses", 40000,
-                "discretionary_expenses", 20000,
-                "income_streams", List.of(Map.of(
-                        "name", "Social Security",
-                        "annual_amount", 24000,
-                        "start_age", 67
-                ))
+                "discretionary_expenses", 20000
         );
     }
 

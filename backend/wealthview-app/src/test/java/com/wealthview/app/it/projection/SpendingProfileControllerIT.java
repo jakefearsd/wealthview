@@ -144,7 +144,6 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
                 "name", name,
                 "essential_expenses", 40000,
                 "discretionary_expenses", 20000,
-                "income_streams", List.of(),
                 "spending_tiers", List.of(conservationTier, goGoTier)
         );
     }

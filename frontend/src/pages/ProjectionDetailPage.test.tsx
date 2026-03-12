@@ -1,7 +1,8 @@
-import { screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderWithRoute } from '../test-utils';
+import { ProjectionCacheProvider } from '../context/ProjectionCacheContext';
 import ProjectionDetailPage from './ProjectionDetailPage';
 import type { Scenario } from '../types/projection';
 
@@ -16,6 +17,7 @@ const mockScenario: Scenario = {
         { id: 'a1', linked_account_id: null, initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07, account_type: 'taxable' },
     ],
     spending_profile: null,
+    income_sources: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
 };
@@ -46,10 +48,15 @@ import { useApiQuery } from '../hooks/useApiQuery';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 function renderPage() {
-    return renderWithRoute(<ProjectionDetailPage />, {
-        path: '/projections/:id',
-        entry: '/projections/abc-123',
-    });
+    return render(
+        <ProjectionCacheProvider>
+            <MemoryRouter initialEntries={['/projections/abc-123']}>
+                <Routes>
+                    <Route path="/projections/:id" element={<ProjectionDetailPage />} />
+                </Routes>
+            </MemoryRouter>
+        </ProjectionCacheProvider>,
+    );
 }
 
 describe('ProjectionDetailPage', () => {

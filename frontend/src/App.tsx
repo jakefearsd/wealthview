@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
+import { ProjectionCacheProvider } from './context/ProjectionCacheContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
@@ -27,6 +28,7 @@ import NotFoundPage from './pages/NotFoundPage';
 export default function App() {
     return (
         <AuthProvider>
+            <ProjectionCacheProvider>
             <BrowserRouter>
                 <Toaster position="top-right" />
                 <Routes>
@@ -54,6 +56,7 @@ export default function App() {
                     </Route>
                 </Routes>
             </BrowserRouter>
+            </ProjectionCacheProvider>
         </AuthProvider>
     );
 }

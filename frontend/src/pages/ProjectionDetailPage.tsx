@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useSearchParams, Link } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
@@ -9,11 +9,13 @@ import SummaryCard from '../components/SummaryCard';
 import ProjectionChart from '../components/ProjectionChart';
 import MilestoneStrip from '../components/MilestoneStrip';
 import ScenarioForm from '../components/ScenarioForm';
+import IncomeStreamsChart from '../components/IncomeStreamsChart';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
+import { useProjectionCache } from '../context/ProjectionCacheContext';
 import type { ProjectionResult, CreateScenarioRequest } from '../types/projection';
 
-type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax';
+type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams';
 
 const tabButtonStyle = (active: boolean) => ({
     padding: '0.5rem 1rem',
@@ -28,17 +30,29 @@ const tabButtonStyle = (active: boolean) => ({
 
 export default function ProjectionDetailPage() {
     const { id } = useParams<{ id: string }>();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const cache = useProjectionCache();
     const { data: scenario, loading, refetch } = useApiQuery(() => getScenario(id!));
-    const [result, setResult] = useState<ProjectionResult | null>(null);
+    const [result, setResult] = useState<ProjectionResult | null>(() => cache.get(id!));
     const [running, setRunning] = useState(false);
     const [activeTab, setActiveTab] = useState<TabId>('chart');
     const [editing, setEditing] = useState(false);
+    const autoRanRef = useRef(false);
+
+    useEffect(() => {
+        if (scenario && searchParams.get('run') === 'true' && !autoRanRef.current) {
+            autoRanRef.current = true;
+            setSearchParams({}, { replace: true });
+            handleRun();
+        }
+    }, [scenario]);
 
     async function handleRun() {
         setRunning(true);
         try {
             const data = await runProjection(id!);
             setResult(data);
+            cache.set(id!, data);
         } catch (err: unknown) {
             toast.error(extractErrorMessage(err));
         } finally {
@@ -56,6 +70,7 @@ export default function ProjectionDetailPage() {
             try {
                 const res = await runProjection(id!);
                 setResult(res);
+                cache.set(id!, res);
             } finally {
                 setRunning(false);
             }
@@ -128,6 +143,36 @@ export default function ProjectionDetailPage() {
                             <SummaryCard label="Spending Profile" value={scenario.spending_profile.name} />
                         )}
                     </div>
+
+                    {scenario.income_sources && scenario.income_sources.length > 0 && (
+                        <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                            <h3 style={{ marginBottom: '1rem' }}>Income Sources</h3>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Base Amount</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Override</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Effective</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {scenario.income_sources.map(is => (
+                                        <tr key={is.income_source_id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                            <td style={{ padding: '0.5rem' }}>{is.name}</td>
+                                            <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(is.annual_amount)}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#666' }}>
+                                                {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}
+                                            </td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(is.effective_amount)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
                     {scenario.accounts.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
@@ -259,6 +304,11 @@ export default function ProjectionDetailPage() {
                                     Income & Tax
                                 </button>
                             )}
+                            {scenario.income_sources.length > 0 && (
+                                <button style={tabButtonStyle(activeTab === 'income_streams')} onClick={() => setActiveTab('income_streams')}>
+                                    Income Streams
+                                </button>
+                            )}
                         </div>
 
                         {activeTab === 'chart' && (
@@ -324,6 +374,14 @@ export default function ProjectionDetailPage() {
                                     </tbody>
                                 </table>
                             </div>
+                        )}
+
+                        {activeTab === 'income_streams' && scenario.income_sources.length > 0 && (
+                            <IncomeStreamsChart
+                                data={result.yearly_data}
+                                incomeSources={scenario.income_sources}
+                                retirementYear={retirementYear}
+                            />
                         )}
 
                         {activeTab === 'table' && (

@@ -63,7 +63,7 @@ class ProjectionControllerTest {
                 SCENARIO_ID, "Retirement Plan",
                 LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.0300"), null,
-                List.of(), null, OffsetDateTime.now(), OffsetDateTime.now());
+                List.of(), null, List.of(), OffsetDateTime.now(), OffsetDateTime.now());
     }
 
     @Test

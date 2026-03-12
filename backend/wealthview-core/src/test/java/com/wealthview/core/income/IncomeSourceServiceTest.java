@@ -203,7 +203,7 @@ class IncomeSourceServiceTest {
                 .thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateIncomeSourceRequest(
-                "Updated Pension", new BigDecimal("28000"), 66, 90,
+                "Updated Pension", "pension", new BigDecimal("28000"), 66, 90,
                 new BigDecimal("0.03"), false, "taxable", null);
 
         var result = service.update(tenantId, sourceId, request);
@@ -231,7 +231,7 @@ class IncomeSourceServiceTest {
                 .thenAnswer(inv -> inv.getArgument(0));
 
         var request = new UpdateIncomeSourceRequest(
-                "Rental", new BigDecimal("26000"), 60, null,
+                "Rental", "rental_property", new BigDecimal("26000"), 60, null,
                 BigDecimal.ZERO, false, "rental_active_reps", propertyId);
 
         var result = service.update(tenantId, sourceId, request);
@@ -247,7 +247,7 @@ class IncomeSourceServiceTest {
                 .thenReturn(Optional.empty());
 
         var request = new UpdateIncomeSourceRequest(
-                "Name", new BigDecimal("10000"), 65, null, BigDecimal.ZERO, false, "taxable", null);
+                "Name", null, new BigDecimal("10000"), 65, null, BigDecimal.ZERO, false, "taxable", null);
 
         assertThatThrownBy(() -> service.update(tenantId, sourceId, request))
                 .isInstanceOf(EntityNotFoundException.class);

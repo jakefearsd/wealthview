@@ -123,6 +123,7 @@ export default function IncomeSourcesPage() {
     const updateFn = useCallback(async (id: string, data: IncomeSourceFormData): Promise<IncomeSource> => {
         return updateIncomeSource(id, {
             name: data.name,
+            income_type: data.income_type,
             annual_amount: data.annual_amount,
             start_age: data.start_age,
             end_age: data.one_time ? data.start_age + 1 : data.end_age,
@@ -229,16 +230,12 @@ export default function IncomeSourcesPage() {
                         </div>
                         <div>
                             <label style={labelStyle}>Income Type</label>
-                            {editingId ? (
-                                <input style={{ ...inputStyle, background: '#f5f5f5' }} value={typeLabel(incomeType)} readOnly />
-                            ) : (
-                                <select style={inputStyle} value={incomeType} onChange={e => handleTypeChange(e.target.value)}>
-                                    {INCOME_TYPES.map(t => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
-                                    ))}
-                                </select>
-                            )}
-                            <HelpText>Type determines how this income is taxed in projections.{editingId ? ' Type cannot be changed after creation.' : ''}</HelpText>
+                            <select style={inputStyle} value={incomeType} onChange={e => handleTypeChange(e.target.value)}>
+                                {INCOME_TYPES.map(t => (
+                                    <option key={t.value} value={t.value}>{t.label}</option>
+                                ))}
+                            </select>
+                            <HelpText>Type determines how this income is taxed in projections.</HelpText>
                         </div>
                     </div>
 

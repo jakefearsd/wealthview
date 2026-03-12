@@ -3,7 +3,6 @@ package com.wealthview.core.projection;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
-import com.wealthview.core.projection.dto.IncomeStreamRequest;
 import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
@@ -61,7 +60,6 @@ class SpendingProfileServiceTest {
                 "Retirement Spending",
                 new BigDecimal("40000"),
                 new BigDecimal("20000"),
-                List.of(new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null, null, null)),
                 null);
 
         var result = service.createProfile(tenantId, request);
@@ -69,8 +67,6 @@ class SpendingProfileServiceTest {
         assertThat(result.name()).isEqualTo("Retirement Spending");
         assertThat(result.essentialExpenses()).isEqualByComparingTo(new BigDecimal("40000"));
         assertThat(result.discretionaryExpenses()).isEqualByComparingTo(new BigDecimal("20000"));
-        assertThat(result.incomeStreams()).hasSize(1);
-        assertThat(result.incomeStreams().getFirst().name()).isEqualTo("Social Security");
     }
 
     @Test
@@ -78,7 +74,7 @@ class SpendingProfileServiceTest {
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
 
         var request = new CreateSpendingProfileRequest(
-                "Plan", BigDecimal.ZERO, BigDecimal.ZERO, List.of(), null);
+                "Plan", BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         assertThatThrownBy(() -> service.createProfile(tenantId, request))
                 .isInstanceOf(InvalidSessionException.class);
@@ -86,8 +82,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void updateProfile_validRequest_updatesFields() {
-        var entity = new SpendingProfileEntity(
-                tenant, "Old Name", new BigDecimal("30000"), new BigDecimal("10000"), "[]", "[]");
+        var entity = new SpendingProfileEntity(tenant,"Old Name", new BigDecimal("30000"), new BigDecimal("10000"), "[]");
         when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
                 .thenReturn(Optional.of(entity));
         when(profileRepository.save(any(SpendingProfileEntity.class)))
@@ -97,7 +92,6 @@ class SpendingProfileServiceTest {
                 "Updated Spending",
                 new BigDecimal("45000"),
                 new BigDecimal("25000"),
-                List.of(),
                 null);
 
         var result = service.updateProfile(tenantId, profileId, request);
@@ -113,7 +107,7 @@ class SpendingProfileServiceTest {
                 .thenReturn(Optional.empty());
 
         var request = new UpdateSpendingProfileRequest(
-                "Plan", BigDecimal.ZERO, BigDecimal.ZERO, List.of(), null);
+                "Plan", BigDecimal.ZERO, BigDecimal.ZERO, null);
 
         assertThatThrownBy(() -> service.updateProfile(tenantId, profileId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -121,8 +115,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void listProfiles_returnsList() {
-        var entity = new SpendingProfileEntity(
-                tenant, "Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]", "[]");
+        var entity = new SpendingProfileEntity(tenant,"Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]");
         when(profileRepository.findByTenant_IdOrderByCreatedAtDesc(tenantId))
                 .thenReturn(List.of(entity));
 
@@ -134,8 +127,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void getProfile_exists_returnsProfile() {
-        var entity = new SpendingProfileEntity(
-                tenant, "Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]", "[]");
+        var entity = new SpendingProfileEntity(tenant,"Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]");
         when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
                 .thenReturn(Optional.of(entity));
 
@@ -154,28 +146,8 @@ class SpendingProfileServiceTest {
     }
 
     @Test
-    void createProfile_withPerStreamInflationRate_persistsInJson() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
-        when(profileRepository.save(any(SpendingProfileEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-        var request = new CreateSpendingProfileRequest(
-                "With Inflation",
-                new BigDecimal("40000"),
-                new BigDecimal("20000"),
-                List.of(new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null, new BigDecimal("0.02"), null)),
-                null);
-
-        var result = service.createProfile(tenantId, request);
-
-        assertThat(result.incomeStreams()).hasSize(1);
-        assertThat(result.incomeStreams().getFirst().inflationRate()).isEqualByComparingTo(new BigDecimal("0.02"));
-    }
-
-    @Test
     void deleteProfile_exists_deletes() {
-        var entity = new SpendingProfileEntity(
-                tenant, "Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]", "[]");
+        var entity = new SpendingProfileEntity(tenant,"Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]");
         when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
                 .thenReturn(Optional.of(entity));
 
@@ -200,7 +172,7 @@ class SpendingProfileServiceTest {
 
         var request = new CreateSpendingProfileRequest(
                 "Retirement", new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), tiers);
+                tiers);
 
         var result = service.createProfile(tenantId, request);
 
@@ -219,7 +191,7 @@ class SpendingProfileServiceTest {
 
         var request = new CreateSpendingProfileRequest(
                 "Simple", new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), null);
+                null);
 
         var result = service.createProfile(tenantId, request);
 
@@ -234,7 +206,7 @@ class SpendingProfileServiceTest {
 
         var request = new CreateSpendingProfileRequest(
                 "Simple", new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), List.of());
+                List.of());
 
         var result = service.createProfile(tenantId, request);
 
@@ -243,8 +215,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void updateProfile_withSpendingTiers_updatesTiers() {
-        var entity = new SpendingProfileEntity(
-                tenant, "Old", new BigDecimal("30000"), new BigDecimal("10000"), "[]", "[]");
+        var entity = new SpendingProfileEntity(tenant,"Old", new BigDecimal("30000"), new BigDecimal("10000"), "[]");
         when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
                 .thenReturn(Optional.of(entity));
         when(profileRepository.save(any(SpendingProfileEntity.class)))
@@ -256,7 +227,7 @@ class SpendingProfileServiceTest {
 
         var request = new UpdateSpendingProfileRequest(
                 "Updated", new BigDecimal("45000"), new BigDecimal("25000"),
-                List.of(), tiers);
+                tiers);
 
         var result = service.updateProfile(tenantId, profileId, request);
 
@@ -278,33 +249,11 @@ class SpendingProfileServiceTest {
 
         var request = new CreateSpendingProfileRequest(
                 "Open-ended", new BigDecimal("40000"), new BigDecimal("20000"),
-                List.of(), tiers);
+                tiers);
 
         var result = service.createProfile(tenantId, request);
 
         assertThat(result.spendingTiers()).hasSize(1);
         assertThat(result.spendingTiers().getFirst().endAge()).isNull();
-    }
-
-    @Test
-    void createProfile_withTiersAndIncomeStreams_serializesBoth() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
-        when(profileRepository.save(any(SpendingProfileEntity.class)))
-                .thenAnswer(inv -> inv.getArgument(0));
-
-        var tiers = List.of(
-                new SpendingTierRequest("Active", 70, 80,
-                        new BigDecimal("200000"), new BigDecimal("74000")));
-        var streams = List.of(
-                new IncomeStreamRequest("Social Security", new BigDecimal("24000"), 67, null, null, null));
-
-        var request = new CreateSpendingProfileRequest(
-                "Full Profile", new BigDecimal("40000"), new BigDecimal("20000"),
-                streams, tiers);
-
-        var result = service.createProfile(tenantId, request);
-
-        assertThat(result.spendingTiers()).hasSize(1);
-        assertThat(result.incomeStreams()).hasSize(1);
     }
 }

@@ -23,5 +23,6 @@ public record CreateScenarioRequest(
         BigDecimal targetBracketRate,
         Integer rothConversionStartYear,
         List<CreateProjectionAccountRequest> accounts,
-        UUID spendingProfileId) {
+        UUID spendingProfileId,
+        List<ScenarioIncomeSourceInput> incomeSources) {
 }
