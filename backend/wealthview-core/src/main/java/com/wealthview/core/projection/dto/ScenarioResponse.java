@@ -15,6 +15,7 @@ public record ScenarioResponse(
         String paramsJson,
         List<ProjectionAccountResponse> accounts,
         SpendingProfileResponse spendingProfile,
+        List<ScenarioIncomeSourceResponse> incomeSources,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 }

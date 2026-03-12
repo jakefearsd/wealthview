@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
-import com.wealthview.core.projection.dto.IncomeStreamRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
@@ -45,7 +44,6 @@ public class SpendingProfileService {
                 request.name(),
                 request.essentialExpenses(),
                 request.discretionaryExpenses(),
-                serializeIncomeStreams(request.incomeStreams()),
                 serializeSpendingTiers(request.spendingTiers()));
 
         var saved = profileRepository.save(entity);
@@ -61,7 +59,6 @@ public class SpendingProfileService {
         entity.setName(request.name());
         entity.setEssentialExpenses(request.essentialExpenses());
         entity.setDiscretionaryExpenses(request.discretionaryExpenses());
-        entity.setIncomeStreams(serializeIncomeStreams(request.incomeStreams()));
         entity.setSpendingTiers(serializeSpendingTiers(request.spendingTiers()));
         entity.setUpdatedAt(OffsetDateTime.now());
 
@@ -90,18 +87,6 @@ public class SpendingProfileService {
                 .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
         profileRepository.delete(entity);
         log.info("Spending profile {} deleted for tenant {}", profileId, tenantId);
-    }
-
-    private String serializeIncomeStreams(List<IncomeStreamRequest> streams) {
-        if (streams == null || streams.isEmpty()) {
-            return "[]";
-        }
-        try {
-            return objectMapper.writeValueAsString(streams);
-        } catch (Exception e) {
-            log.warn("Failed to serialize income streams: {}", e.getMessage());
-            return "[]";
-        }
     }
 
     private String serializeSpendingTiers(List<SpendingTierRequest> tiers) {

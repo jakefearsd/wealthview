@@ -7,6 +7,5 @@ public record CreateSpendingProfileRequest(
         String name,
         BigDecimal essentialExpenses,
         BigDecimal discretionaryExpenses,
-        List<IncomeStreamRequest> incomeStreams,
         List<SpendingTierRequest> spendingTiers) {
 }

@@ -92,6 +92,10 @@ public class IncomeSourceService {
         var entity = incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId)
                 .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
 
+        if (request.incomeType() != null) {
+            validateIncomeType(request.incomeType());
+            entity.setIncomeType(request.incomeType());
+        }
         validateTaxTreatment(request.taxTreatment());
 
         entity.setName(request.name());

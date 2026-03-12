@@ -7,6 +7,24 @@ export interface ProjectionAccount {
     account_type: string;
 }
 
+export interface ScenarioIncomeSourceInput {
+    income_source_id: string;
+    override_annual_amount: number | null;
+}
+
+export interface ScenarioIncomeSourceResponse {
+    income_source_id: string;
+    name: string;
+    income_type: string;
+    annual_amount: number;
+    override_annual_amount: number | null;
+    effective_amount: number;
+    start_age: number;
+    end_age: number | null;
+    inflation_rate: number;
+    one_time: boolean;
+}
+
 export interface Scenario {
     id: string;
     name: string;
@@ -16,6 +34,7 @@ export interface Scenario {
     params_json: string | null;
     accounts: ProjectionAccount[];
     spending_profile: SpendingProfile | null;
+    income_sources: ScenarioIncomeSourceResponse[];
     created_at: string;
     updated_at: string;
 }
@@ -96,18 +115,10 @@ export interface CreateScenarioRequest {
     roth_conversion_start_year?: number | null;
     spending_profile_id?: string | null;
     accounts: ScenarioAccountInput[];
+    income_sources?: ScenarioIncomeSourceInput[];
 }
 
 export interface UpdateScenarioRequest extends CreateScenarioRequest {}
-
-export interface IncomeStream {
-    name: string;
-    annual_amount: number;
-    start_age: number;
-    end_age: number | null;
-    inflation_rate?: number;
-    one_time?: boolean;
-}
 
 export interface SpendingTier {
     name: string;
@@ -122,7 +133,6 @@ export interface SpendingProfile {
     name: string;
     essential_expenses: number;
     discretionary_expenses: number;
-    income_streams: IncomeStream[];
     spending_tiers: SpendingTier[];
     created_at: string;
     updated_at: string;
@@ -132,7 +142,6 @@ export interface CreateSpendingProfileRequest {
     name: string;
     essential_expenses: number;
     discretionary_expenses: number;
-    income_streams: IncomeStream[];
     spending_tiers: SpendingTier[];
 }
 
@@ -181,6 +190,7 @@ export interface CreateIncomeSourceRequest {
 
 export interface UpdateIncomeSourceRequest {
     name: string;
+    income_type: string;
     annual_amount: number;
     start_age: number;
     end_age: number | null;

@@ -16,7 +16,19 @@
   "spendingProfile": {
     "essentialExpenses": "50000",
     "discretionaryExpenses": "25000",
-    "incomeStreams": "[{\"name\":\"Social Security\",\"annualAmount\":30000,\"startAge\":67,\"endAge\":null,\"inflationRate\":0.02}]",
     "spendingTiers": "[{\"name\":\"Go-Go\",\"startAge\":65,\"endAge\":75,\"essentialExpenses\":120000,\"discretionaryExpenses\":60000},{\"name\":\"Slow-Go\",\"startAge\":75,\"endAge\":85,\"essentialExpenses\":80000,\"discretionaryExpenses\":30000},{\"name\":\"No-Go\",\"startAge\":85,\"endAge\":null,\"essentialExpenses\":60000,\"discretionaryExpenses\":10000}]"
-  }
+  },
+  "incomeSources": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "name": "Social Security",
+      "incomeType": "other",
+      "annualAmount": "30000",
+      "startAge": 67,
+      "endAge": null,
+      "inflationRate": "0.02",
+      "oneTime": false,
+      "taxTreatment": "taxable"
+    }
+  ]
 }

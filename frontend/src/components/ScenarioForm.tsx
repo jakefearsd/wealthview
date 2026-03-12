@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
+import { listIncomeSources } from '../api/incomeSources';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import HelpText from './HelpText';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
 import type { Account } from '../types/account';
-import type { Scenario, CreateScenarioRequest, ScenarioAccountInput } from '../types/projection';
+import type { Scenario, CreateScenarioRequest, ScenarioAccountInput, ScenarioIncomeSourceInput } from '../types/projection';
 import { inputStyle, labelStyle } from '../utils/styles';
 
 const ACCOUNT_TYPE_HELP: Record<string, string> = {
@@ -43,6 +44,7 @@ function mapAccountType(realType: string): string {
 export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: ScenarioFormProps) {
     const { data: profiles } = useApiQuery(listSpendingProfiles);
     const { data: accountsPage } = useApiQuery(() => listAccounts(0, 100));
+    const { data: availableIncomeSources } = useApiQuery(listIncomeSources);
     const existingAccounts: Account[] = accountsPage?.data ?? [];
 
     const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
@@ -72,6 +74,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             expected_return: a.expected_return,
             account_type: a.account_type || 'taxable',
         })) ?? [defaultAccount()]
+    );
+    const [selectedIncomeSources, setSelectedIncomeSources] = useState<ScenarioIncomeSourceInput[]>(
+        initialValues?.income_sources?.map(is => ({
+            income_source_id: is.income_source_id,
+            override_annual_amount: is.override_annual_amount,
+        })) ?? []
     );
     const [saving, setSaving] = useState(false);
 
@@ -125,6 +133,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 roth_conversion_start_year: rothConversionStartYear || null,
                 spending_profile_id: spendingProfileId || null,
                 accounts,
+                income_sources: selectedIncomeSources,
             };
             await onSubmit(request);
         } finally {
@@ -174,6 +183,59 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                     <HelpText>Optional. When linked, your spending plan drives portfolio withdrawals — the projection withdraws what you need each year (adjusted for inflation and age-based tiers), minus non-portfolio income.</HelpText>
                 </div>
             </div>
+
+            {availableIncomeSources && availableIncomeSources.length > 0 && (
+                <div style={{ marginBottom: '1rem' }}>
+                    <h4 style={{ marginBottom: '0.5rem' }}>Income Sources</h4>
+                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.75rem' }}>
+                        Select income sources (Social Security, pensions, rental income, etc.) to include in this projection. You can optionally override the annual amount per scenario.
+                    </div>
+                    {availableIncomeSources.map(is => {
+                        const selected = selectedIncomeSources.find(s => s.income_source_id === is.id);
+                        return (
+                            <div key={is.id} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={!!selected}
+                                        onChange={e => {
+                                            if (e.target.checked) {
+                                                setSelectedIncomeSources(prev => [...prev, { income_source_id: is.id, override_annual_amount: null }]);
+                                            } else {
+                                                setSelectedIncomeSources(prev => prev.filter(s => s.income_source_id !== is.id));
+                                            }
+                                        }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <strong>{is.name}</strong>
+                                        <span style={{ color: '#666', marginLeft: '0.5rem', fontSize: '0.85rem' }}>
+                                            ({is.income_type.replace(/_/g, ' ')}) — {formatCurrency(is.annual_amount)}/yr
+                                        </span>
+                                    </div>
+                                    {selected && (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <label style={{ fontSize: '0.85rem', color: '#666' }}>Override:</label>
+                                            <input
+                                                style={{ ...inputStyle, width: '140px' }}
+                                                type="text"
+                                                inputMode="decimal"
+                                                placeholder="Use default"
+                                                value={selected.override_annual_amount != null ? formatCurrencyInput(selected.override_annual_amount) : ''}
+                                                onChange={e => {
+                                                    const val = e.target.value ? Number(parseCurrencyInput(e.target.value)) || null : null;
+                                                    setSelectedIncomeSources(prev => prev.map(s =>
+                                                        s.income_source_id === is.id ? { ...s, override_annual_amount: val } : s
+                                                    ));
+                                                }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <WithdrawalStrategySection
                 withdrawalStrategy={withdrawalStrategy}

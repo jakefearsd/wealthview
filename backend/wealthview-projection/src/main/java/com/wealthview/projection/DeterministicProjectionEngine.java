@@ -45,6 +45,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final FederalTaxCalculator taxCalculator;
     private final IncomeSourceProcessor incomeSourceProcessor;
+    private final IncomeContributionCalculator incomeContributionCalculator;
 
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator) {
         this.taxCalculator = taxCalculator;
@@ -53,6 +54,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
         this.incomeSourceProcessor = new IncomeSourceProcessor(
                 rentalLossCalculator, ssTaxCalculator, seTaxCalculator);
+        this.incomeContributionCalculator = new IncomeContributionCalculator();
     }
 
     @Override
@@ -149,17 +151,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
 
             IncomeSourceProcessor.IncomeSourceYearResult isResult = null;
-            BigDecimal activeIncome = computeActiveIncome(spendingData, age, yearsInRetirement);
-            BigDecimal incomeSourceCash = BigDecimal.ZERO;
+            BigDecimal totalActiveIncome = BigDecimal.ZERO;
 
             if (pool.processIncomeSourcesEveryYear() || retired) {
                 isResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
                         year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
                 suspendedLoss = isResult.suspendedLossCarryforward();
-                incomeSourceCash = isResult.totalCashInflow();
+                totalActiveIncome = isResult.totalCashInflow();
+            } else {
+                totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
             }
 
-            BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(activeIncome, incomeSourceCash);
+            BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(totalActiveIncome, BigDecimal.ZERO);
 
             var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
             conversionAmount = conversion.amountConverted();
@@ -168,7 +171,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (retired) {
                 BigDecimal aggBalance = pool.getTotal();
                 BigDecimal portfolioNeed;
-                BigDecimal totalActiveIncome = activeIncome.add(incomeSourceCash);
 
                 if (spendingData != null) {
                     BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
@@ -197,7 +199,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
-            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate);
+            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate, incomeSources);
             if (isResult != null) {
                 yearDto = applyIncomeSourceFields(yearDto, isResult);
             }
@@ -333,14 +335,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             Integer rothConversionStartYear) {
     }
 
-    private record IncomeStreamData(
-            String name,
-            BigDecimal annualAmount,
-            int startAge,
-            Integer endAge,
-            BigDecimal inflationRate) {
-    }
-
     private record SpendingTierData(
             String name,
             int startAge,
@@ -352,7 +346,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private record SpendingData(
             BigDecimal essentialExpenses,
             BigDecimal discretionaryExpenses,
-            List<IncomeStreamData> incomeStreams,
             List<SpendingTierData> spendingTiers) {
     }
 
@@ -420,26 +413,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         if (profile == null) {
             return null;
         }
-        List<IncomeStreamData> streams = List.of();
-        try {
-            if (profile.incomeStreams() != null && !profile.incomeStreams().isBlank()
-                    && !"[]".equals(profile.incomeStreams().trim())) {
-                var node = objectMapper.readTree(profile.incomeStreams());
-                var list = new ArrayList<IncomeStreamData>();
-                for (var item : node) {
-                    var amount = getDecimal(item, "annualAmount", "annual_amount", BigDecimal.ZERO);
-                    int startAge = getInt(item, "startAge", "start_age", 0);
-                    Integer endAge = getOptionalInt(item, "endAge", "end_age");
-                    var inflRate = getDecimal(item, "inflationRate", "inflation_rate", BigDecimal.ZERO);
-                    list.add(new IncomeStreamData(
-                            getString(item, "name", ""),
-                            amount, startAge, endAge, inflRate));
-                }
-                streams = list;
-            }
-        } catch (Exception e) {
-            log.warn("Failed to parse income_streams: {}", e.getMessage());
-        }
         List<SpendingTierData> tiers = List.of();
         try {
             if (profile.spendingTiers() != null && !profile.spendingTiers().isBlank()
@@ -461,8 +434,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             log.warn("Failed to parse spending_tiers: {}", e.getMessage());
         }
 
-        return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(),
-                streams, tiers);
+        return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(), tiers);
     }
 
     private SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
@@ -535,7 +507,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
-                                              int age, int yearsInRetirement, BigDecimal inflationRate) {
+                                              int age, int yearsInRetirement, BigDecimal inflationRate,
+                                              List<ProjectionIncomeSourceInput> incomeSources) {
         if (spending == null || !base.retired()) {
             return base;
         }
@@ -546,7 +519,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
         BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
 
-        BigDecimal activeIncome = computeActiveIncome(spending, age, yearsInRetirement);
+        BigDecimal activeIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
 
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
         BigDecimal surplus = base.withdrawals().subtract(netNeed);
@@ -572,9 +545,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
         if (isResult == null) return base;
 
-        // Merge income source cash into incomeStreamsTotal
-        BigDecimal existingIncome = base.incomeStreamsTotal() != null ? base.incomeStreamsTotal() : BigDecimal.ZERO;
-        BigDecimal totalIncome = existingIncome.add(isResult.totalCashInflow());
+        BigDecimal totalIncome = isResult.totalCashInflow();
 
         return new ProjectionYearDto(
                 base.year(), base.age(), base.startBalance(), base.contributions(),
@@ -613,23 +584,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
         BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
         return essential.add(discretionary);
-    }
-
-    private BigDecimal computeActiveIncome(SpendingData spendingData, int age, int yearsInRetirement) {
-        if (spendingData == null || spendingData.incomeStreams().isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal activeIncome = BigDecimal.ZERO;
-        for (var stream : spendingData.incomeStreams()) {
-            if (age >= stream.startAge() && (stream.endAge() == null || age < stream.endAge())) {
-                BigDecimal factor = yearsInRetirement > 1
-                        ? BigDecimal.ONE.add(stream.inflationRate()).pow(yearsInRetirement - 1)
-                        : BigDecimal.ONE;
-                activeIncome = activeIncome.add(
-                        stream.annualAmount().multiply(factor).setScale(SCALE, ROUNDING));
-            }
-        }
-        return activeIncome;
     }
 
 }

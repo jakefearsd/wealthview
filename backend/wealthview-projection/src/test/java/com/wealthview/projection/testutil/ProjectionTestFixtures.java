@@ -2,10 +2,10 @@ package com.wealthview.projection.testutil;
 
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import com.wealthview.core.testutil.TaxBracketFixtures;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.DeterministicProjectionEngine;
@@ -29,18 +29,37 @@ public final class ProjectionTestFixtures {
         return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), type);
     }
 
+    public static ProjectionIncomeSourceInput incomeSource(String name, String amount,
+                                                            int startAge, Integer endAge,
+                                                            String inflationRate) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), name, "other",
+                bd(amount), startAge, endAge, bd(inflationRate), false,
+                "taxable",
+                null, null, null, null, null);
+    }
+
     public static ProjectionInput createInput(LocalDate retDate, int endAge,
                                                BigDecimal inflation, String paramsJson,
                                                List<ProjectionAccountInput> accounts) {
-        return createInput(retDate, endAge, inflation, paramsJson, accounts, null);
+        return createInput(retDate, endAge, inflation, paramsJson, accounts, null, List.of());
     }
 
     public static ProjectionInput createInput(LocalDate retDate, int endAge,
                                                BigDecimal inflation, String paramsJson,
                                                List<ProjectionAccountInput> accounts,
                                                SpendingProfileInput spendingProfile) {
+        return createInput(retDate, endAge, inflation, paramsJson, accounts, spendingProfile, List.of());
+    }
+
+    public static ProjectionInput createInput(LocalDate retDate, int endAge,
+                                               BigDecimal inflation, String paramsJson,
+                                               List<ProjectionAccountInput> accounts,
+                                               SpendingProfileInput spendingProfile,
+                                               List<ProjectionIncomeSourceInput> incomeSources) {
         return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
-                retDate, endAge, inflation, paramsJson, accounts, spendingProfile);
+                retDate, endAge, inflation, paramsJson, accounts, spendingProfile,
+                null, incomeSources);
     }
 
     public static ProjectionInput createRetiredInput(String paramsJson,
