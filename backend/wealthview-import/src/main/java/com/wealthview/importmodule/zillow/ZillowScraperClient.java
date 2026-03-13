@@ -8,6 +8,7 @@ import org.jsoup.nodes.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -59,7 +60,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
                     .get();
 
             return extractZestimate(doc);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("Failed to fetch Zillow valuation for address '{}': {}", address, e.getMessage());
             return Optional.empty();
         }
@@ -77,7 +78,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
                     .get();
 
             return extractZestimate(doc);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("Failed to fetch Zillow valuation for zpid '{}': {}", zpid, e.getMessage());
             return Optional.empty();
         }
@@ -95,7 +96,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
                     .get();
 
             return extractSearchResults(doc);
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.warn("Failed to search Zillow for address '{}': {}", address, e.getMessage());
             return Collections.emptyList();
         }

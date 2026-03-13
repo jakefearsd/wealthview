@@ -1,5 +1,6 @@
 package com.wealthview.core.projection;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
@@ -95,7 +96,7 @@ public class SpendingProfileService {
         }
         try {
             return objectMapper.writeValueAsString(tiers);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
             log.warn("Failed to serialize spending tiers: {}", e.getMessage());
             return "[]";
         }

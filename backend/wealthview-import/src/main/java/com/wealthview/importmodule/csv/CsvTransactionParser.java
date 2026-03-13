@@ -92,7 +92,7 @@ public class CsvTransactionParser implements CsvParser {
                     var parsedSymbol = (symbol != null && !symbol.isBlank()) ? symbol : null;
                     transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, amount));
 
-                } catch (Exception e) {
+                } catch (DateTimeParseException | IllegalArgumentException e) {
                     errors.add(new CsvRowError(rowNum, "Error parsing row: " + e.getMessage()));
                 }
             }

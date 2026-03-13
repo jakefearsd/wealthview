@@ -32,6 +32,7 @@ public class PropertyValuationSyncService {
         this.valuationService = valuationService;
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-property resilience
     @Scheduled(cron = "${app.zillow.sync-cron:0 0 6 * * SUN}")
     public void syncAll() {
         long startTime = System.currentTimeMillis();

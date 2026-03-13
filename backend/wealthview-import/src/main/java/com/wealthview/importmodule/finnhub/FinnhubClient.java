@@ -7,6 +7,7 @@ import com.wealthview.core.pricefeed.dto.QuoteResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -43,7 +44,7 @@ public class FinnhubClient implements PriceFeedClient {
             }
 
             return Optional.of(new QuoteResponse(symbol, dto.c()));
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.warn("Failed to fetch quote for symbol {}: {}", symbol, e.getMessage());
             return Optional.empty();
         }
@@ -75,7 +76,7 @@ public class FinnhubClient implements PriceFeedClient {
             }
 
             return Optional.of(new CandleResponse(symbol, entries));
-        } catch (Exception e) {
+        } catch (RestClientException e) {
             log.warn("Failed to fetch candles for symbol {}: {}", symbol, e.getMessage());
             return Optional.empty();
         }

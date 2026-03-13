@@ -39,6 +39,7 @@ public class FidelityPositionsCsvParser implements CsvParser {
         return parse(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public CsvParseResult parse(Reader reader) throws IOException {
         var buffered = new BufferedReader(reader);
         var lines = readAllLines(buffered);
