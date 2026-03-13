@@ -95,6 +95,24 @@ class DeterministicProjectionEngineTest {
     }
 
     @Test
+    void run_withMalformedNumericInParamsJson_usesDefaults() {
+        var input = createInput(
+                LocalDate.now().minusYears(1), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": "abc"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("1000000.0000", "0", "0.0500")));
+
+        var result = engine.run(input);
+
+        assertThat(result.yearlyData()).isNotEmpty();
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.retired()).isTrue();
+        // Default withdrawal rate is 0.04, so withdrawal should be 4% of 1,000,000 = 40,000
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40000.0000"));
+    }
+
+    @Test
     void run_multipleAccounts_aggregatesCorrectly() {
         var input = createInput(
                 LocalDate.now().plusYears(20), 80, bd("0.0200"),

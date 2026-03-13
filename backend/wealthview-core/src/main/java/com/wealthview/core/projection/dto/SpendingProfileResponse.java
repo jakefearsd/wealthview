@@ -1,8 +1,11 @@
 package com.wealthview.core.projection.dto;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -18,6 +21,7 @@ public record SpendingProfileResponse(
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {
 
+    private static final Logger log = LoggerFactory.getLogger(SpendingProfileResponse.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     public static SpendingProfileResponse from(SpendingProfileEntity entity) {
@@ -27,8 +31,8 @@ public record SpendingProfileResponse(
                 tiers = MAPPER.readValue(entity.getSpendingTiers(),
                         new TypeReference<List<SpendingTierResponse>>() {});
             }
-        } catch (Exception e) {
-            // fall through with empty list
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to parse spending tiers JSON: {}", e.getMessage());
         }
 
         return new SpendingProfileResponse(
