@@ -355,7 +355,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion,
                     withdrawalOrder, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear);
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | NumberFormatException e) {
             log.warn("Failed to parse params_json: {}", e.getMessage());
             return new ScenarioParams(null, null, null, null, null, null, null, null,
                     WithdrawalOrder.TAXABLE_FIRST, null, null, null);
