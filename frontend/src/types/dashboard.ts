@@ -32,3 +32,19 @@ export interface CombinedPortfolioHistory {
     investment_account_count: number;
     property_count: number;
 }
+
+export interface SnapshotProjectionDataPoint {
+    year: number;
+    date: string;
+    total_value: number;
+    investment_value: number;
+    property_equity: number;
+}
+
+export interface SnapshotProjection {
+    data_points: SnapshotProjectionDataPoint[];
+    projection_years: number;
+    investment_account_count: number;
+    property_count: number;
+    portfolio_cagr: number;
+}
