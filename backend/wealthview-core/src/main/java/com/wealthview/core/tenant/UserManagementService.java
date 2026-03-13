@@ -1,7 +1,6 @@
 package com.wealthview.core.tenant;
 
 import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.exception.TenantAccessDeniedException;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.UserRepository;
 import org.slf4j.Logger;

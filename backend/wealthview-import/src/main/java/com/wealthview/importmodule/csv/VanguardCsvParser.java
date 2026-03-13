@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component("vanguardCsvParser")
@@ -82,8 +83,10 @@ public class VanguardCsvParser extends AbstractBrokerCsvParser {
     }
 
     String mapAction(String transactionType) {
-        if (transactionType == null) return null;
-        var upper = transactionType.trim().toUpperCase();
+        if (transactionType == null) {
+            return null;
+        }
+        var upper = transactionType.trim().toUpperCase(Locale.US);
         return ACTION_MAP.get(upper);
     }
 }

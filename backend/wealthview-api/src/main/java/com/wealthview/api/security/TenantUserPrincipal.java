@@ -7,6 +7,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 public record TenantUserPrincipal(
@@ -18,7 +19,7 @@ public record TenantUserPrincipal(
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase(Locale.US)));
     }
 
     @Override

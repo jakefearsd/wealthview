@@ -18,8 +18,12 @@ class IncomeContributionCalculator {
 
         BigDecimal total = BigDecimal.ZERO;
         for (var source : sources) {
-            if (age < source.startAge()) continue;
-            if (source.endAge() != null && age >= source.endAge()) continue;
+            if (age < source.startAge()) {
+                continue;
+            }
+            if (source.endAge() != null && age >= source.endAge()) {
+                continue;
+            }
 
             BigDecimal amount;
             if (source.oneTime() || yearsInRetirement <= 1

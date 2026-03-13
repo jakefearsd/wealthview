@@ -3,7 +3,6 @@ package com.wealthview.core.dashboard;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionDataPointDto;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionResponse;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
-import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;

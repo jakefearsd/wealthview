@@ -9,6 +9,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -365,7 +366,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public String getFilingStatusString() {
-            return filingStatus.name().toLowerCase();
+            return filingStatus.name().toLowerCase(Locale.US);
         }
 
         @Override

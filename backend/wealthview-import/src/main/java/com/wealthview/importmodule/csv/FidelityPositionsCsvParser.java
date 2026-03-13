@@ -137,13 +137,13 @@ public class FidelityPositionsCsvParser implements CsvParser {
             if (!foundHeader) {
                 if (line.startsWith(HEADER_MARKER)) {
                     foundHeader = true;
-                    sb.append(line).append("\n");
+                    sb.append(line).append('\n');
                 }
             } else {
                 if (line.isBlank()) {
                     break;
                 }
-                sb.append(line).append("\n");
+                sb.append(line).append('\n');
             }
         }
 

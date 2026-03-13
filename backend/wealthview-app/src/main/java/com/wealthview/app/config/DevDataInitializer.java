@@ -10,7 +10,6 @@ import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.AccountRepository;
-import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
@@ -96,9 +95,8 @@ public class DevDataInitializer implements ApplicationRunner {
                 passwordEncoder.encode("demo123"), "admin");
         demoAdmin = userRepository.save(demoAdmin);
 
-        var demoMember = new UserEntity(demoTenant, "demo-member@wealthview.local",
-                passwordEncoder.encode("demo123"), "member");
-        demoMember = userRepository.save(demoMember);
+        userRepository.save(new UserEntity(demoTenant, "demo-member@wealthview.local",
+                passwordEncoder.encode("demo123"), "member"));
 
         // Invite code
         inviteCodeRepository.save(new InviteCodeEntity(demoTenant, "DEMO1234", demoAdmin,

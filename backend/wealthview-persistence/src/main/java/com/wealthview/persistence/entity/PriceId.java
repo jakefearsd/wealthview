@@ -19,8 +19,12 @@ public class PriceId implements Serializable {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         PriceId priceId = (PriceId) o;
         return Objects.equals(symbol, priceId.symbol) && Objects.equals(date, priceId.date);
     }

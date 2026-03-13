@@ -585,7 +585,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
-        if (isResult == null) return base;
+        if (isResult == null) {
+            return base;
+        }
 
         BigDecimal totalIncome = isResult.totalCashInflow();
 

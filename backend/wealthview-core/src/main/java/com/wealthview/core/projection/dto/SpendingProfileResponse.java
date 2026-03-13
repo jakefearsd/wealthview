@@ -29,7 +29,7 @@ public record SpendingProfileResponse(
         try {
             if (entity.getSpendingTiers() != null && !entity.getSpendingTiers().isBlank()) {
                 tiers = MAPPER.readValue(entity.getSpendingTiers(),
-                        new TypeReference<List<SpendingTierResponse>>() {});
+                        new TypeReference<>() {});
             }
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse spending tiers JSON: {}", e.getMessage());

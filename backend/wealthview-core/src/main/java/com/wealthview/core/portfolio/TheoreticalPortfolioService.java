@@ -1,7 +1,6 @@
 package com.wealthview.core.portfolio;
 
 import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.holding.MoneyMarketDetector;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import com.wealthview.persistence.entity.HoldingEntity;

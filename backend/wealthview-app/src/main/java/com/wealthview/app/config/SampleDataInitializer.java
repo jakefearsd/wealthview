@@ -102,7 +102,7 @@ public class SampleDataInitializer implements ApplicationRunner {
                 new BigDecimal("25"), new BigDecimal("3875.00")));
         transactionRepository.save(new TransactionEntity(account, tenant,
                 LocalDate.of(2024, 1, 10), "buy", "AAPL",
-                new BigDecimal("10"), new BigDecimal("1850.00")));
+                BigDecimal.TEN, new BigDecimal("1850.00")));
 
         // Buy NVDA
         transactionRepository.save(new TransactionEntity(account, tenant,
@@ -123,7 +123,7 @@ public class SampleDataInitializer implements ApplicationRunner {
                 new BigDecimal("20"), new BigDecimal("7200.00")));
         transactionRepository.save(new TransactionEntity(account, tenant,
                 LocalDate.of(2024, 4, 15), "buy", "VOO",
-                new BigDecimal("10"), new BigDecimal("4950.00")));
+                BigDecimal.TEN, new BigDecimal("4950.00")));
 
         // Sell some GOOG
         transactionRepository.save(new TransactionEntity(account, tenant,

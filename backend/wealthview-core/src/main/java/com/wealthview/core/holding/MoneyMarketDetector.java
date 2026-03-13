@@ -1,6 +1,7 @@
 package com.wealthview.core.holding;
 
 import java.math.BigDecimal;
+import java.util.Locale;
 import java.util.Set;
 
 public final class MoneyMarketDetector {
@@ -15,7 +16,7 @@ public final class MoneyMarketDetector {
     }
 
     public static boolean isMoneyMarket(String symbol) {
-        return symbol != null && KNOWN_SYMBOLS.contains(symbol.toUpperCase());
+        return symbol != null && KNOWN_SYMBOLS.contains(symbol.toUpperCase(Locale.US));
     }
 
     public static BigDecimal defaultRate() {

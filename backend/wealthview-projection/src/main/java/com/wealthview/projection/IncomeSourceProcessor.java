@@ -67,7 +67,9 @@ class IncomeSourceProcessor {
         BigDecimal ssBenefit = BigDecimal.ZERO;
 
         for (var source : sources) {
-            if (!isActiveForAge(source, age)) continue;
+            if (!isActiveForAge(source, age)) {
+                continue;
+            }
 
             BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
             if ("social_security".equals(source.incomeType())) {
@@ -78,7 +80,9 @@ class IncomeSourceProcessor {
         }
 
         for (var source : sources) {
-            if (!isActiveForAge(source, age)) continue;
+            if (!isActiveForAge(source, age)) {
+                continue;
+            }
 
             BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
 
@@ -164,9 +168,10 @@ class IncomeSourceProcessor {
     }
 
     boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
-        if (age < source.startAge()) return false;
-        if (source.endAge() != null && age >= source.endAge()) return false;
-        return true;
+        if (age < source.startAge()) {
+            return false;
+        }
+        return source.endAge() == null || age < source.endAge();
     }
 
     BigDecimal computeNominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {

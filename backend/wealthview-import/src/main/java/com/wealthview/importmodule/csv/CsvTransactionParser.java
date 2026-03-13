@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.Set;
 
 @Component
@@ -47,7 +48,7 @@ public class CsvTransactionParser implements CsvParser {
                 rowNum++;
                 try {
                     var dateStr = record.get("date");
-                    var type = record.get("type").toLowerCase();
+                    var type = record.get("type").toLowerCase(Locale.US);
                     var symbol = record.get("symbol");
                     var quantityStr = record.get("quantity");
                     var amountStr = record.get("amount");
