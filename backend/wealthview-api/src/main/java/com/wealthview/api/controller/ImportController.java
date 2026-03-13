@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.importservice.ImportService;
+import com.wealthview.core.importservice.PositionImportService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -22,9 +23,12 @@ import java.util.UUID;
 public class ImportController {
 
     private final ImportService importService;
+    private final PositionImportService positionImportService;
 
-    public ImportController(ImportService importService) {
+    public ImportController(ImportService importService,
+                            PositionImportService positionImportService) {
         this.importService = importService;
+        this.positionImportService = positionImportService;
     }
 
     @PostMapping("/csv")
@@ -45,7 +49,7 @@ public class ImportController {
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String format) throws IOException {
-        var result = importService.importPositions(
+        var result = positionImportService.importPositions(
                 principal.tenantId(), accountId, file.getInputStream(),
                 format != null ? format : "fidelityPositions");
         return ResponseEntity.status(HttpStatus.CREATED).body(result);

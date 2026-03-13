@@ -8,26 +8,17 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.LinkedAccountInput;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
 import com.wealthview.core.projection.dto.ScenarioResponse;
-import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
-import com.wealthview.core.property.DepreciationCalculator;
-import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
-import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
@@ -39,9 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -56,9 +45,8 @@ public class ProjectionService {
     private final ProjectionEngine projectionEngine;
     private final AccountService accountService;
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
-    private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
-    private final DepreciationCalculator depreciationCalculator;
     private final IncomeSourceRepository incomeSourceRepository;
+    private final ProjectionInputBuilder projectionInputBuilder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
@@ -68,9 +56,8 @@ public class ProjectionService {
                              ProjectionEngine projectionEngine,
                              AccountService accountService,
                              ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
-                             PropertyDepreciationScheduleRepository depreciationScheduleRepository,
-                             DepreciationCalculator depreciationCalculator,
-                             IncomeSourceRepository incomeSourceRepository) {
+                             IncomeSourceRepository incomeSourceRepository,
+                             ProjectionInputBuilder projectionInputBuilder) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
@@ -78,9 +65,8 @@ public class ProjectionService {
         this.projectionEngine = projectionEngine;
         this.accountService = accountService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
-        this.depreciationScheduleRepository = depreciationScheduleRepository;
-        this.depreciationCalculator = depreciationCalculator;
         this.incomeSourceRepository = incomeSourceRepository;
+        this.projectionInputBuilder = projectionInputBuilder;
     }
 
     @Transactional
@@ -210,7 +196,7 @@ public class ProjectionService {
         for (var scenarioId : request.scenarioIds()) {
             var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                     .orElseThrow(() -> new EntityNotFoundException("Scenario not found: " + scenarioId));
-            results.add(projectionEngine.run(toProjectionInput(scenario, tenantId)));
+            results.add(projectionEngine.run(projectionInputBuilder.build(scenario, tenantId)));
         }
         return new CompareResponse(results);
     }
@@ -220,92 +206,7 @@ public class ProjectionService {
         log.info("Running projection for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
-        return projectionEngine.run(toProjectionInput(scenario, tenantId));
-    }
-
-    private ProjectionInput toProjectionInput(ProjectionScenarioEntity scenario, UUID tenantId) {
-        var accounts = resolveAccounts(scenario, tenantId);
-        var spendingProfile = scenario.getSpendingProfile() != null
-                ? new SpendingProfileInput(
-                        scenario.getSpendingProfile().getEssentialExpenses(),
-                        scenario.getSpendingProfile().getDiscretionaryExpenses(),
-                        scenario.getSpendingProfile().getSpendingTiers())
-                : null;
-        var incomeSources = resolveIncomeSources(scenario.getId());
-        return new ProjectionInput(
-                scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
-                scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, spendingProfile, null, incomeSources);
-    }
-
-    private List<ProjectionIncomeSourceInput> resolveIncomeSources(UUID scenarioId) {
-        var scenarioLinks = scenarioIncomeSourceRepository.findByScenario_Id(scenarioId);
-        if (scenarioLinks.isEmpty()) {
-            return List.of();
-        }
-        return scenarioLinks.stream()
-                .map(link -> {
-                    var source = link.getIncomeSource();
-                    var amount = link.getOverrideAnnualAmount() != null
-                            ? link.getOverrideAnnualAmount() : source.getAnnualAmount();
-                    return toIncomeSourceInput(source, amount);
-                })
-                .toList();
-    }
-
-    private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount) {
-        BigDecimal annualOpEx = null;
-        BigDecimal annualMortgageInterest = null;
-        BigDecimal annualPropertyTax = null;
-        String depreciationMethod = null;
-        Map<Integer, BigDecimal> depreciationByYear = null;
-
-        if ("rental_property".equals(source.getIncomeType()) && source.getProperty() != null) {
-            var property = source.getProperty();
-            depreciationMethod = property.getDepreciationMethod();
-
-            if ("cost_segregation".equals(depreciationMethod)) {
-                var scheduleEntries = depreciationScheduleRepository
-                        .findByProperty_IdOrderByTaxYear(property.getId());
-                depreciationByYear = new HashMap<>();
-                for (var entry : scheduleEntries) {
-                    depreciationByYear.put(entry.getTaxYear(), entry.getDepreciationAmount());
-                }
-            } else if ("straight_line".equals(depreciationMethod)
-                    && property.getInServiceDate() != null) {
-                var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
-                depreciationByYear = depreciationCalculator.computeStraightLine(
-                        property.getPurchasePrice(), landValue,
-                        property.getInServiceDate(), property.getUsefulLifeYears());
-            }
-        }
-
-        return new ProjectionIncomeSourceInput(
-                source.getId(), source.getName(), source.getIncomeType(),
-                amount, source.getStartAge(), source.getEndAge(),
-                source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
-                annualOpEx, annualMortgageInterest, annualPropertyTax,
-                depreciationMethod, depreciationByYear);
-    }
-
-    private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {
-        return scenario.getAccounts().stream()
-                .map(entity -> toAccountInput(entity, tenantId))
-                .toList();
-    }
-
-    private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId) {
-        if (entity.getLinkedAccount() != null) {
-            var liveBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
-            return new LinkedAccountInput(
-                    entity.getLinkedAccount().getId(), liveBalance,
-                    entity.getAnnualContribution(), entity.getExpectedReturn(),
-                    entity.getAccountType());
-        }
-        return new HypotheticalAccountInput(
-                entity.getInitialBalance(),
-                entity.getAnnualContribution(), entity.getExpectedReturn(),
-                entity.getAccountType());
+        return projectionEngine.run(projectionInputBuilder.build(scenario, tenantId));
     }
 
     private ScenarioResponse toScenarioResponse(ProjectionScenarioEntity scenario, UUID tenantId) {
@@ -345,7 +246,7 @@ public class ProjectionService {
     }
 
     private void saveIncomeSourceLinks(ProjectionScenarioEntity scenario, UUID tenantId,
-                                       java.util.List<com.wealthview.core.projection.dto.ScenarioIncomeSourceInput> incomeSources) {
+                                       List<com.wealthview.core.projection.dto.ScenarioIncomeSourceInput> incomeSources) {
         if (incomeSources == null) {
             return;
         }
@@ -383,10 +284,16 @@ public class ProjectionService {
     }
 
     private boolean putIfNotNull(ObjectNode node, String key, Object value) {
-        if (value == null) return false;
-        if (value instanceof Integer i) node.put(key, i);
-        else if (value instanceof BigDecimal bd) node.put(key, bd);
-        else if (value instanceof String s) node.put(key, s);
+        if (value == null) {
+            return false;
+        }
+        if (value instanceof Integer i) {
+            node.put(key, i);
+        } else if (value instanceof BigDecimal bd) {
+            node.put(key, bd);
+        } else if (value instanceof String s) {
+            node.put(key, s);
+        }
         return true;
     }
 }

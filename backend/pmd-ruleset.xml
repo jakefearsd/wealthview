@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="WealthView"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+                             https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        WealthView custom PMD ruleset. Includes the five standard categories
+        with noisy or project-incompatible rules excluded.
+    </description>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Best Practices
+         ═══════════════════════════════════════════════════════════════════ -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- SLF4J parameterised logging doesn't need guards -->
+        <exclude name="GuardLogStatement"/>
+        <!-- Descriptive names like superAdminPassword are fine -->
+        <exclude name="AvoidReassigningParameters"/>
+        <!-- Test string literals are intentionally duplicated -->
+        <exclude name="AvoidDuplicateLiterals"/>
+        <!-- Triggers on records / DTOs that are data carriers by design -->
+        <exclude name="MissingSerialVersionUID"/>
+        <!-- Package-private is intentional — no comment needed -->
+        <exclude name="LiteralsFirstInComparisons"/>
+    </rule>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Code Style
+         ═══════════════════════════════════════════════════════════════════ -->
+    <rule ref="category/java/codestyle.xml">
+        <!-- Conflicts with CLAUDE.md: var is encouraged when RHS is obvious -->
+        <exclude name="UseExplicitTypes"/>
+        <!-- Constructor-injected params and loop vars don't need final -->
+        <exclude name="MethodArgumentCouldBeFinal"/>
+        <exclude name="LocalVariableCouldBeFinal"/>
+        <!-- Descriptive names are encouraged, not penalised -->
+        <exclude name="LongVariable"/>
+        <exclude name="ShortVariable"/>
+        <!-- Test methods use underscores: method_state_expected -->
+        <exclude name="MethodNamingConventions"/>
+        <!-- Loggers as non-static final fields, Spring @Value fields, etc. -->
+        <exclude name="FieldNamingConventions"/>
+        <!-- Early returns improve readability -->
+        <exclude name="OnlyOneReturn"/>
+        <!-- Spring beans often have no explicit constructor -->
+        <exclude name="AtLeastOneConstructor"/>
+        <!-- Package-private access is intentional -->
+        <exclude name="CommentDefaultAccessModifier"/>
+        <!-- Not needed for superclass constructors -->
+        <exclude name="CallSuperInConstructor"/>
+        <!-- Ternaries are fine when simple -->
+        <exclude name="ConfusingTernary"/>
+        <!-- Underscores in small numeric literals hurt readability -->
+        <exclude name="UseUnderscoresInNumericLiterals"/>
+        <!-- Not useful with records -->
+        <exclude name="UnnecessaryModifier"/>
+    </rule>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Design
+         ═══════════════════════════════════════════════════════════════════ -->
+    <rule ref="category/java/design.xml">
+        <!-- Flags builder/fluent APIs and Spring DI chains -->
+        <exclude name="LawOfDemeter"/>
+        <!-- Records and DTOs are data classes by design -->
+        <exclude name="DataClass"/>
+        <!-- Spring controllers/services naturally have many imports -->
+        <exclude name="ExcessiveImports"/>
+        <!-- Services with full CRUD + business logic are expected -->
+        <exclude name="TooManyMethods"/>
+        <!-- Functional interfaces are fine without annotation -->
+        <exclude name="ImplicitFunctionalInterface"/>
+        <!-- Spring @Value and constructor-injected fields can't be final -->
+        <exclude name="ImmutableField"/>
+    </rule>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Error Prone
+         ═══════════════════════════════════════════════════════════════════ -->
+    <rule ref="category/java/errorprone.xml">
+        <!-- Literals like 0, 1, "" in if-conditions are clear -->
+        <exclude name="AvoidLiteralsInIfCondition"/>
+        <!-- Field/method name overlap is common (e.g. getId / id) -->
+        <exclude name="AvoidFieldNameMatchingMethodName"/>
+        <!-- Not using Java serialisation -->
+        <exclude name="MissingSerialVersionUID"/>
+        <!-- Data initializers and tests repeat literals intentionally -->
+        <exclude name="AvoidDuplicateLiterals"/>
+        <!-- Assignment in stream/lambda expressions is sometimes clearest -->
+        <exclude name="AssignmentInOperand"/>
+    </rule>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Performance
+         ═══════════════════════════════════════════════════════════════════ -->
+    <rule ref="category/java/performance.xml">
+        <!-- Creating objects in loops is often unavoidable -->
+        <exclude name="AvoidInstantiatingObjectsInLoops"/>
+        <!-- Explicit initialisation (= false, = null) aids readability -->
+        <exclude name="RedundantFieldInitializer"/>
+    </rule>
+
+</ruleset>
