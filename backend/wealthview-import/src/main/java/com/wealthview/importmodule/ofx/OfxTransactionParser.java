@@ -35,14 +35,33 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @Component("ofxParser")
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class OfxTransactionParser implements CsvParser {
 
     private static final Logger log = LoggerFactory.getLogger(OfxTransactionParser.class);
+
+    private static final Map<TransactionType, String> BANK_TXN_TYPE_MAP;
+    static {
+        var map = new EnumMap<TransactionType, String>(TransactionType.class);
+        map.put(TransactionType.CREDIT, "deposit");
+        map.put(TransactionType.DEP, "deposit");
+        map.put(TransactionType.DIRECTDEP, "deposit");
+        map.put(TransactionType.DEBIT, "withdrawal");
+        map.put(TransactionType.CHECK, "withdrawal");
+        map.put(TransactionType.PAYMENT, "withdrawal");
+        map.put(TransactionType.POS, "withdrawal");
+        map.put(TransactionType.ATM, "withdrawal");
+        map.put(TransactionType.DIRECTDEBIT, "withdrawal");
+        map.put(TransactionType.DIV, "dividend");
+        map.put(TransactionType.INT, "dividend");
+        BANK_TXN_TYPE_MAP = Map.copyOf(map);
+    }
 
     @Override
     public CsvParseResult parse(InputStream inputStream) throws IOException {
@@ -85,7 +104,6 @@ public class OfxTransactionParser implements CsvParser {
         return map;
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void extractInvestmentTransactions(ResponseEnvelope envelope,
                                                 Map<String, String> tickerMap,
                                                 List<ParsedTransaction> transactions,
@@ -102,35 +120,50 @@ public class OfxTransactionParser implements CsvParser {
             }
 
             var txnList = stmt.getInvestmentTransactionList();
+            processInvestmentTransactionList(txnList.getInvestmentTransactions(), tickerMap, transactions, errors);
+            processBankTransactionsInStatement(txnList.getBankTransactions(), transactions, errors);
+        }
+    }
 
-            if (txnList.getInvestmentTransactions() != null) {
-                int rowNum = 0;
-                for (BaseInvestmentTransaction invTxn : txnList.getInvestmentTransactions()) {
-                    rowNum++;
-                    try {
-                        var parsed = mapInvestmentTransaction(invTxn, tickerMap);
-                        if (parsed != null) {
-                            transactions.add(parsed);
-                        }
-                    } catch (Exception e) {
-                        errors.add(new CsvRowError(rowNum, "Error parsing investment transaction: " + e.getMessage()));
-                    }
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void processInvestmentTransactionList(List<BaseInvestmentTransaction> invTxns,
+                                                   Map<String, String> tickerMap,
+                                                   List<ParsedTransaction> transactions,
+                                                   List<CsvRowError> errors) {
+        if (invTxns == null) {
+            return;
+        }
+        int rowNum = 0;
+        for (BaseInvestmentTransaction invTxn : invTxns) {
+            rowNum++;
+            try {
+                var parsed = mapInvestmentTransaction(invTxn, tickerMap);
+                if (parsed != null) {
+                    transactions.add(parsed);
                 }
+            } catch (Exception e) {
+                errors.add(new CsvRowError(rowNum, "Error parsing investment transaction: " + e.getMessage()));
             }
+        }
+    }
 
-            if (txnList.getBankTransactions() != null) {
-                int rowNum = 0;
-                for (InvestmentBankTransaction bankTxn : txnList.getBankTransactions()) {
-                    rowNum++;
-                    try {
-                        var parsed = mapBankingTransaction(bankTxn.getTransaction());
-                        if (parsed != null) {
-                            transactions.add(parsed);
-                        }
-                    } catch (Exception e) {
-                        errors.add(new CsvRowError(rowNum, "Error parsing bank transaction in investment statement: " + e.getMessage()));
-                    }
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void processBankTransactionsInStatement(List<InvestmentBankTransaction> bankTxns,
+                                                     List<ParsedTransaction> transactions,
+                                                     List<CsvRowError> errors) {
+        if (bankTxns == null) {
+            return;
+        }
+        int rowNum = 0;
+        for (InvestmentBankTransaction bankTxn : bankTxns) {
+            rowNum++;
+            try {
+                var parsed = mapBankingTransaction(bankTxn.getTransaction());
+                if (parsed != null) {
+                    transactions.add(parsed);
                 }
+            } catch (Exception e) {
+                errors.add(new CsvRowError(rowNum, "Error parsing bank transaction in investment statement: " + e.getMessage()));
             }
         }
     }
@@ -244,15 +277,13 @@ public class OfxTransactionParser implements CsvParser {
     }
 
     private String mapBankTransactionType(TransactionType txnType, BigDecimal amount) {
-        if (txnType == null) {
-            return amount.signum() >= 0 ? "deposit" : "withdrawal";
+        if (txnType != null) {
+            var mapped = BANK_TXN_TYPE_MAP.get(txnType);
+            if (mapped != null) {
+                return mapped;
+            }
         }
-        return switch (txnType) {
-            case CREDIT, DEP, DIRECTDEP -> "deposit";
-            case DEBIT, CHECK, PAYMENT, POS, ATM, DIRECTDEBIT -> "withdrawal";
-            case DIV, INT -> "dividend";
-            default -> amount.signum() >= 0 ? "deposit" : "withdrawal";
-        };
+        return amount.signum() >= 0 ? "deposit" : "withdrawal";
     }
 
     private String resolveSymbol(com.webcohesion.ofx4j.domain.data.seclist.SecurityId secId,

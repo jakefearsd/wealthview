@@ -18,24 +18,27 @@ class IncomeContributionCalculator {
 
         BigDecimal total = BigDecimal.ZERO;
         for (var source : sources) {
-            if (age < source.startAge()) {
-                continue;
+            if (isActiveAtAge(source, age)) {
+                total = total.add(computeAmount(source, yearsInRetirement));
             }
-            if (source.endAge() != null && age >= source.endAge()) {
-                continue;
-            }
-
-            BigDecimal amount;
-            if (source.oneTime() || yearsInRetirement <= 1
-                    || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
-                amount = source.annualAmount();
-            } else {
-                BigDecimal factor = BigDecimal.ONE.add(source.inflationRate())
-                        .pow(yearsInRetirement - 1);
-                amount = source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
-            }
-            total = total.add(amount);
         }
         return total;
+    }
+
+    private boolean isActiveAtAge(ProjectionIncomeSourceInput source, int age) {
+        if (age < source.startAge()) {
+            return false;
+        }
+        return source.endAge() == null || age < source.endAge();
+    }
+
+    private BigDecimal computeAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
+        if (source.oneTime() || yearsInRetirement <= 1
+                || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
+            return source.annualAmount();
+        }
+        BigDecimal factor = BigDecimal.ONE.add(source.inflationRate())
+                .pow(yearsInRetirement - 1);
+        return source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
     }
 }
