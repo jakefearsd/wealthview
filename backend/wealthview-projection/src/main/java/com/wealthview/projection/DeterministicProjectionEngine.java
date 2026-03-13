@@ -226,6 +226,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal previousWithdrawal) {
     }
 
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     private RetirementWithdrawalResult processRetirementWithdrawals(
             PoolStrategy pool, WithdrawalStrategy strategy, SpendingData spendingData,
             int age, int yearsInRetirement, BigDecimal inflationRate,
@@ -472,7 +473,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 }
                 tiers = tierList;
             }
-        } catch (Exception e) {
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             log.warn("Failed to parse spending_tiers: {}", e.getMessage());
         }
 

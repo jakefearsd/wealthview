@@ -259,6 +259,7 @@ public class ProjectionService {
         }
     }
 
+    @SuppressWarnings("PMD.ExcessiveParameterList") // private helper assembling JSON from many fields
     private String buildParamsJson(Integer birthYear, BigDecimal withdrawalRate,
                                      String withdrawalStrategy, BigDecimal dynamicCeiling,
                                      BigDecimal dynamicFloor, String filingStatus,

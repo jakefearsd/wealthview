@@ -17,6 +17,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "properties")
+@SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
 public class PropertyEntity {
 
     @Id

@@ -113,6 +113,7 @@ public class ImportService {
         return ImportJobResponse.from(job);
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional catch-all so one bad row doesn't abort entire import
     private ImportResult importTransactions(List<ParsedTransaction> transactions,
                                              UUID tenantId, UUID accountId) {
         int successCount = 0;

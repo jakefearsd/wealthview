@@ -4,6 +4,7 @@ import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
+import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -38,6 +39,7 @@ public class PriceSyncService {
         this.rateLimitMs = rateLimitMs;
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyPrices() {
         long startTime = System.currentTimeMillis();
@@ -90,7 +92,7 @@ public class PriceSyncService {
         for (var entry : candles.entries()) {
             try {
                 upsertPrice(symbol, entry.date(), entry.closePrice(), SOURCE_FINNHUB);
-            } catch (Exception e) {
+            } catch (DataAccessException e) {
                 log.warn("Failed to save candle for {} on {}: {}", symbol, entry.date(), e.getMessage());
             }
         }

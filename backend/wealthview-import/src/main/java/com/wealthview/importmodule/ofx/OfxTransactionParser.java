@@ -53,7 +53,7 @@ public class OfxTransactionParser implements CsvParser {
         try {
             var unmarshaller = new AggregateUnmarshaller<>(ResponseEnvelope.class);
             envelope = unmarshaller.unmarshal(inputStream);
-        } catch (Exception e) {
+        } catch (IOException | com.webcohesion.ofx4j.io.OFXParseException e) {
             log.warn("Failed to parse OFX file: {}", e.getMessage());
             errors.add(new CsvRowError(0, "Failed to parse OFX file: " + e.getMessage()));
             return new CsvParseResult(transactions, errors);
@@ -85,6 +85,7 @@ public class OfxTransactionParser implements CsvParser {
         return map;
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void extractInvestmentTransactions(ResponseEnvelope envelope,
                                                 Map<String, String> tickerMap,
                                                 List<ParsedTransaction> transactions,
@@ -198,6 +199,7 @@ public class OfxTransactionParser implements CsvParser {
         return null;
     }
 
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void extractBankTransactions(ResponseEnvelope envelope,
                                           List<ParsedTransaction> transactions,
                                           List<CsvRowError> errors) {
