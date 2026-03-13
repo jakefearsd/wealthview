@@ -174,26 +174,67 @@ export default function PropertiesListPage() {
                 />
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
                 {properties?.map((p) => (
                     <div key={p.id} style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                         <Link to={`/properties/${p.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                            <h3 style={{ marginBottom: '0.5rem' }}>{p.address}</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', fontSize: '0.9rem' }}>
-                                <div><span style={{ color: '#666' }}>Value:</span> {formatCurrency(p.current_value)}</div>
-                                <div><span style={{ color: '#666' }}>Equity:</span> {formatCurrency(p.equity)}</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>{p.address}</h3>
+                                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <span style={{ padding: '0.2rem 0.6rem', background: p.property_type === 'investment' ? '#fff3e0' : p.property_type === 'vacation' ? '#e8f5e9' : '#e3f2fd', color: p.property_type === 'investment' ? '#e65100' : p.property_type === 'vacation' ? '#2e7d32' : '#1565c0', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600 }}>
+                                        {p.property_type === 'primary_residence' ? 'Primary' : p.property_type === 'investment' ? 'Investment' : 'Vacation'}
+                                    </span>
+                                    {p.use_computed_balance && (
+                                        <span style={{ padding: '0.2rem 0.6rem', background: '#e3f2fd', color: '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>Amortized</span>
+                                    )}
+                                </div>
                             </div>
-                            <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                                <span style={{ padding: '0.15rem 0.5rem', background: p.property_type === 'investment' ? '#fff3e0' : p.property_type === 'vacation' ? '#e8f5e9' : '#e3f2fd', color: p.property_type === 'investment' ? '#e65100' : p.property_type === 'vacation' ? '#2e7d32' : '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>
-                                    {p.property_type === 'primary_residence' ? 'Primary' : p.property_type === 'investment' ? 'Investment' : 'Vacation'}
-                                </span>
-                                {p.use_computed_balance && (
-                                    <span style={{ padding: '0.15rem 0.5rem', background: '#e3f2fd', color: '#1565c0', borderRadius: '4px', fontSize: '0.75rem' }}>Computed Balance</span>
-                                )}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Current Value</div>
+                                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1b5e20' }}>{formatCurrency(p.current_value)}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Equity</div>
+                                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1565c0' }}>{formatCurrency(p.equity)}</div>
+                                </div>
                             </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Purchase Price</div>
+                                    <div style={{ color: '#444' }}>{formatCurrency(p.purchase_price)}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Mortgage Balance</div>
+                                    <div style={{ color: '#444' }}>{p.mortgage_balance ? formatCurrency(p.mortgage_balance) : 'None'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Purchase Date</div>
+                                    <div style={{ color: '#444' }}>{new Date(p.purchase_date + 'T00:00:00').toLocaleDateString()}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Appreciation</div>
+                                    <div style={{ color: p.current_value >= p.purchase_price ? '#2e7d32' : '#d32f2f' }}>
+                                        {formatCurrency(p.current_value - p.purchase_price)} ({((p.current_value - p.purchase_price) / p.purchase_price * 100).toFixed(1)}%)
+                                    </div>
+                                </div>
+                            </div>
+                            {(p.has_loan_details || p.annual_appreciation_rate != null) && (
+                                <div style={{ borderTop: '1px solid #eee', marginTop: '0.75rem', paddingTop: '0.75rem', display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#666', flexWrap: 'wrap' }}>
+                                    {p.has_loan_details && p.annual_interest_rate != null && (
+                                        <span>Rate: {(p.annual_interest_rate * 100).toFixed(2)}%</span>
+                                    )}
+                                    {p.has_loan_details && p.loan_term_months != null && (
+                                        <span>{Math.round(p.loan_term_months / 12)}yr term</span>
+                                    )}
+                                    {p.annual_appreciation_rate != null && (
+                                        <span>Appr: {(p.annual_appreciation_rate * 100).toFixed(1)}%/yr</span>
+                                    )}
+                                </div>
+                            )}
                         </Link>
                         {canWrite && (
-                            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', gap: '0.5rem' }}>
                                 <button onClick={() => startEdit(p)} style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
                                 <button onClick={() => handleDelete(p.id)} style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
                             </div>

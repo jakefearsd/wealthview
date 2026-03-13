@@ -92,18 +92,37 @@ export default function AccountsListPage() {
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '1rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
                 {data?.data.map((account) => (
                     <div key={account.id} style={cardStyle}>
                         <Link to={`/accounts/${account.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                            <h3 style={{ marginBottom: '0.5rem' }}>{account.name}</h3>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>{account.name}</h3>
+                                <span style={{
+                                    padding: '0.2rem 0.6rem',
+                                    background: account.type === 'roth' ? '#e8f5e9' : account.type === 'ira' || account.type === '401k' ? '#fff3e0' : account.type === 'bank' ? '#f3e5f5' : '#e3f2fd',
+                                    color: account.type === 'roth' ? '#2e7d32' : account.type === 'ira' || account.type === '401k' ? '#e65100' : account.type === 'bank' ? '#6a1b9a' : '#1565c0',
+                                    borderRadius: '4px', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap',
+                                }}>
+                                    {account.type === '401k' ? '401(k)' : account.type === 'ira' ? 'IRA' : account.type === 'roth' ? 'Roth IRA' : account.type.charAt(0).toUpperCase() + account.type.slice(1)}
+                                </span>
+                            </div>
+                            <div style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
                                 ${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </div>
-                            <div style={{ color: '#666', fontSize: '0.9rem' }}>{account.type} {account.institution ? `- ${account.institution}` : ''}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Institution</div>
+                                    <div style={{ color: '#444' }}>{account.institution || 'Not specified'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Created</div>
+                                    <div style={{ color: '#444' }}>{new Date(account.created_at).toLocaleDateString()}</div>
+                                </div>
+                            </div>
                         </Link>
                         {canWrite && (
-                            <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                            <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', gap: '0.5rem' }}>
                                 <button onClick={() => startEdit(account)} style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
                                 <button onClick={() => handleDelete(account.id)} style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
                             </div>

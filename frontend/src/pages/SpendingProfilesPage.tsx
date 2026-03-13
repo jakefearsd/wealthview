@@ -163,40 +163,54 @@ export default function SpendingProfilesPage() {
                     <div style={{ color: '#999', fontSize: '1.1rem' }}>No spending profiles yet. Create one to attach to your retirement scenarios.</div>
                 </div>
             ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
-                    {profiles?.map(p => (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
+                    {profiles?.map(p => {
+                        const totalBase = p.essential_expenses + p.discretionary_expenses;
+                        return (
                         <div key={p.id} style={cardStyle}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-                                <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{p.name}</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>{p.name}</h3>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button
-                                        onClick={() => startEdit(p)}
-                                        style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}
-                                    >
-                                        Edit
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(p.id)}
-                                        style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                    >
-                                        Delete
-                                    </button>
+                                    <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
+                                    <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
                                 </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444', flexWrap: 'wrap' }}>
-                                <div><span style={{ color: '#999' }}>Essential:</span> {formatCurrency(p.essential_expenses)}</div>
-                                <div><span style={{ color: '#999' }}>Discretionary:</span> {formatCurrency(p.discretionary_expenses)}</div>
+                            <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#b71c1c' }}>
+                                {formatCurrency(totalBase)}<span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> / year</span>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Essential</div>
+                                    <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(p.essential_expenses)}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Discretionary</div>
+                                    <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(p.discretionary_expenses)}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Monthly Equivalent</div>
+                                    <div style={{ color: '#444' }}>{formatCurrency(totalBase / 12)}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Spending Tiers</div>
+                                    <div style={{ color: '#444' }}>{p.spending_tiers?.length > 0 ? `${p.spending_tiers.length} phase${p.spending_tiers.length > 1 ? 's' : ''}` : 'None (flat spending)'}</div>
+                                </div>
                             </div>
                             {p.spending_tiers?.length > 0 && (
-                                <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.5rem' }}>
-                                    <span style={{ color: '#999' }}>Tiers:</span>{' '}
-                                    {p.spending_tiers.map(t =>
-                                        `${t.name} (${t.start_age}-${t.end_age ?? '\u221E'}: ${formatCurrency(t.essential_expenses + t.discretionary_expenses)}/yr)`
-                                    ).join(', ')}
+                                <div style={{ borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>
+                                    {p.spending_tiers.map((t, idx) => (
+                                        <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.35rem 0', fontSize: '0.85rem' }}>
+                                            <span style={{ color: '#555', fontWeight: 500 }}>{t.name || `Phase ${idx + 1}`}</span>
+                                            <span style={{ color: '#888' }}>
+                                                Ages {t.start_age}-{t.end_age ?? '\u221E'} &middot; {formatCurrency(t.essential_expenses + t.discretionary_expenses)}/yr
+                                            </span>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
