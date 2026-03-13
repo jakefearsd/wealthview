@@ -201,14 +201,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
             int age, int yearsInRetirement, int year, BigDecimal suspendedLoss) {
 
-        IncomeSourceProcessor.IncomeSourceYearResult isResult = null;
+        IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
 
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
-            isResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
+            incomeSourceResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
                     year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
-            suspendedLoss = isResult.suspendedLossCarryforward();
-            totalActiveIncome = isResult.totalCashInflow();
+            suspendedLoss = incomeSourceResult.suspendedLossCarryforward();
+            totalActiveIncome = incomeSourceResult.totalCashInflow();
         } else {
             totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
         }
@@ -216,7 +216,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(totalActiveIncome, BigDecimal.ZERO);
         var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
 
-        return new IncomeAndConversionResult(isResult, totalActiveIncome, effectiveOtherIncome,
+        return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,
                 conversion.amountConverted(), conversion.taxLiability(), suspendedLoss);
     }
 

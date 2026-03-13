@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -114,7 +115,7 @@ public class DashboardService {
 
     private BigDecimal computePropertySummaries(UUID tenantId,
                                                  List<AccountSummary> accountSummaries,
-                                                 HashMap<String, BigDecimal> allocationMap) {
+                                                 Map<String, BigDecimal> allocationMap) {
         var totalPropertyEquity = BigDecimal.ZERO;
         var properties = propertyRepository.findByTenant_Id(tenantId);
         for (var property : properties) {
@@ -147,7 +148,7 @@ public class DashboardService {
         return property.getMortgageBalance();
     }
 
-    private List<AllocationEntry> buildAllocation(HashMap<String, BigDecimal> map, BigDecimal total) {
+    private List<AllocationEntry> buildAllocation(Map<String, BigDecimal> map, BigDecimal total) {
         if (total.compareTo(BigDecimal.ZERO) == 0) {
             return map.entrySet().stream()
                     .map(e -> new AllocationEntry(e.getKey(), e.getValue(), BigDecimal.ZERO))

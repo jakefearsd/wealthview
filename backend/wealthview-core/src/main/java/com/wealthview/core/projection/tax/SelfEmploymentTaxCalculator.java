@@ -48,6 +48,7 @@ public class SelfEmploymentTaxCalculator {
         return seTax.multiply(new BigDecimal("0.5")).setScale(SCALE, ROUNDING);
     }
 
+    @SuppressWarnings("PMD.UnusedFormalParameter")
     private BigDecimal getWageBase(int taxYear) {
         // Use 2025 wage base as default; could be extended with a lookup table
         return WAGE_BASE_2025;

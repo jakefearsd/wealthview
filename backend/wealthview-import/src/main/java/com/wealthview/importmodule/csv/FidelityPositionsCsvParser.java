@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -107,7 +108,7 @@ public class FidelityPositionsCsvParser implements CsvParser {
         return new CsvParseResult(transactions, errors);
     }
 
-    private ArrayList<String> readAllLines(BufferedReader reader) throws IOException {
+    private List<String> readAllLines(BufferedReader reader) throws IOException {
         var lines = new ArrayList<String>();
         String line;
         boolean first = true;
@@ -129,7 +130,7 @@ public class FidelityPositionsCsvParser implements CsvParser {
         return line;
     }
 
-    private String extractCsvContent(ArrayList<String> lines) {
+    private String extractCsvContent(List<String> lines) {
         var sb = new StringBuilder();
         boolean foundHeader = false;
 
@@ -150,7 +151,7 @@ public class FidelityPositionsCsvParser implements CsvParser {
         return sb.toString();
     }
 
-    LocalDate extractDateFromFooter(ArrayList<String> lines) {
+    LocalDate extractDateFromFooter(List<String> lines) {
         for (var rawLine : lines) {
             var line = rawLine.replace("\"", "");
             var matcher = DATE_PATTERN.matcher(line);

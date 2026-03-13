@@ -54,7 +54,7 @@ public class SuperAdminController {
     }
 
     @PutMapping("/tenants/{id}/active")
-    public ResponseEntity<Void> setTenantActive(
+    public ResponseEntity<Void> updateTenantActive(
             @PathVariable UUID id,
             @Valid @RequestBody SetActiveRequest request) {
         tenantService.setTenantActive(id, request.active());
