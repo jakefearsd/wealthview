@@ -13,6 +13,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Component
@@ -25,7 +26,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int AUTH_LIMIT_PER_IP = 60;
     private static final long WINDOW_MS = 60_000;
 
-    private final ConcurrentHashMap<String, RateWindow> windows = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, RateWindow> windows = new ConcurrentHashMap<>();
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,

@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -122,7 +123,7 @@ public class CombinedPortfolioHistoryService {
         }
 
         // Build price map
-        Map<String, TreeMap<LocalDate, BigDecimal>> priceMap;
+        Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap;
         List<String> pricedSymbols;
         if (!regularSymbols.isEmpty()) {
             var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
@@ -160,7 +161,7 @@ public class CombinedPortfolioHistoryService {
 
     private BigDecimal computeInvestmentValue(LocalDate date, List<String> pricedSymbols,
                                                Map<String, BigDecimal> quantityBySymbol,
-                                               Map<String, TreeMap<LocalDate, BigDecimal>> priceMap,
+                                               Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap,
                                                BigDecimal moneyMarketTotal) {
         var value = moneyMarketTotal;
         for (var symbol : pricedSymbols) {
@@ -243,8 +244,8 @@ public class CombinedPortfolioHistoryService {
         return property.getMortgageBalance();
     }
 
-    private Map<String, TreeMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
-        Map<String, TreeMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
+    private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
+        Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
         for (var price : prices) {
             priceMap.computeIfAbsent(price.getSymbol(), k -> new TreeMap<>())
                     .put(price.getDate(), price.getClosePrice());

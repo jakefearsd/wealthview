@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
+@SuppressWarnings("PMD.UseUtilityClass")
 @SpringBootApplication(scanBasePackages = "com.wealthview")
 @EntityScan(basePackages = "com.wealthview.persistence.entity")
 @EnableJpaRepositories(basePackages = "com.wealthview.persistence.repository")

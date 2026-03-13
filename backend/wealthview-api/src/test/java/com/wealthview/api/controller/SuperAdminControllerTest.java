@@ -141,7 +141,7 @@ class SuperAdminControllerTest {
     }
 
     @Test
-    void setTenantActive_superAdmin_returns204() throws Exception {
+    void updateTenantActive_superAdmin_returns204() throws Exception {
         var tenantId = UUID.randomUUID();
         doNothing().when(tenantService).setTenantActive(tenantId, false);
 

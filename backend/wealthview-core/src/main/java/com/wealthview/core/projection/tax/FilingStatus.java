@@ -20,9 +20,9 @@ public enum FilingStatus {
         if (s == null) {
             return SINGLE;
         }
-        return switch (s.toLowerCase(Locale.US)) {
-            case "married_filing_jointly" -> MARRIED_FILING_JOINTLY;
-            default -> SINGLE;
-        };
+        if ("married_filing_jointly".equals(s.toLowerCase(Locale.US))) {
+            return MARRIED_FILING_JOINTLY;
+        }
+        return SINGLE;
     }
 }

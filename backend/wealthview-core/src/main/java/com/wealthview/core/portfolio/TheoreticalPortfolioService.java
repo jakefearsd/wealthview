@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -89,7 +90,7 @@ public class TheoreticalPortfolioService {
         var startDate = endDate.minusYears(clampedYears);
 
         // Build price map for regular symbols
-        final Map<String, TreeMap<LocalDate, BigDecimal>> priceMap;
+        final Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap;
         final List<String> pricedSymbols;
         if (!regularSymbols.isEmpty()) {
             var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
@@ -139,8 +140,8 @@ public class TheoreticalPortfolioService {
                 hasMoneyMarket, hasMoneyMarket ? moneyMarketTotal : null);
     }
 
-    private Map<String, TreeMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
-        Map<String, TreeMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
+    private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
+        Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
         for (var price : prices) {
             priceMap.computeIfAbsent(price.getSymbol(), k -> new TreeMap<>())
                     .put(price.getDate(), price.getClosePrice());
@@ -152,7 +153,7 @@ public class TheoreticalPortfolioService {
             List<LocalDate> fridays,
             List<String> pricedSymbols,
             Map<String, BigDecimal> quantityBySymbol,
-            Map<String, TreeMap<LocalDate, BigDecimal>> priceMap,
+            Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap,
             BigDecimal moneyMarketTotal) {
         var dataPoints = new ArrayList<PortfolioDataPointDto>();
         for (var friday : fridays) {
@@ -169,7 +170,7 @@ public class TheoreticalPortfolioService {
             LocalDate date,
             List<String> symbols,
             Map<String, BigDecimal> quantityBySymbol,
-            Map<String, TreeMap<LocalDate, BigDecimal>> priceMap) {
+            Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap) {
         if (symbols.isEmpty()) {
             return Optional.empty();
         }
