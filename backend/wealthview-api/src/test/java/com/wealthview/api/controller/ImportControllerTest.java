@@ -5,6 +5,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.importservice.ImportService;
+import com.wealthview.core.importservice.PositionImportService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ class ImportControllerTest {
 
     @MockBean
     private ImportService importService;
+
+    @MockBean
+    private PositionImportService positionImportService;
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
@@ -84,7 +88,7 @@ class ImportControllerTest {
     void importPositions_validFile_returns201() throws Exception {
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "positions", "completed",
                 5, 5, 0, null, OffsetDateTime.now());
-        when(importService.importPositions(eq(TENANT_ID), eq(ACCOUNT_ID), any(), eq("fidelityPositions")))
+        when(positionImportService.importPositions(eq(TENANT_ID), eq(ACCOUNT_ID), any(), eq("fidelityPositions")))
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "positions.csv",

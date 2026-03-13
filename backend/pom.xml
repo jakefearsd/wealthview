@@ -36,6 +36,7 @@
         <spotbugs-maven-plugin.version>4.9.4.2</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco-plugin.version>0.8.14</jacoco-plugin.version>
+        <pmd-plugin.version>3.27.0</pmd-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -158,6 +159,20 @@
                             org.checkstyle.google.checks.indentation.arrayInitIndent=4
                             org.checkstyle.google.checks.indentation.lineWrappingIndentation=8
                         </propertyExpansion>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${pmd-plugin.version}</version>
+                    <configuration>
+                        <targetJdk>21</targetJdk>
+                        <failOnViolation>false</failOnViolation>
+                        <printFailingErrors>true</printFailingErrors>
+                        <linkXRef>false</linkXRef>
+                        <rulesets>
+                            <ruleset>pmd-ruleset.xml</ruleset>
+                        </rulesets>
                     </configuration>
                 </plugin>
                 <plugin>

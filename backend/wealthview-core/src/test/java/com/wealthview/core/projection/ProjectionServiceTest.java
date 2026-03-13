@@ -5,8 +5,6 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
@@ -18,11 +16,9 @@ import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
-import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
@@ -43,6 +39,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -72,13 +69,10 @@ class ProjectionServiceTest {
     private ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
 
     @Mock
-    private PropertyDepreciationScheduleRepository depreciationScheduleRepository;
-
-    @Mock
-    private DepreciationCalculator depreciationCalculator;
-
-    @Mock
     private IncomeSourceRepository incomeSourceRepository;
+
+    @Mock
+    private ProjectionInputBuilder projectionInputBuilder;
 
     @InjectMocks
     private ProjectionService service;
@@ -382,10 +376,17 @@ class ProjectionServiceTest {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, id2))
                 .thenReturn(Optional.of(scenario2));
 
+        var input1 = new ProjectionInput(id1, "Plan A", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        var input2 = new ProjectionInput(id2, "Plan B", LocalDate.of(2060, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.build(scenario1, tenantId)).thenReturn(input1);
+        when(projectionInputBuilder.build(scenario2, tenantId)).thenReturn(input2);
+
         var result1 = new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0, null);
         var result2 = new ProjectionResultResponse(id2, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(any(ProjectionInput.class)))
-                .thenReturn(result1, result2);
+        when(projectionEngine.run(input1)).thenReturn(result1);
+        when(projectionEngine.run(input2)).thenReturn(result2);
 
         var response = service.compareScenarios(tenantId, new CompareRequest(List.of(id1, id2)));
 
@@ -500,83 +501,43 @@ class ProjectionServiceTest {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(input);
+
         var engineResult = new ProjectionResultResponse(
                 scenarioId,
                 List.of(ProjectionYearDto.simple(2026, 36, BigDecimal.ZERO,
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, false)),
                 BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(any(ProjectionInput.class))).thenReturn(engineResult);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
 
         var result = service.runProjection(tenantId, scenarioId);
 
         assertThat(result).isEqualTo(engineResult);
-        verify(projectionEngine).run(any(ProjectionInput.class));
+        verify(projectionEngine).run(input);
     }
 
     @Test
-    void runProjection_withLinkedAccount_resolvesCurrentBalance() {
-        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-
+    void runProjection_delegatesToInputBuilder() {
         var scenario = new ProjectionScenarioEntity(
                 tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null);
-        var projAcct = new ProjectionAccountEntity(
-                scenario, linkedAccount, null,
-                new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
-        scenario.addAccount(projAcct);
-
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
-        var currentBalance = new BigDecimal("150000.00");
-        when(accountService.computeBalance(linkedAccount, tenantId))
-                .thenReturn(currentBalance);
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(input);
 
-        var engineResult = new ProjectionResultResponse(
-                scenarioId, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(any(ProjectionInput.class))).thenReturn(engineResult);
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
 
         service.runProjection(tenantId, scenarioId);
 
-        var captor = ArgumentCaptor.forClass(ProjectionInput.class);
-        verify(projectionEngine).run(captor.capture());
-        var input = captor.getValue();
-        assertThat(input.accounts()).hasSize(1);
-        assertThat(input.accounts().getFirst()).isInstanceOf(LinkedAccountInput.class);
-        assertThat(input.accounts().getFirst().initialBalance())
-                .isEqualByComparingTo(currentBalance);
-    }
-
-    @Test
-    void compareScenarios_withLinkedAccount_resolvesCurrentBalance() {
-        var linkedAccount = new AccountEntity(tenant, "401k", "401k", "Fidelity");
-
-        var id1 = UUID.randomUUID();
-        var scenario1 = new ProjectionScenarioEntity(tenant, "Plan A",
-                LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
-        var projAcct = new ProjectionAccountEntity(
-                scenario1, linkedAccount, null,
-                new BigDecimal("5000"), new BigDecimal("0.07"), "traditional");
-        scenario1.addAccount(projAcct);
-
-        when(scenarioRepository.findByTenant_IdAndId(tenantId, id1))
-                .thenReturn(Optional.of(scenario1));
-
-        var currentBalance = new BigDecimal("75000.00");
-        when(accountService.computeBalance(linkedAccount, tenantId))
-                .thenReturn(currentBalance);
-
-        var result1 = new ProjectionResultResponse(id1, List.of(), BigDecimal.ZERO, 0, null);
-        when(projectionEngine.run(any(ProjectionInput.class))).thenReturn(result1);
-
-        service.compareScenarios(tenantId, new CompareRequest(List.of(id1)));
-
-        var captor = ArgumentCaptor.forClass(ProjectionInput.class);
-        verify(projectionEngine).run(captor.capture());
-        var input = captor.getValue();
-        assertThat(input.accounts().getFirst().initialBalance())
-                .isEqualByComparingTo(currentBalance);
+        verify(projectionInputBuilder).build(scenario, tenantId);
+        verify(projectionEngine).run(input);
     }
 
     @Test
