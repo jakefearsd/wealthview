@@ -12,10 +12,13 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.persistence.entity.TransactionEntity;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 @Service
 public class HoldingsComputationService {
@@ -51,7 +54,14 @@ public class HoldingsComputationService {
         }
 
         var transactions = transactionRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
+        var aggregated = aggregateTransactions(transactions);
+        var netQuantity = aggregated[0];
+        var totalCost = aggregated[1];
 
+        saveOrUpdateHolding(existingHolding, account, tenant, symbol, netQuantity, totalCost);
+    }
+
+    private BigDecimal[] aggregateTransactions(List<TransactionEntity> transactions) {
         var netQuantity = BigDecimal.ZERO;
         var totalCost = BigDecimal.ZERO;
 
@@ -78,7 +88,12 @@ public class HoldingsComputationService {
             netQuantity = BigDecimal.ZERO;
             totalCost = BigDecimal.ZERO;
         }
+        return new BigDecimal[]{netQuantity, totalCost};
+    }
 
+    private void saveOrUpdateHolding(java.util.Optional<HoldingEntity> existingHolding,
+                                      AccountEntity account, TenantEntity tenant,
+                                      String symbol, BigDecimal netQuantity, BigDecimal totalCost) {
         if (existingHolding.isPresent()) {
             var holding = existingHolding.orElseThrow();
             holding.setQuantity(netQuantity);

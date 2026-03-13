@@ -53,7 +53,7 @@ public class TheoreticalPortfolioService {
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         if ("bank".equals(account.getType())) {
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
+            return emptyResponse(accountId);
         }
 
         var holdings = holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)
@@ -62,26 +62,18 @@ public class TheoreticalPortfolioService {
                 .toList();
 
         if (holdings.isEmpty()) {
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
+            return emptyResponse(accountId);
         }
 
-        // Partition into money market and priced holdings
-        var moneyMarketHoldings = holdings.stream()
-                .filter(HoldingEntity::isMoneyMarket)
-                .toList();
-        var regularHoldings = holdings.stream()
+        var moneyMarketHoldings = holdings.stream().filter(HoldingEntity::isMoneyMarket).toList();
+        var regularSymbols = holdings.stream()
                 .filter(h -> !h.isMoneyMarket())
-                .toList();
+                .map(HoldingEntity::getSymbol)
+                .distinct().sorted().toList();
 
         var moneyMarketTotal = moneyMarketHoldings.stream()
                 .map(h -> h.getQuantity().multiply(BigDecimal.ONE))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        var regularSymbols = regularHoldings.stream()
-                .map(HoldingEntity::getSymbol)
-                .distinct()
-                .sorted()
-                .toList();
 
         var quantityBySymbol = holdings.stream()
                 .collect(Collectors.toMap(HoldingEntity::getSymbol, HoldingEntity::getQuantity));
@@ -89,42 +81,58 @@ public class TheoreticalPortfolioService {
         var endDate = LocalDate.now();
         var startDate = endDate.minusYears(clampedYears);
 
-        // Build price map for regular symbols
-        final Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap;
-        final List<String> pricedSymbols;
-        if (!regularSymbols.isEmpty()) {
-            var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
-                    regularSymbols, startDate, endDate);
-            priceMap = buildPriceMap(prices);
-
-            pricedSymbols = regularSymbols.stream()
-                    .filter(priceMap::containsKey)
-                    .toList();
-
-            if (pricedSymbols.size() < regularSymbols.size()) {
-                var missing = regularSymbols.stream()
-                        .filter(s -> !priceMap.containsKey(s))
-                        .toList();
-                log.info("Skipping symbols without price data for account {}: {}", accountId, missing);
-            }
-        } else {
-            priceMap = new HashMap<>();
-            pricedSymbols = List.of();
-        }
+        var resolved = resolvePricedSymbols(regularSymbols, startDate, endDate, accountId);
+        var priceMap = resolved.priceMap();
+        var pricedSymbols = resolved.pricedSymbols();
 
         if (pricedSymbols.isEmpty() && moneyMarketHoldings.isEmpty()) {
             log.info("No price data available for any holdings of account {}", accountId);
-            return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
+            return emptyResponse(accountId);
         }
 
         var fridays = generateFridays(startDate, endDate);
-
-        // Compute weekly values for priced symbols
         var hasMoneyMarket = !moneyMarketHoldings.isEmpty();
         var dataPoints = computeWeeklyValuesWithMoneyMarket(
                 fridays, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
 
-        // Build combined symbol list
+        var allSymbols = buildCombinedSymbolList(pricedSymbols, moneyMarketHoldings);
+
+        log.info("Computed {} weekly data points for account {} with {} symbols",
+                dataPoints.size(), accountId, allSymbols.size());
+
+        return new PortfolioHistoryResponse(accountId, dataPoints, allSymbols, dataPoints.size(),
+                hasMoneyMarket, hasMoneyMarket ? moneyMarketTotal : null);
+    }
+
+    private static PortfolioHistoryResponse emptyResponse(UUID accountId) {
+        return new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
+    }
+
+    private record ResolvedPrices(
+            Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap,
+            List<String> pricedSymbols) {
+    }
+
+    private ResolvedPrices resolvePricedSymbols(List<String> regularSymbols,
+                                                 LocalDate startDate, LocalDate endDate,
+                                                 UUID accountId) {
+        if (regularSymbols.isEmpty()) {
+            return new ResolvedPrices(new HashMap<>(), List.of());
+        }
+        var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                regularSymbols, startDate, endDate);
+        var priceMap = buildPriceMap(prices);
+        var pricedSymbols = regularSymbols.stream().filter(priceMap::containsKey).toList();
+
+        if (pricedSymbols.size() < regularSymbols.size()) {
+            var missing = regularSymbols.stream().filter(s -> !priceMap.containsKey(s)).toList();
+            log.info("Skipping symbols without price data for account {}: {}", accountId, missing);
+        }
+        return new ResolvedPrices(priceMap, pricedSymbols);
+    }
+
+    private List<String> buildCombinedSymbolList(List<String> pricedSymbols,
+                                                  List<HoldingEntity> moneyMarketHoldings) {
         var allSymbols = new ArrayList<>(pricedSymbols);
         for (var mmh : moneyMarketHoldings) {
             if (!allSymbols.contains(mmh.getSymbol())) {
@@ -132,12 +140,7 @@ public class TheoreticalPortfolioService {
             }
         }
         allSymbols.sort(String::compareTo);
-
-        log.info("Computed {} weekly data points for account {} with {} symbols",
-                dataPoints.size(), accountId, allSymbols.size());
-
-        return new PortfolioHistoryResponse(accountId, dataPoints, allSymbols, dataPoints.size(),
-                hasMoneyMarket, hasMoneyMarket ? moneyMarketTotal : null);
+        return allSymbols;
     }
 
     private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {

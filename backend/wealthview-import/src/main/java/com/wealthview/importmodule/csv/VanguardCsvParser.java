@@ -45,11 +45,6 @@ public class VanguardCsvParser extends AbstractBrokerCsvParser {
     protected void extractRow(CSVRecord record, int rowNum,
                               List<ParsedTransaction> transactions, List<CsvRowError> errors) {
         var dateStr = record.get("Trade Date");
-        var transactionType = record.get("Transaction Type");
-        var symbol = record.get("Symbol");
-        var sharesStr = record.get("Shares");
-        var netAmountStr = record.get("Net Amount");
-
         if (dateStr == null || dateStr.isBlank()) {
             return;
         }
@@ -62,24 +57,29 @@ public class VanguardCsvParser extends AbstractBrokerCsvParser {
             return;
         }
 
+        var transactionType = record.get("Transaction Type");
         var type = mapAction(transactionType);
         if (type == null) {
             errors.add(new CsvRowError(rowNum, "Unknown transaction type: " + transactionType));
             return;
         }
 
-        BigDecimal quantity = null;
-        if (sharesStr != null && !sharesStr.isBlank()) {
-            quantity = parseAmount(sharesStr);
-        }
-
-        BigDecimal amount = null;
-        if (netAmountStr != null && !netAmountStr.isBlank()) {
-            amount = parseAmount(netAmountStr).abs();
-        }
-
-        var parsedSymbol = (symbol != null && !symbol.isBlank()) ? symbol : null;
+        var quantity = parseOptionalAmount(record.get("Shares"));
+        var amount = parseOptionalAbsAmount(record.get("Net Amount"));
+        var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
         transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, amount));
+    }
+
+    private BigDecimal parseOptionalAmount(String value) {
+        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
+    }
+
+    private BigDecimal parseOptionalAbsAmount(String value) {
+        return (value != null && !value.isBlank()) ? parseAmount(value).abs() : null;
+    }
+
+    private String parseOptionalSymbol(String symbol) {
+        return (symbol != null && !symbol.isBlank()) ? symbol : null;
     }
 
     String mapAction(String transactionType) {

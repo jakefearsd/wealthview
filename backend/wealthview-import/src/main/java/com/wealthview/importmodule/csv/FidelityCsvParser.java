@@ -39,11 +39,6 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
     protected void extractRow(CSVRecord record, int rowNum,
                               List<ParsedTransaction> transactions, List<CsvRowError> errors) {
         var dateStr = record.get("Run Date");
-        var action = record.get("Action");
-        var symbol = record.get("Symbol");
-        var quantityStr = record.get("Quantity");
-        var amountStr = record.get("Amount ($)");
-
         if (dateStr == null || dateStr.isBlank()) {
             return;
         }
@@ -56,28 +51,25 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
             return;
         }
 
-        BigDecimal amount = null;
-        if (amountStr != null && !amountStr.isBlank()) {
-            amount = parseAmount(amountStr);
-        }
-
-        var type = mapAction(action, amount);
+        var amount = parseOptionalAmount(record.get("Amount ($)"));
+        var type = mapAction(record.get("Action"), amount);
         if (type == null) {
-            errors.add(new CsvRowError(rowNum, "Unknown action: " + action));
+            errors.add(new CsvRowError(rowNum, "Unknown action: " + record.get("Action")));
             return;
         }
 
-        BigDecimal quantity = null;
-        if (quantityStr != null && !quantityStr.isBlank()) {
-            quantity = parseAmount(quantityStr);
-        }
+        var quantity = parseOptionalAmount(record.get("Quantity"));
+        var absAmount = amount != null ? amount.abs() : null;
+        var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
+        transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, absAmount));
+    }
 
-        if (amount != null) {
-            amount = amount.abs();
-        }
+    private BigDecimal parseOptionalAmount(String value) {
+        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
+    }
 
-        var parsedSymbol = (symbol != null && !symbol.isBlank()) ? symbol : null;
-        transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, amount));
+    private String parseOptionalSymbol(String symbol) {
+        return (symbol != null && !symbol.isBlank()) ? symbol : null;
     }
 
     String mapAction(String action, BigDecimal amount) {

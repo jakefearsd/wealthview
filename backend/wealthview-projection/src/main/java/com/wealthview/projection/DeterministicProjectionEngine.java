@@ -35,6 +35,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
@@ -314,53 +315,47 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private ScenarioParams parseParams(String paramsJson) {
         if (paramsJson == null || paramsJson.isBlank()) {
-            return new ScenarioParams(null, null, null, null, null, null, null, null,
-                    WithdrawalOrder.TAXABLE_FIRST, null, null, null);
+            return defaultParams();
         }
         try {
             JsonNode node = objectMapper.readTree(paramsJson);
-            Integer birthYear = node.has("birth_year") ? node.get("birth_year").asInt() : null;
-            BigDecimal withdrawalRate = node.has("withdrawal_rate")
-                    ? new BigDecimal(node.get("withdrawal_rate").asText())
-                    : null;
-            String withdrawalStrategy = node.has("withdrawal_strategy")
-                    ? node.get("withdrawal_strategy").asText()
-                    : null;
-            BigDecimal dynamicCeiling = node.has("dynamic_ceiling")
-                    ? new BigDecimal(node.get("dynamic_ceiling").asText())
-                    : null;
-            BigDecimal dynamicFloor = node.has("dynamic_floor")
-                    ? new BigDecimal(node.get("dynamic_floor").asText())
-                    : null;
-            String filingStatus = node.has("filing_status")
-                    ? node.get("filing_status").asText()
-                    : null;
-            BigDecimal otherIncome = node.has("other_income")
-                    ? new BigDecimal(node.get("other_income").asText())
-                    : null;
-            BigDecimal annualRothConversion = node.has("annual_roth_conversion")
-                    ? new BigDecimal(node.get("annual_roth_conversion").asText())
-                    : null;
             WithdrawalOrder withdrawalOrder = node.has("withdrawal_order")
                     ? WithdrawalOrder.fromString(node.get("withdrawal_order").asText())
                     : WithdrawalOrder.TAXABLE_FIRST;
-            String rothConversionStrategy = node.has("roth_conversion_strategy")
-                    ? node.get("roth_conversion_strategy").asText()
-                    : null;
-            BigDecimal targetBracketRate = node.has("target_bracket_rate")
-                    ? new BigDecimal(node.get("target_bracket_rate").asText())
-                    : null;
-            Integer rothConversionStartYear = node.has("roth_conversion_start_year")
-                    ? node.get("roth_conversion_start_year").asInt() : null;
-            return new ScenarioParams(birthYear, withdrawalRate, withdrawalStrategy,
-                    dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion,
-                    withdrawalOrder, rothConversionStrategy, targetBracketRate,
-                    rothConversionStartYear);
+            return new ScenarioParams(
+                    parseOptionalInt(node, "birth_year"),
+                    parseOptionalBigDecimal(node, "withdrawal_rate"),
+                    parseOptionalString(node, "withdrawal_strategy"),
+                    parseOptionalBigDecimal(node, "dynamic_ceiling"),
+                    parseOptionalBigDecimal(node, "dynamic_floor"),
+                    parseOptionalString(node, "filing_status"),
+                    parseOptionalBigDecimal(node, "other_income"),
+                    parseOptionalBigDecimal(node, "annual_roth_conversion"),
+                    withdrawalOrder,
+                    parseOptionalString(node, "roth_conversion_strategy"),
+                    parseOptionalBigDecimal(node, "target_bracket_rate"),
+                    parseOptionalInt(node, "roth_conversion_start_year"));
         } catch (com.fasterxml.jackson.core.JsonProcessingException | NumberFormatException e) {
             log.warn("Failed to parse params_json: {}", e.getMessage());
-            return new ScenarioParams(null, null, null, null, null, null, null, null,
-                    WithdrawalOrder.TAXABLE_FIRST, null, null, null);
+            return defaultParams();
         }
+    }
+
+    private ScenarioParams defaultParams() {
+        return new ScenarioParams(null, null, null, null, null, null, null, null,
+                WithdrawalOrder.TAXABLE_FIRST, null, null, null);
+    }
+
+    private BigDecimal parseOptionalBigDecimal(JsonNode node, String fieldName) {
+        return node.has(fieldName) ? new BigDecimal(node.get(fieldName).asText()) : null;
+    }
+
+    private Integer parseOptionalInt(JsonNode node, String fieldName) {
+        return node.has(fieldName) ? node.get(fieldName).asInt() : null;
+    }
+
+    private String parseOptionalString(JsonNode node, String fieldName) {
+        return node.has(fieldName) ? node.get(fieldName).asText() : null;
     }
 
     private record ScenarioParams(
@@ -598,15 +593,23 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
                 base.rothConversionAmount(), base.taxLiability(),
                 base.essentialExpenses(), base.discretionaryExpenses(),
-                totalIncome.compareTo(BigDecimal.ZERO) > 0 ? totalIncome : base.incomeStreamsTotal(),
+                positiveOrDefault(totalIncome, base.incomeStreamsTotal()),
                 base.netSpendingNeed(), base.spendingSurplus(), base.discretionaryAfterCuts(),
-                isResult.rentalIncomeGross().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalIncomeGross() : null,
-                isResult.rentalExpensesTotal().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalExpensesTotal() : null,
-                isResult.depreciationTotal().compareTo(BigDecimal.ZERO) > 0 ? isResult.depreciationTotal() : null,
-                isResult.rentalLossApplied().compareTo(BigDecimal.ZERO) > 0 ? isResult.rentalLossApplied() : null,
-                isResult.suspendedLossCarryforward().compareTo(BigDecimal.ZERO) > 0 ? isResult.suspendedLossCarryforward() : null,
-                isResult.socialSecurityTaxable().compareTo(BigDecimal.ZERO) > 0 ? isResult.socialSecurityTaxable() : null,
-                isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0 ? isResult.selfEmploymentTax() : null);
+                nullIfZero(isResult.rentalIncomeGross()),
+                nullIfZero(isResult.rentalExpensesTotal()),
+                nullIfZero(isResult.depreciationTotal()),
+                nullIfZero(isResult.rentalLossApplied()),
+                nullIfZero(isResult.suspendedLossCarryforward()),
+                nullIfZero(isResult.socialSecurityTaxable()),
+                nullIfZero(isResult.selfEmploymentTax()));
+    }
+
+    private BigDecimal nullIfZero(BigDecimal value) {
+        return value.compareTo(BigDecimal.ZERO) > 0 ? value : null;
+    }
+
+    private BigDecimal positiveOrDefault(BigDecimal value, BigDecimal fallback) {
+        return value.compareTo(BigDecimal.ZERO) > 0 ? value : fallback;
     }
 
     private BigDecimal computeInflationFactor(SpendingData spending, int age,

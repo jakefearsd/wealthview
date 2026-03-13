@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
+@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class ProjectionService {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionService.class);
