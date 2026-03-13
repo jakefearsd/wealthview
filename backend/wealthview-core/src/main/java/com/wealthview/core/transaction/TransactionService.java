@@ -136,7 +136,9 @@ public class TransactionService {
     private Map<String, Object> txnDetails(TransactionRequest request) {
         var details = new java.util.HashMap<String, Object>();
         details.put("type", request.type());
-        if (request.symbol() != null) details.put("symbol", request.symbol());
+        if (request.symbol() != null) {
+            details.put("symbol", request.symbol());
+        }
         return details;
     }
 }

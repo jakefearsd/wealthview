@@ -1,5 +1,6 @@
 package com.wealthview.core.projection.tax;
 
+import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
@@ -55,7 +56,9 @@ public class FederalTaxCalculator {
         BigDecimal remaining = taxableIncome;
 
         for (var bracket : brackets) {
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) break;
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
 
             BigDecimal bracketWidth;
             if (bracket.getBracketCeiling() != null) {
@@ -109,7 +112,7 @@ public class FederalTaxCalculator {
             Integer maxYear = standardDeductionRepository.findMaxTaxYear();
             if (maxYear != null) {
                 return standardDeductionRepository.findByTaxYearAndFilingStatus(maxYear, status.value())
-                        .map(e -> e.getAmount())
+                        .map(StandardDeductionEntity::getAmount)
                         .orElse(BigDecimal.ZERO);
             }
             return BigDecimal.ZERO;

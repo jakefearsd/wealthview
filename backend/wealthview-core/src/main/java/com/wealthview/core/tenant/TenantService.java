@@ -6,7 +6,6 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.TenantRepository;
@@ -19,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -100,7 +100,7 @@ public class TenantService {
         var creator = userRepository.findById(createdByUserId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + createdByUserId));
 
-        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.US);
         var invite = new InviteCodeEntity(tenant, code, creator,
                 OffsetDateTime.now().plusDays(7));
         invite = inviteCodeRepository.save(invite);

@@ -1,5 +1,7 @@
 package com.wealthview.core.projection.strategy;
 
+import java.util.Locale;
+
 public enum WithdrawalOrder {
     TAXABLE_FIRST,
     TRADITIONAL_FIRST,
@@ -10,7 +12,7 @@ public enum WithdrawalOrder {
         if (value == null) {
             return TAXABLE_FIRST;
         }
-        return switch (value.toLowerCase()) {
+        return switch (value.toLowerCase(Locale.US)) {
             case "taxable_first" -> TAXABLE_FIRST;
             case "traditional_first" -> TRADITIONAL_FIRST;
             case "roth_first" -> ROTH_FIRST;

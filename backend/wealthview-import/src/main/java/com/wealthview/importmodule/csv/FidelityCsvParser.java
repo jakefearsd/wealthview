@@ -10,6 +10,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Component("fidelityCsvParser")
@@ -80,8 +81,10 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
     }
 
     String mapAction(String action, BigDecimal amount) {
-        if (action == null) return null;
-        var upper = action.trim().toUpperCase();
+        if (action == null) {
+            return null;
+        }
+        var upper = action.trim().toUpperCase(Locale.US);
 
         var mapped = ACTION_MAP.get(upper);
         if (mapped != null) {

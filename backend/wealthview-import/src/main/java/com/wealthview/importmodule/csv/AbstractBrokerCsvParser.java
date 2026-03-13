@@ -102,10 +102,10 @@ public abstract class AbstractBrokerCsvParser implements CsvParser {
             if (!foundHeader) {
                 if (isHeaderLine(line)) {
                     foundHeader = true;
-                    sb.append(line).append("\n");
+                    sb.append(line).append('\n');
                 }
             } else {
-                sb.append(line).append("\n");
+                sb.append(line).append('\n');
             }
         }
 
