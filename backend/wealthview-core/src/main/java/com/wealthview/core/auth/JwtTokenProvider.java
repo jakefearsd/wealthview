@@ -16,7 +16,7 @@ import java.util.Date;
 import java.util.UUID;
 
 @Component
-public class JwtTokenProvider {
+public final class JwtTokenProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
