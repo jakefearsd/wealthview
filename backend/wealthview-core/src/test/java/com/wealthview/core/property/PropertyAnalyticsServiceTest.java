@@ -104,7 +104,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "350000", "300000");
         property.setPurchaseDate(LocalDate.of(2020, 1, 1));
         property.setLoanAmount(new BigDecimal("240000"));
-        property.setAnnualInterestRate(new BigDecimal("6.0"));
+        property.setAnnualInterestRate(new BigDecimal("0.06"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2020, 1, 1));
         mockProperty(property);
@@ -138,7 +138,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         property.setLoanAmount(new BigDecimal("280000"));
-        property.setAnnualInterestRate(new BigDecimal("7.0"));
+        property.setAnnualInterestRate(new BigDecimal("0.07"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2023, 1, 1));
         property.setMortgageBalance(new BigDecimal("270000"));
@@ -244,7 +244,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "400000", "300000");
         property.setPurchaseDate(LocalDate.of(2024, 1, 1));
         property.setLoanAmount(new BigDecimal("240000"));
-        property.setAnnualInterestRate(new BigDecimal("6.0"));
+        property.setAnnualInterestRate(new BigDecimal("0.06"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2024, 1, 1));
         mockProperty(property);
@@ -374,7 +374,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("primary_residence", "500000", "200000");
         property.setPurchaseDate(LocalDate.of(1990, 1, 1));
         property.setLoanAmount(new BigDecimal("160000"));
-        property.setAnnualInterestRate(new BigDecimal("8.0"));
+        property.setAnnualInterestRate(new BigDecimal("0.08"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(1990, 1, 1));
         mockProperty(property);
@@ -399,7 +399,7 @@ class PropertyAnalyticsServiceTest {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         property.setLoanAmount(new BigDecimal("280000"));
-        property.setAnnualInterestRate(new BigDecimal("7.0"));
+        property.setAnnualInterestRate(new BigDecimal("0.07"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);

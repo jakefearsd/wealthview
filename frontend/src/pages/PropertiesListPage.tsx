@@ -24,6 +24,11 @@ interface PropertyFormData {
     loanStartDate: string;
     useComputedBalance: boolean;
     propertyType: string;
+    showFinancialAssumptions: boolean;
+    annualAppreciationRate: string;
+    annualPropertyTax: string;
+    annualInsuranceCost: string;
+    annualMaintenanceCost: string;
 }
 
 const initialFormData: PropertyFormData = {
@@ -39,6 +44,11 @@ const initialFormData: PropertyFormData = {
     loanStartDate: '',
     useComputedBalance: false,
     propertyType: 'primary_residence',
+    showFinancialAssumptions: false,
+    annualAppreciationRate: '',
+    annualPropertyTax: '',
+    annualInsuranceCost: '',
+    annualMaintenanceCost: '',
 };
 
 function buildRequest(data: PropertyFormData) {
@@ -51,11 +61,15 @@ function buildRequest(data: PropertyFormData) {
         property_type: data.propertyType,
         ...(data.showLoanDetails && data.loanAmount ? {
             loan_amount: parseFloat(data.loanAmount),
-            annual_interest_rate: parseFloat(data.annualInterestRate),
+            annual_interest_rate: parseFloat(data.annualInterestRate) / 100,
             loan_term_months: parseInt(data.loanTermMonths),
             loan_start_date: data.loanStartDate,
             use_computed_balance: data.useComputedBalance,
         } : {}),
+        annual_appreciation_rate: data.annualAppreciationRate ? parseFloat(data.annualAppreciationRate) / 100 : undefined,
+        annual_property_tax: data.annualPropertyTax ? parseFloat(data.annualPropertyTax) : undefined,
+        annual_insurance_cost: data.annualInsuranceCost ? parseFloat(data.annualInsuranceCost) : undefined,
+        annual_maintenance_cost: data.annualMaintenanceCost ? parseFloat(data.annualMaintenanceCost) : undefined,
     };
 }
 
@@ -99,6 +113,9 @@ export default function PropertiesListPage() {
     }, [crudReset]);
 
     function startEdit(property: Property) {
+        var hasFinancialFields = property.annual_appreciation_rate != null
+            || property.annual_property_tax != null || property.annual_insurance_cost != null
+            || property.annual_maintenance_cost != null;
         crudStartEdit(property.id, {
             address: property.address,
             purchasePrice: String(property.purchase_price),
@@ -107,11 +124,16 @@ export default function PropertiesListPage() {
             mortgageBalance: property.mortgage_balance ? String(property.mortgage_balance) : '',
             showLoanDetails: property.has_loan_details,
             loanAmount: property.loan_amount != null ? String(property.loan_amount) : '',
-            annualInterestRate: property.annual_interest_rate != null ? String(property.annual_interest_rate) : '',
+            annualInterestRate: property.annual_interest_rate != null ? String(property.annual_interest_rate * 100) : '',
             loanTermMonths: property.loan_term_months != null ? String(property.loan_term_months) : '',
             loanStartDate: property.loan_start_date ?? '',
             useComputedBalance: property.use_computed_balance,
             propertyType: property.property_type,
+            showFinancialAssumptions: hasFinancialFields,
+            annualAppreciationRate: property.annual_appreciation_rate != null ? String(property.annual_appreciation_rate * 100) : '',
+            annualPropertyTax: property.annual_property_tax != null ? String(property.annual_property_tax) : '',
+            annualInsuranceCost: property.annual_insurance_cost != null ? String(property.annual_insurance_cost) : '',
+            annualMaintenanceCost: property.annual_maintenance_cost != null ? String(property.annual_maintenance_cost) : '',
         });
         setShowForm(true);
     }
@@ -142,6 +164,11 @@ export default function PropertiesListPage() {
                     loanTermMonths={formData.loanTermMonths} onLoanTermMonthsChange={v => setFormData(prev => ({ ...prev, loanTermMonths: v }))}
                     loanStartDate={formData.loanStartDate} onLoanStartDateChange={v => setFormData(prev => ({ ...prev, loanStartDate: v }))}
                     useComputedBalance={formData.useComputedBalance} onUseComputedBalanceChange={v => setFormData(prev => ({ ...prev, useComputedBalance: v }))}
+                    showFinancialAssumptions={formData.showFinancialAssumptions} onShowFinancialAssumptionsChange={v => setFormData(prev => ({ ...prev, showFinancialAssumptions: v }))}
+                    annualAppreciationRate={formData.annualAppreciationRate} onAnnualAppreciationRateChange={v => setFormData(prev => ({ ...prev, annualAppreciationRate: v }))}
+                    annualPropertyTax={formData.annualPropertyTax} onAnnualPropertyTaxChange={v => setFormData(prev => ({ ...prev, annualPropertyTax: v }))}
+                    annualInsuranceCost={formData.annualInsuranceCost} onAnnualInsuranceCostChange={v => setFormData(prev => ({ ...prev, annualInsuranceCost: v }))}
+                    annualMaintenanceCost={formData.annualMaintenanceCost} onAnnualMaintenanceCostChange={v => setFormData(prev => ({ ...prev, annualMaintenanceCost: v }))}
                     onSubmit={handleSave}
                     onCancel={resetForm}
                 />

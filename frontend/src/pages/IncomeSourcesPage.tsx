@@ -112,7 +112,7 @@ export default function IncomeSourcesPage() {
             annual_amount: data.annual_amount,
             start_age: data.start_age,
             end_age: data.one_time ? data.start_age + 1 : data.end_age,
-            inflation_rate: data.one_time ? 0 : data.inflation_rate,
+            inflation_rate: data.one_time ? 0 : data.inflation_rate / 100,
             one_time: data.one_time,
             tax_treatment: data.tax_treatment,
             property_id: data.income_type === 'rental_property' ? data.property_id : null,
@@ -127,7 +127,7 @@ export default function IncomeSourcesPage() {
             annual_amount: data.annual_amount,
             start_age: data.start_age,
             end_age: data.one_time ? data.start_age + 1 : data.end_age,
-            inflation_rate: data.one_time ? 0 : data.inflation_rate,
+            inflation_rate: data.one_time ? 0 : data.inflation_rate / 100,
             one_time: data.one_time,
             tax_treatment: data.tax_treatment,
             property_id: data.income_type === 'rental_property' ? data.property_id : null,
@@ -160,7 +160,7 @@ export default function IncomeSourcesPage() {
             annual_amount: source.annual_amount,
             start_age: source.start_age,
             end_age: source.end_age,
-            inflation_rate: source.inflation_rate,
+            inflation_rate: source.inflation_rate * 100,
             one_time: source.one_time,
             tax_treatment: source.tax_treatment,
             property_id: source.property_id,
@@ -179,9 +179,9 @@ export default function IncomeSourcesPage() {
             }
             if (newType === 'social_security') {
                 updates.start_age = 67;
-                updates.inflation_rate = 0.02;
+                updates.inflation_rate = 2;
             } else if (newType === 'rental_property') {
-                updates.inflation_rate = 0.02;
+                updates.inflation_rate = 2;
             }
             return { ...prev, ...updates };
         });
@@ -189,7 +189,7 @@ export default function IncomeSourcesPage() {
 
     if (loading) return <div>Loading...</div>;
 
-    const investmentProperties = properties?.filter(p => p.property_type === 'investment') ?? [];
+    const linkableProperties = properties ?? [];
     const grouped = (sources ?? []).reduce<Record<string, IncomeSource[]>>((acc, s) => {
         (acc[s.income_type] = acc[s.income_type] || []).push(s);
         return acc;
@@ -245,7 +245,7 @@ export default function IncomeSourcesPage() {
                                 <label style={labelStyle}>Link to Property (optional)</label>
                                 <select style={inputStyle} value={propertyId ?? ''} onChange={e => setFormData(prev => ({ ...prev, property_id: e.target.value || null }))}>
                                     <option value="">No linked property (hypothetical)</option>
-                                    {investmentProperties.map(p => (
+                                    {linkableProperties.map(p => (
                                         <option key={p.id} value={p.id}>{p.address} — {formatCurrency(p.current_value)}</option>
                                     ))}
                                 </select>
@@ -316,9 +316,9 @@ export default function IncomeSourcesPage() {
                                     <HelpText>Leave blank if this income continues for life.</HelpText>
                                 </div>
                                 <div>
-                                    <label style={labelStyle}>Inflation Rate</label>
-                                    <input style={inputStyle} type="number" step="0.001" value={inflationRate} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
-                                    <HelpText>Annual adjustment rate (e.g., 0.02 = 2%). SS COLA is typically ~2%.</HelpText>
+                                    <label style={labelStyle}>Inflation Rate (%)</label>
+                                    <input style={inputStyle} type="number" step="0.1" value={inflationRate} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
+                                    <HelpText>Annual adjustment rate (e.g., 2 = 2%). SS COLA is typically ~2%.</HelpText>
                                 </div>
                             </>
                         )}

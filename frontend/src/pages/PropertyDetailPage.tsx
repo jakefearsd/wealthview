@@ -163,7 +163,7 @@ export default function PropertyDetailPage() {
                             <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444' }}>Loan Details</h4>
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', fontSize: '0.9rem' }}>
                                 <div><span style={{ color: '#666' }}>Amount:</span> {formatCurrency(property.loan_amount!)}</div>
-                                <div><span style={{ color: '#666' }}>Rate:</span> {property.annual_interest_rate}%</div>
+                                <div><span style={{ color: '#666' }}>Rate:</span> {((property.annual_interest_rate ?? 0) * 100).toFixed(2)}%</div>
                                 <div><span style={{ color: '#666' }}>Term:</span> {property.loan_term_months} months</div>
                                 <div><span style={{ color: '#666' }}>Start:</span> {property.loan_start_date}</div>
                             </div>

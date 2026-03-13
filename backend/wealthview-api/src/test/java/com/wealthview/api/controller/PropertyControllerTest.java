@@ -78,6 +78,17 @@ class PropertyControllerTest {
                 new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("150000"),
                 null, null, null, null, false, false, "primary_residence",
+                null, null, null, null,
+                null, null, "none", new BigDecimal("27.5"));
+    }
+
+    private PropertyResponse sampleResponseWithFinancialFields() {
+        return new PropertyResponse(PROPERTY_ID, "123 Main St",
+                new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
+                new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("150000"),
+                null, null, null, null, false, false, "primary_residence",
+                new BigDecimal("0.03000"), new BigDecimal("4500.0000"), new BigDecimal("1800.0000"), null,
                 null, null, "none", new BigDecimal("27.5"));
     }
 
@@ -96,6 +107,28 @@ class PropertyControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.address").value("123 Main St"));
+    }
+
+    @Test
+    void create_withFinancialFields_returnsFieldsInResponse() throws Exception {
+        when(propertyService.create(eq(TENANT_ID), any(PropertyRequest.class)))
+                .thenReturn(sampleResponseWithFinancialFields());
+
+        mockMvc.perform(post("/api/v1/properties")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"address": "123 Main St", "purchase_price": 300000,
+                                 "purchase_date": "2020-06-01", "current_value": 350000,
+                                 "mortgage_balance": 200000,
+                                 "annual_appreciation_rate": 0.03,
+                                 "annual_property_tax": 4500,
+                                 "annual_insurance_cost": 1800}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.annual_appreciation_rate").value(0.03000))
+                .andExpect(jsonPath("$.annual_property_tax").value(4500.0000))
+                .andExpect(jsonPath("$.annual_insurance_cost").value(1800.0000));
     }
 
     @Test

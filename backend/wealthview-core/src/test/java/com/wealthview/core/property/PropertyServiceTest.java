@@ -74,6 +74,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
@@ -88,8 +89,9 @@ class PropertyServiceTest {
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), new BigDecimal("6.5"), 360,
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360,
                 LocalDate.of(2020, 1, 1), true, null,
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
@@ -106,6 +108,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), null, null, null, null, null,
+                null, null, null, null,
                 null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
@@ -118,7 +121,7 @@ class PropertyServiceTest {
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
         property.setLoanAmount(new BigDecimal("300000"));
-        property.setAnnualInterestRate(new BigDecimal("6.5"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2020, 1, 1));
         property.setUseComputedBalance(false);
@@ -130,8 +133,9 @@ class PropertyServiceTest {
         // Toggle to computed
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), new BigDecimal("6.5"), 360,
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360,
                 LocalDate.of(2020, 1, 1), true, null,
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
@@ -221,6 +225,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "investment",
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
@@ -235,6 +240,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
@@ -248,6 +254,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "commercial",
+                null, null, null, null,
                 null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
@@ -268,6 +275,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "vacation",
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
@@ -447,6 +455,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "investment",
+                null, null, null, null,
                 LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "straight_line", new BigDecimal("27.5"));
         var result = propertyService.create(tenantId, request);
 
@@ -464,6 +473,7 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
+                null, null, null, null,
                 null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
@@ -477,10 +487,69 @@ class PropertyServiceTest {
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
+                null, null, null, null,
                 null, null, "bogus", null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Invalid depreciation method");
+    }
+
+    @Test
+    void create_withFinancialFields_mapsFieldsToResponse() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                new BigDecimal("0.03000"), new BigDecimal("4500.0000"), new BigDecimal("1800.0000"), new BigDecimal("2400.0000"),
+                null, null, null, null);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.annualAppreciationRate()).isEqualByComparingTo("0.03000");
+        assertThat(result.annualPropertyTax()).isEqualByComparingTo("4500");
+        assertThat(result.annualInsuranceCost()).isEqualByComparingTo("1800");
+        assertThat(result.annualMaintenanceCost()).isEqualByComparingTo("2400");
+    }
+
+    @Test
+    void create_withNullFinancialFields_returnsNulls() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, null, null);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.annualAppreciationRate()).isNull();
+        assertThat(result.annualPropertyTax()).isNull();
+        assertThat(result.annualInsuranceCost()).isNull();
+        assertThat(result.annualMaintenanceCost()).isNull();
+    }
+
+    @Test
+    void update_withFinancialFields_updatesFields() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                new BigDecimal("0.04000"), new BigDecimal("5200.0000"), new BigDecimal("2100.0000"), new BigDecimal("3000.0000"),
+                null, null, null, null);
+        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+
+        assertThat(result.annualAppreciationRate()).isEqualByComparingTo("0.04");
+        assertThat(result.annualPropertyTax()).isEqualByComparingTo("5200");
+        assertThat(result.annualInsuranceCost()).isEqualByComparingTo("2100");
+        assertThat(result.annualMaintenanceCost()).isEqualByComparingTo("3000");
     }
 }

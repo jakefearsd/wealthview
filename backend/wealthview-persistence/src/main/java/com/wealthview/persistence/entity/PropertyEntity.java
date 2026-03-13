@@ -70,6 +70,18 @@ public class PropertyEntity {
     @Column(name = "land_value", precision = 19, scale = 4)
     private BigDecimal landValue;
 
+    @Column(name = "annual_appreciation_rate", precision = 7, scale = 5)
+    private BigDecimal annualAppreciationRate;
+
+    @Column(name = "annual_property_tax", precision = 19, scale = 4)
+    private BigDecimal annualPropertyTax;
+
+    @Column(name = "annual_insurance_cost", precision = 19, scale = 4)
+    private BigDecimal annualInsuranceCost;
+
+    @Column(name = "annual_maintenance_cost", precision = 19, scale = 4)
+    private BigDecimal annualMaintenanceCost;
+
     @Column(name = "depreciation_method", nullable = false)
     private String depreciationMethod = "none";
 
@@ -123,6 +135,15 @@ public class PropertyEntity {
 
     public String getZillowZpid() { return zillowZpid; }
     public void setZillowZpid(String zillowZpid) { this.zillowZpid = zillowZpid; }
+
+    public BigDecimal getAnnualAppreciationRate() { return annualAppreciationRate; }
+    public void setAnnualAppreciationRate(BigDecimal annualAppreciationRate) { this.annualAppreciationRate = annualAppreciationRate; }
+    public BigDecimal getAnnualPropertyTax() { return annualPropertyTax; }
+    public void setAnnualPropertyTax(BigDecimal annualPropertyTax) { this.annualPropertyTax = annualPropertyTax; }
+    public BigDecimal getAnnualInsuranceCost() { return annualInsuranceCost; }
+    public void setAnnualInsuranceCost(BigDecimal annualInsuranceCost) { this.annualInsuranceCost = annualInsuranceCost; }
+    public BigDecimal getAnnualMaintenanceCost() { return annualMaintenanceCost; }
+    public void setAnnualMaintenanceCost(BigDecimal annualMaintenanceCost) { this.annualMaintenanceCost = annualMaintenanceCost; }
 
     public LocalDate getInServiceDate() { return inServiceDate; }
     public void setInServiceDate(LocalDate inServiceDate) { this.inServiceDate = inServiceDate; }
