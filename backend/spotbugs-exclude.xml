@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!--
+        Suppress EI_EXPOSE_REP and EI_EXPOSE_REP2 project-wide.
+
+        JPA entities in com.wealthview.persistence.entity expose mutable state
+        by design (getters/setters required by JPA).
+
+        Record classes throughout the project store references directly and are
+        internal types — defensive copying is unnecessary overhead.
+
+        Since both categories apply broadly, we suppress globally.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+</FindBugsFilter>
