@@ -342,45 +342,49 @@ export default function IncomeSourcesPage() {
                 Object.entries(grouped).map(([type, items]) => (
                     <div key={type} style={{ marginBottom: '1.5rem' }}>
                         <h3 style={{ color: TYPE_COLORS[type] ?? '#333', marginBottom: '0.75rem' }}>{typeLabel(type)}</h3>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
                             {items.map(s => (
                                 <div key={s.id} style={cardStyle}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '1.05rem' }}>{s.name}</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
+                                        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{s.name}</h3>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button
-                                                onClick={() => startEdit(s)}
-                                                style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
-                                                Edit
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(s.id)}
-                                                style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
-                                                Delete
-                                            </button>
+                                            <button onClick={() => startEdit(s)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
+                                            <button onClick={() => handleDelete(s.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', fontSize: '0.9rem', color: '#444', marginBottom: '0.25rem' }}>
+                                    <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
+                                        {formatCurrency(s.annual_amount)}
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> {s.one_time ? '(one-time)' : '/ year'}</span>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
                                         <div>
-                                            <span style={{ color: '#999' }}>{s.one_time ? 'Amount:' : 'Annual:'}</span>{' '}
-                                            {formatCurrency(s.annual_amount)}
+                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{s.one_time ? 'Payment Age' : 'Age Range'}</div>
+                                            <div style={{ color: '#444', fontWeight: 500 }}>
+                                                {s.one_time ? `Age ${s.start_age}` : `${s.start_age} - ${s.end_age ?? 'Lifetime'}`}
+                                            </div>
                                         </div>
                                         <div>
-                                            <span style={{ color: '#999' }}>{s.one_time ? 'Age:' : 'Ages:'}</span>{' '}
-                                            {s.one_time ? s.start_age : `${s.start_age}-${s.end_age ?? '\u221E'}`}
+                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Tax Treatment</div>
+                                            <div style={{ color: '#444', fontWeight: 500 }}>{treatmentLabel(s.tax_treatment)}</div>
                                         </div>
-                                        {!s.one_time && s.inflation_rate > 0 && (
+                                        {!s.one_time && (
                                             <div>
-                                                <span style={{ color: '#999' }}>Adj:</span> {(s.inflation_rate * 100).toFixed(1)}%
+                                                <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Annual Adjustment</div>
+                                                <div style={{ color: '#444' }}>{s.inflation_rate > 0 ? `${(s.inflation_rate * 100).toFixed(1)}% / year` : 'None (fixed)'}</div>
+                                            </div>
+                                        )}
+                                        {!s.one_time && (
+                                            <div>
+                                                <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Monthly Equivalent</div>
+                                                <div style={{ color: '#444' }}>{formatCurrency(s.annual_amount / 12)}</div>
                                             </div>
                                         )}
                                     </div>
-                                    <div style={{ fontSize: '0.8rem', color: '#888' }}>
-                                        {treatmentLabel(s.tax_treatment)}
-                                        {s.property_address && ` \u2022 ${s.property_address}`}
-                                    </div>
+                                    {s.property_address && (
+                                        <div style={{ borderTop: '1px solid #eee', paddingTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                            Linked: {s.property_address}
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
