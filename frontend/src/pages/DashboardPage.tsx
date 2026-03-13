@@ -5,6 +5,7 @@ import { cardStyle } from '../utils/styles';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import SummaryCard from '../components/SummaryCard';
 import CombinedPortfolioChart from '../components/CombinedPortfolioChart';
+import SnapshotProjectionChart from '../components/SnapshotProjectionChart';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
 
@@ -27,6 +28,8 @@ export default function DashboardPage() {
             </div>
 
             <CombinedPortfolioChart />
+
+            <SnapshotProjectionChart />
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
                 <div style={cardStyle}>

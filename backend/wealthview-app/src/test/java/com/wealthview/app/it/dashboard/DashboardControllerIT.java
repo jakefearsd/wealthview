@@ -201,6 +201,48 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     }
 
     @Test
+    @Order(10)
+    void getSnapshotProjection_withData_returnsProjectedDataPoints() {
+        var response = restTemplate.exchange("/api/v1/dashboard/snapshot-projection?years=10&lookback=10",
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        var body = response.getBody();
+        assertThat(body).containsKeys("data_points", "projection_years", "investment_account_count",
+                "property_count", "portfolio_cagr");
+
+        @SuppressWarnings("unchecked")
+        var dataPoints = (List<Map<String, Object>>) body.get("data_points");
+        assertThat(dataPoints).hasSize(11); // year 0 through 10
+
+        // Year 0 should have current values
+        var year0 = dataPoints.get(0);
+        assertThat(((Number) year0.get("year")).intValue()).isZero();
+        assertThat(((Number) year0.get("total_value")).doubleValue()).isGreaterThan(0);
+
+        // total_value = investment_value + property_equity
+        for (var dp : dataPoints) {
+            double total = ((Number) dp.get("total_value")).doubleValue();
+            double investment = ((Number) dp.get("investment_value")).doubleValue();
+            double property = ((Number) dp.get("property_equity")).doubleValue();
+            assertThat(total).isCloseTo(investment + property, org.assertj.core.data.Offset.offset(0.01));
+        }
+
+        assertThat(((Number) body.get("projection_years")).intValue()).isEqualTo(10);
+        assertThat(((Number) body.get("investment_account_count")).intValue()).isGreaterThanOrEqualTo(1);
+        assertThat(((Number) body.get("property_count")).intValue()).isEqualTo(1);
+    }
+
+    @Test
+    @Order(11)
+    void getSnapshotProjection_unauthenticated_returns401() {
+        var response = restTemplate.exchange("/api/v1/dashboard/snapshot-projection",
+                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     @Order(100)
     void getSummary_emptyTenant_returnsZeroValues() {
         databaseCleaner.clean();
