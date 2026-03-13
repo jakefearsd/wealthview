@@ -176,7 +176,7 @@ class DashboardServiceTest {
                 new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
                 new BigDecimal("450000"), new BigDecimal("300000"));
         property.setLoanAmount(new BigDecimal("350000"));
-        property.setAnnualInterestRate(new BigDecimal("6.5"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
         property.setLoanTermMonths(360);
         property.setLoanStartDate(LocalDate.of(2020, 1, 1));
         property.setUseComputedBalance(true);

@@ -28,7 +28,7 @@ function defaultAccount(): ScenarioAccountInput {
         linked_account_id: null,
         initial_balance: 100000,
         annual_contribution: 10000,
-        expected_return: 0.07,
+        expected_return: 7,
         account_type: 'taxable',
     };
 }
@@ -52,17 +52,17 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [name, setName] = useState(initialValues?.name ?? '');
     const [retirementDate, setRetirementDate] = useState(initialValues?.retirement_date ?? '');
     const [endAge, setEndAge] = useState(initialValues?.end_age ?? 90);
-    const [inflationRate, setInflationRate] = useState(initialValues?.inflation_rate ?? 0.03);
+    const [inflationRate, setInflationRate] = useState((initialValues?.inflation_rate ?? 0.03) * 100);
     const [birthYear, setBirthYear] = useState<number>(parsedParams.birth_year ?? 1990);
-    const [withdrawalRate, setWithdrawalRate] = useState<number>(parsedParams.withdrawal_rate ?? 0.04);
+    const [withdrawalRate, setWithdrawalRate] = useState<number>((parsedParams.withdrawal_rate ?? 0.04) * 100);
     const [withdrawalStrategy, setWithdrawalStrategy] = useState(parsedParams.withdrawal_strategy ?? 'fixed_percentage');
-    const [dynamicCeiling, setDynamicCeiling] = useState<number>(parsedParams.dynamic_ceiling ?? 0.05);
-    const [dynamicFloor, setDynamicFloor] = useState<number>(parsedParams.dynamic_floor ?? -0.025);
+    const [dynamicCeiling, setDynamicCeiling] = useState<number>((parsedParams.dynamic_ceiling ?? 0.05) * 100);
+    const [dynamicFloor, setDynamicFloor] = useState<number>((parsedParams.dynamic_floor ?? -0.025) * 100);
     const [filingStatus, setFilingStatus] = useState(parsedParams.filing_status ?? 'single');
     const [otherIncome, setOtherIncome] = useState<number>(parsedParams.other_income ?? 0);
     const [annualRothConversion, setAnnualRothConversion] = useState<number>(parsedParams.annual_roth_conversion ?? 0);
     const [rothConversionStrategy, setRothConversionStrategy] = useState(parsedParams.roth_conversion_strategy ?? 'fixed_amount');
-    const [targetBracketRate, setTargetBracketRate] = useState<number>(parsedParams.target_bracket_rate ?? 0.12);
+    const [targetBracketRate, setTargetBracketRate] = useState<number>((parsedParams.target_bracket_rate ?? 0.12) * 100);
     const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
     const [spendingProfileId, setSpendingProfileId] = useState<string>(initialValues?.spending_profile?.id ?? '');
@@ -71,7 +71,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             linked_account_id: a.linked_account_id,
             initial_balance: a.initial_balance,
             annual_contribution: a.annual_contribution,
-            expected_return: a.expected_return,
+            expected_return: a.expected_return * 100,
             account_type: a.account_type || 'taxable',
         })) ?? [defaultAccount()]
     );
@@ -118,21 +118,21 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 name,
                 retirement_date: retirementDate,
                 end_age: endAge,
-                inflation_rate: inflationRate,
+                inflation_rate: inflationRate / 100,
                 birth_year: birthYear,
-                withdrawal_rate: withdrawalRate,
+                withdrawal_rate: withdrawalRate / 100,
                 withdrawal_strategy: withdrawalStrategy,
-                dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling : null,
-                dynamic_floor: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicFloor : null,
+                dynamic_ceiling: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicCeiling / 100 : null,
+                dynamic_floor: withdrawalStrategy === 'vanguard_dynamic_spending' ? dynamicFloor / 100 : null,
                 filing_status: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? filingStatus : null,
                 other_income: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? otherIncome : null,
                 annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
                 withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
                 roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
-                target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate : null,
+                target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate / 100 : null,
                 roth_conversion_start_year: rothConversionStartYear || null,
                 spending_profile_id: spendingProfileId || null,
-                accounts,
+                accounts: accounts.map(a => ({ ...a, expected_return: a.expected_return / 100 })),
                 income_sources: selectedIncomeSources,
             };
             await onSubmit(request);
@@ -163,14 +163,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                     <HelpText>Age at which the projection ends. Plan beyond your expected lifespan for safety.</HelpText>
                 </div>
                 <div>
-                    <label style={labelStyle}>Inflation Rate</label>
-                    <input style={inputStyle} type="number" step="0.01" value={inflationRate} onChange={e => setInflationRate(Number(e.target.value))} />
-                    <HelpText>Annual rate of price increases. 3% is the historical U.S. average.</HelpText>
+                    <label style={labelStyle}>Inflation Rate (%)</label>
+                    <input style={inputStyle} type="number" step="0.1" value={inflationRate} onChange={e => setInflationRate(Number(e.target.value))} />
+                    <HelpText>Annual rate of price increases. 3 = 3%, the historical U.S. average.</HelpText>
                 </div>
                 <div>
-                    <label style={labelStyle}>Withdrawal Rate</label>
-                    <input style={inputStyle} type="number" step="0.01" value={withdrawalRate} onChange={e => setWithdrawalRate(Number(e.target.value))} />
-                    <HelpText>Percentage of portfolio to withdraw annually in retirement.</HelpText>
+                    <label style={labelStyle}>Withdrawal Rate (%)</label>
+                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate} onChange={e => setWithdrawalRate(Number(e.target.value))} />
+                    <HelpText>Percentage of portfolio to withdraw annually in retirement. 4 = 4%.</HelpText>
                 </div>
                 <div>
                     <label style={labelStyle}>Spending Profile</label>
@@ -335,8 +335,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(acct.annual_contribution)} onChange={e => updateAccount(idx, 'annual_contribution', Number(parseCurrencyInput(e.target.value)) || 0)} />
                         </div>
                         <div>
-                            <label style={labelStyle}>Expected Return</label>
-                            <input style={inputStyle} type="number" step="0.01" value={acct.expected_return} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
+                            <label style={labelStyle}>Expected Return (%)</label>
+                            <input style={inputStyle} type="number" step="0.1" value={acct.expected_return} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
                         </div>
                     </div>
                 </div>

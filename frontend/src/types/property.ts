@@ -13,6 +13,10 @@ export interface Property {
     has_loan_details: boolean;
     use_computed_balance: boolean;
     property_type: string;
+    annual_appreciation_rate: number | null;
+    annual_property_tax: number | null;
+    annual_insurance_cost: number | null;
+    annual_maintenance_cost: number | null;
     in_service_date: string | null;
     land_value: number | null;
     depreciation_method: string;
@@ -31,6 +35,10 @@ export interface PropertyRequest {
     loan_start_date?: string;
     use_computed_balance?: boolean;
     property_type?: string;
+    annual_appreciation_rate?: number;
+    annual_property_tax?: number;
+    annual_insurance_cost?: number;
+    annual_maintenance_cost?: number;
     in_service_date?: string;
     land_value?: number;
     depreciation_method?: string;

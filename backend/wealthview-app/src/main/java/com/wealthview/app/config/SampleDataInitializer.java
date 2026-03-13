@@ -238,7 +238,7 @@ public class SampleDataInitializer implements ApplicationRunner {
                 new BigDecimal("1300000.00"), LocalDate.of(2020, 9, 1),
                 new BigDecimal("1300000.00"), new BigDecimal("905000.00"));
         rental2.setLoanAmount(new BigDecimal("905000.00"));
-        rental2.setAnnualInterestRate(new BigDecimal("2.75"));
+        rental2.setAnnualInterestRate(new BigDecimal("0.0275"));
         rental2.setLoanTermMonths(360);
         rental2.setLoanStartDate(LocalDate.of(2020, 9, 1));
         rental2.setUseComputedBalance(true);

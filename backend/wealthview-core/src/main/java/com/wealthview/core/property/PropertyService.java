@@ -73,6 +73,7 @@ public class PropertyService {
                 request.purchaseDate(), request.currentValue(), mortgageBalance);
         applyLoanFields(property, request);
         applyPropertyType(property, request.propertyType());
+        applyFinancialFields(property, request);
         applyDepreciationFields(property, request);
         property = propertyRepository.save(property);
         log.info("Property {} created for tenant {}", property.getId(), tenantId);
@@ -110,6 +111,7 @@ public class PropertyService {
                 ? request.mortgageBalance() : BigDecimal.ZERO);
         applyLoanFields(property, request);
         applyPropertyType(property, request.propertyType());
+        applyFinancialFields(property, request);
         applyDepreciationFields(property, request);
         property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
@@ -250,6 +252,13 @@ public class PropertyService {
             throw new IllegalArgumentException(
                     "Invalid property type: " + propertyType + ". Must be one of: " + VALID_PROPERTY_TYPES);
         }
+    }
+
+    private void applyFinancialFields(PropertyEntity property, PropertyRequest request) {
+        property.setAnnualAppreciationRate(request.annualAppreciationRate());
+        property.setAnnualPropertyTax(request.annualPropertyTax());
+        property.setAnnualInsuranceCost(request.annualInsuranceCost());
+        property.setAnnualMaintenanceCost(request.annualMaintenanceCost());
     }
 
     private void applyDepreciationFields(PropertyEntity property, PropertyRequest request) {

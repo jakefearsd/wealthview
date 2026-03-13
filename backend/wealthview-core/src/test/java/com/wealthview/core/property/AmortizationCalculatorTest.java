@@ -15,7 +15,7 @@ class AmortizationCalculatorTest {
     @Test
     void remainingBalance_day1_equalsLoanAmount() {
         var balance = AmortizationCalculator.remainingBalance(
-                new BigDecimal("300000"), new BigDecimal("6.5"),
+                new BigDecimal("300000"), new BigDecimal("0.065"),
                 360, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 1));
 
         assertThat(balance.setScale(2, RoundingMode.HALF_UP))
@@ -35,7 +35,7 @@ class AmortizationCalculatorTest {
         var asOfDate = startDate.plusMonths(paymentsMade);
 
         var balance = AmortizationCalculator.remainingBalance(
-                new BigDecimal("300000"), new BigDecimal("6.5"),
+                new BigDecimal("300000"), new BigDecimal("0.065"),
                 360, startDate, asOfDate);
 
         assertThat(balance.setScale(2, RoundingMode.HALF_UP))
@@ -56,7 +56,7 @@ class AmortizationCalculatorTest {
     @Test
     void remainingBalance_pastTerm_returnsZero() {
         var balance = AmortizationCalculator.remainingBalance(
-                new BigDecimal("300000"), new BigDecimal("6.5"),
+                new BigDecimal("300000"), new BigDecimal("0.065"),
                 360, LocalDate.of(1990, 1, 1), LocalDate.of(2025, 1, 1));
 
         assertThat(balance).isEqualByComparingTo(BigDecimal.ZERO);
@@ -65,7 +65,7 @@ class AmortizationCalculatorTest {
     @Test
     void remainingBalance_beforeStartDate_returnsLoanAmount() {
         var balance = AmortizationCalculator.remainingBalance(
-                new BigDecimal("300000"), new BigDecimal("6.5"),
+                new BigDecimal("300000"), new BigDecimal("0.065"),
                 360, LocalDate.of(2025, 6, 1), LocalDate.of(2025, 1, 1));
 
         assertThat(balance.setScale(2, RoundingMode.HALF_UP))

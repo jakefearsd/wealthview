@@ -287,7 +287,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 entry("current_value", 350000),
                 entry("mortgage_balance", 200000),
                 entry("loan_amount", 240000),
-                entry("annual_interest_rate", 6.0),
+                entry("annual_interest_rate", 0.06),
                 entry("loan_term_months", 360),
                 entry("loan_start_date", "2020-01-01"),
                 entry("use_computed_balance", true),
@@ -321,7 +321,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 entry("current_value", 400000),
                 entry("mortgage_balance", 250000),
                 entry("loan_amount", 280000),
-                entry("annual_interest_rate", 7.0),
+                entry("annual_interest_rate", 0.07),
                 entry("loan_term_months", 360),
                 entry("loan_start_date", "2023-01-01"),
                 entry("use_computed_balance", false),
@@ -485,6 +485,57 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void create_withFinancialFields_persistsAndReturnsFields() {
+        var body = Map.ofEntries(
+                entry("address", "Financial Fields Test"),
+                entry("purchase_price", 400000),
+                entry("purchase_date", "2023-01-01"),
+                entry("current_value", 420000),
+                entry("mortgage_balance", 300000),
+                entry("property_type", "investment"),
+                entry("annual_appreciation_rate", 0.03),
+                entry("annual_property_tax", 4500),
+                entry("annual_insurance_cost", 1800)
+        );
+
+        var createResponse = restTemplate.exchange("/api/v1/properties",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+
+        assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(((Number) createResponse.getBody().get("annual_appreciation_rate")).doubleValue()).isEqualTo(0.03);
+        assertThat(((Number) createResponse.getBody().get("annual_property_tax")).intValue()).isEqualTo(4500);
+        assertThat(((Number) createResponse.getBody().get("annual_insurance_cost")).intValue()).isEqualTo(1800);
+
+        // Verify persistence via GET
+        var id = (String) createResponse.getBody().get("id");
+        var getResponse = restTemplate.exchange("/api/v1/properties/" + id,
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+
+        assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(((Number) getResponse.getBody().get("annual_appreciation_rate")).doubleValue()).isEqualTo(0.03);
+        assertThat(((Number) getResponse.getBody().get("annual_property_tax")).intValue()).isEqualTo(4500);
+        assertThat(((Number) getResponse.getBody().get("annual_insurance_cost")).intValue()).isEqualTo(1800);
+    }
+
+    @Test
+    void create_withoutFinancialFields_returnsNulls() {
+        var body = Map.of(
+                "address", "No Financial Fields",
+                "purchase_price", 300000,
+                "purchase_date", "2023-01-01",
+                "current_value", 310000
+        );
+
+        var response = restTemplate.exchange("/api/v1/properties",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody().get("annual_appreciation_rate")).isNull();
+        assertThat(response.getBody().get("annual_property_tax")).isNull();
+        assertThat(response.getBody().get("annual_insurance_cost")).isNull();
     }
 
     @Test

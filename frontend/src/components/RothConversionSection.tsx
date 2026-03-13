@@ -78,12 +78,12 @@ export default function RothConversionSection({
                     <div>
                         <label style={labelStyle}>Target Tax Bracket</label>
                         <select style={inputStyle} value={targetBracketRate} onChange={e => onTargetBracketRateChange(Number(e.target.value))}>
-                            <option value={0.10}>10%</option>
-                            <option value={0.12}>12%</option>
-                            <option value={0.22}>22%</option>
-                            <option value={0.24}>24%</option>
-                            <option value={0.32}>32%</option>
-                            <option value={0.35}>35%</option>
+                            <option value={10}>10%</option>
+                            <option value={12}>12%</option>
+                            <option value={22}>22%</option>
+                            <option value={24}>24%</option>
+                            <option value={32}>32%</option>
+                            <option value={35}>35%</option>
                         </select>
                         <HelpText>Convert enough to fill income up to the top of this bracket each year.</HelpText>
                     </div>

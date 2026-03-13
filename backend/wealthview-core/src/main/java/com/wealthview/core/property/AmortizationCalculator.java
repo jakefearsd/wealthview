@@ -10,7 +10,7 @@ public final class AmortizationCalculator {
 
     private static final MathContext MC = MathContext.DECIMAL128;
     static final int MONTHS_PER_YEAR = 12;
-    private static final BigDecimal MONTHLY_RATE_DIVISOR = new BigDecimal(MONTHS_PER_YEAR * 100);
+    private static final BigDecimal MONTHLY_RATE_DIVISOR = new BigDecimal(MONTHS_PER_YEAR);
 
     private AmortizationCalculator() {
     }
@@ -20,7 +20,7 @@ public final class AmortizationCalculator {
      * B = P * [(1+r)^n - (1+r)^p] / [(1+r)^n - 1]
      *
      * @param loanAmount principal
-     * @param annualRate annual interest rate as percentage (e.g., 6.5 for 6.5%)
+     * @param annualRate annual interest rate as decimal (e.g., 0.065 for 6.5%)
      * @param termMonths total loan term in months
      * @param startDate  loan start date
      * @param asOfDate   date to compute balance for

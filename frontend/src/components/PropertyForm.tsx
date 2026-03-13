@@ -16,6 +16,11 @@ interface Props {
     loanTermMonths: string; onLoanTermMonthsChange: (v: string) => void;
     loanStartDate: string; onLoanStartDateChange: (v: string) => void;
     useComputedBalance: boolean; onUseComputedBalanceChange: (v: boolean) => void;
+    showFinancialAssumptions: boolean; onShowFinancialAssumptionsChange: (v: boolean) => void;
+    annualAppreciationRate: string; onAnnualAppreciationRateChange: (v: string) => void;
+    annualPropertyTax: string; onAnnualPropertyTaxChange: (v: string) => void;
+    annualInsuranceCost: string; onAnnualInsuranceCostChange: (v: string) => void;
+    annualMaintenanceCost: string; onAnnualMaintenanceCostChange: (v: string) => void;
     onSubmit: () => void;
     onCancel: () => void;
 }
@@ -89,6 +94,39 @@ export default function PropertyForm(props: Props) {
                         <input type="checkbox" checked={props.useComputedBalance} onChange={(e) => props.onUseComputedBalanceChange(e.target.checked)} />
                         Use computed mortgage balance (amortization)
                     </label>
+                </div>
+            )}
+
+            <div style={{ marginTop: '1rem' }}>
+                <button
+                    onClick={() => props.onShowFinancialAssumptionsChange(!props.showFinancialAssumptions)}
+                    style={{ padding: '0.4rem 0.8rem', background: 'none', border: '1px solid #999', borderRadius: '4px', cursor: 'pointer', fontSize: '0.9rem' }}
+                >
+                    {props.showFinancialAssumptions ? 'Hide' : 'Show'} Financial Assumptions
+                </button>
+            </div>
+
+            {props.showFinancialAssumptions && (
+                <div style={{ marginTop: '1rem', padding: '1rem', background: '#f5f5f5', borderRadius: '8px' }}>
+                    <h4 style={{ marginBottom: '0.75rem', fontSize: '0.95rem' }}>Financial Assumptions</h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div>
+                            <label style={labelStyle}>Annual Appreciation Rate (%)</label>
+                            <input type="number" step="0.1" placeholder="e.g. 3.0" value={props.annualAppreciationRate} onChange={(e) => props.onAnnualAppreciationRateChange(e.target.value)} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Annual Property Tax ($)</label>
+                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualPropertyTax)} onChange={(e) => props.onAnnualPropertyTaxChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Annual Insurance Cost ($)</label>
+                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualInsuranceCost)} onChange={(e) => props.onAnnualInsuranceCostChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Annual Maintenance Cost ($)</label>
+                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualMaintenanceCost)} onChange={(e) => props.onAnnualMaintenanceCostChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                        </div>
+                    </div>
                 </div>
             )}
 
