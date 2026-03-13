@@ -283,24 +283,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 fromTraditional = need.multiply(traditional).divide(total, SCALE, ROUNDING).min(traditional);
                 fromRoth = need.subtract(fromTaxable).subtract(fromTraditional).min(roth).max(BigDecimal.ZERO);
             } else {
-                BigDecimal remaining = totalNeed;
-                BigDecimal[] pools = switch (withdrawalOrder) {
-                    case TRADITIONAL_FIRST -> new BigDecimal[]{traditional, taxable, roth};
-                    case ROTH_FIRST -> new BigDecimal[]{roth, taxable, traditional};
-                    default -> new BigDecimal[]{taxable, traditional, roth};
-                };
-
-                BigDecimal[] drawn = new BigDecimal[3];
-                for (int i = 0; i < 3; i++) {
-                    drawn[i] = remaining.min(pools[i]);
-                    remaining = remaining.subtract(drawn[i]);
-                }
-
-                switch (withdrawalOrder) {
-                    case TRADITIONAL_FIRST -> { fromTraditional = drawn[0]; fromTaxable = drawn[1]; fromRoth = drawn[2]; }
-                    case ROTH_FIRST -> { fromRoth = drawn[0]; fromTaxable = drawn[1]; fromTraditional = drawn[2]; }
-                    default -> { fromTaxable = drawn[0]; fromTraditional = drawn[1]; fromRoth = drawn[2]; }
-                }
+                var ordered = executeOrderedWithdrawals(totalNeed);
+                fromTaxable = ordered[0];
+                fromTraditional = ordered[1];
+                fromRoth = ordered[2];
             }
 
             taxable = taxable.subtract(fromTaxable);
@@ -400,6 +386,27 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         @Override
         public String logTag() {
             return "Projection with pools";
+        }
+
+        private BigDecimal[] executeOrderedWithdrawals(BigDecimal totalNeed) {
+            BigDecimal remaining = totalNeed;
+            BigDecimal[] pools = switch (withdrawalOrder) {
+                case TRADITIONAL_FIRST -> new BigDecimal[]{traditional, taxable, roth};
+                case ROTH_FIRST -> new BigDecimal[]{roth, taxable, traditional};
+                default -> new BigDecimal[]{taxable, traditional, roth};
+            };
+
+            BigDecimal[] drawn = new BigDecimal[3];
+            for (int i = 0; i < 3; i++) {
+                drawn[i] = remaining.min(pools[i]);
+                remaining = remaining.subtract(drawn[i]);
+            }
+
+            return switch (withdrawalOrder) {
+                case TRADITIONAL_FIRST -> new BigDecimal[]{drawn[1], drawn[0], drawn[2]};
+                case ROTH_FIRST -> new BigDecimal[]{drawn[1], drawn[2], drawn[0]};
+                default -> new BigDecimal[]{drawn[0], drawn[1], drawn[2]};
+            };
         }
 
         private void deductFromPools(BigDecimal amount) {

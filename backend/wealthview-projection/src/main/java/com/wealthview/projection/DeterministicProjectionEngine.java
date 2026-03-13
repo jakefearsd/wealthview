@@ -137,8 +137,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             BigDecimal contributions = BigDecimal.ZERO;
             BigDecimal withdrawals = BigDecimal.ZERO;
-            BigDecimal conversionAmount = BigDecimal.ZERO;
-            BigDecimal taxLiability = BigDecimal.ZERO;
 
             if (!retired) {
                 contributions = pool.applyContributions();
@@ -150,49 +148,21 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 yearsInRetirement++;
             }
 
-            IncomeSourceProcessor.IncomeSourceYearResult isResult = null;
-            BigDecimal totalActiveIncome = BigDecimal.ZERO;
-
-            if (pool.processIncomeSourcesEveryYear() || retired) {
-                isResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
-                        year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
-                suspendedLoss = isResult.suspendedLossCarryforward();
-                totalActiveIncome = isResult.totalCashInflow();
-            } else {
-                totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
-            }
-
-            BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(totalActiveIncome, BigDecimal.ZERO);
-
-            var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
-            conversionAmount = conversion.amountConverted();
-            taxLiability = conversion.taxLiability();
+            var incomeResult = processIncomeAndConversions(
+                    pool, incomeSources, age, yearsInRetirement, year, suspendedLoss);
+            suspendedLoss = incomeResult.suspendedLoss();
+            BigDecimal conversionAmount = incomeResult.conversionAmount();
+            BigDecimal taxLiability = incomeResult.taxLiability();
 
             if (retired) {
-                BigDecimal aggBalance = pool.getTotal();
-                BigDecimal portfolioNeed;
-
-                if (spendingData != null) {
-                    BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
-                    portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO).min(aggBalance);
-                    previousWithdrawal = portfolioNeed.add(totalActiveIncome);
-                } else {
-                    var ctx = new WithdrawalContext(
-                            aggBalance, startBalance, previousWithdrawal, pool.getWeightedReturn(),
-                            inflationRate, yearsInRetirement);
-                    portfolioNeed = strategy.computeWithdrawal(ctx).min(aggBalance);
-                    previousWithdrawal = portfolioNeed;
-                }
-
-                var withdrawalResult = pool.executeWithdrawals(
-                        portfolioNeed, year, effectiveOtherIncome, conversionAmount);
-                withdrawals = withdrawalResult.totalWithdrawn();
-                taxLiability = taxLiability.add(withdrawalResult.taxLiability());
-
-                if (pool.tracksSETax() && isResult != null
-                        && isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0) {
-                    taxLiability = taxLiability.add(isResult.selfEmploymentTax());
-                }
+                var retirementResult = processRetirementWithdrawals(
+                        pool, strategy, spendingData, age, yearsInRetirement, inflationRate,
+                        incomeResult.totalActiveIncome(), startBalance, previousWithdrawal,
+                        incomeResult.effectiveOtherIncome(), conversionAmount, year,
+                        incomeResult.isResult());
+                withdrawals = retirementResult.withdrawals();
+                taxLiability = taxLiability.add(retirementResult.taxLiability());
+                previousWithdrawal = retirementResult.previousWithdrawal();
             }
 
             pool.floorAtZero();
@@ -200,8 +170,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
             yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate, incomeSources);
-            if (isResult != null) {
-                yearDto = applyIncomeSourceFields(yearDto, isResult);
+            if (incomeResult.isResult() != null) {
+                yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
             }
             yearlyData.add(yearDto);
         }
@@ -216,6 +186,78 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var feasibility = computeFeasibility(yearlyData, spendingData, inflationRate);
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
                 yearsInRetirement, feasibility);
+    }
+
+    private record IncomeAndConversionResult(
+            IncomeSourceProcessor.IncomeSourceYearResult isResult,
+            BigDecimal totalActiveIncome,
+            BigDecimal effectiveOtherIncome,
+            BigDecimal conversionAmount,
+            BigDecimal taxLiability,
+            BigDecimal suspendedLoss) {
+    }
+
+    private IncomeAndConversionResult processIncomeAndConversions(
+            PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
+            int age, int yearsInRetirement, int year, BigDecimal suspendedLoss) {
+
+        IncomeSourceProcessor.IncomeSourceYearResult isResult = null;
+        BigDecimal totalActiveIncome;
+
+        if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
+            isResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
+                    year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
+            suspendedLoss = isResult.suspendedLossCarryforward();
+            totalActiveIncome = isResult.totalCashInflow();
+        } else {
+            totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
+        }
+
+        BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(totalActiveIncome, BigDecimal.ZERO);
+        var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
+
+        return new IncomeAndConversionResult(isResult, totalActiveIncome, effectiveOtherIncome,
+                conversion.amountConverted(), conversion.taxLiability(), suspendedLoss);
+    }
+
+    private record RetirementWithdrawalResult(
+            BigDecimal withdrawals,
+            BigDecimal taxLiability,
+            BigDecimal previousWithdrawal) {
+    }
+
+    private RetirementWithdrawalResult processRetirementWithdrawals(
+            PoolStrategy pool, WithdrawalStrategy strategy, SpendingData spendingData,
+            int age, int yearsInRetirement, BigDecimal inflationRate,
+            BigDecimal totalActiveIncome, BigDecimal startBalance, BigDecimal previousWithdrawal,
+            BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, int year,
+            IncomeSourceProcessor.IncomeSourceYearResult isResult) {
+
+        BigDecimal aggBalance = pool.getTotal();
+        BigDecimal portfolioNeed;
+
+        if (spendingData != null) {
+            BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
+            portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO).min(aggBalance);
+            previousWithdrawal = portfolioNeed.add(totalActiveIncome);
+        } else {
+            var ctx = new WithdrawalContext(
+                    aggBalance, startBalance, previousWithdrawal, pool.getWeightedReturn(),
+                    inflationRate, yearsInRetirement);
+            portfolioNeed = strategy.computeWithdrawal(ctx).min(aggBalance);
+            previousWithdrawal = portfolioNeed;
+        }
+
+        var withdrawalResult = pool.executeWithdrawals(
+                portfolioNeed, year, effectiveOtherIncome, conversionAmount);
+        BigDecimal taxLiability = withdrawalResult.taxLiability();
+
+        if (pool.tracksSETax() && isResult != null
+                && isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0) {
+            taxLiability = taxLiability.add(isResult.selfEmploymentTax());
+        }
+
+        return new RetirementWithdrawalResult(withdrawalResult.totalWithdrawn(), taxLiability, previousWithdrawal);
     }
 
     private boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {

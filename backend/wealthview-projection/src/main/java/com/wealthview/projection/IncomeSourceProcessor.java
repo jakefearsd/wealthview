@@ -84,38 +84,14 @@ class IncomeSourceProcessor {
 
             switch (source.incomeType()) {
                 case "rental_property" -> {
+                    var rental = processRentalProperty(source, nominal, taxYear, magi, suspendedLoss);
                     rentalIncomeGross = rentalIncomeGross.add(nominal);
-
-                    BigDecimal opExp = source.annualOperatingExpenses() != null
-                            ? source.annualOperatingExpenses() : BigDecimal.ZERO;
-                    BigDecimal mortInt = source.annualMortgageInterest() != null
-                            ? source.annualMortgageInterest() : BigDecimal.ZERO;
-                    BigDecimal propTax = source.annualPropertyTax() != null
-                            ? source.annualPropertyTax() : BigDecimal.ZERO;
-                    BigDecimal expenses = opExp.add(mortInt).add(propTax);
-                    rentalExpensesTotal = rentalExpensesTotal.add(expenses);
-
-                    BigDecimal depreciation = BigDecimal.ZERO;
-                    if (source.depreciationByYear() != null && source.depreciationMethod() != null
-                            && !"none".equals(source.depreciationMethod())) {
-                        depreciation = source.depreciationByYear()
-                                .getOrDefault(taxYear, BigDecimal.ZERO);
-                    }
-                    depreciationTotal = depreciationTotal.add(depreciation);
-
-                    // Cash flow = rent - expenses (depreciation is non-cash)
-                    BigDecimal cashFlow = nominal.subtract(expenses);
-                    totalCashInflow = totalCashInflow.add(cashFlow);
-
-                    // Taxable = rent - expenses - depreciation
-                    BigDecimal netTaxable = nominal.subtract(expenses).subtract(depreciation);
-
-                    var lossResult = rentalLossCalculator.applyLossRules(
-                            netTaxable, source.taxTreatment(),
-                            BigDecimal.ZERO, magi, suspendedLoss);
-                    rentalLossApplied = rentalLossApplied.add(lossResult.lossAppliedToIncome());
-                    suspendedLoss = lossResult.lossSuspended();
-                    totalTaxableIncome = totalTaxableIncome.add(lossResult.netTaxableIncome());
+                    rentalExpensesTotal = rentalExpensesTotal.add(rental.expenses());
+                    depreciationTotal = depreciationTotal.add(rental.depreciation());
+                    totalCashInflow = totalCashInflow.add(rental.cashFlow());
+                    rentalLossApplied = rentalLossApplied.add(rental.lossApplied());
+                    suspendedLoss = rental.newSuspendedLoss();
+                    totalTaxableIncome = totalTaxableIncome.add(rental.taxableIncome());
                 }
                 case "social_security" -> {
                     totalCashInflow = totalCashInflow.add(nominal);
@@ -150,6 +126,41 @@ class IncomeSourceProcessor {
                 totalCashInflow, totalTaxableIncome,
                 rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
                 rentalLossApplied, suspendedLoss, ssTaxable, seTax);
+    }
+
+    private record RentalResult(
+            BigDecimal cashFlow, BigDecimal taxableIncome, BigDecimal expenses,
+            BigDecimal depreciation, BigDecimal lossApplied, BigDecimal newSuspendedLoss) {
+    }
+
+    private RentalResult processRentalProperty(
+            ProjectionIncomeSourceInput source, BigDecimal nominal,
+            int taxYear, BigDecimal magi, BigDecimal suspendedLoss) {
+
+        BigDecimal opExp = source.annualOperatingExpenses() != null
+                ? source.annualOperatingExpenses() : BigDecimal.ZERO;
+        BigDecimal mortInt = source.annualMortgageInterest() != null
+                ? source.annualMortgageInterest() : BigDecimal.ZERO;
+        BigDecimal propTax = source.annualPropertyTax() != null
+                ? source.annualPropertyTax() : BigDecimal.ZERO;
+        BigDecimal expenses = opExp.add(mortInt).add(propTax);
+
+        BigDecimal depreciation = BigDecimal.ZERO;
+        if (source.depreciationByYear() != null && source.depreciationMethod() != null
+                && !"none".equals(source.depreciationMethod())) {
+            depreciation = source.depreciationByYear()
+                    .getOrDefault(taxYear, BigDecimal.ZERO);
+        }
+
+        BigDecimal cashFlow = nominal.subtract(expenses);
+        BigDecimal netTaxable = nominal.subtract(expenses).subtract(depreciation);
+
+        var lossResult = rentalLossCalculator.applyLossRules(
+                netTaxable, source.taxTreatment(),
+                BigDecimal.ZERO, magi, suspendedLoss);
+
+        return new RentalResult(cashFlow, lossResult.netTaxableIncome(), expenses,
+                depreciation, lossResult.lossAppliedToIncome(), lossResult.lossSuspended());
     }
 
     boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
