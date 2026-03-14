@@ -1290,7 +1290,38 @@ class DeterministicProjectionEngineTest {
     }
 
     @Test
-    void run_withSpendingTiers_gapBetweenTiers_usesFlat() {
+    void run_withSpendingTiers_gapBetweenTiers_blendsTransitionYear() {
+        // Conservation endAge=62 (exclusive, covers 54-61), Go-Go startAge=63
+        // Age 62 is a 1-year gap — should blend 50/50
+        var tierJson = tiers()
+                .tier("Conservation", 54, 62, "96000", "0")
+                .tier("Go-Go", 63, 70, "156000", "60000")
+                .build();
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.10}
+                """.formatted(LocalDate.now().getYear() - 62),
+                List.of(acct("5000000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("40000"), bd("20000"), tierJson));
+
+        var result = engine.run(input);
+
+        // Age 62: blend Conservation (96000, 0) + Go-Go (156000, 60000) => (126000, 30000)
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
+        assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
+
+        // Age 63: fully in Go-Go tier
+        var year2 = result.yearlyData().get(1);
+        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
+        assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("60000.0000"));
+    }
+
+    @Test
+    void run_withSpendingTiers_multiYearGap_blendsEachGapYear() {
+        // Conservation endAge=62, Go-Go startAge=65 — 3-year gap (62, 63, 64)
         var tierJson = tiers()
                 .tier("Conservation", 54, 62, "96000", "0")
                 .tier("Go-Go", 65, 70, "156000", "60000")
@@ -1300,18 +1331,45 @@ class DeterministicProjectionEngineTest {
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.10}
-                """.formatted(LocalDate.now().getYear() - 63),
+                """.formatted(LocalDate.now().getYear() - 62),
                 List.of(acct("5000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("40000"), bd("20000"), tierJson));
 
         var result = engine.run(input);
 
+        // Ages 62-64: all blend 50/50 between Conservation and Go-Go
+        for (int i = 0; i < 3; i++) {
+            var year = result.yearlyData().get(i);
+            assertThat(year.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
+            assertThat(year.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
+        }
+
+        // Age 65: fully in Go-Go
+        var year4 = result.yearlyData().get(3);
+        assertThat(year4.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
+    }
+
+    @Test
+    void run_withSpendingTiers_gapBeforeFirstTier_usesFlat() {
+        // Age below all tiers — no previous tier to blend with, so use flat fallback
+        var tierJson = tiers()
+                .tier("Go-Go", 65, 70, "156000", "60000")
+                .build();
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.10}
+                """.formatted(LocalDate.now().getYear() - 60),
+                List.of(acct("5000000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("40000"), bd("20000"), tierJson));
+
+        var result = engine.run(input);
+
+        // Age 60: no previous tier, should use flat
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("40000.0000"));
         assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("20000.0000"));
-
-        var year3 = result.yearlyData().get(2);
-        assertThat(year3.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
     }
 
     @Test

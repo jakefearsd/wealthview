@@ -401,12 +401,38 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private record ResolvedSpending(BigDecimal essential, BigDecimal discretionary) {}
 
+    private static final BigDecimal TWO = new BigDecimal("2");
+
     private ResolvedSpending resolveSpending(SpendingData spending, int age) {
         if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
             for (var tier : spending.spendingTiers()) {
                 if (age >= tier.startAge() && (tier.endAge() == null || age < tier.endAge())) {
                     return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
                 }
+            }
+
+            // Age is in a gap — find the previous and next tiers and blend 50/50
+            SpendingTierData prev = null;
+            SpendingTierData next = null;
+            for (var tier : spending.spendingTiers()) {
+                if (tier.endAge() != null && tier.endAge() <= age) {
+                    if (prev == null || tier.endAge() > prev.endAge()) {
+                        prev = tier;
+                    }
+                }
+                if (tier.startAge() > age) {
+                    if (next == null || tier.startAge() < next.startAge()) {
+                        next = tier;
+                    }
+                }
+            }
+
+            if (prev != null && next != null) {
+                var essential = prev.essentialExpenses().add(next.essentialExpenses())
+                        .divide(TWO, SCALE, ROUNDING);
+                var discretionary = prev.discretionaryExpenses().add(next.discretionaryExpenses())
+                        .divide(TWO, SCALE, ROUNDING);
+                return new ResolvedSpending(essential, discretionary);
             }
         }
         return new ResolvedSpending(spending.essentialExpenses(), spending.discretionaryExpenses());
