@@ -63,6 +63,32 @@ class AmortizationCalculatorTest {
     }
 
     @Test
+    void monthlyPayment_standardLoan_matchesExpected() {
+        var payment = AmortizationCalculator.monthlyPayment(
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360);
+
+        // Standard 30yr @ 6.5% on $300K => ~1896.20
+        assertThat(payment.setScale(2, RoundingMode.HALF_UP))
+                .isEqualByComparingTo("1896.20");
+    }
+
+    @Test
+    void monthlyPayment_zeroRate_simpleDivision() {
+        var payment = AmortizationCalculator.monthlyPayment(
+                new BigDecimal("120000"), BigDecimal.ZERO, 360);
+
+        // 120000 / 360 = 333.3333
+        assertThat(payment.setScale(4, RoundingMode.HALF_UP))
+                .isEqualByComparingTo("333.3333");
+    }
+
+    @Test
+    void monthlyPayment_nullInputs_returnsNull() {
+        assertThat(AmortizationCalculator.monthlyPayment(null, new BigDecimal("0.065"), 360)).isNull();
+        assertThat(AmortizationCalculator.monthlyPayment(new BigDecimal("300000"), null, 360)).isNull();
+    }
+
+    @Test
     void remainingBalance_beforeStartDate_returnsLoanAmount() {
         var balance = AmortizationCalculator.remainingBalance(
                 new BigDecimal("300000"), new BigDecimal("0.065"),

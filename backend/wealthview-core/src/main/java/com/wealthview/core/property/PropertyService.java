@@ -156,7 +156,7 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {
-        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var fromDate = from.atDay(1);
@@ -178,13 +178,16 @@ public class PropertyService {
                     from, to, expenseByMonth);
         }
 
+        var derivedTotal = computeDerivedMonthlyExpenses(property).values().stream()
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         var entries = new ArrayList<MonthlyCashFlowEntry>();
         var current = from;
         var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
         while (!current.isAfter(to)) {
             var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
-            var monthExpense = expenseByMonth.getOrDefault(current, BigDecimal.ZERO);
+            var monthExpense = expenseByMonth.getOrDefault(current, BigDecimal.ZERO).add(derivedTotal);
 
             entries.add(new MonthlyCashFlowEntry(
                     current.format(formatter),
@@ -202,7 +205,7 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowDetailEntry> getMonthlyCashFlowDetail(UUID tenantId, UUID propertyId,
                                                                       YearMonth from, YearMonth to) {
-        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
 
         var fromDate = from.atDay(1);
@@ -224,13 +227,18 @@ public class PropertyService {
                     expense.getCategory(), from, to, expenseByCategoryByMonth);
         }
 
+        var derivedExpenses = computeDerivedMonthlyExpenses(property);
+
         var entries = new ArrayList<MonthlyCashFlowDetailEntry>();
         var current = from;
         var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
         while (!current.isAfter(to)) {
             var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
-            var categoryMap = expenseByCategoryByMonth.getOrDefault(current, Map.of());
+            var categoryMap = new HashMap<>(expenseByCategoryByMonth.getOrDefault(current, Map.of()));
+            for (var entry : derivedExpenses.entrySet()) {
+                categoryMap.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+            }
             var totalExpenses = categoryMap.values().stream()
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -288,6 +296,30 @@ public class PropertyService {
                 bucket.merge(month, amount, BigDecimal::add);
             }
         }
+    }
+
+    Map<String, BigDecimal> computeDerivedMonthlyExpenses(PropertyEntity property) {
+        var result = new HashMap<String, BigDecimal>();
+        var twelve = new BigDecimal("12");
+
+        if (property.getAnnualPropertyTax() != null) {
+            result.put("tax", property.getAnnualPropertyTax().divide(twelve, 4, RoundingMode.HALF_UP));
+        }
+        if (property.getAnnualInsuranceCost() != null) {
+            result.put("insurance", property.getAnnualInsuranceCost().divide(twelve, 4, RoundingMode.HALF_UP));
+        }
+        if (property.getAnnualMaintenanceCost() != null) {
+            result.put("maintenance", property.getAnnualMaintenanceCost().divide(twelve, 4, RoundingMode.HALF_UP));
+        }
+        if (property.hasLoanDetails()) {
+            var mortgage = AmortizationCalculator.monthlyPayment(
+                    property.getLoanAmount(), property.getAnnualInterestRate(), property.getLoanTermMonths());
+            if (mortgage != null) {
+                result.put("mortgage", mortgage);
+            }
+        }
+
+        return result;
     }
 
     BigDecimal computeEffectiveBalance(PropertyEntity property) {
