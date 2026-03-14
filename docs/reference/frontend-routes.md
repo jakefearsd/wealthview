@@ -1,4 +1,4 @@
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 # Frontend Pages
 
@@ -33,5 +33,5 @@ WealthView's frontend is a React 18 SPA built with TypeScript and Vite. Below is
 ## Related Docs
 
 - [Architecture](architecture.md) — Project structure and frontend directory layout
-- [Development Guide](development.md) — Frontend build and test commands
-- [Feature Walkthrough](feature_walkthrough.md) — Step-by-step guided tour of all features
+- [Development Guide](../development.md) — Frontend build and test commands
+- [Feature Walkthrough](../feature_walkthrough.md) — Step-by-step guided tour of all features

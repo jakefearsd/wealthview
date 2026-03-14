@@ -1,4 +1,4 @@
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 # API Reference
 
@@ -144,5 +144,5 @@ Returns paginated list of audit events with action, entity type, entity ID, time
 
 ## Related Docs
 
-- [Administration Guide](administration.md) — Role matrix and admin capabilities
-- [Data Model Reference](data_model.md) — Entity definitions and relationships
+- [Administration Guide](../administration/tenant-and-user-management.md) — Role matrix and admin capabilities
+- [Data Model Reference](data-model.md) — Entity definitions and relationships

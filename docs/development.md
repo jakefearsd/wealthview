@@ -122,5 +122,5 @@ xdg-open wealthview-app/target/site/jacoco/index.html # Linux
 
 ## Related Docs
 
-- [Architecture](architecture.md) — Module structure and dependency rules
-- [Configuration](configuration.md) — Environment variables and Spring profiles
+- [Architecture](reference/architecture.md) — Module structure and dependency rules
+- [Configuration](reference/configuration.md) — Environment variables and Spring profiles

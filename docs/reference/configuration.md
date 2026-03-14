@@ -1,4 +1,4 @@
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 # Configuration Reference
 
@@ -50,5 +50,5 @@ Configured in `application.yml` (not typically overridden via env vars):
 
 ## Related Docs
 
-- [Deployment Guide](deployment.md) — Production security checklist and resource requirements
-- [Development Guide](development.md) — Local setup and build commands
+- [Deployment Guide](../deployment/production-setup.md) — Production security checklist and resource requirements
+- [Development Guide](../development.md) — Local setup and build commands
