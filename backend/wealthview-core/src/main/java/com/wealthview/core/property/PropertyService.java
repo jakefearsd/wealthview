@@ -136,6 +136,15 @@ public class PropertyService {
     }
 
     @Transactional
+    public void deleteExpense(UUID tenantId, UUID propertyId, UUID expenseId) {
+        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+        var expense = expenseRepository.findById(expenseId)
+                .orElseThrow(() -> new EntityNotFoundException("Expense not found"));
+        expenseRepository.delete(expense);
+    }
+
+    @Transactional
     public void addExpense(UUID tenantId, UUID propertyId, PropertyExpenseRequest request) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));

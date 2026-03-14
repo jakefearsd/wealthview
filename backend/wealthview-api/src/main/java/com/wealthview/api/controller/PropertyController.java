@@ -97,6 +97,15 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.listExpenses(principal.tenantId(), id));
     }
 
+    @DeleteMapping("/{id}/expenses/{expenseId}")
+    public ResponseEntity<Void> deleteExpense(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @PathVariable UUID expenseId) {
+        propertyService.deleteExpense(principal.tenantId(), id, expenseId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/expenses")
     public ResponseEntity<Void> addExpense(
             @AuthenticationPrincipal TenantUserPrincipal principal,

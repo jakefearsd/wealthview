@@ -672,6 +672,38 @@ class PropertyServiceTest {
     }
 
     @Test
+    void deleteExpense_existingExpense_deletesSuccessfully() {
+        var propertyId = UUID.randomUUID();
+        var expenseId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var expense = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 3, 1), new BigDecimal("500"), "maintenance", "Plumbing fix");
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+
+        propertyService.deleteExpense(tenantId, propertyId, expenseId);
+
+        verify(expenseRepository).delete(expense);
+    }
+
+    @Test
+    void deleteExpense_nonExistentExpense_throwsNotFound() {
+        var propertyId = UUID.randomUUID();
+        var expenseId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> propertyService.deleteExpense(tenantId, propertyId, expenseId))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
     void listExpenses_nonExistentProperty_throwsNotFound() {
         var propertyId = UUID.randomUUID();
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))

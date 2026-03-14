@@ -342,6 +342,16 @@ class PropertyControllerTest {
     }
 
     @Test
+    void deleteExpense_returns204() throws Exception {
+        var expenseId = UUID.randomUUID();
+        doNothing().when(propertyService).deleteExpense(TENANT_ID, PROPERTY_ID, expenseId);
+
+        mockMvc.perform(delete("/api/v1/properties/{id}/expenses/{expenseId}", PROPERTY_ID, expenseId)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void selectZpid_returns200() throws Exception {
         when(syncService.selectZpid(TENANT_ID, PROPERTY_ID, "12345"))
                 .thenReturn(ValuationRefreshResponse.updated(new BigDecimal("400000")));

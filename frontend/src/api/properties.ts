@@ -40,6 +40,10 @@ export async function listPropertyExpenses(propertyId: string): Promise<Property
     return data;
 }
 
+export async function deletePropertyExpense(propertyId: string, expenseId: string): Promise<void> {
+    await client.delete(`/properties/${propertyId}/expenses/${expenseId}`);
+}
+
 export async function addPropertyExpense(
     propertyId: string,
     request: PropertyExpenseRequest

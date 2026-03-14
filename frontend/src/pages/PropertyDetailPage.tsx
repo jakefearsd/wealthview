@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { getProperty, updateProperty, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics, listPropertyExpenses } from '../api/properties';
+import { getProperty, updateProperty, addPropertyExpense, deletePropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics, listPropertyExpenses } from '../api/properties';
 import { listIncomeSources } from '../api/incomeSources';
 import type { Property, ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
@@ -179,6 +179,18 @@ export default function PropertyDetailPage() {
             refetchExpenses();
         } catch {
             toast.error('Failed to add expense');
+        }
+    }
+
+    async function handleDeleteExpense(expenseId: string) {
+        if (!confirm('Delete this expense?')) return;
+        try {
+            await deletePropertyExpense(id!, expenseId);
+            toast.success('Expense deleted');
+            refetchCashFlow();
+            refetchExpenses();
+        } catch {
+            toast.error('Failed to delete expense');
         }
     }
 
@@ -393,6 +405,7 @@ export default function PropertyDetailPage() {
                                 <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
                                 <th style={{ padding: '0.5rem' }}>Frequency</th>
                                 <th style={{ padding: '0.5rem' }}>Description</th>
+                                {canWrite && <th style={{ padding: '0.5rem', width: '1px' }}></th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -414,6 +427,16 @@ export default function PropertyDetailPage() {
                                         </span>
                                     </td>
                                     <td style={{ padding: '0.5rem', color: '#666' }}>{exp.description ?? ''}</td>
+                                    {canWrite && (
+                                        <td style={{ padding: '0.5rem' }}>
+                                            <button
+                                                onClick={() => handleDeleteExpense(exp.id)}
+                                                style={{ padding: '0.2rem 0.5rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                                            >
+                                                Delete
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
