@@ -45,7 +45,7 @@ public class FinnhubClient implements PriceFeedClient {
 
             return Optional.of(new QuoteResponse(symbol, dto.c()));
         } catch (RestClientException e) {
-            log.warn("Failed to fetch quote for symbol {}: {}", symbol, e.getMessage());
+            log.warn("Failed to fetch quote for symbol {}", symbol, e);
             return Optional.empty();
         }
     }
@@ -77,7 +77,7 @@ public class FinnhubClient implements PriceFeedClient {
 
             return Optional.of(new CandleResponse(symbol, entries));
         } catch (RestClientException e) {
-            log.warn("Failed to fetch candles for symbol {}: {}", symbol, e.getMessage());
+            log.warn("Failed to fetch candles for symbol {}", symbol, e);
             return Optional.empty();
         }
     }

@@ -23,6 +23,7 @@ import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -60,6 +61,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     @Override
     public ProjectionResultResponse run(ProjectionInput input) {
+        MDC.put("operation", "projection");
+        MDC.put("scenarioName", input.scenarioName() != null ? input.scenarioName() : "unnamed");
+        try {
+            return runInternal(input);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("scenarioName");
+        }
+    }
+
+    private ProjectionResultResponse runInternal(ProjectionInput input) {
         var accounts = input.accounts();
         var params = parseParams(input.paramsJson());
 
@@ -336,7 +348,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     parseOptionalBigDecimal(node, "target_bracket_rate"),
                     parseOptionalInt(node, "roth_conversion_start_year"));
         } catch (com.fasterxml.jackson.core.JsonProcessingException | NumberFormatException e) {
-            log.warn("Failed to parse params_json: {}", e.getMessage());
+            log.warn("Failed to parse params_json", e);
             return defaultParams();
         }
     }
@@ -469,7 +481,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 tiers = tierList;
             }
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.warn("Failed to parse spending_tiers: {}", e.getMessage());
+            log.warn("Failed to parse spending_tiers", e);
         }
 
         return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(), tiers);
