@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class IncomeSourceProcessorTest {
@@ -236,6 +239,170 @@ class IncomeSourceProcessorTest {
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    // --- Per-source income map ---
+
+    @Test
+    void process_rentalWithExpenses_incomeBySourceContainsNetCashFlow() {
+        var rentalId = UUID.randomUUID();
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "Rental", "rental_property",
+                new BigDecimal("24000"), 65, null,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("3600"),   // annualOperatingExpenses (insurance+maintenance)
+                new BigDecimal("9600"),   // annualMortgageInterest
+                new BigDecimal("5000"),   // annualPropertyTax
+                null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("5800")));
+
+        var result = processor.process(
+                List.of(rental), 67, 3, 2028,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // NET = 24000 - (3600 + 9600 + 5000) = 24000 - 18200 = 5800
+        assertThat(result.incomeBySource()).containsKey(rentalId.toString());
+        assertThat(result.incomeBySource().get(rentalId.toString()))
+                .isEqualByComparingTo(new BigDecimal("5800"));
+    }
+
+    @Test
+    void process_pensionSource_incomeBySourceContainsNominal() {
+        var pensionId = UUID.randomUUID();
+        var pension = new ProjectionIncomeSourceInput(
+                pensionId, "Pension", "pension",
+                new BigDecimal("30000"), 65, null,
+                BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null);
+
+        var result = processor.process(
+                List.of(pension), 67, 3, 2028,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.incomeBySource()).containsKey(pensionId.toString());
+        assertThat(result.incomeBySource().get(pensionId.toString()))
+                .isEqualByComparingTo(new BigDecimal("30000"));
+    }
+
+    @Test
+    void process_multipleSources_incomeBySourceContainsAllActive() {
+        var rentalId = UUID.randomUUID();
+        var pensionId = UUID.randomUUID();
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "Rental", "rental_property",
+                new BigDecimal("24000"), 65, null,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("6000"), null, null, null, null);
+        var pension = new ProjectionIncomeSourceInput(
+                pensionId, "Pension", "pension",
+                new BigDecimal("20000"), 65, null,
+                BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("18000")));
+
+        var result = processor.process(
+                List.of(rental, pension), 67, 3, 2028,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.incomeBySource()).hasSize(2);
+        // Rental NET = 24000 - 6000 = 18000
+        assertThat(result.incomeBySource().get(rentalId.toString()))
+                .isEqualByComparingTo(new BigDecimal("18000"));
+        assertThat(result.incomeBySource().get(pensionId.toString()))
+                .isEqualByComparingTo(new BigDecimal("20000"));
+    }
+
+    @Test
+    void process_inactiveSource_notInIncomeBySource() {
+        var pensionId = UUID.randomUUID();
+        var pension = new ProjectionIncomeSourceInput(
+                pensionId, "Pension", "pension",
+                new BigDecimal("30000"), 70, null,
+                BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null);
+
+        var result = processor.process(
+                List.of(pension), 65, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.incomeBySource()).isEmpty();
+    }
+
+    @Test
+    void process_emptyList_incomeBySourceIsEmpty() {
+        var result = processor.process(
+                Collections.emptyList(), 65, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.incomeBySource()).isEmpty();
+    }
+
+    // --- Rental transition multiplier on expenses ---
+
+    @Test
+    void process_rentalAtEndAge_halvesExpensesAndGross() {
+        var rentalId = UUID.randomUUID();
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "Rental", "rental_property",
+                new BigDecimal("24000"), 65, 70,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("3600"),   // annualOperatingExpenses
+                new BigDecimal("9600"),   // annualMortgageInterest
+                new BigDecimal("5000"),   // annualPropertyTax
+                null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+
+        var result = processor.process(
+                List.of(rental), 70, 6, 2031,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // gross=24000*0.5=12000, expenses=(3600+9600+5000)*0.5=9100, net=2900
+        assertThat(result.incomeBySource().get(rentalId.toString()))
+                .isEqualByComparingTo(new BigDecimal("2900"));
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("2900"));
+        assertThat(result.rentalIncomeGross()).isEqualByComparingTo(new BigDecimal("12000"));
+        assertThat(result.rentalExpensesTotal()).isEqualByComparingTo(new BigDecimal("9100"));
+    }
+
+    @Test
+    void process_rentalAtStartAge_halvesExpensesAndGross() {
+        var rentalId = UUID.randomUUID();
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "Rental", "rental_property",
+                new BigDecimal("24000"), 65, 70,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("3600"),
+                new BigDecimal("9600"),
+                new BigDecimal("5000"),
+                null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
+
+        var result = processor.process(
+                List.of(rental), 65, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // Same math: gross halved, expenses halved
+        assertThat(result.incomeBySource().get(rentalId.toString()))
+                .isEqualByComparingTo(new BigDecimal("2900"));
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("2900"));
+        assertThat(result.rentalIncomeGross()).isEqualByComparingTo(new BigDecimal("12000"));
+        assertThat(result.rentalExpensesTotal()).isEqualByComparingTo(new BigDecimal("9100"));
     }
 
     // --- Helper ---

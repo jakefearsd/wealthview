@@ -7,7 +7,9 @@ import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Processes income sources (rental properties, Social Security, part-time work, etc.)
@@ -39,7 +41,8 @@ class IncomeSourceProcessor {
             BigDecimal rentalLossApplied,
             BigDecimal suspendedLossCarryforward,
             BigDecimal socialSecurityTaxable,
-            BigDecimal selfEmploymentTax
+            BigDecimal selfEmploymentTax,
+            Map<String, BigDecimal> incomeBySource
     ) {}
 
     IncomeSourceYearResult process(
@@ -49,7 +52,8 @@ class IncomeSourceProcessor {
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                    BigDecimal.ZERO, BigDecimal.ZERO, priorSuspendedLoss, BigDecimal.ZERO, BigDecimal.ZERO);
+                    BigDecimal.ZERO, BigDecimal.ZERO, priorSuspendedLoss, BigDecimal.ZERO, BigDecimal.ZERO,
+                    Map.of());
         }
 
         BigDecimal totalCashInflow = BigDecimal.ZERO;
@@ -61,6 +65,7 @@ class IncomeSourceProcessor {
         BigDecimal suspendedLoss = priorSuspendedLoss;
         BigDecimal ssTaxable = BigDecimal.ZERO;
         BigDecimal seTax = BigDecimal.ZERO;
+        Map<String, BigDecimal> incomeBySource = new HashMap<>();
 
         // Collect non-SS income first (needed for SS provisional income calc)
         BigDecimal nonSSIncome = BigDecimal.ZERO;
@@ -71,8 +76,9 @@ class IncomeSourceProcessor {
                 continue;
             }
 
+            BigDecimal multiplier = transitionMultiplier(source, age);
             BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
-                    .multiply(transitionMultiplier(source, age)).setScale(SCALE, ROUNDING);
+                    .multiply(multiplier).setScale(SCALE, ROUNDING);
             if ("social_security".equals(source.incomeType())) {
                 ssBenefit = ssBenefit.add(nominal);
             } else {
@@ -85,12 +91,14 @@ class IncomeSourceProcessor {
                 continue;
             }
 
+            BigDecimal multiplier = transitionMultiplier(source, age);
             BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
-                    .multiply(transitionMultiplier(source, age)).setScale(SCALE, ROUNDING);
+                    .multiply(multiplier).setScale(SCALE, ROUNDING);
 
+            String sourceKey = source.id().toString();
             switch (source.incomeType()) {
                 case "rental_property" -> {
-                    var rental = processRentalProperty(source, nominal, taxYear, magi, suspendedLoss);
+                    var rental = processRentalProperty(source, nominal, taxYear, magi, suspendedLoss, multiplier);
                     rentalIncomeGross = rentalIncomeGross.add(nominal);
                     rentalExpensesTotal = rentalExpensesTotal.add(rental.expenses());
                     depreciationTotal = depreciationTotal.add(rental.depreciation());
@@ -98,6 +106,7 @@ class IncomeSourceProcessor {
                     rentalLossApplied = rentalLossApplied.add(rental.lossApplied());
                     suspendedLoss = rental.newSuspendedLoss();
                     totalTaxableIncome = totalTaxableIncome.add(rental.taxableIncome());
+                    incomeBySource.merge(sourceKey, rental.cashFlow(), BigDecimal::add);
                 }
                 case "social_security" -> {
                     totalCashInflow = totalCashInflow.add(nominal);
@@ -107,6 +116,7 @@ class IncomeSourceProcessor {
                             "married_filing_jointly".equals(filingStatus) ? "married_filing_jointly" : "single");
                     ssTaxable = ssTaxable.add(taxableAmount);
                     totalTaxableIncome = totalTaxableIncome.add(taxableAmount);
+                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
                 }
                 case "part_time_work" -> {
                     totalCashInflow = totalCashInflow.add(nominal);
@@ -117,6 +127,7 @@ class IncomeSourceProcessor {
                     } else {
                         totalTaxableIncome = totalTaxableIncome.add(nominal);
                     }
+                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
                 }
                 default -> {
                     // pension, annuity, other — fully taxable unless tax_free
@@ -124,6 +135,7 @@ class IncomeSourceProcessor {
                     if (!"tax_free".equals(source.taxTreatment())) {
                         totalTaxableIncome = totalTaxableIncome.add(nominal);
                     }
+                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
                 }
             }
         }
@@ -131,7 +143,8 @@ class IncomeSourceProcessor {
         return new IncomeSourceYearResult(
                 totalCashInflow, totalTaxableIncome,
                 rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
-                rentalLossApplied, suspendedLoss, ssTaxable, seTax);
+                rentalLossApplied, suspendedLoss, ssTaxable, seTax,
+                Map.copyOf(incomeBySource));
     }
 
     private record RentalResult(
@@ -141,7 +154,8 @@ class IncomeSourceProcessor {
 
     private RentalResult processRentalProperty(
             ProjectionIncomeSourceInput source, BigDecimal nominal,
-            int taxYear, BigDecimal magi, BigDecimal suspendedLoss) {
+            int taxYear, BigDecimal magi, BigDecimal suspendedLoss,
+            BigDecimal transitionMultiplier) {
 
         BigDecimal opExp = source.annualOperatingExpenses() != null
                 ? source.annualOperatingExpenses() : BigDecimal.ZERO;
@@ -149,7 +163,8 @@ class IncomeSourceProcessor {
                 ? source.annualMortgageInterest() : BigDecimal.ZERO;
         BigDecimal propTax = source.annualPropertyTax() != null
                 ? source.annualPropertyTax() : BigDecimal.ZERO;
-        BigDecimal expenses = opExp.add(mortInt).add(propTax);
+        BigDecimal expenses = opExp.add(mortInt).add(propTax)
+                .multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
 
         BigDecimal depreciation = BigDecimal.ZERO;
         if (source.depreciationByYear() != null && source.depreciationMethod() != null
