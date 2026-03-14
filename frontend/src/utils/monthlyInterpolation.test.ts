@@ -29,6 +29,7 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         suspended_loss_carryforward: null,
         social_security_taxable: null,
         self_employment_tax: null,
+        income_by_source: null,
         ...overrides,
     };
 }

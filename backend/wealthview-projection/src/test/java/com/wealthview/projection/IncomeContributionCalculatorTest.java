@@ -208,4 +208,34 @@ class IncomeContributionCalculatorTest {
 
         assertThat(result).isEqualByComparingTo(new BigDecimal("30000"));
     }
+
+    @Test
+    void compute_rentalPropertyWithExpenses_returnsNetAmount() {
+        var rental = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental", "rental_property",
+                new BigDecimal("24000"), 60, null,
+                new BigDecimal("0"), false, "active_participation",
+                new BigDecimal("3600"),   // operating expenses
+                new BigDecimal("9600"),   // mortgage interest
+                new BigDecimal("5000"),   // property tax
+                null, null);
+
+        var result = calculator.compute(List.of(rental), 65, 1);
+
+        // NET = 24000 - (3600 + 9600 + 5000) = 24000 - 18200 = 5800
+        assertThat(result).isEqualByComparingTo(new BigDecimal("5800"));
+    }
+
+    @Test
+    void compute_rentalPropertyNoExpenses_returnsGrossAmount() {
+        var rental = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental", "rental_property",
+                new BigDecimal("24000"), 60, null,
+                new BigDecimal("0"), false, "active_participation",
+                null, null, null, null, null);
+
+        var result = calculator.compute(List.of(rental), 65, 1);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("24000"));
+    }
 }

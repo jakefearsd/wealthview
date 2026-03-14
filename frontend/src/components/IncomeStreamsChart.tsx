@@ -23,19 +23,12 @@ export default function IncomeStreamsChart({ data, incomeSources, retirementYear
     const retiredYears = data.filter(y => y.retired);
     if (retiredYears.length === 0 || incomeSources.length === 0) return null;
 
-    const retirementStartAge = retiredYears[0].age;
-
     const chartData = retiredYears.map(y => {
-        const yearsFromRetirement = y.age - retirementStartAge;
         const row: Record<string, number | string> = { year: y.year, age: y.age };
 
         for (const source of incomeSources) {
-            const active = y.age >= source.start_age && (source.end_age == null || y.age <= source.end_age);
-            if (source.one_time) {
-                row[source.income_source_id] = y.age === source.start_age ? source.effective_amount : 0;
-            } else if (active) {
-                row[source.income_source_id] =
-                    Math.round(source.effective_amount * Math.pow(1 + source.inflation_rate, yearsFromRetirement) * 100) / 100;
+            if (y.income_by_source && source.income_source_id in y.income_by_source) {
+                row[source.income_source_id] = y.income_by_source[source.income_source_id];
             } else {
                 row[source.income_source_id] = 0;
             }

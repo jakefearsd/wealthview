@@ -46,12 +46,32 @@ class IncomeContributionCalculator {
     }
 
     private BigDecimal computeAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
+        BigDecimal gross;
         if (source.oneTime() || yearsInRetirement <= 1
                 || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
-            return source.annualAmount();
+            gross = source.annualAmount();
+        } else {
+            BigDecimal factor = BigDecimal.ONE.add(source.inflationRate())
+                    .pow(yearsInRetirement - 1);
+            gross = source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
         }
-        BigDecimal factor = BigDecimal.ONE.add(source.inflationRate())
-                .pow(yearsInRetirement - 1);
-        return source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
+        if ("rental_property".equals(source.incomeType())) {
+            gross = gross.subtract(sumExpenses(source));
+        }
+        return gross;
+    }
+
+    private BigDecimal sumExpenses(ProjectionIncomeSourceInput source) {
+        BigDecimal total = BigDecimal.ZERO;
+        if (source.annualOperatingExpenses() != null) {
+            total = total.add(source.annualOperatingExpenses());
+        }
+        if (source.annualMortgageInterest() != null) {
+            total = total.add(source.annualMortgageInterest());
+        }
+        if (source.annualPropertyTax() != null) {
+            total = total.add(source.annualPropertyTax());
+        }
+        return total;
     }
 }

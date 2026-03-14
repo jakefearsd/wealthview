@@ -152,6 +152,8 @@ export default function ProjectionDetailPage() {
                                     <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                                         <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
                                         <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Start Age</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>End Age</th>
                                         <th style={{ textAlign: 'right', padding: '0.5rem' }}>Base Amount</th>
                                         <th style={{ textAlign: 'right', padding: '0.5rem' }}>Override</th>
                                         <th style={{ textAlign: 'right', padding: '0.5rem' }}>Effective</th>
@@ -162,6 +164,8 @@ export default function ProjectionDetailPage() {
                                         <tr key={is.income_source_id} style={{ borderBottom: '1px solid #f0f0f0' }}>
                                             <td style={{ padding: '0.5rem' }}>{is.name}</td>
                                             <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.start_age}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(is.annual_amount)}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#666' }}>
                                                 {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}

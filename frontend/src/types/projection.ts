@@ -66,6 +66,7 @@ export interface ProjectionYear {
     suspended_loss_carryforward: number | null;
     social_security_taxable: number | null;
     self_employment_tax: number | null;
+    income_by_source: Record<string, number> | null;
 }
 
 export interface SpendingFeasibility {
