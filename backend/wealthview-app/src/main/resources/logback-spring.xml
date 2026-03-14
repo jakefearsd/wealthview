@@ -5,7 +5,7 @@
     <springProfile name="dev | default">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{HH:mm:ss.SSS} %-5level [%X{requestId:-}] [t:%X{tenantId:-}] [u:%X{userId:-}] %logger{36} - %msg%n</pattern>
+                <pattern>%d{HH:mm:ss.SSS} %-5level [%X{requestId:-}] [t:%X{tenantId:-}] [u:%X{userId:-}] [op:%X{operation:-}] %logger{36} - %msg%n</pattern>
             </encoder>
         </appender>
         <root level="INFO">
@@ -22,6 +22,8 @@
             <appender-ref ref="JSON"/>
         </root>
     </springProfile>
+
+    <logger name="org.hibernate.SQL_SLOW" level="WARN"/>
 
     <!-- IT profile: minimal logging at WARN -->
     <springProfile name="it">
