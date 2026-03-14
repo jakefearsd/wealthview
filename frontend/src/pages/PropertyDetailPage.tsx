@@ -1,16 +1,90 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { getProperty, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics } from '../api/properties';
+import { getProperty, updateProperty, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics, listPropertyExpenses } from '../api/properties';
 import { listIncomeSources } from '../api/incomeSources';
-import type { ZillowSearchResult } from '../types/property';
+import type { Property, ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
 import PropertyValuationSection from '../components/PropertyValuationSection';
 import PropertyCashFlowSection from '../components/PropertyCashFlowSection';
+import PropertyForm from '../components/PropertyForm';
 import toast from 'react-hot-toast';
+
+interface PropertyFormData {
+    address: string;
+    purchasePrice: string;
+    purchaseDate: string;
+    currentValue: string;
+    mortgageBalance: string;
+    showLoanDetails: boolean;
+    loanAmount: string;
+    annualInterestRate: string;
+    loanTermMonths: string;
+    loanStartDate: string;
+    useComputedBalance: boolean;
+    propertyType: string;
+    showFinancialAssumptions: boolean;
+    annualAppreciationRate: string;
+    annualPropertyTax: string;
+    annualInsuranceCost: string;
+    annualMaintenanceCost: string;
+}
+
+const initialFormData: PropertyFormData = {
+    address: '',
+    purchasePrice: '',
+    purchaseDate: '',
+    currentValue: '',
+    mortgageBalance: '',
+    showLoanDetails: false,
+    loanAmount: '',
+    annualInterestRate: '',
+    loanTermMonths: '',
+    loanStartDate: '',
+    useComputedBalance: false,
+    propertyType: 'primary_residence',
+    showFinancialAssumptions: false,
+    annualAppreciationRate: '',
+    annualPropertyTax: '',
+    annualInsuranceCost: '',
+    annualMaintenanceCost: '',
+};
+
+function buildRequest(data: PropertyFormData) {
+    return {
+        address: data.address,
+        purchase_price: parseFloat(data.purchasePrice),
+        purchase_date: data.purchaseDate,
+        current_value: parseFloat(data.currentValue),
+        mortgage_balance: data.mortgageBalance ? parseFloat(data.mortgageBalance) : undefined,
+        property_type: data.propertyType,
+        ...(data.showLoanDetails && data.loanAmount ? {
+            loan_amount: parseFloat(data.loanAmount),
+            annual_interest_rate: parseFloat(data.annualInterestRate) / 100,
+            loan_term_months: parseInt(data.loanTermMonths),
+            loan_start_date: data.loanStartDate,
+            use_computed_balance: data.useComputedBalance,
+        } : {}),
+        annual_appreciation_rate: data.annualAppreciationRate ? parseFloat(data.annualAppreciationRate) / 100 : undefined,
+        annual_property_tax: data.annualPropertyTax ? parseFloat(data.annualPropertyTax) : undefined,
+        annual_insurance_cost: data.annualInsuranceCost ? parseFloat(data.annualInsuranceCost) : undefined,
+        annual_maintenance_cost: data.annualMaintenanceCost ? parseFloat(data.annualMaintenanceCost) : undefined,
+    };
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+    mortgage: 'Mortgage',
+    tax: 'Tax',
+    insurance: 'Insurance',
+    maintenance: 'Maintenance',
+    capex: 'CapEx',
+    hoa: 'HOA',
+    mgmt_fee: 'Management Fee',
+};
 
 function getDefaultRange() {
     const now = new Date();
@@ -29,23 +103,80 @@ export default function PropertyDetailPage() {
     const [refreshing, setRefreshing] = useState(false);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
+    const [showEditForm, setShowEditForm] = useState(false);
 
     const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
     const { data: analytics, refetch: refetchAnalytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear));
     const { data: allIncomeSources } = useApiQuery(listIncomeSources);
+    const { data: expenses, refetch: refetchExpenses } = useApiQuery(() => listPropertyExpenses(id!));
 
     const linkedIncomeSource = useMemo(() => {
         if (!allIncomeSources || !id) return null;
         return allIncomeSources.find(s => s.property_id === id) ?? null;
     }, [allIncomeSources, id]);
 
+    const onEditSuccess = useCallback(() => {
+        setShowEditForm(false);
+        refetchProperty();
+    }, [refetchProperty]);
+
+    const updateFn = useCallback(async (_id: string, data: PropertyFormData): Promise<Property> => {
+        return updateProperty(id!, buildRequest(data));
+    }, [id]);
+
+    const createFn = useCallback(async (_data: PropertyFormData): Promise<Property> => {
+        throw new Error('Create not supported on detail page');
+    }, []);
+
+    const { formData, setFormData, handleSave, resetForm: crudReset, startEdit } = useCrudForm<Property, PropertyFormData>({
+        createFn,
+        updateFn,
+        entityName: 'Property',
+        initialFormData,
+        onSuccess: onEditSuccess,
+        formatError: (_err, action) => `Failed to ${action} property`,
+    });
+
+    function handleStartEdit() {
+        if (!property) return;
+        const hasFinancialFields = property.annual_appreciation_rate != null
+            || property.annual_property_tax != null || property.annual_insurance_cost != null
+            || property.annual_maintenance_cost != null;
+        startEdit(property.id, {
+            address: property.address,
+            purchasePrice: String(property.purchase_price),
+            purchaseDate: property.purchase_date,
+            currentValue: String(property.current_value),
+            mortgageBalance: property.mortgage_balance ? String(property.mortgage_balance) : '',
+            showLoanDetails: property.has_loan_details,
+            loanAmount: property.loan_amount != null ? String(property.loan_amount) : '',
+            annualInterestRate: property.annual_interest_rate != null ? String(property.annual_interest_rate * 100) : '',
+            loanTermMonths: property.loan_term_months != null ? String(property.loan_term_months) : '',
+            loanStartDate: property.loan_start_date ?? '',
+            useComputedBalance: property.use_computed_balance,
+            propertyType: property.property_type,
+            showFinancialAssumptions: hasFinancialFields,
+            annualAppreciationRate: property.annual_appreciation_rate != null ? String(property.annual_appreciation_rate * 100) : '',
+            annualPropertyTax: property.annual_property_tax != null ? String(property.annual_property_tax) : '',
+            annualInsuranceCost: property.annual_insurance_cost != null ? String(property.annual_insurance_cost) : '',
+            annualMaintenanceCost: property.annual_maintenance_cost != null ? String(property.annual_maintenance_cost) : '',
+        });
+        setShowEditForm(true);
+    }
+
+    function handleCancelEdit() {
+        crudReset();
+        setShowEditForm(false);
+    }
+
     async function handleAddExpense(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
         try {
             await addPropertyExpense(id!, data);
             toast.success('Expense added');
             refetchCashFlow();
+            refetchExpenses();
         } catch {
             toast.error('Failed to add expense');
         }
@@ -129,7 +260,33 @@ export default function PropertyDetailPage() {
                 <Link to="/properties" style={{ color: '#1976d2', textDecoration: 'none' }}>Properties</Link> / {property?.address}
             </div>
 
-            {property && (
+            {showEditForm && (
+                <PropertyForm
+                    heading="Edit Property"
+                    submitLabel="Save"
+                    address={formData.address} onAddressChange={v => setFormData(prev => ({ ...prev, address: v }))}
+                    purchasePrice={formData.purchasePrice} onPurchasePriceChange={v => setFormData(prev => ({ ...prev, purchasePrice: v }))}
+                    purchaseDate={formData.purchaseDate} onPurchaseDateChange={v => setFormData(prev => ({ ...prev, purchaseDate: v }))}
+                    currentValue={formData.currentValue} onCurrentValueChange={v => setFormData(prev => ({ ...prev, currentValue: v }))}
+                    mortgageBalance={formData.mortgageBalance} onMortgageBalanceChange={v => setFormData(prev => ({ ...prev, mortgageBalance: v }))}
+                    propertyType={formData.propertyType} onPropertyTypeChange={v => setFormData(prev => ({ ...prev, propertyType: v }))}
+                    showLoanDetails={formData.showLoanDetails} onShowLoanDetailsChange={v => setFormData(prev => ({ ...prev, showLoanDetails: v }))}
+                    loanAmount={formData.loanAmount} onLoanAmountChange={v => setFormData(prev => ({ ...prev, loanAmount: v }))}
+                    annualInterestRate={formData.annualInterestRate} onAnnualInterestRateChange={v => setFormData(prev => ({ ...prev, annualInterestRate: v }))}
+                    loanTermMonths={formData.loanTermMonths} onLoanTermMonthsChange={v => setFormData(prev => ({ ...prev, loanTermMonths: v }))}
+                    loanStartDate={formData.loanStartDate} onLoanStartDateChange={v => setFormData(prev => ({ ...prev, loanStartDate: v }))}
+                    useComputedBalance={formData.useComputedBalance} onUseComputedBalanceChange={v => setFormData(prev => ({ ...prev, useComputedBalance: v }))}
+                    showFinancialAssumptions={formData.showFinancialAssumptions} onShowFinancialAssumptionsChange={v => setFormData(prev => ({ ...prev, showFinancialAssumptions: v }))}
+                    annualAppreciationRate={formData.annualAppreciationRate} onAnnualAppreciationRateChange={v => setFormData(prev => ({ ...prev, annualAppreciationRate: v }))}
+                    annualPropertyTax={formData.annualPropertyTax} onAnnualPropertyTaxChange={v => setFormData(prev => ({ ...prev, annualPropertyTax: v }))}
+                    annualInsuranceCost={formData.annualInsuranceCost} onAnnualInsuranceCostChange={v => setFormData(prev => ({ ...prev, annualInsuranceCost: v }))}
+                    annualMaintenanceCost={formData.annualMaintenanceCost} onAnnualMaintenanceCostChange={v => setFormData(prev => ({ ...prev, annualMaintenanceCost: v }))}
+                    onSubmit={handleSave}
+                    onCancel={handleCancelEdit}
+                />
+            )}
+
+            {property && !showEditForm && (
                 <div style={{ ...cardStyle, marginBottom: '2rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
                         <h2>{property.address}</h2>
@@ -139,6 +296,14 @@ export default function PropertyDetailPage() {
                         )}>
                             {property.property_type === 'primary_residence' ? 'Primary Residence' : property.property_type === 'investment' ? 'Investment' : 'Vacation'}
                         </span>
+                        {canWrite && (
+                            <button
+                                onClick={handleStartEdit}
+                                style={{ marginLeft: 'auto', padding: '0.3rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                            >
+                                Edit
+                            </button>
+                        )}
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
                         <div><div style={{ color: '#666', fontSize: '0.85rem' }}>Purchase Price</div><div style={{ fontWeight: 600 }}>{formatCurrency(property.purchase_price)}</div></div>
@@ -216,6 +381,45 @@ export default function PropertyDetailPage() {
                 canWrite={canWrite}
                 onAddExpense={handleAddExpense}
             />
+
+            {expenses && expenses.length > 0 && (
+                <div style={{ ...cardStyle, marginTop: '2rem' }}>
+                    <h3 style={{ marginBottom: '1rem' }}>Recorded Expenses</h3>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                                <th style={{ padding: '0.5rem' }}>Date</th>
+                                <th style={{ padding: '0.5rem' }}>Category</th>
+                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Amount</th>
+                                <th style={{ padding: '0.5rem' }}>Frequency</th>
+                                <th style={{ padding: '0.5rem' }}>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {expenses.map((exp) => (
+                                <tr key={exp.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                    <td style={{ padding: '0.5rem' }}>{exp.date}</td>
+                                    <td style={{ padding: '0.5rem' }}>{CATEGORY_LABELS[exp.category] ?? exp.category}</td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(exp.amount)}</td>
+                                    <td style={{ padding: '0.5rem' }}>
+                                        <span style={{
+                                            padding: '0.1rem 0.4rem',
+                                            background: exp.frequency === 'annual' ? '#fff3e0' : '#e3f2fd',
+                                            color: exp.frequency === 'annual' ? '#e65100' : '#1565c0',
+                                            borderRadius: '4px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                        }}>
+                                            {exp.frequency === 'annual' ? 'Annual' : 'Monthly'}
+                                        </span>
+                                    </td>
+                                    <td style={{ padding: '0.5rem', color: '#666' }}>{exp.description ?? ''}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 }

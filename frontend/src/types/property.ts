@@ -61,6 +61,15 @@ export interface PropertyExpenseRequest {
     frequency?: string;
 }
 
+export interface PropertyExpense {
+    id: string;
+    date: string;
+    amount: number;
+    category: string;
+    description: string | null;
+    frequency: string;
+}
+
 export interface MonthlyCashFlowEntry {
     month: string;
     total_income: number;

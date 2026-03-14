@@ -3,6 +3,7 @@ import type {
     Property,
     PropertyRequest,
     PropertyExpenseRequest,
+    PropertyExpense,
     MonthlyCashFlowEntry,
     MonthlyCashFlowDetailEntry,
     PropertyValuation,
@@ -32,6 +33,11 @@ export async function updateProperty(id: string, request: PropertyRequest): Prom
 
 export async function deleteProperty(id: string): Promise<void> {
     await client.delete(`/properties/${id}`);
+}
+
+export async function listPropertyExpenses(propertyId: string): Promise<PropertyExpense[]> {
+    const { data } = await client.get<PropertyExpense[]>(`/properties/${propertyId}/expenses`);
+    return data;
 }
 
 export async function addPropertyExpense(
