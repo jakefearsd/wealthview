@@ -580,6 +580,6 @@ To test with Zillow enabled:
 
 ## Related Docs
 
-- [Frontend Pages](frontend.md) — Route table reference
-- [API Reference](api_reference.md) — Full endpoint documentation
+- [Frontend Pages](reference/frontend-routes.md) — Route table reference
+- [API Reference](reference/api-reference.md) — Full endpoint documentation
 - [Development Guide](development.md) — How to start dev servers

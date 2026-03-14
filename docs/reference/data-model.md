@@ -1,4 +1,4 @@
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 # Data Model Reference
 
@@ -574,4 +574,4 @@ Flyway migrations are in `backend/wealthview-persistence/src/main/resources/db/m
 ## Related Docs
 
 - [Architecture](architecture.md) — Module structure and dependency rules
-- [API Reference](api_reference.md) — Full endpoint documentation
+- [API Reference](api-reference.md) — Full endpoint documentation

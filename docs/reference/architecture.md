@@ -1,4 +1,4 @@
-[← Back to README](../README.md)
+[← Back to README](../../README.md)
 
 # Architecture
 
@@ -92,5 +92,5 @@ wealthview/
 ## Further Reading
 
 - [PROJECT.md](../PROJECT.md) — Full architectural specification, data model goals, and feature roadmap
-- [Development Guide](development.md) — Local setup, build commands, and testing
-- [Data Model Reference](data_model.md) — Entity definitions and migration inventory
+- [Development Guide](../development.md) — Local setup, build commands, and testing
+- [Data Model Reference](data-model.md) — Entity definitions and migration inventory
