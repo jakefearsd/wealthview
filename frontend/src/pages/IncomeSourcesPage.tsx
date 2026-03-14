@@ -300,7 +300,7 @@ export default function IncomeSourcesPage() {
 
                     <div style={{ display: 'grid', gridTemplateColumns: oneTime ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>{oneTime ? 'Payment Amount' : 'Annual Amount'}</label>
+                            <label style={labelStyle}>{oneTime ? 'Payment Amount' : propertyId ? 'Annual Rent Amount' : 'Annual Amount'}</label>
                             <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualAmount)} onChange={e => setFormData(prev => ({ ...prev, annual_amount: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
                         </div>
                         <div>
