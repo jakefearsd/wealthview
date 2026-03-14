@@ -4,6 +4,7 @@ import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
+import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +17,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Service
 @ConditionalOnExpression("!'${app.finnhub.api-key:}'.isEmpty()")
@@ -42,63 +44,77 @@ public class PriceSyncService {
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyPrices() {
-        long startTime = System.currentTimeMillis();
-        var symbols = holdingRepository.findDistinctSymbols();
-        log.info("Starting daily price sync for {} symbols", symbols.size());
+        MDC.put("operation", "priceSync");
+        MDC.put("requestId", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        try {
+            long startTime = System.currentTimeMillis();
+            var symbols = holdingRepository.findDistinctSymbols();
+            log.info("Starting daily price sync for {} symbols", symbols.size());
 
-        int successCount = 0;
-        int failCount = 0;
-        for (var symbol : symbols) {
-            try {
-                var quoteOpt = priceFeedClient.getQuote(symbol);
-                if (quoteOpt.isEmpty()) {
-                    log.warn("No quote returned for symbol {}", symbol);
+            int successCount = 0;
+            int failCount = 0;
+            for (var symbol : symbols) {
+                try {
+                    var quoteOpt = priceFeedClient.getQuote(symbol);
+                    if (quoteOpt.isEmpty()) {
+                        log.warn("No quote returned for symbol {}", symbol);
+                        failCount++;
+                        continue;
+                    }
+
+                    var quote = quoteOpt.orElseThrow();
+                    upsertPrice(symbol, LocalDate.now(), quote.currentPrice(), SOURCE_FINNHUB);
+                    successCount++;
+                    sleepForRateLimit();
+                } catch (Exception e) {
+                    log.warn("Failed to sync price for symbol {}", symbol, e);
                     failCount++;
-                    continue;
                 }
-
-                var quote = quoteOpt.orElseThrow();
-                upsertPrice(symbol, LocalDate.now(), quote.currentPrice(), SOURCE_FINNHUB);
-                successCount++;
-                sleepForRateLimit();
-            } catch (Exception e) {
-                log.warn("Failed to sync price for symbol {}: {}", symbol, e.getMessage());
-                failCount++;
             }
-        }
 
-        log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
-                successCount, failCount, System.currentTimeMillis() - startTime);
+            log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
+                    successCount, failCount, System.currentTimeMillis() - startTime);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("requestId");
+        }
     }
 
     public void backfillHistoricalPrices(String symbol) {
-        if (priceRepository.existsBySymbol(symbol)) {
-            log.info("Prices already exist for symbol {}, skipping backfill", symbol);
-            return;
-        }
-
-        long startTime = System.currentTimeMillis();
-        log.info("Starting historical backfill for symbol {}", symbol);
-        var to = LocalDate.now();
-        var from = to.minusYears(2);
-
-        var candlesOpt = priceFeedClient.getCandles(symbol, from, to);
-        if (candlesOpt.isEmpty()) {
-            log.warn("No candle data returned for symbol {}", symbol);
-            return;
-        }
-
-        var candles = candlesOpt.orElseThrow();
-        for (var entry : candles.entries()) {
-            try {
-                upsertPrice(symbol, entry.date(), entry.closePrice(), SOURCE_FINNHUB);
-            } catch (DataAccessException e) {
-                log.warn("Failed to save candle for {} on {}: {}", symbol, entry.date(), e.getMessage());
+        MDC.put("operation", "priceBackfill");
+        MDC.put("symbol", symbol);
+        try {
+            if (priceRepository.existsBySymbol(symbol)) {
+                log.info("Prices already exist for symbol {}, skipping backfill", symbol);
+                return;
             }
-        }
 
-        log.info("Historical backfill complete for symbol {}: {} entries, {}ms",
-                symbol, candles.entries().size(), System.currentTimeMillis() - startTime);
+            long startTime = System.currentTimeMillis();
+            log.info("Starting historical backfill for symbol {}", symbol);
+            var to = LocalDate.now();
+            var from = to.minusYears(2);
+
+            var candlesOpt = priceFeedClient.getCandles(symbol, from, to);
+            if (candlesOpt.isEmpty()) {
+                log.warn("No candle data returned for symbol {}", symbol);
+                return;
+            }
+
+            var candles = candlesOpt.orElseThrow();
+            for (var entry : candles.entries()) {
+                try {
+                    upsertPrice(symbol, entry.date(), entry.closePrice(), SOURCE_FINNHUB);
+                } catch (DataAccessException e) {
+                    log.warn("Failed to save candle for {} on {}", symbol, entry.date(), e);
+                }
+            }
+
+            log.info("Historical backfill complete for symbol {}: {} entries, {}ms",
+                    symbol, candles.entries().size(), System.currentTimeMillis() - startTime);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("symbol");
+        }
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

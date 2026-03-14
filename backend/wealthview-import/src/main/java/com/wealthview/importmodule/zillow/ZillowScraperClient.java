@@ -61,7 +61,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
 
             return extractZestimate(doc);
         } catch (IOException e) {
-            log.warn("Failed to fetch Zillow valuation for address '{}': {}", address, e.getMessage());
+            log.warn("Failed to fetch Zillow valuation for address '{}'", address, e);
             return Optional.empty();
         }
     }
@@ -79,7 +79,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
 
             return extractZestimate(doc);
         } catch (IOException e) {
-            log.warn("Failed to fetch Zillow valuation for zpid '{}': {}", zpid, e.getMessage());
+            log.warn("Failed to fetch Zillow valuation for zpid '{}'", zpid, e);
             return Optional.empty();
         }
     }
@@ -97,7 +97,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
 
             return extractSearchResults(doc);
         } catch (IOException e) {
-            log.warn("Failed to search Zillow for address '{}': {}", address, e.getMessage());
+            log.warn("Failed to search Zillow for address '{}'", address, e);
             return Collections.emptyList();
         }
     }

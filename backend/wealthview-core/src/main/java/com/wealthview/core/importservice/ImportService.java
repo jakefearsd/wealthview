@@ -13,6 +13,7 @@ import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -94,23 +95,30 @@ public class ImportService {
     @Transactional
     public ImportJobResponse processImport(UUID tenantId, UUID accountId,
                                             CsvParseResult parseResult, String source) {
-        log.info("Starting {} import for account {}: {} transactions parsed, {} parse errors",
-                source.toUpperCase(Locale.US), accountId, parseResult.transactions().size(), parseResult.errors().size());
+        MDC.put("operation", "import");
+        MDC.put("importFormat", source);
+        try {
+            log.info("Starting {} import for account {}: {} transactions parsed, {} parse errors",
+                    source.toUpperCase(Locale.US), accountId, parseResult.transactions().size(), parseResult.errors().size());
 
-        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+            var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
+                    .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
-        var job = new ImportJobEntity(account.getTenant(), account, source);
-        job.setStatus("processing");
-        job.setTotalRows(parseResult.transactions().size() + parseResult.errors().size());
-        job = importJobRepository.save(job);
+            var job = new ImportJobEntity(account.getTenant(), account, source);
+            job.setStatus("processing");
+            job.setTotalRows(parseResult.transactions().size() + parseResult.errors().size());
+            job = importJobRepository.save(job);
 
-        var result = importTransactions(parseResult.transactions(), tenantId, accountId);
-        finalizeJob(job, result, parseResult.errors().size());
+            var result = importTransactions(parseResult.transactions(), tenantId, accountId);
+            finalizeJob(job, result, parseResult.errors().size());
 
-        log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
-                source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
-        return ImportJobResponse.from(job);
+            log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
+                    source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
+            return ImportJobResponse.from(job);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("importFormat");
+        }
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional catch-all so one bad row doesn't abort entire import
@@ -138,7 +146,7 @@ public class ImportService {
                 transactionService.createWithHash(tenantId, accountId, request, hash);
                 successCount++;
             } catch (Exception e) {
-                log.warn("Failed to import transaction: {}", e.getMessage());
+                log.warn("Failed to import transaction", e);
                 failedCount++;
             }
         }

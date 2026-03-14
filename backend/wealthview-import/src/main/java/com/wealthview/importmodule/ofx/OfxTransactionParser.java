@@ -73,7 +73,7 @@ public class OfxTransactionParser implements CsvParser {
             var unmarshaller = new AggregateUnmarshaller<>(ResponseEnvelope.class);
             envelope = unmarshaller.unmarshal(inputStream);
         } catch (IOException | com.webcohesion.ofx4j.io.OFXParseException e) {
-            log.warn("Failed to parse OFX file: {}", e.getMessage());
+            log.warn("Failed to parse OFX file", e);
             errors.add(new CsvRowError(0, "Failed to parse OFX file: " + e.getMessage()));
             return new CsvParseResult(transactions, errors);
         }

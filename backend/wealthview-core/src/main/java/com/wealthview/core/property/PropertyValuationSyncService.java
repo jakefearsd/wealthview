@@ -6,6 +6,7 @@ import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -35,33 +36,40 @@ public class PropertyValuationSyncService {
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-property resilience
     @Scheduled(cron = "${app.zillow.sync-cron:0 0 6 * * SUN}")
     public void syncAll() {
-        long startTime = System.currentTimeMillis();
-        log.info("Starting property valuation sync");
-        var properties = propertyRepository.findAll();
-        int success = 0;
-        int skipped = 0;
+        MDC.put("operation", "propertyValuationSync");
+        MDC.put("requestId", java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        try {
+            long startTime = System.currentTimeMillis();
+            log.info("Starting property valuation sync");
+            var properties = propertyRepository.findAll();
+            int success = 0;
+            int skipped = 0;
 
-        for (var property : properties) {
-            try {
-                var resultOpt = valuationClient.getValuation(property.getAddress());
-                if (resultOpt.isPresent()) {
-                    var result = resultOpt.orElseThrow();
-                    valuationService.recordValuation(
-                            property.getTenantId(), property.getId(),
-                            result.date(), result.value(), "zillow");
-                    success++;
-                } else {
+            for (var property : properties) {
+                try {
+                    var resultOpt = valuationClient.getValuation(property.getAddress());
+                    if (resultOpt.isPresent()) {
+                        var result = resultOpt.orElseThrow();
+                        valuationService.recordValuation(
+                                property.getTenantId(), property.getId(),
+                                result.date(), result.value(), "zillow");
+                        success++;
+                    } else {
+                        skipped++;
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to sync valuation for property {}",
+                            property.getId(), e);
                     skipped++;
                 }
-            } catch (Exception e) {
-                log.warn("Failed to sync valuation for property {}: {}",
-                        property.getId(), e.getMessage());
-                skipped++;
             }
-        }
 
-        log.info("Property valuation sync complete: {} updated, {} skipped, {}ms",
-                success, skipped, System.currentTimeMillis() - startTime);
+            log.info("Property valuation sync complete: {} updated, {} skipped, {}ms",
+                    success, skipped, System.currentTimeMillis() - startTime);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("requestId");
+        }
     }
 
     @Transactional
