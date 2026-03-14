@@ -13,6 +13,7 @@ import com.wealthview.core.property.PropertyValuationSyncService;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
+import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
@@ -316,6 +317,28 @@ class PropertyControllerTest {
                 .andExpect(jsonPath("$.status").value("multiple_matches"))
                 .andExpect(jsonPath("$.candidates").isArray())
                 .andExpect(jsonPath("$.candidates.length()").value(2));
+    }
+
+    @Test
+    void listExpenses_returns200WithExpenses() throws Exception {
+        var expenses = List.of(
+                new PropertyExpenseResponse(UUID.randomUUID(), LocalDate.of(2025, 3, 1),
+                        new BigDecimal("500"), "maintenance", "Plumbing fix", "monthly"),
+                new PropertyExpenseResponse(UUID.randomUUID(), LocalDate.of(2025, 1, 1),
+                        new BigDecimal("6000"), "tax", null, "annual")
+        );
+        when(propertyService.listExpenses(TENANT_ID, PROPERTY_ID)).thenReturn(expenses);
+
+        mockMvc.perform(get("/api/v1/properties/{id}/expenses", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].category").value("maintenance"))
+                .andExpect(jsonPath("$[0].description").value("Plumbing fix"))
+                .andExpect(jsonPath("$[0].amount").value(500))
+                .andExpect(jsonPath("$[1].category").value("tax"))
+                .andExpect(jsonPath("$[1].frequency").value("annual"));
     }
 
     @Test

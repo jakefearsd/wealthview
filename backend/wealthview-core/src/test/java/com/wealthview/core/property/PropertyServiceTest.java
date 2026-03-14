@@ -2,6 +2,7 @@ package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
+import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
@@ -643,6 +644,41 @@ class PropertyServiceTest {
         assertThat(result).hasSize(1);
         // 1896.2041 (derived) + 200 (manual) = 2096.2041
         assertThat(result.get(0).expensesByCategory().get("mortgage")).isEqualByComparingTo("2096.2041");
+    }
+
+    @Test
+    void listExpenses_returnsExpensesForProperty() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var expense1 = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 3, 1), new BigDecimal("500"), "maintenance", "Plumbing fix");
+        var expense2 = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 2, 1), new BigDecimal("6000"), "tax", null, "annual");
+        when(expenseRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId))
+                .thenReturn(List.of(expense1, expense2));
+
+        var result = propertyService.listExpenses(tenantId, propertyId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).category()).isEqualTo("maintenance");
+        assertThat(result.get(0).description()).isEqualTo("Plumbing fix");
+        assertThat(result.get(0).amount()).isEqualByComparingTo("500");
+        assertThat(result.get(1).category()).isEqualTo("tax");
+        assertThat(result.get(1).frequency()).isEqualTo("annual");
+    }
+
+    @Test
+    void listExpenses_nonExistentProperty_throwsNotFound() {
+        var propertyId = UUID.randomUUID();
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> propertyService.listExpenses(tenantId, propertyId))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test

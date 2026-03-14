@@ -9,6 +9,7 @@ import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
+import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
@@ -87,6 +88,13 @@ public class PropertyController {
             @PathVariable UUID id) {
         propertyService.delete(principal.tenantId(), id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/expenses")
+    public ResponseEntity<List<PropertyExpenseResponse>> listExpenses(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(propertyService.listExpenses(principal.tenantId(), id));
     }
 
     @PostMapping("/{id}/expenses")

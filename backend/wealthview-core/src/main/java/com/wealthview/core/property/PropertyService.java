@@ -6,6 +6,7 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
+import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -123,6 +124,15 @@ public class PropertyService {
         log.info("Property {} deleted for tenant {}", propertyId, tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "property",
                 propertyId, Map.of()));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PropertyExpenseResponse> listExpenses(UUID tenantId, UUID propertyId) {
+        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+        return expenseRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId).stream()
+                .map(PropertyExpenseResponse::from)
+                .toList();
     }
 
     @Transactional
