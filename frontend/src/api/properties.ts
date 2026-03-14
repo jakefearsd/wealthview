@@ -2,7 +2,6 @@ import client from './client';
 import type {
     Property,
     PropertyRequest,
-    PropertyIncomeRequest,
     PropertyExpenseRequest,
     MonthlyCashFlowEntry,
     MonthlyCashFlowDetailEntry,
@@ -33,13 +32,6 @@ export async function updateProperty(id: string, request: PropertyRequest): Prom
 
 export async function deleteProperty(id: string): Promise<void> {
     await client.delete(`/properties/${id}`);
-}
-
-export async function addPropertyIncome(
-    propertyId: string,
-    request: PropertyIncomeRequest
-): Promise<void> {
-    await client.post(`/properties/${propertyId}/income`, request);
 }
 
 export async function addPropertyExpense(

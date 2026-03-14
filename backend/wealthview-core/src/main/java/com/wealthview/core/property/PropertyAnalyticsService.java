@@ -4,12 +4,12 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.EquityGrowthPoint;
 import com.wealthview.core.property.dto.MortgageProgress;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
-import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.PropertyValuationEntity;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.PropertyValuationRepository;
 import org.springframework.stereotype.Service;
@@ -32,16 +32,16 @@ public class PropertyAnalyticsService {
     private static final BigDecimal BD_100 = new BigDecimal("100");
 
     private final PropertyRepository propertyRepository;
-    private final PropertyIncomeRepository incomeRepository;
+    private final IncomeSourceRepository incomeSourceRepository;
     private final PropertyExpenseRepository expenseRepository;
     private final PropertyValuationRepository valuationRepository;
 
     public PropertyAnalyticsService(PropertyRepository propertyRepository,
-                                     PropertyIncomeRepository incomeRepository,
+                                     IncomeSourceRepository incomeSourceRepository,
                                      PropertyExpenseRepository expenseRepository,
                                      PropertyValuationRepository valuationRepository) {
         this.propertyRepository = propertyRepository;
-        this.incomeRepository = incomeRepository;
+        this.incomeSourceRepository = incomeSourceRepository;
         this.expenseRepository = expenseRepository;
         this.valuationRepository = valuationRepository;
     }
@@ -72,10 +72,10 @@ public class PropertyAnalyticsService {
             var rangeTo = dateRange[1];
             var annualFrom = YearMonth.from(rangeFrom).minusMonths(11).atDay(1);
 
-            var incomes = incomeRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
-            var totalIncome = sumWithProration(incomes, rangeFrom, rangeTo,
-                    PropertyIncomeEntity::getAmount, PropertyIncomeEntity::getFrequency,
-                    PropertyIncomeEntity::getDate);
+            var linkedSources = incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId);
+            var totalIncome = linkedSources.stream()
+                    .map(IncomeSourceEntity::getAnnualAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             var operatingExpenses = expenseRepository
                     .findOverlappingExcludingCategory(propertyId, rangeFrom, rangeTo, annualFrom, "mortgage");

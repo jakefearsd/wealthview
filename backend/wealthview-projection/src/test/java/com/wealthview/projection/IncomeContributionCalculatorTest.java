@@ -72,10 +72,19 @@ class IncomeContributionCalculatorTest {
     }
 
     @Test
-    void compute_ageAtEndAge_returnsZero() {
+    void compute_ageAtEndAge_halvesAmount() {
         var sources = List.of(source("SS", "30000", 65, 70, "0"));
 
         var result = calculator.compute(sources, 70, 1);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("15000"));
+    }
+
+    @Test
+    void compute_ageAfterEndAge_returnsZero() {
+        var sources = List.of(source("SS", "30000", 65, 70, "0"));
+
+        var result = calculator.compute(sources, 71, 1);
 
         assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
     }
@@ -103,12 +112,12 @@ class IncomeContributionCalculatorTest {
     }
 
     @Test
-    void compute_firstYearRetirement_noInflation() {
+    void compute_firstYearRetirement_halvesAtStartAge() {
         var sources = List.of(source("SS", "30000", 65, null, "0.02"));
 
         var result = calculator.compute(sources, 65, 1);
 
-        assertThat(result).isEqualByComparingTo(new BigDecimal("30000"));
+        assertThat(result).isEqualByComparingTo(new BigDecimal("15000"));
     }
 
     @Test
@@ -152,5 +161,51 @@ class IncomeContributionCalculatorTest {
         var result = calculator.compute(sources, 65, 5);
 
         assertThat(result).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    @Test
+    void compute_oneTimeSource_atStartAge_notHalved() {
+        var sources = List.of(oneTimeSource("Inheritance", "50000", 65));
+
+        var result = calculator.compute(sources, 65, 1);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    @Test
+    void compute_oneTimeSource_atEndAge_returnsZero() {
+        var sources = List.of(oneTimeSource("Inheritance", "50000", 65));
+
+        var result = calculator.compute(sources, 66, 2);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void compute_oneTimeSource_yearAfterStart_returnsZero() {
+        var sources = List.of(oneTimeSource("Inheritance", "50000", 65));
+
+        var result = calculator.compute(sources, 67, 3);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void compute_oneTimeSource_withInflation_ignoresInflation() {
+        // oneTimeSource helper sets inflationRate=0.02 — should still return base amount
+        var sources = List.of(oneTimeSource("Bonus", "50000", 65));
+
+        var result = calculator.compute(sources, 65, 5);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    @Test
+    void compute_midRangeAge_fullAmount() {
+        var sources = List.of(source("SS", "30000", 65, 70, "0"));
+
+        var result = calculator.compute(sources, 67, 1);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("30000"));
     }
 }

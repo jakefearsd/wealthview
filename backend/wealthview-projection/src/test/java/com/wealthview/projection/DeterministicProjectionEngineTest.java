@@ -26,6 +26,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -403,8 +404,9 @@ class DeterministicProjectionEngineTest {
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(BigDecimal.ZERO);
 
+        // age 67 = startAge → income halved
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.incomeStreamsTotal()).isEqualByComparingTo(bd("24000"));
+        assertThat(year2.incomeStreamsTotal()).isEqualByComparingTo(bd("12000"));
     }
 
     @Test
@@ -420,11 +422,17 @@ class DeterministicProjectionEngineTest {
 
         var result = engine.run(input);
 
+        // age 66 = startAge → halved
         assertThat(result.yearlyData().getFirst().incomeStreamsTotal())
-                .isEqualByComparingTo(bd("30000"));
+                .isEqualByComparingTo(bd("15000"));
+        // age 67 = mid-range → full
         assertThat(result.yearlyData().get(1).incomeStreamsTotal())
                 .isEqualByComparingTo(bd("30000"));
+        // age 68 = endAge → halved
         assertThat(result.yearlyData().get(2).incomeStreamsTotal())
+                .isEqualByComparingTo(bd("15000"));
+        // age 69 = after endAge → zero
+        assertThat(result.yearlyData().get(3).incomeStreamsTotal())
                 .isEqualByComparingTo(BigDecimal.ZERO);
     }
 
@@ -895,8 +903,8 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("45000.0000"));
 
         var year2 = result.yearlyData().get(1);
-        // age 67: income=24k starts, need=45k, withdrawal=21k
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("21000.0000"));
+        // age 67 = startAge: income halved to 12k, need=45k, withdrawal=33k
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("33000.0000"));
     }
 
     @Test
@@ -912,8 +920,9 @@ class DeterministicProjectionEngineTest {
 
         var result = engine.run(input);
 
-        // Spending-needs-driven: need=45k, income=20k, withdrawal=25k
-        assertThat(result.yearlyData().get(0).withdrawals()).isEqualByComparingTo(bd("25000.0000"));
+        // age 66 = startAge → income halved to 10k, need=45k, withdrawal=35k
+        assertThat(result.yearlyData().get(0).withdrawals()).isEqualByComparingTo(bd("35000.0000"));
+        // age 67 = mid-range → income=20k, withdrawal=25k
         assertThat(result.yearlyData().get(1).withdrawals()).isLessThan(bd("45000"));
 
         var year3 = result.yearlyData().get(2);
@@ -1133,9 +1142,10 @@ class DeterministicProjectionEngineTest {
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("96000.0000"));
 
+        // Age 62: overlap Conservation+Go-Go → blend 50/50
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
-        assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("60000.0000"));
+        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
+        assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
     }
 
     @Test
@@ -1241,10 +1251,12 @@ class DeterministicProjectionEngineTest {
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("96000.0000"));
 
+        // Age 62: overlap Conservation+Go-Go → blend (126000, 30000), inflation=1.0
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
-        assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("60000.0000"));
+        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
+        assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
 
+        // Age 63: Go-Go only, 1st full year in tier → 156000 * 1.03^1 = 160680
         var year3 = result.yearlyData().get(2);
         assertThat(year3.essentialExpenses()).isEqualByComparingTo(bd("160680.0000"));
     }
@@ -1291,10 +1303,10 @@ class DeterministicProjectionEngineTest {
 
     @Test
     void run_withSpendingTiers_gapBetweenTiers_blendsTransitionYear() {
-        // Conservation endAge=62 (exclusive, covers 54-61), Go-Go startAge=63
+        // Conservation endAge=61 (inclusive, covers 54-61), Go-Go startAge=63
         // Age 62 is a 1-year gap — should blend 50/50
         var tierJson = tiers()
-                .tier("Conservation", 54, 62, "96000", "0")
+                .tier("Conservation", 54, 61, "96000", "0")
                 .tier("Go-Go", 63, 70, "156000", "60000")
                 .build();
 
@@ -1308,7 +1320,7 @@ class DeterministicProjectionEngineTest {
 
         var result = engine.run(input);
 
-        // Age 62: blend Conservation (96000, 0) + Go-Go (156000, 60000) => (126000, 30000)
+        // Age 62: gap → blend Conservation (96000, 0) + Go-Go (156000, 60000) => (126000, 30000)
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
         assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
@@ -1321,7 +1333,7 @@ class DeterministicProjectionEngineTest {
 
     @Test
     void run_withSpendingTiers_multiYearGap_blendsEachGapYear() {
-        // Conservation endAge=62, Go-Go startAge=65 — 3-year gap (62, 63, 64)
+        // Conservation endAge=62 (inclusive), Go-Go startAge=65 — 2-year gap (63, 64)
         var tierJson = tiers()
                 .tier("Conservation", 54, 62, "96000", "0")
                 .tier("Go-Go", 65, 70, "156000", "60000")
@@ -1337,8 +1349,12 @@ class DeterministicProjectionEngineTest {
 
         var result = engine.run(input);
 
-        // Ages 62-64: all blend 50/50 between Conservation and Go-Go
-        for (int i = 0; i < 3; i++) {
+        // Age 62: still in Conservation (inclusive endAge)
+        var year1 = result.yearlyData().get(0);
+        assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("96000.0000"));
+
+        // Ages 63-64: gap → blend 50/50 between Conservation and Go-Go
+        for (int i = 1; i <= 2; i++) {
             var year = result.yearlyData().get(i);
             assertThat(year.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
             assertThat(year.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
@@ -1392,8 +1408,9 @@ class DeterministicProjectionEngineTest {
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("200000.0000"));
         assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("50000.0000"));
-        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(bd("30000.0000"));
-        assertThat(year1.netSpendingNeed()).isEqualByComparingTo(bd("220000.0000"));
+        // age 67 = startAge → income halved
+        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(bd("15000.0000"));
+        assertThat(year1.netSpendingNeed()).isEqualByComparingTo(bd("235000.0000"));
     }
 
     @Test
@@ -1450,11 +1467,11 @@ class DeterministicProjectionEngineTest {
         var expected64 = bd("100000").multiply(bd("1.03").pow(4));
         assertThat(year5.essentialExpenses()).isEqualByComparingTo(expected64.setScale(4, RoundingMode.HALF_UP));
 
-        // Year 6: age 65, Go-Go, first year in new tier -> $200K (inflation resets)
+        // Year 6: age 65, overlap Conservation+Go-Go → blend (150000, 25000), inflation=1.0
         assertThat(result.yearlyData().get(5).essentialExpenses())
-                .isEqualByComparingTo(bd("200000.0000"));
+                .isEqualByComparingTo(bd("150000.0000"));
 
-        // Year 7: age 66, Go-Go, 2nd year -> $200K * 1.03 = $206K
+        // Year 7: age 66, Go-Go only, 1st full year → $200K * 1.03^1 = $206K
         assertThat(result.yearlyData().get(6).essentialExpenses())
                 .isEqualByComparingTo(bd("206000.0000"));
     }
@@ -1497,7 +1514,7 @@ class DeterministicProjectionEngineTest {
     }
 
     @Test
-    void run_withSpendingTiers_endAgeExclusive_boundaryCorrect() {
+    void run_withSpendingTiers_inclusiveEndAge_overlapBlends() {
         var tierJson = tiers()
                 .tier("Conservation", 54, 62, "96000", "0")
                 .tier("Go-Go", 62, 70, "156000", "60000")
@@ -1513,9 +1530,10 @@ class DeterministicProjectionEngineTest {
 
         var result = engine.run(input);
 
+        // Age 62: overlap Conservation+Go-Go → blend 50/50
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
-        assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("60000.0000"));
+        assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
+        assertThat(year1.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
     }
 
     // === Parameterized tier age resolution ===
@@ -1525,7 +1543,7 @@ class DeterministicProjectionEngineTest {
                 // age, expectedEssential, expectedDiscretionary
                 Arguments.of(53, "40000.0000", "20000.0000"),     // below all tiers -> flat fallback
                 Arguments.of(55, "96000.0000", "0.0000"),         // Conservation (54-62)
-                Arguments.of(62, "156000.0000", "60000.0000"),    // Go-Go (62-70, boundary, endAge exclusive)
+                Arguments.of(62, "126000.0000", "30000.0000"),    // Conservation+Go-Go overlap at 62 → blend 50/50
                 Arguments.of(72, "200000.0000", "74000.0000"),    // Active (70-80)
                 Arguments.of(85, "250000.0000", "118000.0000")    // Glide (80+, null endAge)
         );
@@ -1617,9 +1635,9 @@ class DeterministicProjectionEngineTest {
         // age 64, Frugal tier: need = 40k + 10k = 50k
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("50000.0000"));
 
+        // age 65: overlap Frugal+Active → blend (60000, 20000) = 80k withdrawal
         var year2 = result.yearlyData().get(1);
-        // age 65, Active tier: need = 80k + 30k = 110k
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("110000.0000"));
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("80000.0000"));
     }
 
     @Test
@@ -1789,7 +1807,7 @@ class DeterministicProjectionEngineTest {
 
         var ssSource = new ProjectionIncomeSourceInput(
                 UUID.randomUUID(), "Social Security", "social_security",
-                bd("30000"), 67, null, bd("0.02"), false,
+                bd("30000"), 60, null, bd("0.02"), false,
                 "partially_taxable",
                 null, null, null, null, null);
 
@@ -1807,7 +1825,7 @@ class DeterministicProjectionEngineTest {
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.retired()).isTrue();
-        // SS provides $30k cash, spending is $60k, so only ~$30k from portfolio
+        // SS provides $30k+ cash (mid-range, not boundary), spending is $60k, so ~$30k from portfolio
         assertThat(year1.withdrawals()).isLessThan(bd("35000"));
         // Income streams total should include SS cash inflow
         assertThat(year1.incomeStreamsTotal()).isNotNull();
@@ -1917,5 +1935,40 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.incomeStreamsTotal()).isGreaterThanOrEqualTo(bd("44000"));
         // With $44k+ income, withdrawals should be minimal for $60k spending
         assertThat(year1.withdrawals()).isLessThan(bd("20000"));
+    }
+
+    @Test
+    void run_withOneTimeIncomeSource_firesOnlyAtStartAge() {
+        // Person is already retired at age 66, one-time income at age 67
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("1000000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), null),
+                List.of(oneTimeIncomeSource("Inheritance", "50000", 67)));
+
+        var result = engine.run(input);
+
+        // Year 1: age 66 — one-time source not yet active
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Year 2: age 67 — one-time source fires (full amount, not halved)
+        var year2 = result.yearlyData().get(1);
+        assertThat(year2.incomeStreamsTotal()).isEqualByComparingTo(bd("50000"));
+
+        // Year 3: age 68 — one-time source must NOT fire again
+        var year3 = result.yearlyData().get(2);
+        assertThat(year3.incomeStreamsTotal()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Verify exactly one year has the income across all years
+        long yearsWithIncome = result.yearlyData().stream()
+                .filter(y -> y.incomeStreamsTotal() != null
+                        && y.incomeStreamsTotal().compareTo(BigDecimal.ZERO) > 0)
+                .count();
+        assertThat(yearsWithIncome).isEqualTo(1);
     }
 }

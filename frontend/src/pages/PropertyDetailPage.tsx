@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
-import { getProperty, addPropertyIncome, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics } from '../api/properties';
+import { getProperty, addPropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics } from '../api/properties';
+import { listIncomeSources } from '../api/incomeSources';
 import type { ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
@@ -33,16 +34,12 @@ export default function PropertyDetailPage() {
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
     const { data: analytics, refetch: refetchAnalytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear));
+    const { data: allIncomeSources } = useApiQuery(listIncomeSources);
 
-    async function handleAddIncome(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
-        try {
-            await addPropertyIncome(id!, data);
-            toast.success('Income added');
-            refetchCashFlow();
-        } catch {
-            toast.error('Failed to add income');
-        }
-    }
+    const linkedIncomeSource = useMemo(() => {
+        if (!allIncomeSources || !id) return null;
+        return allIncomeSources.find(s => s.property_id === id) ?? null;
+    }, [allIncomeSources, id]);
 
     async function handleAddExpense(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
         try {
@@ -172,6 +169,29 @@ export default function PropertyDetailPage() {
                 </div>
             )}
 
+            {property && (
+                <div style={{ ...cardStyle, marginBottom: '2rem', padding: '1rem 1.5rem' }}>
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#444' }}>Linked Income Source</h4>
+                    {linkedIncomeSource ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                            <div>
+                                <div style={{ fontWeight: 600 }}>{linkedIncomeSource.name}</div>
+                                <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                                    {formatCurrency(linkedIncomeSource.annual_amount)}/year ({formatCurrency(linkedIncomeSource.annual_amount / 12)}/month)
+                                </div>
+                            </div>
+                            <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none', fontSize: '0.85rem', marginLeft: 'auto' }}>
+                                View on Income Sources page
+                            </Link>
+                        </div>
+                    ) : (
+                        <div style={{ color: '#999', fontSize: '0.9rem' }}>
+                            No income source linked. <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none' }}>Create one on the Income Sources page.</Link>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {analytics && (
                 <PropertyAnalyticsSection
                     analytics={analytics}
@@ -194,7 +214,6 @@ export default function PropertyDetailPage() {
             <PropertyCashFlowSection
                 cashFlow={cashFlow}
                 canWrite={canWrite}
-                onAddIncome={handleAddIncome}
                 onAddExpense={handleAddExpense}
             />
         </div>

@@ -39,6 +39,15 @@ public final class ProjectionTestFixtures {
                 null, null, null, null, null);
     }
 
+    public static ProjectionIncomeSourceInput oneTimeIncomeSource(String name, String amount,
+                                                                    int startAge) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), name, "other",
+                bd(amount), startAge, startAge + 1, bd("0"), true,
+                "taxable",
+                null, null, null, null, null);
+    }
+
     public static ProjectionInput createInput(LocalDate retDate, int endAge,
                                                BigDecimal inflation, String paramsJson,
                                                List<ProjectionAccountInput> accounts) {

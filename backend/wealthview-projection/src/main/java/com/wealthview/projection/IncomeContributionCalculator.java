@@ -10,6 +10,7 @@ class IncomeContributionCalculator {
 
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
+    private static final BigDecimal TWO = new BigDecimal("2");
 
     BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement) {
         if (sources == null || sources.isEmpty()) {
@@ -19,17 +20,29 @@ class IncomeContributionCalculator {
         BigDecimal total = BigDecimal.ZERO;
         for (var source : sources) {
             if (isActiveAtAge(source, age)) {
-                total = total.add(computeAmount(source, yearsInRetirement));
+                BigDecimal amount = computeAmount(source, yearsInRetirement);
+                if (!source.oneTime() && isBoundaryAge(source, age)) {
+                    amount = amount.divide(TWO, SCALE, ROUNDING);
+                }
+                total = total.add(amount);
             }
         }
         return total;
     }
 
     private boolean isActiveAtAge(ProjectionIncomeSourceInput source, int age) {
+        if (source.oneTime()) {
+            return age == source.startAge();
+        }
         if (age < source.startAge()) {
             return false;
         }
-        return source.endAge() == null || age < source.endAge();
+        return source.endAge() == null || age <= source.endAge();
+    }
+
+    private boolean isBoundaryAge(ProjectionIncomeSourceInput source, int age) {
+        return age == source.startAge()
+                || (source.endAge() != null && age == source.endAge());
     }
 
     private BigDecimal computeAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
