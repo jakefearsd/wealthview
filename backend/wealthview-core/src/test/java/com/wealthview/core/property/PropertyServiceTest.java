@@ -448,6 +448,81 @@ class PropertyServiceTest {
     }
 
     @Test
+    void getMonthlyCashFlow_withAnnualCosts_includesDerivedExpenses() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2400"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1200"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 3));
+
+        assertThat(result).hasSize(3);
+        // 500 + 200 + 100 = 800 per month
+        for (var entry : result) {
+            assertThat(entry.totalExpenses()).isEqualByComparingTo("800");
+            assertThat(entry.netCashFlow()).isEqualByComparingTo("-800");
+        }
+    }
+
+    @Test
+    void getMonthlyCashFlow_withLoanDetails_includesMortgageInExpenses() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("1896.2041");
+    }
+
+    @Test
+    void getMonthlyCashFlow_derivedPlusManual_sumsCorrectly() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var manualExpense = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("300"), "maintenance", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(manualExpense));
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 2));
+
+        assertThat(result).hasSize(2);
+        // Jan: 500 (derived tax) + 300 (manual maintenance) = 800
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("800");
+        // Feb: 500 (derived tax only)
+        assertThat(result.get(1).totalExpenses()).isEqualByComparingTo("500");
+    }
+
+    @Test
     void create_withDepreciationFields_setsDepreciation() {
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -588,6 +663,152 @@ class PropertyServiceTest {
             assertThat(entry.totalExpenses()).isEqualByComparingTo("0");
             assertThat(entry.expensesByCategory()).isEmpty();
         }
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_withAnnualPropertyTax_addsDerivedTaxExpense() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).expensesByCategory().get("tax")).isEqualByComparingTo("500");
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("500");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_withAllAnnualCosts_addsAllDerivedCategories() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2400"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1200"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        var categories = result.get(0).expensesByCategory();
+        assertThat(categories.get("tax")).isEqualByComparingTo("500");
+        assertThat(categories.get("insurance")).isEqualByComparingTo("200");
+        assertThat(categories.get("maintenance")).isEqualByComparingTo("100");
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("800");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_withLoanDetails_addsDerivedMortgagePayment() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).expensesByCategory().get("mortgage")).isEqualByComparingTo("1896.2041");
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("1896.2041");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_derivedExpensesMergeWithManual() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        // Manual tax expense of 100 in January
+        var manualTax = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("100"), "tax", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(manualTax));
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 2));
+
+        assertThat(result).hasSize(2);
+        // Jan: 500 (derived) + 100 (manual) = 600
+        assertThat(result.get(0).expensesByCategory().get("tax")).isEqualByComparingTo("600");
+        // Feb: 500 (derived only)
+        assertThat(result.get(1).expensesByCategory().get("tax")).isEqualByComparingTo("500");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_nullAnnualFields_noDerivedExpenses() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        // All annual fields null (default)
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).expensesByCategory()).isEmpty();
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_withLoanAndManualMortgage_mergesAmounts() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var manualMortgage = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("200"), "mortgage", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(manualMortgage));
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        // 1896.2041 (derived) + 200 (manual) = 2096.2041
+        assertThat(result.get(0).expensesByCategory().get("mortgage")).isEqualByComparingTo("2096.2041");
     }
 
     @Test

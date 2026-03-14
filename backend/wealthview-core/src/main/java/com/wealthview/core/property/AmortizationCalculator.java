@@ -62,6 +62,37 @@ public final class AmortizationCalculator {
                 .max(BigDecimal.ZERO);
     }
 
+    /**
+     * Computes monthly mortgage payment using the standard amortization formula:
+     * M = P * [r(1+r)^n / ((1+r)^n - 1)]
+     *
+     * @param loanAmount principal
+     * @param annualRate annual interest rate as decimal (e.g., 0.065 for 6.5%)
+     * @param termMonths total loan term in months
+     * @return monthly payment, or null if any input is null
+     */
+    public static BigDecimal monthlyPayment(BigDecimal loanAmount, BigDecimal annualRate, int termMonths) {
+        if (loanAmount == null || annualRate == null) {
+            return null;
+        }
+
+        if (annualRate.compareTo(BigDecimal.ZERO) == 0) {
+            return loanAmount.divide(new BigDecimal(termMonths), 4, RoundingMode.HALF_UP);
+        }
+
+        var monthlyRate = annualRate.divide(MONTHLY_RATE_DIVISOR, MC);
+        var onePlusR = BigDecimal.ONE.add(monthlyRate);
+        var onePlusRtoN = pow(onePlusR, termMonths);
+
+        // M = P * [r(1+r)^n / ((1+r)^n - 1)]
+        var numerator = monthlyRate.multiply(onePlusRtoN, MC);
+        var denominator = onePlusRtoN.subtract(BigDecimal.ONE);
+
+        return loanAmount.multiply(numerator, MC)
+                .divide(denominator, MC)
+                .setScale(4, RoundingMode.HALF_UP);
+    }
+
     private static BigDecimal pow(BigDecimal base, int exponent) {
         var result = BigDecimal.ONE;
         for (int i = 0; i < exponent; i++) {
