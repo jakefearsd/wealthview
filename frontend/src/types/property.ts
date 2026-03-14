@@ -68,6 +68,14 @@ export interface MonthlyCashFlowEntry {
     net_cash_flow: number;
 }
 
+export interface MonthlyCashFlowDetailEntry {
+    month: string;
+    total_income: number;
+    expenses_by_category: Record<string, number>;
+    total_expenses: number;
+    net_cash_flow: number;
+}
+
 export interface PropertyValuation {
     id: string;
     valuation_date: string;

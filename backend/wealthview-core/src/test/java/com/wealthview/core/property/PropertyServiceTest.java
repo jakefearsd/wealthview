@@ -532,6 +532,65 @@ class PropertyServiceTest {
     }
 
     @Test
+    void getMonthlyCashFlowDetail_groupsExpensesByCategory() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var income = new PropertyIncomeEntity(property, tenant,
+                LocalDate.of(2025, 3, 1), new BigDecimal("2200"), "rent", null);
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(income));
+
+        var mortgage = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 3, 1), new BigDecimal("1200"), "mortgage", null);
+        var insurance = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 3, 15), new BigDecimal("150"), "insurance", null);
+        var tax = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 1), new BigDecimal("3600"), "tax", null, "annual");
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(mortgage, insurance, tax));
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 3), YearMonth.of(2025, 3));
+
+        assertThat(result).hasSize(1);
+        var march = result.get(0);
+        assertThat(march.month()).isEqualTo("2025-03");
+        assertThat(march.totalIncome()).isEqualByComparingTo("2200");
+        assertThat(march.expensesByCategory()).containsEntry("mortgage", new BigDecimal("1200"));
+        assertThat(march.expensesByCategory()).containsEntry("insurance", new BigDecimal("150"));
+        assertThat(march.expensesByCategory().get("tax")).isEqualByComparingTo("300");
+        assertThat(march.totalExpenses()).isEqualByComparingTo("1650");
+        assertThat(march.netCashFlow()).isEqualByComparingTo("550");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_emptyData_returnsZeroEntries() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 3));
+
+        assertThat(result).hasSize(3);
+        for (var entry : result) {
+            assertThat(entry.totalIncome()).isEqualByComparingTo("0");
+            assertThat(entry.totalExpenses()).isEqualByComparingTo("0");
+            assertThat(entry.expensesByCategory()).isEmpty();
+        }
+    }
+
+    @Test
     void update_withFinancialFields_updatesFields() {
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));

@@ -7,6 +7,7 @@ import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import HelpText from '../components/HelpText';
 import InfoSection from '../components/InfoSection';
+import PropertyIncomeChart from '../components/PropertyIncomeChart';
 import type { IncomeSource, CreateIncomeSourceRequest } from '../types/projection';
 
 const INCOME_TYPES = [
@@ -344,7 +345,7 @@ export default function IncomeSourcesPage() {
                         <h3 style={{ color: TYPE_COLORS[type] ?? '#333', marginBottom: '0.75rem' }}>{typeLabel(type)}</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
                             {items.map(s => (
-                                <div key={s.id} style={cardStyle}>
+                                <div key={s.id} style={{ ...cardStyle, ...(s.property_id ? { gridColumn: '1 / -1' } : {}) }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                         <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{s.name}</h3>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -380,10 +381,12 @@ export default function IncomeSourcesPage() {
                                             </div>
                                         )}
                                     </div>
-                                    {s.property_address && (
-                                        <div style={{ borderTop: '1px solid #eee', paddingTop: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
-                                            Linked: {s.property_address}
-                                        </div>
+                                    {s.property_id && s.property_address && (
+                                        <PropertyIncomeChart
+                                            propertyId={s.property_id}
+                                            propertyAddress={s.property_address}
+                                            monthlyRentEstimate={s.annual_amount / 12}
+                                        />
                                     )}
                                 </div>
                             ))}

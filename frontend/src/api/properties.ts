@@ -5,6 +5,7 @@ import type {
     PropertyIncomeRequest,
     PropertyExpenseRequest,
     MonthlyCashFlowEntry,
+    MonthlyCashFlowDetailEntry,
     PropertyValuation,
     PropertyAnalyticsResponse,
     ValuationRefreshResponse,
@@ -55,6 +56,18 @@ export async function getCashFlow(
 ): Promise<MonthlyCashFlowEntry[]> {
     const { data } = await client.get<MonthlyCashFlowEntry[]>(
         `/properties/${propertyId}/cashflow`,
+        { params: { from, to } }
+    );
+    return data;
+}
+
+export async function getCashFlowDetail(
+    propertyId: string,
+    from: string,
+    to: string
+): Promise<MonthlyCashFlowDetailEntry[]> {
+    const { data } = await client.get<MonthlyCashFlowDetailEntry[]>(
+        `/properties/${propertyId}/cashflow-detail`,
         { params: { from, to } }
     );
     return data;

@@ -10,6 +10,7 @@ import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
+import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
@@ -29,7 +30,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
@@ -277,6 +280,30 @@ class PropertyControllerTest {
                         .param("to", "2025-12"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].total_income").value(2500));
+    }
+
+    @Test
+    void getCashFlowDetail_returns200WithCategoryBreakdown() throws Exception {
+        var categories = new LinkedHashMap<String, BigDecimal>();
+        categories.put("mortgage", new BigDecimal("1200"));
+        categories.put("insurance", new BigDecimal("150"));
+        var entry = new MonthlyCashFlowDetailEntry("2025-01",
+                new BigDecimal("2200"), categories,
+                new BigDecimal("1350"), new BigDecimal("850"));
+        when(propertyService.getMonthlyCashFlowDetail(eq(TENANT_ID), eq(PROPERTY_ID),
+                any(YearMonth.class), any(YearMonth.class)))
+                .thenReturn(List.of(entry));
+
+        mockMvc.perform(get("/api/v1/properties/{id}/cashflow-detail", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .param("from", "2025-01")
+                        .param("to", "2025-12"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].total_income").value(2200))
+                .andExpect(jsonPath("$[0].expenses_by_category.mortgage").value(1200))
+                .andExpect(jsonPath("$[0].expenses_by_category.insurance").value(150))
+                .andExpect(jsonPath("$[0].total_expenses").value(1350))
+                .andExpect(jsonPath("$[0].net_cash_flow").value(850));
     }
 
     @Test
