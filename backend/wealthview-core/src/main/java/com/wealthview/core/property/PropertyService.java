@@ -3,6 +3,7 @@ package com.wealthview.core.property;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.UUID;
 
@@ -195,6 +197,77 @@ public class PropertyService {
         }
 
         return entries;
+    }
+
+    @Transactional(readOnly = true)
+    public List<MonthlyCashFlowDetailEntry> getMonthlyCashFlowDetail(UUID tenantId, UUID propertyId,
+                                                                      YearMonth from, YearMonth to) {
+        propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+
+        var fromDate = from.atDay(1);
+        var toDate = to.atEndOfMonth();
+        var annualFromDate = from.minusMonths(11).atDay(1);
+
+        var incomes = incomeRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+
+        Map<YearMonth, BigDecimal> incomeByMonth = new HashMap<>();
+        for (var income : incomes) {
+            spreadEntry(income.getDate(), income.getAmount(), income.getFrequency(),
+                    from, to, incomeByMonth);
+        }
+
+        Map<YearMonth, Map<String, BigDecimal>> expenseByCategoryByMonth = new HashMap<>();
+        for (var expense : expenses) {
+            spreadEntryByCategory(expense.getDate(), expense.getAmount(), expense.getFrequency(),
+                    expense.getCategory(), from, to, expenseByCategoryByMonth);
+        }
+
+        var entries = new ArrayList<MonthlyCashFlowDetailEntry>();
+        var current = from;
+        var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+
+        while (!current.isAfter(to)) {
+            var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
+            var categoryMap = expenseByCategoryByMonth.getOrDefault(current, Map.of());
+            var totalExpenses = categoryMap.values().stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            entries.add(new MonthlyCashFlowDetailEntry(
+                    current.format(formatter),
+                    monthIncome,
+                    new LinkedHashMap<>(categoryMap),
+                    totalExpenses,
+                    monthIncome.subtract(totalExpenses)
+            ));
+
+            current = current.plusMonths(1);
+        }
+
+        return entries;
+    }
+
+    private void spreadEntryByCategory(LocalDate entryDate, BigDecimal amount, String frequency,
+                                        String category, YearMonth rangeFrom, YearMonth rangeTo,
+                                        Map<YearMonth, Map<String, BigDecimal>> bucket) {
+        if ("annual".equals(frequency)) {
+            var monthlyAmount = amount.divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
+            var entryMonth = YearMonth.from(entryDate);
+            for (int i = 0; i < 12; i++) {
+                var month = entryMonth.plusMonths(i);
+                if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
+                    bucket.computeIfAbsent(month, k -> new HashMap<>())
+                            .merge(category, monthlyAmount, BigDecimal::add);
+                }
+            }
+        } else {
+            var month = YearMonth.from(entryDate);
+            if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
+                bucket.computeIfAbsent(month, k -> new HashMap<>())
+                        .merge(category, amount, BigDecimal::add);
+            }
+        }
     }
 
     private void spreadEntry(LocalDate entryDate, BigDecimal amount, String frequency,

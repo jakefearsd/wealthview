@@ -5,6 +5,7 @@ import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
+import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
@@ -118,6 +119,19 @@ public class PropertyController {
         var cashFlow = propertyService.getMonthlyCashFlow(
                 principal.tenantId(), id, fromMonth, toMonth);
         return ResponseEntity.ok(cashFlow);
+    }
+
+    @GetMapping("/{id}/cashflow-detail")
+    public ResponseEntity<List<MonthlyCashFlowDetailEntry>> getCashFlowDetail(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id,
+            @RequestParam String from,
+            @RequestParam String to) {
+        var fromMonth = YearMonth.parse(from);
+        var toMonth = YearMonth.parse(to);
+        var detail = propertyService.getMonthlyCashFlowDetail(
+                principal.tenantId(), id, fromMonth, toMonth);
+        return ResponseEntity.ok(detail);
     }
 
     @GetMapping("/{id}/analytics")
