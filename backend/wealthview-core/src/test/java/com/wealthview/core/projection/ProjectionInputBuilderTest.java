@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -198,6 +199,132 @@ class ProjectionInputBuilderTest {
                 .isEqualByComparingTo(new BigDecimal("40000"));
         assertThat(result.spendingProfile().discretionaryExpenses())
                 .isEqualByComparingTo(new BigDecimal("20000"));
+    }
+
+    @Test
+    void build_rentalWithProperty_populatesExpenses() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(tenant, "123 Main St",
+                new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
+                new BigDecimal("300000"), BigDecimal.ZERO);
+        property.setDepreciationMethod("none");
+        property.setAnnualPropertyTax(new BigDecimal("5000"));
+        property.setAnnualInsuranceCost(new BigDecimal("1200"));
+        property.setAnnualMaintenanceCost(new BigDecimal("2400"));
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("24000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        var input = result.incomeSources().getFirst();
+        assertThat(input.annualPropertyTax()).isEqualByComparingTo("5000");
+        assertThat(input.annualOperatingExpenses()).isEqualByComparingTo("3600");
+        assertThat(input.annualMortgageInterest()).isNull();
+    }
+
+    @Test
+    void build_rentalWithLoan_populatesMortgageInterest() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(tenant, "456 Oak Ave",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("400000"), new BigDecimal("280000"));
+        property.setDepreciationMethod("none");
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("30000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        var input = result.incomeSources().getFirst();
+        assertThat(input.annualMortgageInterest()).isNotNull();
+        assertThat(input.annualMortgageInterest()).isPositive();
+    }
+
+    @Test
+    void build_rentalNoProperty_expensesRemainNull() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Hypothetical Rental", "rental_property",
+                new BigDecimal("24000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        // No property linked
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        var input = result.incomeSources().getFirst();
+        assertThat(input.annualOperatingExpenses()).isNull();
+        assertThat(input.annualMortgageInterest()).isNull();
+        assertThat(input.annualPropertyTax()).isNull();
+    }
+
+    @Test
+    void build_nonRentalWithProperty_expensesRemainNull() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(tenant, "789 Elm St",
+                new BigDecimal("500000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("500000"), BigDecimal.ZERO);
+        property.setAnnualPropertyTax(new BigDecimal("8000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2000"));
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Pension", "pension",
+                new BigDecimal("36000"), 65, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        var input = result.incomeSources().getFirst();
+        assertThat(input.annualOperatingExpenses()).isNull();
+        assertThat(input.annualMortgageInterest()).isNull();
+        assertThat(input.annualPropertyTax()).isNull();
     }
 
     @Test

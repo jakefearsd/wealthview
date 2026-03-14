@@ -87,7 +87,7 @@ class IncomeSourceProcessorTest {
     }
 
     @Test
-    void process_ageEqualsStartAge_sourceActive() {
+    void process_ageEqualsStartAge_halvesAmount() {
         var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
@@ -95,8 +95,8 @@ class IncomeSourceProcessorTest {
                 List.of(source), 65, 1, 2026,
                 BigDecimal.ZERO, "single", BigDecimal.ZERO);
 
-        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
-        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("24000"));
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("12000"));
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("12000"));
     }
 
     @Test
@@ -113,7 +113,7 @@ class IncomeSourceProcessorTest {
     }
 
     @Test
-    void process_ageEqualsEndAge_sourceInactive() {
+    void process_ageEqualsEndAge_halvesAmount() {
         var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
@@ -121,8 +121,34 @@ class IncomeSourceProcessorTest {
                 List.of(source), 70, 1, 2026,
                 BigDecimal.ZERO, "single", BigDecimal.ZERO);
 
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("12000"));
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("12000"));
+    }
+
+    @Test
+    void process_ageAfterEndAge_sourceInactive() {
+        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+                BigDecimal.ZERO, null);
+
+        var result = processor.process(
+                List.of(source), 71, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void process_midRange_fullAmount() {
+        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+                BigDecimal.ZERO, null);
+
+        var result = processor.process(
+                List.of(source), 67, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("24000"));
     }
 
     // --- Inflation computation ---
@@ -148,7 +174,7 @@ class IncomeSourceProcessorTest {
     }
 
     @Test
-    void process_yearsInRetirementOne_noInflationApplied() {
+    void process_yearsInRetirementOne_halvesAtStartAge() {
         var source = makeSource("pension", new BigDecimal("10000"), 60, null,
                 new BigDecimal("0.05"), null);
 
@@ -156,7 +182,7 @@ class IncomeSourceProcessorTest {
                 List.of(source), 60, 1, 2026,
                 BigDecimal.ZERO, "single", BigDecimal.ZERO);
 
-        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("10000"));
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("5000"));
     }
 
     // --- Tax-free income ---
@@ -174,7 +200,60 @@ class IncomeSourceProcessorTest {
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    // --- One-time source tests ---
+
+    @Test
+    void process_oneTimeSource_atStartAge_fullAmount() {
+        var source = makeOneTimeSource(new BigDecimal("50000"), 65);
+
+        var result = processor.process(
+                List.of(source), 65, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    @Test
+    void process_oneTimeSource_atEndAge_inactive() {
+        var source = makeOneTimeSource(new BigDecimal("50000"), 65);
+
+        var result = processor.process(
+                List.of(source), 66, 2, 2027,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void process_oneTimeSource_withInflation_ignoresInflation() {
+        var source = makeOneTimeSource(new BigDecimal("50000"), 65);
+
+        var result = processor.process(
+                List.of(source), 65, 5, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
     // --- Helper ---
+
+    private static ProjectionIncomeSourceInput makeOneTimeSource(
+            BigDecimal annualAmount, int startAge) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(),
+                "One-time event",
+                "other",
+                annualAmount,
+                startAge,
+                startAge + 1,
+                new BigDecimal("0.03"),  // non-zero inflation — should be ignored
+                true,
+                "taxable",
+                null, null, null, null, null);
+    }
 
     private static ProjectionIncomeSourceInput makeSource(
             String incomeType, BigDecimal annualAmount, int startAge, Integer endAge,

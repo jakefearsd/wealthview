@@ -405,17 +405,39 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private ResolvedSpending resolveSpending(SpendingData spending, int age) {
         if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
+            // Collect ALL matching tiers (inclusive endAge)
+            var matches = new ArrayList<SpendingTierData>();
             for (var tier : spending.spendingTiers()) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age < tier.endAge())) {
-                    return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
+                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
+                    matches.add(tier);
                 }
             }
 
-            // Age is in a gap — find the previous and next tiers and blend 50/50
+            if (matches.size() == 1) {
+                var tier = matches.getFirst();
+                return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
+            }
+
+            if (matches.size() >= 2) {
+                // Overlap at boundary — blend 50/50 (mid-year transition)
+                var essSum = BigDecimal.ZERO;
+                var discSum = BigDecimal.ZERO;
+                for (var tier : matches) {
+                    essSum = essSum.add(tier.essentialExpenses());
+                    discSum = discSum.add(tier.discretionaryExpenses());
+                }
+                var count = new BigDecimal(matches.size());
+                return new ResolvedSpending(
+                        essSum.divide(count, SCALE, ROUNDING),
+                        discSum.divide(count, SCALE, ROUNDING));
+            }
+
+            // No match — gap: find prev/next and blend
+            // gap search uses STRICT < because endAge==age is a direct match above
             SpendingTierData prev = null;
             SpendingTierData next = null;
             for (var tier : spending.spendingTiers()) {
-                if (tier.endAge() != null && tier.endAge() <= age) {
+                if (tier.endAge() != null && tier.endAge() < age) {
                     if (prev == null || tier.endAge() > prev.endAge()) {
                         prev = tier;
                     }
@@ -440,12 +462,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private int computeYearsInTier(SpendingData spending, int age, int yearsInRetirement) {
         if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
+            // Collect all matching tiers (inclusive endAge)
+            var matches = new ArrayList<SpendingTierData>();
             for (var tier : spending.spendingTiers()) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age < tier.endAge())) {
-                    int retirementStartAge = age - yearsInRetirement + 1;
-                    int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
-                    return age - effectiveTierStart;
+                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
+                    matches.add(tier);
                 }
+            }
+            if (matches.size() >= 2) {
+                // Overlap (transition year) — no inflation compounding
+                return 0;
+            }
+            if (matches.size() == 1) {
+                var tier = matches.getFirst();
+                int retirementStartAge = age - yearsInRetirement + 1;
+                int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
+                return age - effectiveTierStart;
             }
         }
         return -1;

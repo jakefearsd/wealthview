@@ -71,7 +71,8 @@ class IncomeSourceProcessor {
                 continue;
             }
 
-            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
+            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
+                    .multiply(transitionMultiplier(source, age)).setScale(SCALE, ROUNDING);
             if ("social_security".equals(source.incomeType())) {
                 ssBenefit = ssBenefit.add(nominal);
             } else {
@@ -84,7 +85,8 @@ class IncomeSourceProcessor {
                 continue;
             }
 
-            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement);
+            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
+                    .multiply(transitionMultiplier(source, age)).setScale(SCALE, ROUNDING);
 
             switch (source.incomeType()) {
                 case "rental_property" -> {
@@ -168,14 +170,29 @@ class IncomeSourceProcessor {
     }
 
     boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
+        if (source.oneTime()) {
+            return age == source.startAge();
+        }
         if (age < source.startAge()) {
             return false;
         }
-        return source.endAge() == null || age < source.endAge();
+        return source.endAge() == null || age <= source.endAge();
+    }
+
+    private BigDecimal transitionMultiplier(ProjectionIncomeSourceInput source, int age) {
+        if (source.oneTime()) {
+            return BigDecimal.ONE;
+        }
+        if (age == source.startAge()
+                || (source.endAge() != null && age == source.endAge())) {
+            return new BigDecimal("0.5");
+        }
+        return BigDecimal.ONE;
     }
 
     BigDecimal computeNominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
-        if (yearsInRetirement <= 1 || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
+        if (source.oneTime() || yearsInRetirement <= 1
+                || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
             return source.annualAmount();
         }
         BigDecimal factor = BigDecimal.ONE.add(source.inflationRate()).pow(yearsInRetirement - 1);

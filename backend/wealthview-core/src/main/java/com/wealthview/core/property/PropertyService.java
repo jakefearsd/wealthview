@@ -6,14 +6,11 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
-import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
-import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.slf4j.Logger;
@@ -44,18 +41,15 @@ public class PropertyService {
     private static final Set<String> VALID_DEPRECIATION_METHODS = Set.of("none", "straight_line", "cost_segregation");
 
     private final PropertyRepository propertyRepository;
-    private final PropertyIncomeRepository incomeRepository;
     private final PropertyExpenseRepository expenseRepository;
     private final TenantRepository tenantRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public PropertyService(PropertyRepository propertyRepository,
-                           PropertyIncomeRepository incomeRepository,
                            PropertyExpenseRepository expenseRepository,
                            TenantRepository tenantRepository,
                            ApplicationEventPublisher eventPublisher) {
         this.propertyRepository = propertyRepository;
-        this.incomeRepository = incomeRepository;
         this.expenseRepository = expenseRepository;
         this.tenantRepository = tenantRepository;
         this.eventPublisher = eventPublisher;
@@ -132,17 +126,6 @@ public class PropertyService {
     }
 
     @Transactional
-    public void addIncome(UUID tenantId, UUID propertyId, PropertyIncomeRequest request) {
-        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
-
-        var frequency = request.frequency() != null ? request.frequency() : "monthly";
-        var income = new PropertyIncomeEntity(property, property.getTenant(),
-                request.date(), request.amount(), request.category(), request.description(), frequency);
-        incomeRepository.save(income);
-    }
-
-    @Transactional
     public void addExpense(UUID tenantId, UUID propertyId, PropertyExpenseRequest request) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
@@ -163,14 +146,7 @@ public class PropertyService {
         var toDate = to.atEndOfMonth();
         var annualFromDate = from.minusMonths(11).atDay(1);
 
-        var incomes = incomeRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
         var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
-
-        Map<YearMonth, BigDecimal> incomeByMonth = new HashMap<>();
-        for (var income : incomes) {
-            spreadEntry(income.getDate(), income.getAmount(), income.getFrequency(),
-                    from, to, incomeByMonth);
-        }
 
         Map<YearMonth, BigDecimal> expenseByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -186,14 +162,13 @@ public class PropertyService {
         var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
         while (!current.isAfter(to)) {
-            var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
             var monthExpense = expenseByMonth.getOrDefault(current, BigDecimal.ZERO).add(derivedTotal);
 
             entries.add(new MonthlyCashFlowEntry(
                     current.format(formatter),
-                    monthIncome,
+                    BigDecimal.ZERO,
                     monthExpense,
-                    monthIncome.subtract(monthExpense)
+                    BigDecimal.ZERO.subtract(monthExpense)
             ));
 
             current = current.plusMonths(1);
@@ -212,14 +187,7 @@ public class PropertyService {
         var toDate = to.atEndOfMonth();
         var annualFromDate = from.minusMonths(11).atDay(1);
 
-        var incomes = incomeRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
         var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
-
-        Map<YearMonth, BigDecimal> incomeByMonth = new HashMap<>();
-        for (var income : incomes) {
-            spreadEntry(income.getDate(), income.getAmount(), income.getFrequency(),
-                    from, to, incomeByMonth);
-        }
 
         Map<YearMonth, Map<String, BigDecimal>> expenseByCategoryByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -234,7 +202,6 @@ public class PropertyService {
         var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
 
         while (!current.isAfter(to)) {
-            var monthIncome = incomeByMonth.getOrDefault(current, BigDecimal.ZERO);
             var categoryMap = new HashMap<>(expenseByCategoryByMonth.getOrDefault(current, Map.of()));
             for (var entry : derivedExpenses.entrySet()) {
                 categoryMap.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
@@ -244,10 +211,10 @@ public class PropertyService {
 
             entries.add(new MonthlyCashFlowDetailEntry(
                     current.format(formatter),
-                    monthIncome,
+                    BigDecimal.ZERO,
                     new LinkedHashMap<>(categoryMap),
                     totalExpenses,
-                    monthIncome.subtract(totalExpenses)
+                    BigDecimal.ZERO.subtract(totalExpenses)
             ));
 
             current = current.plusMonths(1);

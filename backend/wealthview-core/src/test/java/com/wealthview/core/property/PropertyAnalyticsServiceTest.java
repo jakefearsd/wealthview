@@ -1,13 +1,13 @@
 package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
-import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.PropertyValuationEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.PropertyValuationRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,7 +37,7 @@ class PropertyAnalyticsServiceTest {
     private PropertyRepository propertyRepository;
 
     @Mock
-    private PropertyIncomeRepository incomeRepository;
+    private IncomeSourceRepository incomeSourceRepository;
 
     @Mock
     private PropertyExpenseRepository expenseRepository;
@@ -55,7 +55,7 @@ class PropertyAnalyticsServiceTest {
         tenantId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
         analyticsService = new PropertyAnalyticsService(
-                propertyRepository, incomeRepository, expenseRepository, valuationRepository);
+                propertyRepository, incomeSourceRepository, expenseRepository, valuationRepository);
     }
 
     @Test
@@ -145,14 +145,8 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        // Mock income: $2500/month rent for trailing 12 months
-        var incomes = List.of(
-                createIncome(property, LocalDate.now().minusMonths(6), "2500"),
-                createIncome(property, LocalDate.now().minusMonths(3), "2500"),
-                createIncome(property, LocalDate.now().minusMonths(1), "2500")
-        );
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(incomes);
+        // Linked income source: $30,000/year rental income
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
         // Mock operating expenses (non-mortgage): $500 tax, $200 insurance
         var opExpenses = List.of(
@@ -190,8 +184,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
@@ -211,8 +204,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
@@ -281,8 +273,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
@@ -329,14 +320,11 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        // Annual income = 24000 (12 * 2000 rent), Operating expenses = 6000 (tax + insurance)
+        // Annual rent from linked income source = 24000
+        // Operating expenses = 6000 (tax)
         // NOI = 24000 - 6000 = 18000
         // Cap Rate = (18000 / 400000) * 100 = 4.5000
-        var incomes = List.of(
-                createIncome(property, LocalDate.now().minusMonths(1), "24000")
-        );
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(incomes);
+        mockLinkedIncomeSources(property, new BigDecimal("24000"));
 
         var opExpenses = List.of(
                 createExpense(property, LocalDate.now().minusMonths(1), "6000", "tax")
@@ -393,7 +381,8 @@ class PropertyAnalyticsServiceTest {
     void getAnalytics_investmentCashOnCash_calculatedCorrectly() {
         // Setup: investment property with known values
         // Purchase: 350000, Loan: 280000 → Cash invested = 70000
-        // Income: 30000, Operating expenses: 6000 → NOI = 24000
+        // Income: 30000 (from linked income source)
+        // Operating expenses: 6000 → NOI = 24000
         // All expenses (incl mortgage): 6000 + 18000 = 24000 → Net cash flow = 30000 - 24000 = 6000
         // Cash-on-cash = (6000 / 70000) * 100 = 8.5714
         var property = createProperty("investment", "400000", "350000");
@@ -405,8 +394,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(List.of(createIncome(property, LocalDate.now().minusMonths(1), "30000")));
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
@@ -434,8 +422,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        mockNoLinkedIncomeSources(property);
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
                 .thenReturn(Collections.emptyList());
@@ -444,13 +431,7 @@ class PropertyAnalyticsServiceTest {
 
         analyticsService.getAnalytics(tenantId, property.getId(), 2024);
 
-        // Verify repository was called with Jan 1 to Dec 31 of 2024, annual from = Feb 1 2023
-        verify(incomeRepository).findOverlapping(
-                eq(property.getId()),
-                eq(LocalDate.of(2024, 1, 1)),
-                eq(LocalDate.of(2024, 12, 31)),
-                eq(LocalDate.of(2023, 2, 1))
-        );
+        // Verify expense repository was called with Jan 1 to Dec 31 of 2024
         verify(expenseRepository).findOverlappingExcludingCategory(
                 eq(property.getId()),
                 eq(LocalDate.of(2024, 1, 1)),
@@ -473,11 +454,8 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        // Annual income of $30,000 starting Jan 2025, analysis year = 2025
-        // Full 12 months overlap → full amount used
-        var annualIncome = createIncome(property, LocalDate.of(2025, 1, 1), "30000", "annual");
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(List.of(annualIncome));
+        // Income from linked income source: $30,000/year
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
 
         // Annual tax of $6,000 starting Jan 2025 — fully overlaps
         var annualTax = createExpense(property, LocalDate.of(2025, 1, 1), "6000", "tax", "annual");
@@ -503,8 +481,7 @@ class PropertyAnalyticsServiceTest {
         mockProperty(property);
         mockEmptyValuations(property);
 
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(Collections.emptyList());
+        mockNoLinkedIncomeSources(property);
 
         // Annual insurance of $12,000 starting Jul 2025 — covers Jul 2025 to Jun 2026
         // Analysis year = 2025 (Jan-Dec): 6 months overlap (Jul-Dec)
@@ -526,17 +503,21 @@ class PropertyAnalyticsServiceTest {
     }
 
     @Test
-    void getAnalytics_mixedMonthlyAndAnnual_sumsCorrectly() {
+    void getAnalytics_multipleLinkedIncomeSources_sumsCorrectly() {
         var property = createProperty("investment", "400000", "350000");
         property.setPurchaseDate(LocalDate.of(2023, 1, 1));
         mockProperty(property);
         mockEmptyValuations(property);
 
-        // Monthly income entries + annual entry
-        var monthlyIncome = createIncome(property, LocalDate.now().minusMonths(1), "2000");
-        var annualIncome = createIncome(property, LocalDate.of(2025, 1, 1), "12000", "annual");
-        when(incomeRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
-                .thenReturn(List.of(monthlyIncome, annualIncome));
+        // Two linked income sources: $24000 + $6000 = $30000 total annual rent
+        var source1 = new IncomeSourceEntity(tenant, "Unit A Rent", "rental_property",
+                new BigDecimal("24000"), 0, null, BigDecimal.ZERO, false, "taxable");
+        source1.setProperty(property);
+        var source2 = new IncomeSourceEntity(tenant, "Parking Income", "rental_property",
+                new BigDecimal("6000"), 0, null, BigDecimal.ZERO, false, "taxable");
+        source2.setProperty(property);
+        when(incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, property.getId()))
+                .thenReturn(List.of(source1, source2));
 
         when(expenseRepository.findOverlappingExcludingCategory(
                 eq(property.getId()), any(), any(), any(), eq("mortgage")))
@@ -546,8 +527,8 @@ class PropertyAnalyticsServiceTest {
 
         var result = analyticsService.getAnalytics(tenantId, property.getId(), 2025);
 
-        // Total income = 2000 (monthly) + 12000 (annual, full overlap) = 14000
-        assertThat(result.annualNoi()).isEqualByComparingTo("14000");
+        // Total income = 24000 + 6000 = 30000
+        assertThat(result.annualNoi()).isEqualByComparingTo("30000");
     }
 
     // --- Helper methods ---
@@ -569,12 +550,17 @@ class PropertyAnalyticsServiceTest {
                 .thenReturn(Collections.emptyList());
     }
 
-    private PropertyIncomeEntity createIncome(PropertyEntity property, LocalDate date, String amount) {
-        return new PropertyIncomeEntity(property, tenant, date, new BigDecimal(amount), "rent", null);
+    private void mockLinkedIncomeSources(PropertyEntity property, BigDecimal annualAmount) {
+        var source = new IncomeSourceEntity(tenant, "Rental Income", "rental_property",
+                annualAmount, 0, null, BigDecimal.ZERO, false, "taxable");
+        source.setProperty(property);
+        when(incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, property.getId()))
+                .thenReturn(List.of(source));
     }
 
-    private PropertyIncomeEntity createIncome(PropertyEntity property, LocalDate date, String amount, String frequency) {
-        return new PropertyIncomeEntity(property, tenant, date, new BigDecimal(amount), "rent", null, frequency);
+    private void mockNoLinkedIncomeSources(PropertyEntity property) {
+        when(incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, property.getId()))
+                .thenReturn(Collections.emptyList());
     }
 
     private PropertyExpenseEntity createExpense(PropertyEntity property, LocalDate date,

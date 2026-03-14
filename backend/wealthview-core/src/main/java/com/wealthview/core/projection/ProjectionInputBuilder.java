@@ -7,6 +7,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
@@ -16,6 +17,8 @@ import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +101,20 @@ public class ProjectionInputBuilder {
 
         if ("rental_property".equals(source.getIncomeType()) && source.getProperty() != null) {
             var property = source.getProperty();
+
+            annualOpEx = sumNullable(property.getAnnualInsuranceCost(), property.getAnnualMaintenanceCost());
+            annualPropertyTax = property.getAnnualPropertyTax();
+
+            if (property.hasLoanDetails()) {
+                var remainingBalance = AmortizationCalculator.remainingBalance(
+                        property.getLoanAmount(), property.getAnnualInterestRate(),
+                        property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
+                if (remainingBalance.compareTo(BigDecimal.ZERO) > 0) {
+                    annualMortgageInterest = remainingBalance.multiply(property.getAnnualInterestRate())
+                            .setScale(4, RoundingMode.HALF_UP);
+                }
+            }
+
             depreciationMethod = property.getDepreciationMethod();
 
             if ("cost_segregation".equals(depreciationMethod)) {
@@ -122,5 +139,15 @@ public class ProjectionInputBuilder {
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
                 annualOpEx, annualMortgageInterest, annualPropertyTax,
                 depreciationMethod, depreciationByYear);
+    }
+
+    private BigDecimal sumNullable(BigDecimal... values) {
+        var sum = BigDecimal.ZERO;
+        for (var v : values) {
+            if (v != null) {
+                sum = sum.add(v);
+            }
+        }
+        return sum.compareTo(BigDecimal.ZERO) == 0 ? null : sum;
     }
 }

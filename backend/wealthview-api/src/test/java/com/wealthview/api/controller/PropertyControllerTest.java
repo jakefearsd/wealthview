@@ -13,7 +13,6 @@ import com.wealthview.core.property.PropertyValuationSyncService;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
-import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
@@ -207,21 +206,6 @@ class PropertyControllerTest {
     }
 
     @Test
-    void addIncome_validInput_returns201() throws Exception {
-        doNothing().when(propertyService).addIncome(eq(TENANT_ID), eq(PROPERTY_ID),
-                any(PropertyIncomeRequest.class));
-
-        mockMvc.perform(post("/api/v1/properties/{id}/income", PROPERTY_ID)
-                        .with(authenticatedAdmin())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"date": "2025-01-01", "amount": 2500, "category": "rent",
-                                 "description": "January rent"}
-                                """))
-                .andExpect(status().isCreated());
-    }
-
-    @Test
     void addExpense_validInput_returns201() throws Exception {
         doNothing().when(propertyService).addExpense(eq(TENANT_ID), eq(PROPERTY_ID),
                 any(PropertyExpenseRequest.class));
@@ -232,21 +216,6 @@ class PropertyControllerTest {
                         .content("""
                                 {"date": "2025-01-01", "amount": 1800, "category": "mortgage",
                                  "description": "January mortgage"}
-                                """))
-                .andExpect(status().isCreated());
-    }
-
-    @Test
-    void addIncome_withAnnualFrequency_returns201() throws Exception {
-        doNothing().when(propertyService).addIncome(eq(TENANT_ID), eq(PROPERTY_ID),
-                any(PropertyIncomeRequest.class));
-
-        mockMvc.perform(post("/api/v1/properties/{id}/income", PROPERTY_ID)
-                        .with(authenticatedAdmin())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"date": "2025-01-01", "amount": 12000, "category": "rent",
-                                 "frequency": "annual"}
                                 """))
                 .andExpect(status().isCreated());
     }
