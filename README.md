@@ -31,6 +31,60 @@ docker compose down                       # Stop (preserve data)
 docker compose down -v                    # Stop and delete database
 ```
 
+## Documentation
+
+### For Users
+
+| Guide | Description |
+|-------|-------------|
+| [Getting Started](docs/user-guide/getting-started.md) | First login, navigation, key concepts |
+| [Investment Accounts](docs/user-guide/investment-accounts.md) | Accounts, transactions, holdings, cost basis |
+| [Data Import](docs/user-guide/data-import.md) | CSV and OFX/QFX import with deduplication |
+| [Prices & Valuation](docs/user-guide/prices-and-valuation.md) | Price feeds, manual entry, portfolio valuation |
+| [Portfolio Analysis](docs/user-guide/portfolio-analysis.md) | Dashboard, charts, net worth breakdown |
+| [Rental Properties](docs/user-guide/rental-properties.md) | Properties, mortgages, income/expenses, analytics |
+| [Retirement Projections](docs/user-guide/retirement-projections.md) | Projection engine, strategies, scenario comparison |
+| [Spending & Income](docs/user-guide/spending-and-income.md) | Spending profiles, income sources, tax treatments |
+| [Settings & Export](docs/user-guide/settings-and-export.md) | Notifications, invite codes, data export |
+
+### Deployment & Operations
+
+| Guide | Description |
+|-------|-------------|
+| [Quick Start Deployment](docs/deployment/quickstart.md) | Get running in 5 minutes with Docker |
+| [Production Setup](docs/deployment/production-setup.md) | Full VPS deployment with nginx and TLS |
+| [TLS & Nginx](docs/deployment/tls-and-nginx.md) | Let's Encrypt certificates, nginx configuration |
+| [Security Hardening](docs/deployment/security-hardening.md) | Firewall, SSH, secrets management |
+| [Upgrading](docs/deployment/upgrading.md) | Upgrades, rollback, Flyway migrations |
+
+### System Administration
+
+| Guide | Description |
+|-------|-------------|
+| [Tenant & User Management](docs/administration/tenant-and-user-management.md) | Tenants, roles, invite codes, audit log |
+| [Backups](docs/administration/backups.md) | Automated backups, restore procedures |
+| [Monitoring & Logging](docs/administration/monitoring-and-logging.md) | Health checks, structured logs, alerting |
+| [Maintenance](docs/administration/maintenance.md) | Database, disk, scheduled jobs, capacity |
+| [Troubleshooting](docs/administration/troubleshooting.md) | Diagnostics, common problems, fixes |
+
+### Reference
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/reference/architecture.md) | Module structure, dependency rules, project tree |
+| [API Reference](docs/reference/api-reference.md) | Full endpoint documentation with examples |
+| [Data Model](docs/reference/data-model.md) | Entity definitions, ER diagram, migrations |
+| [Configuration](docs/reference/configuration.md) | Environment variables, Spring profiles |
+| [Frontend Routes](docs/reference/frontend-routes.md) | Route table with page descriptions |
+
+### For Developers
+
+| Document | Description |
+|----------|-------------|
+| [Development Guide](docs/development.md) | Local setup, build commands, testing |
+| [Feature Walkthrough](docs/feature_walkthrough.md) | Step-by-step manual test script |
+| [PROJECT.md](PROJECT.md) | Full architectural spec and feature roadmap |
+
 ## Tech Stack
 
 | Layer     | Technology                                                |
@@ -41,22 +95,6 @@ docker compose down -v                    # Stop and delete database
 | Build     | Maven multi-module (backend), npm (frontend)              |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest         |
 | Deploy    | Docker Compose (multi-stage build)                        |
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/architecture.md) | Component diagram, module structure, dependency rules, project tree |
-| [Development Guide](docs/development.md) | Local setup, build commands, running tests, code quality tools |
-| [Configuration Reference](docs/configuration.md) | Environment variables, JWT settings, Finnhub/Zillow config, Spring profiles |
-| [Deployment Guide](docs/deployment.md) | Production security checklist, health checks, upgrading, resource requirements |
-| [Administration Guide](docs/administration.md) | Tenant management, user roles, audit log, data export, scheduled jobs |
-| [Backup Operations](docs/doing_backups.md) | Automated backup scheduling, restore procedures, troubleshooting |
-| [Data Model Reference](docs/data_model.md) | All 23 entity definitions, ER diagram, Flyway migration inventory |
-| [API Reference](docs/api_reference.md) | Full endpoint documentation with request/response examples |
-| [Frontend Pages](docs/frontend.md) | Route table with page descriptions |
-| [Feature Walkthrough](docs/feature_walkthrough.md) | Step-by-step guided tour of all features (doubles as manual test script) |
-| [PROJECT.md](PROJECT.md) | Full architectural spec, data model goals, and feature roadmap |
 
 ## License
 
