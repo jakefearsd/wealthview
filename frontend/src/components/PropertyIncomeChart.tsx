@@ -33,10 +33,13 @@ interface ChartRow {
 
 function buildChartData(entries: MonthlyCashFlowDetailEntry[], monthlyRent: number): ChartRow[] {
     return entries.map(entry => {
+        const totalExpenses = Object.values(entry.expenses_by_category)
+            .reduce((sum, amt) => sum + amt, 0);
         const row: ChartRow = {
             month: entry.month,
             label: formatMonthLabel(entry.month),
             income: monthlyRent,
+            net: monthlyRent - totalExpenses,
         };
         for (const [cat, amount] of Object.entries(entry.expenses_by_category)) {
             row[cat] = -amount;
@@ -66,9 +69,10 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
     if (!active || !payload) return null;
 
     const income = payload.find(p => p.name === 'Rent Estimate');
-    const expenses = payload.filter(p => p.name !== 'Rent Estimate');
+    const netEntry = payload.find(p => p.name === 'Net Cash Flow');
+    const expenses = payload.filter(p => p.name !== 'Rent Estimate' && p.name !== 'Net Cash Flow');
     const totalExpenses = expenses.reduce((sum, p) => sum + Math.abs(p.value), 0);
-    const net = (income?.value ?? 0) - totalExpenses;
+    const net = netEntry?.value ?? ((income?.value ?? 0) - totalExpenses);
 
     return (
         <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 6, padding: '0.75rem', fontSize: '0.85rem' }}>
@@ -129,16 +133,37 @@ export default function PropertyIncomeChart({ propertyId, propertyAddress, month
     const chartData = buildChartData(data, monthlyRentEstimate);
 
     const maxExpense = Math.max(...data.map(d => d.total_expenses));
-    const yMin = -Math.ceil(maxExpense / 500) * 500 - 500;
+    const minNet = Math.min(...chartData.map(d => d.net as number));
+    const yMin = -Math.ceil(Math.max(maxExpense, Math.abs(Math.min(minNet, 0))) / 500) * 500 - 500;
     const yMax = Math.ceil(monthlyRentEstimate / 500) * 500 + 500;
+
+    const annualIncome = chartData.reduce((sum, d) => sum + d.income, 0);
+    const annualExpenses = data.reduce((sum, d) => sum + d.total_expenses, 0);
+    const annualNet = annualIncome - annualExpenses;
 
     return (
         <div style={{ ...cardStyle, marginTop: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
-                <div>
+            <div style={{ marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Rent vs Expenses — {propertyAddress}</h4>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '0.25rem' }}>
-                        Trailing 12 months. Rent estimate: {formatCurrency(monthlyRentEstimate)}/mo
+                    <div style={{ fontSize: '0.8rem', color: '#888' }}>
+                        Trailing 12 months
+                    </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
+                    <div>
+                        <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Total Income</div>
+                        <div style={{ color: '#2e7d32', fontWeight: 600 }}>{formatCurrency(annualIncome)}</div>
+                    </div>
+                    <div>
+                        <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Total Expenses</div>
+                        <div style={{ color: '#d32f2f', fontWeight: 600 }}>{formatCurrency(annualExpenses)}</div>
+                    </div>
+                    <div>
+                        <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Net Cash Flow</div>
+                        <div style={{ color: annualNet >= 0 ? '#2e7d32' : '#d32f2f', fontWeight: 700, fontSize: '1rem' }}>
+                            {annualNet >= 0 ? '+' : ''}{formatCurrency(annualNet)}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -164,6 +189,7 @@ export default function PropertyIncomeChart({ propertyId, propertyAddress, month
                             stackId="neg"
                         />
                     ))}
+                    <Bar dataKey="net" name="Net Cash Flow" fill="#ff9800" />
                 </BarChart>
             </ResponsiveContainer>
         </div>
