@@ -27,7 +27,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        MDC.put("requestId", UUID.randomUUID().toString().substring(0, 8));
+        var externalId = request.getHeader("X-Request-ID");
+        var requestId = externalId != null
+                ? externalId.substring(0, Math.min(externalId.length(), 32))
+                : UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        MDC.put("requestId", requestId);
 
         try {
             var token = extractToken(request);
