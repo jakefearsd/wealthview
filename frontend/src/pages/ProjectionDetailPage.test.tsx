@@ -89,6 +89,30 @@ describe('ProjectionDetailPage', () => {
         expect(screen.getByRole('button', { name: /run projection/i })).toBeInTheDocument();
     });
 
+    it('renders income source ages with infinity for null end_age', () => {
+        const scenarioWithIncome: Scenario = {
+            ...mockScenario,
+            income_sources: [
+                { income_source_id: 'is-1', name: 'Social Security', income_type: 'social_security', annual_amount: 24000, override_annual_amount: null, effective_amount: 24000, start_age: 67, end_age: null, inflation_rate: 0.02, one_time: false },
+                { income_source_id: 'is-2', name: 'Pension', income_type: 'pension', annual_amount: 12000, override_annual_amount: null, effective_amount: 12000, start_age: 62, end_age: 75, inflation_rate: 0, one_time: false },
+            ],
+        };
+        mockUseApiQuery.mockReturnValue({ data: scenarioWithIncome, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        // Income Sources table has Start Age / End Age columns
+        const incomeTable = screen.getByText('Income Sources').closest('div')!.querySelector('table')!;
+        expect(incomeTable).toBeInTheDocument();
+        expect(screen.getByText('Start Age')).toBeInTheDocument();
+        // "End Age" also appears in summary cards, so check within table
+        const headers = Array.from(incomeTable.querySelectorAll('th')).map(th => th.textContent);
+        expect(headers).toContain('End Age');
+        expect(screen.getByText('67')).toBeInTheDocument();
+        expect(screen.getByText('∞')).toBeInTheDocument();
+        expect(screen.getByText('62')).toBeInTheDocument();
+        expect(screen.getByText('75')).toBeInTheDocument();
+    });
+
     it('switches tabs when clicked', async () => {
         mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
         renderPage();
@@ -99,7 +123,7 @@ describe('ProjectionDetailPage', () => {
         mockRun.mockResolvedValue({
             scenario_id: 'abc-123',
             yearly_data: [
-                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null },
+                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null, income_by_source: null },
             ],
             final_balance: 117700,
             years_in_retirement: 0,

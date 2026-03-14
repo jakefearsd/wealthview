@@ -182,7 +182,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
-            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate, incomeSources);
+            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate,
+                    incomeResult.totalActiveIncome());
             if (incomeResult.isResult() != null) {
                 yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
             }
@@ -616,7 +617,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
                                               int age, int yearsInRetirement, BigDecimal inflationRate,
-                                              List<ProjectionIncomeSourceInput> incomeSources) {
+                                              BigDecimal activeIncome) {
         if (spending == null || !base.retired()) {
             return base;
         }
@@ -626,8 +627,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
         BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-
-        BigDecimal activeIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
 
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
         BigDecimal surplus = base.withdrawals().subtract(netNeed);
@@ -647,7 +646,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts,
                 base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
                 base.rentalLossApplied(), base.suspendedLossCarryforward(),
-                base.socialSecurityTaxable(), base.selfEmploymentTax());
+                base.socialSecurityTaxable(), base.selfEmploymentTax(),
+                base.incomeBySource());
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
@@ -656,6 +656,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         BigDecimal totalIncome = isResult.totalCashInflow();
+
+        var incomeBySource = isResult.incomeBySource().isEmpty() ? null : isResult.incomeBySource();
 
         return new ProjectionYearDto(
                 base.year(), base.age(), base.startBalance(), base.contributions(),
@@ -671,7 +673,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 nullIfZero(isResult.rentalLossApplied()),
                 nullIfZero(isResult.suspendedLossCarryforward()),
                 nullIfZero(isResult.socialSecurityTaxable()),
-                nullIfZero(isResult.selfEmploymentTax()));
+                nullIfZero(isResult.selfEmploymentTax()),
+                incomeBySource);
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
