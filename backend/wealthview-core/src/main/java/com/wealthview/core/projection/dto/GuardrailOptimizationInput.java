@@ -21,5 +21,7 @@ public record GuardrailOptimizationInput(
         Long seed,
         BigDecimal portfolioFloor,
         BigDecimal maxAnnualAdjustmentRate,
-        int phaseBlendYears
+        int phaseBlendYears,
+        int cashReserveYears,
+        BigDecimal cashReturnRate
 ) {}

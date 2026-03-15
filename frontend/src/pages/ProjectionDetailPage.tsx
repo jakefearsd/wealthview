@@ -149,7 +149,10 @@ export default function ProjectionDetailPage() {
                         <SummaryCard label="Strategy" value={strategyLabel} />
                         <SummaryCard label="Accounts" value={String(scenario.accounts.length)} />
                         {scenario.spending_profile && (
-                            <SummaryCard label="Spending Profile" value={scenario.spending_profile.name} />
+                            <SummaryCard label="Spending Plan" value={scenario.spending_profile.name} />
+                        )}
+                        {scenario.guardrail_profile?.active && !scenario.spending_profile && (
+                            <SummaryCard label="Spending Plan" value={`${scenario.guardrail_profile.name}${scenario.guardrail_profile.stale ? ' (stale)' : ''}`} />
                         )}
                     </div>
 

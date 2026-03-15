@@ -2,7 +2,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { Scenario, GuardrailProfileResponse } from '../types/projection';
+import type { Scenario, GuardrailProfileResponse, GuardrailPhase, GuardrailYearlySpending } from '../types/projection';
+import { computePlanDiagnostics } from './SpendingOptimizerPage';
 
 vi.mock('../api/projections', () => ({
     getScenario: vi.fn(),
@@ -33,6 +34,7 @@ const mockScenario: Scenario = {
     params_json: '{"birth_year":1968}',
     accounts: [{ id: 'a1', linked_account_id: null, initial_balance: 500000, annual_contribution: 0, expected_return: 0.07, account_type: 'taxable' }],
     spending_profile: null,
+    guardrail_profile: null,
     income_sources: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -53,9 +55,9 @@ const mockProfile: GuardrailProfileResponse = {
         { name: 'Mid', start_age: 73, end_age: 82, priority_weight: 1, target_spending: 60000 },
     ],
     yearly_spending: [
-        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000 },
-        { year: 2031, age: 63, recommended: 74000, corridor_low: 61000, corridor_high: 90000, essential_floor: 30000, discretionary: 44000, income_offset: 0, portfolio_withdrawal: 74000, phase_name: 'Early', portfolio_balance_median: 440000 },
-        { year: 2040, age: 72, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 300000 },
+        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p75: 650000 },
+        { year: 2031, age: 63, recommended: 74000, corridor_low: 61000, corridor_high: 90000, essential_floor: 30000, discretionary: 44000, income_offset: 0, portfolio_withdrawal: 74000, phase_name: 'Early', portfolio_balance_median: 440000, portfolio_balance_p10: 180000, portfolio_balance_p25: 320000, portfolio_balance_p75: 600000 },
+        { year: 2041, age: 73, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 300000, portfolio_balance_p10: 50000, portfolio_balance_p25: 180000, portfolio_balance_p75: 500000 },
     ],
     median_final_balance: 250000,
     failure_rate: 0.05,
@@ -68,6 +70,8 @@ const mockProfile: GuardrailProfileResponse = {
     max_annual_adjustment_rate: 0.05,
     phase_blend_years: 1,
     risk_tolerance: 'moderate',
+    cash_reserve_years: 2,
+    cash_return_rate: 0.04,
 };
 
 function renderPage() {
@@ -115,9 +119,9 @@ describe('SpendingOptimizerPage', () => {
         renderPage();
 
         await waitFor(() => {
-            expect(screen.getByText('Portfolio Safety Net ($)')).toBeInTheDocument();
+            expect(screen.getByText('Portfolio Safety Net')).toBeInTheDocument();
         });
-        expect(screen.getByText('Spending Flexibility (%/yr)')).toBeInTheDocument();
+        expect(screen.getByText('Spending Flexibility')).toBeInTheDocument();
         expect(screen.getByText('Phase Blending')).toBeInTheDocument();
     });
 
@@ -130,12 +134,12 @@ describe('SpendingOptimizerPage', () => {
         });
 
         // Advanced fields should not be visible initially
-        expect(screen.queryByText('Expected Return (%)')).not.toBeInTheDocument();
+        expect(screen.queryByText('Cash Reserve')).not.toBeInTheDocument();
 
         await user.click(screen.getByText('Advanced Settings'));
-        expect(screen.getByText('Expected Return (%)')).toBeInTheDocument();
-        expect(screen.getByText('Return Std Dev (%)')).toBeInTheDocument();
-        expect(screen.getByText('Confidence Level (%)')).toBeInTheDocument();
+        expect(screen.getByText('Cash Reserve')).toBeInTheDocument();
+        expect(screen.getByText('Cash Rate')).toBeInTheDocument();
+        expect(screen.getByText('Confidence Level')).toBeInTheDocument();
     });
 
     it('shows default phases with target spending in configure state', async () => {
@@ -146,10 +150,10 @@ describe('SpendingOptimizerPage', () => {
         });
         expect(screen.getByDisplayValue('Mid retirement')).toBeInTheDocument();
         expect(screen.getByDisplayValue('Late retirement')).toBeInTheDocument();
-        // Target spending values
-        expect(screen.getByDisplayValue('80000')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('60000')).toBeInTheDocument();
-        expect(screen.getByDisplayValue('45000')).toBeInTheDocument();
+        // Target spending values (formatted with toLocaleString)
+        expect(screen.getByDisplayValue('80,000')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('60,000')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('45,000')).toBeInTheDocument();
     });
 
     it('loads existing profile and shows results', async () => {
@@ -161,10 +165,10 @@ describe('SpendingOptimizerPage', () => {
         });
 
         // Summary cards
-        expect(screen.getByText('Median Final Balance')).toBeInTheDocument();
         expect(screen.getByText('Failure Rate')).toBeInTheDocument();
         expect(screen.getByText('10th Percentile Final')).toBeInTheDocument();
-        expect(screen.getByText('90th Percentile Final')).toBeInTheDocument();
+        expect(screen.getByText('25th Percentile Final')).toBeInTheDocument();
+        expect(screen.getByText('Median Final Balance')).toBeInTheDocument();
     });
 
     it('renders corridor chart with correct data counts', async () => {
@@ -190,7 +194,7 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByRole('button', { name: /re-optimize/i })).toBeInTheDocument();
     });
 
-    it('year-by-year table renders with portfolio balance column', async () => {
+    it('year-by-year table renders four portfolio balance sub-columns', async () => {
         mockGetProfile.mockResolvedValue(mockProfile);
         renderPage();
 
@@ -198,11 +202,22 @@ describe('SpendingOptimizerPage', () => {
             expect(screen.getByText('Year-by-Year Breakdown')).toBeInTheDocument();
         });
 
-        // Check table headers including new Portfolio Balance column
-        expect(screen.getByText('Age')).toBeInTheDocument();
-        expect(screen.getByText('Phase')).toBeInTheDocument();
-        expect(screen.getByText('Recommended')).toBeInTheDocument();
+        // Check grouped header and sub-headers
         expect(screen.getByText('Portfolio Balance')).toBeInTheDocument();
+        expect(screen.getByText('p10')).toBeInTheDocument();
+        expect(screen.getByText('p25')).toBeInTheDocument();
+        expect(screen.getByText('p50')).toBeInTheDocument();
+    });
+
+    it('renders outcome range card with final year percentiles', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('outcome-range-card')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Outcome Range')).toBeInTheDocument();
     });
 
     it('validates mathematical consistency: recommended = floor + discretionary', async () => {
@@ -263,5 +278,153 @@ describe('SpendingOptimizerPage', () => {
 
         expect(screen.queryByDisplayValue('Early retirement')).not.toBeInTheDocument();
         expect(screen.getAllByRole('button', { name: /remove/i })).toHaveLength(2);
+    });
+
+    it('renders warning banner when plan has warnings', async () => {
+        // Early phase: avg recommended (75000+74000)/2 = 74500 vs target 80000 = 93.1% (ok)
+        // Mid phase: avg recommended 50000 vs target 60000 = 83.3% (warning: <90%)
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('warning-banner')).toBeInTheDocument();
+        });
+        expect(screen.getByText('Plan Warnings')).toBeInTheDocument();
+        expect(screen.getByText(/Mid is only 83% funded/)).toBeInTheDocument();
+    });
+
+    it('renders phase achievement table with progress bars', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Phase Achievement')).toBeInTheDocument();
+        });
+
+        // Both phases with targets should appear
+        expect(screen.getByTestId('progress-bar-Early')).toBeInTheDocument();
+        expect(screen.getByTestId('progress-bar-Mid')).toBeInTheDocument();
+
+        // Achievement percentages should be rendered
+        expect(screen.getByText('93%')).toBeInTheDocument();
+        expect(screen.getByText('83%')).toBeInTheDocument();
+    });
+
+    it('failure rate card shows good color when rate is low', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile); // failure_rate: 0.05
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('failure-rate-card')).toBeInTheDocument();
+        });
+
+        const card = screen.getByTestId('failure-rate-card');
+        expect(card.style.background).toBe('rgb(232, 245, 233)'); // #e8f5e9 (good)
+    });
+
+    it('failure rate card shows danger color when rate exceeds 20%', async () => {
+        mockGetProfile.mockResolvedValue({ ...mockProfile, failure_rate: 0.25 });
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('failure-rate-card')).toBeInTheDocument();
+        });
+
+        const card = screen.getByTestId('failure-rate-card');
+        expect(card.style.background).toBe('rgb(255, 235, 238)'); // #ffebee (danger)
+    });
+
+    it('no warning banner when plan is fully funded', async () => {
+        const fullyFundedProfile: GuardrailProfileResponse = {
+            ...mockProfile,
+            phases: [
+                { name: 'Only', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
+            ],
+            yearly_spending: [
+                { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p75: 650000 },
+                { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 460000, portfolio_balance_p10: 190000, portfolio_balance_p25: 330000, portfolio_balance_p75: 620000 },
+            ],
+            failure_rate: 0.03,
+        };
+        mockGetProfile.mockResolvedValue(fullyFundedProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Spending Corridor')).toBeInTheDocument();
+        });
+
+        expect(screen.queryByTestId('warning-banner')).not.toBeInTheDocument();
+    });
+});
+
+describe('computePlanDiagnostics', () => {
+    it('all phases funded produces no warnings', () => {
+        const phases: GuardrailPhase[] = [
+            { name: 'Early', start_age: 62, end_age: 72, priority_weight: 1, target_spending: 50000 },
+            { name: 'Late', start_age: 73, end_age: null, priority_weight: 1, target_spending: 40000 },
+        ];
+        const yearly: GuardrailYearlySpending[] = [
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Early', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p75: 1200000 },
+            { year: 2041, age: 73, recommended: 40000, corridor_low: 35000, corridor_high: 50000, essential_floor: 20000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 40000, phase_name: 'Late', portfolio_balance_median: 500000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p75: 700000 },
+        ];
+
+        const result = computePlanDiagnostics(phases, yearly, 0.05);
+
+        expect(result.warnings).toHaveLength(0);
+        expect(result.phases).toHaveLength(2);
+        expect(result.phases[0].achievementPct).toBe(100);
+        expect(result.phases[1].achievementPct).toBe(100);
+        expect(result.failureRateSeverity).toBe('good');
+    });
+
+    it('underfunded phase shows warning', () => {
+        const phases: GuardrailPhase[] = [
+            { name: 'Expensive', start_age: 62, end_age: null, priority_weight: 1, target_spending: 100000 },
+        ];
+        const yearly: GuardrailYearlySpending[] = [
+            { year: 2030, age: 62, recommended: 60000, corridor_low: 50000, corridor_high: 70000, essential_floor: 20000, discretionary: 40000, income_offset: 0, portfolio_withdrawal: 60000, phase_name: 'Expensive', portfolio_balance_median: 400000, portfolio_balance_p10: 150000, portfolio_balance_p25: 280000, portfolio_balance_p75: 550000 },
+        ];
+
+        const result = computePlanDiagnostics(phases, yearly, 0.05);
+
+        expect(result.warnings).toContain('Expensive is only 60% funded');
+        expect(result.phases[0].achievementPct).toBe(60);
+    });
+
+    it('detects portfolio depletion at p10', () => {
+        const phases: GuardrailPhase[] = [
+            { name: 'All', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
+        ];
+        const yearly: GuardrailYearlySpending[] = [
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 100000, portfolio_balance_p25: 400000, portfolio_balance_p75: 1200000 },
+            { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 800000, portfolio_balance_p10: 0, portfolio_balance_p25: 300000, portfolio_balance_p75: 1100000 },
+        ];
+
+        const result = computePlanDiagnostics(phases, yearly, 0.05);
+
+        expect(result.depletionAgeP10).toBe(63);
+        expect(result.depletionAgeP25).toBeNull();
+    });
+
+    it('no depletion warning when all percentiles positive', () => {
+        const phases: GuardrailPhase[] = [
+            { name: 'All', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
+        ];
+        const yearly: GuardrailYearlySpending[] = [
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p75: 1200000 },
+        ];
+
+        const result = computePlanDiagnostics(phases, yearly, 0.05);
+
+        expect(result.depletionAgeP10).toBeNull();
+        expect(result.depletionAgeP25).toBeNull();
+        expect(result.warnings.filter(w => w.includes('depleted'))).toHaveLength(0);
+    });
+
+    it('high failure rate produces danger severity', () => {
+        const result = computePlanDiagnostics([], [], 0.25);
+
+        expect(result.failureRateSeverity).toBe('danger');
+        expect(result.warnings).toContain('Failure rate exceeds 20%');
     });
 });

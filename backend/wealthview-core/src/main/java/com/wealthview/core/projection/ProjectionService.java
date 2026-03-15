@@ -8,6 +8,7 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
+import com.wealthview.core.projection.dto.GuardrailProfileSummary;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
@@ -158,7 +159,13 @@ public class ProjectionService {
             var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
                     .orElse(null);
             scenario.setSpendingProfile(profile);
+            scenario.setGuardrailProfile(null);
+        } else if (Boolean.TRUE.equals(request.useGuardrailProfile())) {
+            scenario.setSpendingProfile(null);
         } else {
+            // No explicit spending plan selected — clear spending profile but preserve
+            // any existing guardrail profile. Guardrail profiles are managed by the
+            // optimizer (create/reoptimize/delete), not by the scenario edit form.
             scenario.setSpendingProfile(null);
         }
 
@@ -244,6 +251,10 @@ public class ProjectionService {
         var profile = scenario.getSpendingProfile() != null
                 ? SpendingProfileResponse.from(scenario.getSpendingProfile())
                 : null;
+        var guardrailEntity = guardrailProfileRepository.findByScenario_Id(scenario.getId()).orElse(null);
+        var guardrail = guardrailEntity != null
+                ? GuardrailProfileSummary.from(guardrailEntity, scenario.getGuardrailProfile() != null)
+                : null;
         var incomeSources = scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()).stream()
                 .map(link -> {
                     var src = link.getIncomeSource();
@@ -259,7 +270,7 @@ public class ProjectionService {
         return new ScenarioResponse(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, profile, incomeSources, scenario.getCreatedAt(), scenario.getUpdatedAt());
+                accounts, profile, guardrail, incomeSources, scenario.getCreatedAt(), scenario.getUpdatedAt());
     }
 
     private void saveIncomeSourceLinks(ProjectionScenarioEntity scenario, UUID tenantId,

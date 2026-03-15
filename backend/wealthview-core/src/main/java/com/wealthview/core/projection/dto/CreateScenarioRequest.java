@@ -24,5 +24,6 @@ public record CreateScenarioRequest(
         Integer rothConversionStartYear,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
+        Boolean useGuardrailProfile,
         List<ScenarioIncomeSourceInput> incomeSources) {
 }

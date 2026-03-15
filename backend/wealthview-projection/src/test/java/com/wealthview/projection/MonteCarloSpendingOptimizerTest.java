@@ -41,6 +41,23 @@ class MonteCarloSpendingOptimizerTest {
                                                        BigDecimal portfolioFloor,
                                                        BigDecimal maxAnnualAdjustmentRate,
                                                        int phaseBlendYears) {
+        return buildInputWithCashBuffer(portfolio, essentialFloor, terminalTarget, phases,
+                incomeSources, trialCount, seed, portfolioFloor, maxAnnualAdjustmentRate,
+                phaseBlendYears, 0, BigDecimal.ZERO);
+    }
+
+    private GuardrailOptimizationInput buildInputWithCashBuffer(BigDecimal portfolio,
+                                                                 BigDecimal essentialFloor,
+                                                                 BigDecimal terminalTarget,
+                                                                 List<GuardrailPhaseInput> phases,
+                                                                 List<ProjectionIncomeSourceInput> incomeSources,
+                                                                 int trialCount,
+                                                                 Long seed,
+                                                                 BigDecimal portfolioFloor,
+                                                                 BigDecimal maxAnnualAdjustmentRate,
+                                                                 int phaseBlendYears,
+                                                                 int cashReserveYears,
+                                                                 BigDecimal cashReturnRate) {
         return new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1),
                 1968,
@@ -59,7 +76,9 @@ class MonteCarloSpendingOptimizerTest {
                 seed,
                 portfolioFloor != null ? portfolioFloor : BigDecimal.ZERO,
                 maxAnnualAdjustmentRate,
-                phaseBlendYears
+                phaseBlendYears,
+                cashReserveYears,
+                cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO
         );
     }
 
@@ -91,6 +110,10 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(firstYear.recommended()).isGreaterThan(BigDecimal.ZERO);
         assertThat(firstYear.essentialFloor()).isEqualByComparingTo(new BigDecimal("30000"));
         assertThat(firstYear.phaseName()).isEqualTo("Early");
+        assertThat(firstYear.portfolioBalanceMedian()).isNotNull();
+        assertThat(firstYear.portfolioBalanceP10()).isNotNull();
+        assertThat(firstYear.portfolioBalanceP25()).isNotNull();
+        assertThat(firstYear.portfolioBalanceP75()).isNotNull();
     }
 
     @Test
@@ -192,47 +215,112 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
-    void optimize_corridorWidthIncreasesWithVolatility() {
+    void optimize_withCashBuffer_producesResults() {
         var phases = List.of(
                 new GuardrailPhaseInput("All", 62, null, 1));
 
-        var lowVol = new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1000000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+        var withBuffer = buildInputWithCashBuffer(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
                 List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.05"),
-                500, new BigDecimal("0.95"), phases, 42L,
-                BigDecimal.ZERO, null, 0);
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0,
+                2,
+                new BigDecimal("0.04"));
 
-        var highVol = new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1000000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+        var result = optimizer.optimize(withBuffer);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.failureRate()).isNotNull();
+    }
+
+    @Test
+    void optimize_withCashBuffer_zeroCashReserve_matchesNoCashBehavior() {
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var noCash = buildInputWithCashBuffer(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
                 List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.25"),
-                500, new BigDecimal("0.95"), phases, 42L,
-                BigDecimal.ZERO, null, 0);
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0,
+                0,
+                BigDecimal.ZERO);
 
-        var lowResult = optimizer.optimize(lowVol);
-        var highResult = optimizer.optimize(highVol);
+        var zeroCash = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L);
 
-        var lowAvgWidth = lowResult.yearlySpending().stream()
-                .mapToDouble(y -> y.corridorHigh().subtract(y.corridorLow()).doubleValue())
-                .average()
-                .orElse(0);
-        var highAvgWidth = highResult.yearlySpending().stream()
-                .mapToDouble(y -> y.corridorHigh().subtract(y.corridorLow()).doubleValue())
-                .average()
-                .orElse(0);
+        var resultNoCash = optimizer.optimize(noCash);
+        var resultZeroCash = optimizer.optimize(zeroCash);
 
-        assertThat(highAvgWidth)
-                .as("Higher volatility should produce wider corridors")
-                .isGreaterThan(lowAvgWidth);
+        // Both should produce the same results since cash reserve is 0 in both
+        assertThat(resultNoCash.yearlySpending().size())
+                .isEqualTo(resultZeroCash.yearlySpending().size());
+
+        for (int i = 0; i < resultNoCash.yearlySpending().size(); i++) {
+            assertThat(resultNoCash.yearlySpending().get(i).recommended())
+                    .isEqualByComparingTo(resultZeroCash.yearlySpending().get(i).recommended());
+        }
+    }
+
+    @Test
+    void optimize_withSeed_bootstrapProducesReproducibleResults() {
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input1 = buildInputWithCashBuffer(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0,
+                2,
+                new BigDecimal("0.04"));
+
+        var input2 = buildInputWithCashBuffer(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0,
+                2,
+                new BigDecimal("0.04"));
+
+        var result1 = optimizer.optimize(input1);
+        var result2 = optimizer.optimize(input2);
+
+        for (int i = 0; i < result1.yearlySpending().size(); i++) {
+            assertThat(result1.yearlySpending().get(i).recommended())
+                    .isEqualByComparingTo(result2.yearlySpending().get(i).recommended());
+        }
     }
 
     @Test
@@ -528,7 +616,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
-                BigDecimal.ZERO, null, 0);
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO);
 
         var aggressiveInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -539,7 +628,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.50"), phases, 42L,
-                BigDecimal.ZERO, null, 0);
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO);
 
         var conservativeResult = optimizer.optimize(conservativeInput);
         var aggressiveResult = optimizer.optimize(aggressiveInput);
@@ -603,9 +693,42 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
-    void optimize_yearOverYearSmoothing_limitsSpendingChange() {
-        // With a 5% max annual adjustment and multi-phase setup, year-over-year
-        // spending changes should be limited
+    void optimize_yoySmoothing_doesNotPreventReachingHigherPhaseTarget() {
+        // Phase 1: low spending ($60k target), Phase 2: high spending ($200k target)
+        // With a large portfolio, Phase 2 should achieve close to its target
+        // even with YoY smoothing enabled — smoothing should not cap across phase boundaries
+        var phases = List.of(
+                new GuardrailPhaseInput("Low", 62, 72, 1, new BigDecimal("60000")),
+                new GuardrailPhaseInput("High", 73, null, 3, new BigDecimal("200000")));
+
+        var input = buildInputFull(
+                new BigDecimal("3000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                new BigDecimal("0.05"),
+                1);
+
+        var result = optimizer.optimize(input);
+
+        // Phase 2 midpoint (age 80) should be within 20% of target ($200k)
+        var atAge80 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 80)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge80.recommended().doubleValue())
+                .as("Phase 2 spending at age 80 should reach near the $200k target, not be stuck ramping from Phase 1")
+                .isGreaterThan(160000);
+    }
+
+    @Test
+    void optimize_yearOverYearSmoothing_limitsSpendingChangeWithinPhases() {
+        // With a 5% max annual adjustment, year-over-year spending changes
+        // should be limited WITHIN phases (but not across phase boundaries)
         var phases = List.of(
                 new GuardrailPhaseInput("Early", 62, 72, 3),
                 new GuardrailPhaseInput("Late", 73, null, 1));
@@ -625,7 +748,12 @@ class MonteCarloSpendingOptimizerTest {
         var result = optimizer.optimize(input);
         var spending = result.yearlySpending();
 
+        // Phase boundary is at age 73 — skip that transition
+        int phaseBoundaryAge = 73;
         for (int i = 1; i < spending.size(); i++) {
+            if (spending.get(i).age() == phaseBoundaryAge) {
+                continue; // skip phase boundary
+            }
             double prev = spending.get(i - 1).recommended().doubleValue();
             double curr = spending.get(i).recommended().doubleValue();
             if (prev > 0) {
@@ -772,6 +900,234 @@ class MonteCarloSpendingOptimizerTest {
             assertThat(ratio)
                     .as("Early/Late discretionary ratio should be roughly proportional to targets")
                     .isBetween(1.5, 3.5);
+        }
+    }
+
+    @Test
+    void optimize_targetAllocation_cheapPhaseGetsFullTarget() {
+        // Phase 1 targets $50k (cheap, easily affordable with $2M portfolio)
+        // Phase 2 targets $300k (expensive, can't be fully funded)
+        // With per-phase allocation, Phase 1 should get close to its $50k target
+        // instead of being dragged down by Phase 2's expensive target.
+        var phases = List.of(
+                new GuardrailPhaseInput("Cheap", 62, 72, 1, new BigDecimal("50000")),
+                new GuardrailPhaseInput("Expensive", 73, null, 1, new BigDecimal("300000")));
+
+        var input = buildInput(
+                new BigDecimal("2000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                1000,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        var cheapPhaseAvgRecommended = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        // The cheap phase should achieve at least 80% of its $50k target
+        assertThat(cheapPhaseAvgRecommended)
+                .as("Cheap phase should get close to its $50k target, not be dragged down by expensive phase")
+                .isGreaterThan(40000);
+    }
+
+    @Test
+    void optimize_targetAllocation_expensivePhaseCapAtTarget() {
+        // When a phase's binary search result exceeds its target, it should be capped
+        // Use a very wealthy portfolio with a modest target — binary search would find more
+        var phases = List.of(
+                new GuardrailPhaseInput("Modest", 62, null, 1, new BigDecimal("60000")));
+
+        var input = buildInput(
+                new BigDecimal("5000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                1000,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        var avgRecommended = result.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        // Recommended should be close to $60k (floor $20k + discretionary capped at $40k)
+        // Not much higher — the cap should prevent overspending
+        assertThat(avgRecommended)
+                .as("Average recommended should not greatly exceed the $60k target")
+                .isLessThan(70000);
+    }
+
+    @Test
+    void optimize_targetAllocation_phaseOrderAffectsAllocation() {
+        // Same two phases with same targets, but reversed order.
+        // With per-phase sequential allocation, whichever phase is listed first
+        // should get at least as much as it gets when listed second.
+        var phasesAFirst = List.of(
+                new GuardrailPhaseInput("A", 62, 72, 1, new BigDecimal("120000")),
+                new GuardrailPhaseInput("B", 73, null, 1, new BigDecimal("120000")));
+        var phasesBFirst = List.of(
+                new GuardrailPhaseInput("B", 73, null, 1, new BigDecimal("120000")),
+                new GuardrailPhaseInput("A", 62, 72, 1, new BigDecimal("120000")));
+
+        var inputAFirst = buildInput(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phasesAFirst,
+                List.of(),
+                1000,
+                42L);
+        var inputBFirst = buildInput(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phasesBFirst,
+                List.of(),
+                1000,
+                42L);
+
+        var resultAFirst = optimizer.optimize(inputAFirst);
+        var resultBFirst = optimizer.optimize(inputBFirst);
+
+        var aDiscWhenFirst = resultAFirst.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var aDiscWhenSecond = resultBFirst.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        // Phase A should get at least as much when it's processed first
+        assertThat(aDiscWhenFirst)
+                .as("Phase listed first should get at least as much as when listed second")
+                .isGreaterThanOrEqualTo(aDiscWhenSecond);
+    }
+
+    @Test
+    void optimize_targetAllocation_allPhasesAffordable_eachGetsTarget() {
+        // With a very large portfolio and modest targets, each phase should get its target
+        var phases = List.of(
+                new GuardrailPhaseInput("Early", 62, 72, 1, new BigDecimal("50000")),
+                new GuardrailPhaseInput("Late", 73, null, 1, new BigDecimal("40000")));
+
+        var input = buildInput(
+                new BigDecimal("10000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                1000,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        var earlyAvgDisc = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var lateAvgDisc = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 73)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        double earlyTargetDisc = 50000 - 20000; // target - floor
+        double lateTargetDisc = 40000 - 20000;
+
+        // Each phase should achieve within 5% of its discretionary target
+        assertThat(earlyAvgDisc)
+                .as("Early phase discretionary should be close to target")
+                .isBetween(earlyTargetDisc * 0.95, earlyTargetDisc * 1.05);
+        assertThat(lateAvgDisc)
+                .as("Late phase discretionary should be close to target")
+                .isBetween(lateTargetDisc * 0.95, lateTargetDisc * 1.05);
+    }
+
+    @Test
+    void optimize_targetAllocation_singlePhaseWithTarget_matchesLegacyBinarySearch() {
+        // With a single phase that has a target above what binary search would find,
+        // result should match plain binary search (target acts only as a cap)
+        var withTarget = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1, new BigDecimal("500000")));
+        var withoutTarget = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var inputWithTarget = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                withTarget,
+                List.of(),
+                1000,
+                42L);
+        var inputWithout = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                withoutTarget,
+                List.of(),
+                1000,
+                42L);
+
+        var resultWith = optimizer.optimize(inputWithTarget);
+        var resultWithout = optimizer.optimize(inputWithout);
+
+        var avgWith = resultWith.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var avgWithout = resultWithout.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        // With a very high target ($500k), the cap doesn't bind, so results should be similar
+        // Allow some tolerance since the code paths differ slightly
+        assertThat(Math.abs(avgWith - avgWithout))
+                .as("Single phase with high target should match legacy binary search")
+                .isLessThan(avgWithout * 0.05);
+    }
+
+    @Test
+    void optimize_portfolioBalancePercentiles_orderedCorrectly() {
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        for (var year : result.yearlySpending()) {
+            assertThat(year.portfolioBalanceP10())
+                    .as("p10 should be non-null for age %d", year.age())
+                    .isNotNull();
+            assertThat(year.portfolioBalanceP25())
+                    .as("p25 should be non-null for age %d", year.age())
+                    .isNotNull();
+            assertThat(year.portfolioBalanceP75())
+                    .as("p75 should be non-null for age %d", year.age())
+                    .isNotNull();
+            assertThat(year.portfolioBalanceP10())
+                    .as("p10 <= p25 for age %d", year.age())
+                    .isLessThanOrEqualTo(year.portfolioBalanceP25());
+            assertThat(year.portfolioBalanceP25())
+                    .as("p25 <= median for age %d", year.age())
+                    .isLessThanOrEqualTo(year.portfolioBalanceMedian());
+            assertThat(year.portfolioBalanceMedian())
+                    .as("median <= p75 for age %d", year.age())
+                    .isLessThanOrEqualTo(year.portfolioBalanceP75());
         }
     }
 

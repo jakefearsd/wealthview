@@ -65,7 +65,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [targetBracketRate, setTargetBracketRate] = useState<number>((parsedParams.target_bracket_rate ?? 0.12) * 100);
     const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
-    const [spendingProfileId, setSpendingProfileId] = useState<string>(initialValues?.spending_profile?.id ?? '');
+    const deriveSpendingPlan = () =>
+        initialValues?.guardrail_profile?.active ? 'guardrail' : (initialValues?.spending_profile?.id ?? '');
+    const [spendingPlanSelection, setSpendingPlanSelection] = useState<string>(deriveSpendingPlan);
     const [accounts, setAccounts] = useState<ScenarioAccountInput[]>(
         initialValues?.accounts?.map(a => ({
             linked_account_id: a.linked_account_id,
@@ -131,7 +133,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
                 target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate / 100 : null,
                 roth_conversion_start_year: rothConversionStartYear || null,
-                spending_profile_id: spendingProfileId || null,
+                spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
+                use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({ ...a, expected_return: a.expected_return / 100 })),
                 income_sources: selectedIncomeSources,
             };
@@ -173,14 +176,24 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                     <HelpText>Percentage of portfolio to withdraw annually in retirement. 4 = 4%.</HelpText>
                 </div>
                 <div>
-                    <label style={labelStyle}>Spending Profile</label>
-                    <select style={inputStyle} value={spendingProfileId} onChange={e => setSpendingProfileId(e.target.value)}>
-                        <option value="">None</option>
+                    <label style={labelStyle}>Spending Plan</label>
+                    <select style={inputStyle} value={spendingPlanSelection} onChange={e => setSpendingPlanSelection(e.target.value)}>
+                        <option value="">None (use withdrawal rate)</option>
                         {profiles?.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
+                        {initialValues?.guardrail_profile && (
+                            <option value="guardrail">
+                                &#9881; {initialValues.guardrail_profile.name}{initialValues.guardrail_profile.stale ? ' (stale)' : ''}{!initialValues.guardrail_profile.active ? ' (inactive)' : ''}
+                            </option>
+                        )}
                     </select>
-                    <HelpText>Optional. When linked, your spending plan drives portfolio withdrawals — the projection withdraws what you need each year (adjusted for inflation and age-based tiers), minus non-portfolio income.</HelpText>
+                    {spendingPlanSelection === 'guardrail' && !initialValues?.guardrail_profile && (
+                        <div style={{ fontSize: '0.8rem', color: '#e65100', marginTop: '0.25rem' }}>
+                            Guardrail profile no longer available. Please select another spending plan.
+                        </div>
+                    )}
+                    <HelpText>Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income.</HelpText>
                 </div>
             </div>
 

@@ -31,7 +31,9 @@ public record GuardrailProfileResponse(
         BigDecimal portfolioFloor,
         BigDecimal maxAnnualAdjustmentRate,
         int phaseBlendYears,
-        String riskTolerance
+        String riskTolerance,
+        int cashReserveYears,
+        BigDecimal cashReturnRate
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -49,7 +51,8 @@ public record GuardrailProfileResponse(
                 returnMean, returnStddev, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate,
                 percentile10Final, percentile90Final, stale, createdAt, updatedAt,
-                BigDecimal.ZERO, null, 0, null);
+                BigDecimal.ZERO, null, 0, null,
+                2, new BigDecimal("0.04"));
     }
 
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
@@ -87,7 +90,9 @@ public record GuardrailProfileResponse(
                 entity.getPortfolioFloor(),
                 entity.getMaxAnnualAdjustmentRate(),
                 entity.getPhaseBlendYears(),
-                entity.getRiskTolerance()
+                entity.getRiskTolerance(),
+                entity.getCashReserveYears(),
+                entity.getCashReturnRate()
         );
     }
 }

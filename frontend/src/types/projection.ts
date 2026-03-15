@@ -25,6 +25,13 @@ export interface ScenarioIncomeSourceResponse {
     one_time: boolean;
 }
 
+export interface GuardrailProfileSummary {
+    id: string;
+    name: string;
+    stale: boolean;
+    active: boolean;
+}
+
 export interface Scenario {
     id: string;
     name: string;
@@ -34,6 +41,7 @@ export interface Scenario {
     params_json: string | null;
     accounts: ProjectionAccount[];
     spending_profile: SpendingProfile | null;
+    guardrail_profile: GuardrailProfileSummary | null;
     income_sources: ScenarioIncomeSourceResponse[];
     created_at: string;
     updated_at: string;
@@ -115,6 +123,7 @@ export interface CreateScenarioRequest {
     target_bracket_rate?: number | null;
     roth_conversion_start_year?: number | null;
     spending_profile_id?: string | null;
+    use_guardrail_profile?: boolean | null;
     accounts: ScenarioAccountInput[];
     income_sources?: ScenarioIncomeSourceInput[];
 }
@@ -221,6 +230,9 @@ export interface GuardrailYearlySpending {
     portfolio_withdrawal: number;
     phase_name: string;
     portfolio_balance_median: number | null;
+    portfolio_balance_p10: number | null;
+    portfolio_balance_p25: number | null;
+    portfolio_balance_p75: number | null;
 }
 
 export interface GuardrailProfileResponse {
@@ -246,6 +258,8 @@ export interface GuardrailProfileResponse {
     max_annual_adjustment_rate: number;
     phase_blend_years: number;
     risk_tolerance: string | null;
+    cash_reserve_years: number;
+    cash_return_rate: number;
 }
 
 export interface GuardrailOptimizationRequest {
@@ -262,4 +276,6 @@ export interface GuardrailOptimizationRequest {
     max_annual_adjustment_rate?: number;
     phase_blend_years?: number;
     risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
+    cash_reserve_years?: number;
+    cash_return_rate?: number;
 }
