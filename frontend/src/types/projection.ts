@@ -206,6 +206,7 @@ export interface GuardrailPhase {
     start_age: number;
     end_age: number | null;
     priority_weight: number;
+    target_spending: number | null;
 }
 
 export interface GuardrailYearlySpending {
@@ -219,6 +220,7 @@ export interface GuardrailYearlySpending {
     income_offset: number;
     portfolio_withdrawal: number;
     phase_name: string;
+    portfolio_balance_median: number | null;
 }
 
 export interface GuardrailProfileResponse {
@@ -240,6 +242,10 @@ export interface GuardrailProfileResponse {
     stale: boolean;
     created_at: string;
     updated_at: string;
+    portfolio_floor: number;
+    max_annual_adjustment_rate: number;
+    phase_blend_years: number;
+    risk_tolerance: string | null;
 }
 
 export interface GuardrailOptimizationRequest {
@@ -252,4 +258,8 @@ export interface GuardrailOptimizationRequest {
     trial_count?: number;
     confidence_level?: number;
     phases: GuardrailPhase[];
+    portfolio_floor?: number;
+    max_annual_adjustment_rate?: number;
+    phase_blend_years?: number;
+    risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
 }
