@@ -75,7 +75,10 @@ public class GuardrailProfileService {
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
                 request.confidenceLevel() != null ? request.confidenceLevel() : DEFAULT_CONFIDENCE,
                 request.phases() != null ? request.phases() : List.of(),
-                null
+                null,
+                BigDecimal.ZERO,
+                null,
+                0
         );
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);

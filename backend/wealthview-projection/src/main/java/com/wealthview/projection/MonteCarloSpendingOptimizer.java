@@ -65,10 +65,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 portfolioPaths, incomeByYear, essentialFloor, terminalTarget,
                 confidenceLevel, years, trialCount);
 
+        double portfolioFloor = input.portfolioFloor() != null
+                ? input.portfolioFloor().doubleValue() : 0.0;
+
         // Stage 3: Priority-weighted discretionary allocation
         double[] discretionaryByYear = allocateSpending(
                 portfolioPaths, incomeByYear, adjustedFloors, terminalTarget,
-                input.phases(), retirementAge, years, trialCount);
+                input.phases(), retirementAge, years, trialCount,
+                confidenceLevel, portfolioFloor);
 
         // Compute corridors
         double[][] corridors = computeCorridors(
@@ -225,14 +229,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private double[] allocateSpending(double[][] paths, double[] income,
                                        double[] floors, double terminalTarget,
                                        List<GuardrailPhaseInput> phases,
-                                       int retirementAge, int years, int trialCount) {
+                                       int retirementAge, int years, int trialCount,
+                                       double confidenceLevel, double portfolioFloor) {
         double[] discretionary = new double[years];
 
         if (phases == null || phases.isEmpty()) {
-            // Single phase: binary search for uniform discretionary
             double maxDisc = binarySearchDiscretionary(
                     paths, income, floors, discretionary, terminalTarget,
-                    0, years - 1, years, trialCount);
+                    0, years - 1, years, trialCount, confidenceLevel, portfolioFloor);
             Arrays.fill(discretionary, maxDisc);
             return discretionary;
         }
@@ -256,7 +260,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double maxDisc = binarySearchDiscretionary(
                     paths, income, floors, discretionary, terminalTarget,
-                    phaseStart, phaseEnd, years, trialCount);
+                    phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor);
 
             for (int y = phaseStart; y <= phaseEnd; y++) {
                 discretionary[y] = maxDisc;
@@ -270,9 +274,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                               double[] floors, double[] currentDiscretionary,
                                               double terminalTarget,
                                               int phaseStart, int phaseEnd,
-                                              int years, int trialCount) {
+                                              int years, int trialCount,
+                                              double confidenceLevel, double portfolioFloor) {
         double low = 0;
-        double high = 500_000; // reasonable upper bound for annual discretionary
+        double high = 500_000;
 
         for (int iter = 0; iter < 40; iter++) {
             double mid = (low + high) / 2;
@@ -283,7 +288,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             if (isSustainable(paths, income, floors, testDiscretionary,
-                    terminalTarget, years, trialCount)) {
+                    terminalTarget, years, trialCount, confidenceLevel, portfolioFloor)) {
                 low = mid;
             } else {
                 high = mid;
@@ -295,11 +300,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private boolean isSustainable(double[][] paths, double[] income,
                                    double[] floors, double[] discretionary,
-                                   double terminalTarget, int years, int trialCount) {
-        // Check at 50th percentile (median)
+                                   double terminalTarget, int years, int trialCount,
+                                   double confidenceLevel, double portfolioFloor) {
         double[] finalBalances = new double[trialCount];
+        double[] minBalances = new double[trialCount];
+
         for (int t = 0; t < trialCount; t++) {
             double balance = paths[t][0];
+            double minBalance = balance;
             for (int y = 0; y < years; y++) {
                 double growthFactor = paths[t][y + 1] / paths[t][y];
                 double spending = floors[y] + discretionary[y];
@@ -308,12 +316,27 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 if (balance < 0) {
                     balance = 0;
                 }
+                minBalance = Math.min(minBalance, balance);
             }
             finalBalances[t] = balance;
+            minBalances[t] = minBalance;
         }
+
         Arrays.sort(finalBalances);
-        double medianBalance = percentile(finalBalances, 0.50);
-        return medianBalance >= terminalTarget;
+        double balanceAtConfidence = percentile(finalBalances, 1.0 - confidenceLevel);
+        if (balanceAtConfidence < terminalTarget) {
+            return false;
+        }
+
+        if (portfolioFloor > 0) {
+            Arrays.sort(minBalances);
+            double minAtConfidence = percentile(minBalances, 1.0 - confidenceLevel);
+            if (minAtConfidence < portfolioFloor) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private double[][] computeCorridors(double[][] paths, double[] income,

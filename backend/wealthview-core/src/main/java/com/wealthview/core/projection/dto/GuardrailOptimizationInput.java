@@ -18,5 +18,8 @@ public record GuardrailOptimizationInput(
         int trialCount,
         BigDecimal confidenceLevel,
         List<GuardrailPhaseInput> phases,
-        Long seed
+        Long seed,
+        BigDecimal portfolioFloor,
+        BigDecimal maxAnnualAdjustmentRate,
+        int phaseBlendYears
 ) {}
