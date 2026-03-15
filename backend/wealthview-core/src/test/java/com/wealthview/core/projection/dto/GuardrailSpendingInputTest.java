@@ -34,4 +34,30 @@ class GuardrailSpendingInputTest {
 
         assertThat(map).isEmpty();
     }
+
+    @Test
+    void resolveYear_yearFound_returnsPortfolioWithdrawalAndRecommended() {
+        var y1 = new GuardrailYearlySpending(2030, 62, new BigDecimal("75000"),
+                new BigDecimal("62000"), new BigDecimal("91000"), new BigDecimal("30000"),
+                new BigDecimal("45000"), BigDecimal.ZERO, new BigDecimal("70000"), "Early");
+
+        var input = new GuardrailSpendingInput(List.of(y1));
+        var result = input.resolveYear(2030, 62, 1, new BigDecimal("0.03"), BigDecimal.ZERO);
+
+        assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("70000"));
+        assertThat(result.totalSpending()).isEqualByComparingTo(new BigDecimal("75000"));
+    }
+
+    @Test
+    void resolveYear_yearNotFound_returnsZeros() {
+        var y1 = new GuardrailYearlySpending(2030, 62, new BigDecimal("75000"),
+                new BigDecimal("62000"), new BigDecimal("91000"), new BigDecimal("30000"),
+                new BigDecimal("45000"), BigDecimal.ZERO, new BigDecimal("70000"), "Early");
+
+        var input = new GuardrailSpendingInput(List.of(y1));
+        var result = input.resolveYear(2035, 67, 6, new BigDecimal("0.03"), BigDecimal.ZERO);
+
+        assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.totalSpending()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

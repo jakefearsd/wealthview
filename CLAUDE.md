@@ -232,6 +232,19 @@ wealthview-api NEVER depends directly on wealthview-persistence, wealthview-impo
 - Map between entities and DTOs using a static factory method on the DTO record (e.g., `AccountResponse.from(AccountEntity entity)`).
 - Do NOT use MapStruct or ModelMapper — simple static factory methods on records are sufficient and more transparent.
 
+### Spending Plan Hierarchy
+SpendingProfile (simple tier-based) and GuardrailProfile (Monte Carlo optimized) are both implementations
+of the same abstract concept: "how much to spend per retirement year." They share the sealed interface
+`SpendingPlan` in `wealthview-core/.../projection/dto/`:
+
+- `TierBasedSpendingPlan` — wraps parsed spending tiers from a SpendingProfile. Resolves spending by
+  matching age to tier ranges, handles overlaps/gaps, applies per-tier inflation.
+- `GuardrailSpendingInput` — wraps pre-computed yearly spending from Monte Carlo optimization.
+  Simple year-based lookup.
+
+Both are consumed via `SpendingPlan.resolveYear()` in the projection engine. If neither is set,
+the engine falls back to a withdrawal-rate strategy.
+
 ### Tenant Isolation
 - Every service method that queries data MUST filter by `tenantId`.
 - The `tenantId` comes from the JWT-authenticated security context, NEVER from a request parameter.
