@@ -5,13 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import com.wealthview.core.projection.dto.GuardrailSpendingInput;
-import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingFeasibilitySummary;
+import com.wealthview.core.projection.dto.SpendingPlan;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.dto.TierBasedSpendingPlan;
 import com.wealthview.core.projection.strategy.DynamicPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.FixedPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.VanguardDynamicSpendingWithdrawal;
@@ -98,8 +98,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : BigDecimal.ZERO;
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
-        SpendingData spendingData = loadSpendingData(input.spendingProfile());
-        var guardrailSpending = input.guardrailSpending();
+        TierBasedSpendingPlan tierBasedPlan = parseTierBasedPlan(input.spendingProfile());
+
+        SpendingPlan spendingPlan = null;
+        if (input.guardrailSpending() != null) {
+            spendingPlan = input.guardrailSpending();
+        } else if (tierBasedPlan != null) {
+            spendingPlan = tierBasedPlan;
+        }
+
         var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
@@ -130,7 +137,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         return runProjection(input, pool, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingData, guardrailSpending, incomeSources);
+                retirementYear, endYear, inflationRate, spendingPlan, tierBasedPlan, incomeSources);
     }
 
     private ProjectionResultResponse runProjection(
@@ -138,12 +145,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             PoolStrategy pool,
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate, SpendingData spendingData,
-            GuardrailSpendingInput guardrailSpending,
+            BigDecimal inflationRate, SpendingPlan spendingPlan,
+            TierBasedSpendingPlan tierBasedPlan,
             List<ProjectionIncomeSourceInput> incomeSources) {
-
-        Map<Integer, GuardrailYearlySpending> guardrailByYear = guardrailSpending != null
-                ? guardrailSpending.byYear() : Map.of();
 
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
@@ -175,9 +179,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal taxLiability = incomeResult.taxLiability();
 
             if (retired) {
-                var guardrailYear = guardrailByYear.get(year);
                 var retirementResult = processRetirementWithdrawals(
-                        pool, strategy, spendingData, guardrailYear, age, yearsInRetirement,
+                        pool, strategy, spendingPlan, age, yearsInRetirement,
                         inflationRate, incomeResult.totalActiveIncome(), startBalance,
                         previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
                         year, incomeResult.isResult());
@@ -190,7 +193,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
-            yearDto = applyViability(yearDto, spendingData, age, yearsInRetirement, inflationRate,
+            yearDto = applyViability(yearDto, tierBasedPlan, age, yearsInRetirement, inflationRate,
                     incomeResult.totalActiveIncome());
             if (incomeResult.isResult() != null) {
                 yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
@@ -205,7 +208,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         log.info("{} for scenario '{}': {} years, final balance {}",
                 pool.logTag(), input.scenarioName(), yearlyData.size(), finalBalance);
 
-        var feasibility = computeFeasibility(yearlyData, spendingData, inflationRate);
+        var feasibility = computeFeasibility(yearlyData, tierBasedPlan, inflationRate);
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
                 yearsInRetirement, feasibility);
     }
@@ -250,8 +253,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     @SuppressWarnings("PMD.ExcessiveParameterList")
     private RetirementWithdrawalResult processRetirementWithdrawals(
-            PoolStrategy pool, WithdrawalStrategy strategy, SpendingData spendingData,
-            GuardrailYearlySpending guardrailYear,
+            PoolStrategy pool, WithdrawalStrategy strategy, SpendingPlan spendingPlan,
             int age, int yearsInRetirement, BigDecimal inflationRate,
             BigDecimal totalActiveIncome, BigDecimal startBalance, BigDecimal previousWithdrawal,
             BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, int year,
@@ -260,13 +262,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal aggBalance = pool.getTotal();
         BigDecimal portfolioNeed;
 
-        if (guardrailYear != null) {
-            portfolioNeed = guardrailYear.portfolioWithdrawal().min(aggBalance);
-            previousWithdrawal = guardrailYear.recommended();
-        } else if (spendingData != null) {
-            BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
-            portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO).min(aggBalance);
-            previousWithdrawal = portfolioNeed.add(totalActiveIncome);
+        if (spendingPlan != null) {
+            var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement,
+                    inflationRate, totalActiveIncome);
+            portfolioNeed = resolved.portfolioWithdrawal().min(aggBalance);
+            previousWithdrawal = resolved.totalSpending();
         } else {
             var ctx = new WithdrawalContext(
                     aggBalance, startBalance, previousWithdrawal, pool.getWeightedReturn(),
@@ -398,103 +398,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             Integer rothConversionStartYear) {
     }
 
-    private record SpendingTierData(
-            String name,
-            int startAge,
-            Integer endAge,
-            BigDecimal essentialExpenses,
-            BigDecimal discretionaryExpenses) {
-    }
-
-    private record SpendingData(
-            BigDecimal essentialExpenses,
-            BigDecimal discretionaryExpenses,
-            List<SpendingTierData> spendingTiers) {
-    }
-
-    private record ResolvedSpending(BigDecimal essential, BigDecimal discretionary) {}
-
-    private static final BigDecimal TWO = new BigDecimal("2");
-
-    private ResolvedSpending resolveSpending(SpendingData spending, int age) {
-        if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
-            // Collect ALL matching tiers (inclusive endAge)
-            var matches = new ArrayList<SpendingTierData>();
-            for (var tier : spending.spendingTiers()) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
-                    matches.add(tier);
-                }
-            }
-
-            if (matches.size() == 1) {
-                var tier = matches.getFirst();
-                return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
-            }
-
-            if (matches.size() >= 2) {
-                // Overlap at boundary — blend 50/50 (mid-year transition)
-                var essSum = BigDecimal.ZERO;
-                var discSum = BigDecimal.ZERO;
-                for (var tier : matches) {
-                    essSum = essSum.add(tier.essentialExpenses());
-                    discSum = discSum.add(tier.discretionaryExpenses());
-                }
-                var count = new BigDecimal(matches.size());
-                return new ResolvedSpending(
-                        essSum.divide(count, SCALE, ROUNDING),
-                        discSum.divide(count, SCALE, ROUNDING));
-            }
-
-            // No match — gap: find prev/next and blend
-            // gap search uses STRICT < because endAge==age is a direct match above
-            SpendingTierData prev = null;
-            SpendingTierData next = null;
-            for (var tier : spending.spendingTiers()) {
-                if (tier.endAge() != null && tier.endAge() < age) {
-                    if (prev == null || tier.endAge() > prev.endAge()) {
-                        prev = tier;
-                    }
-                }
-                if (tier.startAge() > age) {
-                    if (next == null || tier.startAge() < next.startAge()) {
-                        next = tier;
-                    }
-                }
-            }
-
-            if (prev != null && next != null) {
-                var essential = prev.essentialExpenses().add(next.essentialExpenses())
-                        .divide(TWO, SCALE, ROUNDING);
-                var discretionary = prev.discretionaryExpenses().add(next.discretionaryExpenses())
-                        .divide(TWO, SCALE, ROUNDING);
-                return new ResolvedSpending(essential, discretionary);
-            }
-        }
-        return new ResolvedSpending(spending.essentialExpenses(), spending.discretionaryExpenses());
-    }
-
-    private int computeYearsInTier(SpendingData spending, int age, int yearsInRetirement) {
-        if (spending.spendingTiers() != null && !spending.spendingTiers().isEmpty()) {
-            // Collect all matching tiers (inclusive endAge)
-            var matches = new ArrayList<SpendingTierData>();
-            for (var tier : spending.spendingTiers()) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
-                    matches.add(tier);
-                }
-            }
-            if (matches.size() >= 2) {
-                // Overlap (transition year) — no inflation compounding
-                return 0;
-            }
-            if (matches.size() == 1) {
-                var tier = matches.getFirst();
-                int retirementStartAge = age - yearsInRetirement + 1;
-                int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
-                return age - effectiveTierStart;
-            }
-        }
-        return -1;
-    }
 
     private BigDecimal getDecimal(JsonNode item, String camelCase, String snakeCase, BigDecimal fallback) {
         if (item.has(camelCase) && !item.get(camelCase).isNull()) {
@@ -530,22 +433,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         return fallback;
     }
 
-    private SpendingData loadSpendingData(@Nullable SpendingProfileInput profile) {
+    private TierBasedSpendingPlan parseTierBasedPlan(@Nullable SpendingProfileInput profile) {
         if (profile == null) {
             return null;
         }
-        List<SpendingTierData> tiers = List.of();
+        List<TierBasedSpendingPlan.SpendingTierData> tiers = List.of();
         try {
             if (profile.spendingTiers() != null && !profile.spendingTiers().isBlank()
                     && !"[]".equals(profile.spendingTiers().trim())) {
                 var tierNode = objectMapper.readTree(profile.spendingTiers());
-                var tierList = new ArrayList<SpendingTierData>();
+                var tierList = new ArrayList<TierBasedSpendingPlan.SpendingTierData>();
                 for (var item : tierNode) {
                     var essExp = getDecimal(item, "essentialExpenses", "essential_expenses", BigDecimal.ZERO);
                     var discExp = getDecimal(item, "discretionaryExpenses", "discretionary_expenses", BigDecimal.ZERO);
                     int startAge = getInt(item, "startAge", "start_age", 0);
                     Integer endAge = getOptionalInt(item, "endAge", "end_age");
-                    tierList.add(new SpendingTierData(
+                    tierList.add(new TierBasedSpendingPlan.SpendingTierData(
                             getString(item, "name", ""),
                             startAge, endAge, essExp, discExp));
                 }
@@ -555,13 +458,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             log.warn("Failed to parse spending_tiers", e);
         }
 
-        return new SpendingData(profile.essentialExpenses(), profile.discretionaryExpenses(), tiers);
+        return TierBasedSpendingPlan.of(profile.essentialExpenses(), profile.discretionaryExpenses(), tiers);
     }
 
     private SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
-                                                           SpendingData spendingData,
+                                                           TierBasedSpendingPlan tierBasedPlan,
                                                            BigDecimal inflationRate) {
-        if (spendingData == null) {
+        if (tierBasedPlan == null) {
             return null;
         }
 
@@ -627,15 +530,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 sustainableForWeakest, requiredForWeakest);
     }
 
-    private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingData spending,
+    private ProjectionYearDto applyViability(ProjectionYearDto base, TierBasedSpendingPlan tierBasedPlan,
                                               int age, int yearsInRetirement, BigDecimal inflationRate,
                                               BigDecimal activeIncome) {
-        if (spending == null || !base.retired()) {
+        if (tierBasedPlan == null || !base.retired()) {
             return base;
         }
 
-        var resolved = resolveSpending(spending, age);
-        BigDecimal inflationFactor = computeInflationFactor(spending, age, yearsInRetirement, inflationRate);
+        var resolved = tierBasedPlan.resolveSpending(age);
+        BigDecimal inflationFactor = tierBasedPlan.computeInflationFactor(age, yearsInRetirement, inflationRate);
 
         BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
         BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
@@ -695,28 +598,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private BigDecimal positiveOrDefault(BigDecimal value, BigDecimal fallback) {
         return value.compareTo(BigDecimal.ZERO) > 0 ? value : fallback;
-    }
-
-    private BigDecimal computeInflationFactor(SpendingData spending, int age,
-                                               int yearsInRetirement, BigDecimal inflationRate) {
-        int yearsInTier = computeYearsInTier(spending, age, yearsInRetirement);
-        if (yearsInTier >= 0) {
-            return yearsInTier > 0
-                    ? BigDecimal.ONE.add(inflationRate).pow(yearsInTier)
-                    : BigDecimal.ONE;
-        }
-        return yearsInRetirement > 1
-                ? BigDecimal.ONE.add(inflationRate).pow(yearsInRetirement - 1)
-                : BigDecimal.ONE;
-    }
-
-    private BigDecimal computeSpendingNeed(SpendingData spendingData, int age,
-                                            int yearsInRetirement, BigDecimal inflationRate) {
-        var resolved = resolveSpending(spendingData, age);
-        BigDecimal inflationFactor = computeInflationFactor(spendingData, age, yearsInRetirement, inflationRate);
-        BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        return essential.add(discretionary);
     }
 
 }
