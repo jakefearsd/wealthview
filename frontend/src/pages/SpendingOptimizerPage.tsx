@@ -335,11 +335,11 @@ export default function SpendingOptimizerPage() {
                         </div>
                         <div className="bg-white border rounded-lg p-4 text-center">
                             <p className="text-sm text-gray-500">10th Percentile Final</p>
-                            <p className="text-xl font-bold">{fmt(result.percentile_10_final)}</p>
+                            <p className="text-xl font-bold">{fmt(result.percentile10_final)}</p>
                         </div>
                         <div className="bg-white border rounded-lg p-4 text-center">
                             <p className="text-sm text-gray-500">90th Percentile Final</p>
-                            <p className="text-xl font-bold">{fmt(result.percentile_90_final)}</p>
+                            <p className="text-xl font-bold">{fmt(result.percentile90_final)}</p>
                         </div>
                     </div>
 

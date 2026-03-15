@@ -237,8 +237,8 @@ export interface GuardrailProfileResponse {
     yearly_spending: GuardrailYearlySpending[];
     median_final_balance: number;
     failure_rate: number;
-    percentile_10_final: number;
-    percentile_90_final: number;
+    percentile10_final: number;
+    percentile90_final: number;
     stale: boolean;
     created_at: string;
     updated_at: string;
