@@ -110,7 +110,8 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 5000, new BigDecimal("0.95"), phases,
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -127,7 +128,8 @@ class GuardrailProfileServiceTest {
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         assertThatThrownBy(() -> service.optimize(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -168,7 +170,8 @@ class GuardrailProfileServiceTest {
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "New Plan", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -249,6 +252,22 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void computeScenarioHash_irrelevantParamsDoNotChangeHash() {
+        var scenarioMinimal = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2030, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenarioWithExtras = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2030, 1, 1), 90,
+                new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\",\"filing_status\":\"married_filing_jointly\"}");
+
+        var hash1 = GuardrailProfileService.computeScenarioHash(scenarioMinimal);
+        var hash2 = GuardrailProfileService.computeScenarioHash(scenarioWithExtras);
+
+        assertThat(hash1).isEqualTo(hash2);
+    }
+
+    @Test
     void optimize_setsGuardrailProfileOnScenarioAndClearsSpendingProfile() {
         scenario.setSpendingProfile(new com.wealthview.persistence.entity.SpendingProfileEntity(
                 tenant, "Manual", new BigDecimal("40000"), new BigDecimal("20000"), "[]"));
@@ -282,7 +301,8 @@ class GuardrailProfileServiceTest {
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Guardrail", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         service.optimize(tenantId, scenarioId, request);
 

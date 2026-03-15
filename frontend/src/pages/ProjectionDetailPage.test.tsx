@@ -17,6 +17,7 @@ const mockScenario: Scenario = {
         { id: 'a1', linked_account_id: null, initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07, account_type: 'taxable' },
     ],
     spending_profile: null,
+    guardrail_profile: null,
     income_sources: [],
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

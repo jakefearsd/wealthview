@@ -37,6 +37,8 @@ public class GuardrailProfileService {
     private static final BigDecimal DEFAULT_CONFIDENCE = new BigDecimal("0.95");
     private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
     private static final int DEFAULT_PHASE_BLEND_YEARS = 1;
+    private static final int DEFAULT_CASH_RESERVE_YEARS = 2;
+    private static final BigDecimal DEFAULT_CASH_RETURN_RATE = new BigDecimal("0.04");
 
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final ProjectionScenarioRepository scenarioRepository;
@@ -84,7 +86,11 @@ public class GuardrailProfileService {
                 request.maxAnnualAdjustmentRate() != null
                         ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
                 request.phaseBlendYears() != null
-                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS
+                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS,
+                request.cashReserveYears() != null
+                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
+                request.cashReturnRate() != null
+                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE
         );
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);
@@ -122,6 +128,8 @@ public class GuardrailProfileService {
         entity.setMaxAnnualAdjustmentRate(optimizationInput.maxAnnualAdjustmentRate() != null
                 ? optimizationInput.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE);
         entity.setPhaseBlendYears(optimizationInput.phaseBlendYears());
+        entity.setCashReserveYears(optimizationInput.cashReserveYears());
+        entity.setCashReturnRate(optimizationInput.cashReturnRate());
         entity.setRiskTolerance(request.riskTolerance());
 
         var saved = guardrailRepository.save(entity);
@@ -182,7 +190,9 @@ public class GuardrailProfileService {
                 existing.getPortfolioFloor(),
                 existing.getMaxAnnualAdjustmentRate(),
                 existing.getPhaseBlendYears(),
-                existing.getRiskTolerance());
+                existing.getRiskTolerance(),
+                existing.getCashReserveYears(),
+                existing.getCashReturnRate());
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -192,7 +202,18 @@ public class GuardrailProfileService {
         sb.append(scenario.getRetirementDate());
         sb.append('|').append(scenario.getEndAge());
         sb.append('|').append(scenario.getInflationRate());
-        sb.append('|').append(scenario.getParamsJson());
+
+        // Only birth_year from paramsJson affects guardrail optimization
+        if (scenario.getParamsJson() != null) {
+            try {
+                var node = MAPPER.readTree(scenario.getParamsJson());
+                if (node.has("birth_year")) {
+                    sb.append('|').append(node.get("birth_year").asInt());
+                }
+            } catch (JsonProcessingException e) {
+                // ignore parse errors — missing birth_year just means it won't affect the hash
+            }
+        }
 
         for (var acct : scenario.getAccounts()) {
             sb.append('|').append(acct.getAccountType());

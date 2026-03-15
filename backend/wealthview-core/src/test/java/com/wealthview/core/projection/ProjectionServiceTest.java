@@ -12,6 +12,7 @@ import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -114,7 +115,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         null)),
-                null, null);
+                null, null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -154,7 +155,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         null)),
-                null, null);
+                null, null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -187,7 +188,7 @@ class ProjectionServiceTest {
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
                                 new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null, null);
+                null, null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -223,7 +224,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         "traditional")),
-                null, null);
+                null, null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -256,7 +257,7 @@ class ProjectionServiceTest {
                         new BigDecimal("10000"),
                         new BigDecimal("0.07"),
                         "traditional")),
-                null, null);
+                null, null, null);
 
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -290,7 +291,7 @@ class ProjectionServiceTest {
                 List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
-                null, null);
+                null, null, null);
 
         service.createScenario(tenantId, request);
 
@@ -438,7 +439,7 @@ class ProjectionServiceTest {
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
-                null, null);
+                null, null, null);
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -463,7 +464,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, List.of(), null, null);
+                null, null, null, null, null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -493,7 +494,7 @@ class ProjectionServiceTest {
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
                                 new BigDecimal("5000"), new BigDecimal("0.07"), "roth")),
-                null, null);
+                null, null, null);
 
         var result = service.updateScenario(tenantId, scenarioId, request);
 
@@ -617,7 +618,7 @@ class ProjectionServiceTest {
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
-                null,
+                null, null,
                 List.of(new ScenarioIncomeSourceInput(incomeSourceId, new BigDecimal("30000"))));
 
         service.createScenario(tenantId, request);
@@ -643,7 +644,7 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                List.of(), null,
+                List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(badId, null)));
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
@@ -675,7 +676,7 @@ class ProjectionServiceTest {
                 "Updated Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                List.of(), null,
+                List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
 
         service.updateScenario(tenantId, scenarioId, request);
@@ -739,7 +740,7 @@ class ProjectionServiceTest {
                 "Old Plan", LocalDate.of(2055, 1, 1), 95,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null,
-                List.of(), null, null);
+                List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -772,12 +773,77 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null,
-                List.of(), null, null);
+                List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
         assertThat(guardrailProfile.isStale()).isFalse();
         verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
+    }
+
+    @Test
+    void updateScenario_withGuardrailProfile_irrelevantParamsDoNotTriggerStaleness() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> {
+                    var saved = (ProjectionScenarioEntity) inv.getArgument(0);
+                    guardrailProfile.setScenarioHash(
+                            GuardrailProfileService.computeScenarioHash(saved));
+                    return saved;
+                });
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Add filing_status and withdrawal_strategy — these should NOT affect guardrail hash
+        var request = new UpdateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), 1990, null,
+                "vanguard_dynamic_spending", null, null,
+                "married_filing_jointly", null, null, null, null, null, null,
+                List.of(), null, null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isFalse();
+        verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
+    }
+
+    @Test
+    void getScenario_withGuardrailProfileButSimpleSpendingActive_includesInactiveGuardrail() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        // Scenario has a spending profile set (guardrail FK is null on the scenario)
+        var spendingProfile = new SpendingProfileEntity(
+                tenant, "Basic Plan", new BigDecimal("40000"), new BigDecimal("20000"), null);
+        scenario.setSpendingProfile(spendingProfile);
+
+        // But a guardrail profile exists in the DB for this scenario
+        var guardrailEntity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Optimized", new BigDecimal("30000"));
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(guardrailProfileRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(Optional.of(guardrailEntity));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        // Guardrail should be present in response but marked inactive
+        assertThat(result.guardrailProfile()).isNotNull();
+        assertThat(result.guardrailProfile().name()).isEqualTo("Optimized");
+        assertThat(result.guardrailProfile().active()).isFalse();
+
+        // Spending profile should also be present
+        assertThat(result.spendingProfile()).isNotNull();
+        assertThat(result.spendingProfile().name()).isEqualTo("Basic Plan");
     }
 
     @Test
@@ -797,7 +863,7 @@ class ProjectionServiceTest {
                 "Updated", LocalDate.of(2060, 1, 1), 95,
                 new BigDecimal("0.02"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                List.of(), null, null);
+                List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 

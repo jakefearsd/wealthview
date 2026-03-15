@@ -82,7 +82,8 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Optimized Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, null, null,
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
                         .with(authenticatedAdmin())
@@ -103,7 +104,8 @@ class GuardrailControllerTest {
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, null, null, List.of(),
-                null, null, null, null);
+                null, null, null, null,
+                null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
                         .with(authenticatedAdmin())

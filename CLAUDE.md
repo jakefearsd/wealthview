@@ -232,18 +232,26 @@ wealthview-api NEVER depends directly on wealthview-persistence, wealthview-impo
 - Map between entities and DTOs using a static factory method on the DTO record (e.g., `AccountResponse.from(AccountEntity entity)`).
 - Do NOT use MapStruct or ModelMapper — simple static factory methods on records are sufficient and more transparent.
 
-### Spending Plan Hierarchy
-SpendingProfile (simple tier-based) and GuardrailProfile (Monte Carlo optimized) are both implementations
-of the same abstract concept: "how much to spend per retirement year." They share the sealed interface
-`SpendingPlan` in `wealthview-core/.../projection/dto/`:
+### Spending Plan Hierarchy (CRITICAL — read before touching projections or spending)
+**Guardrail profiles ARE spending profiles.** Both represent the same concept: "how much to spend per
+retirement year." They are NOT separate features — they are two implementations of one sealed interface.
 
-- `TierBasedSpendingPlan` — wraps parsed spending tiers from a SpendingProfile. Resolves spending by
-  matching age to tier ranges, handles overlaps/gaps, applies per-tier inflation.
-- `GuardrailSpendingInput` — wraps pre-computed yearly spending from Monte Carlo optimization.
-  Simple year-based lookup.
+**Type system:** `SpendingPlan` sealed interface in `wealthview-core/.../projection/dto/`:
+- `TierBasedSpendingPlan` — wraps user-defined spending tiers from a SpendingProfile entity.
+  Resolves spending by matching age to tier ranges, handles overlaps/gaps, applies per-tier inflation.
+- `GuardrailSpendingInput` — wraps pre-computed yearly spending from Monte Carlo optimization
+  (GuardrailSpendingProfile entity). Simple year-based lookup.
 
-Both are consumed via `SpendingPlan.resolveYear()` in the projection engine. If neither is set,
-the engine falls back to a withdrawal-rate strategy.
+**Data model:** A scenario has AT MOST ONE active spending plan at a time. The `projection_scenarios`
+table has two FK columns (`spending_profile_id` and `guardrail_profile_id`) that are mutually exclusive:
+- Setting a spending profile clears the guardrail profile, and vice versa.
+- Setting "None" clears both — the engine falls back to a withdrawal-rate strategy.
+- This mutual exclusivity is enforced in `ProjectionService.updateScenario()` and
+  `GuardrailProfileService.optimize()`. The UI presents a unified "Spending Plan" dropdown.
+
+**Frontend:** `ScenarioForm` shows a single "Spending Plan" dropdown containing regular spending profiles
+AND any guardrail profile that exists for the scenario. `ScenarioResponse` includes both `spending_profile`
+and `guardrail_profile` (summary) so the UI can display whichever is active.
 
 ### Tenant Isolation
 - Every service method that queries data MUST filter by `tenantId`.

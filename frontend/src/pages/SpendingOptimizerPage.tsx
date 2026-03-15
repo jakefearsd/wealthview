@@ -1,12 +1,202 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
-import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest } from '../types/projection';
+import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
+import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import SpendingCorridorChart from '../components/SpendingCorridorChart';
 
 type OptimizerState = 'configure' | 'running' | 'results';
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
+
+export interface PhaseDiagnostic {
+    phaseName: string;
+    targetSpending: number;
+    avgRecommended: number;
+    achievementPct: number;
+}
+
+export interface PlanDiagnostics {
+    phases: PhaseDiagnostic[];
+    overallAchievement: number;
+    warnings: string[];
+    failureRateSeverity: 'good' | 'caution' | 'danger';
+    depletionAgeP10: number | null;
+    depletionAgeP25: number | null;
+}
+
+export function computePlanDiagnostics(
+    phases: GuardrailPhase[],
+    yearlySpending: GuardrailYearlySpending[],
+    failureRate: number,
+): PlanDiagnostics {
+    const phaseDiags: PhaseDiagnostic[] = [];
+    const warnings: string[] = [];
+
+    for (const phase of phases) {
+        if (phase.target_spending == null || phase.target_spending <= 0) continue;
+
+        const phaseYears = yearlySpending.filter(y => {
+            if (y.age < phase.start_age) return false;
+            if (phase.end_age != null && y.age > phase.end_age) return false;
+            return true;
+        });
+
+        if (phaseYears.length === 0) continue;
+
+        const avgRecommended = phaseYears.reduce((sum, y) => sum + y.recommended, 0) / phaseYears.length;
+        const achievementPct = (avgRecommended / phase.target_spending) * 100;
+
+        phaseDiags.push({
+            phaseName: phase.name,
+            targetSpending: phase.target_spending,
+            avgRecommended,
+            achievementPct,
+        });
+
+        if (achievementPct < 90) {
+            warnings.push(`${phase.name} is only ${Math.round(achievementPct)}% funded`);
+        }
+    }
+
+    const overallAchievement = phaseDiags.length > 0
+        ? phaseDiags.reduce((sum, p) => sum + p.achievementPct, 0) / phaseDiags.length
+        : 100;
+
+    let failureRateSeverity: 'good' | 'caution' | 'danger';
+    if (failureRate > 0.20) {
+        failureRateSeverity = 'danger';
+        warnings.push(`Failure rate exceeds 20%`);
+    } else if (failureRate > 0.10) {
+        failureRateSeverity = 'caution';
+    } else {
+        failureRateSeverity = 'good';
+    }
+
+    // Detect portfolio depletion at p10 and p25
+    let depletionAgeP10: number | null = null;
+    let depletionAgeP25: number | null = null;
+    for (const y of yearlySpending) {
+        if (depletionAgeP10 === null && y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0) {
+            depletionAgeP10 = y.age;
+        }
+        if (depletionAgeP25 === null && y.portfolio_balance_p25 != null && y.portfolio_balance_p25 <= 0) {
+            depletionAgeP25 = y.age;
+        }
+    }
+    if (depletionAgeP10 !== null) {
+        warnings.push(`In a pessimistic scenario (10th percentile), portfolio depleted by age ${depletionAgeP10}`);
+    }
+    if (depletionAgeP25 !== null) {
+        warnings.push(`In a below-average scenario (25th percentile), portfolio depleted by age ${depletionAgeP25}`);
+    }
+
+    return { phases: phaseDiags, overallAchievement, warnings, failureRateSeverity, depletionAgeP10, depletionAgeP25 };
+}
+
+const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    appearance: 'auto',
+};
+
+const smallInputStyle: React.CSSProperties = {
+    padding: '0.35rem 0.5rem',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    width: '5rem',
+};
+
+const phaseNameInputStyle: React.CSSProperties = {
+    padding: '0.35rem 0.5rem',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    flex: 1,
+    minWidth: '8rem',
+};
+
+const smallLabelStyle: React.CSSProperties = {
+    fontSize: '0.75rem',
+    color: '#888',
+    marginRight: '0.25rem',
+};
+
+const adornmentWrapStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    overflow: 'hidden',
+};
+
+const adornmentStyle: React.CSSProperties = {
+    padding: '0.5rem 0.5rem',
+    background: '#f5f5f5',
+    color: '#666',
+    fontSize: '0.9rem',
+    borderRight: '1px solid #ccc',
+    userSelect: 'none',
+};
+
+const adornmentSuffixStyle: React.CSSProperties = {
+    ...adornmentStyle,
+    borderRight: 'none',
+    borderLeft: '1px solid #ccc',
+};
+
+const adornedInputStyle: React.CSSProperties = {
+    ...inputStyle,
+    border: 'none',
+    borderRadius: 0,
+    flex: 1,
+};
+
+const smallAdornmentWrapStyle: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    overflow: 'hidden',
+    width: '8rem',
+};
+
+const smallAdornmentStyle: React.CSSProperties = {
+    padding: '0.35rem 0.4rem',
+    background: '#f5f5f5',
+    color: '#666',
+    fontSize: '0.8rem',
+    borderRight: '1px solid #ccc',
+    userSelect: 'none',
+};
+
+const smallAdornedInputStyle: React.CSSProperties = {
+    padding: '0.35rem 0.5rem',
+    border: 'none',
+    borderRadius: 0,
+    flex: 1,
+    width: '100%',
+};
+
+const pillContainerStyle: React.CSSProperties = {
+    display: 'flex',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    overflow: 'hidden',
+};
+
+function pillStyle(active: boolean): React.CSSProperties {
+    return {
+        flex: 1,
+        padding: '0.5rem 0.75rem',
+        border: 'none',
+        background: active ? '#1976d2' : '#fff',
+        color: active ? '#fff' : '#333',
+        cursor: 'pointer',
+        fontWeight: active ? 600 : 400,
+        fontSize: '0.85rem',
+        textTransform: 'capitalize',
+        transition: 'background 0.15s, color 0.15s',
+    };
+}
 
 export default function SpendingOptimizerPage() {
     const { id } = useParams<{ id: string }>();
@@ -24,10 +214,12 @@ export default function SpendingOptimizerPage() {
     const [spendingFlexibility, setSpendingFlexibility] = useState(5);
     const [phaseBlendYears, setPhaseBlendYears] = useState(1);
 
+    // Cash buffer parameters
+    const [cashReserveYears, setCashReserveYears] = useState(2);
+    const [cashReturnRate, setCashReturnRate] = useState(4);
+
     // Advanced parameters (collapsed by default)
     const [showAdvanced, setShowAdvanced] = useState(false);
-    const [returnMean, setReturnMean] = useState(10);
-    const [returnStddev, setReturnStddev] = useState(15);
     const [trialCount, setTrialCount] = useState(5000);
     const [confidenceLevel, setConfidenceLevel] = useState<number | null>(null);
 
@@ -47,9 +239,13 @@ export default function SpendingOptimizerPage() {
                 setName(profile.name);
                 setEssentialFloor(profile.essential_floor);
                 setTerminalTarget(profile.terminal_balance_target);
-                setReturnMean(profile.return_mean * 100);
-                setReturnStddev(profile.return_stddev * 100);
                 setTrialCount(profile.trial_count);
+                setCashReserveYears(profile.cash_reserve_years ?? 2);
+                setCashReturnRate(
+                    profile.cash_return_rate != null
+                        ? profile.cash_return_rate * 100
+                        : 4
+                );
                 setPortfolioFloor(profile.portfolio_floor ?? 0);
                 setSpendingFlexibility(
                     profile.max_annual_adjustment_rate != null
@@ -76,9 +272,9 @@ export default function SpendingOptimizerPage() {
                 name,
                 essential_floor: essentialFloor,
                 terminal_balance_target: terminalTarget,
-                return_mean: returnMean / 100,
-                return_stddev: returnStddev / 100,
                 trial_count: trialCount,
+                cash_reserve_years: cashReserveYears,
+                cash_return_rate: cashReturnRate / 100,
                 phases,
                 portfolio_floor: portfolioFloor,
                 max_annual_adjustment_rate: spendingFlexibility / 100,
@@ -133,116 +329,191 @@ export default function SpendingOptimizerPage() {
         setPhases(updated);
     };
 
+    // Drag-and-drop reordering
+    const dragIndexRef = useRef<number | null>(null);
+    const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+    const handleDragStart = (index: number) => {
+        dragIndexRef.current = index;
+    };
+
+    const handleDragOver = (e: React.DragEvent, index: number) => {
+        e.preventDefault();
+        setDragOverIndex(index);
+    };
+
+    const handleDrop = (e: React.DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        const fromIndex = dragIndexRef.current;
+        if (fromIndex === null || fromIndex === dropIndex) {
+            dragIndexRef.current = null;
+            setDragOverIndex(null);
+            return;
+        }
+        const updated = [...phases];
+        const [moved] = updated.splice(fromIndex, 1);
+        updated.splice(dropIndex, 0, moved);
+        setPhases(updated);
+        dragIndexRef.current = null;
+        setDragOverIndex(null);
+    };
+
+    const handleDragEnd = () => {
+        dragIndexRef.current = null;
+        setDragOverIndex(null);
+    };
+
     const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '--';
+    const fmtShort = (n: number | null | undefined) => {
+        if (n == null) return '--';
+        const abs = Math.abs(n);
+        const sign = n < 0 ? '-' : '';
+        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+        if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
+        return `${sign}$${Math.round(abs)}`;
+    };
     const pct = (n: number | null | undefined) => n != null ? `${(n * 100).toFixed(1)}%` : '--';
 
     if (!scenario) {
-        return <div className="p-6">Loading scenario...</div>;
+        return <div>Loading scenario...</div>;
     }
 
     return (
-        <div className="p-6 max-w-6xl mx-auto">
-            <div className="mb-4">
-                <Link to={`/projections/${id}`} className="text-blue-600 hover:underline text-sm">
+        <div>
+            <div style={{ marginBottom: '1rem' }}>
+                <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none', fontSize: '0.85rem' }}>
                     &larr; Back to {scenario.name}
                 </Link>
             </div>
 
-            <h1 className="text-2xl font-bold mb-1">Spending Optimizer</h1>
-            <p className="text-gray-500 mb-6">Scenario: {scenario.name}</p>
+            <h2 style={{ marginBottom: '0.25rem' }}>Spending Optimizer</h2>
+            <div style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                <strong>Projection:</strong> <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>{scenario.name}</Link>
+            </div>
 
             {state === 'configure' && (
-                <div className="space-y-6">
-                    <div className="bg-white border rounded-lg p-6 space-y-4">
-                        <h2 className="text-lg font-semibold">Optimization Parameters</h2>
-
-                        <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Optimization Parameters</h3>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Profile Name</label>
-                                <input type="text" value={name} onChange={e => setName(e.target.value)}
-                                    className="w-full border rounded px-3 py-2" />
+                                <label style={labelStyle}>Profile Name</label>
+                                <input style={inputStyle} type="text" value={name}
+                                    onChange={e => setName(e.target.value)} />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Essential Spending Floor ($/yr)</label>
-                                <input type="number" value={essentialFloor} onChange={e => setEssentialFloor(Number(e.target.value))}
-                                    className="w-full border rounded px-3 py-2" />
+                                <label style={labelStyle}>Essential Spending Floor (per year)</label>
+                                <div style={adornmentWrapStyle}>
+                                    <span style={adornmentStyle}>$</span>
+                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
+                                        value={essentialFloor.toLocaleString('en-US')}
+                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setEssentialFloor(v); }} />
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Terminal Balance Target ($)</label>
-                                <input type="number" value={terminalTarget} onChange={e => setTerminalTarget(Number(e.target.value))}
-                                    className="w-full border rounded px-3 py-2" />
+                                <label style={labelStyle}>Terminal Balance Target</label>
+                                <div style={adornmentWrapStyle}>
+                                    <span style={adornmentStyle}>$</span>
+                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
+                                        value={terminalTarget.toLocaleString('en-US')}
+                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setTerminalTarget(v); }} />
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Portfolio Safety Net ($)</label>
-                                <input type="number" value={portfolioFloor} onChange={e => setPortfolioFloor(Number(e.target.value))}
-                                    className="w-full border rounded px-3 py-2" />
-                                <p className="text-xs text-gray-500 mt-1">Minimum portfolio balance to maintain during retirement</p>
+                                <label style={labelStyle}>Portfolio Safety Net</label>
+                                <div style={adornmentWrapStyle}>
+                                    <span style={adornmentStyle}>$</span>
+                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
+                                        value={portfolioFloor.toLocaleString('en-US')}
+                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setPortfolioFloor(v); }} />
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                    Minimum portfolio balance to maintain during retirement
+                                </div>
                             </div>
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-4 pt-2">
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Risk Tolerance</label>
-                                <div className="flex rounded-lg border overflow-hidden">
+                                <label style={labelStyle}>Risk Tolerance</label>
+                                <div style={pillContainerStyle}>
                                     {(['conservative', 'moderate', 'aggressive'] as RiskTolerance[]).map(level => (
                                         <button key={level} type="button"
                                             onClick={() => setRiskTolerance(level)}
-                                            className={`flex-1 py-2 text-sm font-medium capitalize transition-colors ${
-                                                riskTolerance === level
-                                                    ? 'bg-blue-600 text-white'
-                                                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                                            }`}>
+                                            style={pillStyle(riskTolerance === level)}>
                                             {level}
                                         </button>
                                     ))}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">
-                                    {riskTolerance === 'conservative' && '90% confidence — lowest failure risk'}
-                                    {riskTolerance === 'moderate' && '80% confidence — balanced approach'}
-                                    {riskTolerance === 'aggressive' && '70% confidence — higher spending, more risk'}
-                                </p>
+                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                    {riskTolerance === 'conservative' && '90% confidence \u2014 lowest failure risk'}
+                                    {riskTolerance === 'moderate' && '80% confidence \u2014 balanced approach'}
+                                    {riskTolerance === 'aggressive' && '70% confidence \u2014 higher spending, more risk'}
+                                </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Spending Flexibility (%/yr)</label>
-                                <input type="number" step="1" min="0" max="50" value={spendingFlexibility}
-                                    onChange={e => setSpendingFlexibility(Number(e.target.value))}
-                                    className="w-full border rounded px-3 py-2" />
-                                <p className="text-xs text-gray-500 mt-1">Maximum annual spending change (e.g., 5%)</p>
+                                <label style={labelStyle}>Spending Flexibility</label>
+                                <div style={adornmentWrapStyle}>
+                                    <input style={adornedInputStyle} type="number" step="1" min="0" max="50"
+                                        value={spendingFlexibility}
+                                        onChange={e => setSpendingFlexibility(Number(e.target.value))} />
+                                    <span style={adornmentSuffixStyle}>%/yr</span>
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                    Maximum annual spending change
+                                </div>
                             </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Phase Blending</label>
-                                <select value={phaseBlendYears} onChange={e => setPhaseBlendYears(Number(e.target.value))}
-                                    className="w-full border rounded px-3 py-2">
+                                <label style={labelStyle}>Phase Blending</label>
+                                <select style={selectStyle} value={phaseBlendYears}
+                                    onChange={e => setPhaseBlendYears(Number(e.target.value))}>
                                     <option value={0}>Off</option>
                                     <option value={1}>1 year</option>
                                     <option value={2}>2 years</option>
                                 </select>
-                                <p className="text-xs text-gray-500 mt-1">Smooth transitions between life phases</p>
+                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                    Smooth transitions between life phases
+                                </div>
                             </div>
                         </div>
 
-                        <div className="border-t pt-4 mt-4">
+                        {/* Advanced Settings */}
+                        <div style={{ borderTop: '1px solid #eee', marginTop: '1.5rem', paddingTop: '1rem' }}>
                             <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
-                                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
-                                <span className={`inline-block transition-transform ${showAdvanced ? 'rotate-90' : ''}`}>&rsaquo;</span>
-                                Advanced Settings
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888', fontSize: '0.85rem', padding: 0 }}>
+                                <span style={{ display: 'inline-block', transition: 'transform 0.15s', transform: showAdvanced ? 'rotate(90deg)' : 'none' }}>&rsaquo;</span>
+                                {' '}Advanced Settings
                             </button>
                             {showAdvanced && (
-                                <div className="grid grid-cols-2 gap-4 mt-3">
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Expected Return (%)</label>
-                                        <input type="number" step="0.1" value={returnMean} onChange={e => setReturnMean(Number(e.target.value))}
-                                            className="w-full border rounded px-3 py-2" />
+                                        <label style={labelStyle}>Cash Reserve</label>
+                                        <select style={selectStyle} value={cashReserveYears}
+                                            onChange={e => setCashReserveYears(Number(e.target.value))}>
+                                            <option value={0}>0 years</option>
+                                            <option value={1}>1 year</option>
+                                            <option value={2}>2 years</option>
+                                            <option value={3}>3 years</option>
+                                        </select>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Years of spending held in cash to avoid selling during downturns
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Return Std Dev (%)</label>
-                                        <input type="number" step="0.1" value={returnStddev} onChange={e => setReturnStddev(Number(e.target.value))}
-                                            className="w-full border rounded px-3 py-2" />
+                                        <label style={labelStyle}>Cash Rate</label>
+                                        <div style={adornmentWrapStyle}>
+                                            <input style={adornedInputStyle} type="number" step="0.1" value={cashReturnRate}
+                                                onChange={e => setCashReturnRate(Number(e.target.value))} />
+                                            <span style={adornmentSuffixStyle}>%</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Expected annual return on cash reserves (money market rate)
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Trial Count</label>
-                                        <select value={trialCount} onChange={e => setTrialCount(Number(e.target.value))}
-                                            className="w-full border rounded px-3 py-2">
+                                        <label style={labelStyle}>Trial Count</label>
+                                        <select style={selectStyle} value={trialCount}
+                                            onChange={e => setTrialCount(Number(e.target.value))}>
                                             <option value={1000}>1,000</option>
                                             <option value={2500}>2,500</option>
                                             <option value={5000}>5,000</option>
@@ -250,134 +521,282 @@ export default function SpendingOptimizerPage() {
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Confidence Level (%)</label>
-                                        <input type="number" step="1" min="50" max="99"
-                                            value={confidenceLevel ?? ''}
-                                            placeholder="Uses risk tolerance"
-                                            onChange={e => setConfidenceLevel(e.target.value ? Number(e.target.value) : null)}
-                                            className="w-full border rounded px-3 py-2" />
-                                        <p className="text-xs text-gray-500 mt-1">Override for risk tolerance setting</p>
+                                        <label style={labelStyle}>Confidence Level</label>
+                                        <div style={adornmentWrapStyle}>
+                                            <input style={adornedInputStyle} type="number" step="1" min="50" max="99"
+                                                value={confidenceLevel ?? ''}
+                                                placeholder="Uses risk tolerance"
+                                                onChange={e => setConfidenceLevel(e.target.value ? Number(e.target.value) : null)} />
+                                            <span style={adornmentSuffixStyle}>%</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Override for risk tolerance
+                                        </div>
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    <div className="bg-white border rounded-lg p-6">
-                        <div className="flex justify-between items-center mb-2">
-                            <h2 className="text-lg font-semibold">Spending Phases</h2>
-                            <button onClick={addPhase} className="text-sm text-blue-600 hover:underline">+ Add Phase</button>
-                        </div>
-                        <p className="text-xs text-gray-500 mb-4">Set your desired annual spending for each life stage. The optimizer will find the best achievable plan within your portfolio's capacity.</p>
-                        <div className="space-y-3">
-                            {phases.map((phase, i) => (
-                                <div key={i} className="flex items-center gap-3 p-3 bg-gray-50 rounded">
-                                    <input type="text" value={phase.name}
-                                        onChange={e => updatePhase(i, 'name', e.target.value)}
-                                        className="border rounded px-2 py-1 flex-1" placeholder="Phase name" />
-                                    <div className="flex items-center gap-1">
-                                        <label className="text-xs text-gray-500">Start</label>
-                                        <input type="number" value={phase.start_age}
-                                            onChange={e => updatePhase(i, 'start_age', Number(e.target.value))}
-                                            className="border rounded px-2 py-1 w-16" />
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <label className="text-xs text-gray-500">End</label>
-                                        <input type="number" value={phase.end_age ?? ''}
-                                            onChange={e => updatePhase(i, 'end_age', e.target.value ? Number(e.target.value) : null)}
-                                            className="border rounded px-2 py-1 w-16" placeholder="--" />
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <label className="text-xs text-gray-500">$ Target</label>
-                                        <input type="number" value={phase.target_spending ?? ''}
-                                            onChange={e => updatePhase(i, 'target_spending', e.target.value ? Number(e.target.value) : null)}
-                                            className="border rounded px-2 py-1 w-28" placeholder="Annual $" />
-                                    </div>
-                                    <button onClick={() => removePhase(i)} className="text-red-500 hover:text-red-700 text-sm">Remove</button>
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div>
+                                <h3 style={{ margin: 0 }}>Spending Phases</h3>
+                                <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                                    Set your desired annual spending for each life stage. The optimizer will find the best achievable plan within your portfolio's capacity.
                                 </div>
-                            ))}
+                            </div>
+                            <button onClick={addPhase}
+                                style={{ padding: '0.25rem 0.75rem', background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                + Add Phase
+                            </button>
                         </div>
+                        {phases.map((phase, i) => (
+                            <div key={i}
+                                draggable
+                                onDragStart={() => handleDragStart(i)}
+                                onDragOver={e => handleDragOver(e, i)}
+                                onDrop={e => handleDrop(e, i)}
+                                onDragEnd={handleDragEnd}
+                                style={{
+                                    display: 'flex', alignItems: 'center', gap: '0.75rem',
+                                    padding: '0.75rem', background: dragOverIndex === i ? '#e3f2fd' : '#f9f9f9',
+                                    borderRadius: '4px', marginBottom: '0.5rem',
+                                    border: dragOverIndex === i ? '2px dashed #1976d2' : '1px solid #eee',
+                                    cursor: 'grab', transition: 'background 0.15s, border 0.15s',
+                                }}>
+                                <span style={{ cursor: 'grab', color: '#999', fontSize: '1.1rem', userSelect: 'none', padding: '0 0.15rem' }}
+                                    title="Drag to reorder">&#x2630;</span>
+                                <input style={phaseNameInputStyle} type="text" value={phase.name}
+                                    onChange={e => updatePhase(i, 'name', e.target.value)}
+                                    placeholder="Phase name" />
+                                <span style={smallLabelStyle}>Start</span>
+                                <input style={smallInputStyle} type="number" value={phase.start_age}
+                                    onChange={e => updatePhase(i, 'start_age', Number(e.target.value))} />
+                                <span style={smallLabelStyle}>End</span>
+                                <input style={smallInputStyle} type="number" value={phase.end_age ?? ''}
+                                    onChange={e => updatePhase(i, 'end_age', e.target.value ? Number(e.target.value) : null)}
+                                    placeholder="--" />
+                                <span style={smallLabelStyle}>$ Target</span>
+                                <div style={smallAdornmentWrapStyle}>
+                                    <span style={smallAdornmentStyle}>$</span>
+                                    <input style={smallAdornedInputStyle} type="text" inputMode="numeric"
+                                        value={phase.target_spending != null ? phase.target_spending.toLocaleString('en-US') : ''}
+                                        placeholder="Annual"
+                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); updatePhase(i, 'target_spending', isNaN(v) ? null : v); }} />
+                                </div>
+                                <button onClick={() => removePhase(i)}
+                                    style={{ padding: '0.25rem 0.5rem', background: '#ef5350', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                    Remove
+                                </button>
+                            </div>
+                        ))}
                     </div>
 
                     <button onClick={handleOptimize}
-                        className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700">
+                        style={{ padding: '0.6rem 1.5rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
                         Run Optimization
                     </button>
                 </div>
             )}
 
             {state === 'running' && (
-                <div className="flex flex-col items-center justify-center py-20">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-                    <p className="text-gray-600">Running {trialCount.toLocaleString()} Monte Carlo trials...</p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '5rem 0' }}>
+                    <div style={{
+                        width: '3rem', height: '3rem', border: '3px solid #e0e0e0',
+                        borderTopColor: '#1976d2', borderRadius: '50%',
+                        animation: 'spin 1s linear infinite', marginBottom: '1rem',
+                    }} />
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    <div style={{ color: '#666' }}>Running {trialCount.toLocaleString()} Monte Carlo trials...</div>
                 </div>
             )}
 
-            {state === 'results' && result && (
-                <div className="space-y-6">
+            {state === 'results' && result && (() => {
+                const diagnostics = computePlanDiagnostics(result.phases, result.yearly_spending, result.failure_rate);
+                const failureRateColors = { good: '#e8f5e9', caution: '#fff8e1', danger: '#ffebee' };
+                const failureRateBorder = { good: '#a5d6a7', caution: '#ffe082', danger: '#ef9a9a' };
+
+                return (
+                <div>
                     {result.stale && (
-                        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex items-center justify-between">
-                            <span className="text-yellow-800">This profile is stale &mdash; the scenario has changed since optimization.</span>
-                            <button onClick={handleReoptimize} className="text-yellow-800 font-medium hover:underline">
+                        <div style={{
+                            background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px',
+                            padding: '1rem', display: 'flex', justifyContent: 'space-between',
+                            alignItems: 'center', marginBottom: '1.5rem',
+                        }}>
+                            <span style={{ color: '#e65100' }}>This profile is stale &mdash; the scenario has changed since optimization.</span>
+                            <button onClick={handleReoptimize}
+                                style={{ padding: '0.35rem 0.75rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
                                 Re-optimize
                             </button>
                         </div>
                     )}
 
-                    <div className="grid grid-cols-4 gap-4">
-                        <div className="bg-white border rounded-lg p-4 text-center">
-                            <p className="text-sm text-gray-500">Median Final Balance</p>
-                            <p className="text-xl font-bold">{fmt(result.median_final_balance)}</p>
+                    {diagnostics.warnings.length > 0 && (
+                        <div data-testid="warning-banner" style={{
+                            background: diagnostics.failureRateSeverity === 'danger' ? '#ffebee' : '#fff8e1',
+                            border: `1px solid ${diagnostics.failureRateSeverity === 'danger' ? '#ef9a9a' : '#ffe082'}`,
+                            borderRadius: '8px', padding: '1rem', marginBottom: '1.5rem',
+                        }}>
+                            <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: diagnostics.failureRateSeverity === 'danger' ? '#c62828' : '#e65100' }}>
+                                Plan Warnings
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '1.25rem' }}>
+                                {diagnostics.warnings.map((w, i) => (
+                                    <li key={i} style={{ fontSize: '0.9rem', color: '#333' }}>{w}</li>
+                                ))}
+                            </ul>
                         </div>
-                        <div className="bg-white border rounded-lg p-4 text-center">
-                            <p className="text-sm text-gray-500">Failure Rate</p>
-                            <p className="text-xl font-bold">{pct(result.failure_rate)}</p>
+                    )}
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                        <div data-testid="failure-rate-card" style={{
+                            ...cardStyle, textAlign: 'center',
+                            background: failureRateColors[diagnostics.failureRateSeverity],
+                            border: `1px solid ${failureRateBorder[diagnostics.failureRateSeverity]}`,
+                        }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Failure Rate</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.failure_rate)}</div>
                         </div>
-                        <div className="bg-white border rounded-lg p-4 text-center">
-                            <p className="text-sm text-gray-500">10th Percentile Final</p>
-                            <p className="text-xl font-bold">{fmt(result.percentile10_final)}</p>
+                        <div style={{ ...cardStyle, textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>10th Percentile Final</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile10_final)}</div>
                         </div>
-                        <div className="bg-white border rounded-lg p-4 text-center">
-                            <p className="text-sm text-gray-500">90th Percentile Final</p>
-                            <p className="text-xl font-bold">{fmt(result.percentile90_final)}</p>
+                        <div style={{ ...cardStyle, textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>25th Percentile Final</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.yearly_spending[result.yearly_spending.length - 1]?.portfolio_balance_p25 ?? 0)}</div>
+                        </div>
+                        <div style={{ ...cardStyle, textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Median Final Balance</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.median_final_balance)}</div>
                         </div>
                     </div>
 
-                    <div className="bg-white border rounded-lg p-6">
-                        <h2 className="text-lg font-semibold mb-4">Spending Corridor</h2>
+                    {(() => {
+                        const lastYear = result.yearly_spending[result.yearly_spending.length - 1];
+                        return lastYear && (lastYear.portfolio_balance_p10 != null || lastYear.portfolio_balance_median != null) ? (
+                            <div data-testid="outcome-range-card" style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                                <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Outcome Range</div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <div style={{ fontSize: '0.75rem', color: '#ef5350' }}>Pessimistic (p10)</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(lastYear.portfolio_balance_p10)}</div>
+                                    </div>
+                                    <div style={{ flex: 1, margin: '0 1rem', height: '4px', background: 'linear-gradient(to right, #ef5350, #4caf50)', borderRadius: '2px' }} />
+                                    <div style={{ textAlign: 'right' }}>
+                                        <div style={{ fontSize: '0.75rem', color: '#4caf50' }}>Median (p50)</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(lastYear.portfolio_balance_median)}</div>
+                                    </div>
+                                </div>
+                                <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                    Final year portfolio balance at age {lastYear.age}
+                                </div>
+                            </div>
+                        ) : null;
+                    })()}
+
+                    {diagnostics.phases.length > 0 && (
+                        <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                            <h3 style={{ marginBottom: '1rem' }}>Phase Achievement</h3>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Phase</th>
+                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Ages</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Target</th>
+                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Avg Recommended</th>
+                                        <th style={{ padding: '0.5rem', width: '35%' }}>Achievement</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {diagnostics.phases.map(p => {
+                                        const barColor = p.achievementPct >= 90 ? '#4caf50'
+                                            : p.achievementPct >= 70 ? '#ff9800' : '#ef5350';
+                                        const phase = result.phases.find(ph => ph.name === p.phaseName);
+                                        const ageRange = phase
+                                            ? `${phase.start_age}\u2013${phase.end_age ?? '\u221E'}`
+                                            : '';
+                                        return (
+                                            <tr key={p.phaseName} style={{ borderBottom: '1px solid #eee' }}>
+                                                <td style={{ padding: '0.5rem' }}>{p.phaseName}</td>
+                                                <td style={{ padding: '0.5rem', color: '#888' }}>{ageRange}</td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
+                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
+                                                <td style={{ padding: '0.5rem' }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                        <div data-testid={`progress-bar-${p.phaseName}`} style={{
+                                                            flex: 1, height: '0.75rem', background: '#eee',
+                                                            borderRadius: '4px', overflow: 'hidden',
+                                                        }}>
+                                                            <div style={{
+                                                                width: `${Math.min(100, p.achievementPct)}%`,
+                                                                height: '100%', background: barColor,
+                                                                borderRadius: '4px',
+                                                            }} />
+                                                        </div>
+                                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, minWidth: '3rem', textAlign: 'right' }}>
+                                                            {Math.round(p.achievementPct)}%
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Spending Corridor</h3>
                         <SpendingCorridorChart yearlySpending={result.yearly_spending} phases={result.phases} />
                     </div>
 
-                    <div className="bg-white border rounded-lg p-6 overflow-x-auto">
-                        <h2 className="text-lg font-semibold mb-4">Year-by-Year Breakdown</h2>
-                        <table className="w-full text-sm">
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Year-by-Year Breakdown</h3>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                             <thead>
-                                <tr className="text-left border-b">
-                                    <th className="py-2 px-2">Age</th>
-                                    <th className="py-2 px-2">Phase</th>
-                                    <th className="py-2 px-2 text-right">Recommended</th>
-                                    <th className="py-2 px-2 text-right">Floor</th>
-                                    <th className="py-2 px-2 text-right">Discretionary</th>
-                                    <th className="py-2 px-2 text-right">Income</th>
-                                    <th className="py-2 px-2 text-right">Portfolio Draw</th>
-                                    <th className="py-2 px-2 text-right">Portfolio Balance</th>
-                                    <th className="py-2 px-2 text-right">Corridor</th>
+                                <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
+                                    <th rowSpan={2} style={{ textAlign: 'left', padding: '0.5rem', verticalAlign: 'bottom' }}>Age</th>
+                                    <th rowSpan={2} style={{ textAlign: 'left', padding: '0.5rem', verticalAlign: 'bottom' }}>Phase</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Recommended</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Floor</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Discretionary</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Income</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Portfolio Draw</th>
+                                    <th colSpan={3} style={{ textAlign: 'center', padding: '0.5rem', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
+                                    <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Corridor</th>
+                                </tr>
+                                <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
+                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
+                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
+                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {result.yearly_spending.map(y => (
-                                    <tr key={y.year} className="border-b hover:bg-gray-50">
-                                        <td className="py-1 px-2">{y.age}</td>
-                                        <td className="py-1 px-2 text-gray-600">{y.phase_name}</td>
-                                        <td className="py-1 px-2 text-right font-medium">{fmt(y.recommended)}</td>
-                                        <td className="py-1 px-2 text-right">{fmt(y.essential_floor)}</td>
-                                        <td className="py-1 px-2 text-right">{fmt(y.discretionary)}</td>
-                                        <td className="py-1 px-2 text-right">{fmt(y.income_offset)}</td>
-                                        <td className="py-1 px-2 text-right">{fmt(y.portfolio_withdrawal)}</td>
-                                        <td className="py-1 px-2 text-right text-gray-500">
-                                            {y.portfolio_balance_median != null ? fmt(y.portfolio_balance_median) : '--'}
+                                    <tr key={y.year} style={{ borderBottom: '1px solid #eee' }}>
+                                        <td style={{ padding: '0.4rem 0.5rem' }}>{y.age}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', color: '#666' }}>{y.phase_name}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>{fmt(y.recommended)}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.essential_floor)}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.discretionary)}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.income_offset)}</td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.portfolio_withdrawal)}</td>
+                                        <td style={{
+                                            padding: '0.4rem 0.5rem', textAlign: 'right',
+                                            color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#ef5350' : '#888',
+                                        }}>
+                                            {fmtShort(y.portfolio_balance_p10)}
                                         </td>
-                                        <td className="py-1 px-2 text-right text-gray-500">
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                            {fmtShort(y.portfolio_balance_p25)}
+                                        </td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                            {fmtShort(y.portfolio_balance_median)}
+                                        </td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
                                             {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}
                                         </td>
                                     </tr>
@@ -386,18 +805,19 @@ export default function SpendingOptimizerPage() {
                         </table>
                     </div>
 
-                    <div className="flex gap-3">
+                    <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button onClick={() => setState('configure')}
-                            className="border border-gray-300 px-4 py-2 rounded hover:bg-gray-50">
+                            style={{ padding: '0.5rem 1rem', background: '#fff', color: '#333', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>
                             Adjust &amp; Re-run
                         </button>
                         <button onClick={() => navigate(`/projections/${id}`)}
-                            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                            style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
                             Back to Scenario
                         </button>
                     </div>
                 </div>
-            )}
+                );
+            })()}
         </div>
     );
 }

@@ -26,6 +26,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final Logger log = LoggerFactory.getLogger(MonteCarloSpendingOptimizer.class);
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
+    private static final double DEFAULT_BLOCK_LENGTH = 5.0;
 
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
@@ -38,23 +39,23 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             return emptyResult(input);
         }
 
-        double returnMean = input.returnMean().doubleValue();
-        double returnStddev = input.returnStddev().doubleValue();
         int trialCount = input.trialCount();
         double initialPortfolio = totalPortfolio(input.accounts());
         double essentialFloor = input.essentialFloor().doubleValue();
         double terminalTarget = input.terminalBalanceTarget().doubleValue();
         double confidenceLevel = input.confidenceLevel().doubleValue();
 
+        int cashReserveYears = input.cashReserveYears();
+        double cashReturnRate = input.cashReturnRate() != null
+                ? input.cashReturnRate().doubleValue() : 0.0;
+
         Random rng = input.seed() != null ? new Random(input.seed()) : new Random();
 
-        // Log-normal parameters
-        double mu = Math.log(1 + returnMean) - 0.5 * returnStddev * returnStddev;
-        double sigma = returnStddev;
+        double[] historicalReturns = HistoricalReturns.getReturns();
 
-        // Stage 1: Run MC trials (no withdrawals) to get portfolio trajectories
+        // Stage 1: Run MC trials (no withdrawals) to get portfolio trajectories using bootstrap
         double[][] portfolioPaths = runMonteCarloTrials(
-                trialCount, years, initialPortfolio, mu, sigma, rng);
+                trialCount, years, initialPortfolio, historicalReturns, rng);
 
         // Compute deterministic income for each year
         double[] incomeByYear = computeDeterministicIncome(
@@ -72,7 +73,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] discretionaryByYear = allocateSpending(
                 portfolioPaths, incomeByYear, adjustedFloors, terminalTarget,
                 input.phases(), retirementAge, years, trialCount,
-                confidenceLevel, portfolioFloor);
+                confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate);
 
         // Stage 4: Post-processing — phase blending and YoY smoothing
         int phaseBlendYears = input.phaseBlendYears();
@@ -84,19 +85,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         Double maxAdjRate = input.maxAnnualAdjustmentRate() != null
                 ? input.maxAnnualAdjustmentRate().doubleValue() : null;
         if (maxAdjRate != null && maxAdjRate > 0) {
-            applyYearOverYearSmoothing(discretionaryByYear, adjustedFloors, maxAdjRate, years);
+            applyYearOverYearSmoothing(discretionaryByYear, adjustedFloors, maxAdjRate, years,
+                    input.phases(), retirementAge);
 
             // Re-verify sustainability of smoothed plan; reduce if broken
             if (!isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
                     discretionaryByYear, terminalTarget, years, trialCount,
-                    confidenceLevel, portfolioFloor)) {
+                    confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < years; y++) {
                         discretionaryByYear[y] *= 0.95;
                     }
                     if (isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
                             discretionaryByYear, terminalTarget, years, trialCount,
-                            confidenceLevel, portfolioFloor)) {
+                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
                         break;
                     }
                 }
@@ -109,27 +111,75 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 terminalTarget, years, trialCount);
         smoothCorridors(corridors[0], corridors[1], years);
 
+        // Clamp corridors to bracket recommended spending (smoothing can overshoot at phase boundaries)
+        for (int y = 0; y < years; y++) {
+            double recommended = adjustedFloors[y] + discretionaryByYear[y];
+            corridors[0][y] = Math.min(corridors[0][y], recommended);
+            corridors[1][y] = Math.max(corridors[1][y], recommended);
+        }
+
         // Simulate with withdrawals to get final balances and per-year median balances
         var rng2 = input.seed() != null ? new Random(input.seed()) : rng;
         double[][] yearBalances = new double[years][trialCount];
         double[] finalBalances = new double[trialCount];
         for (int t = 0; t < trialCount; t++) {
-            double balance = initialPortfolio;
+            var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng2);
+            double[] returnSequence = generator.generateReturnSequence(years);
+
+            double equityBalance;
+            double cashBalance;
+            if (cashReserveYears > 0) {
+                double annualSpending = adjustedFloors[0] + discretionaryByYear[0];
+                cashBalance = annualSpending * cashReserveYears;
+                equityBalance = Math.max(0, initialPortfolio - cashBalance);
+            } else {
+                equityBalance = initialPortfolio;
+                cashBalance = 0;
+            }
+
             for (int y = 0; y < years; y++) {
-                double logReturn = mu + sigma * rng2.nextGaussian();
-                double growthFactor = Math.exp(logReturn);
+                double equityReturn = returnSequence[y];
+                equityBalance *= (1 + equityReturn);
+                cashBalance *= (1 + cashReturnRate);
+
                 double spending = adjustedFloors[y] + discretionaryByYear[y];
                 double withdrawal = Math.max(0, spending - incomeByYear[y]);
-                balance = Math.max(0, balance * growthFactor - withdrawal);
-                yearBalances[y][t] = balance;
+
+                if (cashReserveYears > 0) {
+                    if (equityReturn < 0) {
+                        double cashDraw = Math.min(withdrawal, cashBalance);
+                        equityBalance -= (withdrawal - cashDraw);
+                        cashBalance -= cashDraw;
+                    } else {
+                        double targetCash = spending * cashReserveYears;
+                        double replenishment = Math.min(
+                                Math.max(0, targetCash - cashBalance),
+                                equityBalance * 0.10);
+                        equityBalance -= (withdrawal + replenishment);
+                        cashBalance += replenishment;
+                    }
+                } else {
+                    equityBalance -= withdrawal;
+                }
+
+                double totalBalance = Math.max(0, equityBalance + cashBalance);
+                equityBalance = Math.max(0, equityBalance);
+                cashBalance = Math.max(0, cashBalance);
+                yearBalances[y][t] = totalBalance;
             }
-            finalBalances[t] = balance;
+            finalBalances[t] = Math.max(0, equityBalance + cashBalance);
         }
 
         double[] medianBalanceByYear = new double[years];
+        double[] p10BalanceByYear = new double[years];
+        double[] p25BalanceByYear = new double[years];
+        double[] p75BalanceByYear = new double[years];
         for (int y = 0; y < years; y++) {
             Arrays.sort(yearBalances[y]);
+            p10BalanceByYear[y] = percentile(yearBalances[y], 0.10);
+            p25BalanceByYear[y] = percentile(yearBalances[y], 0.25);
             medianBalanceByYear[y] = percentile(yearBalances[y], 0.50);
+            p75BalanceByYear[y] = percentile(yearBalances[y], 0.75);
         }
 
         Arrays.sort(finalBalances);
@@ -155,7 +205,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     calendarYear, age,
                     toBD(recommended), toBD(corridors[0][y]), toBD(corridors[1][y]),
                     toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName,
-                    toBD(medianBalanceByYear[y])));
+                    toBD(medianBalanceByYear[y]),
+                    toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y]),
+                    toBD(p75BalanceByYear[y])));
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -174,13 +226,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private double[][] runMonteCarloTrials(int trialCount, int years,
                                             double initialPortfolio,
-                                            double mu, double sigma, Random rng) {
+                                            double[] historicalReturns, Random rng) {
         double[][] paths = new double[trialCount][years + 1];
         for (int t = 0; t < trialCount; t++) {
+            var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng);
+            double[] returnSequence = generator.generateReturnSequence(years);
             paths[t][0] = initialPortfolio;
             for (int y = 0; y < years; y++) {
-                double logReturn = mu + sigma * rng.nextGaussian();
-                double growthFactor = Math.exp(logReturn);
+                double growthFactor = 1 + returnSequence[y];
                 paths[t][y + 1] = paths[t][y] * growthFactor;
             }
         }
@@ -265,13 +318,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                        double[] floors, double terminalTarget,
                                        List<GuardrailPhaseInput> phases,
                                        int retirementAge, int years, int trialCount,
-                                       double confidenceLevel, double portfolioFloor) {
+                                       double confidenceLevel, double portfolioFloor,
+                                       int cashReserveYears, double cashReturnRate) {
         double[] discretionary = new double[years];
 
         if (phases == null || phases.isEmpty()) {
             double maxDisc = binarySearchDiscretionary(
                     paths, income, floors, discretionary, terminalTarget,
-                    0, years - 1, years, trialCount, confidenceLevel, portfolioFloor);
+                    0, years - 1, years, trialCount, confidenceLevel, portfolioFloor,
+                    cashReserveYears, cashReturnRate);
             Arrays.fill(discretionary, maxDisc);
             return discretionary;
         }
@@ -283,7 +338,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         if (hasTargets) {
             return allocateByTargets(paths, income, floors, terminalTarget, phases,
-                    retirementAge, years, trialCount, confidenceLevel, portfolioFloor);
+                    retirementAge, years, trialCount, confidenceLevel, portfolioFloor,
+                    cashReserveYears, cashReturnRate);
         }
 
         // Legacy: sort phases by priority weight (highest first)
@@ -305,7 +361,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double maxDisc = binarySearchDiscretionary(
                     paths, income, floors, discretionary, terminalTarget,
-                    phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor);
+                    phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
+                    cashReserveYears, cashReturnRate);
 
             for (int y = phaseStart; y <= phaseEnd; y++) {
                 discretionary[y] = maxDisc;
@@ -319,46 +376,48 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         double[] floors, double terminalTarget,
                                         List<GuardrailPhaseInput> phases,
                                         int retirementAge, int years, int trialCount,
-                                        double confidenceLevel, double portfolioFloor) {
-        // Compute target discretionary for each year based on phase targets
-        double[] targetDisc = new double[years];
-        for (int y = 0; y < years; y++) {
-            int age = retirementAge + y;
-            for (var phase : phases) {
-                if (age >= phase.startAge()
-                        && (phase.endAge() == null || age <= phase.endAge())) {
-                    if (phase.targetSpending() != null) {
-                        targetDisc[y] = Math.max(0,
-                                phase.targetSpending().doubleValue() - floors[y]);
-                    }
-                    break;
-                }
-            }
-        }
-
-        // Binary search for a single scaling factor s in [0, 2]
-        double low = 0;
-        double high = 2.0;
-
-        for (int iter = 0; iter < 40; iter++) {
-            double mid = (low + high) / 2;
-            double[] testDisc = new double[years];
-            for (int y = 0; y < years; y++) {
-                testDisc[y] = mid * targetDisc[y];
-            }
-
-            if (isSustainable(paths, income, floors, testDisc, terminalTarget,
-                    years, trialCount, confidenceLevel, portfolioFloor)) {
-                low = mid;
-            } else {
-                high = mid;
-            }
-        }
-
+                                        double confidenceLevel, double portfolioFloor,
+                                        int cashReserveYears, double cashReturnRate) {
         double[] discretionary = new double[years];
-        for (int y = 0; y < years; y++) {
-            discretionary[y] = low * targetDisc[y];
+
+        for (var phase : phases) {
+            int phaseStart = phase.startAge() - retirementAge;
+            int phaseEnd = phase.endAge() != null
+                    ? Math.min(phase.endAge() - retirementAge, years - 1)
+                    : years - 1;
+            phaseStart = Math.max(0, phaseStart);
+            phaseEnd = Math.min(phaseEnd, years - 1);
+
+            if (phaseStart > phaseEnd) {
+                continue;
+            }
+
+            double found = binarySearchDiscretionary(
+                    paths, income, floors, discretionary, terminalTarget,
+                    phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
+                    cashReserveYears, cashReturnRate);
+
+            double capped;
+            if (phase.targetSpending() != null
+                    && phase.targetSpending().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                double avgFloor = 0;
+                int count = 0;
+                for (int y = phaseStart; y <= phaseEnd; y++) {
+                    avgFloor += floors[y];
+                    count++;
+                }
+                avgFloor = count > 0 ? avgFloor / count : 0;
+                double maxDiscretionary = Math.max(0, phase.targetSpending().doubleValue() - avgFloor);
+                capped = Math.min(found, maxDiscretionary);
+            } else {
+                capped = found;
+            }
+
+            for (int y = phaseStart; y <= phaseEnd; y++) {
+                discretionary[y] = capped;
+            }
         }
+
         return discretionary;
     }
 
@@ -367,7 +426,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                               double terminalTarget,
                                               int phaseStart, int phaseEnd,
                                               int years, int trialCount,
-                                              double confidenceLevel, double portfolioFloor) {
+                                              double confidenceLevel, double portfolioFloor,
+                                              int cashReserveYears, double cashReturnRate) {
         double low = 0;
         double high = 500_000;
 
@@ -380,7 +440,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             if (isSustainable(paths, income, floors, testDiscretionary,
-                    terminalTarget, years, trialCount, confidenceLevel, portfolioFloor)) {
+                    terminalTarget, years, trialCount, confidenceLevel, portfolioFloor,
+                    cashReserveYears, cashReturnRate)) {
                 low = mid;
             } else {
                 high = mid;
@@ -393,24 +454,65 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private boolean isSustainable(double[][] paths, double[] income,
                                    double[] floors, double[] discretionary,
                                    double terminalTarget, int years, int trialCount,
-                                   double confidenceLevel, double portfolioFloor) {
+                                   double confidenceLevel, double portfolioFloor,
+                                   int cashReserveYears, double cashReturnRate) {
         double[] finalBalances = new double[trialCount];
         double[] minBalances = new double[trialCount];
 
         for (int t = 0; t < trialCount; t++) {
-            double balance = paths[t][0];
-            double minBalance = balance;
+            double initialBalance = paths[t][0];
+            double equityBalance;
+            double cashBalance;
+
+            if (cashReserveYears > 0) {
+                double annualSpending = floors[0] + discretionary[0];
+                cashBalance = annualSpending * cashReserveYears;
+                equityBalance = Math.max(0, initialBalance - cashBalance);
+            } else {
+                equityBalance = initialBalance;
+                cashBalance = 0;
+            }
+
+            double minBalance = equityBalance + cashBalance;
+
             for (int y = 0; y < years; y++) {
                 double growthFactor = paths[t][y + 1] / paths[t][y];
+                double equityReturn = growthFactor - 1.0;
+
+                equityBalance *= growthFactor;
+                cashBalance *= (1 + cashReturnRate);
+
                 double spending = floors[y] + discretionary[y];
                 double withdrawal = Math.max(0, spending - income[y]);
-                balance = balance * growthFactor - withdrawal;
-                if (balance < 0) {
-                    balance = 0;
+
+                if (cashReserveYears > 0) {
+                    if (equityReturn < 0) {
+                        double cashDraw = Math.min(withdrawal, cashBalance);
+                        equityBalance -= (withdrawal - cashDraw);
+                        cashBalance -= cashDraw;
+                    } else {
+                        double targetCash = spending * cashReserveYears;
+                        double replenishment = Math.min(
+                                Math.max(0, targetCash - cashBalance),
+                                equityBalance * 0.10);
+                        equityBalance -= (withdrawal + replenishment);
+                        cashBalance += replenishment;
+                    }
+                } else {
+                    equityBalance -= withdrawal;
                 }
-                minBalance = Math.min(minBalance, balance);
+
+                double totalBalance = equityBalance + cashBalance;
+                if (totalBalance < 0) {
+                    equityBalance = 0;
+                    cashBalance = 0;
+                    totalBalance = 0;
+                }
+                equityBalance = Math.max(0, equityBalance);
+                cashBalance = Math.max(0, cashBalance);
+                minBalance = Math.min(minBalance, totalBalance);
             }
-            finalBalances[t] = balance;
+            finalBalances[t] = equityBalance + cashBalance;
             minBalances[t] = minBalance;
         }
 
@@ -440,10 +542,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         for (int y = 0; y < years; y++) {
             double baseSpending = floors[y] + discretionary[y];
 
-            // Compute what spending is sustainable at different percentiles
             double[] sustainableAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
-                // For this trial, how much could we spend this year?
                 double balance = paths[t][0];
                 for (int py = 0; py < y; py++) {
                     double gf = paths[t][py + 1] / paths[t][py];
@@ -460,32 +560,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double p10 = percentile(sustainableAtYear, 0.10);
             double p90 = percentile(sustainableAtYear, 0.90);
 
-            // Corridor bounded by floor and some reasonable cap
             corridorLow[y] = Math.max(floors[y], Math.min(p10, baseSpending));
             corridorHigh[y] = Math.max(baseSpending, Math.min(p90, baseSpending * 3));
         }
 
         return new double[][]{corridorLow, corridorHigh};
-    }
-
-    private double[] simulateWithWithdrawals(int trialCount, int years,
-                                              double initialPortfolio,
-                                              double mu, double sigma, Random rng,
-                                              double[] floors, double[] discretionary,
-                                              double[] income) {
-        double[] finalBalances = new double[trialCount];
-        for (int t = 0; t < trialCount; t++) {
-            double balance = initialPortfolio;
-            for (int y = 0; y < years; y++) {
-                double logReturn = mu + sigma * rng.nextGaussian();
-                double growthFactor = Math.exp(logReturn);
-                double spending = floors[y] + discretionary[y];
-                double withdrawal = Math.max(0, spending - income[y]);
-                balance = Math.max(0, balance * growthFactor - withdrawal);
-            }
-            finalBalances[t] = balance;
-        }
-        return finalBalances;
     }
 
     private void applyPhaseBlending(double[] discretionary, double[] floors,
@@ -523,13 +602,31 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     }
 
     private void applyYearOverYearSmoothing(double[] discretionary, double[] floors,
-                                             double maxRate, int years) {
+                                             double maxRate, int years,
+                                             List<GuardrailPhaseInput> phases,
+                                             int retirementAge) {
+        // Build set of year indices where a new phase starts (skip first phase since
+        // there's no prior year to smooth from)
+        var phaseStartYears = new java.util.HashSet<Integer>();
+        if (phases != null && phases.size() > 1) {
+            for (int i = 1; i < phases.size(); i++) {
+                int yearIdx = phases.get(i).startAge() - retirementAge;
+                if (yearIdx > 0 && yearIdx < years) {
+                    phaseStartYears.add(yearIdx);
+                }
+            }
+        }
+
         double[] totalSpending = new double[years];
         for (int y = 0; y < years; y++) {
             totalSpending[y] = floors[y] + discretionary[y];
         }
 
         for (int y = 1; y < years; y++) {
+            // At phase boundaries, allow spending to jump to the phase's allocated level
+            if (phaseStartYears.contains(y)) {
+                continue;
+            }
             double maxUp = totalSpending[y - 1] * (1 + maxRate);
             double maxDown = totalSpending[y - 1] * (1 - maxRate);
             totalSpending[y] = Math.max(maxDown, Math.min(maxUp, totalSpending[y]));
@@ -557,7 +654,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         System.arraycopy(smoothLow, 0, corridorLow, 0, years);
         System.arraycopy(smoothHigh, 0, corridorHigh, 0, years);
 
-        // Ensure corridorLow <= corridorHigh after smoothing
         for (int y = 0; y < years; y++) {
             if (corridorLow[y] > corridorHigh[y]) {
                 double avg = (corridorLow[y] + corridorHigh[y]) / 2.0;

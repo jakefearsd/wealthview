@@ -17,5 +17,7 @@ public record GuardrailOptimizationRequest(
         BigDecimal portfolioFloor,
         BigDecimal maxAnnualAdjustmentRate,
         Integer phaseBlendYears,
-        String riskTolerance
+        String riskTolerance,
+        Integer cashReserveYears,
+        BigDecimal cashReturnRate
 ) {}
