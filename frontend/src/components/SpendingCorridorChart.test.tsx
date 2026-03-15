@@ -26,14 +26,14 @@ vi.mock('recharts', () => ({
 import SpendingCorridorChart from './SpendingCorridorChart';
 
 const sampleSpending: GuardrailYearlySpending[] = [
-    { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 12000, portfolio_withdrawal: 63000, phase_name: 'Early' },
-    { year: 2031, age: 63, recommended: 76000, corridor_low: 63000, corridor_high: 92000, essential_floor: 30000, discretionary: 46000, income_offset: 12500, portfolio_withdrawal: 63500, phase_name: 'Early' },
-    { year: 2032, age: 64, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid' },
+    { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 12000, portfolio_withdrawal: 63000, phase_name: 'Early', portfolio_balance_median: 480000 },
+    { year: 2031, age: 63, recommended: 76000, corridor_low: 63000, corridor_high: 92000, essential_floor: 30000, discretionary: 46000, income_offset: 12500, portfolio_withdrawal: 63500, phase_name: 'Early', portfolio_balance_median: 440000 },
+    { year: 2032, age: 64, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 350000 },
 ];
 
 const samplePhases: GuardrailPhase[] = [
-    { name: 'Early', start_age: 62, end_age: 63, priority_weight: 3 },
-    { name: 'Mid', start_age: 64, end_age: null, priority_weight: 1 },
+    { name: 'Early', start_age: 62, end_age: 63, priority_weight: 3, target_spending: 80000 },
+    { name: 'Mid', start_age: 64, end_age: null, priority_weight: 1, target_spending: 50000 },
 ];
 
 describe('SpendingCorridorChart', () => {
