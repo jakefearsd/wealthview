@@ -138,6 +138,11 @@ If you catch yourself writing production code first, stop, delete it, write the 
 
 ## Git & Commit Conventions
 
+### Branching Policy
+- **Commit directly on the current branch (usually `main`).** Do NOT create feature branches, topic branches, or git worktrees unless the user explicitly requests one.
+- This is a solo developer project — feature branches add merge overhead and state confusion with no benefit.
+- If you find yourself thinking about `git checkout -b` or `git worktree add`, stop and commit on `main` instead.
+
 ### Conventional Commits Format
 ```
 <type>(<scope>): <short summary>
