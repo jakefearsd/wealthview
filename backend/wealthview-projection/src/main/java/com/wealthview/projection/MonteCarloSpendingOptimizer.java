@@ -271,7 +271,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             return discretionary;
         }
 
-        // Sort phases by priority weight (highest first)
+        // Check if any phase has target spending — use target-based allocation
+        boolean hasTargets = phases.stream()
+                .anyMatch(p -> p.targetSpending() != null
+                        && p.targetSpending().compareTo(BigDecimal.ZERO) > 0);
+
+        if (hasTargets) {
+            return allocateByTargets(paths, income, floors, terminalTarget, phases,
+                    retirementAge, years, trialCount, confidenceLevel, portfolioFloor);
+        }
+
+        // Legacy: sort phases by priority weight (highest first)
         var sortedPhases = phases.stream()
                 .sorted(Comparator.comparingInt(GuardrailPhaseInput::priorityWeight).reversed())
                 .toList();
@@ -297,6 +307,53 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
         }
 
+        return discretionary;
+    }
+
+    private double[] allocateByTargets(double[][] paths, double[] income,
+                                        double[] floors, double terminalTarget,
+                                        List<GuardrailPhaseInput> phases,
+                                        int retirementAge, int years, int trialCount,
+                                        double confidenceLevel, double portfolioFloor) {
+        // Compute target discretionary for each year based on phase targets
+        double[] targetDisc = new double[years];
+        for (int y = 0; y < years; y++) {
+            int age = retirementAge + y;
+            for (var phase : phases) {
+                if (age >= phase.startAge()
+                        && (phase.endAge() == null || age <= phase.endAge())) {
+                    if (phase.targetSpending() != null) {
+                        targetDisc[y] = Math.max(0,
+                                phase.targetSpending().doubleValue() - floors[y]);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Binary search for a single scaling factor s in [0, 2]
+        double low = 0;
+        double high = 2.0;
+
+        for (int iter = 0; iter < 40; iter++) {
+            double mid = (low + high) / 2;
+            double[] testDisc = new double[years];
+            for (int y = 0; y < years; y++) {
+                testDisc[y] = mid * targetDisc[y];
+            }
+
+            if (isSustainable(paths, income, floors, testDisc, terminalTarget,
+                    years, trialCount, confidenceLevel, portfolioFloor)) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+
+        double[] discretionary = new double[years];
+        for (int y = 0; y < years; y++) {
+            discretionary[y] = low * targetDisc[y];
+        }
         return discretionary;
     }
 
