@@ -76,6 +76,18 @@ public class GuardrailSpendingProfileEntity {
     @Column(name = "scenario_hash", nullable = false)
     private String scenarioHash;
 
+    @Column(name = "portfolio_floor", nullable = false, precision = 19, scale = 4)
+    private BigDecimal portfolioFloor = BigDecimal.ZERO;
+
+    @Column(name = "max_annual_adjustment_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal maxAnnualAdjustmentRate = new BigDecimal("0.0500");
+
+    @Column(name = "phase_blend_years", nullable = false)
+    private int phaseBlendYears = 1;
+
+    @Column(name = "risk_tolerance")
+    private String riskTolerance;
+
     @Column(name = "is_stale", nullable = false)
     private boolean stale = false;
 
@@ -127,6 +139,14 @@ public class GuardrailSpendingProfileEntity {
     public void setPercentile90Final(BigDecimal percentile90Final) { this.percentile90Final = percentile90Final; }
     public String getScenarioHash() { return scenarioHash; }
     public void setScenarioHash(String scenarioHash) { this.scenarioHash = scenarioHash; }
+    public BigDecimal getPortfolioFloor() { return portfolioFloor; }
+    public void setPortfolioFloor(BigDecimal portfolioFloor) { this.portfolioFloor = portfolioFloor; }
+    public BigDecimal getMaxAnnualAdjustmentRate() { return maxAnnualAdjustmentRate; }
+    public void setMaxAnnualAdjustmentRate(BigDecimal maxAnnualAdjustmentRate) { this.maxAnnualAdjustmentRate = maxAnnualAdjustmentRate; }
+    public int getPhaseBlendYears() { return phaseBlendYears; }
+    public void setPhaseBlendYears(int phaseBlendYears) { this.phaseBlendYears = phaseBlendYears; }
+    public String getRiskTolerance() { return riskTolerance; }
+    public void setRiskTolerance(String riskTolerance) { this.riskTolerance = riskTolerance; }
     public boolean isStale() { return stale; }
     public void setStale(boolean stale) { this.stale = stale; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

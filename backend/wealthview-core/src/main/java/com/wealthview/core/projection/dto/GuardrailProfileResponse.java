@@ -27,10 +27,30 @@ public record GuardrailProfileResponse(
         BigDecimal percentile90Final,
         boolean stale,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        BigDecimal portfolioFloor,
+        BigDecimal maxAnnualAdjustmentRate,
+        int phaseBlendYears,
+        String riskTolerance
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    public GuardrailProfileResponse(UUID id, UUID scenarioId, String name,
+                                     BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
+                                     BigDecimal returnMean, BigDecimal returnStddev,
+                                     int trialCount, BigDecimal confidenceLevel,
+                                     List<GuardrailPhaseInput> phases,
+                                     List<GuardrailYearlySpending> yearlySpending,
+                                     BigDecimal medianFinalBalance, BigDecimal failureRate,
+                                     BigDecimal percentile10Final, BigDecimal percentile90Final,
+                                     boolean stale, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget,
+                returnMean, returnStddev, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate,
+                percentile10Final, percentile90Final, stale, createdAt, updatedAt,
+                BigDecimal.ZERO, null, 0, null);
+    }
 
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
         List<GuardrailPhaseInput> phases;
@@ -63,7 +83,11 @@ public record GuardrailProfileResponse(
                 entity.getPercentile90Final(),
                 entity.isStale(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getPortfolioFloor(),
+                entity.getMaxAnnualAdjustmentRate(),
+                entity.getPhaseBlendYears(),
+                entity.getRiskTolerance()
         );
     }
 }
