@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams, Link } from 'react-router';
+import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
@@ -30,6 +30,7 @@ const tabButtonStyle = (active: boolean) => ({
 
 export default function ProjectionDetailPage() {
     const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const cache = useProjectionCache();
     const { data: scenario, loading, refetch } = useApiQuery(() => getScenario(id!));
@@ -115,13 +116,21 @@ export default function ProjectionDetailPage() {
                         {editing ? 'Cancel Edit' : 'Edit'}
                     </button>
                     {!editing && (
-                        <button
-                            onClick={handleRun}
-                            disabled={running}
-                            style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                        >
-                            {running ? 'Running...' : 'Run Projection'}
-                        </button>
+                        <>
+                            <button
+                                onClick={() => navigate(`/projections/${id}/optimize`)}
+                                style={{ padding: '0.5rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                Optimize Spending
+                            </button>
+                            <button
+                                onClick={handleRun}
+                                disabled={running}
+                                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                                {running ? 'Running...' : 'Run Projection'}
+                            </button>
+                        </>
                     )}
                 </div>
             </div>

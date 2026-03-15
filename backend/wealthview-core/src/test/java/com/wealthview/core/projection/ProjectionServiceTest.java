@@ -11,12 +11,14 @@ import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
@@ -32,6 +34,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -73,6 +77,9 @@ class ProjectionServiceTest {
 
     @Mock
     private ProjectionInputBuilder projectionInputBuilder;
+
+    @Mock
+    private GuardrailSpendingProfileRepository guardrailProfileRepository;
 
     @InjectMocks
     private ProjectionService service;
@@ -706,5 +713,94 @@ class ProjectionServiceTest {
         assertThat(isResp.annualAmount()).isEqualByComparingTo(new BigDecimal("24000"));
         assertThat(isResp.overrideAnnualAmount()).isEqualByComparingTo(new BigDecimal("28000"));
         assertThat(isResp.effectiveAmount()).isEqualByComparingTo(new BigDecimal("28000"));
+    }
+
+    // ── Guardrail Staleness Tests ──
+
+    @Test
+    void updateScenario_withGuardrailProfile_marksStaleWhenHashChanges() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Old Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario));
+        guardrailProfile.setStale(false);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Change endAge to trigger hash change
+        var request = new UpdateScenarioRequest(
+                "Old Plan", LocalDate.of(2055, 1, 1), 95,
+                new BigDecimal("0.03"), 1990, null, null, null, null,
+                null, null, null, null, null, null, null,
+                List.of(), null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isTrue();
+        verify(guardrailProfileRepository).save(guardrailProfile);
+    }
+
+    @Test
+    void updateScenario_withGuardrailProfile_doesNotMarkStaleWhenHashUnchanged() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> {
+                    var saved = (ProjectionScenarioEntity) inv.getArgument(0);
+                    guardrailProfile.setScenarioHash(
+                            GuardrailProfileService.computeScenarioHash(saved));
+                    return saved;
+                });
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Same fields — no real change
+        var request = new UpdateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), 1990, null, null, null, null,
+                null, null, null, null, null, null, null,
+                List.of(), null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isFalse();
+        verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
+    }
+
+    @Test
+    void updateScenario_noGuardrailProfile_doesNotInteractWithGuardrailRepo() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.empty());
+
+        var request = new UpdateScenarioRequest(
+                "Updated", LocalDate.of(2060, 1, 1), 95,
+                new BigDecimal("0.02"), null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                List.of(), null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
     }
 }

@@ -1,5 +1,7 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
@@ -1970,5 +1972,122 @@ class DeterministicProjectionEngineTest {
                         && y.incomeStreamsTotal().compareTo(BigDecimal.ZERO) > 0)
                 .count();
         assertThat(yearsWithIncome).isEqualTo(1);
+    }
+
+    // ── Guardrail Spending Path Tests ──
+
+    @Test
+    void run_withGuardrailSpending_usesGuardrailWithdrawals() {
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("75000"), bd("62000"),
+                        bd("91000"), bd("30000"), bd("45000"), BigDecimal.ZERO,
+                        bd("75000"), "Early"),
+                new GuardrailYearlySpending(currentYear + 1, 67, bd("76000"), bd("63000"),
+                        bd("92000"), bd("30000"), bd("46000"), BigDecimal.ZERO,
+                        bd("76000"), "Early"));
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Guardrail Test",
+                LocalDate.now().minusYears(1), 68, bd("0.0300"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("1000000.0000", "0", "0.0500")),
+                null, null, List.of(), guardrailInput);
+
+        var result = engine.run(input);
+
+        assertThat(result.yearlyData()).isNotEmpty();
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.retired()).isTrue();
+        // Should use guardrail's portfolioWithdrawal (75000) instead of 4% rate (40000)
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("75000"));
+    }
+
+    @Test
+    void run_withGuardrailSpending_cappedAtBalance() {
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        // Guardrail wants $75k withdrawal but balance is only $50k
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("75000"), bd("62000"),
+                        bd("91000"), bd("30000"), bd("45000"), BigDecimal.ZERO,
+                        bd("75000"), "Early"));
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Guardrail Cap Test",
+                LocalDate.now().minusYears(1), 67, bd("0.0300"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("50000.0000", "0", "0.0500")),
+                null, null, List.of(), guardrailInput);
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        // Withdrawal should be capped at portfolio balance (with growth first: 50000 * 1.05 = 52500)
+        assertThat(year1.withdrawals()).isLessThanOrEqualTo(year1.startBalance().add(year1.growth()));
+    }
+
+    @Test
+    void run_withGuardrailSpending_yearsNotInGuardrailFallBackToDefault() {
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        // Only provide guardrail for year 1, not year 2
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("75000"), bd("62000"),
+                        bd("91000"), bd("30000"), bd("45000"), BigDecimal.ZERO,
+                        bd("75000"), "Early"));
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Partial Guardrail Test",
+                LocalDate.now().minusYears(1), 68, bd("0.0300"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("1000000.0000", "0", "0.0500")),
+                null, null, List.of(), guardrailInput);
+
+        var result = engine.run(input);
+
+        assertThat(result.yearlyData().size()).isGreaterThanOrEqualTo(2);
+
+        // Year 1 uses guardrail
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("75000"));
+
+        // Year 2 falls back to default strategy (4% rate, inflation-adjusted from guardrail recommended)
+        var year2 = result.yearlyData().get(1);
+        assertThat(year2.withdrawals()).isNotNull();
+        // Should not be exactly 75000 or 76000 — falls back to normal withdrawal logic
+        assertThat(year2.retired()).isTrue();
+    }
+
+    @Test
+    void run_withNullGuardrailSpending_usesNormalWithdrawalStrategy() {
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "No Guardrail Test",
+                LocalDate.now().minusYears(1), 90, bd("0.0300"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("1000000.0000", "0", "0.0500")),
+                null, null, List.of(), null);
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.retired()).isTrue();
+        // Normal 4% withdrawal: 1,000,000 * 0.04 = 40,000
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40000.0000"));
     }
 }

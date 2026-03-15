@@ -5,16 +5,25 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.springframework.stereotype.Service;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -27,19 +36,25 @@ import java.util.UUID;
 @Service
 public class ProjectionInputBuilder {
 
+    private static final Logger log = LoggerFactory.getLogger(ProjectionInputBuilder.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     private final AccountService accountService;
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
     private final DepreciationCalculator depreciationCalculator;
+    private final GuardrailSpendingProfileRepository guardrailRepository;
 
     public ProjectionInputBuilder(AccountService accountService,
                                   ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                   PropertyDepreciationScheduleRepository depreciationScheduleRepository,
-                                  DepreciationCalculator depreciationCalculator) {
+                                  DepreciationCalculator depreciationCalculator,
+                                  GuardrailSpendingProfileRepository guardrailRepository) {
         this.accountService = accountService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.depreciationScheduleRepository = depreciationScheduleRepository;
         this.depreciationCalculator = depreciationCalculator;
+        this.guardrailRepository = guardrailRepository;
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {
@@ -51,10 +66,30 @@ public class ProjectionInputBuilder {
                         scenario.getSpendingProfile().getSpendingTiers())
                 : null;
         var incomeSources = resolveIncomeSources(scenario.getId());
+        var guardrailSpending = resolveGuardrailSpending(scenario);
         return new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, spendingProfile, null, incomeSources);
+                accounts, spendingProfile, null, incomeSources, guardrailSpending);
+    }
+
+    private GuardrailSpendingInput resolveGuardrailSpending(ProjectionScenarioEntity scenario) {
+        if (scenario.getGuardrailProfile() == null) {
+            return null;
+        }
+        var profile = guardrailRepository.findByScenario_Id(scenario.getId())
+                .orElse(null);
+        if (profile == null) {
+            return null;
+        }
+        try {
+            var yearlySpending = MAPPER.readValue(profile.getYearlySpending(),
+                    new TypeReference<List<GuardrailYearlySpending>>() {});
+            return new GuardrailSpendingInput(yearlySpending);
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Failed to parse guardrail yearly_spending", e);
+            return null;
+        }
     }
 
     private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {

@@ -200,3 +200,56 @@ export interface UpdateIncomeSourceRequest {
     tax_treatment: string;
     property_id: string | null;
 }
+
+export interface GuardrailPhase {
+    name: string;
+    start_age: number;
+    end_age: number | null;
+    priority_weight: number;
+}
+
+export interface GuardrailYearlySpending {
+    year: number;
+    age: number;
+    recommended: number;
+    corridor_low: number;
+    corridor_high: number;
+    essential_floor: number;
+    discretionary: number;
+    income_offset: number;
+    portfolio_withdrawal: number;
+    phase_name: string;
+}
+
+export interface GuardrailProfileResponse {
+    id: string;
+    scenario_id: string;
+    name: string;
+    essential_floor: number;
+    terminal_balance_target: number;
+    return_mean: number;
+    return_stddev: number;
+    trial_count: number;
+    confidence_level: number;
+    phases: GuardrailPhase[];
+    yearly_spending: GuardrailYearlySpending[];
+    median_final_balance: number;
+    failure_rate: number;
+    percentile_10_final: number;
+    percentile_90_final: number;
+    stale: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface GuardrailOptimizationRequest {
+    scenario_id: string;
+    name: string;
+    essential_floor: number;
+    terminal_balance_target: number;
+    return_mean?: number;
+    return_stddev?: number;
+    trial_count?: number;
+    confidence_level?: number;
+    phases: GuardrailPhase[];
+}

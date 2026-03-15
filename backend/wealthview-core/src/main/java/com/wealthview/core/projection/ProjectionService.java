@@ -18,6 +18,7 @@ import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
@@ -48,8 +49,10 @@ public class ProjectionService {
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final IncomeSourceRepository incomeSourceRepository;
     private final ProjectionInputBuilder projectionInputBuilder;
+    private final GuardrailSpendingProfileRepository guardrailProfileRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
                              TenantRepository tenantRepository,
                              AccountRepository accountRepository,
@@ -58,7 +61,8 @@ public class ProjectionService {
                              AccountService accountService,
                              ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                              IncomeSourceRepository incomeSourceRepository,
-                             ProjectionInputBuilder projectionInputBuilder) {
+                             ProjectionInputBuilder projectionInputBuilder,
+                             GuardrailSpendingProfileRepository guardrailProfileRepository) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
@@ -68,6 +72,7 @@ public class ProjectionService {
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.incomeSourceRepository = incomeSourceRepository;
         this.projectionInputBuilder = projectionInputBuilder;
+        this.guardrailProfileRepository = guardrailProfileRepository;
     }
 
     @Transactional
@@ -178,6 +183,17 @@ public class ProjectionService {
         saveIncomeSourceLinks(scenario, tenantId, request.incomeSources());
 
         var saved = scenarioRepository.save(scenario);
+
+        guardrailProfileRepository.findByScenario_Id(scenarioId).ifPresent(profile -> {
+            var newHash = GuardrailProfileService.computeScenarioHash(saved);
+            if (!newHash.equals(profile.getScenarioHash())) {
+                profile.setStale(true);
+                profile.setUpdatedAt(OffsetDateTime.now());
+                guardrailProfileRepository.save(profile);
+                log.info("Guardrail profile marked stale for scenario {}", scenarioId);
+            }
+        });
+
         log.info("Scenario {} updated for tenant {}", scenarioId, tenantId);
         return toScenarioResponse(saved, tenantId);
     }

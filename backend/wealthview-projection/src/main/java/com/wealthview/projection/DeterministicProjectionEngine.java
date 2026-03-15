@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
@@ -97,6 +99,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
         SpendingData spendingData = loadSpendingData(input.spendingProfile());
+        var guardrailSpending = input.guardrailSpending();
         var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
@@ -127,7 +130,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         return runProjection(input, pool, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingData, incomeSources);
+                retirementYear, endYear, inflationRate, spendingData, guardrailSpending, incomeSources);
     }
 
     private ProjectionResultResponse runProjection(
@@ -136,7 +139,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
             BigDecimal inflationRate, SpendingData spendingData,
+            GuardrailSpendingInput guardrailSpending,
             List<ProjectionIncomeSourceInput> incomeSources) {
+
+        Map<Integer, GuardrailYearlySpending> guardrailByYear = guardrailSpending != null
+                ? guardrailSpending.byYear() : Map.of();
 
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
@@ -168,11 +175,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal taxLiability = incomeResult.taxLiability();
 
             if (retired) {
+                var guardrailYear = guardrailByYear.get(year);
                 var retirementResult = processRetirementWithdrawals(
-                        pool, strategy, spendingData, age, yearsInRetirement, inflationRate,
-                        incomeResult.totalActiveIncome(), startBalance, previousWithdrawal,
-                        incomeResult.effectiveOtherIncome(), conversionAmount, year,
-                        incomeResult.isResult());
+                        pool, strategy, spendingData, guardrailYear, age, yearsInRetirement,
+                        inflationRate, incomeResult.totalActiveIncome(), startBalance,
+                        previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
+                        year, incomeResult.isResult());
                 withdrawals = retirementResult.withdrawals();
                 taxLiability = taxLiability.add(retirementResult.taxLiability());
                 previousWithdrawal = retirementResult.previousWithdrawal();
@@ -243,6 +251,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     @SuppressWarnings("PMD.ExcessiveParameterList")
     private RetirementWithdrawalResult processRetirementWithdrawals(
             PoolStrategy pool, WithdrawalStrategy strategy, SpendingData spendingData,
+            GuardrailYearlySpending guardrailYear,
             int age, int yearsInRetirement, BigDecimal inflationRate,
             BigDecimal totalActiveIncome, BigDecimal startBalance, BigDecimal previousWithdrawal,
             BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, int year,
@@ -251,7 +260,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal aggBalance = pool.getTotal();
         BigDecimal portfolioNeed;
 
-        if (spendingData != null) {
+        if (guardrailYear != null) {
+            portfolioNeed = guardrailYear.portfolioWithdrawal().min(aggBalance);
+            previousWithdrawal = guardrailYear.recommended();
+        } else if (spendingData != null) {
             BigDecimal spendingNeed = computeSpendingNeed(spendingData, age, yearsInRetirement, inflationRate);
             portfolioNeed = spendingNeed.subtract(totalActiveIncome).max(BigDecimal.ZERO).min(aggBalance);
             previousWithdrawal = portfolioNeed.add(totalActiveIncome);
