@@ -642,6 +642,85 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
+    void optimize_rentalPropertyIncome_subtractsExpensesFromGross() {
+        // Rental property with $100k gross and $60k in expenses → $40k net
+        // The optimizer should use $40k (net), not $100k (gross)
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var rentalGross = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                new BigDecimal("100000"), 62, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("25000"),   // operating expenses (insurance + maintenance)
+                new BigDecimal("20000"),   // mortgage interest
+                new BigDecimal("15000"),   // property tax
+                null, null);
+
+        var input = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(rentalGross),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // Income offset at age 62 should be ~$40k (net), not ~$100k (gross)
+        var atAge62 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 62)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge62.incomeOffset().doubleValue())
+                .as("Rental income should be net of expenses: $100k - $60k = $40k (with 0.5x boundary)")
+                .isLessThan(50000); // gross × 0.5 = $50k; net × 0.5 = $20k
+
+        // At a non-boundary age, income should be ~$40k (net), not $100k
+        var atAge65 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 65)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge65.incomeOffset().doubleValue())
+                .as("Rental income at non-boundary age should be net: $100k - $60k = $40k")
+                .isCloseTo(40000, org.assertj.core.data.Offset.offset(1000.0));
+    }
+
+    @Test
+    void optimize_nonRentalIncome_unaffectedByExpenseFields() {
+        // Non-rental income should not subtract expenses even if fields are present
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var ssIncome = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "SS", "social_security",
+                new BigDecimal("30000"), 62, null,
+                BigDecimal.ZERO, false, "partially_taxable",
+                null, null, null, null, null);
+
+        var input = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(ssIncome),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // At a non-boundary age, income should be full $30k
+        var atAge65 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 65)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge65.incomeOffset().doubleValue())
+                .as("Non-rental income should use full amount")
+                .isCloseTo(30000, org.assertj.core.data.Offset.offset(1000.0));
+    }
+
+    @Test
     void optimize_discretionaryEqualsRecommendedMinusFloor() {
         var phases = List.of(
                 new GuardrailPhaseInput("All", 62, null, 1));
