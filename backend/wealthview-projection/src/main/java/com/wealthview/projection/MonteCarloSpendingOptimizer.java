@@ -74,10 +74,40 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.phases(), retirementAge, years, trialCount,
                 confidenceLevel, portfolioFloor);
 
-        // Compute corridors
+        // Stage 4: Post-processing — phase blending and YoY smoothing
+        int phaseBlendYears = input.phaseBlendYears();
+        if (phaseBlendYears > 0 && input.phases() != null && input.phases().size() > 1) {
+            applyPhaseBlending(discretionaryByYear, adjustedFloors, input.phases(),
+                    retirementAge, years, phaseBlendYears);
+        }
+
+        Double maxAdjRate = input.maxAnnualAdjustmentRate() != null
+                ? input.maxAnnualAdjustmentRate().doubleValue() : null;
+        if (maxAdjRate != null && maxAdjRate > 0) {
+            applyYearOverYearSmoothing(discretionaryByYear, adjustedFloors, maxAdjRate, years);
+
+            // Re-verify sustainability of smoothed plan; reduce if broken
+            if (!isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
+                    discretionaryByYear, terminalTarget, years, trialCount,
+                    confidenceLevel, portfolioFloor)) {
+                for (int i = 0; i < 10; i++) {
+                    for (int y = 0; y < years; y++) {
+                        discretionaryByYear[y] *= 0.95;
+                    }
+                    if (isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
+                            discretionaryByYear, terminalTarget, years, trialCount,
+                            confidenceLevel, portfolioFloor)) {
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Compute corridors + corridor smoothing
         double[][] corridors = computeCorridors(
                 portfolioPaths, incomeByYear, adjustedFloors, discretionaryByYear,
                 terminalTarget, years, trialCount);
+        smoothCorridors(corridors[0], corridors[1], years);
 
         // Compute final balance statistics
         double[] finalBalances = new double[trialCount];
@@ -394,6 +424,85 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             finalBalances[t] = balance;
         }
         return finalBalances;
+    }
+
+    private void applyPhaseBlending(double[] discretionary, double[] floors,
+                                     List<GuardrailPhaseInput> phases,
+                                     int retirementAge, int years, int blendYears) {
+        double[] totalSpending = new double[years];
+        for (int y = 0; y < years; y++) {
+            totalSpending[y] = floors[y] + discretionary[y];
+        }
+
+        for (int p = 1; p < phases.size(); p++) {
+            int boundaryAge = phases.get(p).startAge();
+            int boundaryYear = boundaryAge - retirementAge;
+            if (boundaryYear <= 0 || boundaryYear >= years) {
+                continue;
+            }
+
+            int windowStart = Math.max(0, boundaryYear - blendYears);
+            int windowEnd = Math.min(years - 1, boundaryYear + blendYears - 1);
+            int windowLen = windowEnd - windowStart + 1;
+            if (windowLen <= 1) {
+                continue;
+            }
+
+            double startSpend = totalSpending[windowStart];
+            double endSpend = totalSpending[windowEnd];
+
+            for (int y = windowStart; y <= windowEnd; y++) {
+                double t = (double) (y - windowStart) / (windowLen - 1);
+                double blended = startSpend + t * (endSpend - startSpend);
+                totalSpending[y] = blended;
+                discretionary[y] = Math.max(0, blended - floors[y]);
+            }
+        }
+    }
+
+    private void applyYearOverYearSmoothing(double[] discretionary, double[] floors,
+                                             double maxRate, int years) {
+        double[] totalSpending = new double[years];
+        for (int y = 0; y < years; y++) {
+            totalSpending[y] = floors[y] + discretionary[y];
+        }
+
+        for (int y = 1; y < years; y++) {
+            double maxUp = totalSpending[y - 1] * (1 + maxRate);
+            double maxDown = totalSpending[y - 1] * (1 - maxRate);
+            totalSpending[y] = Math.max(maxDown, Math.min(maxUp, totalSpending[y]));
+            discretionary[y] = Math.max(0, totalSpending[y] - floors[y]);
+        }
+    }
+
+    private void smoothCorridors(double[] corridorLow, double[] corridorHigh, int years) {
+        if (years < 3) {
+            return;
+        }
+        double[] smoothLow = new double[years];
+        double[] smoothHigh = new double[years];
+
+        smoothLow[0] = corridorLow[0];
+        smoothHigh[0] = corridorHigh[0];
+        smoothLow[years - 1] = corridorLow[years - 1];
+        smoothHigh[years - 1] = corridorHigh[years - 1];
+
+        for (int y = 1; y < years - 1; y++) {
+            smoothLow[y] = (corridorLow[y - 1] + corridorLow[y] + corridorLow[y + 1]) / 3.0;
+            smoothHigh[y] = (corridorHigh[y - 1] + corridorHigh[y] + corridorHigh[y + 1]) / 3.0;
+        }
+
+        System.arraycopy(smoothLow, 0, corridorLow, 0, years);
+        System.arraycopy(smoothHigh, 0, corridorHigh, 0, years);
+
+        // Ensure corridorLow <= corridorHigh after smoothing
+        for (int y = 0; y < years; y++) {
+            if (corridorLow[y] > corridorHigh[y]) {
+                double avg = (corridorLow[y] + corridorHigh[y]) / 2.0;
+                corridorLow[y] = avg;
+                corridorHigh[y] = avg;
+            }
+        }
     }
 
     private double totalPortfolio(List<ProjectionAccountInput> accounts) {
