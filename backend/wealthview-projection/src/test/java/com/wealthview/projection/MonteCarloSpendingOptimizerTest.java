@@ -27,6 +27,20 @@ class MonteCarloSpendingOptimizerTest {
                                                    List<ProjectionIncomeSourceInput> incomeSources,
                                                    int trialCount,
                                                    Long seed) {
+        return buildInputFull(portfolio, essentialFloor, terminalTarget, phases, incomeSources,
+                trialCount, seed, BigDecimal.ZERO, null, 0);
+    }
+
+    private GuardrailOptimizationInput buildInputFull(BigDecimal portfolio,
+                                                       BigDecimal essentialFloor,
+                                                       BigDecimal terminalTarget,
+                                                       List<GuardrailPhaseInput> phases,
+                                                       List<ProjectionIncomeSourceInput> incomeSources,
+                                                       int trialCount,
+                                                       Long seed,
+                                                       BigDecimal portfolioFloor,
+                                                       BigDecimal maxAnnualAdjustmentRate,
+                                                       int phaseBlendYears) {
         return new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1),
                 1968,
@@ -42,7 +56,10 @@ class MonteCarloSpendingOptimizerTest {
                 trialCount,
                 new BigDecimal("0.95"),
                 phases,
-                seed
+                seed,
+                portfolioFloor != null ? portfolioFloor : BigDecimal.ZERO,
+                maxAnnualAdjustmentRate,
+                phaseBlendYears
         );
     }
 
@@ -187,7 +204,8 @@ class MonteCarloSpendingOptimizerTest {
                 List.of(),
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"), new BigDecimal("0.05"),
-                500, new BigDecimal("0.95"), phases, 42L);
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0);
 
         var highVol = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -197,7 +215,8 @@ class MonteCarloSpendingOptimizerTest {
                 List.of(),
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"), new BigDecimal("0.25"),
-                500, new BigDecimal("0.95"), phases, 42L);
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0);
 
         var lowResult = optimizer.optimize(lowVol);
         var highResult = optimizer.optimize(highVol);
@@ -490,5 +509,96 @@ class MonteCarloSpendingOptimizerTest {
                     .as("Age %d: discretionary should equal recommended - floor", year.age())
                     .isEqualByComparingTo(expectedDiscretionary);
         }
+    }
+
+    @Test
+    void optimize_sustainabilityUsesConfigurableConfidence_notMedian() {
+        // With confidence=0.95, isSustainable checks the 5th percentile (more conservative)
+        // than 0.50 which checks the median. Use a constrained portfolio + terminal target
+        // so the difference in confidence actually constrains spending.
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var conservativeInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0);
+
+        var aggressiveInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.50"), phases, 42L,
+                BigDecimal.ZERO, null, 0);
+
+        var conservativeResult = optimizer.optimize(conservativeInput);
+        var aggressiveResult = optimizer.optimize(aggressiveInput);
+
+        var avgConservative = conservativeResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+        var avgAggressive = aggressiveResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        assertThat(avgConservative)
+                .as("Higher confidence (0.95) should produce lower spending than 0.50")
+                .isLessThan(avgAggressive);
+    }
+
+    @Test
+    void optimize_portfolioFloor_reducesSpendingToProtectBalance() {
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        // Without floor
+        var noFloorInput = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        // With a $200k portfolio floor
+        var withFloorInput = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                new BigDecimal("200000"),
+                null,
+                0);
+
+        var noFloorResult = optimizer.optimize(noFloorInput);
+        var withFloorResult = optimizer.optimize(withFloorInput);
+
+        var avgNoFloor = noFloorResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+        var avgWithFloor = withFloorResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        assertThat(avgWithFloor)
+                .as("Portfolio floor should reduce average spending to protect mid-retirement balance")
+                .isLessThan(avgNoFloor);
     }
 }
