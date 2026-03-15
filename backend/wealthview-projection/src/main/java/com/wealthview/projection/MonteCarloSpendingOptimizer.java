@@ -259,6 +259,16 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     continue;
                 }
                 double amount = source.annualAmount().doubleValue();
+
+                // For rental properties, subtract operating expenses, mortgage interest,
+                // and property tax to get net cash flow (matching the deterministic engine)
+                if ("rental_property".equals(source.incomeType())) {
+                    amount -= nullSafe(source.annualOperatingExpenses());
+                    amount -= nullSafe(source.annualMortgageInterest());
+                    amount -= nullSafe(source.annualPropertyTax());
+                    amount = Math.max(0, amount);
+                }
+
                 if (source.inflationRate() != null
                         && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
                     amount *= Math.pow(1 + source.inflationRate().doubleValue(), yearsInRetirement - 1);
@@ -696,6 +706,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
         }
         return "Retirement";
+    }
+
+    private static double nullSafe(BigDecimal value) {
+        return value != null ? value.doubleValue() : 0.0;
     }
 
     private static double percentile(double[] sorted, double p) {
