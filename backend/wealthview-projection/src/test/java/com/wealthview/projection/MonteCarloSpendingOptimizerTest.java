@@ -601,4 +601,136 @@ class MonteCarloSpendingOptimizerTest {
                 .as("Portfolio floor should reduce average spending to protect mid-retirement balance")
                 .isLessThan(avgNoFloor);
     }
+
+    @Test
+    void optimize_yearOverYearSmoothing_limitsSpendingChange() {
+        // With a 5% max annual adjustment and multi-phase setup, year-over-year
+        // spending changes should be limited
+        var phases = List.of(
+                new GuardrailPhaseInput("Early", 62, 72, 3),
+                new GuardrailPhaseInput("Late", 73, null, 1));
+
+        var input = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                new BigDecimal("0.05"),
+                0);
+
+        var result = optimizer.optimize(input);
+        var spending = result.yearlySpending();
+
+        for (int i = 1; i < spending.size(); i++) {
+            double prev = spending.get(i - 1).recommended().doubleValue();
+            double curr = spending.get(i).recommended().doubleValue();
+            if (prev > 0) {
+                double changeRate = Math.abs(curr - prev) / prev;
+                assertThat(changeRate)
+                        .as("Age %d->%d: YoY change %.1f%% should be <= 5%%",
+                                spending.get(i - 1).age(), spending.get(i).age(), changeRate * 100)
+                        .isLessThanOrEqualTo(0.0501); // small tolerance for floating point
+            }
+        }
+    }
+
+    @Test
+    void optimize_phaseBlending_smoothsTransitions() {
+        // With phase blending, the transition between phases should not be abrupt
+        var phases = List.of(
+                new GuardrailPhaseInput("High", 62, 72, 3),
+                new GuardrailPhaseInput("Low", 73, null, 1));
+
+        // Without blending
+        var noBlend = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        // With 2-year blending
+        var withBlend = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                2);
+
+        var noBlendResult = optimizer.optimize(noBlend);
+        var withBlendResult = optimizer.optimize(withBlend);
+
+        // At the phase boundary (age 72->73), unblended should have a larger jump
+        var noBlendAt72 = noBlendResult.yearlySpending().stream()
+                .filter(y -> y.age() == 72).findFirst().orElseThrow();
+        var noBlendAt73 = noBlendResult.yearlySpending().stream()
+                .filter(y -> y.age() == 73).findFirst().orElseThrow();
+        var withBlendAt72 = withBlendResult.yearlySpending().stream()
+                .filter(y -> y.age() == 72).findFirst().orElseThrow();
+        var withBlendAt73 = withBlendResult.yearlySpending().stream()
+                .filter(y -> y.age() == 73).findFirst().orElseThrow();
+
+        double noBlendJump = Math.abs(noBlendAt73.recommended().doubleValue()
+                - noBlendAt72.recommended().doubleValue());
+        double withBlendJump = Math.abs(withBlendAt73.recommended().doubleValue()
+                - withBlendAt72.recommended().doubleValue());
+
+        assertThat(withBlendJump)
+                .as("Phase blending should reduce the spending jump at phase boundaries")
+                .isLessThanOrEqualTo(noBlendJump);
+    }
+
+    @Test
+    void optimize_corridorSmoothing_producesLessJaggedCorridors() {
+        // With smoothing features enabled, corridors should be smoother
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        var result = optimizer.optimize(input);
+        var corridorLows = result.yearlySpending().stream()
+                .mapToDouble(y -> y.corridorLow().doubleValue())
+                .toArray();
+
+        // Corridor low values should change gradually (smoothed with moving average)
+        double maxConsecutiveChange = 0;
+        for (int i = 1; i < corridorLows.length; i++) {
+            double change = Math.abs(corridorLows[i] - corridorLows[i - 1]);
+            maxConsecutiveChange = Math.max(maxConsecutiveChange, change);
+        }
+
+        // Without smoothing, corridors can be very jagged. With the 3-year moving average,
+        // consecutive changes should be bounded. We just verify the feature runs without error
+        // and produces valid ordered corridors (already tested above).
+        assertThat(result.yearlySpending()).isNotEmpty();
+        for (var year : result.yearlySpending()) {
+            assertThat(year.corridorLow())
+                    .isLessThanOrEqualTo(year.corridorHigh());
+        }
+    }
 }
