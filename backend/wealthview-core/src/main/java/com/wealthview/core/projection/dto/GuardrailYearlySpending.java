@@ -12,5 +12,16 @@ public record GuardrailYearlySpending(
         BigDecimal discretionary,
         BigDecimal incomeOffset,
         BigDecimal portfolioWithdrawal,
-        String phaseName
-) {}
+        String phaseName,
+        BigDecimal portfolioBalanceMedian
+) {
+
+    public GuardrailYearlySpending(int year, int age, BigDecimal recommended,
+                                    BigDecimal corridorLow, BigDecimal corridorHigh,
+                                    BigDecimal essentialFloor, BigDecimal discretionary,
+                                    BigDecimal incomeOffset, BigDecimal portfolioWithdrawal,
+                                    String phaseName) {
+        this(year, age, recommended, corridorLow, corridorHigh, essentialFloor,
+                discretionary, incomeOffset, portfolioWithdrawal, phaseName, null);
+    }
+}

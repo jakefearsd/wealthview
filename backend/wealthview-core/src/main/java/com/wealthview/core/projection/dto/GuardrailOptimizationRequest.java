@@ -13,5 +13,9 @@ public record GuardrailOptimizationRequest(
         BigDecimal returnStddev,
         Integer trialCount,
         BigDecimal confidenceLevel,
-        List<GuardrailPhaseInput> phases
+        List<GuardrailPhaseInput> phases,
+        BigDecimal portfolioFloor,
+        BigDecimal maxAnnualAdjustmentRate,
+        Integer phaseBlendYears,
+        String riskTolerance
 ) {}

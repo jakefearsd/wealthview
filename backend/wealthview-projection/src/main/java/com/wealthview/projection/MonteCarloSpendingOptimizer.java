@@ -109,24 +109,28 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 terminalTarget, years, trialCount);
         smoothCorridors(corridors[0], corridors[1], years);
 
-        // Compute final balance statistics
+        // Simulate with withdrawals to get final balances and per-year median balances
+        var rng2 = input.seed() != null ? new Random(input.seed()) : rng;
+        double[][] yearBalances = new double[years][trialCount];
         double[] finalBalances = new double[trialCount];
         for (int t = 0; t < trialCount; t++) {
-            double balance = portfolioPaths[t][years];
-            double totalWithdrawn = 0;
+            double balance = initialPortfolio;
             for (int y = 0; y < years; y++) {
+                double logReturn = mu + sigma * rng2.nextGaussian();
+                double growthFactor = Math.exp(logReturn);
                 double spending = adjustedFloors[y] + discretionaryByYear[y];
                 double withdrawal = Math.max(0, spending - incomeByYear[y]);
-                totalWithdrawn += withdrawal;
+                balance = Math.max(0, balance * growthFactor - withdrawal);
+                yearBalances[y][t] = balance;
             }
-            finalBalances[t] = Math.max(0, portfolioPaths[t][years] - totalWithdrawn);
+            finalBalances[t] = balance;
         }
 
-        // Re-simulate final balances with actual withdrawals
-        finalBalances = simulateWithWithdrawals(
-                trialCount, years, initialPortfolio, mu, sigma,
-                input.seed() != null ? new Random(input.seed()) : rng,
-                adjustedFloors, discretionaryByYear, incomeByYear);
+        double[] medianBalanceByYear = new double[years];
+        for (int y = 0; y < years; y++) {
+            Arrays.sort(yearBalances[y]);
+            medianBalanceByYear[y] = percentile(yearBalances[y], 0.50);
+        }
 
         Arrays.sort(finalBalances);
         double medianFinal = percentile(finalBalances, 0.50);
@@ -150,7 +154,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             yearlySpending.add(new GuardrailYearlySpending(
                     calendarYear, age,
                     toBD(recommended), toBD(corridors[0][y]), toBD(corridors[1][y]),
-                    toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName));
+                    toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName,
+                    toBD(medianBalanceByYear[y])));
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",

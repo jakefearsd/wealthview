@@ -35,6 +35,8 @@ public class GuardrailProfileService {
     private static final BigDecimal DEFAULT_RETURN_STDDEV = new BigDecimal("0.15");
     private static final int DEFAULT_TRIAL_COUNT = 5000;
     private static final BigDecimal DEFAULT_CONFIDENCE = new BigDecimal("0.95");
+    private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
+    private static final int DEFAULT_PHASE_BLEND_YEARS = 1;
 
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final ProjectionScenarioRepository scenarioRepository;
@@ -61,6 +63,8 @@ public class GuardrailProfileService {
 
         int birthYear = parseBirthYear(scenario.getParamsJson());
 
+        BigDecimal confidence = resolveConfidence(request);
+
         var optimizationInput = new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
                 birthYear,
@@ -73,12 +77,14 @@ public class GuardrailProfileService {
                 request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
                 request.returnStddev() != null ? request.returnStddev() : DEFAULT_RETURN_STDDEV,
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
-                request.confidenceLevel() != null ? request.confidenceLevel() : DEFAULT_CONFIDENCE,
+                confidence,
                 request.phases() != null ? request.phases() : List.of(),
                 null,
-                BigDecimal.ZERO,
-                null,
-                0
+                request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
+                request.maxAnnualAdjustmentRate() != null
+                        ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
+                request.phaseBlendYears() != null
+                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS
         );
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);
@@ -111,6 +117,12 @@ public class GuardrailProfileService {
         entity.setFailureRate(optimizerResult.failureRate());
         entity.setPercentile10Final(optimizerResult.percentile10Final());
         entity.setPercentile90Final(optimizerResult.percentile90Final());
+        entity.setPortfolioFloor(optimizationInput.portfolioFloor() != null
+                ? optimizationInput.portfolioFloor() : BigDecimal.ZERO);
+        entity.setMaxAnnualAdjustmentRate(optimizationInput.maxAnnualAdjustmentRate() != null
+                ? optimizationInput.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE);
+        entity.setPhaseBlendYears(optimizationInput.phaseBlendYears());
+        entity.setRiskTolerance(request.riskTolerance());
 
         var saved = guardrailRepository.save(entity);
 
@@ -166,7 +178,11 @@ public class GuardrailProfileService {
                 existing.getReturnStddev(),
                 existing.getTrialCount(),
                 existing.getConfidenceLevel(),
-                phases);
+                phases,
+                existing.getPortfolioFloor(),
+                existing.getMaxAnnualAdjustmentRate(),
+                existing.getPhaseBlendYears(),
+                existing.getRiskTolerance());
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -192,6 +208,21 @@ public class GuardrailProfileService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    private BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
+        if (request.confidenceLevel() != null) {
+            return request.confidenceLevel();
+        }
+        if (request.riskTolerance() != null) {
+            return switch (request.riskTolerance()) {
+                case "conservative" -> new BigDecimal("0.90");
+                case "moderate" -> new BigDecimal("0.80");
+                case "aggressive" -> new BigDecimal("0.70");
+                default -> DEFAULT_CONFIDENCE;
+            };
+        }
+        return DEFAULT_CONFIDENCE;
     }
 
     private int parseBirthYear(String paramsJson) {

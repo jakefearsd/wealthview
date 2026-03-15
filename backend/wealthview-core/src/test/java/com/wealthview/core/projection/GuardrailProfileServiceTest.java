@@ -109,7 +109,8 @@ class GuardrailProfileServiceTest {
                 scenarioId, "Optimized Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
-                5000, new BigDecimal("0.95"), phases);
+                5000, new BigDecimal("0.95"), phases,
+                null, null, null, null);
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -125,7 +126,8 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(),
+                null, null, null, null);
 
         assertThatThrownBy(() -> service.optimize(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -165,7 +167,8 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "New Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(),
+                null, null, null, null);
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -278,7 +281,8 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Guardrail", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of());
+                null, null, null, null, List.of(),
+                null, null, null, null);
 
         service.optimize(tenantId, scenarioId, request);
 
