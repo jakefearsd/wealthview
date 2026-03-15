@@ -53,16 +53,18 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         double[] historicalReturns = HistoricalReturns.getReturns();
 
+        double inflationRate = input.inflationRate() != null
+                ? input.inflationRate().doubleValue() : 0.0;
+
         // Stage 1: Run MC trials (no withdrawals) to get portfolio trajectories using bootstrap
+        // Bootstrap returns are real (CPI-adjusted); convert to nominal via Fisher equation
+        // so portfolio growth matches the nominal spending/income model.
         double[][] portfolioPaths = runMonteCarloTrials(
-                trialCount, years, initialPortfolio, historicalReturns, rng);
+                trialCount, years, initialPortfolio, historicalReturns, rng, inflationRate);
 
         // Compute deterministic income for each year
         double[] incomeByYear = computeDeterministicIncome(
                 input.incomeSources(), retirementAge, years, input.birthYear());
-
-        double inflationRate = input.inflationRate() != null
-                ? input.inflationRate().doubleValue() : 0.0;
 
         // Stage 2: Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
@@ -142,15 +144,16 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             for (int y = 0; y < years; y++) {
-                double equityReturn = returnSequence[y];
-                equityBalance *= (1 + equityReturn);
+                double realReturn = returnSequence[y];
+                double nominalReturn = toNominal(realReturn, inflationRate);
+                equityBalance *= (1 + nominalReturn);
                 cashBalance *= (1 + cashReturnRate);
 
                 double spending = adjustedFloors[y] + discretionaryByYear[y];
                 double withdrawal = Math.max(0, spending - incomeByYear[y]);
 
                 if (cashReserveYears > 0) {
-                    if (equityReturn < 0) {
+                    if (nominalReturn < 0) {
                         double cashDraw = Math.min(withdrawal, cashBalance);
                         equityBalance -= (withdrawal - cashDraw);
                         cashBalance -= cashDraw;
@@ -230,18 +233,24 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private double[][] runMonteCarloTrials(int trialCount, int years,
                                             double initialPortfolio,
-                                            double[] historicalReturns, Random rng) {
+                                            double[] historicalReturns, Random rng,
+                                            double inflationRate) {
         double[][] paths = new double[trialCount][years + 1];
         for (int t = 0; t < trialCount; t++) {
             var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng);
             double[] returnSequence = generator.generateReturnSequence(years);
             paths[t][0] = initialPortfolio;
             for (int y = 0; y < years; y++) {
-                double growthFactor = 1 + returnSequence[y];
+                double nominalReturn = toNominal(returnSequence[y], inflationRate);
+                double growthFactor = 1 + nominalReturn;
                 paths[t][y + 1] = paths[t][y] * growthFactor;
             }
         }
         return paths;
+    }
+
+    private static double toNominal(double realReturn, double inflationRate) {
+        return (1 + realReturn) * (1 + inflationRate) - 1;
     }
 
     private double[] computeDeterministicIncome(List<ProjectionIncomeSourceInput> sources,
@@ -689,6 +698,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
     }
 
+    private static double nullSafe(BigDecimal value) {
+        return value != null ? value.doubleValue() : 0.0;
+    }
+
     private double totalPortfolio(List<ProjectionAccountInput> accounts) {
         return accounts.stream()
                 .mapToDouble(a -> a.initialBalance().doubleValue())
@@ -706,10 +719,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
         }
         return "Retirement";
-    }
-
-    private static double nullSafe(BigDecimal value) {
-        return value != null ? value.doubleValue() : 0.0;
     }
 
     private static double percentile(double[] sorted, double p) {
