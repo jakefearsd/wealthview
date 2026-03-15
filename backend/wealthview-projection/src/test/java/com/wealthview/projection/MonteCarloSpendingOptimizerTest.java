@@ -1383,4 +1383,94 @@ class MonteCarloSpendingOptimizerTest {
                 .as("Late phase average discretionary should reflect real gap of ~$30k (inflated)")
                 .isGreaterThan(20000);
     }
+
+    @Test
+    void optimize_withInflation_nominalReturnsProduceHigherSpending() {
+        // Bootstrap returns are real (~7% mean). With 3% inflation, nominal returns
+        // become ~10%. Portfolio grows faster in nominal terms → can sustain more
+        // nominal spending. Before fix: inflation makes optimizer pessimistic (FAILS).
+        // After fix: nominal returns match nominal spending → higher spending (PASSES).
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        // Use a constrained portfolio + terminal target so binary search doesn't
+        // hit the $500k cap and differences in return modeling are visible.
+
+        // With 3% inflation (default in buildInput)
+        var withInflation = buildInput(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("100000"),
+                phases,
+                List.of(),
+                1000,
+                42L);
+
+        // With 0% inflation — construct directly to override the inflation rate
+        var noInflation = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                1000, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO);
+
+        var resultWithInflation = optimizer.optimize(withInflation);
+        var resultNoInflation = optimizer.optimize(noInflation);
+
+        // With inflation: floors inflate (spending grows) but portfolio also grows
+        // at nominal rate. Discretionary should be higher because portfolio has
+        // more nominal growth to fund the nominal spending.
+        var avgDiscWithInflation = resultWithInflation.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var avgDiscNoInflation = resultNoInflation.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        assertThat(avgDiscWithInflation)
+                .as("With inflation, nominal portfolio growth should fund more discretionary spending")
+                .isGreaterThan(avgDiscNoInflation);
+    }
+
+    @Test
+    void optimize_zeroInflation_nominalMatchesReal() {
+        // With inflation=0, toNominal(real, 0) = real. Results should be identical
+        // to current behavior — backward compatibility baseline.
+        var phases = List.of(
+                new GuardrailPhaseInput("All", 62, null, 1));
+
+        var zeroInflation = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO);
+
+        var result = optimizer.optimize(zeroInflation);
+
+        // Basic sanity: results should be valid
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.yearlySpending().size()).isEqualTo(28);
+
+        // With zero inflation, floors don't inflate, so first and last floor should be equal
+        var firstFloor = result.yearlySpending().getFirst().essentialFloor().doubleValue();
+        var lastFloor = result.yearlySpending().getLast().essentialFloor().doubleValue();
+        assertThat(firstFloor).isEqualTo(lastFloor);
+
+        // Discretionary should be positive (portfolio grows at real ~7%)
+        var avgDisc = result.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        assertThat(avgDisc).isGreaterThan(0);
+    }
 }
