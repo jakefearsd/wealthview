@@ -61,10 +61,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] incomeByYear = computeDeterministicIncome(
                 input.incomeSources(), retirementAge, years, input.birthYear());
 
-        // Stage 2: Verify essential floor feasibility
+        double inflationRate = input.inflationRate() != null
+                ? input.inflationRate().doubleValue() : 0.0;
+
+        // Stage 2: Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
-                portfolioPaths, incomeByYear, essentialFloor, terminalTarget,
-                confidenceLevel, years, trialCount);
+                portfolioPaths, incomeByYear, essentialFloor,
+                confidenceLevel, years, trialCount, inflationRate);
 
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
@@ -73,7 +76,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] discretionaryByYear = allocateSpending(
                 portfolioPaths, incomeByYear, adjustedFloors, terminalTarget,
                 input.phases(), retirementAge, years, trialCount,
-                confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate);
+                confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
+                inflationRate);
 
         // Stage 4: Post-processing — phase blending and YoY smoothing
         int phaseBlendYears = input.phaseBlendYears();
@@ -283,32 +287,38 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     }
 
     private double[] verifyEssentialFloor(double[][] paths, double[] income,
-                                           double essentialFloor, double terminalTarget,
-                                           double confidenceLevel, int years, int trialCount) {
+                                           double essentialFloor,
+                                           double confidenceLevel, int years, int trialCount,
+                                           double inflationRate) {
         double[] floors = new double[years];
         int confidenceIndex = (int) Math.ceil((1 - confidenceLevel) * trialCount) - 1;
         confidenceIndex = Math.max(0, Math.min(confidenceIndex, trialCount - 1));
 
         for (int y = 0; y < years; y++) {
+            double inflatedFloor = essentialFloor * Math.pow(1 + inflationRate, y);
+
             double[] balancesAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
                 // Subtract cumulative floor withdrawals up to this year
                 double cumulativeWithdrawal = 0;
                 for (int py = 0; py <= y; py++) {
-                    cumulativeWithdrawal += Math.max(0, essentialFloor - income[py]);
+                    double floorAtPy = essentialFloor * Math.pow(1 + inflationRate, py);
+                    cumulativeWithdrawal += Math.max(0, floorAtPy - income[py]);
                 }
                 balancesAtYear[t] = paths[t][y + 1] - cumulativeWithdrawal;
             }
             Arrays.sort(balancesAtYear);
 
             double availableAtConfidence = balancesAtYear[confidenceIndex];
-            double pvTerminal = terminalTarget;
-            double capacityForFloor = availableAtConfidence - pvTerminal + income[y];
+            // Capacity = portfolio remaining after cumulative floor withdrawals + this year's income.
+            // Terminal target is NOT subtracted here — essential spending is essential.
+            // The terminal target constrains discretionary spending via isSustainable().
+            double capacityForFloor = availableAtConfidence + income[y];
 
-            if (capacityForFloor >= essentialFloor) {
-                floors[y] = essentialFloor;
+            if (capacityForFloor >= inflatedFloor) {
+                floors[y] = inflatedFloor;
             } else {
-                floors[y] = Math.max(0, Math.min(essentialFloor, capacityForFloor));
+                floors[y] = Math.max(0, Math.min(inflatedFloor, capacityForFloor));
             }
         }
         return floors;
@@ -319,7 +329,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                        List<GuardrailPhaseInput> phases,
                                        int retirementAge, int years, int trialCount,
                                        double confidenceLevel, double portfolioFloor,
-                                       int cashReserveYears, double cashReturnRate) {
+                                       int cashReserveYears, double cashReturnRate,
+                                       double inflationRate) {
         double[] discretionary = new double[years];
 
         if (phases == null || phases.isEmpty()) {
@@ -339,7 +350,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         if (hasTargets) {
             return allocateByTargets(paths, income, floors, terminalTarget, phases,
                     retirementAge, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate);
+                    cashReserveYears, cashReturnRate, inflationRate);
         }
 
         // Legacy: sort phases by priority weight (highest first)
@@ -377,7 +388,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         List<GuardrailPhaseInput> phases,
                                         int retirementAge, int years, int trialCount,
                                         double confidenceLevel, double portfolioFloor,
-                                        int cashReserveYears, double cashReturnRate) {
+                                        int cashReserveYears, double cashReturnRate,
+                                        double inflationRate) {
         double[] discretionary = new double[years];
 
         for (var phase : phases) {
@@ -401,13 +413,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             if (phase.targetSpending() != null
                     && phase.targetSpending().compareTo(java.math.BigDecimal.ZERO) > 0) {
                 double avgFloor = 0;
+                double avgInflatedTarget = 0;
                 int count = 0;
+                double nominalTarget = phase.targetSpending().doubleValue();
                 for (int y = phaseStart; y <= phaseEnd; y++) {
                     avgFloor += floors[y];
+                    avgInflatedTarget += nominalTarget * Math.pow(1 + inflationRate, y);
                     count++;
                 }
                 avgFloor = count > 0 ? avgFloor / count : 0;
-                double maxDiscretionary = Math.max(0, phase.targetSpending().doubleValue() - avgFloor);
+                avgInflatedTarget = count > 0 ? avgInflatedTarget / count : nominalTarget;
+                double maxDiscretionary = Math.max(0, avgInflatedTarget - avgFloor);
                 capped = Math.min(found, maxDiscretionary);
             } else {
                 capped = found;
