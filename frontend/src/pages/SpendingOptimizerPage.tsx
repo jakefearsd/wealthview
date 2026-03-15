@@ -133,8 +133,8 @@ export default function SpendingOptimizerPage() {
         setPhases(updated);
     };
 
-    const fmt = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-    const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+    const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '--';
+    const pct = (n: number | null | undefined) => n != null ? `${(n * 100).toFixed(1)}%` : '--';
 
     if (!scenario) {
         return <div className="p-6">Loading scenario...</div>;
