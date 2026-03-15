@@ -53,6 +53,10 @@ public class ProjectionScenarioEntity {
     @JoinColumn(name = "spending_profile_id")
     private SpendingProfileEntity spendingProfile;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "guardrail_profile_id")
+    private GuardrailSpendingProfileEntity guardrailProfile;
+
     @OneToMany(mappedBy = "scenario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProjectionAccountEntity> accounts = new ArrayList<>();
 
@@ -90,6 +94,8 @@ public class ProjectionScenarioEntity {
     public void setParamsJson(String paramsJson) { this.paramsJson = paramsJson; }
     public SpendingProfileEntity getSpendingProfile() { return spendingProfile; }
     public void setSpendingProfile(SpendingProfileEntity spendingProfile) { this.spendingProfile = spendingProfile; }
+    public GuardrailSpendingProfileEntity getGuardrailProfile() { return guardrailProfile; }
+    public void setGuardrailProfile(GuardrailSpendingProfileEntity guardrailProfile) { this.guardrailProfile = guardrailProfile; }
     public List<ProjectionAccountEntity> getAccounts() { return accounts; }
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public OffsetDateTime getUpdatedAt() { return updatedAt; }

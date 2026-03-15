@@ -1,5 +1,5 @@
 import client from './client';
-import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse } from '../types/projection';
+import type { Scenario, ProjectionResult, CreateScenarioRequest, UpdateScenarioRequest, CompareResponse, GuardrailProfileResponse, GuardrailOptimizationRequest } from '../types/projection';
 
 export async function listScenarios(): Promise<Scenario[]> {
     const { data } = await client.get<Scenario[]>('/projections');
@@ -32,5 +32,28 @@ export async function runProjection(id: string): Promise<ProjectionResult> {
 
 export async function compareScenarios(ids: string[]): Promise<CompareResponse> {
     const { data } = await client.post<CompareResponse>('/projections/compare', { scenario_ids: ids });
+    return data;
+}
+
+export async function optimizeSpending(scenarioId: string, request: GuardrailOptimizationRequest): Promise<GuardrailProfileResponse> {
+    const { data } = await client.post<GuardrailProfileResponse>(`/projections/${scenarioId}/optimize`, request);
+    return data;
+}
+
+export async function getGuardrailProfile(scenarioId: string): Promise<GuardrailProfileResponse | null> {
+    try {
+        const { data } = await client.get<GuardrailProfileResponse>(`/projections/${scenarioId}/guardrail`);
+        return data;
+    } catch {
+        return null;
+    }
+}
+
+export async function deleteGuardrailProfile(scenarioId: string): Promise<void> {
+    await client.delete(`/projections/${scenarioId}/guardrail`);
+}
+
+export async function reoptimize(scenarioId: string): Promise<GuardrailProfileResponse> {
+    const { data } = await client.post<GuardrailProfileResponse>(`/projections/${scenarioId}/guardrail/reoptimize`);
     return data;
 }

@@ -8,11 +8,13 @@ import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,6 +29,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -46,6 +49,9 @@ class ProjectionInputBuilderTest {
 
     @Mock
     private DepreciationCalculator depreciationCalculator;
+
+    @Mock
+    private GuardrailSpendingProfileRepository guardrailSpendingProfileRepository;
 
     @InjectMocks
     private ProjectionInputBuilder builder;
@@ -344,5 +350,96 @@ class ProjectionInputBuilderTest {
         assertThat(result.endAge()).isEqualTo(90);
         assertThat(result.inflationRate()).isEqualByComparingTo(new BigDecimal("0.03"));
         assertThat(result.paramsJson()).isEqualTo("{\"birth_year\":1990}");
+    }
+
+    // ── Guardrail Spending Loading Tests ──
+
+    @Test
+    void build_withGuardrailProfile_loadsGuardrailSpending() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var guardrailEntity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailEntity.setYearlySpending("""
+                [{"year":2030,"age":62,"recommended":75000,"corridorLow":62000,
+                  "corridorHigh":91000,"essentialFloor":30000,"discretionary":45000,
+                  "incomeOffset":12000,"portfolioWithdrawal":63000,"phaseName":"Early"}]
+                """);
+        guardrailEntity.setPhases("[]");
+        guardrailEntity.setScenarioHash("abc");
+        scenario.setGuardrailProfile(guardrailEntity);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+        when(guardrailSpendingProfileRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(Optional.of(guardrailEntity));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNotNull();
+        assertThat(result.guardrailSpending().yearlySpending()).hasSize(1);
+        assertThat(result.guardrailSpending().yearlySpending().getFirst().year()).isEqualTo(2030);
+        assertThat(result.guardrailSpending().yearlySpending().getFirst().recommended())
+                .isEqualByComparingTo(new BigDecimal("75000"));
+    }
+
+    @Test
+    void build_withoutGuardrailProfile_returnsNullGuardrailSpending() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        // No guardrail profile set
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNull();
+    }
+
+    @Test
+    void build_withGuardrailProfileButRepoReturnsEmpty_returnsNullGuardrailSpending() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var guardrailEntity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        scenario.setGuardrailProfile(guardrailEntity);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+        when(guardrailSpendingProfileRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(Optional.empty());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNull();
+    }
+
+    @Test
+    void build_withMalformedGuardrailJson_returnsNullGuardrailSpending() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var guardrailEntity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailEntity.setYearlySpending("NOT VALID JSON");
+        guardrailEntity.setPhases("[]");
+        guardrailEntity.setScenarioHash("abc");
+        scenario.setGuardrailProfile(guardrailEntity);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+        when(guardrailSpendingProfileRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(Optional.of(guardrailEntity));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.guardrailSpending()).isNull();
     }
 }

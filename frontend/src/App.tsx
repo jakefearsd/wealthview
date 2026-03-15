@@ -16,6 +16,7 @@ import PropertyDetailPage from './pages/PropertyDetailPage';
 import ProjectionsPage from './pages/ProjectionsPage';
 import ProjectionComparePage from './pages/ProjectionComparePage';
 import ProjectionDetailPage from './pages/ProjectionDetailPage';
+import SpendingOptimizerPage from './pages/SpendingOptimizerPage';
 import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import IncomeSourcesPage from './pages/IncomeSourcesPage';
 import HoldingDetailPage from './pages/HoldingDetailPage';
@@ -44,6 +45,7 @@ export default function App() {
                         <Route path="projections" element={<ProjectionsPage />} />
                         <Route path="projections/compare" element={<ProjectionComparePage />} />
                         <Route path="projections/:id" element={<ProjectionDetailPage />} />
+                        <Route path="projections/:id/optimize" element={<SpendingOptimizerPage />} />
                         <Route path="spending-profiles" element={<SpendingProfilesPage />} />
                         <Route path="income-sources" element={<IncomeSourcesPage />} />
                         <Route path="properties" element={<PropertiesListPage />} />
