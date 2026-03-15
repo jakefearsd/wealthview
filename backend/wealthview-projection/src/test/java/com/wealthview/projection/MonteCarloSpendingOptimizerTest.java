@@ -733,4 +733,80 @@ class MonteCarloSpendingOptimizerTest {
                     .isLessThanOrEqualTo(year.corridorHigh());
         }
     }
+
+    @Test
+    void optimize_targetBasedAllocation_spendingProportionalToTargets() {
+        // Phases with target spending should allocate proportionally
+        var phases = List.of(
+                new GuardrailPhaseInput("Early", 62, 72, 1, new BigDecimal("80000")),
+                new GuardrailPhaseInput("Late", 73, null, 1, new BigDecimal("40000")));
+
+        var input = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        var result = optimizer.optimize(input);
+
+        var earlyAvg = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var lateAvg = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 73)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        // Early phase targets $80k total ($70k discretionary), late targets $40k ($30k disc)
+        // The ratio of discretionary spending should be roughly 70/30 ≈ 2.33
+        // Allow generous tolerance since MC is stochastic
+        if (lateAvg > 0) {
+            double ratio = earlyAvg / lateAvg;
+            assertThat(ratio)
+                    .as("Early/Late discretionary ratio should be roughly proportional to targets")
+                    .isBetween(1.5, 3.5);
+        }
+    }
+
+    @Test
+    void optimize_legacyPriorityFallback_worksWhenNoTargetSpending() {
+        // Phases without targetSpending should use legacy priority-weight allocation
+        var phases = List.of(
+                new GuardrailPhaseInput("High Priority", 62, 72, 3),
+                new GuardrailPhaseInput("Low Priority", 73, 82, 1));
+
+        var input = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("100000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        var result = optimizer.optimize(input);
+
+        var highPhaseAvg = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 62 && y.age() <= 72)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+        var lowPhaseAvg = result.yearlySpending().stream()
+                .filter(y -> y.age() >= 73 && y.age() <= 82)
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        assertThat(highPhaseAvg)
+                .as("Legacy priority allocation: high-priority phase should get more")
+                .isGreaterThan(lowPhaseAvg);
+    }
 }
