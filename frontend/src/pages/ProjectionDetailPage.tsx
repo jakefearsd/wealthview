@@ -13,7 +13,8 @@ import IncomeStreamsChart from '../components/IncomeStreamsChart';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
-import type { ProjectionResult, CreateScenarioRequest } from '../types/projection';
+import type { ProjectionResult, ProjectionYear, CreateScenarioRequest } from '../types/projection';
+import { downloadBlob } from '../api/export';
 
 type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams';
 
@@ -89,6 +90,48 @@ export default function ProjectionDetailPage() {
     const hasIncomeSourceData = result?.yearly_data.some(y =>
         y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
     ) ?? false;
+
+    const computeTotalSpending = (y: ProjectionYear): number | null => {
+        if (y.essential_expenses != null) {
+            return y.essential_expenses + (y.discretionary_after_cuts ?? y.discretionary_expenses ?? 0);
+        }
+        if (y.withdrawals > 0 || (y.income_streams_total != null && y.income_streams_total > 0)) {
+            return y.withdrawals + (y.income_streams_total ?? 0);
+        }
+        return null;
+    };
+
+    const buildProjectionCsv = (yearlyData: ProjectionYear[]): string => {
+        const headers = ['Year', 'Age', 'Start', 'Contributions', 'Growth', 'Withdrawals', 'Income', 'Total Spending', 'End', 'Status'];
+        if (hasPoolData) headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
+        if (hasSpendingData) headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
+
+        const rows = yearlyData.map(y => {
+            const vals: (string | number)[] = [
+                y.year, y.age, y.start_balance, y.contributions, y.growth, y.withdrawals,
+                y.income_streams_total ?? '', computeTotalSpending(y) ?? '',
+                y.end_balance, y.retired ? 'Retired' : 'Working',
+            ];
+            if (hasPoolData) vals.push(
+                y.traditional_balance ?? '', y.roth_balance ?? '', y.taxable_balance ?? '',
+                y.roth_conversion_amount ?? '', y.tax_liability ?? '',
+            );
+            if (hasSpendingData) vals.push(
+                y.essential_expenses ?? '', y.discretionary_after_cuts ?? y.discretionary_expenses ?? '',
+                y.net_spending_need ?? '', y.spending_surplus ?? '',
+            );
+            return vals.join(',');
+        });
+
+        return [headers.join(','), ...rows].join('\n');
+    };
+
+    const handleDownloadCsv = () => {
+        if (!result) return;
+        const date = new Date().toISOString().slice(0, 10);
+        const name = scenario.name.replace(/[^a-zA-Z0-9 -]/g, '').replace(/ /g, '-');
+        downloadBlob(buildProjectionCsv(result.yearly_data), `projection-${name}-${date}.csv`, 'text/csv');
+    };
     const parsedParams = scenario.params_json ? JSON.parse(scenario.params_json) : {};
     const strategyLabels: Record<string, string> = {
         fixed_percentage: 'Fixed Percentage',
@@ -340,7 +383,7 @@ export default function ProjectionDetailPage() {
                         )}
 
                         {activeTab === 'income_tax' && hasIncomeSourceData && (
-                            <div style={{ maxHeight: '450px', overflow: 'auto' }}>
+                            <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
@@ -401,7 +444,24 @@ export default function ProjectionDetailPage() {
                         )}
 
                         {activeTab === 'table' && (
-                            <div style={{ maxHeight: '450px', overflow: 'auto' }}>
+                            <>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                                <button
+                                    onClick={handleDownloadCsv}
+                                    style={{
+                                        padding: '0.4rem 1rem',
+                                        background: '#1976d2',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.85rem',
+                                    }}
+                                >
+                                    Download CSV
+                                </button>
+                            </div>
+                            <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
@@ -411,6 +471,8 @@ export default function ProjectionDetailPage() {
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Contributions</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Growth</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Withdrawals</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Income</th>
+                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Total Spending</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>End</th>
                                             <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
                                             {hasPoolData && (
@@ -426,10 +488,8 @@ export default function ProjectionDetailPage() {
                                                 <>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Essential</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Discretionary</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Income</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Net Need</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus/Deficit</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Disc. After Cuts</th>
                                                 </>
                                             )}
                                         </tr>
@@ -452,6 +512,8 @@ export default function ProjectionDetailPage() {
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.contributions > 0 ? formatCurrency(y.contributions) : '-'}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: y.growth >= 0 ? '#2e7d32' : '#d32f2f' }}>{formatCurrency(y.growth)}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawals > 0 ? formatCurrency(y.withdrawals) : '-'}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.income_streams_total != null ? formatCurrency(y.income_streams_total) : '-'}</td>
+                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{computeTotalSpending(y) != null ? formatCurrency(computeTotalSpending(y)!) : '-'}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
                                                     {hasPoolData && (
@@ -466,8 +528,7 @@ export default function ProjectionDetailPage() {
                                                     {hasSpendingData && (
                                                         <>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.essential_expenses != null ? formatCurrency(y.essential_expenses) : '-'}</td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.discretionary_expenses != null ? formatCurrency(y.discretionary_expenses) : '-'}</td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.income_streams_total != null ? formatCurrency(y.income_streams_total) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.discretionary_after_cuts != null ? formatCurrency(y.discretionary_after_cuts) : y.discretionary_expenses != null ? formatCurrency(y.discretionary_expenses) : '-'}</td>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.net_spending_need != null ? formatCurrency(y.net_spending_need) : '-'}</td>
                                                             <td style={{
                                                                 padding: '0.5rem', textAlign: 'right',
@@ -476,7 +537,6 @@ export default function ProjectionDetailPage() {
                                                             }}>
                                                                 {y.spending_surplus != null ? formatCurrency(y.spending_surplus) : '-'}
                                                             </td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#ff9800' }}>{y.discretionary_after_cuts != null ? formatCurrency(y.discretionary_after_cuts) : '-'}</td>
                                                         </>
                                                     )}
                                                 </tr>
@@ -485,6 +545,7 @@ export default function ProjectionDetailPage() {
                                     </tbody>
                                 </table>
                             </div>
+                            </>
                         )}
                     </div>
                 </>
