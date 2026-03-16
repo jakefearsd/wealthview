@@ -43,6 +43,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
+    private static final BigDecimal SHORTFALL_TOLERANCE = new BigDecimal("-10");
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
@@ -98,13 +99,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : BigDecimal.ZERO;
 
         WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
-        TierBasedSpendingPlan tierBasedPlan = parseTierBasedPlan(input.spendingProfile());
-
         SpendingPlan spendingPlan = null;
         if (input.guardrailSpending() != null) {
             spendingPlan = input.guardrailSpending();
-        } else if (tierBasedPlan != null) {
-            spendingPlan = tierBasedPlan;
+        } else if (input.spendingProfile() != null) {
+            spendingPlan = parseTierBasedPlan(input.spendingProfile());
         }
 
         var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
@@ -137,7 +136,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         return runProjection(input, pool, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingPlan, tierBasedPlan, incomeSources);
+                retirementYear, endYear, inflationRate, spendingPlan, incomeSources);
     }
 
     private ProjectionResultResponse runProjection(
@@ -146,7 +145,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
             BigDecimal inflationRate, SpendingPlan spendingPlan,
-            TierBasedSpendingPlan tierBasedPlan,
             List<ProjectionIncomeSourceInput> incomeSources) {
 
         var yearlyData = new ArrayList<ProjectionYearDto>();
@@ -193,7 +191,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
-            yearDto = applyViability(yearDto, tierBasedPlan, age, yearsInRetirement, inflationRate,
+            yearDto = applyViability(yearDto, spendingPlan, year, age, yearsInRetirement, inflationRate,
                     incomeResult.totalActiveIncome());
             if (incomeResult.isResult() != null) {
                 yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
@@ -208,7 +206,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         log.info("{} for scenario '{}': {} years, final balance {}",
                 pool.logTag(), input.scenarioName(), yearlyData.size(), finalBalance);
 
-        var feasibility = computeFeasibility(yearlyData, tierBasedPlan, inflationRate);
+        var feasibility = computeFeasibility(yearlyData, spendingPlan, inflationRate);
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
                 yearsInRetirement, feasibility);
     }
@@ -462,9 +460,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
-                                                           TierBasedSpendingPlan tierBasedPlan,
+                                                           SpendingPlan spendingPlan,
                                                            BigDecimal inflationRate) {
-        if (tierBasedPlan == null) {
+        if (spendingPlan == null) {
             return null;
         }
 
@@ -481,7 +479,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
             retiredYearIndex++;
 
-            if (year.spendingSurplus() != null && year.spendingSurplus().compareTo(BigDecimal.ZERO) < 0
+            if (year.spendingSurplus() != null && year.spendingSurplus().compareTo(SHORTFALL_TOLERANCE) < 0
                     && firstShortfallYear == null) {
                 firstShortfallYear = year.year();
                 firstShortfallAge = year.age();
@@ -530,18 +528,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 sustainableForWeakest, requiredForWeakest);
     }
 
-    private ProjectionYearDto applyViability(ProjectionYearDto base, TierBasedSpendingPlan tierBasedPlan,
-                                              int age, int yearsInRetirement, BigDecimal inflationRate,
-                                              BigDecimal activeIncome) {
-        if (tierBasedPlan == null || !base.retired()) {
+    private ProjectionYearDto applyViability(ProjectionYearDto base, SpendingPlan spendingPlan,
+                                              int year, int age, int yearsInRetirement,
+                                              BigDecimal inflationRate, BigDecimal activeIncome) {
+        if (spendingPlan == null || !base.retired()) {
             return base;
         }
 
-        var resolved = tierBasedPlan.resolveSpending(age);
-        BigDecimal inflationFactor = tierBasedPlan.computeInflationFactor(age, yearsInRetirement, inflationRate);
-
-        BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement, inflationRate, activeIncome);
+        BigDecimal essential = resolved.essential();
+        BigDecimal discretionary = resolved.discretionary();
 
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
         BigDecimal surplus = base.withdrawals().subtract(netNeed);

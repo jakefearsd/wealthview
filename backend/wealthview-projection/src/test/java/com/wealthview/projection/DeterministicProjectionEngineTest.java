@@ -812,6 +812,40 @@ class DeterministicProjectionEngineTest {
         assertThat(result.spendingFeasibility().firstShortfallAge()).isNotNull();
     }
 
+    @Test
+    void run_withSpendingProfile_subTenDollarShortfall_treatedAsFeasible() {
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("59995.0000", "0", "0.0000")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"));
+
+        var result = engine.run(input);
+
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+    }
+
+    @Test
+    void run_withSpendingProfile_meaningfulShortfall_reportedAsInfeasible() {
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("59900.0000", "0", "0.0000")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"));
+
+        var result = engine.run(input);
+
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isFalse();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNotNull();
+    }
+
     // === Income sources affect portfolio withdrawals (Step 2) ===
 
     @Test

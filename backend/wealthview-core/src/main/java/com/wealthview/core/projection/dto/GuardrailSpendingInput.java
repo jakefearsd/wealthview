@@ -20,8 +20,9 @@ public record GuardrailSpendingInput(
                                              BigDecimal inflationRate, BigDecimal activeIncome) {
         var gy = byYear().get(year);
         if (gy == null) {
-            return new ResolvedYearSpending(BigDecimal.ZERO, BigDecimal.ZERO);
+            return new ResolvedYearSpending(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         }
-        return new ResolvedYearSpending(gy.portfolioWithdrawal(), gy.recommended());
+        return new ResolvedYearSpending(gy.portfolioWithdrawal(), gy.recommended(),
+                gy.essentialFloor(), gy.discretionary());
     }
 }
