@@ -1,6 +1,6 @@
 import client from './client';
 
-function downloadBlob(data: string | object, filename: string, type: string) {
+export function downloadBlob(data: string | object, filename: string, type: string) {
     const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     const blob = new Blob([content], { type });
     const url = URL.createObjectURL(blob);
