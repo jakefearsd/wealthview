@@ -386,9 +386,54 @@ export default function SpendingOptimizerPage() {
                 </Link>
             </div>
 
-            <h2 style={{ marginBottom: '0.25rem' }}>Spending Optimizer</h2>
-            <div style={{ fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                <strong>Projection:</strong> <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>{scenario.name}</Link>
+            <h2 style={{ marginBottom: '0.75rem' }}>Spending Optimizer</h2>
+            <div style={{
+                background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: '6px',
+                padding: '0.75rem 1rem', marginBottom: '1.5rem', fontSize: '0.85rem',
+            }}>
+                <div style={{ marginBottom: '0.35rem' }}>
+                    <strong style={{ color: '#666' }}>Scenario:</strong>{' '}
+                    <Link to={`/projections/${id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>{scenario.name}</Link>
+                </div>
+                <div style={{ display: 'flex', gap: '1.5rem', color: '#555', flexWrap: 'wrap', marginBottom: '0.35rem' }}>
+                    <span><strong style={{ color: '#666' }}>Inflation:</strong> {(scenario.inflation_rate * 100).toFixed(1)}%</span>
+                    <span><strong style={{ color: '#666' }}>Retirement:</strong> {new Date(scenario.retirement_date).getFullYear()}</span>
+                    <span><strong style={{ color: '#666' }}>End Age:</strong> {scenario.end_age}</span>
+                </div>
+                {scenario.accounts.length > 0 && (
+                    <div style={{ color: '#555', marginBottom: '0.35rem' }}>
+                        <strong style={{ color: '#666' }}>Accounts:</strong>{' '}
+                        {Object.entries(
+                            scenario.accounts.reduce<Record<string, number>>((acc, a) => {
+                                const type = a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1);
+                                acc[type] = (acc[type] ?? 0) + a.initial_balance;
+                                return acc;
+                            }, {})
+                        ).map(([type, balance], i, arr) => (
+                            <span key={type}>
+                                {balance.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} {type}
+                                {i < arr.length - 1 ? ' · ' : ''}
+                            </span>
+                        ))}
+                    </div>
+                )}
+                {scenario.income_sources.length > 0 && (
+                    <div style={{ color: '#555', marginBottom: '0.35rem' }}>
+                        <strong style={{ color: '#666' }}>Income:</strong>{' '}
+                        {scenario.income_sources.slice(0, 3).map((src, i, arr) => (
+                            <span key={src.income_source_id}>
+                                {src.name} ({src.effective_amount.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })})
+                                {i < arr.length - 1 ? ' · ' : ''}
+                            </span>
+                        ))}
+                        {scenario.income_sources.length > 3 && (
+                            <span> and {scenario.income_sources.length - 3} more</span>
+                        )}
+                    </div>
+                )}
+                <div style={{ fontSize: '0.75rem', color: '#999', marginTop: '0.25rem' }}>
+                    These values come from the projection scenario. Edit the scenario to change them.
+                </div>
             </div>
 
             {state === 'configure' && (
