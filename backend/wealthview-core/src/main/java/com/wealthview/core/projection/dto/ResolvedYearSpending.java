@@ -4,5 +4,7 @@ import java.math.BigDecimal;
 
 public record ResolvedYearSpending(
         BigDecimal portfolioWithdrawal,
-        BigDecimal totalSpending
+        BigDecimal totalSpending,
+        BigDecimal essential,
+        BigDecimal discretionary
 ) {}

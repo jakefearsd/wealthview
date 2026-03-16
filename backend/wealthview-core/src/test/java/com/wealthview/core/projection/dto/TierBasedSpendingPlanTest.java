@@ -30,6 +30,8 @@ class TierBasedSpendingPlanTest {
         // yearsInRetirement=1 → inflation factor = 1 (not > 1)
         assertThat(result.totalSpending()).isEqualByComparingTo(new BigDecimal("60000.0000"));
         assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("60000.0000"));
+        assertThat(result.essential()).isEqualByComparingTo(new BigDecimal("40000.0000"));
+        assertThat(result.discretionary()).isEqualByComparingTo(new BigDecimal("20000.0000"));
     }
 
     @Test
@@ -128,6 +130,8 @@ class TierBasedSpendingPlanTest {
 
         assertThat(result.totalSpending()).isEqualByComparingTo(new BigDecimal("60000.0000"));
         assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("35000.0000"));
+        assertThat(result.essential()).isEqualByComparingTo(new BigDecimal("40000.0000"));
+        assertThat(result.discretionary()).isEqualByComparingTo(new BigDecimal("20000.0000"));
     }
 
     @Test

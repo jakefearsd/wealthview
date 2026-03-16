@@ -46,6 +46,8 @@ class GuardrailSpendingInputTest {
 
         assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("70000"));
         assertThat(result.totalSpending()).isEqualByComparingTo(new BigDecimal("75000"));
+        assertThat(result.essential()).isEqualByComparingTo(new BigDecimal("30000"));
+        assertThat(result.discretionary()).isEqualByComparingTo(new BigDecimal("45000"));
     }
 
     @Test
@@ -59,5 +61,7 @@ class GuardrailSpendingInputTest {
 
         assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalSpending()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.essential()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(result.discretionary()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 }
