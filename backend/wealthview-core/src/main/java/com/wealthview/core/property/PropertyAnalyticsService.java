@@ -67,31 +67,56 @@ public class PropertyAnalyticsService {
         BigDecimal totalCashInvested = null;
 
         if ("investment".equals(property.getPropertyType())) {
-            var dateRange = computeDateRange(year);
-            var rangeFrom = dateRange[0];
-            var rangeTo = dateRange[1];
-            var annualFrom = YearMonth.from(rangeFrom).minusMonths(11).atDay(1);
-
             var linkedSources = incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId);
             var totalIncome = linkedSources.stream()
                     .map(IncomeSourceEntity::getAnnualAmount)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            var operatingExpenses = expenseRepository
-                    .findOverlappingExcludingCategory(propertyId, rangeFrom, rangeTo, annualFrom, "mortgage");
-            var totalOperatingExpenses = sumWithProration(operatingExpenses, rangeFrom, rangeTo,
-                    PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
-                    PropertyExpenseEntity::getDate);
+            boolean hasEntityFields = property.getAnnualPropertyTax() != null
+                    || property.getAnnualInsuranceCost() != null
+                    || property.getAnnualMaintenanceCost() != null;
 
-            annualNoi = totalIncome.subtract(totalOperatingExpenses);
-            capRate = percentageOf(annualNoi, property.getCurrentValue());
+            if (hasEntityFields) {
+                var totalOperatingExpenses = sumNullable(
+                        property.getAnnualPropertyTax(),
+                        property.getAnnualInsuranceCost(),
+                        property.getAnnualMaintenanceCost());
 
-            var allExpenses = expenseRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
-            var totalAllExpenses = sumWithProration(allExpenses, rangeFrom, rangeTo,
-                    PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
-                    PropertyExpenseEntity::getDate);
+                annualNoi = totalIncome.subtract(totalOperatingExpenses);
+                capRate = percentageOf(annualNoi, property.getCurrentValue());
 
-            annualNetCashFlow = totalIncome.subtract(totalAllExpenses);
+                var totalAllExpenses = totalOperatingExpenses;
+                if (property.hasLoanDetails()) {
+                    var annualMortgage = AmortizationCalculator.monthlyPayment(
+                            property.getLoanAmount(), property.getAnnualInterestRate(),
+                            property.getLoanTermMonths())
+                            .multiply(new BigDecimal("12"));
+                    totalAllExpenses = totalAllExpenses.add(annualMortgage);
+                }
+
+                annualNetCashFlow = totalIncome.subtract(totalAllExpenses);
+            } else {
+                var dateRange = computeDateRange(year);
+                var rangeFrom = dateRange[0];
+                var rangeTo = dateRange[1];
+                var annualFrom = YearMonth.from(rangeFrom).minusMonths(11).atDay(1);
+
+                var operatingExpenses = expenseRepository
+                        .findOverlappingExcludingCategory(propertyId, rangeFrom, rangeTo, annualFrom, "mortgage");
+                var totalOperatingExpenses = sumWithProration(operatingExpenses, rangeFrom, rangeTo,
+                        PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
+                        PropertyExpenseEntity::getDate);
+
+                annualNoi = totalIncome.subtract(totalOperatingExpenses);
+                capRate = percentageOf(annualNoi, property.getCurrentValue());
+
+                var allExpenses = expenseRepository.findOverlapping(propertyId, rangeFrom, rangeTo, annualFrom);
+                var totalAllExpenses = sumWithProration(allExpenses, rangeFrom, rangeTo,
+                        PropertyExpenseEntity::getAmount, PropertyExpenseEntity::getFrequency,
+                        PropertyExpenseEntity::getDate);
+
+                annualNetCashFlow = totalIncome.subtract(totalAllExpenses);
+            }
 
             totalCashInvested = property.hasLoanDetails()
                     ? property.getPurchasePrice().subtract(property.getLoanAmount())
@@ -229,6 +254,16 @@ public class PropertyAnalyticsService {
         long overlappingMonths = overlapStart.until(overlapEnd, java.time.temporal.ChronoUnit.MONTHS) + 1;
         return amount.multiply(new BigDecimal(overlappingMonths))
                 .divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal sumNullable(BigDecimal... values) {
+        var sum = BigDecimal.ZERO;
+        for (var v : values) {
+            if (v != null) {
+                sum = sum.add(v);
+            }
+        }
+        return sum;
     }
 
     private BigDecimal percentageOf(BigDecimal numerator, BigDecimal denominator) {

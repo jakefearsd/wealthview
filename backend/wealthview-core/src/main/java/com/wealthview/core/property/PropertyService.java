@@ -165,7 +165,11 @@ public class PropertyService {
         var toDate = to.atEndOfMonth();
         var annualFromDate = from.minusMonths(11).atDay(1);
 
-        var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var allExpenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var coveredCategories = entityCoveredCategories(property);
+        var expenses = allExpenses.stream()
+                .filter(e -> !coveredCategories.contains(e.getCategory()))
+                .toList();
 
         Map<YearMonth, BigDecimal> expenseByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -206,7 +210,11 @@ public class PropertyService {
         var toDate = to.atEndOfMonth();
         var annualFromDate = from.minusMonths(11).atDay(1);
 
-        var expenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var allExpenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var coveredCategories = entityCoveredCategories(property);
+        var expenses = allExpenses.stream()
+                .filter(e -> !coveredCategories.contains(e.getCategory()))
+                .toList();
 
         Map<YearMonth, Map<String, BigDecimal>> expenseByCategoryByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -282,6 +290,23 @@ public class PropertyService {
                 bucket.merge(month, amount, BigDecimal::add);
             }
         }
+    }
+
+    private Set<String> entityCoveredCategories(PropertyEntity property) {
+        var categories = new java.util.HashSet<String>();
+        if (property.getAnnualPropertyTax() != null) {
+            categories.add("tax");
+        }
+        if (property.getAnnualInsuranceCost() != null) {
+            categories.add("insurance");
+        }
+        if (property.getAnnualMaintenanceCost() != null) {
+            categories.add("maintenance");
+        }
+        if (property.hasLoanDetails()) {
+            categories.add("mortgage");
+        }
+        return categories;
     }
 
     Map<String, BigDecimal> computeDerivedMonthlyExpenses(PropertyEntity property) {
