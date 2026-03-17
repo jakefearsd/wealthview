@@ -9,5 +9,12 @@ public record ProjectionResultResponse(
         List<ProjectionYearDto> yearlyData,
         BigDecimal finalBalance,
         int yearsInRetirement,
-        SpendingFeasibilitySummary spendingFeasibility) {
+        SpendingFeasibilitySummary spendingFeasibility,
+        BigDecimal finalNetWorth) {
+
+    public ProjectionResultResponse(UUID scenarioId, List<ProjectionYearDto> yearlyData,
+                                    BigDecimal finalBalance, int yearsInRetirement,
+                                    SpendingFeasibilitySummary spendingFeasibility) {
+        this(scenarioId, yearlyData, finalBalance, yearsInRetirement, spendingFeasibility, null);
+    }
 }

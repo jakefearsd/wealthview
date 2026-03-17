@@ -16,6 +16,7 @@ import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
+import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ class ProjectionInputBuilderTest {
 
     @Mock
     private GuardrailSpendingProfileRepository guardrailSpendingProfileRepository;
+
+    @Mock
+    private PropertyRepository propertyRepository;
 
     @InjectMocks
     private ProjectionInputBuilder builder;
@@ -418,6 +422,60 @@ class ProjectionInputBuilderTest {
         var result = builder.build(scenario, tenantId);
 
         assertThat(result.guardrailSpending()).isNull();
+    }
+
+    // ── Property Resolution Tests ──
+
+    @Test
+    void build_withProperties_populatesPropertyInputs() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var property = new PropertyEntity(tenant, "123 Main St",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("500000"), new BigDecimal("280000"));
+        property.setAnnualAppreciationRate(new BigDecimal("0.03"));
+        property.setLoanAmount(new BigDecimal("320000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+
+        when(propertyRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(property));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.properties()).hasSize(1);
+        var propInput = result.properties().getFirst();
+        assertThat(propInput.name()).isEqualTo("123 Main St");
+        assertThat(propInput.currentValue()).isEqualByComparingTo("500000");
+        assertThat(propInput.annualAppreciationRate()).isEqualByComparingTo("0.03");
+        assertThat(propInput.loanAmount()).isEqualByComparingTo("320000");
+        assertThat(propInput.annualInterestRate()).isEqualByComparingTo("0.065");
+        assertThat(propInput.loanTermMonths()).isEqualTo(360);
+        // Mortgage balance should be computed via amortization (not manual 280000)
+        assertThat(propInput.mortgageBalance()).isLessThan(new BigDecimal("320000"));
+        assertThat(propInput.mortgageBalance()).isPositive();
+    }
+
+    @Test
+    void build_withNoProperties_returnsEmptyPropertyList() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+        when(propertyRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.properties()).isEmpty();
     }
 
     @Test

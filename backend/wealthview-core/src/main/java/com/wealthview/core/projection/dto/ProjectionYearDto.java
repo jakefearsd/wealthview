@@ -30,7 +30,9 @@ public record ProjectionYearDto(
         BigDecimal suspendedLossCarryforward,
         BigDecimal socialSecurityTaxable,
         BigDecimal selfEmploymentTax,
-        Map<String, BigDecimal> incomeBySource) {
+        Map<String, BigDecimal> incomeBySource,
+        BigDecimal propertyEquity,
+        BigDecimal totalNetWorth) {
 
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
@@ -39,6 +41,7 @@ public record ProjectionYearDto(
         return new ProjectionYearDto(year, age, startBalance, contributions, growth,
                 withdrawals, endBalance, retired, null, null, null, null, null,
                 null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null,
+                null, null);
     }
 }

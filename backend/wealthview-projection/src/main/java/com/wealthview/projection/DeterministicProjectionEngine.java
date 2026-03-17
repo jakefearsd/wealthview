@@ -6,6 +6,7 @@ import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingFeasibilitySummary;
@@ -107,6 +108,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
+        var properties = input.properties() != null ? input.properties() : List.<ProjectionPropertyInput>of();
 
         boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
 
@@ -136,7 +138,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         return runProjection(input, pool, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingPlan, incomeSources);
+                retirementYear, endYear, inflationRate, spendingPlan, incomeSources, properties);
     }
 
     private ProjectionResultResponse runProjection(
@@ -145,7 +147,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             WithdrawalStrategy strategy,
             int currentYear, int birthYear, int retirementYear, int endYear,
             BigDecimal inflationRate, SpendingPlan spendingPlan,
-            List<ProjectionIncomeSourceInput> incomeSources) {
+            List<ProjectionIncomeSourceInput> incomeSources,
+            List<ProjectionPropertyInput> properties) {
 
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
@@ -189,8 +192,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             pool.floorAtZero();
 
+            int yearsElapsed = year - currentYear;
+            BigDecimal propertyEquity = computePropertyEquity(properties, yearsElapsed);
+
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
+            yearDto = applyPropertyEquity(yearDto, propertyEquity);
             yearDto = applyViability(yearDto, spendingPlan, year, age, yearsInRetirement, inflationRate,
                     incomeResult.totalActiveIncome());
             if (incomeResult.isResult() != null) {
@@ -207,8 +214,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 pool.logTag(), input.scenarioName(), yearlyData.size(), finalBalance);
 
         var feasibility = computeFeasibility(yearlyData, spendingPlan, inflationRate);
+        BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
-                yearsInRetirement, feasibility);
+                yearsInRetirement, feasibility, finalNetWorth);
     }
 
     private record IncomeAndConversionResult(
@@ -558,7 +566,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
                 base.rentalLossApplied(), base.suspendedLossCarryforward(),
                 base.socialSecurityTaxable(), base.selfEmploymentTax(),
-                base.incomeBySource());
+                base.incomeBySource(),
+                base.propertyEquity(), base.totalNetWorth());
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
@@ -585,7 +594,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 nullIfZero(isResult.suspendedLossCarryforward()),
                 nullIfZero(isResult.socialSecurityTaxable()),
                 nullIfZero(isResult.selfEmploymentTax()),
-                incomeBySource);
+                incomeBySource,
+                base.propertyEquity(), base.totalNetWorth());
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
@@ -594,6 +604,58 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private BigDecimal positiveOrDefault(BigDecimal value, BigDecimal fallback) {
         return value.compareTo(BigDecimal.ZERO) > 0 ? value : fallback;
+    }
+
+    private BigDecimal computePropertyEquity(List<ProjectionPropertyInput> properties, int yearsElapsed) {
+        if (properties.isEmpty()) {
+            return null;
+        }
+        BigDecimal totalEquity = BigDecimal.ZERO;
+        for (var prop : properties) {
+            BigDecimal appreciationFactor = BigDecimal.ONE.add(prop.annualAppreciationRate())
+                    .pow(yearsElapsed);
+            BigDecimal projectedValue = prop.currentValue()
+                    .multiply(appreciationFactor)
+                    .setScale(SCALE, ROUNDING);
+
+            BigDecimal mortgageBalance;
+            if (prop.loanAmount() != null && prop.annualInterestRate() != null
+                    && prop.loanTermMonths() > 0 && prop.loanStartDate() != null) {
+                // Amortize from the start of the projection to projection year
+                java.time.LocalDate asOf = prop.loanStartDate()
+                        .plusYears(yearsElapsed)
+                        .withDayOfYear(1);
+                mortgageBalance = com.wealthview.core.property.AmortizationCalculator
+                        .remainingBalance(prop.loanAmount(), prop.annualInterestRate(),
+                                prop.loanTermMonths(), prop.loanStartDate(), asOf)
+                        .max(BigDecimal.ZERO);
+            } else {
+                mortgageBalance = prop.mortgageBalance() != null ? prop.mortgageBalance() : BigDecimal.ZERO;
+            }
+
+            totalEquity = totalEquity.add(projectedValue.subtract(mortgageBalance));
+        }
+        return totalEquity;
+    }
+
+    private ProjectionYearDto applyPropertyEquity(ProjectionYearDto base, BigDecimal propertyEquity) {
+        if (propertyEquity == null) {
+            return base;
+        }
+        BigDecimal totalNetWorth = base.endBalance().add(propertyEquity);
+        return new ProjectionYearDto(
+                base.year(), base.age(), base.startBalance(), base.contributions(),
+                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
+                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
+                base.rothConversionAmount(), base.taxLiability(),
+                base.essentialExpenses(), base.discretionaryExpenses(),
+                base.incomeStreamsTotal(), base.netSpendingNeed(), base.spendingSurplus(),
+                base.discretionaryAfterCuts(),
+                base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
+                base.rentalLossApplied(), base.suspendedLossCarryforward(),
+                base.socialSecurityTaxable(), base.selfEmploymentTax(),
+                base.incomeBySource(),
+                propertyEquity, totalNetWorth);
     }
 
 }

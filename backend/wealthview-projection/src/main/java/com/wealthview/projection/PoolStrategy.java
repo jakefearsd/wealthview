@@ -356,7 +356,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null,
                     taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
                     null, null, null, null, null, null,
-                    null, null, null, null, null, null, null, null);
+                    null, null, null, null, null, null, null, null,
+                    null, null);
         }
 
         @Override

@@ -4,6 +4,7 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
@@ -69,6 +70,34 @@ public final class ProjectionTestFixtures {
         return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
                 retDate, endAge, inflation, paramsJson, accounts, spendingProfile,
                 null, incomeSources);
+    }
+
+    public static ProjectionInput createInputWithProperties(LocalDate retDate, int endAge,
+                                                              BigDecimal inflation, String paramsJson,
+                                                              List<ProjectionAccountInput> accounts,
+                                                              List<ProjectionPropertyInput> properties) {
+        return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
+                retDate, endAge, inflation, paramsJson, accounts, null,
+                null, List.of(), null, properties);
+    }
+
+    public static ProjectionPropertyInput property(String currentValue, String appreciationRate,
+                                                     String loanAmount, String interestRate,
+                                                     int termMonths, LocalDate loanStartDate) {
+        return new ProjectionPropertyInput(
+                UUID.randomUUID(), "Test Property",
+                bd(currentValue), bd(loanAmount),
+                bd(appreciationRate),
+                bd(loanAmount), bd(interestRate), termMonths, loanStartDate);
+    }
+
+    public static ProjectionPropertyInput propertyNoLoan(String currentValue, String appreciationRate,
+                                                           String mortgageBalance) {
+        return new ProjectionPropertyInput(
+                UUID.randomUUID(), "Test Property",
+                bd(currentValue), bd(mortgageBalance),
+                bd(appreciationRate),
+                null, null, 0, null);
     }
 
     public static ProjectionInput createRetiredInput(String paramsJson,
