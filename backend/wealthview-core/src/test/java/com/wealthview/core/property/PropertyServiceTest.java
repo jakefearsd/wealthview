@@ -355,7 +355,7 @@ class PropertyServiceTest {
     }
 
     @Test
-    void getMonthlyCashFlow_derivedPlusManual_sumsCorrectly() {
+    void getMonthlyCashFlow_derivedPlusManualDifferentCategory_sumsCorrectly() {
         var propertyId = UUID.randomUUID();
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
@@ -363,6 +363,7 @@ class PropertyServiceTest {
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
                 .thenReturn(Optional.of(property));
 
+        // Maintenance ad-hoc — NOT covered by entity fields, so it should pass through
         var manualExpense = new PropertyExpenseEntity(property, tenant,
                 LocalDate.of(2025, 1, 15), new BigDecimal("300"), "maintenance", null);
         when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
@@ -372,7 +373,7 @@ class PropertyServiceTest {
                 YearMonth.of(2025, 1), YearMonth.of(2025, 2));
 
         assertThat(result).hasSize(2);
-        // Jan: 500 (derived tax) + 300 (manual maintenance) = 800
+        // Jan: 500 (derived tax) + 300 (manual maintenance, different category) = 800
         assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("800");
         // Feb: 500 (derived tax only)
         assertThat(result.get(1).totalExpenses()).isEqualByComparingTo("500");
@@ -579,14 +580,14 @@ class PropertyServiceTest {
     }
 
     @Test
-    void getMonthlyCashFlowDetail_derivedExpensesMergeWithManual() {
+    void getMonthlyCashFlowDetail_entityFieldSet_suppressesManualSameCategory() {
         var propertyId = UUID.randomUUID();
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
         property.setAnnualPropertyTax(new BigDecimal("6000"));
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
                 .thenReturn(Optional.of(property));
-        // Manual tax expense of 100 in January
+        // Manual tax expense of 100 in January — should be suppressed
         var manualTax = new PropertyExpenseEntity(property, tenant,
                 LocalDate.of(2025, 1, 15), new BigDecimal("100"), "tax", null);
         when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
@@ -596,8 +597,8 @@ class PropertyServiceTest {
                 YearMonth.of(2025, 1), YearMonth.of(2025, 2));
 
         assertThat(result).hasSize(2);
-        // Jan: 500 (derived) + 100 (manual) = 600
-        assertThat(result.get(0).expensesByCategory().get("tax")).isEqualByComparingTo("600");
+        // Jan: 500 (derived only, manual suppressed)
+        assertThat(result.get(0).expensesByCategory().get("tax")).isEqualByComparingTo("500");
         // Feb: 500 (derived only)
         assertThat(result.get(1).expensesByCategory().get("tax")).isEqualByComparingTo("500");
     }
@@ -622,7 +623,7 @@ class PropertyServiceTest {
     }
 
     @Test
-    void getMonthlyCashFlowDetail_withLoanAndManualMortgage_mergesAmounts() {
+    void getMonthlyCashFlowDetail_withLoanAndManualMortgage_suppressesManualMortgage() {
         var propertyId = UUID.randomUUID();
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
@@ -642,8 +643,8 @@ class PropertyServiceTest {
                 YearMonth.of(2025, 1), YearMonth.of(2025, 1));
 
         assertThat(result).hasSize(1);
-        // 1896.2041 (derived) + 200 (manual) = 2096.2041
-        assertThat(result.get(0).expensesByCategory().get("mortgage")).isEqualByComparingTo("2096.2041");
+        // 1896.2041 (derived only, manual suppressed)
+        assertThat(result.get(0).expensesByCategory().get("mortgage")).isEqualByComparingTo("1896.2041");
     }
 
     @Test
@@ -711,6 +712,105 @@ class PropertyServiceTest {
 
         assertThatThrownBy(() -> propertyService.listExpenses(tenantId, propertyId))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void getMonthlyCashFlow_entityTaxSetAndAdHocTaxRecord_noDoubleCount() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        // Ad-hoc "tax" expense that should be suppressed by entity field
+        var adHocTax = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("400"), "tax", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(adHocTax));
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        // Should be 500 (derived tax only), NOT 500 + 400 = 900
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("500");
+    }
+
+    @Test
+    void getMonthlyCashFlow_entityTaxNull_usesAdHocTaxRecord() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        // annualPropertyTax is null (default)
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var adHocTax = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("400"), "tax", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(adHocTax));
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        // No entity field → ad-hoc record used
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("400");
+    }
+
+    @Test
+    void getMonthlyCashFlowDetail_entityTaxSet_suppressesAdHocTaxCategory() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var adHocTax = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("400"), "tax", null);
+        // Also a maintenance expense that should NOT be suppressed
+        var adHocMaintenance = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 20), new BigDecimal("200"), "maintenance", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(adHocTax, adHocMaintenance));
+
+        var result = propertyService.getMonthlyCashFlowDetail(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        var jan = result.get(0);
+        // Tax should be 500 (derived only, ad-hoc suppressed)
+        assertThat(jan.expensesByCategory().get("tax")).isEqualByComparingTo("500");
+        // Maintenance should be 200 (ad-hoc, no entity field covers it)
+        assertThat(jan.expensesByCategory().get("maintenance")).isEqualByComparingTo("200");
+        assertThat(jan.totalExpenses()).isEqualByComparingTo("700");
+    }
+
+    @Test
+    void getMonthlyCashFlow_loanDetailsSet_suppressesAdHocMortgageRecord() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var adHocMortgage = new PropertyExpenseEntity(property, tenant,
+                LocalDate.of(2025, 1, 15), new BigDecimal("2000"), "mortgage", null);
+        when(expenseRepository.findOverlapping(eq(propertyId), any(), any(), any()))
+                .thenReturn(List.of(adHocMortgage));
+
+        var result = propertyService.getMonthlyCashFlow(tenantId, propertyId,
+                YearMonth.of(2025, 1), YearMonth.of(2025, 1));
+
+        assertThat(result).hasSize(1);
+        // Should be derived mortgage (1896.2041), NOT derived + ad-hoc
+        assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("1896.2041");
     }
 
     @Test

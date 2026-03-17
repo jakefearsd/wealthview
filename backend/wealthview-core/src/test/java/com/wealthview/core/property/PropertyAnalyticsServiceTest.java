@@ -531,6 +531,87 @@ class PropertyAnalyticsServiceTest {
         assertThat(result.annualNoi()).isEqualByComparingTo("30000");
     }
 
+    @Test
+    void getAnalytics_investmentWithEntityFields_usesEntityFieldsForNoi() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2400"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1200"));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
+
+        // NOI = 30000 - (6000 + 2400 + 1200) = 20400
+        assertThat(result.annualNoi()).isEqualByComparingTo("20400");
+        // Cap rate = (20400 / 400000) * 100 = 5.1000
+        assertThat(result.capRate()).isEqualByComparingTo("5.1000");
+    }
+
+    @Test
+    void getAnalytics_investmentWithEntityFieldsAndLoan_cashOnCashUsesAmortizedMortgage() {
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        property.setAnnualPropertyTax(new BigDecimal("6000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2400"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1200"));
+        property.setLoanAmount(new BigDecimal("280000"));
+        property.setAnnualInterestRate(new BigDecimal("0.07"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2023, 1, 1));
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
+
+        // NOI = 30000 - (6000 + 2400 + 1200) = 20400
+        assertThat(result.annualNoi()).isEqualByComparingTo("20400");
+
+        // Cash-on-cash: net cash flow = income - opex - mortgage payment * 12
+        // Cash invested = 350000 - 280000 = 70000
+        assertThat(result.totalCashInvested()).isEqualByComparingTo("70000");
+        // Annual mortgage = monthlyPayment * 12
+        var annualMortgage = AmortizationCalculator.monthlyPayment(
+                new BigDecimal("280000"), new BigDecimal("0.07"), 360)
+                .multiply(new BigDecimal("12"));
+        var expectedNetCashFlow = new BigDecimal("30000")
+                .subtract(new BigDecimal("9600"))
+                .subtract(annualMortgage);
+        assertThat(result.annualNetCashFlow()).isEqualByComparingTo(expectedNetCashFlow);
+    }
+
+    @Test
+    void getAnalytics_investmentWithNullEntityFields_fallsBackToAdHocRecords() {
+        // All entity fields null → existing behavior using ad-hoc records
+        var property = createProperty("investment", "400000", "350000");
+        property.setPurchaseDate(LocalDate.of(2023, 1, 1));
+        // No entity fields set (all null)
+        mockProperty(property);
+        mockEmptyValuations(property);
+
+        mockLinkedIncomeSources(property, new BigDecimal("30000"));
+
+        var opExpenses = List.of(
+                createExpense(property, LocalDate.now().minusMonths(1), "6000", "tax")
+        );
+        when(expenseRepository.findOverlappingExcludingCategory(
+                eq(property.getId()), any(), any(), any(), eq("mortgage")))
+                .thenReturn(opExpenses);
+        when(expenseRepository.findOverlapping(eq(property.getId()), any(), any(), any()))
+                .thenReturn(opExpenses);
+
+        var result = analyticsService.getAnalytics(tenantId, property.getId(), null);
+
+        // Falls back to ad-hoc: NOI = 30000 - 6000 = 24000
+        assertThat(result.annualNoi()).isEqualByComparingTo("24000");
+        assertThat(result.capRate()).isEqualByComparingTo("6.0000");
+    }
+
     // --- Helper methods ---
 
     private PropertyEntity createProperty(String propertyType, String currentValue, String purchasePrice) {
