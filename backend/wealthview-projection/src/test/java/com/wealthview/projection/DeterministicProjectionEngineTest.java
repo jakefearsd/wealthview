@@ -4,6 +4,7 @@ import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
@@ -25,10 +26,13 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInputWithProperties;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.propertyNoLoan;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -2123,5 +2127,138 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.retired()).isTrue();
         // Normal 4% withdrawal: 1,000,000 * 0.04 = 40,000
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40000.0000"));
+    }
+
+    // ── Property Equity and Net Worth Tests ──
+
+    @Test
+    void run_withPropertyNoLoan_equityEqualsCurrentValueEachYear() {
+        // Property worth 300,000 with no mortgage, 0% appreciation → equity stays 300,000
+        var prop = propertyNoLoan("300000", "0.00", "0");
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.05")),
+                List.of(prop));
+
+        var result = engine.run(input);
+
+        for (var year : result.yearlyData()) {
+            assertThat(year.propertyEquity())
+                    .as("year %d property equity", year.year())
+                    .isEqualByComparingTo(bd("300000"));
+        }
+    }
+
+    @Test
+    void run_withPropertyAppreciation_equityGrowsEachYear() {
+        // Property worth 300,000 with 5% appreciation, no mortgage
+        var prop = propertyNoLoan("300000", "0.05", "0");
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.05")),
+                List.of(prop));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().get(0);
+        var year2 = result.yearlyData().get(1);
+
+        // After 1 year of appreciation, equity should be higher
+        assertThat(year2.propertyEquity()).isGreaterThan(year1.propertyEquity());
+        // Year 2 equity ≈ 300,000 * 1.05 = 315,000
+        assertThat(year2.propertyEquity())
+                .isEqualByComparingTo(bd("315000"));
+    }
+
+    @Test
+    void run_withProperty_totalNetWorthIncludesPropertyEquity() {
+        // Portfolio: 500,000; property: 300,000 no mortgage — net worth = 800,000 in year 1
+        var prop = propertyNoLoan("300000", "0.00", "0");
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.00")),
+                List.of(prop));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.totalNetWorth())
+                .isEqualByComparingTo(year1.endBalance().add(year1.propertyEquity()));
+    }
+
+    @Test
+    void run_withMultipleProperties_sumsBothEquities() {
+        // Two properties, 200,000 each with no mortgage, 0% appreciation
+        var prop1 = propertyNoLoan("200000", "0.00", "0");
+        var prop2 = propertyNoLoan("150000", "0.00", "0");
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.00")),
+                List.of(prop1, prop2));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.propertyEquity()).isEqualByComparingTo(bd("350000"));
+    }
+
+    @Test
+    void run_withNoProperties_propertyEquityIsZeroOrNull() {
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.00")),
+                List.of());
+
+        var result = engine.run(input);
+
+        for (var year : result.yearlyData()) {
+            assertThat(year.propertyEquity() == null
+                    || year.propertyEquity().compareTo(BigDecimal.ZERO) == 0).isTrue();
+        }
+    }
+
+    @Test
+    void run_withProperty_finalNetWorthSetOnResult() {
+        var prop = propertyNoLoan("300000", "0.00", "0");
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 65;
+        var input = createInputWithProperties(
+                LocalDate.of(currentYear - 1, 1, 1), 68, bd("0.00"),
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.00")),
+                List.of(prop));
+
+        var result = engine.run(input);
+
+        assertThat(result.finalNetWorth()).isNotNull();
+        var lastYear = result.yearlyData().getLast();
+        assertThat(result.finalNetWorth()).isEqualByComparingTo(lastYear.totalNetWorth());
     }
 }

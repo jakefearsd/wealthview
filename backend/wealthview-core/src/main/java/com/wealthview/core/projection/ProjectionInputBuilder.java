@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
@@ -17,8 +18,10 @@ import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
+import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.springframework.stereotype.Service;
 
@@ -44,17 +47,20 @@ public class ProjectionInputBuilder {
     private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
     private final DepreciationCalculator depreciationCalculator;
     private final GuardrailSpendingProfileRepository guardrailRepository;
+    private final PropertyRepository propertyRepository;
 
     public ProjectionInputBuilder(AccountService accountService,
                                   ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                   PropertyDepreciationScheduleRepository depreciationScheduleRepository,
                                   DepreciationCalculator depreciationCalculator,
-                                  GuardrailSpendingProfileRepository guardrailRepository) {
+                                  GuardrailSpendingProfileRepository guardrailRepository,
+                                  PropertyRepository propertyRepository) {
         this.accountService = accountService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.depreciationScheduleRepository = depreciationScheduleRepository;
         this.depreciationCalculator = depreciationCalculator;
         this.guardrailRepository = guardrailRepository;
+        this.propertyRepository = propertyRepository;
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {
@@ -67,10 +73,42 @@ public class ProjectionInputBuilder {
                 : null;
         var incomeSources = resolveIncomeSources(scenario.getId());
         var guardrailSpending = resolveGuardrailSpending(scenario);
+        var properties = resolveProperties(tenantId);
         return new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, spendingProfile, null, incomeSources, guardrailSpending);
+                accounts, spendingProfile, null, incomeSources, guardrailSpending, properties);
+    }
+
+    private List<ProjectionPropertyInput> resolveProperties(UUID tenantId) {
+        var entities = propertyRepository.findByTenant_Id(tenantId);
+        return entities.stream()
+                .map(this::toPropertyInput)
+                .toList();
+    }
+
+    private ProjectionPropertyInput toPropertyInput(PropertyEntity property) {
+        BigDecimal mortgageBalance;
+        if (property.hasLoanDetails()) {
+            mortgageBalance = AmortizationCalculator.remainingBalance(
+                    property.getLoanAmount(), property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(), property.getLoanStartDate(),
+                    LocalDate.now());
+        } else {
+            mortgageBalance = property.getMortgageBalance();
+        }
+
+        return new ProjectionPropertyInput(
+                property.getId(),
+                property.getAddress(),
+                property.getCurrentValue(),
+                mortgageBalance,
+                property.getAnnualAppreciationRate() != null
+                        ? property.getAnnualAppreciationRate() : BigDecimal.ZERO,
+                property.hasLoanDetails() ? property.getLoanAmount() : null,
+                property.hasLoanDetails() ? property.getAnnualInterestRate() : null,
+                property.hasLoanDetails() ? property.getLoanTermMonths() : 0,
+                property.hasLoanDetails() ? property.getLoanStartDate() : null);
     }
 
     private GuardrailSpendingInput resolveGuardrailSpending(ProjectionScenarioEntity scenario) {

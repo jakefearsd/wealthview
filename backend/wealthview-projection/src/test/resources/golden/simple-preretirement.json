@@ -27,7 +27,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -55,7 +57,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -83,7 +87,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -111,7 +117,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -139,7 +147,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -167,7 +177,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -195,7 +207,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -223,7 +237,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -251,7 +267,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -279,7 +297,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -307,7 +327,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -335,7 +357,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -363,7 +387,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -391,7 +417,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -419,7 +447,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -447,7 +477,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -475,7 +507,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -503,7 +537,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -531,7 +567,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -559,7 +597,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -587,7 +627,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -615,7 +657,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -643,7 +687,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -671,7 +717,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -699,7 +747,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -727,7 +777,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -755,7 +807,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -783,7 +837,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -811,7 +867,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -839,7 +897,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -867,7 +927,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -895,7 +957,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -923,7 +987,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -951,7 +1017,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -979,7 +1047,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -1007,7 +1077,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -1035,7 +1107,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -1063,7 +1137,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -1091,7 +1167,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -1119,7 +1197,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -1147,7 +1227,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -1175,7 +1257,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -1203,7 +1287,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -1231,7 +1317,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -1259,7 +1347,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -1287,7 +1377,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -1315,7 +1407,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -1343,7 +1437,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -1371,7 +1467,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -1399,7 +1497,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -1427,7 +1527,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -1455,7 +1557,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -1483,7 +1587,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -1511,7 +1617,9 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -1539,9 +1647,12 @@
     "suspendedLossCarryforward" : null,
     "socialSecurityTaxable" : null,
     "selfEmploymentTax" : null,
-    "incomeBySource" : null
+    "incomeBySource" : null,
+    "propertyEquity" : null,
+    "totalNetWorth" : null
   } ],
   "finalBalance" : 12201675.8664,
   "yearsInRetirement" : 25,
-  "spendingFeasibility" : null
+  "spendingFeasibility" : null,
+  "finalNetWorth" : null
 }
