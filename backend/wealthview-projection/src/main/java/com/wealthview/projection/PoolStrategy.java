@@ -27,7 +27,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     BigDecimal applyContributions();
 
-    BigDecimal applyGrowth();
+    GrowthResult applyGrowth();
 
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount);
@@ -44,7 +44,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
                                    BigDecimal contributions, BigDecimal totalGrowth,
                                    BigDecimal withdrawals, boolean retired,
-                                   BigDecimal conversionAmount, BigDecimal taxLiability);
+                                   BigDecimal conversionAmount, BigDecimal taxLiability,
+                                   GrowthResult growthResult,
+                                   BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
+                                   BigDecimal withdrawalFromRoth,
+                                   TaxSourceResult combinedTaxSource);
 
     /**
      * Returns the MAGI value to pass to processIncomeSources.
@@ -74,8 +78,24 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     /** Log tag for the projection type. */
     String logTag();
 
-    record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability) {}
-    record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability) {}
+    record GrowthResult(BigDecimal total, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {}
+
+    record TaxSourceResult(BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth) {
+        static final TaxSourceResult ZERO = new TaxSourceResult(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        TaxSourceResult add(TaxSourceResult other) {
+            return new TaxSourceResult(
+                    fromTaxable.add(other.fromTaxable),
+                    fromTraditional.add(other.fromTraditional),
+                    fromRoth.add(other.fromRoth));
+        }
+    }
+
+    record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability, TaxSourceResult taxSource) {}
+
+    record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
+                               BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
+                               TaxSourceResult taxSource) {}
 
     // --- SinglePool ---
 
@@ -107,10 +127,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public BigDecimal applyGrowth() {
+        public GrowthResult applyGrowth() {
             BigDecimal growth = balance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
             balance = balance.add(growth);
-            return growth;
+            return new GrowthResult(growth, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         @Override
@@ -120,13 +140,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // Simple path: withdrawal is just min(need, balance), no tax tracking
             BigDecimal withdrawn = need.min(balance);
             balance = balance.subtract(withdrawn);
-            return new WithdrawalTaxResult(withdrawn, BigDecimal.ZERO);
+            return new WithdrawalTaxResult(withdrawn, BigDecimal.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
         }
 
         @Override
         public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome) {
             // No-op for single pool
-            return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO);
+            return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
         }
 
         @Override
@@ -145,7 +166,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
                                               BigDecimal contributions, BigDecimal totalGrowth,
                                               BigDecimal withdrawals, boolean retired,
-                                              BigDecimal conversionAmount, BigDecimal taxLiability) {
+                                              BigDecimal conversionAmount, BigDecimal taxLiability,
+                                              GrowthResult growthResult,
+                                              BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
+                                              BigDecimal withdrawalFromRoth,
+                                              TaxSourceResult combinedTaxSource) {
             return ProjectionYearDto.simple(year, age, startBalance, contributions,
                     totalGrowth, withdrawals, balance, retired);
         }
@@ -262,14 +287,15 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public BigDecimal applyGrowth() {
+        public GrowthResult applyGrowth() {
             BigDecimal tradGrowth = traditional.multiply(weightedReturn).setScale(SCALE, ROUNDING);
             BigDecimal rothGrowth = roth.multiply(weightedReturn).setScale(SCALE, ROUNDING);
             BigDecimal taxableGrowth = taxable.multiply(weightedReturn).setScale(SCALE, ROUNDING);
             traditional = traditional.add(tradGrowth);
             roth = roth.add(rothGrowth);
             taxable = taxable.add(taxableGrowth);
-            return tradGrowth.add(rothGrowth).add(taxableGrowth);
+            return new GrowthResult(tradGrowth.add(rothGrowth).add(taxableGrowth),
+                    taxableGrowth, tradGrowth, rothGrowth);
         }
 
         @Override
@@ -277,7 +303,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                       BigDecimal effectiveOtherIncome,
                                                       BigDecimal conversionAmount) {
             if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
-                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO);
+                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
 
             BigDecimal fromTaxable;
@@ -287,7 +314,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if (withdrawalOrder == WithdrawalOrder.PRO_RATA) {
                 BigDecimal total = getTotal();
                 if (total.compareTo(BigDecimal.ZERO) <= 0) {
-                    return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO);
+                    return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
+                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
                 }
                 BigDecimal need = totalNeed.min(total);
                 fromTaxable = need.multiply(taxable).divide(total, SCALE, ROUNDING).min(taxable);
@@ -304,21 +332,23 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             traditional = traditional.subtract(fromTraditional);
             roth = roth.subtract(fromRoth);
 
+            TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
             if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
                 withdrawalTax = taxCalculator.computeTax(
                         fromTraditional.add(effectiveOtherIncome), year, filingStatus);
-                deductFromPools(withdrawalTax);
+                withdrawalTaxSource = deductFromPools(withdrawalTax);
             }
 
             return new WithdrawalTaxResult(
-                    fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax);
+                    fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax,
+                    fromTaxable, fromTraditional, fromRoth, withdrawalTaxSource);
         }
 
         @Override
         public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome) {
             if (rothConversionStartYear != null && year < rothConversionStartYear) {
-                return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO);
+                return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
 
             BigDecimal effectiveLimit;
@@ -333,7 +363,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             if (effectiveLimit.compareTo(BigDecimal.ZERO) <= 0
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
-                return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO);
+                return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
             BigDecimal actual = effectiveLimit.min(traditional);
             traditional = traditional.subtract(actual);
@@ -342,10 +372,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if (taxCalculator != null) {
                 BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
                 BigDecimal tax = taxCalculator.computeTax(taxableIncome, year, filingStatus);
-                deductFromPools(tax);
-                return new ConversionResult(actual, tax);
+                TaxSourceResult taxSource = deductFromPools(tax);
+                return new ConversionResult(actual, tax, taxSource);
             }
-            return new ConversionResult(actual, BigDecimal.ZERO);
+            return new ConversionResult(actual, BigDecimal.ZERO, TaxSourceResult.ZERO);
         }
 
         @Override
@@ -364,7 +394,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
                                               BigDecimal contributions, BigDecimal totalGrowth,
                                               BigDecimal withdrawals, boolean retired,
-                                              BigDecimal conversionAmount, BigDecimal taxLiability) {
+                                              BigDecimal conversionAmount, BigDecimal taxLiability,
+                                              GrowthResult growthResult,
+                                              BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
+                                              BigDecimal withdrawalFromRoth,
+                                              TaxSourceResult combinedTaxSource) {
             return new ProjectionYearDto(
                     year, age, startBalance, contributions, totalGrowth, withdrawals, getTotal(), retired,
                     traditional, roth, taxable,
@@ -372,7 +406,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
                     null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null,
-                    null, null, null);
+                    null, null, null,
+                    growthResult.taxable(), growthResult.traditional(), growthResult.roth(),
+                    combinedTaxSource.fromTaxable().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTaxable() : null,
+                    combinedTaxSource.fromTraditional().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTraditional() : null,
+                    combinedTaxSource.fromRoth().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromRoth() : null,
+                    withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTaxable : null,
+                    withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null,
+                    withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null);
         }
 
         @Override
@@ -426,9 +467,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             };
         }
 
-        private void deductFromPools(BigDecimal amount) {
+        private TaxSourceResult deductFromPools(BigDecimal amount) {
             if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-                return;
+                return TaxSourceResult.ZERO;
             }
             BigDecimal remaining = amount;
 
@@ -441,6 +482,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             remaining = remaining.subtract(fromTrad);
 
             roth = roth.subtract(remaining);
+            return new TaxSourceResult(fromTax, fromTrad, remaining);
         }
     }
 }

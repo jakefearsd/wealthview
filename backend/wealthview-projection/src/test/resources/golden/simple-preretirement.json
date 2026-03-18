@@ -30,7 +30,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -61,7 +70,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -92,7 +110,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -123,7 +150,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -154,7 +190,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -185,7 +230,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -216,7 +270,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -247,7 +310,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -278,7 +350,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -309,7 +390,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -340,7 +430,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -371,7 +470,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -402,7 +510,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -433,7 +550,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -464,7 +590,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -495,7 +630,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -526,7 +670,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -557,7 +710,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -588,7 +750,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -619,7 +790,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -650,7 +830,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -681,7 +870,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -712,7 +910,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -743,7 +950,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -774,7 +990,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -805,7 +1030,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -836,7 +1070,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -867,7 +1110,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -898,7 +1150,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -929,7 +1190,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -960,7 +1230,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -991,7 +1270,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -1022,7 +1310,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -1053,7 +1350,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -1084,7 +1390,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -1115,7 +1430,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -1146,7 +1470,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -1177,7 +1510,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -1208,7 +1550,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -1239,7 +1590,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -1270,7 +1630,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -1301,7 +1670,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -1332,7 +1710,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -1363,7 +1750,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -1394,7 +1790,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -1425,7 +1830,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -1456,7 +1870,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -1487,7 +1910,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -1518,7 +1950,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -1549,7 +1990,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -1580,7 +2030,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -1611,7 +2070,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -1642,7 +2110,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -1673,7 +2150,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -1704,7 +2190,16 @@
     "incomeBySource" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
-    "surplusReinvested" : null
+    "surplusReinvested" : null,
+    "taxableGrowth" : null,
+    "traditionalGrowth" : null,
+    "rothGrowth" : null,
+    "taxPaidFromTaxable" : null,
+    "taxPaidFromTraditional" : null,
+    "taxPaidFromRoth" : null,
+    "withdrawalFromTaxable" : null,
+    "withdrawalFromTraditional" : null,
+    "withdrawalFromRoth" : null
   } ],
   "finalBalance" : 12201675.8664,
   "yearsInRetirement" : 25,

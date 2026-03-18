@@ -167,7 +167,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 contributions = pool.applyContributions();
             }
 
-            BigDecimal totalGrowth = pool.applyGrowth();
+            var growthResult = pool.applyGrowth();
+            BigDecimal totalGrowth = growthResult.total();
 
             if (retired) {
                 yearsInRetirement++;
@@ -180,6 +181,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal taxLiability = incomeResult.taxLiability();
 
             BigDecimal surplusReinvested = null;
+            BigDecimal wdFromTaxable = BigDecimal.ZERO;
+            BigDecimal wdFromTraditional = BigDecimal.ZERO;
+            BigDecimal wdFromRoth = BigDecimal.ZERO;
+            PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
             if (retired) {
                 var retirementResult = processRetirementWithdrawals(
                         pool, strategy, spendingPlan, age, yearsInRetirement,
@@ -190,7 +195,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 taxLiability = taxLiability.add(retirementResult.taxLiability());
                 previousWithdrawal = retirementResult.previousWithdrawal();
                 surplusReinvested = retirementResult.surplusReinvested();
+                wdFromTaxable = retirementResult.withdrawalFromTaxable();
+                wdFromTraditional = retirementResult.withdrawalFromTraditional();
+                wdFromRoth = retirementResult.withdrawalFromRoth();
+                withdrawalTaxSource = retirementResult.withdrawalTaxSource();
             }
+
+            var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
 
             pool.floorAtZero();
 
@@ -198,7 +209,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal propertyEquity = computePropertyEquity(properties, yearsElapsed);
 
             var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
-                    totalGrowth, withdrawals, retired, conversionAmount, taxLiability);
+                    totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
+                    growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
             yearDto = applyPropertyEquity(yearDto, propertyEquity);
             yearDto = applyViability(yearDto, spendingPlan, year, age, yearsInRetirement, inflationRate,
                     incomeResult.totalActiveIncome());
@@ -230,7 +242,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal effectiveOtherIncome,
             BigDecimal conversionAmount,
             BigDecimal taxLiability,
-            BigDecimal suspendedLoss) {
+            BigDecimal suspendedLoss,
+            PoolStrategy.TaxSourceResult conversionTaxSource) {
     }
 
     private IncomeAndConversionResult processIncomeAndConversions(
@@ -253,14 +266,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,
-                conversion.amountConverted(), conversion.taxLiability(), suspendedLoss);
+                conversion.amountConverted(), conversion.taxLiability(), suspendedLoss, conversion.taxSource());
     }
 
     private record RetirementWithdrawalResult(
             BigDecimal withdrawals,
             BigDecimal taxLiability,
             BigDecimal previousWithdrawal,
-            BigDecimal surplusReinvested) {
+            BigDecimal surplusReinvested,
+            BigDecimal withdrawalFromTaxable,
+            BigDecimal withdrawalFromTraditional,
+            BigDecimal withdrawalFromRoth,
+            PoolStrategy.TaxSourceResult withdrawalTaxSource) {
     }
 
     @SuppressWarnings("PMD.ExcessiveParameterList")
@@ -313,7 +330,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         return new RetirementWithdrawalResult(withdrawalResult.totalWithdrawn(), taxLiability,
-                previousWithdrawal, surplusReinvested);
+                previousWithdrawal, surplusReinvested,
+                withdrawalResult.fromTaxable(), withdrawalResult.fromTraditional(),
+                withdrawalResult.fromRoth(), withdrawalResult.taxSource());
     }
 
     private boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {
@@ -590,7 +609,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.rentalLossApplied(), base.suspendedLossCarryforward(),
                 base.socialSecurityTaxable(), base.selfEmploymentTax(),
                 base.incomeBySource(),
-                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested());
+                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
+                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
+                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
@@ -618,7 +640,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 nullIfZero(isResult.socialSecurityTaxable()),
                 nullIfZero(isResult.selfEmploymentTax()),
                 incomeBySource,
-                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested());
+                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
+                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
+                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
     }
 
     private ProjectionYearDto applySurplusReinvested(ProjectionYearDto base, BigDecimal surplusReinvested) {
@@ -634,7 +659,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.rentalLossApplied(), base.suspendedLossCarryforward(),
                 base.socialSecurityTaxable(), base.selfEmploymentTax(),
                 base.incomeBySource(),
-                base.propertyEquity(), base.totalNetWorth(), surplusReinvested);
+                base.propertyEquity(), base.totalNetWorth(), surplusReinvested,
+                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
+                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
@@ -694,7 +722,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.rentalLossApplied(), base.suspendedLossCarryforward(),
                 base.socialSecurityTaxable(), base.selfEmploymentTax(),
                 base.incomeBySource(),
-                propertyEquity, totalNetWorth, base.surplusReinvested());
+                propertyEquity, totalNetWorth, base.surplusReinvested(),
+                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
+                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
     }
 
 }

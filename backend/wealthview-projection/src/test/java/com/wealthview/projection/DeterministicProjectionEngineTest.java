@@ -2304,6 +2304,109 @@ class DeterministicProjectionEngineTest {
                 .isGreaterThan(resultWithout.yearlyData().get(2).endBalance());
     }
 
+    // ── Per-Pool Transparency Tests ──
+
+    @Test
+    void run_multiPool_exposesPerPoolGrowth() {
+        var input = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("200000.0000", "0", "0.0500", "traditional"),
+                        acct("100000.0000", "0", "0.0500", "roth"),
+                        acct("50000.0000", "0", "0.0500", "taxable")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("10000.0000"));
+        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("5000.0000"));
+        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("2500.0000"));
+        assertThat(year1.growth()).isEqualByComparingTo(
+                year1.traditionalGrowth().add(year1.rothGrowth()).add(year1.taxableGrowth()));
+    }
+
+    @Test
+    void run_rothConversion_exposesConversionTaxSource() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var input = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "annual_roth_conversion": 50000}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("500000.0000", "0", "0.0700", "traditional"),
+                        acct("100000.0000", "0", "0.0700", "roth"),
+                        acct("50000.0000", "0", "0.0700", "taxable")));
+
+        var result = engineTax.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        // Tax should come from taxable first
+        assertThat(year1.taxPaidFromTaxable()).isNotNull();
+        assertThat(year1.taxPaidFromTaxable()).isGreaterThan(BigDecimal.ZERO);
+        // Total tax paid from pools should equal tax liability
+        BigDecimal totalTaxPaid = year1.taxPaidFromTaxable()
+                .add(year1.taxPaidFromTraditional() != null ? year1.taxPaidFromTraditional() : BigDecimal.ZERO)
+                .add(year1.taxPaidFromRoth() != null ? year1.taxPaidFromRoth() : BigDecimal.ZERO);
+        assertThat(totalTaxPaid).isEqualByComparingTo(year1.taxLiability());
+    }
+
+    @Test
+    void run_retirementWithdrawal_exposesPerPoolWithdrawals() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("300000.0000", "0", "0.0500", "traditional"),
+                        acct("100000.0000", "0", "0.0500", "roth"),
+                        acct("100000.0000", "0", "0.0500", "taxable")));
+
+        var result = engineTax.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.withdrawals()).isGreaterThan(BigDecimal.ZERO);
+        // Default order is taxable-first
+        assertThat(year1.withdrawalFromTaxable()).isNotNull();
+        // Per-pool withdrawals should sum to total withdrawals
+        BigDecimal totalPerPool = (year1.withdrawalFromTaxable() != null ? year1.withdrawalFromTaxable() : BigDecimal.ZERO)
+                .add(year1.withdrawalFromTraditional() != null ? year1.withdrawalFromTraditional() : BigDecimal.ZERO)
+                .add(year1.withdrawalFromRoth() != null ? year1.withdrawalFromRoth() : BigDecimal.ZERO);
+        assertThat(totalPerPool).isEqualByComparingTo(year1.withdrawals());
+    }
+
+    @Test
+    void run_singlePool_perPoolFieldsAreNull() {
+        var input = createInput(
+                LocalDate.now().plusYears(30), 90, bd("0.0300"),
+                """
+                {"birth_year": %d}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(acct("100000.0000", "10000.0000", "0.0700")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.taxableGrowth()).isNull();
+        assertThat(year1.traditionalGrowth()).isNull();
+        assertThat(year1.rothGrowth()).isNull();
+        assertThat(year1.taxPaidFromTaxable()).isNull();
+        assertThat(year1.taxPaidFromTraditional()).isNull();
+        assertThat(year1.taxPaidFromRoth()).isNull();
+        assertThat(year1.withdrawalFromTaxable()).isNull();
+        assertThat(year1.withdrawalFromTraditional()).isNull();
+        assertThat(year1.withdrawalFromRoth()).isNull();
+    }
+
     // ── Property Equity and Net Worth Tests ──
 
     @Test

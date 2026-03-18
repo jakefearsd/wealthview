@@ -91,6 +91,7 @@ export default function ProjectionDetailPage() {
         y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
     ) ?? false;
     const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
+    const [showPoolDetails, setShowPoolDetails] = useState(false);
 
     const computeTotalSpending = (y: ProjectionYear): number | null => {
         if (y.essential_expenses != null) {
@@ -104,7 +105,12 @@ export default function ProjectionDetailPage() {
 
     const buildProjectionCsv = (yearlyData: ProjectionYear[]): string => {
         const headers = ['Year', 'Age', 'Start', 'Contributions', 'Growth', 'Withdrawals', 'Income', 'Total Spending', 'End', 'Status'];
-        if (hasPoolData) headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
+        if (hasPoolData) {
+            headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
+            headers.push('Trad Growth', 'Roth Growth', 'Taxable Growth',
+                'Tax from Taxable', 'Tax from Trad', 'Tax from Roth',
+                'WD from Taxable', 'WD from Trad', 'WD from Roth');
+        }
         if (hasSpendingData) {
             headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
             if (hasSurplusReinvested) headers.push('Surplus Reinvested');
@@ -116,10 +122,15 @@ export default function ProjectionDetailPage() {
                 y.income_streams_total ?? '', computeTotalSpending(y) ?? '',
                 y.end_balance, y.retired ? 'Retired' : 'Working',
             ];
-            if (hasPoolData) vals.push(
-                y.traditional_balance ?? '', y.roth_balance ?? '', y.taxable_balance ?? '',
-                y.roth_conversion_amount ?? '', y.tax_liability ?? '',
-            );
+            if (hasPoolData) {
+                vals.push(
+                    y.traditional_balance ?? '', y.roth_balance ?? '', y.taxable_balance ?? '',
+                    y.roth_conversion_amount ?? '', y.tax_liability ?? '',
+                    y.traditional_growth ?? '', y.roth_growth ?? '', y.taxable_growth ?? '',
+                    y.tax_paid_from_taxable ?? '', y.tax_paid_from_traditional ?? '', y.tax_paid_from_roth ?? '',
+                    y.withdrawal_from_taxable ?? '', y.withdrawal_from_traditional ?? '', y.withdrawal_from_roth ?? '',
+                );
+            }
             if (hasSpendingData) {
                 vals.push(
                     y.essential_expenses ?? '', y.discretionary_after_cuts ?? y.discretionary_expenses ?? '',
@@ -462,7 +473,23 @@ export default function ProjectionDetailPage() {
 
                         {activeTab === 'table' && (
                             <>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem', gap: '0.5rem' }}>
+                                {hasPoolData && (
+                                    <button
+                                        onClick={() => setShowPoolDetails(!showPoolDetails)}
+                                        style={{
+                                            padding: '0.4rem 0.8rem',
+                                            background: showPoolDetails ? '#e65100' : '#757575',
+                                            color: '#fff',
+                                            border: 'none',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            fontSize: '0.85rem',
+                                        }}
+                                    >
+                                        {showPoolDetails ? 'Hide' : 'Show'} Pool Details
+                                    </button>
+                                )}
                                 <button
                                     onClick={handleDownloadCsv}
                                     style={{
@@ -491,7 +518,6 @@ export default function ProjectionDetailPage() {
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Income</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Total Spending</th>
                                             <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>End</th>
-                                            <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
                                             {hasPoolData && (
                                                 <>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Traditional</th>
@@ -506,10 +532,28 @@ export default function ProjectionDetailPage() {
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Essential</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Discretionary</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Net Need</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus/Deficit</th>
-                                                    {hasSurplusReinvested && (
-                                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus Reinvested</th>
+                                                </>
+                                            )}
+                                            {showPoolDetails && hasPoolData && (
+                                                <>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Trad Growth</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Roth Growth</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Taxable Growth</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax from Taxable</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax from Trad</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax from Roth</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>WD from Taxable</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>WD from Trad</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>WD from Roth</th>
+                                                    {hasSpendingData && (
+                                                        <>
+                                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus/Deficit</th>
+                                                            {hasSurplusReinvested && (
+                                                                <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus Reinvested</th>
+                                                            )}
+                                                        </>
                                                     )}
+                                                    <th style={{ textAlign: 'center', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Status</th>
                                                 </>
                                             )}
                                         </tr>
@@ -535,7 +579,6 @@ export default function ProjectionDetailPage() {
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.income_streams_total != null ? formatCurrency(y.income_streams_total) : '-'}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{computeTotalSpending(y) != null ? formatCurrency(computeTotalSpending(y)!) : '-'}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(y.end_balance)}</td>
-                                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
                                                     {hasPoolData && (
                                                         <>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>{y.traditional_balance != null ? formatCurrency(y.traditional_balance) : '-'}</td>
@@ -550,18 +593,36 @@ export default function ProjectionDetailPage() {
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.essential_expenses != null ? formatCurrency(y.essential_expenses) : '-'}</td>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.discretionary_after_cuts != null ? formatCurrency(y.discretionary_after_cuts) : y.discretionary_expenses != null ? formatCurrency(y.discretionary_expenses) : '-'}</td>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.net_spending_need != null ? formatCurrency(y.net_spending_need) : '-'}</td>
-                                                            <td style={{
-                                                                padding: '0.5rem', textAlign: 'right',
-                                                                color: y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? (y.spending_surplus > 0 ? '#2e7d32' : '#d32f2f') : undefined,
-                                                                fontWeight: 600,
-                                                            }}>
-                                                                {y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? formatCurrency(y.spending_surplus) : '-'}
-                                                            </td>
-                                                            {hasSurplusReinvested && (
-                                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
-                                                                    {y.surplus_reinvested != null && y.surplus_reinvested > 0 ? formatCurrency(y.surplus_reinvested) : '-'}
-                                                                </td>
+                                                        </>
+                                                    )}
+                                                    {showPoolDetails && hasPoolData && (
+                                                        <>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.traditional_growth != null ? formatCurrency(y.traditional_growth) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.roth_growth != null ? formatCurrency(y.roth_growth) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.taxable_growth != null ? formatCurrency(y.taxable_growth) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_taxable != null ? formatCurrency(y.tax_paid_from_taxable) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_traditional != null ? formatCurrency(y.tax_paid_from_traditional) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_roth != null ? formatCurrency(y.tax_paid_from_roth) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_taxable != null ? formatCurrency(y.withdrawal_from_taxable) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_traditional != null ? formatCurrency(y.withdrawal_from_traditional) : '-'}</td>
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_roth != null ? formatCurrency(y.withdrawal_from_roth) : '-'}</td>
+                                                            {hasSpendingData && (
+                                                                <>
+                                                                    <td style={{
+                                                                        padding: '0.5rem', textAlign: 'right',
+                                                                        color: y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? (y.spending_surplus > 0 ? '#2e7d32' : '#d32f2f') : undefined,
+                                                                        fontWeight: 600,
+                                                                    }}>
+                                                                        {y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? formatCurrency(y.spending_surplus) : '-'}
+                                                                    </td>
+                                                                    {hasSurplusReinvested && (
+                                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                                            {y.surplus_reinvested != null && y.surplus_reinvested > 0 ? formatCurrency(y.surplus_reinvested) : '-'}
+                                                                        </td>
+                                                                    )}
+                                                                </>
                                                             )}
+                                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{y.retired ? 'Retired' : 'Working'}</td>
                                                         </>
                                                     )}
                                                 </tr>
