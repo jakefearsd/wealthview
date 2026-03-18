@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
@@ -17,6 +18,7 @@ import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
@@ -31,6 +33,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -260,9 +264,12 @@ public class ProjectionService {
                     var src = link.getIncomeSource();
                     var effective = link.getOverrideAnnualAmount() != null
                             ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
+                    var netCashFlow = computeRentalNetCashFlow(src.getIncomeType(),
+                            src.getProperty(), effective);
                     return new ScenarioIncomeSourceResponse(
                             src.getId(), src.getName(), src.getIncomeType(),
                             src.getAnnualAmount(), link.getOverrideAnnualAmount(), effective,
+                            netCashFlow,
                             src.getStartAge(), src.getEndAge(),
                             src.getInflationRate(), src.isOneTime());
                 })
@@ -324,5 +331,43 @@ public class ProjectionService {
             node.put(key, s);
         }
         return true;
+    }
+
+    private BigDecimal computeRentalNetCashFlow(String incomeType, PropertyEntity property,
+                                                 BigDecimal grossAnnual) {
+        if (!"rental_property".equals(incomeType) || property == null) {
+            return null;
+        }
+        BigDecimal expenses = sumNullable(property.getAnnualInsuranceCost(),
+                property.getAnnualMaintenanceCost(),
+                property.getAnnualPropertyTax());
+        if (property.hasLoanDetails()) {
+            var remaining = AmortizationCalculator.remainingBalance(
+                    property.getLoanAmount(), property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
+            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
+                var interest = remaining.multiply(property.getAnnualInterestRate())
+                        .setScale(4, RoundingMode.HALF_UP);
+                var annualPayment = AmortizationCalculator.monthlyPayment(
+                        property.getLoanAmount(), property.getAnnualInterestRate(),
+                        property.getLoanTermMonths()).multiply(new BigDecimal("12"));
+                var principal = annualPayment.subtract(interest).max(BigDecimal.ZERO);
+                var debtService = interest.add(principal);
+                expenses = expenses == null ? debtService : expenses.add(debtService);
+            }
+        }
+        return expenses != null
+                ? grossAnnual.subtract(expenses).max(BigDecimal.ZERO)
+                : grossAnnual;
+    }
+
+    private static BigDecimal sumNullable(BigDecimal... values) {
+        BigDecimal total = null;
+        for (var v : values) {
+            if (v != null) {
+                total = total == null ? v : total.add(v);
+            }
+        }
+        return total;
     }
 }

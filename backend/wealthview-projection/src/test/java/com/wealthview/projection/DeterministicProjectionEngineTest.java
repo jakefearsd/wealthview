@@ -1849,7 +1849,7 @@ class DeterministicProjectionEngineTest {
                 UUID.randomUUID(), "Social Security", "social_security",
                 bd("30000"), 60, null, bd("0.02"), false,
                 "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = new ProjectionInput(
                 UUID.randomUUID(), "Test Scenario",
@@ -1888,7 +1888,7 @@ class DeterministicProjectionEngineTest {
                 UUID.randomUUID(), "Rental Property", "rental_property",
                 bd("24000"), 60, null, BigDecimal.ZERO, false,
                 "rental_passive",
-                bd("6000"), bd("4000"), bd("3000"),
+                bd("6000"), bd("4000"), null, bd("3000"),
                 "straight_line", depreciationSchedule);
 
         var input = new ProjectionInput(
@@ -1920,7 +1920,7 @@ class DeterministicProjectionEngineTest {
                 UUID.randomUUID(), "Consulting", "part_time_work",
                 bd("50000"), 60, 70, BigDecimal.ZERO, false,
                 "self_employment",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = new ProjectionInput(
                 UUID.randomUUID(), "Test Scenario",
@@ -1950,13 +1950,13 @@ class DeterministicProjectionEngineTest {
                 UUID.randomUUID(), "SS", "social_security",
                 bd("24000"), 67, null, bd("0.02"), false,
                 "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var pensionSource = new ProjectionIncomeSourceInput(
                 UUID.randomUUID(), "Pension", "pension",
                 bd("20000"), 65, null, BigDecimal.ZERO, false,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = new ProjectionInput(
                 UUID.randomUUID(), "Test Scenario",

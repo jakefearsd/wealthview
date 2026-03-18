@@ -130,7 +130,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "SS", "social_security",
                 new BigDecimal("50000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = buildInput(
                 new BigDecimal("1000000"),
@@ -399,7 +399,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "Social Security", "social_security",
                 new BigDecimal("24000"), 67, null,
                 new BigDecimal("0.02"), false, "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var withIncome = buildInput(
                 new BigDecimal("1000000"),
@@ -506,7 +506,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "SS", "social_security",
                 new BigDecimal("24000"), 67, null,
                 BigDecimal.ZERO, false, "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = buildInput(
                 new BigDecimal("1000000"),
@@ -588,7 +588,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "Inheritance", "other",
                 new BigDecimal("100000"), 65, 66,
                 BigDecimal.ZERO, true, "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = buildInput(
                 new BigDecimal("500000"),
@@ -618,7 +618,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "SS", "social_security",
                 new BigDecimal("24000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = buildInput(
                 new BigDecimal("1000000"),
@@ -654,6 +654,7 @@ class MonteCarloSpendingOptimizerTest {
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("25000"),   // operating expenses (insurance + maintenance)
                 new BigDecimal("20000"),   // mortgage interest
+                null,                      // annualMortgagePrincipal
                 new BigDecimal("15000"),   // property tax
                 null, null);
 
@@ -697,7 +698,7 @@ class MonteCarloSpendingOptimizerTest {
                 java.util.UUID.randomUUID(), "SS", "social_security",
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var input = buildInput(
                 new BigDecimal("1000000"),
@@ -1472,5 +1473,130 @@ class MonteCarloSpendingOptimizerTest {
                 .mapToDouble(y -> y.discretionary().doubleValue())
                 .average().orElse(0);
         assertThat(avgDisc).isGreaterThan(0);
+    }
+
+    // ── Bug fixes: computeDeterministicIncome inconsistencies ──────────────────
+
+    @Test
+    void computeIncome_rentalWithMortgagePrincipal_deductsPrincipalFromIncomeOffset() {
+        // Rental property: $100k gross, $30k interest, $10k property tax, $20k principal
+        // Net cash flow = 100k - 30k - 10k - 20k = $40k (principal must be deducted)
+        // Pre-fix: optimizer excluded principal → assumed $60k income → WRONG
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var rentalWithPrincipal = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                new BigDecimal("100000"), 60, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                null,                      // no operating expenses (keep simple)
+                new BigDecimal("30000"),   // mortgage interest
+                new BigDecimal("20000"),   // mortgage principal — must be deducted
+                new BigDecimal("10000"),   // property tax
+                null, null);
+
+        var input = buildInput(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(rentalWithPrincipal),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // At age 65 (non-boundary, full year): income offset must be $40k ($100k - $30k - $10k - $20k)
+        // Pre-fix value was $60k ($100k - $30k - $10k, no principal deducted).
+        var atAge65 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 65)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge65.incomeOffset().doubleValue())
+                .as("Income offset must deduct mortgage principal: $100k - $30k - $10k - $20k = $40k")
+                .isCloseTo(40000, org.assertj.core.data.Offset.offset(500.0));
+    }
+
+    @Test
+    void computeIncome_oneTimeSource_notHalvedAtStartAge() {
+        // One-time income ($60k lump sum at age 65) must NOT be halved.
+        // Pre-fix: optimizer applied 0.5 boundary multiplier to all sources, giving $30k.
+        // ICC and ISP both correctly return full $60k for one_time sources.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var oneTime = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Inheritance", "other",
+                new BigDecimal("60000"), 65, 66,
+                BigDecimal.ZERO, true, "taxable",
+                null, null, null, null, null, null);
+
+        var input = buildInput(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(oneTime),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // At age 65 (startAge), the income offset must be the full $60k, not the halved $30k.
+        var atAge65 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 65)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge65.incomeOffset().doubleValue())
+                .as("One-time income must not be halved at startAge: expected full $60k, not $30k")
+                .isCloseTo(60000, org.assertj.core.data.Offset.offset(500.0));
+
+        // One year later the one-time income must be $0 (source expires after startAge)
+        var atAge66 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 66)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge66.incomeOffset().doubleValue())
+                .as("One-time income must not appear at age 66")
+                .isCloseTo(0, org.assertj.core.data.Offset.offset(500.0));
+    }
+
+    @Test
+    void computeIncome_rentalWithInflation_inflatesGrossBeforeSubtractingExpenses() {
+        // Rental: $100k gross at 10% inflation, $60k fixed expenses, no principal.
+        // After 5 years (year 6, age 67): gross = $100k × 1.1^5 = $161k, net = $161k - $60k = $101k.
+        // Pre-fix: optimizer inflated NET → ($100k - $60k) × 1.1^5 = $64.4k → WRONG.
+        // ISP inflates gross → $100k × 1.1^5 - $60k = $101k.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var rentalInflating = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                new BigDecimal("100000"), 62, null,
+                new BigDecimal("0.10"), false, "rental_passive",
+                new BigDecimal("30000"),   // operating expenses (fixed, don't inflate)
+                null,
+                null,
+                new BigDecimal("30000"),   // property tax (fixed, don't inflate)
+                null, null);
+
+        var input = buildInput(
+                new BigDecimal("2000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(rentalInflating),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // At age 67 (year 6, non-boundary): gross = $100k × 1.1^5 ≈ $161k, net = $161k - $60k ≈ $101k
+        // Pre-fix: ($100k - $60k) × 1.1^5 = $64.4k
+        var atAge67 = result.yearlySpending().stream()
+                .filter(y -> y.age() == 67)
+                .findFirst().orElseThrow();
+
+        assertThat(atAge67.incomeOffset().doubleValue())
+                .as("Rental income after 5yr at 10% inflation: gross inflates to ~$161k, net = ~$101k. "
+                        + "Pre-fix (inflate net) would give ~$64k.")
+                .isGreaterThan(90000);
     }
 }

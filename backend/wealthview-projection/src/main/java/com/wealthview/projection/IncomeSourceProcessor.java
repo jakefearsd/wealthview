@@ -173,7 +173,13 @@ class IncomeSourceProcessor {
                     .getOrDefault(taxYear, BigDecimal.ZERO);
         }
 
-        BigDecimal cashFlow = nominal.subtract(expenses);
+        // Principal reduces cash flow but is NOT tax-deductible
+        BigDecimal mortPrincipal = source.annualMortgagePrincipal() != null
+                ? source.annualMortgagePrincipal() : BigDecimal.ZERO;
+        BigDecimal principalScaled = mortPrincipal
+                .multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
+
+        BigDecimal cashFlow = nominal.subtract(expenses).subtract(principalScaled);
         BigDecimal netTaxable = nominal.subtract(expenses).subtract(depreciation);
 
         var lossResult = rentalLossCalculator.applyLossRules(

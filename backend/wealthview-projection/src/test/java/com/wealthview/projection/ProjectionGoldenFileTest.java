@@ -102,7 +102,7 @@ class ProjectionGoldenFileTest {
                         new BigDecimal(item.get("inflationRate").asText()),
                         item.get("oneTime").asBoolean(),
                         item.get("taxTreatment").asText(),
-                        null, null, null, null, null
+                        null, null, null, null, null, null
                 ));
             }
             incomeSources = sourceList;

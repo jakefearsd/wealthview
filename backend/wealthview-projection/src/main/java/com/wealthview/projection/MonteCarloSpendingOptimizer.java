@@ -267,23 +267,32 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 if (!isActiveForAge(source, age)) {
                     continue;
                 }
-                double amount = source.annualAmount().doubleValue();
+                double gross = source.annualAmount().doubleValue();
 
-                // For rental properties, subtract operating expenses, mortgage interest,
-                // and property tax to get net cash flow (matching the deterministic engine)
+                if (source.inflationRate() != null
+                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
+                    gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearsInRetirement - 1);
+                }
+
+                double amount = gross;
+
+                // For rental properties, subtract all cash outflows to get net cash flow,
+                // matching IncomeSourceProcessor: operating expenses, mortgage interest,
+                // property tax, AND mortgage principal (principal reduces available cash even
+                // though it is not tax-deductible).
                 if ("rental_property".equals(source.incomeType())) {
                     amount -= nullSafe(source.annualOperatingExpenses());
                     amount -= nullSafe(source.annualMortgageInterest());
                     amount -= nullSafe(source.annualPropertyTax());
+                    amount -= nullSafe(source.annualMortgagePrincipal());
                     amount = Math.max(0, amount);
                 }
 
-                if (source.inflationRate() != null
-                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    amount *= Math.pow(1 + source.inflationRate().doubleValue(), yearsInRetirement - 1);
-                }
-                // Apply boundary multiplier
-                if (age == source.startAge() || (source.endAge() != null && age == source.endAge())) {
+                // Apply boundary multiplier (0.5 at startAge/endAge) for recurring sources only.
+                // One-time sources pay their full amount at startAge, matching ICC and ISP.
+                if (!source.oneTime()
+                        && (age == source.startAge()
+                                || (source.endAge() != null && age == source.endAge()))) {
                     amount *= 0.5;
                 }
                 income[y] += amount;
