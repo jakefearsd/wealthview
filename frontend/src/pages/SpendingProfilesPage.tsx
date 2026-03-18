@@ -5,7 +5,8 @@ import { listScenarios, getGuardrailProfile, deleteGuardrailProfile, reoptimize 
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { formatCurrency } from '../utils/format';
+import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
 import toast from 'react-hot-toast';
 import type { SpendingProfile, CreateSpendingProfileRequest, SpendingTier, GuardrailProfileResponse } from '../types/projection';
@@ -146,12 +147,12 @@ export default function SpendingProfilesPage() {
                         </div>
                         <div>
                             <label style={labelStyle}>Essential Expenses (annual)</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(essentialExpenses)} onChange={e => setFormData(prev => ({ ...prev, essential_expenses: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={essentialExpenses} onChange={v => setFormData(prev => ({ ...prev, essential_expenses: Number(v) || 0 }))} />
                             <HelpText>Default non-negotiable annual costs when no spending tier matches the current age.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Discretionary Expenses (annual)</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(discretionaryExpenses)} onChange={e => setFormData(prev => ({ ...prev, discretionary_expenses: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={discretionaryExpenses} onChange={v => setFormData(prev => ({ ...prev, discretionary_expenses: Number(v) || 0 }))} />
                             <HelpText>Default flexible annual spending when no spending tier matches the current age.</HelpText>
                         </div>
                     </div>
@@ -187,11 +188,11 @@ export default function SpendingProfilesPage() {
                             </div>
                             <div>
                                 <label style={labelStyle}>Essential (annual)</label>
-                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(tier.essential_expenses)} onChange={e => updateTier(idx, 'essential_expenses', Number(parseCurrencyInput(e.target.value)) || 0)} />
+                                <CurrencyInput style={inputStyle} value={tier.essential_expenses} onChange={v => updateTier(idx, 'essential_expenses', Number(v) || 0)} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Discretionary (annual)</label>
-                                <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(tier.discretionary_expenses)} onChange={e => updateTier(idx, 'discretionary_expenses', Number(parseCurrencyInput(e.target.value)) || 0)} />
+                                <CurrencyInput style={inputStyle} value={tier.discretionary_expenses} onChange={v => updateTier(idx, 'discretionary_expenses', Number(v) || 0)} />
                             </div>
                             <div>
                                 <button

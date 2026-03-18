@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { createTransaction, updateTransaction } from '../api/transactions';
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import CurrencyInput from './CurrencyInput';
 import type { Transaction, TransactionRequest } from '../types/transaction';
 import toast from 'react-hot-toast';
 
@@ -53,7 +53,7 @@ export default function TransactionForm({ accountId, onSuccess, onCancel, initia
                 </select>
                 <input placeholder="Symbol" value={txnSymbol} onChange={(e) => setTxnSymbol(e.target.value)} style={{ padding: '0.4rem' }} />
                 <input placeholder="Quantity" type="number" value={txnQuantity} onChange={(e) => setTxnQuantity(e.target.value)} style={{ padding: '0.4rem' }} />
-                <input placeholder="Amount" type="text" inputMode="decimal" value={formatCurrencyInput(txnAmount)} onChange={(e) => setTxnAmount(parseCurrencyInput(e.target.value))} style={{ padding: '0.4rem' }} />
+                <CurrencyInput placeholder="Amount" value={txnAmount} onChange={setTxnAmount} style={{ padding: '0.4rem' }} />
             </div>
             <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem' }}>
                 <button onClick={handleSubmit} style={{ padding: '0.4rem 0.8rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save</button>

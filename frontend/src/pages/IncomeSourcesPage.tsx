@@ -4,7 +4,8 @@ import { listProperties } from '../api/properties';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { formatCurrency, toPercent } from '../utils/format';
+import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
 import InfoSection from '../components/InfoSection';
 import PropertyIncomeChart from '../components/PropertyIncomeChart';
@@ -161,7 +162,7 @@ export default function IncomeSourcesPage() {
             annual_amount: source.annual_amount,
             start_age: source.start_age,
             end_age: source.end_age,
-            inflation_rate: source.inflation_rate * 100,
+            inflation_rate: toPercent(source.inflation_rate),
             one_time: source.one_time,
             tax_treatment: source.tax_treatment,
             property_id: source.property_id,
@@ -302,7 +303,7 @@ export default function IncomeSourcesPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: oneTime ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Amount' : propertyId ? 'Annual Rent Amount' : 'Annual Amount'}</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualAmount)} onChange={e => setFormData(prev => ({ ...prev, annual_amount: Number(parseCurrencyInput(e.target.value)) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={annualAmount} onChange={v => setFormData(prev => ({ ...prev, annual_amount: Number(v) || 0 }))} />
                         </div>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>

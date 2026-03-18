@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import CurrencyInput from './CurrencyInput';
 import { cardStyle } from '../utils/styles';
 
 interface CategoryOption {
@@ -40,7 +40,7 @@ export default function PropertyTransactionForm({ title, categories, onSubmit, b
             <h3 style={{ marginBottom: '1rem' }}>{title}</h3>
             <div style={{ display: 'grid', gap: '0.5rem' }}>
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ padding: '0.4rem' }} />
-                <input type="text" inputMode="decimal" placeholder="Amount" value={formatCurrencyInput(amount)} onChange={(e) => setAmount(parseCurrencyInput(e.target.value))} style={{ padding: '0.4rem' }} />
+                <CurrencyInput placeholder="Amount" value={amount} onChange={setAmount} style={{ padding: '0.4rem' }} />
                 <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: '0.4rem' }}>
                     {categories.map((c) => (
                         <option key={c.value} value={c.value}>{c.label}</option>

@@ -1,5 +1,5 @@
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
 import { inputStyle, labelStyle } from '../utils/styles';
+import CurrencyInput from './CurrencyInput';
 
 interface Props {
     heading: string;
@@ -36,7 +36,7 @@ export default function PropertyForm(props: Props) {
                 </div>
                 <div>
                     <label style={labelStyle}>Purchase Price</label>
-                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.purchasePrice)} onChange={(e) => props.onPurchasePriceChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                    <CurrencyInput value={props.purchasePrice} onChange={props.onPurchasePriceChange} style={inputStyle} />
                 </div>
                 <div>
                     <label style={labelStyle}>Purchase Date</label>
@@ -44,11 +44,11 @@ export default function PropertyForm(props: Props) {
                 </div>
                 <div>
                     <label style={labelStyle}>Current Value</label>
-                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.currentValue)} onChange={(e) => props.onCurrentValueChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                    <CurrencyInput value={props.currentValue} onChange={props.onCurrentValueChange} style={inputStyle} />
                 </div>
                 <div>
                     <label style={labelStyle}>Mortgage Balance</label>
-                    <input type="text" inputMode="decimal" value={formatCurrencyInput(props.mortgageBalance)} onChange={(e) => props.onMortgageBalanceChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                    <CurrencyInput value={props.mortgageBalance} onChange={props.onMortgageBalanceChange} style={inputStyle} />
                 </div>
                 <div>
                     <label style={labelStyle}>Property Type</label>
@@ -75,7 +75,7 @@ export default function PropertyForm(props: Props) {
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                             <label style={labelStyle}>Loan Amount</label>
-                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.loanAmount)} onChange={(e) => props.onLoanAmountChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                            <CurrencyInput value={props.loanAmount} onChange={props.onLoanAmountChange} style={inputStyle} />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Interest Rate (%)</label>
@@ -116,15 +116,15 @@ export default function PropertyForm(props: Props) {
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Property Tax ($)</label>
-                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualPropertyTax)} onChange={(e) => props.onAnnualPropertyTaxChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                            <CurrencyInput value={props.annualPropertyTax} onChange={props.onAnnualPropertyTaxChange} style={inputStyle} />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Insurance Cost ($)</label>
-                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualInsuranceCost)} onChange={(e) => props.onAnnualInsuranceCostChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                            <CurrencyInput value={props.annualInsuranceCost} onChange={props.onAnnualInsuranceCostChange} style={inputStyle} />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Maintenance Cost ($)</label>
-                            <input type="text" inputMode="decimal" value={formatCurrencyInput(props.annualMaintenanceCost)} onChange={(e) => props.onAnnualMaintenanceCostChange(parseCurrencyInput(e.target.value))} style={inputStyle} />
+                            <CurrencyInput value={props.annualMaintenanceCost} onChange={props.onAnnualMaintenanceCostChange} style={inputStyle} />
                         </div>
                     </div>
                 </div>

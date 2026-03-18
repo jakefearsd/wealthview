@@ -3,7 +3,8 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
 import { listIncomeSources } from '../api/incomeSources';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { formatCurrency, toPercent } from '../utils/format';
+import CurrencyInput from './CurrencyInput';
 import HelpText from './HelpText';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
@@ -52,17 +53,17 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [name, setName] = useState(initialValues?.name ?? '');
     const [retirementDate, setRetirementDate] = useState(initialValues?.retirement_date ?? '');
     const [endAge, setEndAge] = useState(initialValues?.end_age ?? 90);
-    const [inflationRate, setInflationRate] = useState((initialValues?.inflation_rate ?? 0.03) * 100);
+    const [inflationRate, setInflationRate] = useState(toPercent(initialValues?.inflation_rate ?? 0.03));
     const [birthYear, setBirthYear] = useState<number>(parsedParams.birth_year ?? 1990);
-    const [withdrawalRate, setWithdrawalRate] = useState<number>((parsedParams.withdrawal_rate ?? 0.04) * 100);
+    const [withdrawalRate, setWithdrawalRate] = useState<number>(toPercent(parsedParams.withdrawal_rate ?? 0.04));
     const [withdrawalStrategy, setWithdrawalStrategy] = useState(parsedParams.withdrawal_strategy ?? 'fixed_percentage');
-    const [dynamicCeiling, setDynamicCeiling] = useState<number>((parsedParams.dynamic_ceiling ?? 0.05) * 100);
-    const [dynamicFloor, setDynamicFloor] = useState<number>((parsedParams.dynamic_floor ?? -0.025) * 100);
+    const [dynamicCeiling, setDynamicCeiling] = useState<number>(toPercent(parsedParams.dynamic_ceiling ?? 0.05));
+    const [dynamicFloor, setDynamicFloor] = useState<number>(toPercent(parsedParams.dynamic_floor ?? -0.025));
     const [filingStatus, setFilingStatus] = useState(parsedParams.filing_status ?? 'single');
     const [otherIncome, setOtherIncome] = useState<number>(parsedParams.other_income ?? 0);
     const [annualRothConversion, setAnnualRothConversion] = useState<number>(parsedParams.annual_roth_conversion ?? 0);
     const [rothConversionStrategy, setRothConversionStrategy] = useState(parsedParams.roth_conversion_strategy ?? 'fixed_amount');
-    const [targetBracketRate, setTargetBracketRate] = useState<number>((parsedParams.target_bracket_rate ?? 0.12) * 100);
+    const [targetBracketRate, setTargetBracketRate] = useState<number>(toPercent(parsedParams.target_bracket_rate ?? 0.12));
     const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
     const deriveSpendingPlan = () =>
@@ -73,7 +74,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             linked_account_id: a.linked_account_id,
             initial_balance: a.initial_balance,
             annual_contribution: a.annual_contribution,
-            expected_return: a.expected_return * 100,
+            expected_return: toPercent(a.expected_return),
             account_type: a.account_type || 'taxable',
         })) ?? [defaultAccount()]
     );
@@ -228,14 +229,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                     {selected && (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                             <label style={{ fontSize: '0.85rem', color: '#666' }}>Override:</label>
-                                            <input
+                                            <CurrencyInput
                                                 style={{ ...inputStyle, width: '140px' }}
-                                                type="text"
-                                                inputMode="decimal"
                                                 placeholder="Use default"
-                                                value={selected.override_annual_amount != null ? formatCurrencyInput(selected.override_annual_amount) : ''}
-                                                onChange={e => {
-                                                    const val = e.target.value ? Number(parseCurrencyInput(e.target.value)) || null : null;
+                                                value={selected.override_annual_amount != null ? selected.override_annual_amount : ''}
+                                                onChange={v => {
+                                                    const val = v ? Number(v) || null : null;
                                                     setSelectedIncomeSources(prev => prev.map(s =>
                                                         s.income_source_id === is.id ? { ...s, override_annual_amount: val } : s
                                                     ));
@@ -334,18 +333,16 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         </div>
                         <div>
                             <label style={labelStyle}>Initial Balance{acct.linked_account_id ? ' (live)' : ''}</label>
-                            <input
+                            <CurrencyInput
                                 style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
-                                type="text"
-                                inputMode="decimal"
-                                value={formatCurrencyInput(acct.initial_balance)}
-                                onChange={e => updateAccount(idx, 'initial_balance', Number(parseCurrencyInput(e.target.value)) || 0)}
+                                value={acct.initial_balance}
+                                onChange={v => updateAccount(idx, 'initial_balance', Number(v) || 0)}
                                 readOnly={!!acct.linked_account_id}
                             />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Contribution</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(acct.annual_contribution)} onChange={e => updateAccount(idx, 'annual_contribution', Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <CurrencyInput style={inputStyle} value={acct.annual_contribution} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
                         </div>
                         <div>
                             <label style={labelStyle}>Expected Return (%)</label>
