@@ -18,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class MonteCarloSpendingOptimizerTest {
 
-    private final MonteCarloSpendingOptimizer optimizer = new MonteCarloSpendingOptimizer();
+    private final MonteCarloSpendingOptimizer optimizer = new MonteCarloSpendingOptimizer(null);
 
     private GuardrailOptimizationInput buildInput(BigDecimal portfolio,
                                                    BigDecimal essentialFloor,

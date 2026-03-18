@@ -29,7 +29,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -59,7 +60,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -89,7 +91,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -119,7 +122,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -149,7 +153,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -179,7 +184,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -209,7 +215,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -239,7 +246,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -269,7 +277,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -299,7 +308,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -329,7 +339,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -359,7 +370,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -389,7 +401,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -419,7 +432,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -449,7 +463,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -479,7 +494,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -509,7 +525,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -539,7 +556,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -569,7 +587,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -599,7 +618,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -629,7 +649,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -659,7 +680,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -689,7 +711,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -719,7 +742,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -749,7 +773,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -779,7 +804,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -809,7 +835,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -839,7 +866,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -869,7 +897,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -899,7 +928,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -929,7 +959,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -959,7 +990,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -989,7 +1021,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -1019,7 +1052,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -1049,7 +1083,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -1079,7 +1114,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -1109,7 +1145,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -1139,7 +1176,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -1169,7 +1207,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -1199,7 +1238,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -1229,7 +1269,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -1259,7 +1300,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -1289,7 +1331,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -1319,7 +1362,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -1349,7 +1393,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -1379,7 +1424,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -1409,7 +1455,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -1439,7 +1486,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -1469,7 +1517,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -1499,7 +1548,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -1529,7 +1579,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -1559,7 +1610,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -1589,7 +1641,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -1619,7 +1672,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -1649,7 +1703,8 @@
     "selfEmploymentTax" : null,
     "incomeBySource" : null,
     "propertyEquity" : null,
-    "totalNetWorth" : null
+    "totalNetWorth" : null,
+    "surplusReinvested" : null
   } ],
   "finalBalance" : 15437939.6945,
   "yearsInRetirement" : 25,

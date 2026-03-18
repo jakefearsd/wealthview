@@ -7,8 +7,11 @@ import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -27,6 +30,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final double DEFAULT_BLOCK_LENGTH = 5.0;
+
+    private final FederalTaxCalculator taxCalculator;
+
+    public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator) {
+        this.taxCalculator = taxCalculator;
+    }
 
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
@@ -63,8 +72,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 trialCount, years, initialPortfolio, historicalReturns, rng, inflationRate);
 
         // Compute deterministic income for each year
-        double[] incomeByYear = computeDeterministicIncome(
+        IncomeYearData[] incomeData = computeDeterministicIncome(
                 input.incomeSources(), retirementAge, years, input.birthYear());
+        double[] incomeByYear = new double[years];
+        // Pre-compute surplus tax once per year to avoid calling the tax calculator inside hot loops.
+        double[] surplusTaxByYear = new double[years];
+        for (int y = 0; y < years; y++) {
+            incomeByYear[y] = incomeData[y].totalIncome();
+            surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y);
+        }
 
         // Stage 2: Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
@@ -76,7 +92,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         // Stage 3: Priority-weighted discretionary allocation
         double[] discretionaryByYear = allocateSpending(
-                portfolioPaths, incomeByYear, adjustedFloors, terminalTarget,
+                portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors, terminalTarget,
                 input.phases(), retirementAge, years, trialCount,
                 confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
                 inflationRate);
@@ -95,14 +111,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     input.phases(), retirementAge);
 
             // Re-verify sustainability of smoothed plan; reduce if broken
-            if (!isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
+            if (!isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
                     discretionaryByYear, terminalTarget, years, trialCount,
                     confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < years; y++) {
                         discretionaryByYear[y] *= 0.95;
                     }
-                    if (isSustainable(portfolioPaths, incomeByYear, adjustedFloors,
+                    if (isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
                             discretionaryByYear, terminalTarget, years, trialCount,
                             confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
                         break;
@@ -167,6 +183,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     }
                 } else {
                     equityBalance -= withdrawal;
+                }
+
+                // Surplus: income exceeds spending — deposit after-tax surplus to equity
+                if (incomeByYear[y] > spending) {
+                    double grossSurplus = incomeByYear[y] - spending;
+                    equityBalance += Math.max(0, grossSurplus - surplusTaxByYear[y]);
                 }
 
                 double totalBalance = Math.max(0, equityBalance + cashBalance);
@@ -253,16 +275,23 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return (1 + realReturn) * (1 + inflationRate) - 1;
     }
 
-    private double[] computeDeterministicIncome(List<ProjectionIncomeSourceInput> sources,
-                                                 int retirementAge, int years, int birthYear) {
-        double[] income = new double[years];
+    private record IncomeYearData(double totalIncome, double taxableIncome) {}
+
+    private IncomeYearData[] computeDeterministicIncome(List<ProjectionIncomeSourceInput> sources,
+                                                         int retirementAge, int years, int birthYear) {
+        IncomeYearData[] result = new IncomeYearData[years];
+        for (int y = 0; y < years; y++) {
+            result[y] = new IncomeYearData(0, 0);
+        }
         if (sources == null || sources.isEmpty()) {
-            return income;
+            return result;
         }
 
         for (int y = 0; y < years; y++) {
             int age = retirementAge + y;
             int yearsInRetirement = y + 1;
+            double totalIncome = 0;
+            double taxableIncome = 0;
             for (var source : sources) {
                 if (!isActiveForAge(source, age)) {
                     continue;
@@ -295,10 +324,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                 || (source.endAge() != null && age == source.endAge()))) {
                     amount *= 0.5;
                 }
-                income[y] += amount;
+                totalIncome += amount;
+
+                // All non-rental income is treated as taxable for MC purposes.
+                // Rental net cash is excluded (complex passive-loss rules not applicable here).
+                if (!"rental_property".equals(source.incomeType())) {
+                    taxableIncome += amount;
+                }
             }
+            result[y] = new IncomeYearData(totalIncome, taxableIncome);
         }
-        return income;
+        return result;
     }
 
     private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
@@ -352,7 +388,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return floors;
     }
 
-    private double[] allocateSpending(double[][] paths, double[] income,
+    private double[] allocateSpending(double[][] paths, double[] income, double[] surplusTax,
                                        double[] floors, double terminalTarget,
                                        List<GuardrailPhaseInput> phases,
                                        int retirementAge, int years, int trialCount,
@@ -363,7 +399,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         if (phases == null || phases.isEmpty()) {
             double maxDisc = binarySearchDiscretionary(
-                    paths, income, floors, discretionary, terminalTarget,
+                    paths, income, surplusTax, floors, discretionary, terminalTarget,
                     0, years - 1, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate);
             Arrays.fill(discretionary, maxDisc);
@@ -376,7 +412,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         && p.targetSpending().compareTo(BigDecimal.ZERO) > 0);
 
         if (hasTargets) {
-            return allocateByTargets(paths, income, floors, terminalTarget, phases,
+            return allocateByTargets(paths, income, surplusTax, floors, terminalTarget, phases,
                     retirementAge, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, inflationRate);
         }
@@ -399,7 +435,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             double maxDisc = binarySearchDiscretionary(
-                    paths, income, floors, discretionary, terminalTarget,
+                    paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate);
 
@@ -411,7 +447,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return discretionary;
     }
 
-    private double[] allocateByTargets(double[][] paths, double[] income,
+    private double[] allocateByTargets(double[][] paths, double[] income, double[] surplusTax,
                                         double[] floors, double terminalTarget,
                                         List<GuardrailPhaseInput> phases,
                                         int retirementAge, int years, int trialCount,
@@ -433,7 +469,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             double found = binarySearchDiscretionary(
-                    paths, income, floors, discretionary, terminalTarget,
+                    paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate);
 
@@ -465,7 +501,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return discretionary;
     }
 
-    private double binarySearchDiscretionary(double[][] paths, double[] income,
+    private double binarySearchDiscretionary(double[][] paths, double[] income, double[] surplusTax,
                                               double[] floors, double[] currentDiscretionary,
                                               double terminalTarget,
                                               int phaseStart, int phaseEnd,
@@ -483,7 +519,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 testDiscretionary[y] = mid;
             }
 
-            if (isSustainable(paths, income, floors, testDiscretionary,
+            if (isSustainable(paths, income, surplusTax, floors, testDiscretionary,
                     terminalTarget, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate)) {
                 low = mid;
@@ -495,7 +531,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return low;
     }
 
-    private boolean isSustainable(double[][] paths, double[] income,
+    private boolean isSustainable(double[][] paths, double[] income, double[] surplusTax,
                                    double[] floors, double[] discretionary,
                                    double terminalTarget, int years, int trialCount,
                                    double confidenceLevel, double portfolioFloor,
@@ -544,6 +580,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     }
                 } else {
                     equityBalance -= withdrawal;
+                }
+
+                // Surplus: income exceeds spending — deposit after-tax surplus to equity
+                if (income[y] > spending) {
+                    double grossSurplus = income[y] - spending;
+                    equityBalance += Math.max(0, grossSurplus - surplusTax[y]);
                 }
 
                 double totalBalance = equityBalance + cashBalance;
@@ -705,6 +747,16 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 corridorHigh[y] = avg;
             }
         }
+    }
+
+    private double computeSurplusTax(double taxableIncome, int taxYear) {
+        if (taxCalculator == null || taxableIncome <= 0) {
+            return 0.0;
+        }
+        // Use SINGLE as the default filing status for MC optimization (no user-specific context).
+        BigDecimal tax = taxCalculator.computeTax(
+                BigDecimal.valueOf(taxableIncome), taxYear, FilingStatus.SINGLE);
+        return tax.doubleValue();
     }
 
     private static double nullSafe(BigDecimal value) {

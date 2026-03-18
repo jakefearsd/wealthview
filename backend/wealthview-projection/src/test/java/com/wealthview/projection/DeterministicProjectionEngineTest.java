@@ -2129,6 +2129,181 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40000.0000"));
     }
 
+    // === Surplus Income Reinvestment Tests ===
+
+    @Test
+    void run_withSpendingProfile_incomeExceedsSpending_depositsGrossSurplus() {
+        // No tax calculator: gross surplus is deposited in full.
+        // Spending = $30k, Income = $50k (mid-range age, full amount) → surplus = $20k
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null),
+                List.of(incomeSource("Pension", "50000", 60, null, "0")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("20000"));
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_withSpendingProfile_incomeUnderSpending_surplusReinvestedIsNull() {
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), null),
+                List.of(incomeSource("Pension", "20000", 60, null, "0")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.surplusReinvested()).isNull();
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("25000.0000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_incomeEqualsSpending_surplusReinvestedIsNull() {
+        // Income exactly covers spending: no surplus deposited, no withdrawal
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null),
+                List.of(incomeSource("Pension", "30000", 60, null, "0")));
+
+        var result = engine.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.surplusReinvested()).isNull();
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_withSpendingProfile_surplusWithTaxCalc_depositsAfterTaxAmount() {
+        // MultiPool with tax calculator: tax is deducted before depositing surplus.
+        // Spending = $30k, Income = $50k → gross surplus = $20k
+        // Tax on $50k SINGLE 2025 (standard ded $15k):
+        //   taxable = $50k - $15k = $35k
+        //   10%: $11,925 × 0.10 = $1,192.50
+        //   12%: $23,075 × 0.12 = $2,769.00 → total = $3,961.50
+        // After-tax surplus = $20,000 - $3,961.50 = $16,038.50
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000.0000", "0", "0.0500", "traditional"),
+                        acct("200000.0000", "0", "0.0500", "roth")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null),
+                List.of(incomeSource("Pension", "50000", 60, null, "0")));
+
+        var result = engineTax.run(input);
+
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.surplusReinvested()).isNotNull();
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("16038.5000"));
+        // Taxable account balance should equal the deposited after-tax surplus
+        // (starts at 0, grows at 0, then receives deposit)
+        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("16038.5000"));
+    }
+
+    @Test
+    void run_withSpendingProfile_pensionRefundSpike_surplusReinvestedOnlyInSpikeYear() {
+        // One-time pension refund at age 67: $100k income vs $30k spending → $70k surplus (year 2).
+        // All other years: no surplus (income = 0 < spending).
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 70, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null),
+                List.of(oneTimeIncomeSource("Pension Refund", "100000", 67)));
+
+        var result = engine.run(input);
+
+        // Year 1 (age 66): no one-time income → no surplus
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.surplusReinvested()).isNull();
+
+        // Year 2 (age 67): one-time $100k > $30k spending → surplus = $70k
+        var year2 = result.yearlyData().get(1);
+        assertThat(year2.surplusReinvested()).isEqualByComparingTo(bd("70000"));
+
+        // Year 3 (age 68): one-time source expired → no surplus
+        var year3 = result.yearlyData().get(2);
+        assertThat(year3.surplusReinvested()).isNull();
+    }
+
+    @Test
+    void run_withoutSpendingProfile_incomeSource_noSurplusReinvested() {
+        // On the withdrawal-strategy path (no spending profile), surplus is never deposited.
+        var birthYear = LocalDate.now().getYear() - 66;
+        var input = createInput(
+                LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(acct("500000.0000", "0", "0.0500")));
+
+        var result = engine.run(input);
+
+        result.yearlyData().forEach(year ->
+                assertThat(year.surplusReinvested()).isNull());
+    }
+
+    @Test
+    void run_withSpendingProfile_surplusIncreasesSubsequentYearBalances() {
+        // Surplus deposited in year 2 compounds into subsequent years.
+        // Without surplus: balance grows from portfolio alone.
+        // With surplus: balance in year 3+ is higher by at least the deposited amount.
+        var birthYear = LocalDate.now().getYear() - 66;
+        String params = """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(birthYear);
+
+        var inputWithout = createInput(
+                LocalDate.now().minusYears(1), 70, BigDecimal.ZERO, params,
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null));
+
+        var inputWith = createInput(
+                LocalDate.now().minusYears(1), 70, BigDecimal.ZERO, params,
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), null),
+                List.of(oneTimeIncomeSource("Pension Refund", "100000", 67)));
+
+        var resultWithout = engine.run(inputWithout);
+        var resultWith = engine.run(inputWith);
+
+        // Year 2 (spike year): balance with surplus > without
+        assertThat(resultWith.yearlyData().get(1).endBalance())
+                .isGreaterThan(resultWithout.yearlyData().get(1).endBalance());
+
+        // Year 3: balance with surplus is still higher (surplus compounded)
+        assertThat(resultWith.yearlyData().get(2).endBalance())
+                .isGreaterThan(resultWithout.yearlyData().get(2).endBalance());
+    }
+
     // ── Property Equity and Net Worth Tests ──
 
     @Test

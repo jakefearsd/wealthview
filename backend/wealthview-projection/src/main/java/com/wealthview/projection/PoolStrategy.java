@@ -36,6 +36,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     void floorAtZero();
 
+    /**
+     * Deposits a surplus amount into the taxable account (or aggregate balance for SinglePool).
+     */
+    void depositToTaxable(BigDecimal amount);
+
     ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
                                    BigDecimal contributions, BigDecimal totalGrowth,
                                    BigDecimal withdrawals, boolean retired,
@@ -129,6 +134,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if (balance.compareTo(BigDecimal.ZERO) < 0) {
                 balance = BigDecimal.ZERO;
             }
+        }
+
+        @Override
+        public void depositToTaxable(BigDecimal amount) {
+            balance = balance.add(amount);
         }
 
         @Override
@@ -346,6 +356,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
+        public void depositToTaxable(BigDecimal amount) {
+            taxable = taxable.add(amount);
+        }
+
+        @Override
         public ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
                                               BigDecimal contributions, BigDecimal totalGrowth,
                                               BigDecimal withdrawals, boolean retired,
@@ -357,7 +372,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
                     null, null, null, null, null, null,
                     null, null, null, null, null, null, null, null,
-                    null, null);
+                    null, null, null);
         }
 
         @Override

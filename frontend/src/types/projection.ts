@@ -76,6 +76,9 @@ export interface ProjectionYear {
     social_security_taxable: number | null;
     self_employment_tax: number | null;
     income_by_source: Record<string, number> | null;
+    property_equity: number | null;
+    total_net_worth: number | null;
+    surplus_reinvested: number | null;
 }
 
 export interface SpendingFeasibility {

@@ -49,6 +49,9 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         social_security_taxable: null,
         self_employment_tax: null,
         income_by_source: null,
+        property_equity: null,
+        total_net_worth: null,
+        surplus_reinvested: null,
         ...overrides,
     };
 }
