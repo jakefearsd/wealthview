@@ -90,6 +90,7 @@ export default function ProjectionDetailPage() {
     const hasIncomeSourceData = result?.yearly_data.some(y =>
         y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
     ) ?? false;
+    const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
 
     const computeTotalSpending = (y: ProjectionYear): number | null => {
         if (y.essential_expenses != null) {
@@ -104,7 +105,10 @@ export default function ProjectionDetailPage() {
     const buildProjectionCsv = (yearlyData: ProjectionYear[]): string => {
         const headers = ['Year', 'Age', 'Start', 'Contributions', 'Growth', 'Withdrawals', 'Income', 'Total Spending', 'End', 'Status'];
         if (hasPoolData) headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
-        if (hasSpendingData) headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
+        if (hasSpendingData) {
+            headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
+            if (hasSurplusReinvested) headers.push('Surplus Reinvested');
+        }
 
         const rows = yearlyData.map(y => {
             const vals: (string | number)[] = [
@@ -116,10 +120,13 @@ export default function ProjectionDetailPage() {
                 y.traditional_balance ?? '', y.roth_balance ?? '', y.taxable_balance ?? '',
                 y.roth_conversion_amount ?? '', y.tax_liability ?? '',
             );
-            if (hasSpendingData) vals.push(
-                y.essential_expenses ?? '', y.discretionary_after_cuts ?? y.discretionary_expenses ?? '',
-                y.net_spending_need ?? '', y.spending_surplus ?? '',
-            );
+            if (hasSpendingData) {
+                vals.push(
+                    y.essential_expenses ?? '', y.discretionary_after_cuts ?? y.discretionary_expenses ?? '',
+                    y.net_spending_need ?? '', y.spending_surplus ?? '',
+                );
+                if (hasSurplusReinvested) vals.push(y.surplus_reinvested ?? '');
+            }
             return vals.join(',');
         });
 
@@ -500,6 +507,9 @@ export default function ProjectionDetailPage() {
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Discretionary</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Net Need</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus/Deficit</th>
+                                                    {hasSurplusReinvested && (
+                                                        <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Surplus Reinvested</th>
+                                                    )}
                                                 </>
                                             )}
                                         </tr>
@@ -542,11 +552,16 @@ export default function ProjectionDetailPage() {
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.net_spending_need != null ? formatCurrency(y.net_spending_need) : '-'}</td>
                                                             <td style={{
                                                                 padding: '0.5rem', textAlign: 'right',
-                                                                color: y.spending_surplus != null ? (y.spending_surplus >= 0 ? '#2e7d32' : '#d32f2f') : undefined,
+                                                                color: y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? (y.spending_surplus > 0 ? '#2e7d32' : '#d32f2f') : undefined,
                                                                 fontWeight: 600,
                                                             }}>
-                                                                {y.spending_surplus != null ? formatCurrency(y.spending_surplus) : '-'}
+                                                                {y.spending_surplus != null && Math.abs(y.spending_surplus) >= 1 ? formatCurrency(y.spending_surplus) : '-'}
                                                             </td>
+                                                            {hasSurplusReinvested && (
+                                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                                    {y.surplus_reinvested != null && y.surplus_reinvested > 0 ? formatCurrency(y.surplus_reinvested) : '-'}
+                                                                </td>
+                                                            )}
                                                         </>
                                                     )}
                                                 </tr>
