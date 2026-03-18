@@ -69,6 +69,9 @@ class IncomeContributionCalculator {
         if (source.annualMortgageInterest() != null) {
             total = total.add(source.annualMortgageInterest());
         }
+        if (source.annualMortgagePrincipal() != null) {
+            total = total.add(source.annualMortgagePrincipal());
+        }
         if (source.annualPropertyTax() != null) {
             total = total.add(source.annualPropertyTax());
         }

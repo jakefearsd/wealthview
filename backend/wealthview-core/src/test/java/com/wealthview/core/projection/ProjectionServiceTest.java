@@ -12,6 +12,7 @@ import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
@@ -868,5 +869,90 @@ class ProjectionServiceTest {
         service.updateScenario(tenantId, scenarioId, request);
 
         verify(guardrailProfileRepository, never()).save(any(GuardrailSpendingProfileEntity.class));
+    }
+
+    @Test
+    void getScenario_withRentalPropertyIncomeSource_populatesNetCashFlow() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(
+                tenant, "123 Main St", new BigDecimal("400000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("450000"), BigDecimal.ZERO);
+        property.setAnnualInsuranceCost(new BigDecimal("2500"));
+        property.setAnnualMaintenanceCost(new BigDecimal("3000"));
+        property.setAnnualPropertyTax(new BigDecimal("14000"));
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "AirBnB", "rental_property",
+                new BigDecimal("96000"), 54, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        var isResp = result.incomeSources().getFirst();
+        assertThat(isResp.annualNetCashFlow()).isNotNull();
+        assertThat(isResp.annualNetCashFlow()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(isResp.annualNetCashFlow()).isLessThan(isResp.annualAmount());
+    }
+
+    @Test
+    void getScenario_withNonRentalIncomeSource_netCashFlowIsNull() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Pension", "pension",
+                new BigDecimal("36000"), 65, null,
+                BigDecimal.ZERO, false, "taxable");
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.incomeSources().getFirst().annualNetCashFlow()).isNull();
+    }
+
+    @Test
+    void getScenario_withRentalPropertyNoLinkedProperty_netCashFlowIsNull() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Hypothetical Rental", "rental_property",
+                new BigDecimal("24000"), 60, null,
+                BigDecimal.ZERO, false, "taxable");
+        // no property linked
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.incomeSources().getFirst().annualNetCashFlow()).isNull();
     }
 }

@@ -10,6 +10,7 @@ public record ScenarioIncomeSourceResponse(
         BigDecimal annualAmount,
         BigDecimal overrideAnnualAmount,
         BigDecimal effectiveAmount,
+        BigDecimal annualNetCashFlow,
         int startAge,
         Integer endAge,
         BigDecimal inflationRate,

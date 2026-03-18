@@ -252,6 +252,7 @@ class IncomeSourceProcessorTest {
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses (insurance+maintenance)
                 new BigDecimal("9600"),   // annualMortgageInterest
+                null,                     // annualMortgagePrincipal
                 new BigDecimal("5000"),   // annualPropertyTax
                 null, null);
 
@@ -277,7 +278,7 @@ class IncomeSourceProcessorTest {
                 pensionId, "Pension", "pension",
                 new BigDecimal("30000"), 65, null,
                 BigDecimal.ZERO, false, "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var result = processor.process(
                 List.of(pension), 67, 3, 2028,
@@ -296,12 +297,12 @@ class IncomeSourceProcessorTest {
                 rentalId, "Rental", "rental_property",
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
-                new BigDecimal("6000"), null, null, null, null);
+                new BigDecimal("6000"), null, null, null, null, null);
         var pension = new ProjectionIncomeSourceInput(
                 pensionId, "Pension", "pension",
                 new BigDecimal("20000"), 65, null,
                 BigDecimal.ZERO, false, "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
                 any(), any(), any()))
@@ -327,7 +328,7 @@ class IncomeSourceProcessorTest {
                 pensionId, "Pension", "pension",
                 new BigDecimal("30000"), 70, null,
                 BigDecimal.ZERO, false, "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var result = processor.process(
                 List.of(pension), 65, 1, 2026,
@@ -345,6 +346,64 @@ class IncomeSourceProcessorTest {
         assertThat(result.incomeBySource()).isEmpty();
     }
 
+    // --- Mortgage principal: cash flow vs taxable income ---
+
+    @Test
+    void processRentalProperty_withMortgagePrincipal_subtractedFromCashFlowButNotTaxableIncome() {
+        var rentalId = UUID.randomUUID();
+        // gross=$96k, opEx=$5.5k, interest=$26k, principal=$22.5k, propTax=$14k
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "AirBnB", "rental_property",
+                new BigDecimal("96000"), 60, null,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("5500"),   // annualOperatingExpenses
+                new BigDecimal("26000"),  // annualMortgageInterest
+                new BigDecimal("22500"),  // annualMortgagePrincipal — cash flow only, NOT tax
+                new BigDecimal("14000"),  // annualPropertyTax
+                null, null);
+
+        // netTaxable = 96000 - (5500+26000+14000) = 50500 (principal excluded from tax calc)
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("50500")));
+
+        var result = processor.process(
+                List.of(rental), 67, 8, 2033,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // cashFlow = 96000 - (5500+26000+14000) - 22500 = 28000
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("28000"));
+        // taxableIncome does NOT deduct the $22500 principal
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50500"));
+    }
+
+    @Test
+    void processRentalProperty_withNullMortgagePrincipal_treatsAsZero() {
+        var rentalId = UUID.randomUUID();
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "Rental", "rental_property",
+                new BigDecimal("24000"), 65, null,
+                BigDecimal.ZERO, false, "active_participation",
+                new BigDecimal("6000"),   // annualOperatingExpenses
+                null,                     // annualMortgageInterest
+                null,                     // annualMortgagePrincipal — null should not NPE
+                null,                     // annualPropertyTax
+                null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("active_participation"),
+                any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("18000")));
+
+        var result = processor.process(
+                List.of(rental), 67, 3, 2028,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // principal null treated as 0 — cashFlow = 24000 - 6000 = 18000, no NPE
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("18000"));
+    }
+
     // --- Rental transition multiplier on expenses ---
 
     @Test
@@ -356,6 +415,7 @@ class IncomeSourceProcessorTest {
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses
                 new BigDecimal("9600"),   // annualMortgageInterest
+                null,                     // annualMortgagePrincipal
                 new BigDecimal("5000"),   // annualPropertyTax
                 null, null);
 
@@ -385,6 +445,7 @@ class IncomeSourceProcessorTest {
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),
                 new BigDecimal("9600"),
+                null,                     // annualMortgagePrincipal
                 new BigDecimal("5000"),
                 null, null);
 
@@ -419,7 +480,7 @@ class IncomeSourceProcessorTest {
                 new BigDecimal("0.03"),  // non-zero inflation — should be ignored
                 true,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     private static ProjectionIncomeSourceInput makeSource(
@@ -437,6 +498,7 @@ class IncomeSourceProcessorTest {
                 taxTreatment,
                 null,   // annualOperatingExpenses
                 null,   // annualMortgageInterest
+                null,   // annualMortgagePrincipal
                 null,   // annualPropertyTax
                 null,   // depreciationMethod
                 null    // depreciationByYear

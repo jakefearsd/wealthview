@@ -221,11 +221,21 @@ export default function ProjectionDetailPage() {
                                             <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.start_age}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(is.annual_amount)}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                {formatCurrency(is.annual_amount)}
+                                                {is.income_type === 'rental_property' && (
+                                                    <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>(gross)</span>
+                                                )}
+                                            </td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#666' }}>
                                                 {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}
                                             </td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>{formatCurrency(is.effective_amount)}</td>
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                                                {is.income_type === 'rental_property' && is.annual_net_cash_flow != null
+                                                    ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#999', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
+                                                    : formatCurrency(is.effective_amount)
+                                                }
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

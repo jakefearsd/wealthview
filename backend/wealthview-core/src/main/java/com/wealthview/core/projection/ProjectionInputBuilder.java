@@ -168,6 +168,7 @@ public class ProjectionInputBuilder {
     private ProjectionIncomeSourceInput toIncomeSourceInput(IncomeSourceEntity source, BigDecimal amount) {
         BigDecimal annualOpEx = null;
         BigDecimal annualMortgageInterest = null;
+        BigDecimal annualMortgagePrincipal = null;
         BigDecimal annualPropertyTax = null;
         String depreciationMethod = null;
         Map<Integer, BigDecimal> depreciationByYear = null;
@@ -185,6 +186,12 @@ public class ProjectionInputBuilder {
                 if (remainingBalance.compareTo(BigDecimal.ZERO) > 0) {
                     annualMortgageInterest = remainingBalance.multiply(property.getAnnualInterestRate())
                             .setScale(4, RoundingMode.HALF_UP);
+                    BigDecimal annualPayment = AmortizationCalculator.monthlyPayment(
+                            property.getLoanAmount(), property.getAnnualInterestRate(),
+                            property.getLoanTermMonths())
+                            .multiply(new BigDecimal("12"));
+                    annualMortgagePrincipal = annualPayment.subtract(annualMortgageInterest)
+                            .max(BigDecimal.ZERO);
                 }
             }
 
@@ -210,7 +217,7 @@ public class ProjectionInputBuilder {
                 source.getId(), source.getName(), source.getIncomeType(),
                 amount, source.getStartAge(), source.getEndAge(),
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
-                annualOpEx, annualMortgageInterest, annualPropertyTax,
+                annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
                 depreciationMethod, depreciationByYear);
     }
 

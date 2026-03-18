@@ -280,6 +280,45 @@ class ProjectionInputBuilderTest {
     }
 
     @Test
+    void build_withMortgagedProperty_setsMortgagePrincipalOnIncomeSource() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(tenant, "456 Oak Ave",
+                new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
+                new BigDecimal("400000"), new BigDecimal("280000"));
+        property.setDepreciationMethod("none");
+        property.setLoanAmount(new BigDecimal("300000"));
+        property.setAnnualInterestRate(new BigDecimal("0.065"));
+        property.setLoanTermMonths(360);
+        property.setLoanStartDate(LocalDate.of(2020, 1, 1));
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Rental Income", "rental_property",
+                new BigDecimal("30000"), 0, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        var input = result.incomeSources().getFirst();
+        // annualMortgagePrincipal = fullAnnualPayment - annualInterest; both must be > 0
+        assertThat(input.annualMortgagePrincipal()).isNotNull();
+        assertThat(input.annualMortgagePrincipal()).isPositive();
+        // principal + interest should equal full annual payment (within rounding)
+        var fullAnnualPayment = com.wealthview.core.property.AmortizationCalculator.monthlyPayment(
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360)
+                .multiply(new BigDecimal("12"));
+        assertThat(input.annualMortgageInterest().add(input.annualMortgagePrincipal()))
+                .isEqualByComparingTo(fullAnnualPayment.setScale(4, java.math.RoundingMode.HALF_UP));
+    }
+
+    @Test
     void build_rentalNoProperty_expensesRemainNull() {
         var scenario = new ProjectionScenarioEntity(
                 tenant, "Plan", LocalDate.of(2055, 1, 1), 90,

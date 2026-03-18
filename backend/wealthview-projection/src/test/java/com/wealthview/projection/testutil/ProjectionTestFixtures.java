@@ -37,7 +37,7 @@ public final class ProjectionTestFixtures {
                 UUID.randomUUID(), name, "other",
                 bd(amount), startAge, endAge, bd(inflationRate), false,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     public static ProjectionIncomeSourceInput oneTimeIncomeSource(String name, String amount,
@@ -46,7 +46,7 @@ public final class ProjectionTestFixtures {
                 UUID.randomUUID(), name, "other",
                 bd(amount), startAge, startAge + 1, bd("0"), true,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     public static ProjectionInput createInput(LocalDate retDate, int endAge,

@@ -16,6 +16,7 @@ public record ProjectionIncomeSourceInput(
         String taxTreatment,
         BigDecimal annualOperatingExpenses,
         BigDecimal annualMortgageInterest,
+        BigDecimal annualMortgagePrincipal,
         BigDecimal annualPropertyTax,
         String depreciationMethod,
         Map<Integer, BigDecimal> depreciationByYear

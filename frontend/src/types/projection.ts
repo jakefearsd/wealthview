@@ -19,6 +19,7 @@ export interface ScenarioIncomeSourceResponse {
     annual_amount: number;
     override_annual_amount: number | null;
     effective_amount: number;
+    annual_net_cash_flow?: number | null;
     start_age: number;
     end_age: number | null;
     inflation_rate: number;

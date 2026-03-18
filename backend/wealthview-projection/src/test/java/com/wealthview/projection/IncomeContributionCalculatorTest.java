@@ -27,7 +27,7 @@ class IncomeContributionCalculatorTest {
                 new BigDecimal(amount), startAge, endAge,
                 new BigDecimal(inflationRate), false,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     private ProjectionIncomeSourceInput oneTimeSource(String name, String amount, int startAge) {
@@ -36,7 +36,7 @@ class IncomeContributionCalculatorTest {
                 new BigDecimal(amount), startAge, startAge + 1,
                 new BigDecimal("0.02"), true,
                 "taxable",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     @Test
@@ -217,6 +217,7 @@ class IncomeContributionCalculatorTest {
                 new BigDecimal("0"), false, "active_participation",
                 new BigDecimal("3600"),   // operating expenses
                 new BigDecimal("9600"),   // mortgage interest
+                null,                     // annualMortgagePrincipal
                 new BigDecimal("5000"),   // property tax
                 null, null);
 
@@ -232,7 +233,7 @@ class IncomeContributionCalculatorTest {
                 UUID.randomUUID(), "Rental", "rental_property",
                 new BigDecimal("24000"), 60, null,
                 new BigDecimal("0"), false, "active_participation",
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var result = calculator.compute(List.of(rental), 65, 1);
 
