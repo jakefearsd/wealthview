@@ -1,6 +1,8 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.core.pricefeed.PriceSyncService;
 import com.wealthview.core.tenant.TenantService;
+import org.springframework.lang.Nullable;
 import com.wealthview.core.tenant.dto.SetActiveRequest;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.core.tenant.dto.TenantRequest;
@@ -24,9 +26,12 @@ import java.util.UUID;
 public class SuperAdminController {
 
     private final TenantService tenantService;
+    @Nullable
+    private final PriceSyncService priceSyncService;
 
-    public SuperAdminController(TenantService tenantService) {
+    public SuperAdminController(TenantService tenantService, @Nullable PriceSyncService priceSyncService) {
         this.tenantService = tenantService;
+        this.priceSyncService = priceSyncService;
     }
 
     @PostMapping("/tenants")
@@ -58,6 +63,15 @@ public class SuperAdminController {
             @PathVariable UUID id,
             @Valid @RequestBody SetActiveRequest request) {
         tenantService.setTenantActive(id, request.active());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/prices/sync")
+    public ResponseEntity<Void> triggerPriceSync() {
+        if (priceSyncService == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+        priceSyncService.syncDailyPrices();
         return ResponseEntity.noContent().build();
     }
 }
