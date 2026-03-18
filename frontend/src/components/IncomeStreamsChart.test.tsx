@@ -52,6 +52,15 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         property_equity: null,
         total_net_worth: null,
         surplus_reinvested: null,
+        taxable_growth: null,
+        traditional_growth: null,
+        roth_growth: null,
+        tax_paid_from_taxable: null,
+        tax_paid_from_traditional: null,
+        tax_paid_from_roth: null,
+        withdrawal_from_taxable: null,
+        withdrawal_from_traditional: null,
+        withdrawal_from_roth: null,
         ...overrides,
     };
 }

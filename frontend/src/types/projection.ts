@@ -79,6 +79,15 @@ export interface ProjectionYear {
     property_equity: number | null;
     total_net_worth: number | null;
     surplus_reinvested: number | null;
+    taxable_growth: number | null;
+    traditional_growth: number | null;
+    roth_growth: number | null;
+    tax_paid_from_taxable: number | null;
+    tax_paid_from_traditional: number | null;
+    tax_paid_from_roth: number | null;
+    withdrawal_from_taxable: number | null;
+    withdrawal_from_traditional: number | null;
+    withdrawal_from_roth: number | null;
 }
 
 export interface SpendingFeasibility {
