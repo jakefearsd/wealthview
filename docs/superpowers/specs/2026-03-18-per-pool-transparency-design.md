@@ -102,14 +102,17 @@ No logic changes — same operations in the same order, just capturing data that
 With these fields exposed, each pool can be audited year-over-year:
 
 ```
-pool_end = pool_start + pool_growth + conversion_in - conversion_out
+pool_end = pool_start + contributions + pool_growth + conversion_in - conversion_out
          - tax_paid_from_pool - withdrawal_from_pool + surplus_deposited
 ```
 
-Where `conversion_in` applies to roth, `conversion_out` applies to traditional, and `surplus_deposited` applies to taxable.
+Where `contributions` are per-pool (from account inputs), `conversion_in` applies to roth, `conversion_out` applies to traditional, and `surplus_deposited` applies to taxable.
+
+**Tax field scope:** The `taxPaidFrom*` fields cover conversion tax and withdrawal tax only. Self-employment tax is included in the aggregate `taxLiability` field but is not deducted from pool balances (it represents a liability reported separately). Surplus reinvestment tax reduces the deposited amount itself (`surplusReinvested` is already the after-tax value) and does not appear in `taxPaidFrom*`.
 
 ## Out of Scope
 
 - Per-pool contribution breakdown (already derivable from account inputs)
 - Income source deposit tracking (income offsets withdrawal need rather than depositing into pools)
 - Passthrough losses / REPS / STR loopholes (future feature, this lays the transparency foundation)
+- MonteCarloSpendingOptimizer: no changes needed (uses its own simplified single-aggregate-balance model, not PoolStrategy)
