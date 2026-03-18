@@ -6,7 +6,7 @@ import type { Property, ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, toPercent } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
 import PropertyValuationSection from '../components/PropertyValuationSection';
@@ -152,13 +152,13 @@ export default function PropertyDetailPage() {
             mortgageBalance: property.mortgage_balance ? String(property.mortgage_balance) : '',
             showLoanDetails: property.has_loan_details,
             loanAmount: property.loan_amount != null ? String(property.loan_amount) : '',
-            annualInterestRate: property.annual_interest_rate != null ? String(property.annual_interest_rate * 100) : '',
+            annualInterestRate: property.annual_interest_rate != null ? String(toPercent(property.annual_interest_rate)) : '',
             loanTermMonths: property.loan_term_months != null ? String(property.loan_term_months) : '',
             loanStartDate: property.loan_start_date ?? '',
             useComputedBalance: property.use_computed_balance,
             propertyType: property.property_type,
             showFinancialAssumptions: hasFinancialFields,
-            annualAppreciationRate: property.annual_appreciation_rate != null ? String(property.annual_appreciation_rate * 100) : '',
+            annualAppreciationRate: property.annual_appreciation_rate != null ? String(toPercent(property.annual_appreciation_rate)) : '',
             annualPropertyTax: property.annual_property_tax != null ? String(property.annual_property_tax) : '',
             annualInsuranceCost: property.annual_insurance_cost != null ? String(property.annual_insurance_cost) : '',
             annualMaintenanceCost: property.annual_maintenance_cost != null ? String(property.annual_maintenance_cost) : '',

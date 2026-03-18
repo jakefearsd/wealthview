@@ -1,6 +1,6 @@
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import CurrencyInput from './CurrencyInput';
 import { inputStyle, labelStyle } from '../utils/styles';
 
 export interface RothConversionSectionProps {
@@ -70,7 +70,7 @@ export default function RothConversionSection({
                 {rothConversionStrategy === 'fixed_amount' && (
                     <div>
                         <label style={labelStyle}>Annual Roth Conversion</label>
-                        <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(annualRothConversion)} onChange={e => onAnnualRothConversionChange(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                        <CurrencyInput style={inputStyle} value={annualRothConversion} onChange={v => onAnnualRothConversionChange(Number(v) || 0)} />
                         <HelpText>Fixed dollar amount to convert each year. Set to $0 to skip.</HelpText>
                     </div>
                 )}
@@ -105,7 +105,7 @@ export default function RothConversionSection({
                         </div>
                         <div>
                             <label style={labelStyle}>Other Income</label>
-                            <input style={inputStyle} type="text" inputMode="decimal" value={formatCurrencyInput(otherIncome)} onChange={e => onOtherIncomeChange(Number(parseCurrencyInput(e.target.value)) || 0)} />
+                            <CurrencyInput style={inputStyle} value={otherIncome} onChange={v => onOtherIncomeChange(Number(v) || 0)} />
                             <HelpText>Non-retirement income (salary, rental income) that affects which tax bracket your conversions fall into.</HelpText>
                         </div>
                     </>

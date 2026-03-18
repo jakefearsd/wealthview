@@ -4,7 +4,8 @@ import { getHolding, updateHolding } from '../api/holdings';
 import { listTransactions } from '../api/transactions';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
-import { formatCurrency, formatCurrencyInput, parseCurrencyInput } from '../utils/format';
+import { formatCurrency } from '../utils/format';
+import CurrencyInput from '../components/CurrencyInput';
 import { cardStyle } from '../utils/styles';
 import type { Transaction } from '../types/transaction';
 import toast from 'react-hot-toast';
@@ -86,7 +87,7 @@ export default function HoldingDetailPage() {
                         </div>
                         <div>
                             <label style={{ display: 'block', marginBottom: '0.25rem', fontWeight: 'bold' }}>Cost Basis</label>
-                            <input type="text" inputMode="decimal" value={formatCurrencyInput(editCostBasis)} onChange={(e) => setEditCostBasis(parseCurrencyInput(e.target.value))}
+                            <CurrencyInput value={editCostBasis} onChange={setEditCostBasis}
                                 style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
                         <div style={{ gridColumn: '1 / -1' }}>
