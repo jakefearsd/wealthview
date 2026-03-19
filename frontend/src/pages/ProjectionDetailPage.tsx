@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
@@ -16,7 +16,7 @@ import { useProjectionCache } from '../context/ProjectionCacheContext';
 import type { ProjectionResult, ProjectionYear, CreateScenarioRequest } from '../types/projection';
 import { downloadBlob } from '../api/export';
 
-type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams';
+type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield';
 
 const tabButtonStyle = (active: boolean) => ({
     padding: '0.5rem 1rem',
@@ -82,6 +82,58 @@ export default function ProjectionDetailPage() {
             toast.error(extractErrorMessage(err));
         }
     }
+
+    const taxShieldSummary = useMemo(() => {
+        if (!result?.yearly_data) return null;
+        const years = result.yearly_data.filter(y => y.retired);
+
+        let totalDepreciation = 0;
+        let totalLossApplied = 0;
+        let estimatedTaxSavings = 0;
+        let rothConversionSheltered = 0;
+        const perProperty: Record<string, { name: string; taxTreatment: string; depreciation: number; lossApplied: number }> = {};
+
+        for (const y of years) {
+            const dep = y.depreciation_total || 0;
+            const loss = y.rental_loss_applied || 0;
+            totalDepreciation += dep;
+            totalLossApplied += loss;
+
+            // Estimated tax savings using effective rate (approximate)
+            if (loss > 0 && y.tax_liability != null && y.tax_liability > 0) {
+                const taxableIncome = (y.income_streams_total || 0) + (y.roth_conversion_amount || 0);
+                const effectiveRate = taxableIncome > 0 ? y.tax_liability / taxableIncome : 0;
+                estimatedTaxSavings += loss * effectiveRate;
+            }
+
+            // Roth conversion sheltered (approximate)
+            if (loss > 0 && y.roth_conversion_amount && y.roth_conversion_amount > 0) {
+                rothConversionSheltered += Math.min(loss, y.roth_conversion_amount);
+            }
+
+            // Per-property aggregation
+            if (y.rental_property_details) {
+                for (const d of y.rental_property_details) {
+                    const key = d.income_source_id;
+                    if (!perProperty[key]) {
+                        perProperty[key] = { name: d.property_name, taxTreatment: d.tax_treatment, depreciation: 0, lossApplied: 0 };
+                    }
+                    perProperty[key].depreciation += d.depreciation;
+                    perProperty[key].lossApplied += d.loss_applied_to_income;
+                }
+            }
+        }
+
+        const suspendedLossRemaining = years.length > 0
+            ? (years[years.length - 1].suspended_loss_carryforward || 0)
+            : 0;
+
+        return {
+            totalDepreciation, totalLossApplied, estimatedTaxSavings,
+            rothConversionSheltered, suspendedLossRemaining,
+            perProperty: Object.values(perProperty),
+        };
+    }, [result]);
 
     if (loading) return <div>Loading...</div>;
     if (!scenario) return <div>Scenario not found</div>;
@@ -406,6 +458,11 @@ export default function ProjectionDetailPage() {
                                     Income Streams
                                 </button>
                             )}
+                            {taxShieldSummary && taxShieldSummary.totalDepreciation > 0 && (
+                                <button style={tabButtonStyle(activeTab === 'tax_shield')} onClick={() => setActiveTab('tax_shield')}>
+                                    Tax Shield
+                                </button>
+                            )}
                         </div>
 
                         {activeTab === 'chart' && (
@@ -529,6 +586,73 @@ export default function ProjectionDetailPage() {
                                 incomeSources={scenario.income_sources}
                                 retirementYear={retirementYear}
                             />
+                        )}
+
+                        {activeTab === 'tax_shield' && taxShieldSummary && (
+                            <div style={{ padding: '1rem' }}>
+                                <h3 style={{ marginBottom: '0.25rem' }}>Depreciation Tax Shield Summary</h3>
+                                <p style={{ fontSize: '0.85rem', color: '#888', marginBottom: '1rem' }}>
+                                    Values marked (approx.) are estimates based on effective tax rates.
+                                </p>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                                    <div style={{ padding: '1rem', background: '#f5f5f5', borderRadius: 8 }}>
+                                        <div style={{ color: '#666', fontSize: '0.85rem' }}>Total Depreciation Taken</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(taxShieldSummary.totalDepreciation)}</div>
+                                    </div>
+                                    <div style={{ padding: '1rem', background: '#f5f5f5', borderRadius: 8 }}>
+                                        <div style={{ color: '#666', fontSize: '0.85rem' }}>Total Loss Applied to Income</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(taxShieldSummary.totalLossApplied)}</div>
+                                    </div>
+                                    <div style={{ padding: '1rem', background: '#e8f5e9', borderRadius: 8 }}>
+                                        <div style={{ color: '#666', fontSize: '0.85rem' }}>Estimated Tax Savings (approx.)</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#2e7d32' }}>{formatCurrency(taxShieldSummary.estimatedTaxSavings)}</div>
+                                    </div>
+                                    <div style={{ padding: '1rem', background: '#e3f2fd', borderRadius: 8 }}>
+                                        <div style={{ color: '#666', fontSize: '0.85rem' }}>Roth Conversion Sheltered (approx.)</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 600, color: '#1565c0' }}>{formatCurrency(taxShieldSummary.rothConversionSheltered)}</div>
+                                    </div>
+                                    <div style={{ padding: '1rem', background: '#fff3e0', borderRadius: 8 }}>
+                                        <div style={{ color: '#666', fontSize: '0.85rem' }}>Suspended Losses Remaining</div>
+                                        <div style={{ fontSize: '1.5rem', fontWeight: 600 }}>{formatCurrency(taxShieldSummary.suspendedLossRemaining)}</div>
+                                    </div>
+                                </div>
+
+                                {taxShieldSummary.perProperty.length > 0 && (
+                                    <div style={{ marginTop: '1.5rem' }}>
+                                        <h4 style={{ marginBottom: '0.5rem' }}>Per-Property Breakdown</h4>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                            <thead>
+                                                <tr style={{ background: '#fafafa', borderBottom: '2px solid #ddd' }}>
+                                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Property</th>
+                                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Classification</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total Depreciation</th>
+                                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total Loss Applied</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {taxShieldSummary.perProperty.map((p, i) => (
+                                                    <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
+                                                        <td style={{ padding: '0.5rem' }}>{p.name}</td>
+                                                        <td style={{ padding: '0.5rem' }}>
+                                                            <span style={{
+                                                                fontSize: '0.75rem', padding: '2px 6px', borderRadius: 4,
+                                                                background: p.taxTreatment === 'rental_passive' ? '#e0e0e0'
+                                                                    : p.taxTreatment === 'rental_active_reps' ? '#c8e6c9' : '#bbdefb',
+                                                                color: '#333',
+                                                            }}>
+                                                                {p.taxTreatment === 'rental_passive' ? 'Passive'
+                                                                    : p.taxTreatment === 'rental_active_reps' ? 'REPS' : 'STR'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.depreciation)}</td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.lossApplied)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {activeTab === 'table' && (
