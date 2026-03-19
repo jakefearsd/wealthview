@@ -400,6 +400,8 @@ export default function PropertyDetailPage() {
                     analyticsYear={analyticsYear}
                     analyticsYearOptions={analyticsYearOptions}
                     onYearChange={handleAnalyticsYearChange}
+                    propertyId={id!}
+                    depreciationMethod={property?.depreciation_method || 'none'}
                 />
             )}
 

@@ -9,6 +9,7 @@ import type {
     PropertyValuation,
     PropertyAnalyticsResponse,
     ValuationRefreshResponse,
+    DepreciationScheduleResponse,
 } from '../types/property';
 
 export async function listProperties(): Promise<Property[]> {
@@ -104,6 +105,13 @@ export async function getPropertyAnalytics(
     const { data } = await client.get<PropertyAnalyticsResponse>(
         `/properties/${propertyId}/analytics`,
         { params: year ? { year } : {} }
+    );
+    return data;
+}
+
+export async function getDepreciationSchedule(propertyId: string): Promise<DepreciationScheduleResponse> {
+    const { data } = await client.get<DepreciationScheduleResponse>(
+        `/properties/${propertyId}/depreciation-schedule`
     );
     return data;
 }
