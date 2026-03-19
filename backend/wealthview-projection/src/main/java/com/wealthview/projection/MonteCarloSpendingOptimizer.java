@@ -243,7 +243,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 trialCount, years, toBD(medianFinal));
 
         return new GuardrailProfileResponse(
-                null, null, input.phases().isEmpty() ? "Optimized" : "Optimized",
+                null, null, "Optimized",
                 input.essentialFloor(), input.terminalBalanceTarget(),
                 input.returnMean(), input.returnStddev(),
                 trialCount, input.confidenceLevel(),
