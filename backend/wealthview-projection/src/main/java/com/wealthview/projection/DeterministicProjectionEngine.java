@@ -75,6 +75,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
     }
 
+    private record ResolvedParams(
+            int currentYear, int birthYear, int retirementYear, int endYear,
+            BigDecimal withdrawalRate, BigDecimal inflationRate,
+            WithdrawalStrategy strategy, SpendingPlan spendingPlan,
+            List<ProjectionIncomeSourceInput> incomeSources,
+            List<ProjectionPropertyInput> properties) {
+    }
+
     private ProjectionResultResponse runInternal(ProjectionInput input) {
         var accounts = input.accounts();
         var params = parseParams(input.paramsJson());
@@ -84,6 +92,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 input.retirementDate() != null ? input.retirementDate().getYear() : "default",
                 input.endAge() != null ? input.endAge() : 90);
 
+        var resolved = resolveProjectionParams(input, params);
+        var pool = buildPoolStrategy(accounts, params);
+
+        return runProjection(input, pool, resolved.strategy(), resolved.currentYear(), resolved.birthYear(),
+                resolved.retirementYear(), resolved.endYear(), resolved.inflationRate(),
+                resolved.spendingPlan(), resolved.incomeSources(), resolved.properties());
+    }
+
+    private ResolvedParams resolveProjectionParams(ProjectionInput input, ScenarioParams params) {
         int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
         int birthYear = params.birthYear != null ? params.birthYear : currentYear - 35;
         int retirementYear = input.retirementDate() != null
@@ -110,10 +127,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
         var properties = input.properties() != null ? input.properties() : List.<ProjectionPropertyInput>of();
 
-        boolean hasMultiplePools = hasMultipleAccountTypes(accounts);
+        return new ResolvedParams(currentYear, birthYear, retirementYear, endYear,
+                withdrawalRate, inflationRate, strategy, spendingPlan, incomeSources, properties);
+    }
 
-        PoolStrategy pool;
-        if (hasMultiplePools) {
+    private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts, ScenarioParams params) {
+        if (hasMultipleAccountTypes(accounts)) {
             Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
                     .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
 
@@ -123,7 +142,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal annualRothConversion = params.annualRothConversion != null
                     ? params.annualRothConversion : BigDecimal.ZERO;
 
-            pool = new PoolStrategy.MultiPool(grouped,
+            return new PoolStrategy.MultiPool(grouped,
                     computeWeightedReturn(accounts,
                             sumInitialBalances(grouped.getOrDefault("taxable", List.of()))
                                     .add(sumInitialBalances(grouped.getOrDefault("traditional", List.of())))
@@ -133,12 +152,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     params.rothConversionStartYear(), params.withdrawalOrder(), taxCalculator);
         } else {
             BigDecimal balance = sumInitialBalances(accounts);
-            pool = new PoolStrategy.SinglePool(balance, sumContributions(accounts),
+            return new PoolStrategy.SinglePool(balance, sumContributions(accounts),
                     computeWeightedReturn(accounts, balance));
         }
-
-        return runProjection(input, pool, strategy, currentYear, birthYear,
-                retirementYear, endYear, inflationRate, spendingPlan, incomeSources, properties);
     }
 
     private ProjectionResultResponse runProjection(
