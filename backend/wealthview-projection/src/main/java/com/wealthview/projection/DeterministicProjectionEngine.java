@@ -665,23 +665,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private ProjectionYearDto applySurplusReinvested(ProjectionYearDto base, BigDecimal surplusReinvested) {
-        return new ProjectionYearDto(
-                base.year(), base.age(), base.startBalance(), base.contributions(),
-                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
-                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
-                base.rothConversionAmount(), base.taxLiability(),
-                base.essentialExpenses(), base.discretionaryExpenses(),
-                base.incomeStreamsTotal(), base.netSpendingNeed(), base.spendingSurplus(),
-                base.discretionaryAfterCuts(),
-                base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
-                base.rentalLossApplied(), base.suspendedLossCarryforward(),
-                base.socialSecurityTaxable(), base.selfEmploymentTax(),
-                base.incomeBySource(),
-                base.propertyEquity(), base.totalNetWorth(), surplusReinvested,
-                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
-                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
-                base.rentalPropertyDetails());
+        return base.withSurplusReinvested(surplusReinvested);
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
@@ -729,23 +713,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             return base;
         }
         BigDecimal totalNetWorth = base.endBalance().add(propertyEquity);
-        return new ProjectionYearDto(
-                base.year(), base.age(), base.startBalance(), base.contributions(),
-                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
-                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
-                base.rothConversionAmount(), base.taxLiability(),
-                base.essentialExpenses(), base.discretionaryExpenses(),
-                base.incomeStreamsTotal(), base.netSpendingNeed(), base.spendingSurplus(),
-                base.discretionaryAfterCuts(),
-                base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
-                base.rentalLossApplied(), base.suspendedLossCarryforward(),
-                base.socialSecurityTaxable(), base.selfEmploymentTax(),
-                base.incomeBySource(),
-                propertyEquity, totalNetWorth, base.surplusReinvested(),
-                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
-                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
-                base.rentalPropertyDetails());
+        return base.withPropertyEquity(propertyEquity, totalNetWorth);
     }
 
 }
