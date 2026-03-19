@@ -319,6 +319,28 @@ class CombinedPortfolioHistoryServiceTest {
         assertThat(lastPoint.propertyEquity()).isGreaterThan(new BigDecimal("500000"));
     }
 
+    @Test
+    void computeHistory_propertyWithValuation_groupsByPropertyIdField() {
+        when(accountRepository.findByTenant_Id(TENANT_ID, Pageable.unpaged()))
+                .thenReturn(new PageImpl<>(List.of()));
+        when(holdingRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
+
+        var property = mockProperty(
+                LocalDate.now().minusYears(3), new BigDecimal("300000"),
+                new BigDecimal("350000"), BigDecimal.ZERO, false);
+        when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(property));
+
+        var valuation = mockValuation(property.getId(),
+                LocalDate.now().minusMonths(6), new BigDecimal("325000"));
+        when(propertyValuationRepository.findByTenant_IdOrderByValuationDateAsc(TENANT_ID))
+                .thenReturn(List.of(valuation));
+
+        var result = service.computeHistory(TENANT_ID, 1);
+
+        assertThat(result.dataPoints()).isNotEmpty();
+        assertThat(result.propertyCount()).isEqualTo(1);
+    }
+
     // --- Helper Methods ---
 
     private AccountEntity mockAccount(String type) {
@@ -363,6 +385,14 @@ class CombinedPortfolioHistoryServiceTest {
         lenient().when(property.getLoanTermMonths()).thenReturn(termMonths);
         lenient().when(property.getLoanStartDate()).thenReturn(loanStartDate);
         return property;
+    }
+
+    private PropertyValuationEntity mockValuation(UUID propertyId, LocalDate date, BigDecimal value) {
+        var valuation = mock(PropertyValuationEntity.class);
+        when(valuation.getPropertyId()).thenReturn(propertyId);
+        when(valuation.getValuationDate()).thenReturn(date);
+        when(valuation.getValue()).thenReturn(value);
+        return valuation;
     }
 
     private List<PriceEntity> buildPrices(String symbol, LocalDate start, LocalDate end, BigDecimal price) {

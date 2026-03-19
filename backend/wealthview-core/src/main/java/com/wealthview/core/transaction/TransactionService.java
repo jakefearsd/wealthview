@@ -76,6 +76,21 @@ public class TransactionService {
         return TransactionResponse.from(txn);
     }
 
+    @Transactional
+    public TransactionResponse createWithHashNoRecompute(UUID tenantId, UUID accountId,
+                                                          TransactionRequest request, String importHash) {
+        var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
+                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+
+        var txn = new TransactionEntity(account, account.getTenant(), request.date(),
+                request.type(), request.symbol(), request.quantity(), request.amount());
+        txn.setImportHash(importHash);
+        txn = transactionRepository.save(txn);
+
+        log.info("Transaction {} created for account {} with import hash (no recompute)", txn.getId(), accountId);
+        return TransactionResponse.from(txn);
+    }
+
     @Transactional(readOnly = true)
     public PageResponse<TransactionResponse> listByAccount(UUID tenantId, UUID accountId, Pageable pageable) {
         var page = transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, pageable);

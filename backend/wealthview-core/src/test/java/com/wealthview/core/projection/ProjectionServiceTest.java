@@ -703,7 +703,7 @@ class ProjectionServiceTest {
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+        when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
                 .thenReturn(List.of(link));
 
         var result = service.getScenario(tenantId, scenarioId);
@@ -898,7 +898,7 @@ class ProjectionServiceTest {
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+        when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
                 .thenReturn(List.of(link));
 
         var result = service.getScenario(tenantId, scenarioId);
@@ -924,12 +924,37 @@ class ProjectionServiceTest {
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+        when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
                 .thenReturn(List.of(link));
 
         var result = service.getScenario(tenantId, scenarioId);
 
         assertThat(result.incomeSources().getFirst().annualNetCashFlow()).isNull();
+    }
+
+    @Test
+    void getScenario_usesEagerFetchForIncomeSources() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Pension", "pension",
+                new BigDecimal("36000"), 65, null,
+                BigDecimal.ZERO, false, "taxable");
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        // Should use the eager-fetch method, not the N+1 method
+        verify(scenarioIncomeSourceRepository).findWithIncomeSourceByScenarioId(scenario.getId());
+        verify(scenarioIncomeSourceRepository, never()).findByScenario_Id(any());
     }
 
     @Test
@@ -948,7 +973,7 @@ class ProjectionServiceTest {
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
-        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+        when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
                 .thenReturn(List.of(link));
 
         var result = service.getScenario(tenantId, scenarioId);

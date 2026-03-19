@@ -1,5 +1,6 @@
 package com.wealthview.core.importservice;
 
+import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.importservice.dto.CsvParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.core.transaction.TransactionService;
@@ -22,6 +23,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -45,6 +47,8 @@ class ImportServiceTest {
     @Mock
     private TransactionService transactionService;
     @Mock
+    private HoldingsComputationService holdingsComputationService;
+    @Mock
     private CsvParser csvParser;
 
     private ImportService importService;
@@ -56,7 +60,7 @@ class ImportServiceTest {
     void setUp() {
         importService = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
-                transactionService, csvParser, Map.of());
+                transactionService, holdingsComputationService, csvParser, Map.of());
     }
 
     private void setupAccountAndJobMocks() {
@@ -73,8 +77,8 @@ class ImportServiceTest {
     @Test
     void processCsvImport_newTransactions_createsAllWithHashes() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                any(), any(), anyString())).thenReturn(false);
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of());
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
@@ -85,7 +89,7 @@ class ImportServiceTest {
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
-        verify(transactionService, times(2)).createWithHash(
+        verify(transactionService, times(2)).createWithHashNoRecompute(
                 eq(tenantId), eq(accountId), any(TransactionRequest.class), anyString());
         assertThat(result.successfulRows()).isEqualTo(2);
         assertThat(result.failedRows()).isEqualTo(0);
@@ -94,8 +98,12 @@ class ImportServiceTest {
     @Test
     void processCsvImport_duplicateTransactions_skipsAll() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                any(), any(), anyString())).thenReturn(true);
+
+        var hash = TransactionHashUtil.computeHash(
+                LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of(hash));
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
@@ -104,7 +112,7 @@ class ImportServiceTest {
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
-        verify(transactionService, never()).createWithHash(
+        verify(transactionService, never()).createWithHashNoRecompute(
                 any(), any(), any(TransactionRequest.class), anyString());
         assertThat(result.successfulRows()).isEqualTo(0);
         assertThat(result.errorMessage()).contains("duplicate transactions skipped");
@@ -121,10 +129,8 @@ class ImportServiceTest {
                 LocalDate.of(2024, 1, 16), "sell", "GOOG",
                 new BigDecimal("5"), new BigDecimal("750"));
 
-        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                tenantId, accountId, buyHash)).thenReturn(true);
-        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                tenantId, accountId, sellHash)).thenReturn(false);
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of(buyHash));
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
@@ -135,7 +141,7 @@ class ImportServiceTest {
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
-        verify(transactionService, times(1)).createWithHash(
+        verify(transactionService, times(1)).createWithHashNoRecompute(
                 eq(tenantId), eq(accountId), any(TransactionRequest.class), eq(sellHash));
         assertThat(result.successfulRows()).isEqualTo(1);
         assertThat(result.errorMessage()).contains("1 duplicate transactions skipped");
@@ -144,8 +150,8 @@ class ImportServiceTest {
     @Test
     void processCsvImport_hashPassedToCreateWithHash() {
         setupAccountAndJobMocks();
-        when(transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                any(), any(), anyString())).thenReturn(false);
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of());
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
@@ -155,13 +161,37 @@ class ImportServiceTest {
         importService.processCsvImport(tenantId, accountId, parseResult);
 
         var hashCaptor = ArgumentCaptor.forClass(String.class);
-        verify(transactionService).createWithHash(
+        verify(transactionService).createWithHashNoRecompute(
                 eq(tenantId), eq(accountId), any(TransactionRequest.class), hashCaptor.capture());
 
         var expectedHash = TransactionHashUtil.computeHash(
                 LocalDate.of(2024, 1, 15), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         assertThat(hashCaptor.getValue()).isEqualTo(expectedHash);
+    }
+
+    @Test
+    void processCsvImport_defersHoldingsRecomputation_toEndOfImport() {
+        setupAccountAndJobMocks();
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of());
+
+        var transactions = List.of(
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                        new BigDecimal("10"), new BigDecimal("1500")),
+                new ParsedTransaction(LocalDate.of(2024, 1, 16), "buy", "AAPL",
+                        new BigDecimal("5"), new BigDecimal("750")),
+                new ParsedTransaction(LocalDate.of(2024, 1, 17), "sell", "GOOG",
+                        new BigDecimal("3"), new BigDecimal("450")));
+        var parseResult = new CsvParseResult(transactions, List.of());
+
+        importService.processCsvImport(tenantId, accountId, parseResult);
+
+        // Holdings recomputed once per distinct symbol, not once per transaction
+        verify(holdingsComputationService, times(1))
+                .recomputeForAccountAndSymbol(any(), any(), eq("AAPL"));
+        verify(holdingsComputationService, times(1))
+                .recomputeForAccountAndSymbol(any(), any(), eq("GOOG"));
     }
 
     private static void setField(Object target, String fieldName, Object value) {

@@ -238,6 +238,21 @@ class PropertyControllerTest {
     }
 
     @Test
+    void addIncome_validInput_returns201() throws Exception {
+        doNothing().when(propertyService).addIncome(eq(TENANT_ID), eq(PROPERTY_ID),
+                any(com.wealthview.core.property.dto.PropertyIncomeRequest.class));
+
+        mockMvc.perform(post("/api/v1/properties/{id}/income", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2024-01-15", "amount": 2000, "category": "rent",
+                                 "description": "January rent"}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void getCashFlow_returns200() throws Exception {
         var entry = new MonthlyCashFlowEntry("2025-01",
                 new BigDecimal("2500"), new BigDecimal("1800"), new BigDecimal("700"));

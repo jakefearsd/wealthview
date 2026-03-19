@@ -3,11 +3,14 @@ package com.wealthview.core.property;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
+import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
+import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
+import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +46,9 @@ class PropertyServiceTest {
 
     @Mock
     private PropertyExpenseRepository expenseRepository;
+
+    @Mock
+    private PropertyIncomeRepository incomeRepository;
 
     @Mock
     private TenantRepository tenantRepository;
@@ -908,6 +914,51 @@ class PropertyServiceTest {
         assertThatThrownBy(() -> propertyService.update(tenantId, UUID.randomUUID(), request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("in_service_date");
+    }
+
+    @Test
+    void addIncome_validRequest_savesIncomeEntity() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        propertyService.addIncome(tenantId, UUID.randomUUID(),
+                new PropertyIncomeRequest(LocalDate.of(2024, 1, 15), new BigDecimal("2000"), "rent", "January rent", null));
+
+        var captor = ArgumentCaptor.forClass(PropertyIncomeEntity.class);
+        verify(incomeRepository).save(captor.capture());
+        assertThat(captor.getValue().getAmount()).isEqualByComparingTo("2000");
+        assertThat(captor.getValue().getCategory()).isEqualTo("rent");
+        assertThat(captor.getValue().getDescription()).isEqualTo("January rent");
+        assertThat(captor.getValue().getFrequency()).isEqualTo("monthly");
+    }
+
+    @Test
+    void addIncome_withAnnualFrequency_savesWithFrequency() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(incomeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        propertyService.addIncome(tenantId, UUID.randomUUID(),
+                new PropertyIncomeRequest(LocalDate.of(2024, 1, 1), new BigDecimal("24000"), "rent", null, "annual"));
+
+        var captor = ArgumentCaptor.forClass(PropertyIncomeEntity.class);
+        verify(incomeRepository).save(captor.capture());
+        assertThat(captor.getValue().getFrequency()).isEqualTo("annual");
+    }
+
+    @Test
+    void addIncome_nonExistentProperty_throwsNotFound() {
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> propertyService.addIncome(tenantId, UUID.randomUUID(),
+                new PropertyIncomeRequest(LocalDate.of(2024, 1, 15), new BigDecimal("2000"), "rent", null, null)))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test
