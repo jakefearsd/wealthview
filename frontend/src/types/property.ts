@@ -132,3 +132,18 @@ export interface PropertyAnalyticsResponse {
     annual_net_cash_flow: number | null;
     total_cash_invested: number | null;
 }
+
+export interface DepreciationScheduleYear {
+    tax_year: number;
+    annual_depreciation: number;
+    cumulative_taken: number;
+    remaining_basis: number;
+}
+
+export interface DepreciationScheduleResponse {
+    depreciation_method: string;
+    depreciable_basis: number;
+    useful_life_years: number;
+    in_service_date: string;
+    schedule: DepreciationScheduleYear[];
+}

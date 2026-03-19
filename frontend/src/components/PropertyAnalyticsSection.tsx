@@ -1,15 +1,19 @@
+import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
-import type { PropertyAnalyticsResponse } from '../types/property';
+import { getDepreciationSchedule } from '../api/properties';
+import type { PropertyAnalyticsResponse, DepreciationScheduleResponse } from '../types/property';
 
 interface PropertyAnalyticsSectionProps {
     analytics: PropertyAnalyticsResponse;
     analyticsYear: number | undefined;
     analyticsYearOptions: number[];
     onYearChange: (value: string) => void;
+    propertyId: string;
+    depreciationMethod: string;
 }
 
 export default function PropertyAnalyticsSection({
@@ -17,7 +21,23 @@ export default function PropertyAnalyticsSection({
     analyticsYear,
     analyticsYearOptions,
     onYearChange,
+    propertyId,
+    depreciationMethod,
 }: PropertyAnalyticsSectionProps) {
+    const [depreciationSchedule, setDepreciationSchedule] = useState<DepreciationScheduleResponse | null>(null);
+
+    useEffect(() => {
+        if (depreciationMethod === 'none') {
+            setDepreciationSchedule(null);
+            return;
+        }
+        getDepreciationSchedule(propertyId)
+            .then(setDepreciationSchedule)
+            .catch(() => setDepreciationSchedule(null));
+    }, [propertyId, depreciationMethod]);
+
+    const currentYear = new Date().getFullYear();
+
     return (
         <>
             <div style={{ ...cardStyle, marginBottom: '2rem' }}>
@@ -141,6 +161,51 @@ export default function PropertyAnalyticsSection({
                             <HelpText>Your out-of-pocket investment: purchase price minus loan amount.</HelpText>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {depreciationSchedule && depreciationSchedule.schedule.length > 0 && (
+                <div style={{ ...cardStyle, marginBottom: '2rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem' }}>Depreciation Schedule</h3>
+                    <div style={{ display: 'flex', gap: '2rem', fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
+                        <span>Straight-Line Depreciation</span>
+                        <span>Depreciable Basis: {formatCurrency(depreciationSchedule.depreciable_basis)}</span>
+                        <span>Annual: {formatCurrency(depreciationSchedule.schedule[0]?.annual_depreciation ?? 0)}</span>
+                    </div>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                        <thead>
+                            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                                <th style={{ padding: '0.5rem' }}>Tax Year</th>
+                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Annual Depreciation</th>
+                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Cumulative Taken</th>
+                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Remaining Basis</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {depreciationSchedule.schedule.map((row) => (
+                                <tr
+                                    key={row.tax_year}
+                                    style={{
+                                        borderBottom: '1px solid #eee',
+                                        background: row.tax_year === currentYear ? '#fff8e1' : undefined,
+                                    }}
+                                >
+                                    <td style={{ padding: '0.5rem', fontWeight: row.tax_year === currentYear ? 600 : 400 }}>
+                                        {row.tax_year}
+                                    </td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                        {formatCurrency(row.annual_depreciation)}
+                                    </td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                        {formatCurrency(row.cumulative_taken)}
+                                    </td>
+                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                        {formatCurrency(row.remaining_basis)}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             )}
         </>
