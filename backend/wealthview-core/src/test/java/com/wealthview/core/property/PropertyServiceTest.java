@@ -877,6 +877,40 @@ class PropertyServiceTest {
     }
 
     @Test
+    void create_withStraightLineAndNullInServiceDate_throwsIllegalArgument() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, "straight_line", null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("in_service_date");
+    }
+
+    @Test
+    void update_withStraightLineAndNullInServiceDate_throwsIllegalArgument() {
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, "straight_line", null);
+
+        assertThatThrownBy(() -> propertyService.update(tenantId, UUID.randomUUID(), request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("in_service_date");
+    }
+
+    @Test
     void update_withFinancialFields_updatesFields() {
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));

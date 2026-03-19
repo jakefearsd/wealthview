@@ -425,6 +425,10 @@ public class PropertyService {
             throw new IllegalArgumentException(
                     "Invalid depreciation method: " + method + ". Must be one of: " + VALID_DEPRECIATION_METHODS);
         }
+        if (!"none".equals(method) && request.inServiceDate() == null) {
+            throw new IllegalArgumentException(
+                    "in_service_date is required when depreciation method is " + method);
+        }
         property.setDepreciationMethod(method);
         property.setInServiceDate(request.inServiceDate());
         property.setLandValue(request.landValue());
