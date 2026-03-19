@@ -1,7 +1,7 @@
 # Depreciation Transparency & Input Design
 
 **Date:** 2026-03-19
-**Status:** Approved
+**Status:** Completed
 **Scope:** Surface depreciation inputs on property form, add depreciation schedule to property analytics, add per-property rental breakdown to projection output, add depreciation tax shield summary.
 
 ---
