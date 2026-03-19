@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
@@ -40,6 +40,7 @@ export default function ProjectionDetailPage() {
     const [activeTab, setActiveTab] = useState<TabId>('chart');
     const [editing, setEditing] = useState(false);
     const [showPoolDetails, setShowPoolDetails] = useState(false);
+    const [expandedTaxYears, setExpandedTaxYears] = useState<Set<number>>(new Set());
     const autoRanRef = useRef(false);
 
     useEffect(() => {
@@ -101,6 +102,15 @@ export default function ProjectionDetailPage() {
             return y.withdrawals + (y.income_streams_total ?? 0);
         }
         return null;
+    };
+
+    const toggleTaxYear = (year: number) => {
+        setExpandedTaxYears(prev => {
+            const next = new Set(prev);
+            if (next.has(year)) next.delete(year);
+            else next.add(year);
+            return next;
+        });
     };
 
     const buildProjectionCsv = (yearlyData: ProjectionYear[]): string => {
@@ -428,36 +438,86 @@ export default function ProjectionDetailPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {result.yearly_data.filter(y => y.retired).map(y => (
-                                            <tr key={y.year} style={{ borderBottom: '1px solid #f0f0f0', background: '#fff8e1' }}>
-                                                <td style={{ padding: '0.5rem' }}>{y.year}</td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
-                                                    {y.rental_income_gross != null ? formatCurrency(y.rental_income_gross) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
-                                                    {y.rental_expenses_total != null ? formatCurrency(y.rental_expenses_total) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#6a1b9a' }}>
-                                                    {y.depreciation_total != null ? formatCurrency(y.depreciation_total) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
-                                                    {y.rental_loss_applied != null && y.rental_loss_applied > 0 ? formatCurrency(y.rental_loss_applied) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
-                                                    {y.suspended_loss_carryforward != null && y.suspended_loss_carryforward > 0 ? formatCurrency(y.suspended_loss_carryforward) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>
-                                                    {y.social_security_taxable != null ? formatCurrency(y.social_security_taxable) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
-                                                    {y.self_employment_tax != null && y.self_employment_tax > 0 ? formatCurrency(y.self_employment_tax) : '-'}
-                                                </td>
-                                                <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>
-                                                    {y.tax_liability != null ? formatCurrency(y.tax_liability) : '-'}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {result.yearly_data.filter(y => y.retired).map(y => {
+                                            const hasDetails = y.rental_property_details && y.rental_property_details.length > 0;
+                                            const isExpanded = expandedTaxYears.has(y.year);
+                                            return (
+                                                <React.Fragment key={y.year}>
+                                                    <tr
+                                                        style={{
+                                                            borderBottom: '1px solid #f0f0f0',
+                                                            background: '#fff8e1',
+                                                            cursor: hasDetails ? 'pointer' : 'default',
+                                                        }}
+                                                        onClick={() => hasDetails && toggleTaxYear(y.year)}
+                                                    >
+                                                        <td style={{ padding: '0.5rem' }}>
+                                                            {hasDetails ? (isExpanded ? '\u25BC ' : '\u25B6 ') : '  '}{y.year}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                            {y.rental_income_gross != null ? formatCurrency(y.rental_income_gross) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                            {y.rental_expenses_total != null ? formatCurrency(y.rental_expenses_total) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#6a1b9a' }}>
+                                                            {y.depreciation_total != null ? formatCurrency(y.depreciation_total) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                            {y.rental_loss_applied != null && y.rental_loss_applied > 0 ? formatCurrency(y.rental_loss_applied) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
+                                                            {y.suspended_loss_carryforward != null && y.suspended_loss_carryforward > 0 ? formatCurrency(y.suspended_loss_carryforward) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                            {y.social_security_taxable != null ? formatCurrency(y.social_security_taxable) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                            {y.self_employment_tax != null && y.self_employment_tax > 0 ? formatCurrency(y.self_employment_tax) : '-'}
+                                                        </td>
+                                                        <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>
+                                                            {y.tax_liability != null ? formatCurrency(y.tax_liability) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                    {isExpanded && y.rental_property_details?.map(d => (
+                                                        <tr key={d.income_source_id} style={{ background: '#f5f5f5', fontSize: '0.85rem' }}>
+                                                            <td style={{ padding: '0.3rem 0.75rem', paddingLeft: '2rem' }} colSpan={2}>
+                                                                {d.property_name}
+                                                                {' '}
+                                                                <span style={{
+                                                                    fontSize: '0.7rem',
+                                                                    padding: '1px 5px',
+                                                                    borderRadius: 3,
+                                                                    background: d.tax_treatment === 'rental_passive' ? '#e0e0e0'
+                                                                        : d.tax_treatment === 'rental_active_reps' ? '#c8e6c9' : '#bbdefb',
+                                                                    color: '#333',
+                                                                }}>
+                                                                    {d.tax_treatment === 'rental_passive' ? 'Passive'
+                                                                        : d.tax_treatment === 'rental_active_reps' ? 'REPS' : 'STR'}
+                                                                </span>
+                                                            </td>
+                                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                                {formatCurrency(d.gross_rent)}
+                                                            </td>
+                                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                                {formatCurrency(d.operating_expenses + d.mortgage_interest + d.property_tax)}
+                                                            </td>
+                                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#6a1b9a' }}>
+                                                                {formatCurrency(d.depreciation)}
+                                                            </td>
+                                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#2e7d32' }}>
+                                                                {d.loss_applied_to_income > 0 ? formatCurrency(d.loss_applied_to_income) : '-'}
+                                                            </td>
+                                                            <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#e65100' }}>
+                                                                {d.suspended_loss_carryforward > 0 ? formatCurrency(d.suspended_loss_carryforward) : '-'}
+                                                            </td>
+                                                            <td colSpan={3}></td>
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
