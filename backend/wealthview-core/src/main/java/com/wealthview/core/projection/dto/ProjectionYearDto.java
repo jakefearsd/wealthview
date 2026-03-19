@@ -46,6 +46,46 @@ public record ProjectionYearDto(
         BigDecimal withdrawalFromRoth,
         List<RentalPropertyYearDetail> rentalPropertyDetails) {
 
+    public ProjectionYearDto withSurplusReinvested(BigDecimal surplusReinvested) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses(), discretionaryExpenses(),
+                incomeStreamsTotal(), netSpendingNeed(), spendingSurplus(),
+                discretionaryAfterCuts(),
+                rentalIncomeGross(), rentalExpensesTotal(), depreciationTotal(),
+                rentalLossApplied(), suspendedLossCarryforward(),
+                socialSecurityTaxable(), selfEmploymentTax(),
+                incomeBySource(),
+                propertyEquity(), totalNetWorth(), surplusReinvested,
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails());
+    }
+
+    public ProjectionYearDto withPropertyEquity(BigDecimal propertyEquity, BigDecimal totalNetWorth) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses(), discretionaryExpenses(),
+                incomeStreamsTotal(), netSpendingNeed(), spendingSurplus(),
+                discretionaryAfterCuts(),
+                rentalIncomeGross(), rentalExpensesTotal(), depreciationTotal(),
+                rentalLossApplied(), suspendedLossCarryforward(),
+                socialSecurityTaxable(), selfEmploymentTax(),
+                incomeBySource(),
+                propertyEquity, totalNetWorth, surplusReinvested(),
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails());
+    }
+
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
                                             BigDecimal withdrawals, BigDecimal endBalance,
