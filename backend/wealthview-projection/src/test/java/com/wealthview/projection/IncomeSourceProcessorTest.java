@@ -14,6 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -464,6 +465,83 @@ class IncomeSourceProcessorTest {
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("2900"));
         assertThat(result.rentalIncomeGross()).isEqualByComparingTo(new BigDecimal("12000"));
         assertThat(result.rentalExpensesTotal()).isEqualByComparingTo(new BigDecimal("9100"));
+    }
+
+    // --- Rental property details ---
+
+    @Test
+    void process_rentalProperty_populatesRentalPropertyDetails() {
+        var rentalId = UUID.randomUUID();
+        var lossResult = new RentalLossCalculator.LossResult(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("10800.0000"));
+        when(rentalLossCalculator.applyLossRules(any(), eq("rental_active_reps"), any(), any(), any()))
+                .thenReturn(lossResult);
+
+        var rental = new ProjectionIncomeSourceInput(
+                rentalId, "123 Main St Rental", "rental_property",
+                new BigDecimal("24000"), 65, null,
+                BigDecimal.ZERO, false, "rental_active_reps",
+                new BigDecimal("3600"), new BigDecimal("9600"),
+                null, null, "straight_line",
+                Map.of(2026, new BigDecimal("14545")));
+
+        // age=67, mid-range — no transition multiplier
+        var result = processor.process(
+                List.of(rental), 67, 3, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.rentalPropertyDetails()).hasSize(1);
+        var detail = result.rentalPropertyDetails().get(0);
+        assertThat(detail.incomeSourceId()).isEqualTo(rentalId);
+        assertThat(detail.propertyName()).isEqualTo("123 Main St Rental");
+        assertThat(detail.taxTreatment()).isEqualTo("rental_active_reps");
+        assertThat(detail.grossRent()).isEqualByComparingTo("24000");
+        assertThat(detail.depreciation()).isEqualByComparingTo("14545");
+    }
+
+    @Test
+    void process_multipleRentalProperties_collectsAllDetails() {
+        var id1 = UUID.randomUUID();
+        var id2 = UUID.randomUUID();
+        var lossResult = new RentalLossCalculator.LossResult(
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("5000"));
+        when(rentalLossCalculator.applyLossRules(any(), any(), any(), any(), any()))
+                .thenReturn(lossResult);
+
+        var rental1 = new ProjectionIncomeSourceInput(
+                id1, "Property A", "rental_property",
+                new BigDecimal("24000"), 60, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                null, null, null, null, null, null);
+        var rental2 = new ProjectionIncomeSourceInput(
+                id2, "Property B", "rental_property",
+                new BigDecimal("36000"), 60, null,
+                BigDecimal.ZERO, false, "rental_active_str",
+                null, null, null, null, null, null);
+
+        var result = processor.process(
+                List.of(rental1, rental2), 65, 6, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.rentalPropertyDetails()).hasSize(2);
+        assertThat(result.rentalPropertyDetails().get(0).propertyName()).isEqualTo("Property A");
+        assertThat(result.rentalPropertyDetails().get(1).propertyName()).isEqualTo("Property B");
+    }
+
+    @Test
+    void process_noRentalProperties_returnsEmptyDetails() {
+        var pensionId = UUID.randomUUID();
+        var pension = new ProjectionIncomeSourceInput(
+                pensionId, "Pension", "pension",
+                new BigDecimal("30000"), 65, null,
+                BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null, null);
+
+        var result = processor.process(
+                List.of(pension), 65, 1, 2026,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        assertThat(result.rentalPropertyDetails()).isEmpty();
     }
 
     // --- Helper ---
