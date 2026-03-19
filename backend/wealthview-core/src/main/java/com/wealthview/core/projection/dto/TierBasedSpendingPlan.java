@@ -66,57 +66,74 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
 
     public ResolvedSpending resolveSpending(int age) {
         if (!spendingTiers.isEmpty()) {
-            var matches = new ArrayList<SpendingTierData>();
-            for (var tier : spendingTiers) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
-                    matches.add(tier);
-                }
-            }
+            var matches = findMatchingTiers(age);
 
             if (matches.size() == 1) {
-                var tier = matches.getFirst();
-                return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
+                return resolveFromSingleTier(matches.getFirst());
             }
-
             if (matches.size() >= 2) {
-                var essSum = BigDecimal.ZERO;
-                var discSum = BigDecimal.ZERO;
-                for (var tier : matches) {
-                    essSum = essSum.add(tier.essentialExpenses());
-                    discSum = discSum.add(tier.discretionaryExpenses());
-                }
-                var count = new BigDecimal(matches.size());
-                return new ResolvedSpending(
-                        essSum.divide(count, SCALE, ROUNDING),
-                        discSum.divide(count, SCALE, ROUNDING));
+                return resolveFromOverlappingTiers(matches);
             }
-
-            // No match — gap: find prev/next and blend
-            SpendingTierData prev = null;
-            SpendingTierData next = null;
-            for (var tier : spendingTiers) {
-                if (tier.endAge() != null && tier.endAge() < age) {
-                    if (prev == null || tier.endAge() > prev.endAge()) {
-                        prev = tier;
-                    }
-                }
-                if (tier.startAge() > age) {
-                    if (next == null || tier.startAge() < next.startAge()) {
-                        next = tier;
-                    }
-                }
-            }
-
-            if (prev != null && next != null) {
-                var TWO = new BigDecimal("2");
-                var essential = prev.essentialExpenses().add(next.essentialExpenses())
-                        .divide(TWO, SCALE, ROUNDING);
-                var discretionary = prev.discretionaryExpenses().add(next.discretionaryExpenses())
-                        .divide(TWO, SCALE, ROUNDING);
-                return new ResolvedSpending(essential, discretionary);
+            var gapResult = resolveFromGap(age);
+            if (gapResult != null) {
+                return gapResult;
             }
         }
         return new ResolvedSpending(essentialExpenses, discretionaryExpenses);
+    }
+
+    private List<SpendingTierData> findMatchingTiers(int age) {
+        var matches = new ArrayList<SpendingTierData>();
+        for (var tier : spendingTiers) {
+            if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
+                matches.add(tier);
+            }
+        }
+        return matches;
+    }
+
+    private ResolvedSpending resolveFromSingleTier(SpendingTierData tier) {
+        return new ResolvedSpending(tier.essentialExpenses(), tier.discretionaryExpenses());
+    }
+
+    private ResolvedSpending resolveFromOverlappingTiers(List<SpendingTierData> matches) {
+        var essSum = BigDecimal.ZERO;
+        var discSum = BigDecimal.ZERO;
+        for (var tier : matches) {
+            essSum = essSum.add(tier.essentialExpenses());
+            discSum = discSum.add(tier.discretionaryExpenses());
+        }
+        var count = new BigDecimal(matches.size());
+        return new ResolvedSpending(
+                essSum.divide(count, SCALE, ROUNDING),
+                discSum.divide(count, SCALE, ROUNDING));
+    }
+
+    private ResolvedSpending resolveFromGap(int age) {
+        SpendingTierData prev = null;
+        SpendingTierData next = null;
+        for (var tier : spendingTiers) {
+            if (tier.endAge() != null && tier.endAge() < age) {
+                if (prev == null || tier.endAge() > prev.endAge()) {
+                    prev = tier;
+                }
+            }
+            if (tier.startAge() > age) {
+                if (next == null || tier.startAge() < next.startAge()) {
+                    next = tier;
+                }
+            }
+        }
+
+        if (prev != null && next != null) {
+            var TWO = new BigDecimal("2");
+            var essential = prev.essentialExpenses().add(next.essentialExpenses())
+                    .divide(TWO, SCALE, ROUNDING);
+            var discretionary = prev.discretionaryExpenses().add(next.discretionaryExpenses())
+                    .divide(TWO, SCALE, ROUNDING);
+            return new ResolvedSpending(essential, discretionary);
+        }
+        return null;
     }
 
     public int computeYearsInTier(int age, int yearsInRetirement) {
