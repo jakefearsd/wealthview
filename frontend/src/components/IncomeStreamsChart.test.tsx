@@ -61,6 +61,7 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         withdrawal_from_taxable: null,
         withdrawal_from_traditional: null,
         withdrawal_from_roth: null,
+        rental_property_details: null,
         ...overrides,
     };
 }

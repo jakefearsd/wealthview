@@ -75,6 +75,7 @@ export interface ProjectionYear {
     suspended_loss_carryforward: number | null;
     social_security_taxable: number | null;
     self_employment_tax: number | null;
+    rental_property_details: RentalPropertyYearDetail[] | null;
     income_by_source: Record<string, number> | null;
     property_equity: number | null;
     total_net_worth: number | null;
@@ -273,6 +274,22 @@ export interface GuardrailProfileResponse {
     risk_tolerance: string | null;
     cash_reserve_years: number;
     cash_return_rate: number;
+}
+
+export interface RentalPropertyYearDetail {
+    income_source_id: string;
+    property_name: string;
+    tax_treatment: string;
+    gross_rent: number;
+    operating_expenses: number;
+    mortgage_interest: number;
+    property_tax: number;
+    depreciation: number;
+    net_taxable_income: number;
+    loss_applied_to_income: number;
+    loss_suspended: number;
+    suspended_loss_carryforward: number;
+    cash_flow: number;
 }
 
 export interface GuardrailOptimizationRequest {
