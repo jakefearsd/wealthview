@@ -39,6 +39,7 @@ export default function ProjectionDetailPage() {
     const [running, setRunning] = useState(false);
     const [activeTab, setActiveTab] = useState<TabId>('chart');
     const [editing, setEditing] = useState(false);
+    const [showPoolDetails, setShowPoolDetails] = useState(false);
     const autoRanRef = useRef(false);
 
     useEffect(() => {
@@ -91,7 +92,6 @@ export default function ProjectionDetailPage() {
         y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
     ) ?? false;
     const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
-    const [showPoolDetails, setShowPoolDetails] = useState(false);
 
     const computeTotalSpending = (y: ProjectionYear): number | null => {
         if (y.essential_expenses != null) {
