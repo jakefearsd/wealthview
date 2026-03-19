@@ -7,6 +7,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
+import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
@@ -67,31 +68,7 @@ public class GuardrailProfileService {
 
         BigDecimal confidence = resolveConfidence(request);
 
-        var optimizationInput = new GuardrailOptimizationInput(
-                scenario.getRetirementDate(),
-                birthYear,
-                scenario.getEndAge() != null ? scenario.getEndAge() : 90,
-                scenario.getInflationRate() != null ? scenario.getInflationRate() : BigDecimal.ZERO,
-                projectionInput.accounts(),
-                projectionInput.incomeSources(),
-                request.essentialFloor(),
-                request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
-                request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
-                request.returnStddev() != null ? request.returnStddev() : DEFAULT_RETURN_STDDEV,
-                request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
-                confidence,
-                request.phases() != null ? request.phases() : List.of(),
-                null,
-                request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
-                request.maxAnnualAdjustmentRate() != null
-                        ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
-                request.phaseBlendYears() != null
-                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS,
-                request.cashReserveYears() != null
-                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
-                request.cashReturnRate() != null
-                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE
-        );
+        var optimizationInput = buildOptimizationInput(scenario, projectionInput, request, birthYear, confidence);
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);
 
@@ -229,6 +206,38 @@ public class GuardrailProfileService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
+    }
+
+    private GuardrailOptimizationInput buildOptimizationInput(ProjectionScenarioEntity scenario,
+                                                               ProjectionInput projectionInput,
+                                                               GuardrailOptimizationRequest request,
+                                                               int birthYear,
+                                                               BigDecimal confidence) {
+        return new GuardrailOptimizationInput(
+                scenario.getRetirementDate(),
+                birthYear,
+                scenario.getEndAge() != null ? scenario.getEndAge() : 90,
+                scenario.getInflationRate() != null ? scenario.getInflationRate() : BigDecimal.ZERO,
+                projectionInput.accounts(),
+                projectionInput.incomeSources(),
+                request.essentialFloor(),
+                request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
+                request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
+                request.returnStddev() != null ? request.returnStddev() : DEFAULT_RETURN_STDDEV,
+                request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
+                confidence,
+                request.phases() != null ? request.phases() : List.of(),
+                null,
+                request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
+                request.maxAnnualAdjustmentRate() != null
+                        ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
+                request.phaseBlendYears() != null
+                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS,
+                request.cashReserveYears() != null
+                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
+                request.cashReturnRate() != null
+                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE
+        );
     }
 
     private BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
