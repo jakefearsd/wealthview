@@ -41,13 +41,14 @@ Shown below the inputs, updates live as user types:
 - **Depreciable Basis:** `purchase_price - land_value`
 - **Annual Depreciation:** `depreciable_basis / useful_life_years`
 - **First Year (prorated):** Computed using IRS mid-month convention from in-service date
-- **Depreciation End Year:** `in_service_date.year + ceil(useful_life_years)`
+- **Depreciation End Year:** Computed from the schedule (last year with a non-zero entry). Not a simple formula due to mid-month convention affecting first/last year proration.
 
 ### Validation
 
 - If `land_value >= purchase_price`, show warning: "Land value must be less than purchase price for depreciation."
 - When depreciation method is "None", the other fields are hidden/disabled.
 - `useful_life_years` must be > 0.
+- **`in_service_date` is required when depreciation method is not "none."** The form must populate this field before saving. If the user selects Straight-Line and leaves the date blank, the form auto-fills with `purchase_date` and displays a note: "Defaulted to purchase date." The backend should reject a property with `depreciation_method != "none"` and `in_service_date = null`.
 
 ### API
 
@@ -61,9 +62,11 @@ Add a "Depreciation Schedule" tab to `PropertyAnalyticsSection.tsx`.
 
 ### New Endpoint
 
-`GET /api/properties/{id}/depreciation-schedule`
+`GET /api/v1/properties/{id}/depreciation-schedule`
 
-**Response:**
+Returns 400 if `depreciation_method` is "none" or depreciation is not configured. Returns 200 with the schedule otherwise.
+
+**Response (200):**
 
 ```json
 {
@@ -74,25 +77,27 @@ Add a "Depreciation Schedule" tab to `PropertyAnalyticsSection.tsx`.
   "schedule": [
     {
       "tax_year": 2024,
-      "annual_depreciation": 7272.73,
-      "cumulative_taken": 7272.73,
-      "remaining_basis": 392727.27
+      "annual_depreciation": 7878.79,
+      "cumulative_taken": 7878.79,
+      "remaining_basis": 392121.21
     },
     {
       "tax_year": 2025,
       "annual_depreciation": 14545.45,
-      "cumulative_taken": 21818.18,
-      "remaining_basis": 378181.82
+      "cumulative_taken": 22424.24,
+      "remaining_basis": 377575.76
     }
   ]
 }
 ```
 
+_Note: First year prorated via IRS mid-month convention. For a June 15 in-service date, 6.5 remaining months (half of June + July–December), so first year = `14545.45 * 6.5 / 12 = 7878.79`._
+
 ### Backend
 
-- New `DepreciationScheduleResponse` record in `wealthview-api` with nested `DepreciationScheduleYearResponse` record.
-- New controller method on `PropertyController` that calls `DepreciationCalculator.computeStraightLine()` and assembles the response with cumulative/remaining columns.
-- Service method on `PropertyService` (or a dedicated method) that loads the property, validates depreciation is configured, and delegates to the calculator.
+- **Service layer:** New method on `PropertyService` that loads the property, validates depreciation is configured, calls `DepreciationCalculator.computeStraightLine()`, and returns the raw `Map<Integer, BigDecimal>` schedule along with the property's depreciation metadata (method, basis, useful life, in-service date).
+- **API layer:** New `DepreciationScheduleResponse` record in `wealthview-api` with nested `DepreciationScheduleYearResponse` record. The controller method receives the raw map from the service and assembles it into the response DTO with cumulative/remaining columns.
+- This follows the existing module boundary pattern: service returns domain data, controller maps to response DTO.
 
 ### Frontend
 
@@ -111,7 +116,7 @@ Add a "Depreciation Schedule" tab to `PropertyAnalyticsSection.tsx`.
 
 ```java
 record RentalPropertyYearDetail(
-    UUID propertyId,
+    UUID incomeSourceId,
     String propertyName,
     String taxTreatment,
     BigDecimal grossRent,
@@ -127,13 +132,19 @@ record RentalPropertyYearDetail(
 ) {}
 ```
 
+_Note: Uses `incomeSourceId` (not property entity ID) because the projection operates on income sources. The income source name (e.g., "123 Main St Rental") serves as the property identifier in the UI._
+
 ### Backend Changes
 
-- `IncomeSourceProcessor.RentalResult` expanded to carry source ID, property name, and tax treatment.
+- `IncomeSourceProcessor.RentalResult` expanded to carry source ID, source name, and tax treatment.
 - `IncomeSourceProcessor.IncomeSourceYearResult` gains a `List<RentalPropertyYearDetail>` field.
 - `processRentalProperty()` builds a `RentalPropertyYearDetail` from each rental result.
 - `ProjectionYearDto` gains a `List<RentalPropertyYearDetail> rentalPropertyDetails` field.
 - Existing aggregate fields (`depreciationTotal`, `rentalLossApplied`, `rentalExpensesTotal`, `suspendedLossCarryforward`) remain unchanged for backward compatibility and summary display.
+
+### Suspended Loss Tracking — Known Limitation
+
+The current `IncomeSourceProcessor` tracks suspended passive losses as a **single aggregate pool** shared across all rental properties (line 107). IRS rules technically track suspended losses per-activity (per-property). For this phase, the per-property `lossSuspended` and `suspendedLossCarryforward` fields on `RentalPropertyYearDetail` will reflect the **per-property contribution to the shared pool** (i.e., how much loss this property generated that was suspended), not true per-property carryforward tracking. The aggregate `suspendedLossCarryforward` on `ProjectionYearDto` remains the authoritative total. Per-property carryforward tracking is a future enhancement that would require refactoring `IncomeSourceProcessor` to maintain a `Map<UUID, BigDecimal>` of suspended losses by income source.
 
 ### Data Flow
 
@@ -163,8 +174,8 @@ A summary section on the projection results page showing the cumulative impact o
 |--------|-------------|--------|
 | Total Depreciation Taken | Sum of `depreciation` across all properties and all projection years | Per-year `rentalPropertyDetails` |
 | Total Loss Applied to Income | Sum of `loss_applied_to_income` across all years | Per-year `rentalPropertyDetails` |
-| Estimated Tax Savings | For each year: `loss_applied * marginal_rate`, summed | Per-year data + `tax_liability` / taxable income |
-| Roth Conversion Sheltered | For each year with Roth conversions: `min(rental_loss_applied, roth_conversion_amount)` | Per-year `rental_loss_applied` + `roth_conversion_amount` |
+| Estimated Tax Savings (approx.) | For each year: `loss_applied * effective_tax_rate`, summed. Uses effective rate (tax_liability / taxable_income) as a practical approximation; true marginal rate would require re-running the tax engine. Label as approximate in the UI. | Per-year data |
+| Roth Conversion Sheltered (approx.) | For each year with Roth conversions: `min(rental_loss_applied, roth_conversion_amount)`. This overstates sheltering when other ordinary income exists, since IRS rules reduce AGI overall — the loss does not specifically target conversion income. Label as approximate in the UI. | Per-year `rental_loss_applied` + `roth_conversion_amount` |
 | Suspended Losses Remaining | Final year's `suspended_loss_carryforward` | Last projection year |
 
 ### Per-Property Subtotals
@@ -179,7 +190,8 @@ Within the summary, show each property's contribution:
 ### Implementation
 
 - **Client-side aggregation.** All required data is in the per-year projection response. No new backend computation needed.
-- Roth Conversion Sheltered uses `min(rentalLossApplied, rothConversionAmount)` per year as a reasonable approximation. The rental loss offsets ordinary income, which includes the Roth conversion — this captures the overlap without requiring the engine to track the exact attribution.
+- Roth Conversion Sheltered uses `min(rentalLossApplied, rothConversionAmount)` per year as an approximation. This overstates the sheltering effect when other ordinary income exists (the loss reduces AGI overall, not specifically conversion income). The UI should label this metric as "approximate."
+- Estimated Tax Savings uses the effective tax rate as an approximation. True marginal savings would require re-running the tax engine without depreciation losses, which is out of scope for this phase. The UI should label as "approximate."
 - Rendered as a card/panel near the top of the projection results page or as a dedicated "Tax Shield" tab.
 
 ---
@@ -212,3 +224,13 @@ Within the summary, show each property's contribution:
 
 ### No Schema Migration Needed
 All depreciation fields already exist in the database (V032). No new columns or tables required.
+
+---
+
+## Known Limitations & Future Work
+
+- **Suspended losses tracked as single pool.** The engine shares one suspended loss total across all rental properties rather than tracking per-activity as IRS rules require. Per-property carryforward is a future enhancement.
+- **Tax savings and Roth sheltering are approximations.** Labeled as such in the UI. True marginal analysis would require running the tax engine twice (with and without depreciation) per projection year.
+- **No cost segregation study input.** Only None and Straight-Line offered. Cost Segregation schedule entry is a future phase.
+- **No property disposition modeling.** When a property is sold, all suspended passive losses are released per IRC Section 469(g). This is not modeled in the current projection engine.
+- **No depreciation recapture.** When a property is sold, depreciation taken is recaptured at 25% (Section 1250). Not modeled.
