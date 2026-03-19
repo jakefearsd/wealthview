@@ -1,6 +1,7 @@
 package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.api.dto.DepreciationScheduleResponse;
 import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
@@ -165,6 +166,14 @@ public class PropertyController {
         }
         var result = syncService.refreshProperty(principal.tenantId(), id);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{id}/depreciation-schedule")
+    public ResponseEntity<DepreciationScheduleResponse> getDepreciationSchedule(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID id) {
+        var result = propertyService.getDepreciationSchedule(principal.tenantId(), id);
+        return ResponseEntity.ok(DepreciationScheduleResponse.from(result));
     }
 
     @PostMapping("/{id}/valuations/select-zpid")

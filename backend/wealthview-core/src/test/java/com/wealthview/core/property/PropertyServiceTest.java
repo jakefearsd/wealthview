@@ -16,6 +16,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
@@ -48,6 +49,9 @@ class PropertyServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Spy
+    private DepreciationCalculator depreciationCalculator = new DepreciationCalculator();
 
     @InjectMocks
     private PropertyService propertyService;
@@ -811,6 +815,65 @@ class PropertyServiceTest {
         assertThat(result).hasSize(1);
         // Should be derived mortgage (1896.2041), NOT derived + ad-hoc
         assertThat(result.get(0).totalExpenses()).isEqualByComparingTo("1896.2041");
+    }
+
+    @Test
+    void getDepreciationSchedule_straightLine_returnsScheduleWithCumulativeAndRemaining() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("400000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("450000"), new BigDecimal("200000"));
+        property.setDepreciationMethod("straight_line");
+        property.setLandValue(new BigDecimal("100000"));
+        property.setInServiceDate(LocalDate.of(2024, 1, 1));
+        property.setUsefulLifeYears(new BigDecimal("27.5"));
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var result = propertyService.getDepreciationSchedule(tenantId, propertyId);
+
+        assertThat(result).isNotNull();
+        assertThat(result.depreciationMethod()).isEqualTo("straight_line");
+        assertThat(result.depreciableBasis()).isEqualByComparingTo("300000");
+        assertThat(result.usefulLifeYears()).isEqualByComparingTo("27.5");
+        assertThat(result.inServiceDate()).isEqualTo(LocalDate.of(2024, 1, 1));
+        assertThat(result.schedule()).isNotEmpty();
+        assertThat(result.schedule().get(0).taxYear()).isEqualTo(2024);
+
+        // Cumulative of first entry should equal its annual depreciation
+        var first = result.schedule().get(0);
+        assertThat(first.cumulativeTaken()).isEqualByComparingTo(first.annualDepreciation());
+        assertThat(first.remainingBasis()).isEqualByComparingTo(
+                new BigDecimal("300000").subtract(first.cumulativeTaken()));
+
+        // Last entry remaining basis should be ~0
+        var last = result.schedule().get(result.schedule().size() - 1);
+        assertThat(last.remainingBasis()).isEqualByComparingTo("0.0000");
+    }
+
+    @Test
+    void getDepreciationSchedule_methodNone_throwsIllegalArgument() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("400000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("450000"), new BigDecimal("200000"));
+        property.setDepreciationMethod("none");
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        assertThatThrownBy(() -> propertyService.getDepreciationSchedule(tenantId, propertyId))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Depreciation is not configured");
+    }
+
+    @Test
+    void getDepreciationSchedule_propertyNotFound_throwsEntityNotFound() {
+        var propertyId = UUID.randomUUID();
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> propertyService.getDepreciationSchedule(tenantId, propertyId))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 
     @Test
