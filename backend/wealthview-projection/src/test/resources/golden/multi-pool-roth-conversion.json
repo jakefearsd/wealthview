@@ -39,7 +39,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -79,7 +80,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -119,7 +121,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -159,7 +162,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -199,7 +203,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -239,7 +244,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -279,7 +285,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -319,7 +326,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -359,7 +367,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -399,7 +408,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -439,7 +449,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -479,7 +490,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -519,7 +531,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -559,7 +572,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -599,7 +613,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -639,7 +654,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -679,7 +695,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -719,7 +736,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -759,7 +777,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -799,7 +818,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -839,7 +859,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -879,7 +900,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -919,7 +941,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -959,7 +982,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -999,7 +1023,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -1039,7 +1064,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -1079,7 +1105,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -1119,7 +1146,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -1159,7 +1187,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -1199,7 +1228,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -1239,7 +1269,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : 271149.3110,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -1279,7 +1310,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : 276572.2972,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -1319,7 +1351,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : 282103.7431,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : null
+    "withdrawalFromRoth" : null,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -1359,7 +1392,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : 245040.5461,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 42705.2719
+    "withdrawalFromRoth" : 42705.2719,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -1399,7 +1433,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 293500.7344
+    "withdrawalFromRoth" : 293500.7344,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -1439,7 +1474,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 299370.7491
+    "withdrawalFromRoth" : 299370.7491,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -1479,7 +1515,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 305358.1641
+    "withdrawalFromRoth" : 305358.1641,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -1519,7 +1556,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 311465.3274
+    "withdrawalFromRoth" : 311465.3274,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -1559,7 +1597,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 317694.6339
+    "withdrawalFromRoth" : 317694.6339,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -1599,7 +1638,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 324048.5266
+    "withdrawalFromRoth" : 324048.5266,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -1639,7 +1679,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 330529.4971
+    "withdrawalFromRoth" : 330529.4971,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -1679,7 +1720,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 337140.0870
+    "withdrawalFromRoth" : 337140.0870,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -1719,7 +1761,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 343882.8887
+    "withdrawalFromRoth" : 343882.8887,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -1759,7 +1802,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 350760.5465
+    "withdrawalFromRoth" : 350760.5465,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -1799,7 +1843,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 357775.7574
+    "withdrawalFromRoth" : 357775.7574,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -1839,7 +1884,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 364931.2725
+    "withdrawalFromRoth" : 364931.2725,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -1879,7 +1925,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 372229.8980
+    "withdrawalFromRoth" : 372229.8980,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -1919,7 +1966,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 379674.4960
+    "withdrawalFromRoth" : 379674.4960,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -1959,7 +2007,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 387267.9859
+    "withdrawalFromRoth" : 387267.9859,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -1999,7 +2048,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 395013.3456
+    "withdrawalFromRoth" : 395013.3456,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -2039,7 +2089,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 402913.6125
+    "withdrawalFromRoth" : 402913.6125,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -2079,7 +2130,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 410971.8848
+    "withdrawalFromRoth" : 410971.8848,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -2119,7 +2171,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 419191.3225
+    "withdrawalFromRoth" : 419191.3225,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -2159,7 +2212,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 427575.1490
+    "withdrawalFromRoth" : 427575.1490,
+    "rentalPropertyDetails" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -2199,7 +2253,8 @@
     "taxPaidFromRoth" : null,
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
-    "withdrawalFromRoth" : 436126.6520
+    "withdrawalFromRoth" : 436126.6520,
+    "rentalPropertyDetails" : null
   } ],
   "finalBalance" : 15437939.6945,
   "yearsInRetirement" : 25,

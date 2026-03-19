@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 public record ProjectionYearDto(
@@ -42,7 +43,8 @@ public record ProjectionYearDto(
         BigDecimal taxPaidFromRoth,
         BigDecimal withdrawalFromTaxable,
         BigDecimal withdrawalFromTraditional,
-        BigDecimal withdrawalFromRoth) {
+        BigDecimal withdrawalFromRoth,
+        List<RentalPropertyYearDetail> rentalPropertyDetails) {
 
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
@@ -53,6 +55,6 @@ public record ProjectionYearDto(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
     }
 }
