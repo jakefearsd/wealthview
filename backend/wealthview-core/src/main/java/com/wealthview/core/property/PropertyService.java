@@ -3,6 +3,7 @@ package com.wealthview.core.property;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
@@ -45,15 +46,18 @@ public class PropertyService {
     private final PropertyExpenseRepository expenseRepository;
     private final TenantRepository tenantRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final DepreciationCalculator depreciationCalculator;
 
     public PropertyService(PropertyRepository propertyRepository,
                            PropertyExpenseRepository expenseRepository,
                            TenantRepository tenantRepository,
-                           ApplicationEventPublisher eventPublisher) {
+                           ApplicationEventPublisher eventPublisher,
+                           DepreciationCalculator depreciationCalculator) {
         this.propertyRepository = propertyRepository;
         this.expenseRepository = expenseRepository;
         this.tenantRepository = tenantRepository;
         this.eventPublisher = eventPublisher;
+        this.depreciationCalculator = depreciationCalculator;
     }
 
     @Transactional
@@ -142,6 +146,41 @@ public class PropertyService {
         var expense = expenseRepository.findById(expenseId)
                 .orElseThrow(() -> new EntityNotFoundException("Expense not found"));
         expenseRepository.delete(expense);
+    }
+
+    @Transactional(readOnly = true)
+    public DepreciationScheduleResult getDepreciationSchedule(UUID tenantId, UUID propertyId) {
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found: " + propertyId));
+
+        var method = property.getDepreciationMethod();
+        if (method == null || "none".equals(method)) {
+            throw new IllegalArgumentException("Depreciation is not configured for this property");
+        }
+
+        var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
+        var depreciableBasis = property.getPurchasePrice().subtract(landValue);
+        var schedule = depreciationCalculator.computeStraightLine(
+                property.getPurchasePrice(), landValue,
+                property.getInServiceDate(), property.getUsefulLifeYears());
+
+        var cumulative = BigDecimal.ZERO;
+        var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
+        for (var entry : schedule.entrySet()) {
+            cumulative = cumulative.add(entry.getValue());
+            entries.add(new DepreciationScheduleResult.YearEntry(
+                    entry.getKey(),
+                    entry.getValue(),
+                    cumulative,
+                    depreciableBasis.subtract(cumulative)));
+        }
+
+        return new DepreciationScheduleResult(
+                property.getDepreciationMethod(),
+                depreciableBasis,
+                property.getUsefulLifeYears(),
+                property.getInServiceDate(),
+                entries);
     }
 
     @Transactional

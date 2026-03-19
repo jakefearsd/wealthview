@@ -10,6 +10,7 @@ import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
+import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
@@ -364,5 +365,51 @@ class PropertyControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("updated"));
+    }
+
+    @Test
+    void getDepreciationSchedule_happyPath_returns200() throws Exception {
+        var entries = List.of(
+                new DepreciationScheduleResult.YearEntry(2024, new BigDecimal("10909.09"),
+                        new BigDecimal("10909.09"), new BigDecimal("289090.91")),
+                new DepreciationScheduleResult.YearEntry(2025, new BigDecimal("10909.09"),
+                        new BigDecimal("21818.18"), new BigDecimal("278181.82"))
+        );
+        var result = new DepreciationScheduleResult(
+                "straight_line", new BigDecimal("300000"),
+                new BigDecimal("27.5"), LocalDate.of(2024, 1, 15), entries);
+
+        when(propertyService.getDepreciationSchedule(TENANT_ID, PROPERTY_ID)).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/properties/{id}/depreciation-schedule", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depreciation_method").value("straight_line"))
+                .andExpect(jsonPath("$.depreciable_basis").value(300000))
+                .andExpect(jsonPath("$.schedule").isArray())
+                .andExpect(jsonPath("$.schedule.length()").value(2))
+                .andExpect(jsonPath("$.schedule[0].tax_year").value(2024))
+                .andExpect(jsonPath("$.schedule[0].annual_depreciation").value(10909.09));
+    }
+
+    @Test
+    void getDepreciationSchedule_methodNone_returns400() throws Exception {
+        when(propertyService.getDepreciationSchedule(TENANT_ID, PROPERTY_ID))
+                .thenThrow(new IllegalArgumentException("Depreciation is not configured for this property"));
+
+        mockMvc.perform(get("/api/v1/properties/{id}/depreciation-schedule", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getDepreciationSchedule_notFound_returns404() throws Exception {
+        when(propertyService.getDepreciationSchedule(TENANT_ID, PROPERTY_ID))
+                .thenThrow(new EntityNotFoundException("Property not found: " + PROPERTY_ID));
+
+        mockMvc.perform(get("/api/v1/properties/{id}/depreciation-schedule", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 }
