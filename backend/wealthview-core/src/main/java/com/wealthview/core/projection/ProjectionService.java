@@ -231,7 +231,7 @@ public class ProjectionService {
         var guardrail = guardrailEntity != null
                 ? GuardrailProfileSummary.from(guardrailEntity, scenario.getGuardrailProfile() != null)
                 : null;
-        var incomeSources = scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()).stream()
+        var incomeSources = scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()).stream()
                 .map(link -> {
                     var src = link.getIncomeSource();
                     var effective = link.getOverrideAnnualAmount() != null

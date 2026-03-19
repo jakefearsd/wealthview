@@ -1,12 +1,14 @@
 package com.wealthview.core.importservice;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.importservice.dto.CsvParseResult;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import com.wealthview.core.importservice.dto.ImportResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.core.transaction.TransactionService;
 import com.wealthview.core.transaction.dto.TransactionRequest;
+import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
@@ -20,10 +22,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.OffsetDateTime;
-import java.util.Locale;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -35,6 +40,7 @@ public class ImportService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
+    private final HoldingsComputationService holdingsComputationService;
     private final CsvParser csvParser;
     private final Map<String, CsvParser> namedParsers;
 
@@ -42,12 +48,14 @@ public class ImportService {
                          AccountRepository accountRepository,
                          TransactionRepository transactionRepository,
                          TransactionService transactionService,
+                         HoldingsComputationService holdingsComputationService,
                          CsvParser csvParser,
                          Map<String, CsvParser> namedParsers) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
         this.transactionService = transactionService;
+        this.holdingsComputationService = holdingsComputationService;
         this.csvParser = csvParser;
         this.namedParsers = namedParsers;
     }
@@ -109,7 +117,7 @@ public class ImportService {
             job.setTotalRows(parseResult.transactions().size() + parseResult.errors().size());
             job = importJobRepository.save(job);
 
-            var result = importTransactions(parseResult.transactions(), tenantId, accountId);
+            var result = importTransactions(parseResult.transactions(), tenantId, accountId, account);
             finalizeJob(job, result, parseResult.errors().size());
 
             log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
@@ -123,33 +131,56 @@ public class ImportService {
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional catch-all so one bad row doesn't abort entire import
     private ImportResult importTransactions(List<ParsedTransaction> transactions,
-                                             UUID tenantId, UUID accountId) {
+                                             UUID tenantId, UUID accountId,
+                                             AccountEntity account) {
+        // Batch compute all hashes and check duplicates in one query
+        var hashToTransaction = new LinkedHashMap<String, ParsedTransaction>();
+        for (var parsed : transactions) {
+            var hash = TransactionHashUtil.computeHash(
+                    parsed.date(), parsed.type(), parsed.symbol(),
+                    parsed.quantity(), parsed.amount());
+            hashToTransaction.put(hash, parsed);
+        }
+
+        var existingHashes = transactionRepository.findExistingImportHashes(
+                tenantId, accountId, hashToTransaction.keySet());
+
         int successCount = 0;
         int skippedDuplicates = 0;
         int failedCount = 0;
-        for (var parsed : transactions) {
+        Set<String> affectedSymbols = new HashSet<>();
+
+        for (var entry : hashToTransaction.entrySet()) {
+            var hash = entry.getKey();
+            var parsed = entry.getValue();
+
+            if (existingHashes.contains(hash)) {
+                log.debug("Skipped duplicate transaction: hash={}", hash);
+                skippedDuplicates++;
+                continue;
+            }
+
             try {
-                var hash = TransactionHashUtil.computeHash(
-                        parsed.date(), parsed.type(), parsed.symbol(),
-                        parsed.quantity(), parsed.amount());
-
-                if (transactionRepository.existsByTenant_IdAndAccount_IdAndImportHash(
-                        tenantId, accountId, hash)) {
-                    log.debug("Skipped duplicate transaction: hash={}", hash);
-                    skippedDuplicates++;
-                    continue;
-                }
-
                 var request = new TransactionRequest(
                         parsed.date(), parsed.type(), parsed.symbol(),
                         parsed.quantity(), parsed.amount());
-                transactionService.createWithHash(tenantId, accountId, request, hash);
+                transactionService.createWithHashNoRecompute(tenantId, accountId, request, hash);
                 successCount++;
+                if (parsed.symbol() != null) {
+                    affectedSymbols.add(parsed.symbol());
+                }
             } catch (Exception e) {
                 log.warn("Failed to import transaction", e);
                 failedCount++;
             }
         }
+
+        // Recompute holdings once per distinct symbol at the end
+        for (var symbol : affectedSymbols) {
+            holdingsComputationService.recomputeForAccountAndSymbol(
+                    account, account.getTenant(), symbol);
+        }
+
         return new ImportResult(successCount, skippedDuplicates, failedCount);
     }
 

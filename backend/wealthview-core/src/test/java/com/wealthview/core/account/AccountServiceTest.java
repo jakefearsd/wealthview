@@ -6,7 +6,6 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
@@ -21,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -33,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -149,13 +148,8 @@ class AccountServiceTest {
         var account = new AccountEntity(tenant, "Checking", "bank", "Chase");
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
-
-        var deposit = new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 1), "deposit", null, null, new BigDecimal("5000.00"));
-        var withdrawal = new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 15), "withdrawal", null, null, new BigDecimal("1500.00"));
-        when(transactionRepository.findByAccount_IdAndTenant_Id(eq(account.getId()), eq(tenantId), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(deposit, withdrawal)));
+        when(transactionRepository.computeBalance(account.getId(), tenantId))
+                .thenReturn(new BigDecimal("3500.00"));
 
         var result = accountService.get(tenantId, accountId);
 
@@ -175,12 +169,55 @@ class AccountServiceTest {
                 .thenReturn(List.of(holding));
 
         var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
-        when(priceRepository.findFirstBySymbolOrderByDateDesc("AAPL"))
-                .thenReturn(Optional.of(price));
+        when(priceRepository.findLatestBySymbolIn(List.of("AAPL")))
+                .thenReturn(List.of(price));
 
         var result = accountService.get(tenantId, accountId);
 
         assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("2000.00"));
+    }
+
+    @Test
+    void get_investmentAccount_multipleHoldings_batchFetchesPrices() {
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+
+        var holdingAapl = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.00"));
+        var holdingGoog = new HoldingEntity(account, tenant, "GOOG",
+                new BigDecimal("5"), new BigDecimal("2000.00"));
+        when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
+                .thenReturn(List.of(holdingAapl, holdingGoog));
+
+        var priceAapl = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
+        var priceGoog = new PriceEntity("GOOG", LocalDate.of(2025, 3, 1), new BigDecimal("150.00"), "manual");
+        when(priceRepository.findLatestBySymbolIn(List.of("AAPL", "GOOG")))
+                .thenReturn(List.of(priceAapl, priceGoog));
+
+        var result = accountService.get(tenantId, accountId);
+
+        // AAPL: 10 * 200 = 2000, GOOG: 5 * 150 = 750, total = 2750
+        assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("2750.00"));
+        // Should NOT call findFirstBySymbolOrderByDateDesc (the N+1 method)
+        verify(priceRepository, never()).findFirstBySymbolOrderByDateDesc(any());
+    }
+
+    @Test
+    void get_bankAccount_usesRepositoryAggregation() {
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Checking", "bank", "Chase");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        when(transactionRepository.computeBalance(account.getId(), tenantId))
+                .thenReturn(new BigDecimal("3500.00"));
+
+        var result = accountService.get(tenantId, accountId);
+
+        assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("3500.00"));
+        // Should NOT load all transactions via Pageable.unpaged()
+        verify(transactionRepository, never()).findByAccount_IdAndTenant_Id(any(), any(), any());
     }
 
     @Test
@@ -195,8 +232,8 @@ class AccountServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
                 .thenReturn(List.of(holding));
 
-        when(priceRepository.findFirstBySymbolOrderByDateDesc("XYZ"))
-                .thenReturn(Optional.empty());
+        when(priceRepository.findLatestBySymbolIn(List.of("XYZ")))
+                .thenReturn(List.of());
 
         var result = accountService.get(tenantId, accountId);
 

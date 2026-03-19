@@ -139,7 +139,7 @@ public class CombinedPortfolioHistoryService {
 
         // Build property valuation maps
         var valuationsByProperty = allValuations.stream()
-                .collect(Collectors.groupingBy(v -> v.getProperty().getId()));
+                .collect(Collectors.groupingBy(PropertyValuationEntity::getPropertyId));
 
         // Compute weekly data points
         var dataPoints = new ArrayList<CombinedPortfolioDataPointDto>();

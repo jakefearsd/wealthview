@@ -27,6 +27,9 @@ public class PropertyValuationEntity {
     @JoinColumn(name = "property_id", nullable = false)
     private PropertyEntity property;
 
+    @Column(name = "property_id", insertable = false, updatable = false)
+    private UUID propertyId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tenant_id", nullable = false)
     private TenantEntity tenant;
@@ -60,6 +63,7 @@ public class PropertyValuationEntity {
 
     public UUID getId() { return id; }
     public PropertyEntity getProperty() { return property; }
+    public UUID getPropertyId() { return propertyId; }
     public TenantEntity getTenant() { return tenant; }
     public LocalDate getValuationDate() { return valuationDate; }
     public BigDecimal getValue() { return value; }

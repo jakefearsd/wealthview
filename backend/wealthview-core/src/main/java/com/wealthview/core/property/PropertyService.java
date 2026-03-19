@@ -10,9 +10,12 @@ import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
+import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
+import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
+import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.slf4j.Logger;
@@ -44,17 +47,20 @@ public class PropertyService {
 
     private final PropertyRepository propertyRepository;
     private final PropertyExpenseRepository expenseRepository;
+    private final PropertyIncomeRepository incomeRepository;
     private final TenantRepository tenantRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final DepreciationCalculator depreciationCalculator;
 
     public PropertyService(PropertyRepository propertyRepository,
                            PropertyExpenseRepository expenseRepository,
+                           PropertyIncomeRepository incomeRepository,
                            TenantRepository tenantRepository,
                            ApplicationEventPublisher eventPublisher,
                            DepreciationCalculator depreciationCalculator) {
         this.propertyRepository = propertyRepository;
         this.expenseRepository = expenseRepository;
+        this.incomeRepository = incomeRepository;
         this.tenantRepository = tenantRepository;
         this.eventPublisher = eventPublisher;
         this.depreciationCalculator = depreciationCalculator;
@@ -192,6 +198,17 @@ public class PropertyService {
         var expense = new PropertyExpenseEntity(property, property.getTenant(),
                 request.date(), request.amount(), request.category(), request.description(), frequency);
         expenseRepository.save(expense);
+    }
+
+    @Transactional
+    public void addIncome(UUID tenantId, UUID propertyId, PropertyIncomeRequest request) {
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+
+        var frequency = request.frequency() != null ? request.frequency() : "monthly";
+        var income = new PropertyIncomeEntity(property, property.getTenant(),
+                request.date(), request.amount(), request.category(), request.description(), frequency);
+        incomeRepository.save(income);
     }
 
     @Transactional(readOnly = true)

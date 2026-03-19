@@ -407,3 +407,4 @@ Before committing, verify:
 7. **Do not skip writing the migration.** If you change an entity, there MUST be a corresponding Flyway migration.
 8. **Do not use `@Autowired` on fields.** Use constructor injection only.
 9. **Do not push to GitHub without explicit user confirmation.**
+10. **Do not assume test failures are pre-existing.** When you encounter a failing test — unit, integration, or end-to-end — investigate and fix it immediately. Never skip a failing test with the rationale that "it was already broken." Every red test is your responsibility to resolve before moving on.

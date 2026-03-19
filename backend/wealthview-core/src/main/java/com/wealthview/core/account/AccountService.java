@@ -8,6 +8,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
@@ -25,6 +26,7 @@ import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class AccountService {
@@ -107,32 +109,33 @@ public class AccountService {
     }
 
     private BigDecimal computeBankBalance(AccountEntity account, UUID tenantId) {
-        var transactions = transactionRepository.findByAccount_IdAndTenant_Id(
-                account.getId(), tenantId, Pageable.unpaged());
-        var balance = BigDecimal.ZERO;
-        for (var txn : transactions) {
-            if ("deposit".equals(txn.getType())) {
-                balance = balance.add(txn.getAmount());
-            } else if ("withdrawal".equals(txn.getType())) {
-                balance = balance.subtract(txn.getAmount());
-            }
-        }
-        return balance;
+        return transactionRepository.computeBalance(account.getId(), tenantId);
     }
 
     private BigDecimal computeInvestmentValue(AccountEntity account, UUID tenantId) {
         var holdings = holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId);
+        if (holdings.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        var symbols = holdings.stream()
+                .map(HoldingEntity::getSymbol)
+                .distinct()
+                .toList();
+
+        var latestPrices = priceRepository.findLatestBySymbolIn(symbols).stream()
+                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+
         var value = BigDecimal.ZERO;
         for (var holding : holdings) {
-            value = value.add(getHoldingValue(holding));
+            var price = latestPrices.get(holding.getSymbol());
+            if (price != null) {
+                value = value.add(holding.getQuantity().multiply(price)
+                        .setScale(4, RoundingMode.HALF_UP));
+            } else {
+                value = value.add(holding.getCostBasis());
+            }
         }
         return value;
-    }
-
-    private BigDecimal getHoldingValue(HoldingEntity holding) {
-        return priceRepository.findFirstBySymbolOrderByDateDesc(holding.getSymbol())
-                .map(price -> holding.getQuantity().multiply(price.getClosePrice())
-                        .setScale(4, RoundingMode.HALF_UP))
-                .orElse(holding.getCostBasis());
     }
 }
