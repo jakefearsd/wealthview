@@ -1,5 +1,6 @@
 package com.wealthview.core.dashboard;
 
+import com.wealthview.core.account.AccountService;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionDataPointDto;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionResponse;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
@@ -8,10 +9,8 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,17 +34,17 @@ public class SnapshotProjectionService {
     private static final long MIN_MONTHS_FOR_CAGR = 3;
 
     private final AccountRepository accountRepository;
+    private final AccountService accountService;
     private final PropertyRepository propertyRepository;
-    private final TransactionRepository transactionRepository;
     private final TheoreticalPortfolioService theoreticalPortfolioService;
 
     public SnapshotProjectionService(AccountRepository accountRepository,
+                                      AccountService accountService,
                                       PropertyRepository propertyRepository,
-                                      TransactionRepository transactionRepository,
                                       TheoreticalPortfolioService theoreticalPortfolioService) {
         this.accountRepository = accountRepository;
+        this.accountService = accountService;
         this.propertyRepository = propertyRepository;
-        this.transactionRepository = transactionRepository;
         this.theoreticalPortfolioService = theoreticalPortfolioService;
     }
 
@@ -65,7 +64,7 @@ public class SnapshotProjectionService {
         var accountProjections = new ArrayList<AccountProjection>();
         for (var account : accounts) {
             if ("bank".equals(account.getType())) {
-                var balance = computeBankBalance(account, tenantId);
+                var balance = accountService.computeBalance(account, tenantId);
                 accountProjections.add(new AccountProjection(balance, BigDecimal.ZERO));
             } else {
                 var projection = computeInvestmentProjection(tenantId, account, clampedLookback);
@@ -138,20 +137,6 @@ public class SnapshotProjectionService {
         var cagr = BigDecimal.valueOf(Math.pow(ratio.doubleValue(), exponent.doubleValue())).subtract(BigDecimal.ONE);
 
         return new AccountProjection(currentValue, cagr);
-    }
-
-    private BigDecimal computeBankBalance(AccountEntity account, UUID tenantId) {
-        var transactions = transactionRepository.findByAccount_IdAndTenant_Id(
-                account.getId(), tenantId, Pageable.unpaged());
-        var balance = BigDecimal.ZERO;
-        for (var txn : transactions) {
-            if ("deposit".equals(txn.getType())) {
-                balance = balance.add(txn.getAmount());
-            } else if ("withdrawal".equals(txn.getType())) {
-                balance = balance.subtract(txn.getAmount());
-            }
-        }
-        return balance;
     }
 
     private BigDecimal computeWeightedCagr(List<AccountProjection> projections, BigDecimal totalValue) {
