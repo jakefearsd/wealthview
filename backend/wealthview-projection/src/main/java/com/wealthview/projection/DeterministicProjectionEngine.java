@@ -612,7 +612,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
                 base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
+                base.rentalPropertyDetails());
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
@@ -643,7 +644,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
                 base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
+                isResult.rentalPropertyDetails().isEmpty() ? null : isResult.rentalPropertyDetails());
     }
 
     private ProjectionYearDto applySurplusReinvested(ProjectionYearDto base, BigDecimal surplusReinvested) {
@@ -662,7 +664,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.propertyEquity(), base.totalNetWorth(), surplusReinvested,
                 base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
+                base.rentalPropertyDetails());
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
@@ -725,7 +728,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 propertyEquity, totalNetWorth, base.surplusReinvested(),
                 base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth());
+                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
+                base.rentalPropertyDetails());
     }
 
 }
