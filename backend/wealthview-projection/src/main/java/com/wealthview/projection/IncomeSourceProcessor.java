@@ -1,15 +1,18 @@
 package com.wealthview.projection;
 
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Processes income sources (rental properties, Social Security, part-time work, etc.)
@@ -42,7 +45,8 @@ class IncomeSourceProcessor {
             BigDecimal suspendedLossCarryforward,
             BigDecimal socialSecurityTaxable,
             BigDecimal selfEmploymentTax,
-            Map<String, BigDecimal> incomeBySource
+            Map<String, BigDecimal> incomeBySource,
+            List<RentalPropertyYearDetail> rentalPropertyDetails
     ) {}
 
     IncomeSourceYearResult process(
@@ -53,7 +57,7 @@ class IncomeSourceProcessor {
             return new IncomeSourceYearResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                     BigDecimal.ZERO, BigDecimal.ZERO, priorSuspendedLoss, BigDecimal.ZERO, BigDecimal.ZERO,
-                    Map.of());
+                    Map.of(), List.of());
         }
 
         BigDecimal totalCashInflow = BigDecimal.ZERO;
@@ -66,6 +70,7 @@ class IncomeSourceProcessor {
         BigDecimal ssTaxable = BigDecimal.ZERO;
         BigDecimal seTax = BigDecimal.ZERO;
         Map<String, BigDecimal> incomeBySource = new HashMap<>();
+        List<RentalPropertyYearDetail> rentalDetails = new ArrayList<>();
 
         // Collect non-SS income first (needed for SS provisional income calc)
         BigDecimal nonSSIncome = BigDecimal.ZERO;
@@ -107,6 +112,14 @@ class IncomeSourceProcessor {
                     suspendedLoss = rental.newSuspendedLoss();
                     totalTaxableIncome = totalTaxableIncome.add(rental.taxableIncome());
                     incomeBySource.merge(sourceKey, rental.cashFlow(), BigDecimal::add);
+                    rentalDetails.add(new RentalPropertyYearDetail(
+                            rental.incomeSourceId(), rental.propertyName(), rental.taxTreatment(),
+                            rental.grossRent(), rental.operatingExpenses(),
+                            rental.mortgageInterest(), rental.propertyTax(),
+                            rental.depreciation(), rental.taxableIncome(),
+                            rental.lossApplied(), rental.newSuspendedLoss(),
+                            rental.newSuspendedLoss(),
+                            rental.cashFlow()));
                 }
                 case "social_security" -> {
                     totalCashInflow = totalCashInflow.add(nominal);
@@ -144,12 +157,15 @@ class IncomeSourceProcessor {
                 totalCashInflow, totalTaxableIncome,
                 rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
                 rentalLossApplied, suspendedLoss, ssTaxable, seTax,
-                Map.copyOf(incomeBySource));
+                Map.copyOf(incomeBySource), List.copyOf(rentalDetails));
     }
 
     private record RentalResult(
             BigDecimal cashFlow, BigDecimal taxableIncome, BigDecimal expenses,
-            BigDecimal depreciation, BigDecimal lossApplied, BigDecimal newSuspendedLoss) {
+            BigDecimal depreciation, BigDecimal lossApplied, BigDecimal newSuspendedLoss,
+            UUID incomeSourceId, String propertyName, String taxTreatment,
+            BigDecimal grossRent, BigDecimal mortgageInterest, BigDecimal propertyTax,
+            BigDecimal operatingExpenses) {
     }
 
     private RentalResult processRentalProperty(
@@ -186,8 +202,14 @@ class IncomeSourceProcessor {
                 netTaxable, source.taxTreatment(),
                 BigDecimal.ZERO, magi, suspendedLoss);
 
+        BigDecimal scaledOpExp = opExp.multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
+        BigDecimal scaledMortInt = mortInt.multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
+        BigDecimal scaledPropTax = propTax.multiply(transitionMultiplier).setScale(SCALE, ROUNDING);
+
         return new RentalResult(cashFlow, lossResult.netTaxableIncome(), expenses,
-                depreciation, lossResult.lossAppliedToIncome(), lossResult.lossSuspended());
+                depreciation, lossResult.lossAppliedToIncome(), lossResult.lossSuspended(),
+                source.id(), source.name(), source.taxTreatment(),
+                nominal, scaledMortInt, scaledPropTax, scaledOpExp);
     }
 
     boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
