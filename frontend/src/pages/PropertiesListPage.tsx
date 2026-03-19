@@ -30,6 +30,11 @@ interface PropertyFormData {
     annualPropertyTax: string;
     annualInsuranceCost: string;
     annualMaintenanceCost: string;
+    showDepreciation: boolean;
+    depreciationMethod: string;
+    inServiceDate: string;
+    landValue: string;
+    usefulLifeYears: string;
 }
 
 const initialFormData: PropertyFormData = {
@@ -50,6 +55,11 @@ const initialFormData: PropertyFormData = {
     annualPropertyTax: '',
     annualInsuranceCost: '',
     annualMaintenanceCost: '',
+    showDepreciation: false,
+    depreciationMethod: 'none',
+    inServiceDate: '',
+    landValue: '',
+    usefulLifeYears: '27.5',
 };
 
 function buildRequest(data: PropertyFormData) {
@@ -71,6 +81,10 @@ function buildRequest(data: PropertyFormData) {
         annual_property_tax: data.annualPropertyTax ? parseFloat(data.annualPropertyTax) : undefined,
         annual_insurance_cost: data.annualInsuranceCost ? parseFloat(data.annualInsuranceCost) : undefined,
         annual_maintenance_cost: data.annualMaintenanceCost ? parseFloat(data.annualMaintenanceCost) : undefined,
+        depreciation_method: data.depreciationMethod,
+        in_service_date: data.depreciationMethod !== 'none' ? (data.inServiceDate || data.purchaseDate || undefined) : undefined,
+        land_value: data.landValue ? parseFloat(data.landValue) : undefined,
+        useful_life_years: data.usefulLifeYears ? parseFloat(data.usefulLifeYears) : undefined,
     };
 }
 
@@ -114,7 +128,7 @@ export default function PropertiesListPage() {
     }, [crudReset]);
 
     function startEdit(property: Property) {
-        var hasFinancialFields = property.annual_appreciation_rate != null
+        const hasFinancialFields = property.annual_appreciation_rate != null
             || property.annual_property_tax != null || property.annual_insurance_cost != null
             || property.annual_maintenance_cost != null;
         crudStartEdit(property.id, {
@@ -135,6 +149,11 @@ export default function PropertiesListPage() {
             annualPropertyTax: property.annual_property_tax != null ? String(property.annual_property_tax) : '',
             annualInsuranceCost: property.annual_insurance_cost != null ? String(property.annual_insurance_cost) : '',
             annualMaintenanceCost: property.annual_maintenance_cost != null ? String(property.annual_maintenance_cost) : '',
+            showDepreciation: !!property.depreciation_method && property.depreciation_method !== 'none',
+            depreciationMethod: property.depreciation_method || 'none',
+            inServiceDate: property.in_service_date ?? '',
+            landValue: property.land_value != null ? String(property.land_value) : '',
+            usefulLifeYears: String(property.useful_life_years || 27.5),
         });
         setShowForm(true);
     }
@@ -170,6 +189,12 @@ export default function PropertiesListPage() {
                     annualPropertyTax={formData.annualPropertyTax} onAnnualPropertyTaxChange={v => setFormData(prev => ({ ...prev, annualPropertyTax: v }))}
                     annualInsuranceCost={formData.annualInsuranceCost} onAnnualInsuranceCostChange={v => setFormData(prev => ({ ...prev, annualInsuranceCost: v }))}
                     annualMaintenanceCost={formData.annualMaintenanceCost} onAnnualMaintenanceCostChange={v => setFormData(prev => ({ ...prev, annualMaintenanceCost: v }))}
+                    showDepreciation={formData.showDepreciation} onShowDepreciationChange={v => setFormData(prev => ({ ...prev, showDepreciation: v }))}
+                    depreciationMethod={formData.depreciationMethod} onDepreciationMethodChange={v => setFormData(prev => ({ ...prev, depreciationMethod: v }))}
+                    inServiceDate={formData.inServiceDate} onInServiceDateChange={v => setFormData(prev => ({ ...prev, inServiceDate: v }))}
+                    landValue={formData.landValue} onLandValueChange={v => setFormData(prev => ({ ...prev, landValue: v }))}
+                    usefulLifeYears={formData.usefulLifeYears} onUsefulLifeYearsChange={v => setFormData(prev => ({ ...prev, usefulLifeYears: v }))}
+                    purchasePriceNum={parseFloat(formData.purchasePrice) || 0}
                     onSubmit={handleSave}
                     onCancel={resetForm}
                 />
