@@ -197,18 +197,9 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {
-        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
-
-        var fromDate = from.atDay(1);
-        var toDate = to.atEndOfMonth();
-        var annualFromDate = from.minusMonths(11).atDay(1);
-
-        var allExpenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
-        var coveredCategories = entityCoveredCategories(property);
-        var expenses = allExpenses.stream()
-                .filter(e -> !coveredCategories.contains(e.getCategory()))
-                .toList();
+        var ctx = loadCashFlowContext(tenantId, propertyId, from, to);
+        var property = ctx.property();
+        var expenses = ctx.expenses();
 
         Map<YearMonth, BigDecimal> expenseByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -242,18 +233,9 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowDetailEntry> getMonthlyCashFlowDetail(UUID tenantId, UUID propertyId,
                                                                       YearMonth from, YearMonth to) {
-        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
-
-        var fromDate = from.atDay(1);
-        var toDate = to.atEndOfMonth();
-        var annualFromDate = from.minusMonths(11).atDay(1);
-
-        var allExpenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
-        var coveredCategories = entityCoveredCategories(property);
-        var expenses = allExpenses.stream()
-                .filter(e -> !coveredCategories.contains(e.getCategory()))
-                .toList();
+        var ctx = loadCashFlowContext(tenantId, propertyId, from, to);
+        var property = ctx.property();
+        var expenses = ctx.expenses();
 
         Map<YearMonth, Map<String, BigDecimal>> expenseByCategoryByMonth = new HashMap<>();
         for (var expense : expenses) {
@@ -287,6 +269,26 @@ public class PropertyService {
         }
 
         return entries;
+    }
+
+    private record CashFlowContext(PropertyEntity property, List<PropertyExpenseEntity> expenses,
+                                   YearMonth from, YearMonth to) {}
+
+    private CashFlowContext loadCashFlowContext(UUID tenantId, UUID propertyId, YearMonth from, YearMonth to) {
+        var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
+                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+
+        var fromDate = from.atDay(1);
+        var toDate = to.atEndOfMonth();
+        var annualFromDate = from.minusMonths(11).atDay(1);
+
+        var allExpenses = expenseRepository.findOverlapping(propertyId, fromDate, toDate, annualFromDate);
+        var coveredCategories = entityCoveredCategories(property);
+        var expenses = allExpenses.stream()
+                .filter(e -> !coveredCategories.contains(e.getCategory()))
+                .toList();
+
+        return new CashFlowContext(property, expenses, from, to);
     }
 
     private void spreadEntryByCategory(LocalDate entryDate, BigDecimal amount, String frequency,
