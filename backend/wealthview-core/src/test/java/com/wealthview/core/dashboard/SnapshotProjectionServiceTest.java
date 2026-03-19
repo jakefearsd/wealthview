@@ -1,22 +1,18 @@
 package com.wealthview.core.dashboard;
 
+import com.wealthview.core.account.AccountService;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,9 +21,8 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -40,10 +35,10 @@ class SnapshotProjectionServiceTest {
     private AccountRepository accountRepository;
 
     @Mock
-    private PropertyRepository propertyRepository;
+    private AccountService accountService;
 
     @Mock
-    private TransactionRepository transactionRepository;
+    private PropertyRepository propertyRepository;
 
     @Mock
     private TheoreticalPortfolioService theoreticalPortfolioService;
@@ -53,7 +48,7 @@ class SnapshotProjectionServiceTest {
     @BeforeEach
     void setUp() {
         service = new SnapshotProjectionService(
-                accountRepository, propertyRepository, transactionRepository,
+                accountRepository, accountService, propertyRepository,
                 theoreticalPortfolioService);
     }
 
@@ -114,14 +109,12 @@ class SnapshotProjectionServiceTest {
     @Test
     void computeProjection_bankAccount_projectedFlat() {
         var account = mockAccount("bank");
-        var accountId = account.getId();
         when(accountRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(account));
         when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
 
-        // Bank account with $5000 balance from transactions
-        var deposit = mockTransaction(accountId, "deposit", new BigDecimal("5000"));
-        when(transactionRepository.findByAccount_IdAndTenant_Id(eq(accountId), eq(TENANT_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(deposit)));
+        // Bank account with $5000 balance
+        when(accountService.computeBalance(account, TENANT_ID))
+                .thenReturn(new BigDecimal("5000"));
 
         var result = service.computeProjection(TENANT_ID, 5, 10);
 
@@ -260,7 +253,7 @@ class SnapshotProjectionServiceTest {
         when(accountRepository.findByTenant_Id(TENANT_ID))
                 .thenReturn(List.of(brokerageAccount, bankAccount));
 
-        // Brokerage: flat CAGR (identical start/end over 1 year → 0% growth), current value $50,000
+        // Brokerage: flat CAGR (identical start/end over 1 year -> 0% growth), current value $50,000
         var now = LocalDate.now();
         var history = new PortfolioHistoryResponse(brokerageAccount.getId(),
                 List.of(
@@ -272,9 +265,8 @@ class SnapshotProjectionServiceTest {
                 .thenReturn(history);
 
         // Bank: $10,000 balance
-        var deposit = mockTransaction(bankAccount.getId(), "deposit", new BigDecimal("10000"));
-        when(transactionRepository.findByAccount_IdAndTenant_Id(eq(bankAccount.getId()), eq(TENANT_ID), any(Pageable.class)))
-                .thenReturn(new PageImpl<>(List.of(deposit)));
+        when(accountService.computeBalance(bankAccount, TENANT_ID))
+                .thenReturn(new BigDecimal("10000"));
 
         // Property: $300,000 value, no mortgage, no appreciation
         var property = mockProperty(new BigDecimal("300000"), null, BigDecimal.ZERO, false);
@@ -297,16 +289,9 @@ class SnapshotProjectionServiceTest {
     private AccountEntity mockAccount(String type) {
         var account = mock(AccountEntity.class);
         var id = UUID.randomUUID();
-        when(account.getId()).thenReturn(id);
+        lenient().when(account.getId()).thenReturn(id);
         when(account.getType()).thenReturn(type);
         return account;
-    }
-
-    private TransactionEntity mockTransaction(UUID accountId, String type, BigDecimal amount) {
-        var txn = mock(TransactionEntity.class);
-        when(txn.getType()).thenReturn(type);
-        when(txn.getAmount()).thenReturn(amount);
-        return txn;
     }
 
     private PropertyEntity mockProperty(BigDecimal currentValue, BigDecimal appreciationRate,
