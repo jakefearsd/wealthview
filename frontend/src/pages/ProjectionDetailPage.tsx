@@ -527,15 +527,15 @@ export default function ProjectionDetailPage() {
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax</th>
                                                 </>
                                             )}
-                                            {hasSpendingData && (
-                                                <>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Essential</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Discretionary</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Net Need</th>
-                                                </>
-                                            )}
                                             {showPoolDetails && hasPoolData && (
                                                 <>
+                                                    {hasSpendingData && (
+                                                        <>
+                                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Essential</th>
+                                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Discretionary</th>
+                                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Net Need</th>
+                                                        </>
+                                                    )}
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Trad Growth</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Roth Growth</th>
                                                     <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Taxable Growth</th>
@@ -588,15 +588,15 @@ export default function ProjectionDetailPage() {
                                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_liability ? formatCurrency(y.tax_liability) : '-'}</td>
                                                         </>
                                                     )}
-                                                    {hasSpendingData && (
-                                                        <>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.essential_expenses != null ? formatCurrency(y.essential_expenses) : '-'}</td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.discretionary_after_cuts != null ? formatCurrency(y.discretionary_after_cuts) : y.discretionary_expenses != null ? formatCurrency(y.discretionary_expenses) : '-'}</td>
-                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.net_spending_need != null ? formatCurrency(y.net_spending_need) : '-'}</td>
-                                                        </>
-                                                    )}
                                                     {showPoolDetails && hasPoolData && (
                                                         <>
+                                                            {hasSpendingData && (
+                                                                <>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.essential_expenses != null ? formatCurrency(y.essential_expenses) : '-'}</td>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.discretionary_after_cuts != null ? formatCurrency(y.discretionary_after_cuts) : y.discretionary_expenses != null ? formatCurrency(y.discretionary_expenses) : '-'}</td>
+                                                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.net_spending_need != null ? formatCurrency(y.net_spending_need) : '-'}</td>
+                                                                </>
+                                                            )}
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.traditional_growth != null ? formatCurrency(y.traditional_growth) : '-'}</td>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.roth_growth != null ? formatCurrency(y.roth_growth) : '-'}</td>
                                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.taxable_growth != null ? formatCurrency(y.taxable_growth) : '-'}</td>
