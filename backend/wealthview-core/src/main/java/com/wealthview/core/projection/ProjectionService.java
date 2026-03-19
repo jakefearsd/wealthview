@@ -7,6 +7,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.projection.dto.CompareRequest;
+import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.GuardrailProfileSummary;
@@ -102,22 +103,7 @@ public class ProjectionService {
             scenario.setSpendingProfile(profile);
         }
 
-        if (request.accounts() != null) {
-            for (var acctReq : request.accounts()) {
-                var linkedAccount = acctReq.linkedAccountId() != null
-                        ? accountRepository.findByTenant_IdAndId(tenantId, acctReq.linkedAccountId())
-                                .orElse(null)
-                        : null;
-
-                var projAcct = new ProjectionAccountEntity(
-                        scenario, linkedAccount,
-                        linkedAccount != null ? null : acctReq.initialBalance(),
-                        acctReq.annualContribution(),
-                        acctReq.expectedReturn(),
-                        acctReq.accountType());
-                scenario.addAccount(projAcct);
-            }
-        }
+        addAccountsToScenario(scenario, tenantId, request.accounts());
 
         var saved = scenarioRepository.save(scenario);
 
@@ -174,21 +160,7 @@ public class ProjectionService {
         }
 
         scenario.getAccounts().clear();
-        if (request.accounts() != null) {
-            for (var acctReq : request.accounts()) {
-                var linkedAccount = acctReq.linkedAccountId() != null
-                        ? accountRepository.findByTenant_IdAndId(tenantId, acctReq.linkedAccountId())
-                                .orElse(null)
-                        : null;
-                var projAcct = new ProjectionAccountEntity(
-                        scenario, linkedAccount,
-                        linkedAccount != null ? null : acctReq.initialBalance(),
-                        acctReq.annualContribution(),
-                        acctReq.expectedReturn(),
-                        acctReq.accountType());
-                scenario.addAccount(projAcct);
-            }
-        }
+        addAccountsToScenario(scenario, tenantId, request.accounts());
 
         scenarioIncomeSourceRepository.deleteByScenario_Id(scenarioId);
         saveIncomeSourceLinks(scenario, tenantId, request.incomeSources());
@@ -291,6 +263,26 @@ public class ProjectionService {
                             "Income source not found: " + isReq.incomeSourceId()));
             scenarioIncomeSourceRepository.save(
                     new ScenarioIncomeSourceEntity(scenario, incomeSource, isReq.overrideAnnualAmount()));
+        }
+    }
+
+    private void addAccountsToScenario(ProjectionScenarioEntity scenario, UUID tenantId,
+                                        List<CreateProjectionAccountRequest> accounts) {
+        if (accounts == null) {
+            return;
+        }
+        for (var acctReq : accounts) {
+            var linkedAccount = acctReq.linkedAccountId() != null
+                    ? accountRepository.findByTenant_IdAndId(tenantId, acctReq.linkedAccountId())
+                            .orElse(null)
+                    : null;
+            var projAcct = new ProjectionAccountEntity(
+                    scenario, linkedAccount,
+                    linkedAccount != null ? null : acctReq.initialBalance(),
+                    acctReq.annualContribution(),
+                    acctReq.expectedReturn(),
+                    acctReq.accountType());
+            scenario.addAccount(projAcct);
         }
     }
 
