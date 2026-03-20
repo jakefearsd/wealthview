@@ -263,6 +263,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (surplusReinvested != null) {
                 yearDto = applySurplusReinvested(yearDto, surplusReinvested);
             }
+            if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
+                BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
+                        .add(incomeResult.effectiveOtherIncome());
+                var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+                var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
+                BigDecimal fedTax = breakdown.federalTax();
+                BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
+                        ? breakdown.stateTax() : null;
+                BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
+                        ? breakdown.saltDeduction() : null;
+                yearDto = yearDto.withTaxBreakdown(fedTax, stTax, saltDed, breakdown.usedItemized());
+            }
             yearlyData.add(yearDto);
         }
 
