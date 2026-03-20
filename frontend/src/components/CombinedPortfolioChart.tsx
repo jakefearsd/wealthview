@@ -112,7 +112,7 @@ export default function CombinedPortfolioChart() {
                             <Tooltip
                                 formatter={(value: number, name: string) => [
                                     formatCurrency(value),
-                                    name === 'investmentValue' ? 'Investments' : 'Property Equity',
+                                    name,
                                 ]}
                                 labelFormatter={(label: string) => {
                                     const date = new Date(label + 'T00:00:00');
