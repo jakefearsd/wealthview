@@ -10,6 +10,7 @@ import ProjectionChart from '../components/ProjectionChart';
 import MilestoneStrip from '../components/MilestoneStrip';
 import ScenarioForm from '../components/ScenarioForm';
 import IncomeStreamsChart from '../components/IncomeStreamsChart';
+import TaxBreakdownChart from '../components/TaxBreakdownChart';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
@@ -135,6 +136,48 @@ export default function ProjectionDetailPage() {
         };
     }, [result]);
 
+    const taxMetrics = useMemo(() => {
+        if (!result?.yearly_data) return null;
+        const retiredYears = result.yearly_data.filter(y => y.retired && y.tax_liability != null);
+        if (retiredYears.length === 0) return null;
+
+        const hasStateTax = retiredYears.some(y => y.state_tax != null);
+
+        let lifetimeTax = 0;
+        let totalStateTax = 0;
+        let totalSalt = 0;
+        let itemizedCount = 0;
+        const rates: number[] = [];
+
+        for (const y of retiredYears) {
+            lifetimeTax += y.tax_liability ?? 0;
+            totalStateTax += y.state_tax ?? 0;
+            if (y.used_itemized_deduction) {
+                totalSalt += y.salt_deduction ?? 0;
+                itemizedCount++;
+            }
+
+            const taxableIncome = (y.income_streams_total ?? 0)
+                + (y.roth_conversion_amount ?? 0)
+                + (y.withdrawal_from_traditional ?? 0);
+            if (taxableIncome > 0) {
+                rates.push(((y.tax_liability ?? 0) / taxableIncome) * 100);
+            }
+        }
+
+        const avgRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
+
+        return {
+            lifetimeTax,
+            avgRate: Math.round(avgRate * 10) / 10,
+            totalStateTax,
+            totalSalt,
+            itemizedCount,
+            totalRetiredYears: retiredYears.length,
+            hasStateTax,
+        };
+    }, [result]);
+
     if (loading) return <div>Loading...</div>;
     if (!scenario) return <div>Scenario not found</div>;
 
@@ -143,6 +186,7 @@ export default function ProjectionDetailPage() {
     const hasSpendingData = result?.yearly_data.some(y => y.essential_expenses !== null) ?? false;
     const hasIncomeSourceData = result?.yearly_data.some(y =>
         y.rental_income_gross !== null || y.social_security_taxable !== null || y.self_employment_tax !== null
+        || y.state_tax !== null
     ) ?? false;
     const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
 
@@ -166,12 +210,16 @@ export default function ProjectionDetailPage() {
     };
 
     const buildProjectionCsv = (yearlyData: ProjectionYear[]): string => {
+        const csvHasStateTax = yearlyData.some(y => y.state_tax != null);
         const headers = ['Year', 'Age', 'Start', 'Contributions', 'Growth', 'Withdrawals', 'Income', 'Total Spending', 'End', 'Status'];
         if (hasPoolData) {
             headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
             headers.push('Trad Growth', 'Roth Growth', 'Taxable Growth',
                 'Tax from Taxable', 'Tax from Trad', 'Tax from Roth',
                 'WD from Taxable', 'WD from Trad', 'WD from Roth');
+        }
+        if (csvHasStateTax) {
+            headers.push('Federal Tax', 'State Tax', 'SALT', 'Deduction Type');
         }
         if (hasSpendingData) {
             headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
@@ -191,6 +239,12 @@ export default function ProjectionDetailPage() {
                     y.traditional_growth ?? '', y.roth_growth ?? '', y.taxable_growth ?? '',
                     y.tax_paid_from_taxable ?? '', y.tax_paid_from_traditional ?? '', y.tax_paid_from_roth ?? '',
                     y.withdrawal_from_taxable ?? '', y.withdrawal_from_traditional ?? '', y.withdrawal_from_roth ?? '',
+                );
+            }
+            if (csvHasStateTax) {
+                vals.push(
+                    y.federal_tax ?? '', y.state_tax ?? '', y.salt_deduction ?? '',
+                    y.used_itemized_deduction != null ? (y.used_itemized_deduction ? 'Itemized' : 'Standard') : '',
                 );
             }
             if (hasSpendingData) {
@@ -428,6 +482,43 @@ export default function ProjectionDetailPage() {
                         })()}
                     </div>
 
+                    {taxMetrics && (
+                        <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: taxMetrics.hasStateTax ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)',
+                            gap: '1rem',
+                            marginBottom: '1rem',
+                        }}>
+                            <SummaryCard
+                                label="Lifetime Tax"
+                                value={formatCurrency(taxMetrics.lifetimeTax)}
+                                valueColor="#d32f2f"
+                                subtext="Federal + state taxes over retirement"
+                            />
+                            <SummaryCard
+                                label="Avg Effective Rate"
+                                value={`${taxMetrics.avgRate}%`}
+                                subtext="Average tax rate on retirement income"
+                            />
+                            {taxMetrics.hasStateTax && (
+                                <SummaryCard
+                                    label="Total State Tax"
+                                    value={formatCurrency(taxMetrics.totalStateTax)}
+                                    valueColor="#e65100"
+                                    subtext="Cumulative state tax over retirement"
+                                />
+                            )}
+                            {taxMetrics.hasStateTax && (
+                                <SummaryCard
+                                    label="SALT Claimed"
+                                    value={formatCurrency(taxMetrics.totalSalt)}
+                                    valueColor="#2e7d32"
+                                    subtext={`${taxMetrics.itemizedCount} of ${taxMetrics.totalRetiredYears} years itemized`}
+                                />
+                            )}
+                        </div>
+                    )}
+
                     <div style={{ marginBottom: '1.5rem' }}>
                         <MilestoneStrip result={result} retirementYear={retirementYear} />
                     </div>
@@ -477,27 +568,45 @@ export default function ProjectionDetailPage() {
                             <ProjectionChart data={result.yearly_data} retirementYear={retirementYear} mode="spending" />
                         )}
 
-                        {activeTab === 'income_tax' && hasIncomeSourceData && (
+                        {activeTab === 'income_tax' && hasIncomeSourceData && (() => {
+                            const hasStateTax = result.yearly_data.some(y => y.state_tax != null);
+                            const stickyTh = { textAlign: 'right' as const, padding: '0.5rem', position: 'sticky' as const, top: 0, background: '#fff' };
+                            return (
+                            <div>
+                            <h4 style={{ marginBottom: '0.5rem' }}>
+                                {hasStateTax ? 'Tax Breakdown: Federal + State' : 'Tax Burden Over Time'}
+                            </h4>
+                            <TaxBreakdownChart
+                                data={result.yearly_data}
+                                retirementYear={retirementYear}
+                                hasStateTax={hasStateTax}
+                            />
+                            <h4 style={{ marginTop: '1.5rem', marginBottom: '0.5rem' }}>Year-by-Year Detail</h4>
                             <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                     <thead>
                                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                            <th style={{ textAlign: 'left', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Year</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Age</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Rental Gross</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Rental Exp.</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Depreciation</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Loss Applied</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Suspended Loss</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>SS Taxable</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>SE Tax</th>
-                                            <th style={{ textAlign: 'right', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Tax Liability</th>
+                                            <th style={{ ...stickyTh, textAlign: 'left' }}>Year</th>
+                                            <th style={stickyTh}>Age</th>
+                                            <th style={stickyTh}>Rental Gross</th>
+                                            <th style={stickyTh}>Rental Exp.</th>
+                                            <th style={stickyTh}>Depreciation</th>
+                                            <th style={stickyTh}>Loss Applied</th>
+                                            <th style={stickyTh}>Suspended Loss</th>
+                                            <th style={stickyTh}>SS Taxable</th>
+                                            <th style={stickyTh}>SE Tax</th>
+                                            {hasStateTax && <th style={stickyTh}>Federal Tax</th>}
+                                            {hasStateTax && <th style={stickyTh}>State Tax</th>}
+                                            {hasStateTax && <th style={stickyTh}>SALT</th>}
+                                            {hasStateTax && <th style={stickyTh}>Deduction</th>}
+                                            <th style={stickyTh}>Tax Liability</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {result.yearly_data.filter(y => y.retired).map(y => {
                                             const hasDetails = y.rental_property_details && y.rental_property_details.length > 0;
                                             const isExpanded = expandedTaxYears.has(y.year);
+                                            const detailColSpan = hasStateTax ? 7 : 3;
                                             return (
                                                 <React.Fragment key={y.year}>
                                                     <tr
@@ -533,6 +642,36 @@ export default function ProjectionDetailPage() {
                                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
                                                             {y.self_employment_tax != null && y.self_employment_tax > 0 ? formatCurrency(y.self_employment_tax) : '-'}
                                                         </td>
+                                                        {hasStateTax && (
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                                {y.federal_tax != null ? formatCurrency(y.federal_tax) : '-'}
+                                                            </td>
+                                                        )}
+                                                        {hasStateTax && (
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#e65100' }}>
+                                                                {y.state_tax != null ? formatCurrency(y.state_tax) : '-'}
+                                                            </td>
+                                                        )}
+                                                        {hasStateTax && (
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                                {y.salt_deduction != null ? formatCurrency(y.salt_deduction) : '-'}
+                                                            </td>
+                                                        )}
+                                                        {hasStateTax && (
+                                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                                {y.used_itemized_deduction != null ? (
+                                                                    <span style={{
+                                                                        fontSize: '0.75rem',
+                                                                        padding: '1px 6px',
+                                                                        borderRadius: 3,
+                                                                        background: y.used_itemized_deduction ? '#bbdefb' : '#e0e0e0',
+                                                                        color: '#333',
+                                                                    }}>
+                                                                        {y.used_itemized_deduction ? 'Itemized' : 'Standard'}
+                                                                    </span>
+                                                                ) : '-'}
+                                                            </td>
+                                                        )}
                                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>
                                                             {y.tax_liability != null ? formatCurrency(y.tax_liability) : '-'}
                                                         </td>
@@ -569,7 +708,7 @@ export default function ProjectionDetailPage() {
                                                             <td style={{ padding: '0.3rem 0.75rem', textAlign: 'right', color: '#e65100' }}>
                                                                 {d.suspended_loss_carryforward > 0 ? formatCurrency(d.suspended_loss_carryforward) : '-'}
                                                             </td>
-                                                            <td colSpan={3}></td>
+                                                            <td colSpan={detailColSpan}></td>
                                                         </tr>
                                                     ))}
                                                 </React.Fragment>
@@ -578,7 +717,9 @@ export default function ProjectionDetailPage() {
                                     </tbody>
                                 </table>
                             </div>
-                        )}
+                            </div>
+                            );
+                        })()}
 
                         {activeTab === 'income_streams' && scenario.income_sources.length > 0 && (
                             <IncomeStreamsChart

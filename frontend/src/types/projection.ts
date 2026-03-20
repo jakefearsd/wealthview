@@ -89,6 +89,10 @@ export interface ProjectionYear {
     withdrawal_from_taxable: number | null;
     withdrawal_from_traditional: number | null;
     withdrawal_from_roth: number | null;
+    federal_tax: number | null;
+    state_tax: number | null;
+    salt_deduction: number | null;
+    used_itemized_deduction: boolean | null;
 }
 
 export interface SpendingFeasibility {
@@ -136,6 +140,9 @@ export interface CreateScenarioRequest {
     roth_conversion_strategy?: string | null;
     target_bracket_rate?: number | null;
     roth_conversion_start_year?: number | null;
+    state?: string | null;
+    primary_residence_property_tax?: number | null;
+    primary_residence_mortgage_interest?: number | null;
     spending_profile_id?: string | null;
     use_guardrail_profile?: boolean | null;
     accounts: ScenarioAccountInput[];

@@ -110,6 +110,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -150,6 +151,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.05"),
                 new BigDecimal("-0.025"),
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -184,6 +186,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
@@ -219,6 +222,7 @@ class ProjectionServiceTest {
                 null, null, null,
                 null, null, null,
                 "traditional_first", null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
@@ -252,6 +256,7 @@ class ProjectionServiceTest {
                 null, null, null,
                 "single", null, null, null,
                 "fill_bracket", new BigDecimal("0.12"), null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("200000"),
@@ -289,6 +294,7 @@ class ProjectionServiceTest {
                 "Linked Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
@@ -437,6 +443,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.035"),
                 "dynamic_percentage",
                 null, null, null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
@@ -465,7 +472,8 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null, List.of(), null, null, null);
+                null, null, null, null, null, null, null,
+                null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -490,6 +498,7 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
@@ -616,6 +625,7 @@ class ProjectionServiceTest {
                 "Plan with Income", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
                 null, null, null, null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
@@ -645,6 +655,7 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(badId, null)));
 
@@ -677,6 +688,7 @@ class ProjectionServiceTest {
                 "Updated Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
 
@@ -741,6 +753,7 @@ class ProjectionServiceTest {
                 "Old Plan", LocalDate.of(2055, 1, 1), 95,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
@@ -774,6 +787,7 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
@@ -808,6 +822,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.03"), 1990, null,
                 "vanguard_dynamic_spending", null, null,
                 "married_filing_jointly", null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
@@ -864,6 +879,7 @@ class ProjectionServiceTest {
                 "Updated", LocalDate.of(2060, 1, 1), 95,
                 new BigDecimal("0.02"), null, null, null, null, null,
                 null, null, null, null, null, null, null,
+                null, null, null,
                 List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);

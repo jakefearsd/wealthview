@@ -66,6 +66,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [targetBracketRate, setTargetBracketRate] = useState<number>(toPercent(parsedParams.target_bracket_rate ?? 0.12));
     const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
+    const [state, setState] = useState<string>(parsedParams.state ?? '');
+    const [primaryResidencePropertyTax, setPrimaryResidencePropertyTax] = useState<number>(parsedParams.primary_residence_property_tax ?? 0);
+    const [primaryResidenceMortgageInterest, setPrimaryResidenceMortgageInterest] = useState<number>(parsedParams.primary_residence_mortgage_interest ?? 0);
     const deriveSpendingPlan = () =>
         initialValues?.guardrail_profile?.active ? 'guardrail' : (initialValues?.spending_profile?.id ?? '');
     const [spendingPlanSelection, setSpendingPlanSelection] = useState<string>(deriveSpendingPlan);
@@ -134,6 +137,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
                 target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate / 100 : null,
                 roth_conversion_start_year: rothConversionStartYear || null,
+                state: state || null,
+                primary_residence_property_tax: state ? primaryResidencePropertyTax : null,
+                primary_residence_mortgage_interest: state ? primaryResidenceMortgageInterest : null,
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({ ...a, expected_return: a.expected_return / 100 })),
@@ -274,6 +280,46 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 otherIncome={otherIncome}
                 onOtherIncomeChange={setOtherIncome}
             />
+
+            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
+                <h4 style={{ marginBottom: '0.75rem' }}>Tax Configuration</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div>
+                        <label style={labelStyle}>State</label>
+                        <select style={inputStyle} value={state} onChange={e => setState(e.target.value)}>
+                            <option value="">None (federal only)</option>
+                            <option value="AZ">AZ - Arizona</option>
+                            <option value="CA">CA - California</option>
+                            <option value="NV">NV - Nevada (no income tax)</option>
+                            <option value="OR">OR - Oregon</option>
+                            <option value="WA">WA - Washington (no income tax)</option>
+                        </select>
+                        <HelpText>State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.</HelpText>
+                    </div>
+                    {state && (
+                        <>
+                            <div>
+                                <label style={labelStyle}>Primary Residence Property Tax</label>
+                                <CurrencyInput
+                                    style={inputStyle}
+                                    value={primaryResidencePropertyTax}
+                                    onChange={v => setPrimaryResidencePropertyTax(Number(v) || 0)}
+                                />
+                                <HelpText>Annual property tax on your primary residence. Feeds SALT deduction (capped at $10K with state income tax).</HelpText>
+                            </div>
+                            <div>
+                                <label style={labelStyle}>Primary Residence Mortgage Interest</label>
+                                <CurrencyInput
+                                    style={inputStyle}
+                                    value={primaryResidenceMortgageInterest}
+                                    onChange={v => setPrimaryResidenceMortgageInterest(Number(v) || 0)}
+                                />
+                                <HelpText>Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.</HelpText>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <h4>Accounts</h4>

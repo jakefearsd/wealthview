@@ -3,8 +3,9 @@ package com.wealthview.projection;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
-import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.CombinedTaxResult;
+import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -64,6 +65,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      * Whether income sources should be processed every year (true) or only when retired (false).
      */
     boolean processIncomeSourcesEveryYear();
+
+    /**
+     * Returns the accumulated tax breakdown from the most recent withdrawal + conversion cycle.
+     * Only meaningful for MultiPool when a CombinedTaxCalculator is in use.
+     */
+    default CombinedTaxResult getLastTaxBreakdown() {
+        return null;
+    }
 
     /**
      * Whether SE tax should be added to tax liability.
@@ -212,6 +221,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private BigDecimal taxable;
         private BigDecimal traditional;
         private BigDecimal roth;
+        private CombinedTaxResult lastTaxBreakdown;
 
         private final BigDecimal tradContrib;
         private final BigDecimal rothContrib;
@@ -225,7 +235,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final BigDecimal targetBracketRate;
         private final Integer rothConversionStartYear;
         private final WithdrawalOrder withdrawalOrder;
-        private final FederalTaxCalculator taxCalculator;
+        private final TaxCalculationStrategy taxCalculator;
 
         MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
                   BigDecimal weightedReturn,
@@ -236,7 +246,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                   BigDecimal targetBracketRate,
                   Integer rothConversionStartYear,
                   WithdrawalOrder withdrawalOrder,
-                  FederalTaxCalculator taxCalculator) {
+                  TaxCalculationStrategy taxCalculator) {
             this.taxable = sumBalances(grouped.getOrDefault("taxable", List.of()));
             this.traditional = sumBalances(grouped.getOrDefault("traditional", List.of()));
             this.roth = sumBalances(grouped.getOrDefault("roth", List.of()));
@@ -335,8 +345,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
             if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                withdrawalTax = taxCalculator.computeTax(
+                var detailed = taxCalculator.computeDetailedTax(
                         fromTraditional.add(effectiveOtherIncome), year, filingStatus);
+                withdrawalTax = detailed.totalTax();
+                lastTaxBreakdown = detailed;
                 withdrawalTaxSource = deductFromPools(withdrawalTax);
             }
 
@@ -353,7 +365,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             BigDecimal effectiveLimit;
             if ("fill_bracket".equals(rothConversionStrategy) && targetBracketRate != null && taxCalculator != null) {
-                BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
+                BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForTargetRate(
                         targetBracketRate, year, filingStatus);
                 BigDecimal space = bracketCeiling.subtract(effectiveOtherIncome).max(BigDecimal.ZERO);
                 effectiveLimit = space;
@@ -371,7 +383,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             if (taxCalculator != null) {
                 BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
-                BigDecimal tax = taxCalculator.computeTax(taxableIncome, year, filingStatus);
+                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
+                BigDecimal tax = detailed.totalTax();
+                lastTaxBreakdown = detailed;
                 TaxSourceResult taxSource = deductFromPools(tax);
                 return new ConversionResult(actual, tax, taxSource);
             }
@@ -383,6 +397,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             taxable = taxable.max(BigDecimal.ZERO);
             traditional = traditional.max(BigDecimal.ZERO);
             roth = roth.max(BigDecimal.ZERO);
+        }
+
+        @Override
+        public CombinedTaxResult getLastTaxBreakdown() {
+            return lastTaxBreakdown;
         }
 
         @Override
@@ -399,6 +418,20 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                               BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
                                               BigDecimal withdrawalFromRoth,
                                               TaxSourceResult combinedTaxSource) {
+            BigDecimal fedTax = null;
+            BigDecimal stTax = null;
+            BigDecimal saltDed = null;
+            Boolean usedItemized = null;
+            if (lastTaxBreakdown != null) {
+                fedTax = lastTaxBreakdown.federalTax();
+                stTax = lastTaxBreakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
+                        ? lastTaxBreakdown.stateTax() : null;
+                saltDed = lastTaxBreakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
+                        ? lastTaxBreakdown.saltDeduction() : null;
+                usedItemized = lastTaxBreakdown.usedItemized();
+            }
+            lastTaxBreakdown = null;
+
             return new ProjectionYearDto(
                     year, age, startBalance, contributions, totalGrowth, withdrawals, getTotal(), retired,
                     traditional, roth, taxable,
@@ -414,7 +447,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTaxable : null,
                     withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null,
                     withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null,
-                    null);
+                    null,
+                    fedTax, stTax, saltDed, usedItemized);
         }
 
         @Override

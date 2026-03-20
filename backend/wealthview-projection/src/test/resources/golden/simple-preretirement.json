@@ -40,7 +40,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2026,
     "age" : 36,
@@ -81,7 +85,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2027,
     "age" : 37,
@@ -122,7 +130,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2028,
     "age" : 38,
@@ -163,7 +175,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2029,
     "age" : 39,
@@ -204,7 +220,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2030,
     "age" : 40,
@@ -245,7 +265,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2031,
     "age" : 41,
@@ -286,7 +310,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2032,
     "age" : 42,
@@ -327,7 +355,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2033,
     "age" : 43,
@@ -368,7 +400,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2034,
     "age" : 44,
@@ -409,7 +445,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2035,
     "age" : 45,
@@ -450,7 +490,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2036,
     "age" : 46,
@@ -491,7 +535,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2037,
     "age" : 47,
@@ -532,7 +580,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2038,
     "age" : 48,
@@ -573,7 +625,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2039,
     "age" : 49,
@@ -614,7 +670,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2040,
     "age" : 50,
@@ -655,7 +715,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2041,
     "age" : 51,
@@ -696,7 +760,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2042,
     "age" : 52,
@@ -737,7 +805,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2043,
     "age" : 53,
@@ -778,7 +850,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2044,
     "age" : 54,
@@ -819,7 +895,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2045,
     "age" : 55,
@@ -860,7 +940,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2046,
     "age" : 56,
@@ -901,7 +985,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2047,
     "age" : 57,
@@ -942,7 +1030,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2048,
     "age" : 58,
@@ -983,7 +1075,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2049,
     "age" : 59,
@@ -1024,7 +1120,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2050,
     "age" : 60,
@@ -1065,7 +1165,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2051,
     "age" : 61,
@@ -1106,7 +1210,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2052,
     "age" : 62,
@@ -1147,7 +1255,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2053,
     "age" : 63,
@@ -1188,7 +1300,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2054,
     "age" : 64,
@@ -1229,7 +1345,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2055,
     "age" : 65,
@@ -1270,7 +1390,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2056,
     "age" : 66,
@@ -1311,7 +1435,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2057,
     "age" : 67,
@@ -1352,7 +1480,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2058,
     "age" : 68,
@@ -1393,7 +1525,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2059,
     "age" : 69,
@@ -1434,7 +1570,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2060,
     "age" : 70,
@@ -1475,7 +1615,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2061,
     "age" : 71,
@@ -1516,7 +1660,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2062,
     "age" : 72,
@@ -1557,7 +1705,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2063,
     "age" : 73,
@@ -1598,7 +1750,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2064,
     "age" : 74,
@@ -1639,7 +1795,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2065,
     "age" : 75,
@@ -1680,7 +1840,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2066,
     "age" : 76,
@@ -1721,7 +1885,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2067,
     "age" : 77,
@@ -1762,7 +1930,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2068,
     "age" : 78,
@@ -1803,7 +1975,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2069,
     "age" : 79,
@@ -1844,7 +2020,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2070,
     "age" : 80,
@@ -1885,7 +2065,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2071,
     "age" : 81,
@@ -1926,7 +2110,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2072,
     "age" : 82,
@@ -1967,7 +2155,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2073,
     "age" : 83,
@@ -2008,7 +2200,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2074,
     "age" : 84,
@@ -2049,7 +2245,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2075,
     "age" : 85,
@@ -2090,7 +2290,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2076,
     "age" : 86,
@@ -2131,7 +2335,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2077,
     "age" : 87,
@@ -2172,7 +2380,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2078,
     "age" : 88,
@@ -2213,7 +2425,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   }, {
     "year" : 2079,
     "age" : 89,
@@ -2254,7 +2470,11 @@
     "withdrawalFromTaxable" : null,
     "withdrawalFromTraditional" : null,
     "withdrawalFromRoth" : null,
-    "rentalPropertyDetails" : null
+    "rentalPropertyDetails" : null,
+    "federalTax" : null,
+    "stateTax" : null,
+    "saltDeduction" : null,
+    "usedItemizedDeduction" : null
   } ],
   "finalBalance" : 12201675.8664,
   "yearsInRetirement" : 25,

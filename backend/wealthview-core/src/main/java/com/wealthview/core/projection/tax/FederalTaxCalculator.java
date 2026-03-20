@@ -75,6 +75,51 @@ public class FederalTaxCalculator {
         return totalTax.setScale(SCALE, ROUNDING);
     }
 
+    public BigDecimal computeTaxWithDeduction(BigDecimal grossIncome, BigDecimal deduction,
+                                                int taxYear, FilingStatus status) {
+        if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
+        if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+
+        var brackets = loadBrackets(taxYear, status);
+        if (brackets.isEmpty()) {
+            Integer maxYear = taxBracketRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                brackets = loadBrackets(maxYear, status);
+            }
+        }
+        if (brackets.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal remaining = taxableIncome;
+
+        for (var bracket : brackets) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            BigDecimal bracketWidth;
+            if (bracket.getBracketCeiling() != null) {
+                bracketWidth = bracket.getBracketCeiling().subtract(bracket.getBracketFloor());
+            } else {
+                bracketWidth = remaining;
+            }
+
+            BigDecimal taxableInBracket = remaining.min(bracketWidth);
+            totalTax = totalTax.add(taxableInBracket.multiply(bracket.getRate()));
+            remaining = remaining.subtract(taxableInBracket);
+        }
+
+        return totalTax.setScale(SCALE, ROUNDING);
+    }
+
     public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear, FilingStatus status) {
         var brackets = loadBrackets(taxYear, status);
         if (brackets.isEmpty()) {
@@ -102,7 +147,7 @@ public class FederalTaxCalculator {
         deductionCache.clear();
     }
 
-    private BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
+    BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
         String key = taxYear + ":" + status.value();
         return deductionCache.computeIfAbsent(key, k -> {
             var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());

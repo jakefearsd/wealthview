@@ -110,6 +110,6 @@ public final class ProjectionTestFixtures {
     public static DeterministicProjectionEngine engineWithTax(TaxBracketRepository taxBracketRepo,
                                                                 StandardDeductionRepository deductionRepo) {
         var calc = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
-        return new DeterministicProjectionEngine(calc);
+        return new DeterministicProjectionEngine(calc, null);
     }
 }
