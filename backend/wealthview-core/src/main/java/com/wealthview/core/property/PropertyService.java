@@ -1,8 +1,12 @@
 package com.wealthview.core.property;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
@@ -44,6 +48,8 @@ public class PropertyService {
     private static final Logger log = LoggerFactory.getLogger(PropertyService.class);
     private static final Set<String> VALID_PROPERTY_TYPES = Set.of("primary_residence", "investment", "vacation");
     private static final Set<String> VALID_DEPRECIATION_METHODS = Set.of("none", "straight_line", "cost_segregation");
+    private static final Set<String> VALID_ASSET_CLASSES = Set.of("5yr", "7yr", "15yr", "27_5yr");
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final PropertyRepository propertyRepository;
     private final PropertyExpenseRepository expenseRepository;
@@ -166,9 +172,40 @@ public class PropertyService {
 
         var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
         var depreciableBasis = property.getPurchasePrice().subtract(landValue);
+
+        if ("cost_segregation".equals(method)) {
+            return buildCostSegScheduleResult(property, depreciableBasis);
+        }
+
         var schedule = depreciationCalculator.computeStraightLine(
                 property.getPurchasePrice(), landValue,
                 property.getInServiceDate(), property.getUsefulLifeYears());
+
+        return buildScheduleResult(method, depreciableBasis, property.getUsefulLifeYears(),
+                property.getInServiceDate(), schedule);
+    }
+
+    private DepreciationScheduleResult buildScheduleResult(String method, BigDecimal depreciableBasis,
+                                                             BigDecimal usefulLifeYears, LocalDate inServiceDate,
+                                                             Map<Integer, BigDecimal> schedule) {
+        var cumulative = BigDecimal.ZERO;
+        var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
+        for (var entry : schedule.entrySet()) {
+            cumulative = cumulative.add(entry.getValue());
+            entries.add(new DepreciationScheduleResult.YearEntry(
+                    entry.getKey(),
+                    entry.getValue(),
+                    cumulative,
+                    depreciableBasis.subtract(cumulative)));
+        }
+        return new DepreciationScheduleResult(method, depreciableBasis, usefulLifeYears, inServiceDate, entries);
+    }
+
+    private DepreciationScheduleResult buildCostSegScheduleResult(PropertyEntity property, BigDecimal depreciableBasis) {
+        var allocations = parseCostSegAllocations(property.getCostSegAllocations());
+        var bonusRate = property.getBonusDepreciationRate();
+        var schedule = depreciationCalculator.computeCostSegregation(
+                allocations, bonusRate, property.getInServiceDate(), property.getCostSegStudyYear());
 
         var cumulative = BigDecimal.ZERO;
         var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
@@ -181,12 +218,57 @@ public class PropertyService {
                     depreciableBasis.subtract(cumulative)));
         }
 
+        var classBreakdowns = buildClassBreakdowns(allocations, bonusRate);
+
         return new DepreciationScheduleResult(
                 property.getDepreciationMethod(),
                 depreciableBasis,
                 property.getUsefulLifeYears(),
                 property.getInServiceDate(),
-                entries);
+                entries,
+                bonusRate,
+                allocations,
+                classBreakdowns);
+    }
+
+    private List<DepreciationScheduleResult.ClassBreakdown> buildClassBreakdowns(
+            List<CostSegAllocation> allocations, BigDecimal bonusRate) {
+        var breakdowns = new ArrayList<DepreciationScheduleResult.ClassBreakdown>();
+        for (var alloc : allocations) {
+            var lifeYears = switch (alloc.assetClass()) {
+                case "5yr" -> new BigDecimal("5");
+                case "7yr" -> new BigDecimal("7");
+                case "15yr" -> new BigDecimal("15");
+                case "27_5yr" -> new BigDecimal("27.5");
+                default -> BigDecimal.ZERO;
+            };
+            boolean isBonusEligible = Set.of("5yr", "7yr", "15yr").contains(alloc.assetClass());
+            var bonusAmount = isBonusEligible
+                    ? alloc.allocation().multiply(bonusRate).setScale(4, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            var remainder = alloc.allocation().subtract(bonusAmount);
+            var annualSL = remainder.compareTo(BigDecimal.ZERO) > 0
+                    ? remainder.divide(lifeYears, 4, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+            int slYears = remainder.compareTo(BigDecimal.ZERO) > 0
+                    ? lifeYears.intValue() + 1 // includes partial first/last year
+                    : 0;
+            breakdowns.add(new DepreciationScheduleResult.ClassBreakdown(
+                    alloc.assetClass(), lifeYears, alloc.allocation(),
+                    bonusAmount, annualSL, slYears));
+        }
+        return breakdowns;
+    }
+
+    private List<CostSegAllocation> parseCostSegAllocations(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) {
+            return List.of();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to parse cost seg allocations", e);
+        }
     }
 
     @Transactional
@@ -454,6 +536,57 @@ public class PropertyService {
         if (request.usefulLifeYears() != null) {
             property.setUsefulLifeYears(request.usefulLifeYears());
         }
+
+        if ("cost_segregation".equals(method)) {
+            applyCostSegFields(property, request);
+        } else {
+            property.setCostSegAllocations("[]");
+            property.setBonusDepreciationRate(BigDecimal.ONE);
+            property.setCostSegStudyYear(null);
+        }
+    }
+
+    private void applyCostSegFields(PropertyEntity property, PropertyRequest request) {
+        var allocations = request.costSegAllocations();
+        if (allocations == null || allocations.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Cost segregation allocations are required when depreciation method is cost_segregation");
+        }
+
+        var landValue = request.landValue() != null ? request.landValue() : BigDecimal.ZERO;
+        var depreciableBasis = request.purchasePrice().subtract(landValue);
+
+        // Validate asset classes
+        for (var alloc : allocations) {
+            if (!VALID_ASSET_CLASSES.contains(alloc.assetClass())) {
+                throw new IllegalArgumentException(
+                        "Invalid asset class: " + alloc.assetClass()
+                                + ". Must be one of: " + VALID_ASSET_CLASSES);
+            }
+            if (alloc.allocation().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException(
+                        "Allocation for " + alloc.assetClass() + " must be non-negative");
+            }
+        }
+
+        // Validate sum equals depreciable basis
+        var sum = allocations.stream()
+                .map(CostSegAllocation::allocation)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (sum.compareTo(depreciableBasis) != 0) {
+            throw new IllegalArgumentException(
+                    "Cost segregation allocations (" + sum
+                            + ") must equal depreciable basis (" + depreciableBasis + ")");
+        }
+
+        try {
+            property.setCostSegAllocations(MAPPER.writeValueAsString(allocations));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize cost seg allocations", e);
+        }
+        property.setBonusDepreciationRate(
+                request.bonusDepreciationRate() != null ? request.bonusDepreciationRate() : BigDecimal.ONE);
+        property.setCostSegStudyYear(request.costSegStudyYear());
     }
 
     private void validateLoanDetails(PropertyRequest request) {

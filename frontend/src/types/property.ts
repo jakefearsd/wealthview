@@ -1,3 +1,8 @@
+export interface CostSegAllocation {
+    asset_class: string;
+    allocation: number;
+}
+
 export interface Property {
     id: string;
     address: string;
@@ -21,6 +26,9 @@ export interface Property {
     land_value: number | null;
     depreciation_method: string;
     useful_life_years: number;
+    cost_seg_allocations: CostSegAllocation[];
+    bonus_depreciation_rate: number;
+    cost_seg_study_year: number | null;
 }
 
 export interface PropertyRequest {
@@ -43,6 +51,9 @@ export interface PropertyRequest {
     land_value?: number;
     depreciation_method?: string;
     useful_life_years?: number;
+    cost_seg_allocations?: CostSegAllocation[];
+    bonus_depreciation_rate?: number;
+    cost_seg_study_year?: number;
 }
 
 export interface PropertyIncomeRequest {
@@ -140,10 +151,22 @@ export interface DepreciationScheduleYear {
     remaining_basis: number;
 }
 
+export interface ClassBreakdown {
+    asset_class: string;
+    life_years: number;
+    allocation: number;
+    bonus_amount: number;
+    annual_straight_line: number;
+    straight_line_years: number;
+}
+
 export interface DepreciationScheduleResponse {
     depreciation_method: string;
     depreciable_basis: number;
     useful_life_years: number;
     in_service_date: string;
     schedule: DepreciationScheduleYear[];
+    bonus_depreciation_rate: number | null;
+    cost_seg_allocations: CostSegAllocation[] | null;
+    class_breakdowns: ClassBreakdown[] | null;
 }

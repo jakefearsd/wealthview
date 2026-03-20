@@ -1,12 +1,15 @@
 package com.wealthview.core.property;
 
+import com.wealthview.core.property.dto.CostSegAllocation;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class DepreciationCalculator {
@@ -57,6 +60,110 @@ public class DepreciationCalculator {
         }
 
         return schedule;
+    }
+
+    private static final Set<String> BONUS_ELIGIBLE_CLASSES = Set.of("5yr", "7yr", "15yr");
+
+    private static final Map<String, BigDecimal> CLASS_LIFE_YEARS = Map.of(
+            "5yr", new BigDecimal("5"),
+            "7yr", new BigDecimal("7"),
+            "15yr", new BigDecimal("15"),
+            "27_5yr", new BigDecimal("27.5"));
+
+    /**
+     * Computes a cost segregation depreciation schedule.
+     * Bonus-eligible classes (5yr, 7yr, 15yr) get bonus depreciation in year 1,
+     * with the remainder on straight-line over the class life.
+     * Structural (27.5yr) gets straight-line only, no bonus.
+     *
+     * If studyYear is set and later than the in-service year, computes a
+     * Section 481(a) catch-up adjustment for the study year.
+     */
+    public Map<Integer, BigDecimal> computeCostSegregation(
+            List<CostSegAllocation> allocations, BigDecimal bonusRate,
+            LocalDate inServiceDate, Integer studyYear) {
+        if (allocations == null || allocations.isEmpty()) {
+            return Map.of();
+        }
+
+        var schedule = new LinkedHashMap<Integer, BigDecimal>();
+        boolean hasCatchUp = studyYear != null && studyYear > inServiceDate.getYear();
+
+        for (var alloc : allocations) {
+            var lifeYears = CLASS_LIFE_YEARS.get(alloc.assetClass());
+            if (lifeYears == null) {
+                throw new IllegalArgumentException("Invalid asset class: " + alloc.assetClass());
+            }
+
+            boolean isBonusEligible = BONUS_ELIGIBLE_CLASSES.contains(alloc.assetClass());
+
+            if (isBonusEligible && hasCatchUp) {
+                applyCatchUpSchedule(alloc, lifeYears, bonusRate, inServiceDate, studyYear, schedule);
+            } else if (isBonusEligible) {
+                applyBonusSchedule(alloc, lifeYears, bonusRate, inServiceDate, schedule);
+            } else {
+                // Structural — straight-line, no bonus
+                var classSchedule = computeStraightLine(alloc.allocation(), BigDecimal.ZERO,
+                        inServiceDate, lifeYears);
+                for (var entry : classSchedule.entrySet()) {
+                    schedule.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+                }
+            }
+        }
+
+        return schedule;
+    }
+
+    private void applyBonusSchedule(CostSegAllocation alloc, BigDecimal lifeYears,
+                                      BigDecimal bonusRate, LocalDate inServiceDate,
+                                      Map<Integer, BigDecimal> schedule) {
+        var bonusAmount = alloc.allocation().multiply(bonusRate).setScale(SCALE, ROUNDING);
+        var remainder = alloc.allocation().subtract(bonusAmount);
+
+        // Bonus goes entirely in year 1
+        int startYear = inServiceDate.getYear();
+        schedule.merge(startYear, bonusAmount, BigDecimal::add);
+
+        // Remainder on straight-line over class life
+        if (remainder.compareTo(BigDecimal.ZERO) > 0) {
+            var classSchedule = computeStraightLine(remainder, BigDecimal.ZERO, inServiceDate, lifeYears);
+            for (var entry : classSchedule.entrySet()) {
+                schedule.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+            }
+        }
+    }
+
+    private void applyCatchUpSchedule(CostSegAllocation alloc, BigDecimal lifeYears,
+                                        BigDecimal bonusRate, LocalDate inServiceDate,
+                                        int studyYear, Map<Integer, BigDecimal> schedule) {
+        // Step 1: What was actually taken under 27.5yr straight-line for this portion
+        var priorSLSchedule = computeStraightLine(alloc.allocation(), BigDecimal.ZERO,
+                inServiceDate, new BigDecimal("27.5"));
+        var priorStraightLine = BigDecimal.ZERO;
+        for (int y = inServiceDate.getYear(); y < studyYear; y++) {
+            priorStraightLine = priorStraightLine.add(priorSLSchedule.getOrDefault(y, BigDecimal.ZERO));
+            // Include the prior-year deductions in the schedule (they were already claimed)
+            schedule.merge(y, priorSLSchedule.getOrDefault(y, BigDecimal.ZERO), BigDecimal::add);
+        }
+
+        // Step 2: What should have been taken under accelerated method
+        var shouldHaveTakenSchedule = new LinkedHashMap<Integer, BigDecimal>();
+        applyBonusSchedule(alloc, lifeYears, bonusRate, inServiceDate, shouldHaveTakenSchedule);
+        var shouldHaveTaken = BigDecimal.ZERO;
+        for (int y = inServiceDate.getYear(); y < studyYear; y++) {
+            shouldHaveTaken = shouldHaveTaken.add(shouldHaveTakenSchedule.getOrDefault(y, BigDecimal.ZERO));
+        }
+
+        // Step 3: 481(a) adjustment = shouldHaveTaken - priorStraightLine → added to studyYear
+        var adjustment = shouldHaveTaken.subtract(priorStraightLine);
+        schedule.merge(studyYear, adjustment, BigDecimal::add);
+
+        // Step 4: From studyYear onward, continue the accelerated schedule
+        for (var entry : shouldHaveTakenSchedule.entrySet()) {
+            if (entry.getKey() >= studyYear) {
+                schedule.merge(entry.getKey(), entry.getValue(), BigDecimal::add);
+            }
+        }
     }
 
     /**

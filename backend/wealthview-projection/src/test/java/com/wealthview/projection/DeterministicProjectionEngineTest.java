@@ -2521,6 +2521,69 @@ class DeterministicProjectionEngineTest {
     }
 
     @Test
+    void rothConversion_withDepreciation_usesReducedTaxableIncome() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int currentYear = LocalDate.now().getYear();
+        int birthYear = currentYear - 50;
+
+        // Rental property with $90k gross and $180k depreciation year 1
+        // Cash inflow = $90k - $10k opex = $80k
+        // Taxable income = $90k - $10k opex - $180k dep = -$100k (deeply negative)
+        var rentalWithDepreciation = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental with CostSeg", "rental_property",
+                bd("90000"), 0, null, bd("0"), false,
+                "active_participation",
+                bd("10000"), null, null, null,
+                "cost_segregation",
+                Map.of(currentYear, bd("180000"), currentYear + 1, bd("5000")));
+
+        // Baseline: same cash but NO depreciation
+        var rentalNoDepreciation = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental no dep", "rental_property",
+                bd("90000"), 0, null, bd("0"), false,
+                "active_participation",
+                bd("10000"), null, null, null,
+                null, null);
+
+        // fill_bracket strategy tries to fill up to a target bracket
+        String paramsTemplate = """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """;
+
+        // Run with depreciation
+        var inputWithDep = createInput(
+                LocalDate.of(currentYear + 15, 1, 1), 90, bd("0"),
+                paramsTemplate.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")),
+                null,
+                List.of(rentalWithDepreciation));
+        var resultWithDep = engineTax.run(inputWithDep);
+
+        // Run without depreciation (same cash income)
+        var inputNoDep = createInput(
+                LocalDate.of(currentYear + 15, 1, 1), 90, bd("0"),
+                paramsTemplate.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")),
+                null,
+                List.of(rentalNoDepreciation));
+        var resultNoDep = engineTax.run(inputNoDep);
+
+        // With depreciation: taxable income is much lower → more bracket space → bigger conversion
+        var year1WithDep = resultWithDep.yearlyData().getFirst();
+        var year1NoDep = resultNoDep.yearlyData().getFirst();
+
+        assertThat(year1WithDep.rothConversionAmount())
+                .isGreaterThan(year1NoDep.rothConversionAmount());
+    }
+
+    @Test
     void run_withProperty_finalNetWorthSetOnResult() {
         var prop = propertyNoLoan("300000", "0.00", "0");
         int currentYear = LocalDate.now().getYear();
