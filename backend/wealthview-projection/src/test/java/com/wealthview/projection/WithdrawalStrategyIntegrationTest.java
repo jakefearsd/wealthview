@@ -40,7 +40,7 @@ class WithdrawalStrategyIntegrationTest {
             "10000000, 0.04"
     })
     void fixedPercentage_variousBalances_neverNegative(String balance, String rate) {
-        var engine = new DeterministicProjectionEngine(null);
+        var engine = new DeterministicProjectionEngine(null, null);
         var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": %s, "withdrawal_strategy": "fixed_percentage"}
@@ -61,7 +61,7 @@ class WithdrawalStrategyIntegrationTest {
             "10000000"
     })
     void dynamicPercentage_variousBalances_neverDepletes(String balance) {
-        var engine = new DeterministicProjectionEngine(null);
+        var engine = new DeterministicProjectionEngine(null, null);
         var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "dynamic_percentage"}
@@ -83,7 +83,7 @@ class WithdrawalStrategyIntegrationTest {
             "0.15"
     })
     void vanguard_extremeReturns_capsAndFloors(String returnRate) {
-        var engine = new DeterministicProjectionEngine(null);
+        var engine = new DeterministicProjectionEngine(null, null);
         var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "vanguard_dynamic_spending", "dynamic_ceiling": 0.05, "dynamic_floor": -0.025}

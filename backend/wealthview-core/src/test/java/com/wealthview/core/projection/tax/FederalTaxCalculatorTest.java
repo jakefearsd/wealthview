@@ -261,6 +261,40 @@ class FederalTaxCalculatorTest {
     }
 
     @Test
+    void computeTaxWithDeduction_usesProvidedDeduction() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        // Use a custom deduction of $18000 instead of standard $15000
+        // Taxable = 50000 - 18000 = 32000
+        // 10%: 11925 * 0.10 = 1192.50
+        // 12%: (32000-11925) * 0.12 = 20075 * 0.12 = 2409.00
+        // Total = 3601.50
+        var tax = calculator.computeTaxWithDeduction(bd("50000"), bd("18000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(tax).isEqualByComparingTo(bd("3601.5000"));
+    }
+
+    @Test
+    void computeTaxWithDeduction_largerDeduction_lowerTax() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        stubSingleDeduction2025();
+
+        var standardTax = calculator.computeTax(bd("100000"), 2025, FilingStatus.SINGLE);
+        var itemizedTax = calculator.computeTaxWithDeduction(bd("100000"), bd("25000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(itemizedTax).isLessThan(standardTax);
+    }
+
+    @Test
+    void computeTaxWithDeduction_zeroIncome_returnsZero() {
+        var tax = calculator.computeTaxWithDeduction(BigDecimal.ZERO, bd("15000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(tax).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     void computeTax_afterClearCache_stillComputes() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
                 .thenReturn(single2025Brackets());

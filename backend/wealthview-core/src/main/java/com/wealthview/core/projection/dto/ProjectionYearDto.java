@@ -44,7 +44,11 @@ public record ProjectionYearDto(
         BigDecimal withdrawalFromTaxable,
         BigDecimal withdrawalFromTraditional,
         BigDecimal withdrawalFromRoth,
-        List<RentalPropertyYearDetail> rentalPropertyDetails) {
+        List<RentalPropertyYearDetail> rentalPropertyDetails,
+        BigDecimal federalTax,
+        BigDecimal stateTax,
+        BigDecimal saltDeduction,
+        Boolean usedItemizedDeduction) {
 
     public ProjectionYearDto withSurplusReinvested(BigDecimal surplusReinvested) {
         return new ProjectionYearDto(
@@ -63,7 +67,8 @@ public record ProjectionYearDto(
                 taxableGrowth(), traditionalGrowth(), rothGrowth(),
                 taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
                 withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
-                rentalPropertyDetails());
+                rentalPropertyDetails(),
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction());
     }
 
     public ProjectionYearDto withPropertyEquity(BigDecimal propertyEquity, BigDecimal totalNetWorth) {
@@ -83,7 +88,8 @@ public record ProjectionYearDto(
                 taxableGrowth(), traditionalGrowth(), rothGrowth(),
                 taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
                 withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
-                rentalPropertyDetails());
+                rentalPropertyDetails(),
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction());
     }
 
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
@@ -95,6 +101,7 @@ public record ProjectionYearDto(
                 null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null);
     }
 }

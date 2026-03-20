@@ -45,7 +45,7 @@ class DeterministicProjectionEngineTest {
 
     @BeforeEach
     void setUp() {
-        engine = new DeterministicProjectionEngine(null);
+        engine = new DeterministicProjectionEngine(null, null);
         taxBracketRepository = mock(TaxBracketRepository.class);
         standardDeductionRepository = mock(StandardDeductionRepository.class);
     }

@@ -91,7 +91,8 @@ public class ProjectionService {
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
-                request.rothConversionStartYear());
+                request.rothConversionStartYear(), request.state(),
+                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest());
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -142,7 +143,8 @@ public class ProjectionService {
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
-                request.rothConversionStartYear()));
+                request.rothConversionStartYear(), request.state(),
+                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest()));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -293,7 +295,9 @@ public class ProjectionService {
                                      BigDecimal otherIncome, BigDecimal annualRothConversion,
                                      String withdrawalOrder,
                                      String rothConversionStrategy, BigDecimal targetBracketRate,
-                                     Integer rothConversionStartYear) {
+                                     Integer rothConversionStartYear,
+                                     String state, BigDecimal primaryResidencePropertyTax,
+                                     BigDecimal primaryResidenceMortgageInterest) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
         hasContent |= putIfNotNull(node, "birth_year", birthYear);
@@ -308,6 +312,9 @@ public class ProjectionService {
         hasContent |= putIfNotNull(node, "roth_conversion_strategy", rothConversionStrategy);
         hasContent |= putIfNotNull(node, "target_bracket_rate", targetBracketRate);
         hasContent |= putIfNotNull(node, "roth_conversion_start_year", rothConversionStartYear);
+        hasContent |= putIfNotNull(node, "state", state);
+        hasContent |= putIfNotNull(node, "primary_residence_property_tax", primaryResidencePropertyTax);
+        hasContent |= putIfNotNull(node, "primary_residence_mortgage_interest", primaryResidenceMortgageInterest);
         return hasContent ? node.toString() : null;
     }
 

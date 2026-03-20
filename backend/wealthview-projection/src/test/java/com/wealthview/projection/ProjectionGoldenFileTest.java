@@ -47,7 +47,7 @@ class ProjectionGoldenFileTest {
         stubSingle2025(taxBracketRepo, deductionRepo);
 
         var engine = new DeterministicProjectionEngine(
-                new FederalTaxCalculator(taxBracketRepo, deductionRepo));
+                new FederalTaxCalculator(taxBracketRepo, deductionRepo), null);
         var result = engine.run(input);
 
         var actualJson = MAPPER.writeValueAsString(result);

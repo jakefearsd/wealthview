@@ -45,6 +45,10 @@ vi.mock('../components/MilestoneStrip', () => ({
     default: () => <div data-testid="milestone-strip">Milestones</div>,
 }));
 
+vi.mock('../components/TaxBreakdownChart', () => ({
+    default: () => <div data-testid="tax-breakdown-chart">TaxBreakdownChart</div>,
+}));
+
 import { useApiQuery } from '../hooks/useApiQuery';
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
@@ -124,7 +128,7 @@ describe('ProjectionDetailPage', () => {
         mockRun.mockResolvedValue({
             scenario_id: 'abc-123',
             yearly_data: [
-                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null, income_by_source: null, property_equity: null, total_net_worth: null, surplus_reinvested: null, taxable_growth: null, traditional_growth: null, roth_growth: null, tax_paid_from_taxable: null, tax_paid_from_traditional: null, tax_paid_from_roth: null, withdrawal_from_taxable: null, withdrawal_from_traditional: null, withdrawal_from_roth: null, rental_property_details: null },
+                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null, income_by_source: null, property_equity: null, total_net_worth: null, surplus_reinvested: null, taxable_growth: null, traditional_growth: null, roth_growth: null, tax_paid_from_taxable: null, tax_paid_from_traditional: null, tax_paid_from_roth: null, withdrawal_from_taxable: null, withdrawal_from_traditional: null, withdrawal_from_roth: null, rental_property_details: null, federal_tax: null, state_tax: null, salt_deduction: null, used_itemized_deduction: null },
             ],
             final_balance: 117700,
             years_in_retirement: 0,
