@@ -12,6 +12,13 @@ function formatCurrency(value: number): string {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
+interface CostSegAllocationsState {
+    fiveYr: string;
+    sevenYr: string;
+    fifteenYr: string;
+    twentySevenYr: string;
+}
+
 interface PropertyFormData {
     address: string;
     purchasePrice: string;
@@ -35,6 +42,9 @@ interface PropertyFormData {
     inServiceDate: string;
     landValue: string;
     usefulLifeYears: string;
+    costSegAllocations: CostSegAllocationsState;
+    bonusDepreciationRate: string;
+    costSegStudyYear: string;
 }
 
 const initialFormData: PropertyFormData = {
@@ -60,9 +70,22 @@ const initialFormData: PropertyFormData = {
     inServiceDate: '',
     landValue: '',
     usefulLifeYears: '27.5',
+    costSegAllocations: { fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '' },
+    bonusDepreciationRate: '100',
+    costSegStudyYear: '',
 };
 
+function buildCostSegAllocations(allocs: CostSegAllocationsState) {
+    const result = [];
+    if (allocs.fiveYr && parseFloat(allocs.fiveYr) > 0) result.push({ asset_class: '5yr', allocation: parseFloat(allocs.fiveYr) });
+    if (allocs.sevenYr && parseFloat(allocs.sevenYr) > 0) result.push({ asset_class: '7yr', allocation: parseFloat(allocs.sevenYr) });
+    if (allocs.fifteenYr && parseFloat(allocs.fifteenYr) > 0) result.push({ asset_class: '15yr', allocation: parseFloat(allocs.fifteenYr) });
+    if (allocs.twentySevenYr && parseFloat(allocs.twentySevenYr) > 0) result.push({ asset_class: '27_5yr', allocation: parseFloat(allocs.twentySevenYr) });
+    return result;
+}
+
 function buildRequest(data: PropertyFormData) {
+    const isCostSeg = data.depreciationMethod === 'cost_segregation';
     return {
         address: data.address,
         purchase_price: parseFloat(data.purchasePrice),
@@ -85,6 +108,11 @@ function buildRequest(data: PropertyFormData) {
         in_service_date: data.depreciationMethod !== 'none' ? (data.inServiceDate || data.purchaseDate || undefined) : undefined,
         land_value: data.landValue ? parseFloat(data.landValue) : undefined,
         useful_life_years: data.usefulLifeYears ? parseFloat(data.usefulLifeYears) : undefined,
+        ...(isCostSeg ? {
+            cost_seg_allocations: buildCostSegAllocations(data.costSegAllocations),
+            bonus_depreciation_rate: parseFloat(data.bonusDepreciationRate) / 100,
+            cost_seg_study_year: data.costSegStudyYear ? parseInt(data.costSegStudyYear) : undefined,
+        } : {}),
     };
 }
 
@@ -114,7 +142,7 @@ export default function PropertiesListPage() {
         entityName: 'Property',
         initialFormData,
         onSuccess,
-        formatError: (_err, action) => `Failed to ${action} property`,
+        formatError: undefined,
     });
 
     const handleDelete = useCallback(async (id: string) => {
@@ -126,6 +154,17 @@ export default function PropertiesListPage() {
         crudReset();
         setShowForm(false);
     }, [crudReset]);
+
+    function allocationsToState(allocs: Property['cost_seg_allocations']): CostSegAllocationsState {
+        const state: CostSegAllocationsState = { fiveYr: '', sevenYr: '', fifteenYr: '', twentySevenYr: '' };
+        for (const a of allocs ?? []) {
+            if (a.asset_class === '5yr') state.fiveYr = String(a.allocation);
+            else if (a.asset_class === '7yr') state.sevenYr = String(a.allocation);
+            else if (a.asset_class === '15yr') state.fifteenYr = String(a.allocation);
+            else if (a.asset_class === '27_5yr') state.twentySevenYr = String(a.allocation);
+        }
+        return state;
+    }
 
     function startEdit(property: Property) {
         const hasFinancialFields = property.annual_appreciation_rate != null
@@ -154,6 +193,9 @@ export default function PropertiesListPage() {
             inServiceDate: property.in_service_date ?? '',
             landValue: property.land_value != null ? String(property.land_value) : '',
             usefulLifeYears: String(property.useful_life_years || 27.5),
+            costSegAllocations: allocationsToState(property.cost_seg_allocations),
+            bonusDepreciationRate: String((property.bonus_depreciation_rate ?? 1) * 100),
+            costSegStudyYear: property.cost_seg_study_year != null ? String(property.cost_seg_study_year) : '',
         });
         setShowForm(true);
     }
@@ -194,6 +236,9 @@ export default function PropertiesListPage() {
                     inServiceDate={formData.inServiceDate} onInServiceDateChange={v => setFormData(prev => ({ ...prev, inServiceDate: v }))}
                     landValue={formData.landValue} onLandValueChange={v => setFormData(prev => ({ ...prev, landValue: v }))}
                     usefulLifeYears={formData.usefulLifeYears} onUsefulLifeYearsChange={v => setFormData(prev => ({ ...prev, usefulLifeYears: v }))}
+                    costSegAllocations={formData.costSegAllocations} onCostSegAllocationsChange={v => setFormData(prev => ({ ...prev, costSegAllocations: v }))}
+                    bonusDepreciationRate={formData.bonusDepreciationRate} onBonusDepreciationRateChange={v => setFormData(prev => ({ ...prev, bonusDepreciationRate: v }))}
+                    costSegStudyYear={formData.costSegStudyYear} onCostSegStudyYearChange={v => setFormData(prev => ({ ...prev, costSegStudyYear: v }))}
                     purchasePriceNum={parseFloat(formData.purchasePrice) || 0}
                     onSubmit={handleSave}
                     onCancel={resetForm}

@@ -167,11 +167,47 @@ export default function PropertyAnalyticsSection({
             {depreciationSchedule && depreciationSchedule.schedule.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '2rem' }}>
                     <h3 style={{ marginBottom: '0.5rem' }}>Depreciation Schedule</h3>
-                    <div style={{ display: 'flex', gap: '2rem', fontSize: '0.85rem', color: '#666', marginBottom: '1rem' }}>
-                        <span>Straight-Line Depreciation</span>
+                    <div style={{ display: 'flex', gap: '2rem', fontSize: '0.85rem', color: '#666', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                        <span>{depreciationSchedule.depreciation_method === 'cost_segregation' ? 'Cost Segregation' : 'Straight-Line Depreciation'}</span>
                         <span>Depreciable Basis: {formatCurrency(depreciationSchedule.depreciable_basis)}</span>
-                        <span>Annual: {formatCurrency(depreciationSchedule.schedule[0]?.annual_depreciation ?? 0)}</span>
+                        {depreciationSchedule.bonus_depreciation_rate != null && (
+                            <span>Bonus Rate: {(depreciationSchedule.bonus_depreciation_rate * 100).toFixed(0)}%</span>
+                        )}
+                        {depreciationSchedule.depreciation_method !== 'cost_segregation' && (
+                            <span>Annual: {formatCurrency(depreciationSchedule.schedule[0]?.annual_depreciation ?? 0)}</span>
+                        )}
                     </div>
+
+                    {depreciationSchedule.class_breakdowns && depreciationSchedule.class_breakdowns.length > 0 && (
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444' }}>Asset Class Breakdown</h4>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
+                                        <th style={{ padding: '0.4rem 0.5rem' }}>Class</th>
+                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Allocation</th>
+                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Bonus</th>
+                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Annual SL</th>
+                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>SL Years</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {depreciationSchedule.class_breakdowns.map((cb) => (
+                                        <tr key={cb.asset_class} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                                            <td style={{ padding: '0.4rem 0.5rem', fontWeight: 600 }}>
+                                                {cb.asset_class === '27_5yr' ? '27.5-Year' : cb.asset_class.replace('yr', '-Year')}
+                                            </td>
+                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{formatCurrency(cb.allocation)}</td>
+                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{formatCurrency(cb.bonus_amount)}</td>
+                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{cb.annual_straight_line > 0 ? formatCurrency(cb.annual_straight_line) : '—'}</td>
+                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{cb.straight_line_years > 0 ? cb.straight_line_years : '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                         <thead>
                             <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>

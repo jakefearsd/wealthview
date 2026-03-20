@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -88,6 +90,16 @@ public class PropertyEntity {
     @Column(name = "useful_life_years", nullable = false, precision = 4, scale = 1)
     private BigDecimal usefulLifeYears = new BigDecimal("27.5");
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "cost_seg_allocations", nullable = false, columnDefinition = "jsonb")
+    private String costSegAllocations = "[]";
+
+    @Column(name = "bonus_depreciation_rate", nullable = false, precision = 5, scale = 4)
+    private BigDecimal bonusDepreciationRate = BigDecimal.ONE;
+
+    @Column(name = "cost_seg_study_year")
+    private Integer costSegStudyYear;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -153,6 +165,13 @@ public class PropertyEntity {
     public void setDepreciationMethod(String depreciationMethod) { this.depreciationMethod = depreciationMethod; }
     public BigDecimal getUsefulLifeYears() { return usefulLifeYears; }
     public void setUsefulLifeYears(BigDecimal usefulLifeYears) { this.usefulLifeYears = usefulLifeYears; }
+
+    public String getCostSegAllocations() { return costSegAllocations; }
+    public void setCostSegAllocations(String costSegAllocations) { this.costSegAllocations = costSegAllocations; }
+    public BigDecimal getBonusDepreciationRate() { return bonusDepreciationRate; }
+    public void setBonusDepreciationRate(BigDecimal bonusDepreciationRate) { this.bonusDepreciationRate = bonusDepreciationRate; }
+    public Integer getCostSegStudyYear() { return costSegStudyYear; }
+    public void setCostSegStudyYear(Integer costSegStudyYear) { this.costSegStudyYear = costSegStudyYear; }
 
     public boolean hasLoanDetails() {
         return loanAmount != null && annualInterestRate != null

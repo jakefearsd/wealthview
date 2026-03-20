@@ -15,7 +15,6 @@ import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
-import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,9 +43,6 @@ class ProjectionInputBuilderTest {
 
     @Mock
     private ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
-
-    @Mock
-    private PropertyDepreciationScheduleRepository depreciationScheduleRepository;
 
     @Mock
     private DepreciationCalculator depreciationCalculator;
@@ -515,6 +511,56 @@ class ProjectionInputBuilderTest {
         var result = builder.build(scenario, tenantId);
 
         assertThat(result.properties()).isEmpty();
+    }
+
+    @Test
+    void toIncomeSourceInput_costSegProperty_populatesDepreciationByYear() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var property = new PropertyEntity(tenant, "Beryl St",
+                new BigDecimal("500000"), LocalDate.of(2021, 7, 1),
+                new BigDecimal("500000"), BigDecimal.ZERO);
+        property.setDepreciationMethod("cost_segregation");
+        property.setInServiceDate(LocalDate.of(2021, 7, 1));
+        property.setLandValue(new BigDecimal("75000"));
+        property.setCostSegAllocations("""
+                [{"assetClass":"5yr","allocation":80000},
+                 {"assetClass":"7yr","allocation":60000},
+                 {"assetClass":"15yr","allocation":40000},
+                 {"assetClass":"27_5yr","allocation":245000}]
+                """);
+        property.setBonusDepreciationRate(new BigDecimal("1.0000"));
+        property.setCostSegStudyYear(null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Beryl St Rental", "rental_property",
+                new BigDecimal("36000"), 0, null,
+                BigDecimal.ZERO, false, "active_participation");
+        incomeSource.setProperty(property);
+
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var expectedSchedule = Map.of(2021, new BigDecimal("184462.1212"));
+        when(depreciationCalculator.computeCostSegregation(
+                org.mockito.ArgumentMatchers.anyList(),
+                org.mockito.ArgumentMatchers.eq(new BigDecimal("1.0000")),
+                org.mockito.ArgumentMatchers.eq(LocalDate.of(2021, 7, 1)),
+                org.mockito.ArgumentMatchers.isNull()))
+                .thenReturn(expectedSchedule);
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        assertThat(result.incomeSources().getFirst().depreciationMethod()).isEqualTo("cost_segregation");
+        assertThat(result.incomeSources().getFirst().depreciationByYear()).isNotNull();
+        assertThat(result.incomeSources().getFirst().depreciationByYear()).isNotEmpty();
+        assertThat(result.incomeSources().getFirst().depreciationByYear().get(2021))
+                .isEqualByComparingTo(new BigDecimal("184462.1212"));
     }
 
     @Test

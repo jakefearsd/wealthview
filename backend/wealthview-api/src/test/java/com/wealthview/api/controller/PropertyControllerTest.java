@@ -10,6 +10,7 @@ import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
+import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
@@ -83,7 +84,8 @@ class PropertyControllerTest {
                 new BigDecimal("150000"),
                 null, null, null, null, false, false, "primary_residence",
                 null, null, null, null,
-                null, null, "none", new BigDecimal("27.5"));
+                null, null, "none", new BigDecimal("27.5"),
+                List.of(), BigDecimal.ONE, null);
     }
 
     private PropertyResponse sampleResponseWithFinancialFields() {
@@ -93,7 +95,8 @@ class PropertyControllerTest {
                 new BigDecimal("150000"),
                 null, null, null, null, false, false, "primary_residence",
                 new BigDecimal("0.03000"), new BigDecimal("4500.0000"), new BigDecimal("1800.0000"), null,
-                null, null, "none", new BigDecimal("27.5"));
+                null, null, "none", new BigDecimal("27.5"),
+                List.of(), BigDecimal.ONE, null);
     }
 
     @Test
@@ -426,5 +429,75 @@ class PropertyControllerTest {
                         .with(authenticatedAdmin()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value("NOT_FOUND"));
+    }
+
+    @Test
+    void create_withCostSegAllocations_returns201() throws Exception {
+        var response = new PropertyResponse(PROPERTY_ID, "123 Main St",
+                new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
+                new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("150000"),
+                null, null, null, null, false, false, "investment",
+                null, null, null, null,
+                LocalDate.of(2020, 6, 1), new BigDecimal("50000"), "cost_segregation", new BigDecimal("27.5"),
+                List.of(new CostSegAllocation("5yr", new BigDecimal("15000")),
+                        new CostSegAllocation("27_5yr", new BigDecimal("235000"))),
+                BigDecimal.ONE, null);
+
+        when(propertyService.create(eq(TENANT_ID), any(PropertyRequest.class)))
+                .thenReturn(response);
+
+        mockMvc.perform(post("/api/v1/properties")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"address": "123 Main St", "purchase_price": 300000,
+                                 "purchase_date": "2020-06-01", "current_value": 350000,
+                                 "mortgage_balance": 200000, "property_type": "investment",
+                                 "depreciation_method": "cost_segregation",
+                                 "in_service_date": "2020-06-01", "land_value": 50000,
+                                 "cost_seg_allocations": [
+                                   {"asset_class": "5yr", "allocation": 15000},
+                                   {"asset_class": "27_5yr", "allocation": 235000}
+                                 ],
+                                 "bonus_depreciation_rate": 1.0}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.depreciation_method").value("cost_segregation"))
+                .andExpect(jsonPath("$.cost_seg_allocations").isArray())
+                .andExpect(jsonPath("$.cost_seg_allocations.length()").value(2))
+                .andExpect(jsonPath("$.bonus_depreciation_rate").value(1));
+    }
+
+    @Test
+    void getDepreciationSchedule_costSeg_returnsEnrichedResponse() throws Exception {
+        var allocations = List.of(
+                new CostSegAllocation("5yr", new BigDecimal("15000")),
+                new CostSegAllocation("27_5yr", new BigDecimal("235000")));
+        var breakdowns = List.of(
+                new DepreciationScheduleResult.ClassBreakdown("5yr", new BigDecimal("5"),
+                        new BigDecimal("15000"), new BigDecimal("15000"), BigDecimal.ZERO, 0),
+                new DepreciationScheduleResult.ClassBreakdown("27_5yr", new BigDecimal("27.5"),
+                        new BigDecimal("235000"), BigDecimal.ZERO, new BigDecimal("8545.4545"), 29));
+        var entries = List.of(
+                new DepreciationScheduleResult.YearEntry(2024, new BigDecimal("23000"),
+                        new BigDecimal("23000"), new BigDecimal("227000")));
+        var result = new DepreciationScheduleResult(
+                "cost_segregation", new BigDecimal("250000"),
+                new BigDecimal("27.5"), LocalDate.of(2024, 1, 15), entries,
+                BigDecimal.ONE, allocations, breakdowns);
+
+        when(propertyService.getDepreciationSchedule(TENANT_ID, PROPERTY_ID)).thenReturn(result);
+
+        mockMvc.perform(get("/api/v1/properties/{id}/depreciation-schedule", PROPERTY_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.depreciation_method").value("cost_segregation"))
+                .andExpect(jsonPath("$.bonus_depreciation_rate").value(1))
+                .andExpect(jsonPath("$.cost_seg_allocations").isArray())
+                .andExpect(jsonPath("$.class_breakdowns").isArray())
+                .andExpect(jsonPath("$.class_breakdowns.length()").value(2))
+                .andExpect(jsonPath("$.class_breakdowns[0].asset_class").value("5yr"))
+                .andExpect(jsonPath("$.class_breakdowns[0].bonus_amount").value(15000));
     }
 }

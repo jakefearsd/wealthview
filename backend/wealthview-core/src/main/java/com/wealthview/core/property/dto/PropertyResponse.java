@@ -1,9 +1,12 @@
 package com.wealthview.core.property.dto;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.PropertyEntity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record PropertyResponse(
@@ -28,8 +31,13 @@ public record PropertyResponse(
         LocalDate inServiceDate,
         BigDecimal landValue,
         String depreciationMethod,
-        BigDecimal usefulLifeYears
+        BigDecimal usefulLifeYears,
+        List<CostSegAllocation> costSegAllocations,
+        BigDecimal bonusDepreciationRate,
+        Integer costSegStudyYear
 ) {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
     public static PropertyResponse from(PropertyEntity entity, BigDecimal effectiveMortgageBalance) {
         var equity = entity.getCurrentValue().subtract(effectiveMortgageBalance);
         return new PropertyResponse(
@@ -54,7 +62,21 @@ public record PropertyResponse(
                 entity.getInServiceDate(),
                 entity.getLandValue(),
                 entity.getDepreciationMethod(),
-                entity.getUsefulLifeYears()
+                entity.getUsefulLifeYears(),
+                parseCostSegAllocations(entity.getCostSegAllocations()),
+                entity.getBonusDepreciationRate(),
+                entity.getCostSegStudyYear()
         );
+    }
+
+    private static List<CostSegAllocation> parseCostSegAllocations(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) {
+            return List.of();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
     }
 }

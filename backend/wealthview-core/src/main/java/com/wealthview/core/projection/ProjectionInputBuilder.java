@@ -20,7 +20,6 @@ import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
-import com.wealthview.persistence.repository.PropertyDepreciationScheduleRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import org.springframework.stereotype.Service;
@@ -31,7 +30,6 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -44,20 +42,17 @@ public class ProjectionInputBuilder {
 
     private final AccountService accountService;
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
-    private final PropertyDepreciationScheduleRepository depreciationScheduleRepository;
     private final DepreciationCalculator depreciationCalculator;
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final PropertyRepository propertyRepository;
 
     public ProjectionInputBuilder(AccountService accountService,
                                   ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
-                                  PropertyDepreciationScheduleRepository depreciationScheduleRepository,
                                   DepreciationCalculator depreciationCalculator,
                                   GuardrailSpendingProfileRepository guardrailRepository,
                                   PropertyRepository propertyRepository) {
         this.accountService = accountService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
-        this.depreciationScheduleRepository = depreciationScheduleRepository;
         this.depreciationCalculator = depreciationCalculator;
         this.guardrailRepository = guardrailRepository;
         this.propertyRepository = propertyRepository;
@@ -198,11 +193,11 @@ public class ProjectionInputBuilder {
             depreciationMethod = property.getDepreciationMethod();
 
             if ("cost_segregation".equals(depreciationMethod)) {
-                var scheduleEntries = depreciationScheduleRepository
-                        .findByProperty_IdOrderByTaxYear(property.getId());
-                depreciationByYear = new HashMap<>();
-                for (var entry : scheduleEntries) {
-                    depreciationByYear.put(entry.getTaxYear(), entry.getDepreciationAmount());
+                var allocations = parseCostSegAllocations(property.getCostSegAllocations());
+                if (!allocations.isEmpty()) {
+                    depreciationByYear = depreciationCalculator.computeCostSegregation(
+                            allocations, property.getBonusDepreciationRate(),
+                            property.getInServiceDate(), property.getCostSegStudyYear());
                 }
             } else if ("straight_line".equals(depreciationMethod)
                     && property.getInServiceDate() != null) {
@@ -219,6 +214,19 @@ public class ProjectionInputBuilder {
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
                 annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
                 depreciationMethod, depreciationByYear);
+    }
+
+    private List<com.wealthview.core.property.dto.CostSegAllocation> parseCostSegAllocations(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) {
+            return List.of();
+        }
+        try {
+            return MAPPER.readValue(json,
+                    new com.fasterxml.jackson.core.type.TypeReference<List<com.wealthview.core.property.dto.CostSegAllocation>>() {});
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            log.warn("Failed to parse cost_seg_allocations JSON", e);
+            return List.of();
+        }
     }
 
     private BigDecimal sumNullable(BigDecimal... values) {

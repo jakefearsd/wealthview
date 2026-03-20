@@ -387,6 +387,8 @@ export default function IncomeSourcesPage() {
                                             propertyId={s.property_id}
                                             propertyAddress={s.property_address}
                                             monthlyRentEstimate={s.annual_amount / 12}
+                                            annualRent={s.annual_amount}
+                                            inflationRate={s.inflation_rate}
                                         />
                                     )}
                                 </div>

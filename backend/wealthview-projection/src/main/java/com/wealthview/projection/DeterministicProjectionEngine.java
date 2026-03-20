@@ -268,17 +268,20 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
+        BigDecimal taxableActiveIncome;
 
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
             incomeSourceResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
                     year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
             suspendedLoss = incomeSourceResult.suspendedLossCarryforward();
             totalActiveIncome = incomeSourceResult.totalCashInflow();
+            taxableActiveIncome = incomeSourceResult.totalTaxableIncome();
         } else {
             totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
+            taxableActiveIncome = totalActiveIncome;
         }
 
-        BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(totalActiveIncome, BigDecimal.ZERO);
+        BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(taxableActiveIncome, BigDecimal.ZERO);
         var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,

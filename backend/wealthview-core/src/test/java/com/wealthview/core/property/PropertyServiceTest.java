@@ -1,6 +1,7 @@
 package com.wealthview.core.property;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
@@ -80,7 +81,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.address()).isEqualTo("123 Main St");
@@ -97,7 +98,7 @@ class PropertyServiceTest {
                 new BigDecimal("300000"), new BigDecimal("0.065"), 360,
                 LocalDate.of(2020, 1, 1), true, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.hasLoanDetails()).isTrue();
@@ -114,7 +115,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 new BigDecimal("300000"), null, null, null, null, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -141,7 +142,7 @@ class PropertyServiceTest {
                 new BigDecimal("300000"), new BigDecimal("0.065"), 360,
                 LocalDate.of(2020, 1, 1), true, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.useComputedBalance()).isTrue();
@@ -215,7 +216,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "investment",
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.propertyType()).isEqualTo("investment");
@@ -230,7 +231,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.propertyType()).isEqualTo("primary_residence");
@@ -244,7 +245,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "commercial",
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -265,7 +266,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "vacation",
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.propertyType()).isEqualTo("vacation");
@@ -398,7 +399,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, "investment",
                 null, null, null, null,
-                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "straight_line", new BigDecimal("27.5"));
+                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "straight_line", new BigDecimal("27.5"), null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.depreciationMethod()).isEqualTo("straight_line");
@@ -416,7 +417,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.depreciationMethod()).isEqualTo("none");
@@ -430,7 +431,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, "bogus", null);
+                null, null, "bogus", null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -446,7 +447,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 new BigDecimal("0.03000"), new BigDecimal("4500.0000"), new BigDecimal("1800.0000"), new BigDecimal("2400.0000"),
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.annualAppreciationRate()).isEqualByComparingTo("0.03000");
@@ -464,7 +465,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.create(tenantId, request);
 
         assertThat(result.annualAppreciationRate()).isNull();
@@ -890,7 +891,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, "straight_line", null);
+                null, null, "straight_line", null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -909,7 +910,7 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 null, null, null, null,
-                null, null, "straight_line", null);
+                null, null, "straight_line", null, null, null, null);
 
         assertThatThrownBy(() -> propertyService.update(tenantId, UUID.randomUUID(), request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -974,12 +975,111 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
                 null, null, null, null, null, null,
                 new BigDecimal("0.04000"), new BigDecimal("5200.0000"), new BigDecimal("2100.0000"), new BigDecimal("3000.0000"),
-                null, null, null, null);
+                null, null, null, null, null, null, null);
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.annualAppreciationRate()).isEqualByComparingTo("0.04");
         assertThat(result.annualPropertyTax()).isEqualByComparingTo("5200");
         assertThat(result.annualInsuranceCost()).isEqualByComparingTo("2100");
         assertThat(result.annualMaintenanceCost()).isEqualByComparingTo("3000");
+    }
+
+    // --- Cost Segregation tests ---
+
+    @Test
+    void create_withCostSegAllocations_savesFieldsAndSchedule() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var allocations = List.of(
+                new CostSegAllocation("5yr", new BigDecimal("15000")),
+                new CostSegAllocation("27_5yr", new BigDecimal("235000")));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment",
+                null, null, null, null,
+                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "cost_segregation", new BigDecimal("27.5"),
+                allocations, new BigDecimal("1.0"), null);
+        var result = propertyService.create(tenantId, request);
+
+        assertThat(result.depreciationMethod()).isEqualTo("cost_segregation");
+        assertThat(result.costSegAllocations()).hasSize(2);
+        assertThat(result.bonusDepreciationRate()).isEqualByComparingTo("1.0");
+    }
+
+    @Test
+    void create_costSeg_sumMismatch_throwsWithBothAmounts() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        // Depreciable basis = 300000 - 50000 = 250000, but allocations sum to 200000
+        var allocations = List.of(
+                new CostSegAllocation("5yr", new BigDecimal("15000")),
+                new CostSegAllocation("27_5yr", new BigDecimal("185000")));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment",
+                null, null, null, null,
+                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "cost_segregation", new BigDecimal("27.5"),
+                allocations, new BigDecimal("1.0"), null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("must equal depreciable basis")
+                .hasMessageContaining("200000")
+                .hasMessageContaining("250000");
+    }
+
+    @Test
+    void create_costSeg_invalidClass_throws() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+
+        var allocations = List.of(
+                new CostSegAllocation("10yr", new BigDecimal("250000")));
+
+        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, "investment",
+                null, null, null, null,
+                LocalDate.of(2020, 6, 15), new BigDecimal("50000"), "cost_segregation", new BigDecimal("27.5"),
+                allocations, new BigDecimal("1.0"), null);
+
+        assertThatThrownBy(() -> propertyService.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid asset class");
+    }
+
+    @Test
+    void getDepreciationSchedule_costSeg_returnsClassBreakdowns() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        property.setDepreciationMethod("cost_segregation");
+        property.setLandValue(new BigDecimal("50000"));
+        property.setInServiceDate(LocalDate.of(2024, 1, 1));
+        property.setUsefulLifeYears(new BigDecimal("27.5"));
+        property.setBonusDepreciationRate(BigDecimal.ONE);
+        property.setCostSegAllocations("""
+                [{"assetClass":"5yr","allocation":15000},{"assetClass":"27_5yr","allocation":235000}]""");
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var result = propertyService.getDepreciationSchedule(tenantId, propertyId);
+
+        assertThat(result.depreciationMethod()).isEqualTo("cost_segregation");
+        assertThat(result.depreciableBasis()).isEqualByComparingTo("250000");
+        assertThat(result.bonusDepreciationRate()).isEqualByComparingTo("1.0");
+        assertThat(result.costSegAllocations()).hasSize(2);
+        assertThat(result.classBreakdowns()).hasSize(2);
+        assertThat(result.schedule()).isNotEmpty();
+
+        // Year 1 should include the bonus for 5yr class
+        var first = result.schedule().get(0);
+        assertThat(first.taxYear()).isEqualTo(2024);
+        // 15000 bonus + prorated structural = significantly more than structural alone
+        var structuralAnnual = new BigDecimal("235000").divide(new BigDecimal("27.5"), 4, java.math.RoundingMode.HALF_UP);
+        assertThat(first.annualDepreciation().compareTo(structuralAnnual)).isGreaterThan(0);
     }
 }
