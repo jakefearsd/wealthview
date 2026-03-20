@@ -92,6 +92,28 @@ public record ProjectionYearDto(
                 federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction());
     }
 
+    public ProjectionYearDto withTaxBreakdown(BigDecimal federalTax, BigDecimal stateTax,
+                                                BigDecimal saltDeduction, Boolean usedItemizedDeduction) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses(), discretionaryExpenses(),
+                incomeStreamsTotal(), netSpendingNeed(), spendingSurplus(),
+                discretionaryAfterCuts(),
+                rentalIncomeGross(), rentalExpensesTotal(), depreciationTotal(),
+                rentalLossApplied(), suspendedLossCarryforward(),
+                socialSecurityTaxable(), selfEmploymentTax(),
+                incomeBySource(),
+                propertyEquity(), totalNetWorth(), surplusReinvested(),
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails(),
+                federalTax, stateTax, saltDeduction, usedItemizedDeduction);
+    }
+
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
                                             BigDecimal withdrawals, BigDecimal endBalance,
