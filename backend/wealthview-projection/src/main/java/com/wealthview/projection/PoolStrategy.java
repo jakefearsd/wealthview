@@ -344,9 +344,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
-            if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                BigDecimal combinedIncome = fromTraditional.add(effectiveOtherIncome).add(conversionAmount);
-                var detailed = taxCalculator.computeDetailedTax(combinedIncome, year, filingStatus);
+            BigDecimal taxableIncome = fromTraditional.add(effectiveOtherIncome).add(conversionAmount);
+            if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
+                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
 
                 if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
                     // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
