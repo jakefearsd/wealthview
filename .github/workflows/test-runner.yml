@@ -1,0 +1,26 @@
+name: Test Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: self-hosted
+    steps:
+      - name: Java
+        run: java --version
+
+      - name: Gradle
+        run: gradle --version
+
+      - name: Kotlin
+        run: kotlin -version
+
+      - name: Maven
+        run: mvn --version
+
+      - name: Python
+        run: python --version
+
+      - name: All tools verified
+        run: echo "All build tools are working!"
