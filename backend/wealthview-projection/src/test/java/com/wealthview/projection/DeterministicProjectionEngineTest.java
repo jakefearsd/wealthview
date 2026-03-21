@@ -3653,4 +3653,78 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.traditionalBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
         assertThat(year1.rothBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
     }
+
+    // === spendingSurplus must account for tax liability ===
+
+    @Test
+    void run_viability_withdrawalBarelyCoversSpendsButTaxOwed_surplusIsNegative() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $40K, spending $45K → portfolioNeed $5K from traditional
+        // Withdrawal exactly covers spending need, but tax is also owed
+        // Tax on ($40K pension + $5K trad withdrawal) = tax($45K) = $3,361.50
+        // Withdrawal ($5K) covers spending gap but NOT the $3,361.50 tax
+        // surplus = withdrawals - netNeed - taxLiability = $5K - $5K - $3,361.50 = -$3,361.50
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), "[]"),
+                List.of(incomeSource("Pension", "40000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+
+        // spendingSurplus must reflect that tax eats into available resources
+        assertThat(year1.spendingSurplus()).isNotNull();
+        assertThat(year1.spendingSurplus()).isLessThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void run_viability_withdrawalWithTax_discretionaryCutReflectsTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $40K, spending $45K (essential $30K + discretionary $15K)
+        // portfolioNeed = $5K from traditional, tax on $45K pension + $5K withdrawal = $50K
+        // Tax = $3,961.50
+        // surplus = $5K withdrawal - $5K need - $3,961.50 tax = -$3,961.50
+        // discretionaryAfterCuts should be less than $15K
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), "[]"),
+                List.of(incomeSource("Pension", "40000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+
+        // Discretionary should be cut because tax reduces available resources
+        assertThat(year1.discretionaryAfterCuts()).isLessThan(bd("15000"));
+        assertThat(year1.discretionaryAfterCuts()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+    }
 }
