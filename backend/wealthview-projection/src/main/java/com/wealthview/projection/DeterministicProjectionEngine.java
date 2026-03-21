@@ -362,9 +362,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal grossSurplus = totalActiveIncome.subtract(resolved.totalSpending());
             if (grossSurplus.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal tax = BigDecimal.ZERO;
-                if (taxStrategy != null && isResult != null) {
+                if (taxStrategy != null) {
+                    // Tax on all taxable income: other_income (params) + income source
+                    // taxable income + any Roth conversion amount
+                    BigDecimal surplusTaxableIncome = effectiveOtherIncome.add(conversionAmount);
                     FilingStatus filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
-                    tax = taxStrategy.computeTotalTax(isResult.totalTaxableIncome(), year, filingStatus);
+                    tax = taxStrategy.computeTotalTax(surplusTaxableIncome, year, filingStatus);
                 }
                 surplusTax = tax;
                 BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).max(BigDecimal.ZERO);

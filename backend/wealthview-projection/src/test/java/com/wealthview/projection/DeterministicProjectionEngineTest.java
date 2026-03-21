@@ -3284,10 +3284,11 @@ class DeterministicProjectionEngineTest {
         // SS $40K + other_income $30K → provisional = $30K + $20K(50% SS) = $50K > $34K
         // Both tiers: tier1 = ($34K-$25K)*0.5 = $4,500, tier2 = ($50K-$34K)*0.85 = $13,600
         // SS taxable = $18,100 (< 85% cap of $34K)
+        // effectiveOtherIncome = $30K (other_income) + $18,100 (SS taxable) = $48,100
         // Spending $20K < cash $40K → surplus = $20K
-        // Tax on $18,100 taxable: after $15K deduction = $3,100
-        // 10%: $3,100 * 0.10 = $310
-        // afterTaxSurplus = $20,000 - $310 = $19,690
+        // Tax on $48,100: taxable = $48,100 - $15K = $33,100
+        // 10%: $1,192.50, 12%: $2,541.00 = $3,733.50
+        // afterTaxSurplus = $20,000 - $3,733.50 = $16,266.50
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -3304,7 +3305,7 @@ class DeterministicProjectionEngineTest {
 
         assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(bd("40000"));
         assertThat(year1.surplusReinvested()).isNotNull();
-        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("19690.0000"));
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("16266.5000"));
     }
 
     @Test
@@ -3402,6 +3403,75 @@ class DeterministicProjectionEngineTest {
         var year1 = result.yearlyData().getFirst();
 
         // taxLiability must equal federalTax + stateTax in surplus years too
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.stateTax()).isNotNull();
+        BigDecimal breakdownSum = year1.federalTax().add(year1.stateTax());
+        assertThat(year1.taxLiability()).isEqualByComparingTo(breakdownSum);
+    }
+
+    @Test
+    void run_surplusIncome_withOtherIncome_taxIncludesOtherIncome() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $50K + other_income $20K → total taxable = $70K
+        // Spending $30K < pension cash $50K → surplus = $20K
+        // Tax should be on $70K (pension + other_income), not just $50K (pension only)
+        // Tax on $70K: taxable = $70K - $15K = $55K
+        // 10%: $1,192.50, 12%: $4,386.00, 22%: $1,435.50 = $7,014.00
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 20000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // The tax must cover ALL taxable income ($70K), not just income sources ($50K)
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("7014.0000"));
+
+        // Surplus deposit = cash surplus - full tax
+        // Cash surplus = $50K - $30K = $20K
+        // After-tax surplus = $20K - $7,014 = $12,986
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("12986.0000"));
+    }
+
+    @Test
+    void run_surplusIncome_withOtherIncome_stateTax_breakdownMatches() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineState = engineWithStateTax("CA");
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // With state taxes and other_income, breakdown must match taxLiability
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "other_income": 20000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineState.run(input);
+        var year1 = result.yearlyData().getFirst();
+
         assertThat(year1.taxLiability()).isNotNull();
         assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
         assertThat(year1.federalTax()).isNotNull();
