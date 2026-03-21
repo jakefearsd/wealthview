@@ -38,6 +38,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSo
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.propertyNoLoan;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -2801,5 +2802,332 @@ class DeterministicProjectionEngineTest {
         // (not wildly different due to combined marginal rate confusion)
         assertThat(stateConv).isGreaterThan(bd("50000"));
         assertThat(stateConv).isLessThan(bd("80000"));
+    }
+
+    // === Gap #1: Conversion + withdrawal combined tax must not double-count ===
+
+    @Test
+    void run_conversionAndTraditionalWithdrawal_correctCombinedTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Retired, 0% return, 0% inflation → perfectly predictable amounts
+        // other_income=20000, annual_roth_conversion=30000, withdrawal_rate=0.04
+        // withdrawal_order=traditional_first forces traditional withdrawal
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Conversion: $30K. Withdrawal: 4% of $900K = $36K from traditional.
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("30000"));
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("36000"));
+
+        // Correct tax = tax($30K conv + $36K wd + $20K other = $86K gross)
+        // Taxable = $86K - $15K deduction = $71K
+        // 10% on $11,925 = $1,192.50
+        // 12% on ($48,475 - $11,925) = $4,386.00
+        // 22% on ($71,000 - $48,475) = $4,955.50
+        // Total = $10,534.00
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("10534.0000"));
+    }
+
+    @Test
+    void run_conversionAndTraditionalWithdrawal_taxLiabilityMatchesFederalTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // For federal-only, taxLiability must equal the federalTax breakdown
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.taxLiability()).isEqualByComparingTo(year1.federalTax());
+    }
+
+    @Test
+    void run_conversionAndTraditionalWithdrawal_withState_taxMatchesBreakdown() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineState = engineWithStateTax("CA");
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000,
+                 "withdrawal_order": "traditional_first", "state": "CA"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineState.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // taxLiability must equal federalTax + stateTax
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.stateTax()).isNotNull();
+        BigDecimal breakdownTotal = year1.federalTax().add(year1.stateTax());
+        assertThat(year1.taxLiability()).isEqualByComparingTo(breakdownTotal);
+    }
+
+    @Test
+    void run_traditionalWithdrawalOnly_noConversion_taxCorrect() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // No Roth conversion — just traditional withdrawal
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Withdrawal: 4% of $800K = $32K from traditional
+        // Tax = tax($32K + $20K other = $52K gross)
+        // Taxable = $52K - $15K = $37K
+        // 10% on $11,925 = $1,192.50
+        // 12% on ($37,000 - $11,925) = $3,009.00
+        // Total = $4,201.50
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("4201.5000"));
+    }
+
+    @Test
+    void run_conversionOnly_preRetirement_taxCorrect() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Pre-retirement conversion only (no withdrawal)
+        var input = createInput(
+                LocalDate.now().plusYears(10), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Conversion: $30K. Tax = tax($30K + $20K = $50K)
+        // Taxable = $50K - $15K = $35K
+        // 10% on $11,925 = $1,192.50
+        // 12% on ($35,000 - $11,925) = $2,769.00
+        // Total = $3,961.50
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("30000"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3961.5000"));
+    }
+
+    // === Gap #3: Social Security taxable fraction affects fill-bracket space ===
+
+    @Test
+    void run_fillBracket_withSocialSecurity_useTaxableFractionNotFullAmount() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // With SS typed as "other" (fully taxable $30K)
+        var inputOther = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 40000,
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(birthYear),
+                List.of(
+                        acct("1000000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                null,
+                List.of(incomeSource("Pension", "30000", retireAge, null, "0")));
+
+        // With SS typed as "social_security" (only ~85% taxable = $25,500)
+        var inputSS = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 40000,
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(birthYear),
+                List.of(
+                        acct("1000000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                null,
+                List.of(socialSecuritySource("30000", retireAge)));
+
+        var resultOther = engineTax.run(inputOther);
+        var resultSS = engineTax.run(inputSS);
+
+        var convOther = resultOther.yearlyData().getFirst().rothConversionAmount();
+        var convSS = resultSS.yearlyData().getFirst().rothConversionAmount();
+
+        // SS taxable fraction < full amount, so effectiveOtherIncome is lower,
+        // leaving MORE room for Roth conversion
+        assertThat(convSS).isGreaterThan(convOther);
+    }
+
+    // === Gap #4: Tax source pool assignment when conversion exhausts taxable ===
+
+    @Test
+    void run_conversionTaxExhaustsTaxable_withdrawalTaxFallsOnTraditional() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Tiny taxable balance ($1000) — conversion tax ($3961.50) will exceed it
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("1000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Tax was paid — some must have come from traditional since taxable was tiny
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.taxPaidFromTraditional()).isNotNull();
+        assertThat(year1.taxPaidFromTraditional()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    // === Gap #6: Pre-retirement conversion with active income sources ===
+
+    @Test
+    void run_fillBracket_preRetirement_withIncomeSource_reducesConversion() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int age = 50;
+        int birthYear = LocalDate.now().getYear() - age;
+
+        // Without income source
+        var inputNoIncome = createInput(
+                LocalDate.now().plusYears(15), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        // With $20K pension, starting at age 49 (so age 50 is NOT the start year,
+        // avoiding the 0.5 transition multiplier)
+        var inputWithIncome = createInput(
+                LocalDate.now().plusYears(15), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                null,
+                List.of(incomeSource("Pension", "20000", age - 1, null, "0")));
+
+        var resultNoIncome = engineTax.run(inputNoIncome);
+        var resultWithIncome = engineTax.run(inputWithIncome);
+
+        var convNoIncome = resultNoIncome.yearlyData().getFirst().rothConversionAmount();
+        var convWithIncome = resultWithIncome.yearlyData().getFirst().rothConversionAmount();
+
+        // 12% bracket ceiling = $63,475
+        // Without income: full $63,475 conversion
+        assertThat(convNoIncome).isEqualByComparingTo(bd("63475"));
+        // With $20K income: reduced to $63,475 - $20,000 = $43,475
+        assertThat(convWithIncome).isEqualByComparingTo(bd("43475"));
+    }
+
+    // === Gap #7: State tax breakdown fields in retirement years ===
+
+    @Test
+    void run_withStateTax_retirementYear_breakdownFieldsPopulated() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineState = engineWithStateTax("CA");
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000,
+                 "withdrawal_order": "traditional_first", "state": "CA",
+                 "primary_residence_property_tax": 5000}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineState.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.federalTax()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.stateTax()).isNotNull();
+        assertThat(year1.stateTax()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.saltDeduction()).isNotNull();
+        assertThat(year1.usedItemizedDeduction()).isNotNull();
+    }
+
+    // === Gap #8: Pre-retirement conversion tax breakdown fields ===
+
+    @Test
+    void run_preRetirementConversion_breakdownFieldsSet() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineState = engineWithStateTax("CA");
+
+        var input = createInput(
+                LocalDate.now().plusYears(10), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "annual_roth_conversion": 50000}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("300000", "0", "0.00", "taxable")));
+
+        var result = engineState.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Pre-retirement conversion should still have tax breakdown from lastTaxBreakdown
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.federalTax()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.stateTax()).isNotNull();
+        assertThat(year1.stateTax()).isGreaterThan(BigDecimal.ZERO);
     }
 }
