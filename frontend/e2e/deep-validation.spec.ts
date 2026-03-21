@@ -27,16 +27,16 @@ test.describe('Dashboard data integrity', () => {
     test('33: dashboard accounts table lists all seeded accounts', async ({ page }) => {
         await expect(page.locator('h3:has-text("Accounts")')).toBeVisible({ timeout: 5000 });
         const table = page.locator('table').first();
-        await expect(table.locator('td:has-text("Fidelity Brokerage")')).toBeVisible();
-        await expect(table.locator('td:has-text("Fidelity 401(k)")')).toBeVisible();
-        await expect(table.locator('td:has-text("Chase Checking")')).toBeVisible();
+        await expect(table.locator('td:has-text("Fidelity Brokerage")').first()).toBeVisible();
+        await expect(table.locator('td:has-text("Fidelity 401(k)")').first()).toBeVisible();
+        await expect(table.locator('td:has-text("Chase Checking")').first()).toBeVisible();
     });
 
     test('34: dashboard accounts table includes properties', async ({ page }) => {
         await expect(page.locator('h3:has-text("Accounts")')).toBeVisible({ timeout: 5000 });
         const table = page.locator('table').first();
-        await expect(table.locator('td:has-text("742 Evergreen Terrace")')).toBeVisible();
-        await expect(table.locator('td:has-text("2020 Beryl Street")')).toBeVisible();
+        await expect(table.locator('td:has-text("742 Evergreen Terrace")').first()).toBeVisible();
+        await expect(table.locator('td:has-text("2020 Beryl Street")').first()).toBeVisible();
     });
 
     test('35: combined portfolio history chart renders', async ({ page }) => {
@@ -53,7 +53,7 @@ test.describe('Account detail data integrity', () => {
     });
 
     test('36: brokerage account shows 4 holdings', async ({ page }) => {
-        await page.locator('h3:has-text("Fidelity Brokerage")').click();
+        await page.locator('h3:has-text("Fidelity Brokerage")').first().click();
         await expect(page).toHaveURL(/\/accounts\//);
         // Seeded data has AAPL, NVDA, GOOG, VOO
         await expect(page.locator('a:has-text("AAPL")').first()).toBeVisible({ timeout: 5000 });
@@ -114,7 +114,7 @@ test.describe('Property detail data integrity', () => {
     });
 
     test('41: 742 Evergreen Terrace shows correct purchase price', async ({ page }) => {
-        await page.locator('h3:has-text("742 Evergreen Terrace")').click();
+        await page.locator('h3:has-text("742 Evergreen Terrace")').first().click();
         await expect(page).toHaveURL(/\/properties\//);
         // Seeded purchase price is $285,000
         await expect(page.locator('text=$285,000.00')).toBeVisible({ timeout: 5000 });
@@ -122,11 +122,11 @@ test.describe('Property detail data integrity', () => {
 
     test('42: 2020 Beryl Street shows computed balance badge', async ({ page }) => {
         // The properties list page shows "Computed Balance" badge for this property
-        await expect(page.locator('text=Computed Balance')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Computed Balance').first()).toBeVisible({ timeout: 5000 });
     });
 
     test('43: property detail shows income and expense data', async ({ page }) => {
-        await page.locator('h3:has-text("742 Evergreen Terrace")').click();
+        await page.locator('h3:has-text("742 Evergreen Terrace")').first().click();
         await expect(page).toHaveURL(/\/properties\//);
         // Should show financial info - incomes and expenses
         await expect(page.locator('text=/income|rent/i').first()).toBeVisible({ timeout: 5000 });

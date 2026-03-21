@@ -10,14 +10,14 @@ test.describe('Accounts', () => {
         await page.click('nav >> text=Accounts');
         await expect(page).toHaveURL('/accounts');
         // Should show the 3 seeded accounts
-        await expect(page.locator('text=Fidelity Brokerage')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Fidelity Brokerage').first()).toBeVisible({ timeout: 5000 });
         await expect(page.locator('text=Fidelity 401(k)')).toBeVisible();
         await expect(page.locator('text=Chase Checking')).toBeVisible();
     });
 
     test('11: clicking an account navigates to detail page', async ({ page }) => {
         await page.click('nav >> text=Accounts');
-        await page.locator('text=Fidelity Brokerage').click();
+        await page.locator('text=Fidelity Brokerage').first().click();
         await expect(page).toHaveURL(/\/accounts\//);
         // Should show holdings for the brokerage account
         await expect(page.locator('a:has-text("AAPL")').first()).toBeVisible({ timeout: 5000 });
@@ -34,7 +34,7 @@ test.describe('Accounts', () => {
 
     test('13: create new account', async ({ page }) => {
         await page.click('nav >> text=Accounts');
-        await expect(page.locator('text=Fidelity Brokerage')).toBeVisible({ timeout: 5000 });
+        await expect(page.locator('text=Fidelity Brokerage').first()).toBeVisible({ timeout: 5000 });
 
         // Open the create form
         await page.click('button:has-text("New Account")');
