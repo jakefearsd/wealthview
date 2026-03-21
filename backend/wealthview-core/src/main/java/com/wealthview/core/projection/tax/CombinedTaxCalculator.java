@@ -67,67 +67,30 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
     @Override
     public BigDecimal computeMaxIncomeForTargetRate(BigDecimal targetRate, int taxYear, FilingStatus status) {
-        // For combined rate: find income where federal_marginal + state_marginal first exceeds target.
-        // Simple approach: if state calculator is null/zero, delegate to federal.
-        // Otherwise, find the income level where combined marginal rate exceeds target.
+        // The target rate represents a federal bracket rate (from the UI dropdown).
+        // Find the federal bracket ceiling and add the appropriate deduction
+        // (standard or itemized, whichever the filer would use at that income level).
+        // State tax is a cost of the conversion, not a gating factor for how much to convert.
 
         if (state instanceof NullStateTaxCalculator) {
             return federal.computeMaxIncomeForBracket(targetRate, taxYear, status);
         }
 
-        // Walk through federal brackets and find where combined marginal rate exceeds target.
-        // The deduction used affects the gross income ceiling, so we need to account for it.
-        // We use a binary-search approach: find the largest gross income where the combined
-        // marginal rate (at that point) is <= targetRate.
-
-        // Start with federal behavior and adjust for state marginal rate.
-        // At any given income level, the state marginal rate is determined by which state bracket
-        // the income falls in. We approximate by computing the state marginal rate at a reference
-        // income, then finding the federal bracket whose rate alone brings the combined rate
-        // above target.
-
-        // Simplified approach: iterate incomes from the federal bracket ceilings and check
-        // combined marginal rate at each boundary.
-        BigDecimal federalStandardDeduction = federal.loadStandardDeduction(taxYear, status);
-
-        // Determine itemized deduction at a mid-range estimate
-        BigDecimal estStateTax = state.computeTax(bd("200000"), taxYear, status);
-        BigDecimal estSalt = estStateTax.add(primaryResidencePropertyTax).min(SALT_CAP);
-        BigDecimal estItemized = estSalt.add(primaryResidenceMortgageInterest);
-        BigDecimal chosenDeduction = estItemized.compareTo(federalStandardDeduction) > 0
-                ? estItemized : federalStandardDeduction;
-
-        // Use a stepping approach: increase income in increments and check marginal rate
-        // This is approximate but sufficient for Roth conversion bracket-filling
-        BigDecimal step = bd("1000");
-        BigDecimal testIncome = chosenDeduction; // start at deduction level (zero tax)
-        BigDecimal maxIncome = bd("5000000");
-        BigDecimal lastBelowTarget = testIncome;
-
-        while (testIncome.compareTo(maxIncome) < 0) {
-            BigDecimal taxAtIncome = computeTotalTax(testIncome, taxYear, status);
-            BigDecimal taxAtIncomeMinusStep = computeTotalTax(testIncome.subtract(step), taxYear, status);
-            BigDecimal marginalTax = taxAtIncome.subtract(taxAtIncomeMinusStep);
-            BigDecimal marginalRate = marginalTax.divide(step, SCALE, ROUNDING);
-
-            if (marginalRate.compareTo(targetRate) > 0) {
-                // Found the boundary — refine with smaller steps
-                if (step.compareTo(bd("1")) <= 0) {
-                    return lastBelowTarget;
-                }
-                testIncome = lastBelowTarget;
-                step = step.divide(bd("10"), 0, ROUNDING).max(bd("1"));
-                continue;
-            }
-
-            lastBelowTarget = testIncome;
-            testIncome = testIncome.add(step);
+        BigDecimal bracketCeiling = federal.findBracketCeiling(targetRate, taxYear, status);
+        if (bracketCeiling.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
         }
 
-        return lastBelowTarget;
-    }
+        // Determine whether itemized or standard deduction applies at the bracket ceiling
+        BigDecimal standardDeduction = federal.loadStandardDeduction(taxYear, status);
+        BigDecimal grossEstimate = bracketCeiling.add(standardDeduction);
 
-    private static BigDecimal bd(String val) {
-        return new BigDecimal(val);
+        BigDecimal estStateTax = state.computeTax(grossEstimate, taxYear, status);
+        BigDecimal estSalt = estStateTax.add(primaryResidencePropertyTax).min(SALT_CAP);
+        BigDecimal estItemized = estSalt.add(primaryResidenceMortgageInterest);
+        BigDecimal chosenDeduction = estItemized.compareTo(standardDeduction) > 0
+                ? estItemized : standardDeduction;
+
+        return bracketCeiling.add(chosenDeduction);
     }
 }

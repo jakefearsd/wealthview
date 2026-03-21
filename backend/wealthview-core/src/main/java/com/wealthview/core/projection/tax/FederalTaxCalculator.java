@@ -142,6 +142,28 @@ public class FederalTaxCalculator {
         return BigDecimal.ZERO;
     }
 
+    /**
+     * Returns the taxable income ceiling for the given federal bracket rate,
+     * WITHOUT adding any deduction. Returns ZERO if the rate is not found
+     * or is the top bracket (which has no ceiling).
+     */
+    BigDecimal findBracketCeiling(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        var brackets = loadBrackets(taxYear, status);
+        if (brackets.isEmpty()) {
+            Integer maxYear = taxBracketRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                brackets = loadBrackets(maxYear, status);
+            }
+        }
+
+        for (var bracket : brackets) {
+            if (bracket.getRate().compareTo(targetRate) == 0) {
+                return bracket.getBracketCeiling() != null ? bracket.getBracketCeiling() : BigDecimal.ZERO;
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+
     public void clearCache() {
         bracketCache.clear();
         deductionCache.clear();

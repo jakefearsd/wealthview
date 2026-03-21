@@ -134,6 +134,67 @@ class CombinedTaxCalculatorTest {
         assertThat(maxIncome).isEqualByComparingTo(bd("118350"));
     }
 
+    @Test
+    void computeMaxIncomeForTargetRate_withStateTax_22vs24_returnsDifferentCeilings() {
+        TaxBracketFixtures.stubMfj2025(taxBracketRepo, deductionRepo);
+        var mfjCalc = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+
+        // Use a proportional state calculator (~6% effective rate) to simulate a real state
+        StateTaxCalculator proportionalState = new ProportionalStateTaxCalculator("CA", bd("0.06"));
+        var combined = new CombinedTaxCalculator(mfjCalc, proportionalState, bd("5500"), BigDecimal.ZERO);
+
+        BigDecimal ceiling22 = combined.computeMaxIncomeForTargetRate(bd("0.2200"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
+        BigDecimal ceiling24 = combined.computeMaxIncomeForTargetRate(bd("0.2400"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
+
+        // 22% bracket ceiling for MFJ = $206,700, 24% = $394,600
+        // These are different brackets, so the ceilings MUST differ
+        assertThat(ceiling24).isGreaterThan(ceiling22);
+        // The difference should be substantial (bracket is ~$188K wide)
+        assertThat(ceiling24.subtract(ceiling22)).isGreaterThan(bd("100000"));
+    }
+
+    @Test
+    void computeMaxIncomeForTargetRate_withStateTax_12vs22_returnsDifferentCeilings() {
+        StateTaxCalculator proportionalState = new ProportionalStateTaxCalculator("CA", bd("0.04"));
+        var combined = buildCombined(proportionalState, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        BigDecimal ceiling12 = combined.computeMaxIncomeForTargetRate(bd("0.1200"), 2025, FilingStatus.SINGLE);
+        BigDecimal ceiling22 = combined.computeMaxIncomeForTargetRate(bd("0.2200"), 2025, FilingStatus.SINGLE);
+
+        // 12% ceiling = $48,475 + deduction, 22% ceiling = $103,350 + deduction
+        assertThat(ceiling22).isGreaterThan(ceiling12);
+        assertThat(ceiling22.subtract(ceiling12)).isGreaterThan(bd("40000"));
+    }
+
+    @Test
+    void computeMaxIncomeForTargetRate_withStateTax_usesCorrectDeduction() {
+        // High state tax + property tax → itemized > standard
+        // State tax 8%, property tax $12000, mortgage interest $15000
+        // At ~$200K income: state tax ~$16K, SALT = min($16K + $12K, $10K) = $10K
+        // Itemized = $10K + $15K = $25K > standard $15K → uses itemized
+        StateTaxCalculator proportionalState = new ProportionalStateTaxCalculator("CA", bd("0.08"));
+        var combined = buildCombined(proportionalState, bd("12000"), bd("15000"));
+
+        BigDecimal ceiling22 = combined.computeMaxIncomeForTargetRate(bd("0.2200"), 2025, FilingStatus.SINGLE);
+
+        // 22% bracket ceiling = $103,350
+        // With itemized deduction ($25K), gross income ceiling = $103,350 + $25,000 = $128,350
+        // With standard deduction ($15K), gross income ceiling = $103,350 + $15,000 = $118,350
+        // The ceiling should be larger than federal-only because itemized > standard
+        assertThat(ceiling22).isGreaterThan(bd("118350"));
+    }
+
+    @Test
+    void computeMaxIncomeForTargetRate_withStateTax_topBracket_returnsZero() {
+        StateTaxCalculator proportionalState = new ProportionalStateTaxCalculator("CA", bd("0.05"));
+        var combined = buildCombined(proportionalState, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        // 37% is the top bracket (no ceiling)
+        BigDecimal ceiling37 = combined.computeMaxIncomeForTargetRate(bd("0.3700"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ceiling37).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     /**
      * Test helper: a StateTaxCalculator that always returns a fixed amount of tax.
      */
@@ -142,6 +203,35 @@ class CombinedTaxCalculatorTest {
         @Override
         public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
             return grossIncome.compareTo(BigDecimal.ZERO) > 0 ? fixedTax : BigDecimal.ZERO;
+        }
+
+        @Override
+        public BigDecimal getStandardDeduction(int taxYear, FilingStatus status) {
+            return BigDecimal.ZERO;
+        }
+
+        @Override
+        public String stateCode() {
+            return code;
+        }
+
+        @Override
+        public boolean taxesCapitalGainsAsOrdinaryIncome() {
+            return true;
+        }
+    }
+
+    /**
+     * Test helper: a StateTaxCalculator that returns tax as a flat percentage of gross income.
+     * More realistic than FixedStateTaxCalculator for testing marginal rate interactions.
+     */
+    private record ProportionalStateTaxCalculator(String code, BigDecimal rate) implements StateTaxCalculator {
+
+        @Override
+        public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+            return grossIncome.compareTo(BigDecimal.ZERO) > 0
+                    ? grossIncome.multiply(rate).setScale(4, java.math.RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
         }
 
         @Override
