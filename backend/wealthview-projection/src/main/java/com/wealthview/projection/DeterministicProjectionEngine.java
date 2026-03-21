@@ -667,8 +667,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal essential = resolved.essential();
         BigDecimal discretionary = resolved.discretionary();
 
+        BigDecimal taxBurden = base.taxLiability() != null ? base.taxLiability() : BigDecimal.ZERO;
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);
-        BigDecimal surplus = base.withdrawals().subtract(netNeed);
+        BigDecimal surplus = base.withdrawals().subtract(netNeed).subtract(taxBurden);
 
         BigDecimal discAfterCuts;
         if (surplus.compareTo(BigDecimal.ZERO) < 0) {
