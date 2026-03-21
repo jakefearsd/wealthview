@@ -5,6 +5,7 @@ import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import SpendingCorridorChart from '../components/SpendingCorridorChart';
+import PortfolioFanChart from '../components/PortfolioFanChart';
 
 type OptimizerState = 'configure' | 'running' | 'results';
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
@@ -695,7 +696,7 @@ export default function SpendingOptimizerPage() {
                         </div>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                         <div data-testid="failure-rate-card" style={{
                             ...cardStyle, textAlign: 'center',
                             background: failureRateColors[diagnostics.failureRateSeverity],
@@ -716,22 +717,32 @@ export default function SpendingOptimizerPage() {
                             <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Median Final Balance</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.median_final_balance)}</div>
                         </div>
+                        <div data-testid="p90-card" style={{ ...cardStyle, textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>90th Percentile Final</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile90_final)}</div>
+                        </div>
                     </div>
 
                     {(() => {
                         const lastYear = result.yearly_spending[result.yearly_spending.length - 1];
                         return lastYear && (lastYear.portfolio_balance_p10 != null || lastYear.portfolio_balance_median != null) ? (
                             <div data-testid="outcome-range-card" style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                                <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Outcome Range</div>
+                                <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.5rem' }}>Outcome Range (Final Portfolio Balance)</div>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <div style={{ fontSize: '0.75rem', color: '#ef5350' }}>Pessimistic (p10)</div>
                                         <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(lastYear.portfolio_balance_p10)}</div>
                                     </div>
-                                    <div style={{ flex: 1, margin: '0 1rem', height: '4px', background: 'linear-gradient(to right, #ef5350, #4caf50)', borderRadius: '2px' }} />
+                                    <div style={{ flex: 1, margin: '0 0.75rem' }}>
+                                        <div style={{ height: '4px', background: 'linear-gradient(to right, #ef5350, #ff9800, #4caf50, #1976d2)', borderRadius: '2px' }} />
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.25rem' }}>
+                                            <span style={{ fontSize: '0.7rem', color: '#888' }}>p25: {fmt(lastYear.portfolio_balance_p25)}</span>
+                                            <span style={{ fontSize: '0.7rem', color: '#888' }}>p50: {fmt(lastYear.portfolio_balance_median)}</span>
+                                        </div>
+                                    </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.75rem', color: '#4caf50' }}>Median (p50)</div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(lastYear.portfolio_balance_median)}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Optimistic (p90)</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.percentile90_final)}</div>
                                     </div>
                                 </div>
                                 <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
@@ -740,6 +751,17 @@ export default function SpendingOptimizerPage() {
                             </div>
                         ) : null;
                     })()}
+
+                    <div data-testid="tax-disclaimer" style={{
+                        padding: '0.75rem 1rem', marginBottom: '1.5rem',
+                        background: '#fff3e0', border: '1px solid #ffe0b2', borderRadius: '6px',
+                        fontSize: '0.8rem', color: '#e65100',
+                    }}>
+                        <strong>Note:</strong> Spending recommendations account for income tax on
+                        traditional account withdrawals using your scenario&apos;s filing status and
+                        withdrawal ordering. Actual tax liability may vary based on deductions,
+                        credits, and state taxes not fully modeled in the Monte Carlo simulation.
+                    </div>
 
                     {diagnostics.phases.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
@@ -794,6 +816,11 @@ export default function SpendingOptimizerPage() {
                     )}
 
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                        <h3 style={{ marginBottom: '1rem' }}>Portfolio Balance Projections</h3>
+                        <PortfolioFanChart yearlySpending={result.yearly_spending} />
+                    </div>
+
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}>Spending Corridor</h3>
                         <SpendingCorridorChart yearlySpending={result.yearly_spending} phases={result.phases} />
                     </div>
@@ -810,13 +837,14 @@ export default function SpendingOptimizerPage() {
                                     <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Discretionary</th>
                                     <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Income</th>
                                     <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Portfolio Draw</th>
-                                    <th colSpan={3} style={{ textAlign: 'center', padding: '0.5rem', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
+                                    <th colSpan={4} style={{ textAlign: 'center', padding: '0.5rem', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
                                     <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Corridor</th>
                                 </tr>
                                 <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
+                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p75</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -840,6 +868,9 @@ export default function SpendingOptimizerPage() {
                                         </td>
                                         <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
                                             {fmtShort(y.portfolio_balance_median)}
+                                        </td>
+                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                            {fmtShort(y.portfolio_balance_p75)}
                                         </td>
                                         <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
                                             {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}

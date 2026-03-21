@@ -56,7 +56,7 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                         dataKey="corridorRange"
                         fill="#dbeafe"
                         stroke="none"
-                        name="Confidence Corridor (10th-90th)"
+                        name="Spending Adjustment Range"
                         fillOpacity={0.6}
                     />
 
