@@ -625,6 +625,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (year.discretionaryExpenses() != null) {
                 nominalRequired = nominalRequired.add(year.discretionaryExpenses());
             }
+            if (year.taxLiability() != null) {
+                nominalRequired = nominalRequired.add(year.taxLiability());
+            }
 
             BigDecimal expenseInflationFactor = retiredYearIndex > 1
                     ? BigDecimal.ONE.add(inflationRate).pow(retiredYearIndex - 1)
