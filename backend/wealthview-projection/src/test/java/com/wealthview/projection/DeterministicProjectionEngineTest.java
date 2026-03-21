@@ -3332,23 +3332,14 @@ class DeterministicProjectionEngineTest {
         var result = engineTax.run(input);
         var year1 = result.yearlyData().getFirst();
 
-        // Pension $30K is taxable income — tax should be computed even without
-        // traditional withdrawal or conversion
-        // Tax on $30K: taxable = $30K - $15K = $15K
+        // Pension $30K is taxable income — tax must be computed even without
+        // traditional withdrawal or conversion.
+        // Tax on $30K: taxable = $30K - $15K deduction = $15K
         // 10%: $11,925 * 0.10 = $1,192.50
         // 12%: ($15,000 - $11,925) * 0.12 = $369.00
-        // Expected total = $1,561.50
-        // NOTE: If this assertion fails with taxLiability=0, it confirms the
-        // income-only tax gap — income source income goes untaxed when no
-        // traditional withdrawal or conversion occurs.
-        if (year1.taxLiability() == null || year1.taxLiability().compareTo(BigDecimal.ZERO) == 0) {
-            // Document as known gap — income-only tax is not computed
-            // The engine only computes tax when fromTraditional > 0 or conversion > 0
-            assertThat(year1.withdrawalFromTraditional()).isNull();
-            assertThat(year1.rothConversionAmount()).isNull();
-        } else {
-            assertThat(year1.taxLiability()).isEqualByComparingTo(bd("1561.5000"));
-        }
+        // Total = $1,561.50
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("1561.5000"));
     }
 
     @Test
