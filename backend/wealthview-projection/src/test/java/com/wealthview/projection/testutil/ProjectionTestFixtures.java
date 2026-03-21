@@ -100,6 +100,15 @@ public final class ProjectionTestFixtures {
                 null, null, 0, null);
     }
 
+    public static ProjectionIncomeSourceInput selfEmploymentSource(String name, String amount,
+                                                                      int startAge, Integer endAge) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), name, "part_time_work",
+                bd(amount), startAge, endAge, bd("0"), false,
+                "self_employment",
+                null, null, null, null, null, null);
+    }
+
     public static ProjectionIncomeSourceInput socialSecuritySource(String amount, int startAge) {
         return new ProjectionIncomeSourceInput(
                 UUID.randomUUID(), "Social Security", "social_security",

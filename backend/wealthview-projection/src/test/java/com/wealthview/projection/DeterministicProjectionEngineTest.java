@@ -38,6 +38,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSo
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.propertyNoLoan;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
@@ -3833,5 +3834,59 @@ class DeterministicProjectionEngineTest {
         // With tax: required = $40K + ~$2.7K = ~$42.7K
         assertThat(result.spendingFeasibility().requiredAnnualSpending())
                 .isGreaterThan(bd("40000"));
+    }
+
+    // === SE tax must be subtracted from surplus deposit ===
+
+    @Test
+    void run_surplusWithSelfEmployment_depositSubtractsSETax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // SE income $80K, spending $50K → grossSurplus = $30K
+        // SE tax: 15.3% on 92.35% of $80K = 15.3% * $73,880 = $11,303.64
+        // Income tax on $80K: taxable = $80K - $15K = $65K
+        // 10%: $1,192.50, 12%: $4,386, 22%: $3,635.50 = $9,214
+        // Total tax = $9,214 (income) + $11,303.64 (SE) = $20,517.64
+        // afterTaxSurplus should = $30K - $9,214 - $11,303.64 = $9,482.36
+        // (not $30K - $9,214 = $20,786 — which ignores SE tax)
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("35000"), bd("15000"), "[]"),
+                List.of(selfEmploymentSource("Consulting", "80000", retireAge - 1, null)));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // taxLiability includes both income tax and SE tax
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.selfEmploymentTax()).isNotNull();
+        assertThat(year1.selfEmploymentTax()).isGreaterThan(bd("10000"));
+
+        // surplusReinvested must reflect BOTH income tax AND SE tax deductions
+        // If SE tax is ignored in the deposit, surplusReinvested would be too large
+        if (year1.surplusReinvested() != null) {
+            BigDecimal incomeTaxPortion = year1.taxLiability().subtract(year1.selfEmploymentTax());
+            BigDecimal correctSurplus = bd("30000").subtract(incomeTaxPortion)
+                    .subtract(year1.selfEmploymentTax()).max(BigDecimal.ZERO);
+            assertThat(year1.surplusReinvested()).isEqualByComparingTo(correctSurplus);
+        }
+
+        // spendingSurplus and surplusReinvested must be consistent
+        // (both account for SE tax)
+        if (year1.surplusReinvested() != null && year1.spendingSurplus() != null) {
+            // surplusReinvested should not exceed what spendingSurplus indicates
+            assertThat(year1.surplusReinvested())
+                    .isLessThanOrEqualTo(year1.spendingSurplus().max(BigDecimal.ZERO).add(bd("1")));
+        }
     }
 }

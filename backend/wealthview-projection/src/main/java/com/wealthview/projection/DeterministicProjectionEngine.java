@@ -377,8 +377,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                         tax = fullTax;
                     }
                 }
+                // Also subtract self-employment tax from the surplus deposit
+                BigDecimal seTax = (pool.tracksSETax() && isResult != null)
+                        ? isResult.selfEmploymentTax() : BigDecimal.ZERO;
                 surplusTax = tax;
-                BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).max(BigDecimal.ZERO);
+                BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).subtract(seTax).max(BigDecimal.ZERO);
                 if (afterTaxSurplus.compareTo(BigDecimal.ZERO) > 0) {
                     pool.depositToTaxable(afterTaxSurplus);
                     surplusReinvested = afterTaxSurplus;
