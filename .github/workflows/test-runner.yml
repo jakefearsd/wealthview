@@ -13,11 +13,41 @@ jobs:
       - name: Maven
         run: mvn --version
 
+      - name: Gradle
+        run: gradle --version
+
+      - name: Kotlin
+        run: kotlin -version
+
       - name: Python
         run: python --version
 
+      - name: pip
+        run: pip --version
+
+      - name: pipx
+        run: pipx --version
+
       - name: Node
-        run: node --version || echo "Node not installed"
+        run: node --version
+
+      - name: npm
+        run: npm --version
+
+      - name: Docker
+        run: docker --version
+
+      - name: Docker Compose
+        run: docker compose version
+
+      - name: rsync
+        run: rsync --version | head -1
+
+      - name: jq
+        run: jq --version
+
+      - name: zip/unzip
+        run: zip --version | head -2 && unzip -v | head -1
 
       - name: All tools verified
         run: echo "All build tools are working!"
