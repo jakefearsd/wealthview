@@ -3342,6 +3342,142 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.taxLiability()).isEqualByComparingTo(bd("1561.5000"));
     }
 
+    // === Surplus tax must be reported in taxLiability ===
+
+    @Test
+    void run_surplusIncome_taxReportedInTaxLiability() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $50K exceeds spending $30K → surplus = $20K
+        // Tax on $50K pension: taxable = $50K - $15K = $35K
+        // 10%: $1,192.50, 12%: $2,769.00 = $3,961.50
+        // afterTaxSurplus = $20K - $3,961.50 = $16,038.50
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Surplus correctly deposited after tax
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("16038.5000"));
+
+        // The $3,961.50 income tax MUST appear in taxLiability — it's real tax owed
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3961.5000"));
+    }
+
+    @Test
+    void run_surplusIncome_taxLiabilityMatchesBreakdown() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineState = engineWithStateTax("CA");
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "primary_residence_property_tax": 5000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineState.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // taxLiability must equal federalTax + stateTax in surplus years too
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.stateTax()).isNotNull();
+        BigDecimal breakdownSum = year1.federalTax().add(year1.stateTax());
+        assertThat(year1.taxLiability()).isEqualByComparingTo(breakdownSum);
+    }
+
+    // === Pool cascade: tax drains into Roth ===
+
+    @Test
+    void run_poolCascade_taxDrainsIntoRoth_exactValues() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Tiny taxable ($100) + tiny traditional ($1000)
+        // Conversion tax $3,961.50 exceeds both → remainder from Roth
+        var input = createInput(
+                LocalDate.now().plusYears(10), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "other_income": 20000, "annual_roth_conversion": 30000}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("50000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth"),
+                        acct("100", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Conversion = $30K from traditional → traditional = $20K
+        // Tax = $3,961.50
+        // Cascade: $100 from taxable, then min($3,861.50, $20K) = $3,861.50 from traditional
+        // Roth untouched since traditional covers remainder
+        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(bd("100"));
+        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(bd("3861.5000"));
+
+        // All balances >= 0
+        assertThat(year1.taxableBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.traditionalBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+        assertThat(year1.rothBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+    }
+
+    // === Vanguard dynamic spending floor ===
+
+    @Test
+    void run_vanguardFloor_severeMarketLoss_floorsWithdrawal() {
+        // Vanguard uses currentBalance (after growth), not startOfYearBalance
+        // Year 1: $1M * 0.70 (growth) = $700K. Raw = $700K * 0.04 = $28,000
+        // Year 2: ($700K - $28K) * 0.70 = $470,400. Raw = $470,400 * 0.04 = $18,816
+        // Floor: $28,000 * (1 - 0.025) = $27,300
+        // Raw ($18,816) < floor ($27,300) → capped UP to $27,300
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04,
+                 "withdrawal_strategy": "vanguard_dynamic_spending",
+                 "dynamic_ceiling": 0.05, "dynamic_floor": -0.025}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("1000000", "0", "-0.30")));
+
+        var result = engine.run(input);
+        var year1 = result.yearlyData().get(0);
+        var year2 = result.yearlyData().get(1);
+
+        // Year 1: raw = currentBalance * 0.04 = $700K * 0.04 = $28,000
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("28000"));
+
+        // Year 2: raw = $18,816 < floor $27,300 → capped at floor
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("27300"));
+
+        // Floor prevented a 33% drop — withdrawal only dropped 2.5%
+        assertThat(year2.withdrawals()).isGreaterThan(year1.withdrawals().multiply(bd("0.95")));
+    }
+
     @Test
     void run_poolCascade_conversionTaxExhaustsTaxable_exactValues() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
