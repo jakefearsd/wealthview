@@ -3836,6 +3836,42 @@ class DeterministicProjectionEngineTest {
                 .isGreaterThan(bd("40000"));
     }
 
+    // === Income exactly equals spending — tax must still be computed ===
+
+    @Test
+    void run_incomeExactlyEqualsSpending_taxStillComputed() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $45K exactly equals spending $45K (essential $30K + discretionary $15K)
+        // portfolioNeed = 0 (income covers spending exactly)
+        // grossSurplus = 0 (not > 0, so surplus block skipped)
+        // But $45K of pension income IS taxable!
+        // Tax on $45K: taxable = $45K - $15K = $30K
+        // 10%: $1,192.50, 12%: ($30K - $11,925) * 0.12 = $2,169.00 = $3,361.50
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("15000"), "[]"),
+                List.of(incomeSource("Pension", "45000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Tax on $45K pension MUST be computed even when income exactly equals spending
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3361.5000"));
+    }
+
     // === SE tax must be subtracted from surplus deposit ===
 
     @Test

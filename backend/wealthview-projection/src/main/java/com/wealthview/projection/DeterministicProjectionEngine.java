@@ -358,9 +358,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             portfolioNeed = resolved.portfolioWithdrawal().min(aggBalance);
             previousWithdrawal = resolved.totalSpending();
 
-            // Detect surplus: income exceeds total spending
+            // Detect surplus or exact-match: income meets or exceeds total spending.
+            // Tax must be computed even when income exactly equals spending (zero surplus).
             BigDecimal grossSurplus = totalActiveIncome.subtract(resolved.totalSpending());
-            if (grossSurplus.compareTo(BigDecimal.ZERO) > 0) {
+            if (grossSurplus.compareTo(BigDecimal.ZERO) >= 0) {
                 BigDecimal tax = BigDecimal.ZERO;
                 if (taxStrategy != null) {
                     BigDecimal surplusTaxableIncome = effectiveOtherIncome.add(conversionAmount);
