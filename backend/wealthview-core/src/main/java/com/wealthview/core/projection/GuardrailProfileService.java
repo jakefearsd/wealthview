@@ -66,11 +66,12 @@ public class GuardrailProfileService {
 
         int birthYear = parseBirthYear(scenario.getParamsJson());
         String filingStatus = parseFilingStatus(scenario.getParamsJson());
+        String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order");
 
         BigDecimal confidence = resolveConfidence(request);
 
         var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
-                birthYear, confidence, filingStatus);
+                birthYear, confidence, filingStatus, withdrawalOrder);
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);
 
@@ -215,7 +216,8 @@ public class GuardrailProfileService {
                                                                GuardrailOptimizationRequest request,
                                                                int birthYear,
                                                                BigDecimal confidence,
-                                                               String filingStatus) {
+                                                               String filingStatus,
+                                                               String withdrawalOrder) {
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
                 birthYear,
@@ -240,21 +242,26 @@ public class GuardrailProfileService {
                         ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
                 request.cashReturnRate() != null
                         ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE,
-                filingStatus
+                filingStatus,
+                withdrawalOrder != null ? withdrawalOrder : "taxable_first"
         );
     }
 
     private String parseFilingStatus(String paramsJson) {
+        return parseStringParam(paramsJson, "filing_status");
+    }
+
+    private String parseStringParam(String paramsJson, String field) {
         if (paramsJson == null || paramsJson.isBlank()) {
             return null;
         }
         try {
             var node = MAPPER.readTree(paramsJson);
-            if (node.has("filing_status")) {
-                return node.get("filing_status").asText();
+            if (node.has(field)) {
+                return node.get(field).asText();
             }
         } catch (JsonProcessingException e) {
-            log.warn("Failed to parse filing_status from paramsJson", e);
+            log.warn("Failed to parse {} from paramsJson", field, e);
         }
         return null;
     }

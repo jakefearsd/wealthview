@@ -15,6 +15,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
 
 class MonteCarloSpendingOptimizerTest {
 
@@ -79,7 +86,7 @@ class MonteCarloSpendingOptimizerTest {
                 phaseBlendYears,
                 cashReserveYears,
                 cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO,
-                null
+                null, null
         );
     }
 
@@ -765,7 +772,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null);
+                0, BigDecimal.ZERO, null, null);
 
         var aggressiveInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -777,7 +784,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.50"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null);
+                0, BigDecimal.ZERO, null, null);
 
         var conservativeResult = optimizer.optimize(conservativeInput);
         var aggressiveResult = optimizer.optimize(aggressiveInput);
@@ -1419,7 +1426,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 1000, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null);
+                0, BigDecimal.ZERO, null, null);
 
         var resultWithInflation = optimizer.optimize(withInflation);
         var resultNoInflation = optimizer.optimize(noInflation);
@@ -1456,7 +1463,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null);
+                0, BigDecimal.ZERO, null, null);
 
         var result = optimizer.optimize(zeroInflation);
 
@@ -1599,5 +1606,78 @@ class MonteCarloSpendingOptimizerTest {
                 .as("Rental income after 5yr at 10% inflation: gross inflates to ~$161k, net = ~$101k. "
                         + "Pre-fix (inflate net) would give ~$64k.")
                 .isGreaterThan(90000);
+    }
+
+    // === Withdrawal tax modeling ===
+
+    private MonteCarloSpendingOptimizer taxAwareOptimizer() {
+        var taxCalc = mock(FederalTaxCalculator.class);
+        // Simple 20% flat tax for test predictability
+        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(inv -> {
+                    BigDecimal income = inv.getArgument(0);
+                    if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+                    return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
+                });
+        return new MonteCarloSpendingOptimizer(taxCalc);
+    }
+
+    @Test
+    void optimize_allTraditional_lowerSpendingThanAllRoth() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        // All Roth — withdrawals are tax-free
+        // Use a constrained portfolio ($500K) with terminal target to force
+        // the binary search below $500K ceiling
+        var rothInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "roth")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first");
+
+        // All Traditional — withdrawals taxed at 20%
+        var tradInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first");
+
+        var taxOptimizer = taxAwareOptimizer();
+        var rothResult = taxOptimizer.optimize(rothInput);
+        var tradResult = taxOptimizer.optimize(tradInput);
+
+        double rothSpending = rothResult.yearlySpending().getFirst().recommended().doubleValue();
+        double tradSpending = tradResult.yearlySpending().getFirst().recommended().doubleValue();
+
+        // Traditional should recommend LESS spending due to tax drag
+        assertThat(tradSpending).isLessThan(rothSpending);
+        // The difference should be material (at least 10% less)
+        assertThat(tradSpending).isLessThan(rothSpending * 0.90);
+    }
+
+    @Test
+    void optimize_noTaxCalculator_backwardCompatible() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = buildInput(new BigDecimal("1000000"),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                phases, null, 200, 42L);
+
+        // null tax calculator — should produce results without error
+        var result = optimizer.optimize(input);
+
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.failureRate()).isNotNull();
     }
 }

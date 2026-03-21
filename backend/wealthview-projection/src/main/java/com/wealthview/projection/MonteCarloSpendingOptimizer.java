@@ -50,6 +50,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         int trialCount = input.trialCount();
         double initialPortfolio = totalPortfolio(input.accounts());
+        double initTaxable = sumByType(input.accounts(), "taxable");
+        double initTraditional = sumByType(input.accounts(), "traditional");
+        double initRoth = sumByType(input.accounts(), "roth");
+        String withdrawalOrder = input.withdrawalOrder() != null ? input.withdrawalOrder() : "taxable_first";
         double essentialFloor = input.essentialFloor().doubleValue();
         double terminalTarget = input.terminalBalanceTarget().doubleValue();
         double confidenceLevel = input.confidenceLevel().doubleValue();
@@ -78,10 +82,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
         double[] incomeByYear = new double[years];
+        double[] taxableIncomeByYear = new double[years];
         // Pre-compute surplus tax once per year to avoid calling the tax calculator inside hot loops.
         double[] surplusTaxByYear = new double[years];
         for (int y = 0; y < years; y++) {
             incomeByYear[y] = incomeData[y].totalIncome();
+            taxableIncomeByYear[y] = incomeData[y].taxableIncome();
             surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
         }
 
@@ -89,6 +95,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] adjustedFloors = verifyEssentialFloor(
                 portfolioPaths, incomeByYear, essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
+
+        TaxContext taxCtx = taxCalculator != null
+                ? new TaxContext(initTaxable, initTraditional, initRoth,
+                        withdrawalOrder, taxableIncomeByYear, filingStatus, retirementYear)
+                : null;
 
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
@@ -98,7 +109,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors, terminalTarget,
                 input.phases(), retirementAge, years, trialCount,
                 confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                inflationRate);
+                inflationRate, taxCtx);
 
         // Stage 4: Post-processing — phase blending and YoY smoothing
         int phaseBlendYears = input.phaseBlendYears();
@@ -116,14 +127,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             // Re-verify sustainability of smoothed plan; reduce if broken
             if (!isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
                     discretionaryByYear, terminalTarget, years, trialCount,
-                    confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
+                    confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, taxCtx)) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < years; y++) {
                         discretionaryByYear[y] *= 0.95;
                     }
                     if (isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
                             discretionaryByYear, terminalTarget, years, trialCount,
-                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate)) {
+                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, taxCtx)) {
                         break;
                     }
                 }
@@ -402,14 +413,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                        int retirementAge, int years, int trialCount,
                                        double confidenceLevel, double portfolioFloor,
                                        int cashReserveYears, double cashReturnRate,
-                                       double inflationRate) {
+                                       double inflationRate, TaxContext taxCtx) {
         double[] discretionary = new double[years];
 
         if (phases == null || phases.isEmpty()) {
             double maxDisc = binarySearchDiscretionary(
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     0, years - 1, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate);
+                    cashReserveYears, cashReturnRate, taxCtx);
             Arrays.fill(discretionary, maxDisc);
             return discretionary;
         }
@@ -422,7 +433,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         if (hasTargets) {
             return allocateByTargets(paths, income, surplusTax, floors, terminalTarget, phases,
                     retirementAge, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate, inflationRate);
+                    cashReserveYears, cashReturnRate, inflationRate, taxCtx);
         }
 
         // Legacy: sort phases by priority weight (highest first)
@@ -445,7 +456,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double maxDisc = binarySearchDiscretionary(
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate);
+                    cashReserveYears, cashReturnRate, taxCtx);
 
             for (int y = phaseStart; y <= phaseEnd; y++) {
                 discretionary[y] = maxDisc;
@@ -461,7 +472,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         int retirementAge, int years, int trialCount,
                                         double confidenceLevel, double portfolioFloor,
                                         int cashReserveYears, double cashReturnRate,
-                                        double inflationRate) {
+                                        double inflationRate, TaxContext taxCtx) {
         double[] discretionary = new double[years];
 
         for (var phase : phases) {
@@ -479,7 +490,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double found = binarySearchDiscretionary(
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate);
+                    cashReserveYears, cashReturnRate, taxCtx);
 
             double capped;
             if (phase.targetSpending() != null
@@ -515,7 +526,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                               int phaseStart, int phaseEnd,
                                               int years, int trialCount,
                                               double confidenceLevel, double portfolioFloor,
-                                              int cashReserveYears, double cashReturnRate) {
+                                              int cashReserveYears, double cashReturnRate,
+                                              TaxContext taxCtx) {
         double low = 0;
         double high = 500_000;
 
@@ -529,7 +541,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             if (isSustainable(paths, income, surplusTax, floors, testDiscretionary,
                     terminalTarget, years, trialCount, confidenceLevel, portfolioFloor,
-                    cashReserveYears, cashReturnRate)) {
+                    cashReserveYears, cashReturnRate, taxCtx)) {
                 low = mid;
             } else {
                 high = mid;
@@ -543,70 +555,131 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                    double[] floors, double[] discretionary,
                                    double terminalTarget, int years, int trialCount,
                                    double confidenceLevel, double portfolioFloor,
-                                   int cashReserveYears, double cashReturnRate) {
+                                   int cashReserveYears, double cashReturnRate,
+                                   TaxContext taxCtx) {
         double[] finalBalances = new double[trialCount];
         double[] minBalances = new double[trialCount];
 
+        boolean hasPools = taxCtx != null && (taxCtx.initTraditional > 0 || taxCtx.initRoth > 0);
+
         for (int t = 0; t < trialCount; t++) {
             double initialBalance = paths[t][0];
-            double equityBalance;
-            double cashBalance;
 
+            // Pool tracking for tax-aware withdrawals
+            double pTaxable = hasPools ? taxCtx.initTaxable : initialBalance;
+            double pTraditional = hasPools ? taxCtx.initTraditional : 0;
+            double pRoth = hasPools ? taxCtx.initRoth : 0;
+            String order = hasPools ? taxCtx.withdrawalOrder : "taxable_first";
+
+            double cashBalance = 0;
             if (cashReserveYears > 0) {
                 double annualSpending = floors[0] + discretionary[0];
                 cashBalance = annualSpending * cashReserveYears;
-                equityBalance = Math.max(0, initialBalance - cashBalance);
-            } else {
-                equityBalance = initialBalance;
-                cashBalance = 0;
+                double cashFromTaxable = Math.min(cashBalance, pTaxable);
+                pTaxable -= cashFromTaxable;
+                double remaining = cashBalance - cashFromTaxable;
+                if (remaining > 0) {
+                    double fromTrad = Math.min(remaining, pTraditional);
+                    pTraditional -= fromTrad;
+                    remaining -= fromTrad;
+                    pRoth -= remaining;
+                    pRoth = Math.max(0, pRoth);
+                }
             }
 
-            double minBalance = equityBalance + cashBalance;
+            double minBalance = pTaxable + pTraditional + pRoth + cashBalance;
 
             for (int y = 0; y < years; y++) {
                 double growthFactor = paths[t][y + 1] / paths[t][y];
                 double equityReturn = growthFactor - 1.0;
 
-                equityBalance *= growthFactor;
+                pTaxable *= growthFactor;
+                pTraditional *= growthFactor;
+                pRoth *= growthFactor;
                 cashBalance *= (1 + cashReturnRate);
 
                 double spending = floors[y] + discretionary[y];
                 double withdrawal = Math.max(0, spending - income[y]);
 
+                // Split withdrawal across pools
+                double equityTotal = pTaxable + pTraditional + pRoth;
+                var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth, withdrawal, order);
+
+                // Compute tax on traditional withdrawal
+                double withdrawalTax = 0;
+                if (hasPools && drawn[1] > 0 && taxCtx.filingStatus != null) {
+                    withdrawalTax = computeWithdrawalTax(drawn[1],
+                            taxCtx.taxableIncomeByYear[y],
+                            taxCtx.retirementYear + y, taxCtx.filingStatus);
+                }
+
+                double totalDraw = withdrawal + withdrawalTax;
+
                 if (cashReserveYears > 0) {
                     if (equityReturn < 0) {
-                        double cashDraw = Math.min(withdrawal, cashBalance);
-                        equityBalance -= (withdrawal - cashDraw);
+                        double cashDraw = Math.min(totalDraw, cashBalance);
+                        double equityDraw = totalDraw - cashDraw;
+                        // Distribute equity draw proportionally to what was already drawn
+                        double drawnTotal = drawn[0] + drawn[1] + drawn[2];
+                        if (drawnTotal > 0 && equityDraw > 0) {
+                            double scale = equityDraw / Math.max(drawnTotal, equityDraw);
+                            pTaxable -= drawn[0] * scale + withdrawalTax * Math.min(pTaxable, withdrawalTax) / Math.max(1, pTaxable + pTraditional + pRoth);
+                        } else {
+                            pTaxable -= drawn[0];
+                            pTraditional -= drawn[1];
+                            pRoth -= drawn[2];
+                        }
                         cashBalance -= cashDraw;
                     } else {
+                        // Deduct withdrawal from pools
+                        pTaxable -= drawn[0];
+                        pTraditional -= drawn[1];
+                        pRoth -= drawn[2];
+                        // Deduct tax from pools (taxable → traditional → roth)
+                        double taxRem = withdrawalTax;
+                        double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
+                        pTaxable -= taxFromTax; taxRem -= taxFromTax;
+                        double taxFromTrad = Math.min(taxRem, Math.max(0, pTraditional));
+                        pTraditional -= taxFromTrad; taxRem -= taxFromTrad;
+                        pRoth -= taxRem;
+
                         double targetCash = spending * cashReserveYears;
                         double replenishment = Math.min(
                                 Math.max(0, targetCash - cashBalance),
-                                equityBalance * 0.10);
-                        equityBalance -= (withdrawal + replenishment);
+                                Math.max(0, pTaxable + pTraditional + pRoth) * 0.10);
+                        pTaxable -= replenishment;  // replenish from taxable
+                        if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
                         cashBalance += replenishment;
                     }
                 } else {
-                    equityBalance -= withdrawal;
+                    // Deduct withdrawal from pools
+                    pTaxable -= drawn[0];
+                    pTraditional -= drawn[1];
+                    pRoth -= drawn[2];
+                    // Deduct tax from pools
+                    double taxRem = withdrawalTax;
+                    double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
+                    pTaxable -= taxFromTax; taxRem -= taxFromTax;
+                    double taxFromTrad = Math.min(taxRem, Math.max(0, pTraditional));
+                    pTraditional -= taxFromTrad; taxRem -= taxFromTrad;
+                    pRoth -= taxRem;
                 }
 
-                // Surplus: income exceeds spending — deposit after-tax surplus to equity
+                // Surplus: income exceeds spending — deposit after-tax surplus to taxable
                 if (income[y] > spending) {
                     double grossSurplus = income[y] - spending;
-                    equityBalance += Math.max(0, grossSurplus - surplusTax[y]);
+                    pTaxable += Math.max(0, grossSurplus - surplusTax[y]);
                 }
 
-                double totalBalance = equityBalance + cashBalance;
-                if (totalBalance < 0) {
-                    equityBalance = 0;
-                    cashBalance = 0;
-                    totalBalance = 0;
-                }
-                equityBalance = Math.max(0, equityBalance);
+                pTaxable = Math.max(0, pTaxable);
+                pTraditional = Math.max(0, pTraditional);
+                pRoth = Math.max(0, pRoth);
                 cashBalance = Math.max(0, cashBalance);
+
+                double totalBalance = pTaxable + pTraditional + pRoth + cashBalance;
                 minBalance = Math.min(minBalance, totalBalance);
             }
-            finalBalances[t] = equityBalance + cashBalance;
+            finalBalances[t] = pTaxable + pTraditional + pRoth + cashBalance;
             minBalances[t] = minBalance;
         }
 
@@ -755,6 +828,69 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 corridorHigh[y] = avg;
             }
         }
+    }
+
+    // --- Pool-aware withdrawal tax context ---
+
+    private record TaxContext(
+            double initTaxable, double initTraditional, double initRoth,
+            String withdrawalOrder, double[] taxableIncomeByYear,
+            FilingStatus filingStatus, int retirementYear) {}
+
+    // --- Pool-aware withdrawal helpers for tax modeling ---
+
+    private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {
+        return accounts.stream()
+                .filter(a -> type.equals(a.accountType()))
+                .mapToDouble(a -> a.initialBalance().doubleValue())
+                .sum();
+    }
+
+    /**
+     * Split a withdrawal need across three pools using the specified ordering.
+     * Returns [fromTaxable, fromTraditional, fromRoth].
+     */
+    private static double[] splitWithdrawal(double taxable, double traditional, double roth,
+                                              double need, String order) {
+        if (need <= 0) return new double[]{0, 0, 0};
+
+        double[] pools;
+        int[] mapping; // maps pool index -> result index (0=taxable, 1=traditional, 2=roth)
+
+        if ("traditional_first".equals(order)) {
+            pools = new double[]{traditional, taxable, roth};
+            mapping = new int[]{1, 0, 2};
+        } else if ("roth_first".equals(order)) {
+            pools = new double[]{roth, taxable, traditional};
+            mapping = new int[]{2, 0, 1};
+        } else { // taxable_first (default)
+            pools = new double[]{taxable, traditional, roth};
+            mapping = new int[]{0, 1, 2};
+        }
+
+        double[] result = new double[3];
+        double remaining = need;
+        for (int i = 0; i < 3; i++) {
+            double drawn = Math.min(remaining, Math.max(0, pools[i]));
+            result[mapping[i]] = drawn;
+            remaining -= drawn;
+            if (remaining <= 0) break;
+        }
+        return result;
+    }
+
+    private double computeWithdrawalTax(double traditionalWithdrawal, double taxableIncome,
+                                          int taxYear, FilingStatus filingStatus) {
+        if (taxCalculator == null || traditionalWithdrawal <= 0) return 0;
+        double totalIncome = traditionalWithdrawal + taxableIncome;
+        double totalTax = taxCalculator.computeTax(
+                BigDecimal.valueOf(totalIncome), taxYear, filingStatus).doubleValue();
+        if (taxableIncome > 0) {
+            double baseTax = taxCalculator.computeTax(
+                    BigDecimal.valueOf(taxableIncome), taxYear, filingStatus).doubleValue();
+            return Math.max(0, totalTax - baseTax);
+        }
+        return totalTax;
     }
 
     private double computeSurplusTax(double taxableIncome, int taxYear, FilingStatus filingStatus) {
