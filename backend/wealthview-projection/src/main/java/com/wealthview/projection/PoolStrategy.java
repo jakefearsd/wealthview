@@ -345,9 +345,20 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
             if (fromTraditional.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                var detailed = taxCalculator.computeDetailedTax(
-                        fromTraditional.add(effectiveOtherIncome), year, filingStatus);
-                withdrawalTax = detailed.totalTax();
+                BigDecimal combinedIncome = fromTraditional.add(effectiveOtherIncome).add(conversionAmount);
+                var detailed = taxCalculator.computeDetailedTax(combinedIncome, year, filingStatus);
+
+                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
+                    // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
+                    // Compute only the marginal tax caused by the traditional withdrawal to avoid
+                    // double-counting the base income through separate progressive-bracket calculations.
+                    var baseTax = taxCalculator.computeDetailedTax(
+                            conversionAmount.add(effectiveOtherIncome), year, filingStatus);
+                    withdrawalTax = detailed.totalTax().subtract(baseTax.totalTax()).max(BigDecimal.ZERO);
+                } else {
+                    withdrawalTax = detailed.totalTax();
+                }
+
                 lastTaxBreakdown = detailed;
                 withdrawalTaxSource = deductFromPools(withdrawalTax);
             }

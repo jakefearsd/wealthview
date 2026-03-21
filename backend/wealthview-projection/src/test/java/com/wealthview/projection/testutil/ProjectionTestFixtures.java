@@ -100,6 +100,25 @@ public final class ProjectionTestFixtures {
                 null, null, 0, null);
     }
 
+    public static ProjectionIncomeSourceInput socialSecuritySource(String amount, int startAge) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Social Security", "social_security",
+                bd(amount), startAge, null, bd("0"), false,
+                "taxable",
+                null, null, null, null, null, null);
+    }
+
+    public static ProjectionInput createInput(LocalDate retDate, int endAge,
+                                               BigDecimal inflation, String paramsJson,
+                                               List<ProjectionAccountInput> accounts,
+                                               SpendingProfileInput spendingProfile,
+                                               List<ProjectionIncomeSourceInput> incomeSources,
+                                               List<ProjectionPropertyInput> properties) {
+        return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
+                retDate, endAge, inflation, paramsJson, accounts, spendingProfile,
+                null, incomeSources, null, properties);
+    }
+
     public static ProjectionInput createRetiredInput(String paramsJson,
                                                       List<ProjectionAccountInput> accounts) {
         return new ProjectionInput(UUID.randomUUID(), "Test",
