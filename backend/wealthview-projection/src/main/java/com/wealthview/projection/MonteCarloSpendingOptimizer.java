@@ -96,9 +96,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 portfolioPaths, incomeByYear, essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
 
-        TaxContext taxCtx = taxCalculator != null
+        double[] marginalRates = precomputeMarginalRates(taxableIncomeByYear, retirementYear, years, filingStatus);
+        TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
-                        withdrawalOrder, taxableIncomeByYear, filingStatus, retirementYear)
+                        withdrawalOrder, marginalRates)
                 : null;
 
         double portfolioFloor = input.portfolioFloor() != null
@@ -605,12 +606,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 double equityTotal = pTaxable + pTraditional + pRoth;
                 var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth, withdrawal, order);
 
-                // Compute tax on traditional withdrawal
+                // Estimate tax on traditional withdrawal using pre-computed marginal rate
                 double withdrawalTax = 0;
-                if (hasPools && drawn[1] > 0 && taxCtx.filingStatus != null) {
-                    withdrawalTax = computeWithdrawalTax(drawn[1],
-                            taxCtx.taxableIncomeByYear[y],
-                            taxCtx.retirementYear + y, taxCtx.filingStatus);
+                if (hasPools && drawn[1] > 0) {
+                    withdrawalTax = estimateWithdrawalTax(drawn[1], taxCtx.marginalRateByYear[y]);
                 }
 
                 double totalDraw = withdrawal + withdrawalTax;
@@ -834,8 +833,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private record TaxContext(
             double initTaxable, double initTraditional, double initRoth,
-            String withdrawalOrder, double[] taxableIncomeByYear,
-            FilingStatus filingStatus, int retirementYear) {}
+            String withdrawalOrder, double[] marginalRateByYear) {}
 
     // --- Pool-aware withdrawal helpers for tax modeling ---
 
@@ -879,18 +877,41 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return result;
     }
 
-    private double computeWithdrawalTax(double traditionalWithdrawal, double taxableIncome,
-                                          int taxYear, FilingStatus filingStatus) {
-        if (taxCalculator == null || traditionalWithdrawal <= 0) return 0;
-        double totalIncome = traditionalWithdrawal + taxableIncome;
-        double totalTax = taxCalculator.computeTax(
-                BigDecimal.valueOf(totalIncome), taxYear, filingStatus).doubleValue();
-        if (taxableIncome > 0) {
-            double baseTax = taxCalculator.computeTax(
-                    BigDecimal.valueOf(taxableIncome), taxYear, filingStatus).doubleValue();
-            return Math.max(0, totalTax - baseTax);
+    /**
+     * Estimates marginal tax on a traditional withdrawal using the pre-computed
+     * marginal rate for the year. This avoids calling computeTax() (which uses
+     * BigDecimal) inside the hot MC trial loop — with 10,000 trials × 28 years
+     * × 40 binary search iterations, the BigDecimal overhead is prohibitive.
+     */
+    private static double estimateWithdrawalTax(double traditionalWithdrawal,
+                                                  double marginalRate) {
+        if (traditionalWithdrawal <= 0) return 0;
+        return traditionalWithdrawal * marginalRate;
+    }
+
+    /**
+     * Pre-computes the marginal tax rate for traditional withdrawals at each
+     * retirement year. Uses a representative withdrawal amount ($50K) to find
+     * the marginal rate at the income level of (taxableIncome + $50K).
+     */
+    private double[] precomputeMarginalRates(double[] taxableIncomeByYear,
+                                               int retirementYear, int years,
+                                               FilingStatus filingStatus) {
+        double[] rates = new double[years];
+        if (taxCalculator == null) return rates;
+
+        double probeAmount = 50_000;
+        for (int y = 0; y < years; y++) {
+            int taxYear = retirementYear + y;
+            double baseIncome = taxableIncomeByYear[y];
+            double baseTax = baseIncome > 0
+                    ? taxCalculator.computeTax(BigDecimal.valueOf(baseIncome), taxYear, filingStatus).doubleValue()
+                    : 0;
+            double totalTax = taxCalculator.computeTax(
+                    BigDecimal.valueOf(baseIncome + probeAmount), taxYear, filingStatus).doubleValue();
+            rates[y] = (totalTax - baseTax) / probeAmount;
         }
-        return totalTax;
+        return rates;
     }
 
     private double computeSurplusTax(double taxableIncome, int taxYear, FilingStatus filingStatus) {
