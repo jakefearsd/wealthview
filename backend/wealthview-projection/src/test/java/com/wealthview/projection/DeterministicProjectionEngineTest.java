@@ -3132,6 +3132,45 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.stateTax()).isGreaterThan(BigDecimal.ZERO);
     }
 
+    // === Primary residence deductions without state tax ===
+
+    @Test
+    void run_noStateTax_withPrimaryResidenceDeductions_usesItemizedWhenLarger() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // No state configured, but large primary residence deductions:
+        // Property tax $12K, mortgage interest $25K
+        // SALT = min($0 state tax + $12K property tax, $10K) = $10K
+        // Itemized = $10K + $25K = $35K > standard $15K → should itemize
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "primary_residence_property_tax": 12000,
+                 "primary_residence_mortgage_interest": 25000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Withdrawal: 4% of $600K = $24K from traditional
+        // With standard deduction ($15K): taxable = $24K - $15K = $9K, tax ≈ $900
+        // With itemized ($35K): taxable = $24K - $35K = negative → $0 tax
+        // The engine should use itemized → null/zero tax
+        // If FederalOnlyTaxStrategy is used, it applies standard → ~$900 tax
+        if (year1.taxLiability() != null) {
+            assertThat(year1.taxLiability()).isEqualByComparingTo(BigDecimal.ZERO);
+        }
+        // The key assertion: with itemized deductions, tax must be lower than
+        // what standard deduction would produce
+        assertThat(year1.usedItemizedDeduction()).isNotNull();
+        assertThat(year1.usedItemizedDeduction()).isTrue();
+    }
+
     // === Complex interaction integration tests ===
 
     @Test
