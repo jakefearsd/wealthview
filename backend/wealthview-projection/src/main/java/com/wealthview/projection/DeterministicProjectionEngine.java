@@ -363,11 +363,19 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (grossSurplus.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal tax = BigDecimal.ZERO;
                 if (taxStrategy != null) {
-                    // Tax on all taxable income: other_income (params) + income source
-                    // taxable income + any Roth conversion amount
                     BigDecimal surplusTaxableIncome = effectiveOtherIncome.add(conversionAmount);
                     FilingStatus filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
-                    tax = taxStrategy.computeTotalTax(surplusTaxableIncome, year, filingStatus);
+                    BigDecimal fullTax = taxStrategy.computeTotalTax(surplusTaxableIncome, year, filingStatus);
+
+                    if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
+                        // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
+                        // Only add the marginal tax not yet accounted for to avoid double-counting.
+                        BigDecimal baseTax = taxStrategy.computeTotalTax(
+                                conversionAmount.add(effectiveOtherIncome), year, filingStatus);
+                        tax = fullTax.subtract(baseTax).max(BigDecimal.ZERO);
+                    } else {
+                        tax = fullTax;
+                    }
                 }
                 surplusTax = tax;
                 BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).max(BigDecimal.ZERO);
