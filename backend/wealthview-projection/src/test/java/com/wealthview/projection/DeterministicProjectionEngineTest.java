@@ -3516,6 +3516,77 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.rothBalance()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
     }
 
+    // === Surplus + conversion must not double-count tax ===
+
+    @Test
+    void run_surplusWithConversion_taxNotDoubleCounted() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $50K > spending $30K → surplus $20K
+        // Roth conversion $20K also happens
+        // Conversion tax = tax($20K conv + $50K pension = $70K)
+        // Taxable = $70K - $15K = $55K
+        // 10%: $1,192.50, 12%: $4,386, 22%: $1,435.50 = $7,014
+        // Surplus tax should be $0 — conversion already taxed everything
+        // Total taxLiability = $7,014 (not $14,028)
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "annual_roth_conversion": 20000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("50000", "0", "0.00", "taxable")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("20000"));
+
+        // Tax must be computed ONCE on the $70K combined income, not twice
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("7014.0000"));
+
+        // Full surplus deposited (no additional surplus tax)
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("20000"));
+    }
+
+    @Test
+    void run_surplusWithConversion_breakdownMatchesTaxLiability() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "annual_roth_conversion": 20000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth"),
+                        acct("50000", "0", "0.00", "taxable")),
+                new SpendingProfileInput(bd("20000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "50000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // federalTax must match taxLiability (no state tax in this scenario)
+        assertThat(year1.federalTax()).isNotNull();
+        assertThat(year1.taxLiability()).isEqualByComparingTo(year1.federalTax());
+    }
+
     // === Vanguard dynamic spending floor ===
 
     @Test
