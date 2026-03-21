@@ -7,11 +7,22 @@ jobs:
   verify:
     runs-on: self-hosted
     steps:
+      - name: Debug PATH
+        run: |
+          echo "PATH=$PATH"
+          echo "---"
+          which java || echo "java not found"
+          which gradle || echo "gradle not found"
+          which kotlin || echo "kotlin not found"
+          which mvn || echo "mvn not found"
+          which python || echo "python not found"
+          ls /home/jakefear/.sdkman/candidates/gradle/current/bin/ || echo "gradle dir missing"
+
       - name: Java
         run: java --version
 
       - name: Gradle
-        run: gradle --version
+        run: /home/jakefear/.sdkman/candidates/gradle/current/bin/gradle --version
 
       - name: Kotlin
         run: kotlin -version
