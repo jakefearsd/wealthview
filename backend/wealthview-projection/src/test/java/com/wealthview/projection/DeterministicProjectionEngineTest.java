@@ -3727,4 +3727,72 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.discretionaryAfterCuts()).isLessThan(bd("15000"));
         assertThat(year1.discretionaryAfterCuts()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
     }
+
+    // === Surplus with tax must not produce false shortfall ===
+
+    @Test
+    void run_viability_incomeExceedsSpendingWithTax_surplusStillPositive() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Pension $80K far exceeds spending $60K (essential $40K + discretionary $20K)
+        // Tax on $80K: taxable = $80K - $15K = $65K
+        // 10%: $1,192.50, 12%: $4,386, 22%: $3,635.50 = $9,214
+        // Actual surplus = $80K - $60K - $9,214 = +$10,786
+        // surplus must be POSITIVE — income covers spending AND tax
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("40000"), bd("20000"), "[]"),
+                List.of(incomeSource("Pension", "80000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.taxLiability()).isNotNull();
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+
+        // Income ($80K) covers spending ($60K) and tax ($9K) with room to spare
+        assertThat(year1.spendingSurplus()).isNotNull();
+        assertThat(year1.spendingSurplus()).isGreaterThan(BigDecimal.ZERO);
+
+        // Discretionary should NOT be cut — there's real surplus
+        assertThat(year1.discretionaryAfterCuts()).isEqualByComparingTo(bd("20000"));
+    }
+
+    @Test
+    void run_viability_incomeExceedsSpendingWithTax_feasibilityNotFalseShortfall() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Same high-income scenario — feasibility must report feasible
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.05", "traditional"),
+                        acct("200000", "0", "0.05", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("10000"), "[]"),
+                List.of(incomeSource("Pension", "80000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+
+        // Must be feasible — $80K pension covers $40K spending + taxes with surplus
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+    }
 }
