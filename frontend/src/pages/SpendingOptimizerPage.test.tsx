@@ -20,6 +20,12 @@ vi.mock('../components/SpendingCorridorChart', () => ({
     ),
 }));
 
+vi.mock('../components/PortfolioFanChart', () => ({
+    default: ({ yearlySpending }: { yearlySpending: unknown[] }) => (
+        <div data-testid="portfolio-fan-chart" data-spending-count={yearlySpending.length} />
+    ),
+}));
+
 import { getScenario, getGuardrailProfile } from '../api/projections';
 
 const mockGetScenario = vi.mocked(getScenario);
@@ -217,7 +223,58 @@ describe('SpendingOptimizerPage', () => {
             expect(screen.getByTestId('outcome-range-card')).toBeInTheDocument();
         });
 
-        expect(screen.getByText('Outcome Range')).toBeInTheDocument();
+        expect(screen.getByText(/Outcome Range/)).toBeInTheDocument();
+    });
+
+    it('displays p90 final balance in summary cards', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('p90-card')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('90th Percentile Final')).toBeInTheDocument();
+    });
+
+    it('displays p75 column in year-by-year table', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('p75')).toBeInTheDocument();
+        });
+    });
+
+    it('shows tax disclaimer note', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('tax-disclaimer')).toBeInTheDocument();
+        });
+    });
+
+    it('renders portfolio fan chart with balance projections', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('portfolio-fan-chart')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Portfolio Balance Projections')).toBeInTheDocument();
+    });
+
+    it('outcome range card includes p90 endpoint', async () => {
+        mockGetProfile.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByTestId('outcome-range-card')).toBeInTheDocument();
+        });
+
+        expect(screen.getByText(/Optimistic \(p90\)/)).toBeInTheDocument();
     });
 
     it('validates mathematical consistency: recommended = floor + discretionary', async () => {
