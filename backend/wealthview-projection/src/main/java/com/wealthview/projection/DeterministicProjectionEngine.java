@@ -21,6 +21,7 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.CombinedTaxCalculator;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
+import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -178,6 +179,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal mortgageInterest = params.primaryResidenceMortgageInterest() != null
                     ? params.primaryResidenceMortgageInterest() : BigDecimal.ZERO;
             return new CombinedTaxCalculator(taxCalculator, stateCalc, propertyTax, mortgageInterest);
+        }
+
+        // Even without state tax, primary residence deductions may exceed the standard
+        // deduction (e.g., a Texan with a large mortgage). Use CombinedTaxCalculator with
+        // NullStateTaxCalculator so itemized vs standard comparison still happens.
+        BigDecimal propertyTax = params.primaryResidencePropertyTax() != null
+                ? params.primaryResidencePropertyTax() : BigDecimal.ZERO;
+        BigDecimal mortgageInterest = params.primaryResidenceMortgageInterest() != null
+                ? params.primaryResidenceMortgageInterest() : BigDecimal.ZERO;
+        if (propertyTax.compareTo(BigDecimal.ZERO) > 0 || mortgageInterest.compareTo(BigDecimal.ZERO) > 0) {
+            return new CombinedTaxCalculator(taxCalculator, new NullStateTaxCalculator(),
+                    propertyTax, mortgageInterest);
         }
 
         return new FederalOnlyTaxStrategy(taxCalculator);
