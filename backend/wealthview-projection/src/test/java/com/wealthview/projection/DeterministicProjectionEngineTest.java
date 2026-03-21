@@ -6,6 +6,11 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.NullStateTaxCalculator;
+import com.wealthview.core.projection.tax.StateTaxCalculator;
+import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,8 +39,10 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeI
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.propertyNoLoan;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class DeterministicProjectionEngineTest {
 
@@ -2601,5 +2608,198 @@ class DeterministicProjectionEngineTest {
         assertThat(result.finalNetWorth()).isNotNull();
         var lastYear = result.yearlyData().getLast();
         assertThat(result.finalNetWorth()).isEqualByComparingTo(lastYear.totalNetWorth());
+    }
+
+    // === Fill-bracket Roth conversion with state taxes ===
+
+    private DeterministicProjectionEngine engineWithStateTax(String stateCode) {
+        var calc = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+        var factory = mock(StateTaxCalculatorFactory.class);
+        // Return a proportional 6% state tax calculator to simulate CA-like behavior
+        StateTaxCalculator proportional = new StateTaxCalculator() {
+            @Override
+            public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+                return grossIncome.compareTo(BigDecimal.ZERO) > 0
+                        ? grossIncome.multiply(bd("0.06")).setScale(4, java.math.RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+            }
+
+            @Override
+            public BigDecimal getStandardDeduction(int taxYear, FilingStatus status) {
+                return BigDecimal.ZERO;
+            }
+
+            @Override
+            public String stateCode() {
+                return stateCode;
+            }
+
+            @Override
+            public boolean taxesCapitalGainsAsOrdinaryIncome() {
+                return true;
+            }
+        };
+        when(factory.forState(stateCode)).thenReturn(proportional);
+        return new DeterministicProjectionEngine(calc, factory);
+    }
+
+    @Test
+    void run_fillBracket_withState_22vs24_producesDifferentConversions() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+
+        var engine22 = engineWithStateTax("CA");
+        var input22 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("1500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        var engine24 = engineWithStateTax("CA");
+        var input24 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.24}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("1500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        var result22 = engine22.run(input22);
+        var result24 = engine24.run(input24);
+
+        var year1at22 = result22.yearlyData().getFirst();
+        var year1at24 = result24.yearlyData().getFirst();
+
+        // Both should convert something
+        assertThat(year1at22.rothConversionAmount()).isNotNull();
+        assertThat(year1at24.rothConversionAmount()).isNotNull();
+
+        // 24% target should convert MORE than 22% target
+        assertThat(year1at24.rothConversionAmount()).isGreaterThan(year1at22.rothConversionAmount());
+    }
+
+    @Test
+    void run_fillBracket_withState_22vs24_producesDifferentTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+
+        var engine22 = engineWithStateTax("CA");
+        var input22 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("1500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        var engine24 = engineWithStateTax("CA");
+        var input24 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.24}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("1500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        var result22 = engine22.run(input22);
+        var result24 = engine24.run(input24);
+
+        var year1at22 = result22.yearlyData().getFirst();
+        var year1at24 = result24.yearlyData().getFirst();
+
+        // Higher bracket target → more conversion → more tax
+        assertThat(year1at24.taxLiability()).isGreaterThan(year1at22.taxLiability());
+    }
+
+    @Test
+    void run_fillBracket_withState_mfj_22vs24_differentConversions() {
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+
+        var engine22 = engineWithStateTax("CA");
+        var input22 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("2000000", "0", "0.07", "traditional"),
+                        acct("200000", "0", "0.07", "roth")));
+
+        var engine24 = engineWithStateTax("CA");
+        var input24 = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.24}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("2000000", "0", "0.07", "traditional"),
+                        acct("200000", "0", "0.07", "roth")));
+
+        var result22 = engine22.run(input22);
+        var result24 = engine24.run(input24);
+
+        var year1at22 = result22.yearlyData().getFirst();
+        var year1at24 = result24.yearlyData().getFirst();
+
+        // MFJ 22% bracket ceiling = $206,700, 24% = $394,600 — very different
+        assertThat(year1at24.rothConversionAmount()).isGreaterThan(year1at22.rothConversionAmount());
+        // The difference should be substantial
+        assertThat(year1at24.rothConversionAmount().subtract(year1at22.rothConversionAmount()))
+                .isGreaterThan(bd("100000"));
+    }
+
+    @Test
+    void run_fillBracket_withState_conversionAmountMatchesFederalBracketCeiling() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+
+        // With no state tax, fill_bracket at 12% should fill to federal 12% bracket
+        var engineFedOnly = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        var inputFedOnly = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        // With state tax, fill_bracket at 12% should STILL fill to the federal 12% bracket
+        // (the target rate refers to the federal bracket, not the combined rate)
+        var engineState = engineWithStateTax("CA");
+        var inputState = createInput(
+                LocalDate.now().plusYears(30), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "state": "CA",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(LocalDate.now().getYear() - 35),
+                List.of(
+                        acct("500000", "0", "0.07", "traditional"),
+                        acct("100000", "0", "0.07", "roth")));
+
+        var resultFedOnly = engineFedOnly.run(inputFedOnly);
+        var resultState = engineState.run(inputState);
+
+        var fedConv = resultFedOnly.yearlyData().getFirst().rothConversionAmount();
+        var stateConv = resultState.yearlyData().getFirst().rothConversionAmount();
+
+        // Federal-only: 12% ceiling $48,475 + $15,000 standard deduction = $63,475
+        assertThat(fedConv).isEqualByComparingTo(bd("63475"));
+
+        // With state: conversion should be similar — possibly slightly different due to
+        // itemized vs standard deduction choice, but should be in the same ballpark
+        // (not wildly different due to combined marginal rate confusion)
+        assertThat(stateConv).isGreaterThan(bd("50000"));
+        assertThat(stateConv).isLessThan(bd("80000"));
     }
 }
