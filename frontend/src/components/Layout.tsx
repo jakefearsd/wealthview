@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router';
 import { useAuth } from '../context/AuthContext';
+import ErrorBoundary from './ErrorBoundary';
 
 const navItems: { to: string; label: string; requiredRole?: string }[] = [
     { to: '/', label: 'Dashboard' },
@@ -71,7 +72,9 @@ export default function Layout() {
                 </div>
             </nav>
             <main style={{ flex: 1, padding: '2rem', background: '#f5f5f5' }}>
-                <Outlet />
+                <ErrorBoundary>
+                    <Outlet />
+                </ErrorBoundary>
             </main>
         </div>
     );
