@@ -15,7 +15,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile({"dev", "docker"})
+@Profile({"dev", "docker", "prod"})
 @Order(1)
 public class SuperAdminInitializer implements ApplicationRunner {
 
