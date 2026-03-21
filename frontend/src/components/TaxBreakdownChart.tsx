@@ -113,8 +113,8 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
             <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                <YAxis yAxisId="dollars" tickFormatter={dollarFormatter} tick={{ fontSize: 12 }} width={70} />
-                <YAxis yAxisId="pct" orientation="right" tickFormatter={pctFormatter} tick={{ fontSize: 12 }} width={50} />
+                <YAxis yAxisId="dollars" tickFormatter={dollarFormatter} tick={{ fontSize: 12 }} width={70} domain={[0, 'auto']} />
+                <YAxis yAxisId="pct" orientation="right" tickFormatter={pctFormatter} tick={{ fontSize: 12 }} width={50} domain={[0, 'auto']} />
                 <Tooltip content={<TaxTooltipContent />} />
                 <Legend />
                 {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}

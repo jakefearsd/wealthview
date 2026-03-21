@@ -136,7 +136,9 @@ class IncomeSourceProcessor {
                     if ("self_employment".equals(source.taxTreatment())) {
                         var tax = seTaxCalculator.computeSETax(nominal, taxYear);
                         seTax = seTax.add(tax);
-                        totalTaxableIncome = totalTaxableIncome.add(nominal);
+                        // IRS allows deducting 50% of SE tax from gross income (Schedule 1, line 15)
+                        BigDecimal seDeduction = seTaxCalculator.deductibleAmount(tax);
+                        totalTaxableIncome = totalTaxableIncome.add(nominal).subtract(seDeduction);
                     } else {
                         totalTaxableIncome = totalTaxableIncome.add(nominal);
                     }

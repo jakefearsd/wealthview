@@ -561,6 +561,48 @@ class IncomeSourceProcessorTest {
                 null, null, null, null, null, null);
     }
 
+    // === Self-employment tax deduction ===
+
+    @Test
+    void process_selfEmployment_deductsHalfSETaxFromTaxableIncome() {
+        // IRS allows deducting 50% of SE tax from gross income before computing income tax
+        var realSeTaxCalc = new SelfEmploymentTaxCalculator();
+        var processorWithRealSE = new IncomeSourceProcessor(rentalLossCalculator, ssTaxCalculator, realSeTaxCalc);
+
+        var source = makeSource("part_time_work", new BigDecimal("50000"),
+                60, null, BigDecimal.ZERO, "self_employment");
+
+        var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // SE tax on $50K: 15.3% × ($50K × 0.9235) = $7,064.78 (approx)
+        assertThat(result.selfEmploymentTax()).isGreaterThan(new BigDecimal("7000"));
+
+        // 50% of SE tax is deductible from gross income
+        // totalTaxableIncome should be $50K - deduction, NOT the full $50K
+        BigDecimal seTax = result.selfEmploymentTax();
+        BigDecimal deduction = seTax.multiply(new BigDecimal("0.5"))
+                .setScale(4, RoundingMode.HALF_UP);
+        BigDecimal expectedTaxable = new BigDecimal("50000").subtract(deduction);
+
+        assertThat(result.totalTaxableIncome()).isEqualByComparingTo(expectedTaxable);
+    }
+
+    @Test
+    void process_selfEmployment_cashInflowIsFullAmount() {
+        var realSeTaxCalc = new SelfEmploymentTaxCalculator();
+        var processorWithRealSE = new IncomeSourceProcessor(rentalLossCalculator, ssTaxCalculator, realSeTaxCalc);
+
+        var source = makeSource("part_time_work", new BigDecimal("50000"),
+                60, null, BigDecimal.ZERO, "self_employment");
+
+        var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
+                BigDecimal.ZERO, "single", BigDecimal.ZERO);
+
+        // Cash inflow is the full amount (deduction only affects taxable income, not cash)
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
     private static ProjectionIncomeSourceInput makeSource(
             String incomeType, BigDecimal annualAmount, int startAge, Integer endAge,
             BigDecimal inflationRate, String taxTreatment) {
