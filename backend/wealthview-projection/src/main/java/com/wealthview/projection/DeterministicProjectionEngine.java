@@ -350,6 +350,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal aggBalance = pool.getTotal();
         BigDecimal portfolioNeed;
         BigDecimal surplusReinvested = null;
+        BigDecimal surplusTax = BigDecimal.ZERO;
 
         if (spendingPlan != null) {
             var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement,
@@ -365,6 +366,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     FilingStatus filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
                     tax = taxStrategy.computeTotalTax(isResult.totalTaxableIncome(), year, filingStatus);
                 }
+                surplusTax = tax;
                 BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).max(BigDecimal.ZERO);
                 if (afterTaxSurplus.compareTo(BigDecimal.ZERO) > 0) {
                     pool.depositToTaxable(afterTaxSurplus);
@@ -381,7 +383,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         var withdrawalResult = pool.executeWithdrawals(
                 portfolioNeed, year, effectiveOtherIncome, conversionAmount);
-        BigDecimal taxLiability = withdrawalResult.taxLiability();
+        BigDecimal taxLiability = withdrawalResult.taxLiability().add(surplusTax);
 
         if (pool.tracksSETax() && isResult != null
                 && isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0) {
