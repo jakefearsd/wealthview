@@ -3795,4 +3795,43 @@ class DeterministicProjectionEngineTest {
         assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
         assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
     }
+
+    // === Feasibility must account for tax in sustainable spending ===
+
+    @Test
+    void run_feasibility_sustainableSpendingAccountsForTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // MultiPool (traditional + roth) so tax is computed on traditional withdrawals
+        // Pension $30K income, spending $40K, withdrawal covers $10K gap from traditional
+        // Tax on ($30K pension + $10K withdrawal) = tax($40K)
+        // taxable = $40K - $15K = $25K
+        // 10%: $1,192.50, 12%: ($25K - $11,925) * 0.12 = $1,569.00 = $2,761.50
+        // Required for feasibility should include tax: $40K spending + $2,761.50 tax
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("25000"), bd("15000"), "[]"),
+                List.of(incomeSource("Pension", "30000", retireAge - 1, null, "0")));
+
+        var result = engineTax.run(input);
+
+        assertThat(result.spendingFeasibility()).isNotNull();
+
+        // requiredAnnualSpending should include tax burden, not just spending
+        // Without tax: required = $40K
+        // With tax: required = $40K + ~$2.7K = ~$42.7K
+        assertThat(result.spendingFeasibility().requiredAnnualSpending())
+                .isGreaterThan(bd("40000"));
+    }
 }
