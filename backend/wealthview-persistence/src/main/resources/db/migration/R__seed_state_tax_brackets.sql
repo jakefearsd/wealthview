@@ -21,7 +21,7 @@ INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_flo
 ('CA', 2024, 'single', 349137, 418961, 0.1030),
 ('CA', 2024, 'single', 418961, 698271, 0.1130),
 ('CA', 2024, 'single', 698271, 1000000, 0.1230),
-('CA', 2024, 'single', 1000000, NULL, 0.1330);
+('CA', 2024, 'single', 1000000, NULL, 0.1230);
 
 -- 2024 Married Filing Jointly
 INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_floor, bracket_ceiling, rate) VALUES
@@ -34,7 +34,7 @@ INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_flo
 ('CA', 2024, 'married_filing_jointly', 698274, 837922, 0.1030),
 ('CA', 2024, 'married_filing_jointly', 837922, 1396542, 0.1130),
 ('CA', 2024, 'married_filing_jointly', 1396542, 2000000, 0.1230),
-('CA', 2024, 'married_filing_jointly', 2000000, NULL, 0.1330);
+('CA', 2024, 'married_filing_jointly', 2000000, NULL, 0.1230);
 
 -- =============================================================================
 -- CALIFORNIA (CA) — 2025
@@ -51,7 +51,7 @@ INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_flo
 ('CA', 2025, 'single', 360659, 432787, 0.1030),
 ('CA', 2025, 'single', 432787, 721314, 0.1130),
 ('CA', 2025, 'single', 721314, 1000000, 0.1230),
-('CA', 2025, 'single', 1000000, NULL, 0.1330);
+('CA', 2025, 'single', 1000000, NULL, 0.1230);
 
 -- 2025 Married Filing Jointly (estimated, inflation-adjusted from 2024)
 INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_floor, bracket_ceiling, rate) VALUES
@@ -64,7 +64,7 @@ INSERT INTO state_tax_brackets (state_code, tax_year, filing_status, bracket_flo
 ('CA', 2025, 'married_filing_jointly', 721318, 865574, 0.1030),
 ('CA', 2025, 'married_filing_jointly', 865574, 1442628, 0.1130),
 ('CA', 2025, 'married_filing_jointly', 1442628, 2000000, 0.1230),
-('CA', 2025, 'married_filing_jointly', 2000000, NULL, 0.1330);
+('CA', 2025, 'married_filing_jointly', 2000000, NULL, 0.1230);
 
 -- =============================================================================
 -- CALIFORNIA Standard Deductions
