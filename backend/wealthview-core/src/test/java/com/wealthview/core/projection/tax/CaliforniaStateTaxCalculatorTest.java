@@ -51,7 +51,7 @@ class CaliforniaStateTaxCalculatorTest {
                 new StateTaxBracketEntity("CA", 2025, "single", bd("360659"), bd("432787"), bd("0.1030")),
                 new StateTaxBracketEntity("CA", 2025, "single", bd("432787"), bd("721314"), bd("0.1130")),
                 new StateTaxBracketEntity("CA", 2025, "single", bd("721314"), bd("1000000"), bd("0.1230")),
-                new StateTaxBracketEntity("CA", 2025, "single", bd("1000000"), null, bd("0.1330")));
+                new StateTaxBracketEntity("CA", 2025, "single", bd("1000000"), null, bd("0.1230")));
     }
 
     @BeforeEach
@@ -137,7 +137,10 @@ class CaliforniaStateTaxCalculatorTest {
 
         // Verify surcharge is applied: tax should be higher than a non-surcharge scenario
         // The exact value depends on bracket arithmetic; trust the algorithm, verify surcharge effect
-        assertThat(tax).isEqualByComparingTo(bd("132176.5160"));
+        // 12.3% bracket above $1M + 1% MHST surcharge = 13.3% effective
+        // The old value of $132,176.52 was wrong (used 13.3% bracket + 1% surcharge = 14.3%)
+        // Correct: top bracket at 12.3%, surcharge adds 1% → 13.3% total above $1M
+        assertThat(tax).isEqualByComparingTo(bd("130233.7360"));
     }
 
     @Test
@@ -185,6 +188,21 @@ class CaliforniaStateTaxCalculatorTest {
         BigDecimal deduction = calculator.getStandardDeduction(2025, FilingStatus.SINGLE);
 
         assertThat(deduction).isEqualByComparingTo(bd("5722"));
+    }
+
+    @Test
+    void computeTax_aboveOneMillion_effectiveRateIs13_3PercentNotHigher() {
+        // CA tax above $1M should be 12.3% (bracket) + 1% (MHST surcharge) = 13.3%
+        // NOT 13.3% (bracket) + 1% (surcharge) = 14.3%
+        // Test with $100K of income above the $1M threshold
+        // The marginal tax on that $100K should be $13,300 (13.3%), not $14,300 (14.3%)
+        BigDecimal taxAt1M = calculator.computeTax(bd("1005722"), 2025, FilingStatus.SINGLE);
+        BigDecimal taxAt1_1M = calculator.computeTax(bd("1105722"), 2025, FilingStatus.SINGLE);
+
+        BigDecimal marginalTax = taxAt1_1M.subtract(taxAt1M);
+        // $100K at 13.3% = $13,300 (correct: 12.3% bracket + 1% surcharge)
+        // $100K at 14.3% = $14,300 (wrong: 13.3% bracket + 1% surcharge)
+        assertThat(marginalTax).isEqualByComparingTo(bd("13300.0000"));
     }
 
     @Test
