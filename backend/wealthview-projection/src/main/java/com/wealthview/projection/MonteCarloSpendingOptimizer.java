@@ -74,12 +74,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         // Compute deterministic income for each year
         IncomeYearData[] incomeData = computeDeterministicIncome(
                 input.incomeSources(), retirementAge, years, input.birthYear());
+        FilingStatus filingStatus = input.filingStatus() != null
+                ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
+
         double[] incomeByYear = new double[years];
         // Pre-compute surplus tax once per year to avoid calling the tax calculator inside hot loops.
         double[] surplusTaxByYear = new double[years];
         for (int y = 0; y < years; y++) {
             incomeByYear[y] = incomeData[y].totalIncome();
-            surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y);
+            surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
         }
 
         // Stage 2: Verify essential floor feasibility (inflation-adjusted)
@@ -749,13 +752,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
     }
 
-    private double computeSurplusTax(double taxableIncome, int taxYear) {
+    private double computeSurplusTax(double taxableIncome, int taxYear, FilingStatus filingStatus) {
         if (taxCalculator == null || taxableIncome <= 0) {
             return 0.0;
         }
-        // Use SINGLE as the default filing status for MC optimization (no user-specific context).
         BigDecimal tax = taxCalculator.computeTax(
-                BigDecimal.valueOf(taxableIncome), taxYear, FilingStatus.SINGLE);
+                BigDecimal.valueOf(taxableIncome), taxYear, filingStatus);
         return tax.doubleValue();
     }
 

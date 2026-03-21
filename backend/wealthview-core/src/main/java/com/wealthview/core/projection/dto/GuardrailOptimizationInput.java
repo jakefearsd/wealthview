@@ -23,5 +23,6 @@ public record GuardrailOptimizationInput(
         BigDecimal maxAnnualAdjustmentRate,
         int phaseBlendYears,
         int cashReserveYears,
-        BigDecimal cashReturnRate
+        BigDecimal cashReturnRate,
+        String filingStatus
 ) {}
