@@ -366,13 +366,18 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double[] balancesAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
-                // Subtract cumulative floor withdrawals up to this year
-                double cumulativeWithdrawal = 0;
+                // Simulate year-by-year balance with floor withdrawals and compounded growth.
+                // Using raw cumulative subtraction from the unconstrained path would overestimate
+                // the remaining balance because withdrawn dollars would have compounded if left.
+                double balance = paths[t][0];
                 for (int py = 0; py <= y; py++) {
+                    double growthFactor = paths[t][py + 1] / paths[t][py];
+                    balance *= growthFactor;
                     double floorAtPy = essentialFloor * Math.pow(1 + inflationRate, py);
-                    cumulativeWithdrawal += Math.max(0, floorAtPy - income[py]);
+                    balance -= Math.max(0, floorAtPy - income[py]);
+                    balance = Math.max(0, balance);
                 }
-                balancesAtYear[t] = paths[t][y + 1] - cumulativeWithdrawal;
+                balancesAtYear[t] = balance;
             }
             Arrays.sort(balancesAtYear);
 
