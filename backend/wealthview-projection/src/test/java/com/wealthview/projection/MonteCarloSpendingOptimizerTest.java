@@ -78,7 +78,8 @@ class MonteCarloSpendingOptimizerTest {
                 maxAnnualAdjustmentRate,
                 phaseBlendYears,
                 cashReserveYears,
-                cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO
+                cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO,
+                null
         );
     }
 
@@ -764,7 +765,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO);
+                0, BigDecimal.ZERO, null);
 
         var aggressiveInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -776,7 +777,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.50"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO);
+                0, BigDecimal.ZERO, null);
 
         var conservativeResult = optimizer.optimize(conservativeInput);
         var aggressiveResult = optimizer.optimize(aggressiveInput);
@@ -1418,7 +1419,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 1000, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO);
+                0, BigDecimal.ZERO, null);
 
         var resultWithInflation = optimizer.optimize(withInflation);
         var resultNoInflation = optimizer.optimize(noInflation);
@@ -1455,7 +1456,7 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO);
+                0, BigDecimal.ZERO, null);
 
         var result = optimizer.optimize(zeroInflation);
 
