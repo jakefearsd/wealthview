@@ -24,5 +24,6 @@ public record GuardrailOptimizationInput(
         int phaseBlendYears,
         int cashReserveYears,
         BigDecimal cashReturnRate,
-        String filingStatus
+        String filingStatus,
+        String withdrawalOrder
 ) {}
