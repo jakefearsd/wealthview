@@ -1963,4 +1963,34 @@ class MonteCarloSpendingOptimizerTest {
                     .isLessThanOrEqualTo(discretionary + essentialFloor * 0.5);
         }
     }
+
+    @Test
+    void splitWithdrawal_allOrdersAndPreAge595_correctDistribution() {
+        double taxable = 100, traditional = 200, roth = 300;
+        double need = 150;
+
+        // taxable_first: draws 100 from taxable, 50 from traditional
+        var tf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "taxable_first", false);
+        assertThat(tf[0]).isEqualTo(100); // from taxable
+        assertThat(tf[1]).isEqualTo(50);  // from traditional
+        assertThat(tf[2]).isEqualTo(0);   // none from roth
+
+        // traditional_first: draws 150 from traditional
+        var trf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "traditional_first", false);
+        assertThat(trf[0]).isEqualTo(0);
+        assertThat(trf[1]).isEqualTo(150);
+        assertThat(trf[2]).isEqualTo(0);
+
+        // roth_first: draws 150 from roth (has 300)
+        var rf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "roth_first", false);
+        assertThat(rf[0]).isEqualTo(0);
+        assertThat(rf[1]).isEqualTo(0);
+        assertThat(rf[2]).isEqualTo(150);
+
+        // preAge595: always from taxable only, regardless of order
+        var pre = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "traditional_first", true);
+        assertThat(pre[0]).isEqualTo(100); // capped at available taxable
+        assertThat(pre[1]).isEqualTo(0);
+        assertThat(pre[2]).isEqualTo(0);
+    }
 }

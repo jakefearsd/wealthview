@@ -1053,4 +1053,302 @@ class RothConversionOptimizerTest {
                 .as("No conversions needed when traditional is already below target")
                 .isEqualTo(0);
     }
+
+    // ---- Edge-case characterization tests ----
+
+    @Test
+    void scheduleForFraction_zeroTraditionalBalance_returnsZeroConversions() {
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = buildOptimizer(
+                0, 500_000, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var result = optimizer.scheduleForFraction(0.5);
+
+        assertThat(result).isNotNull();
+        for (int i = 0; i < years; i++) {
+            assertThat(result.conversionByYear()[i])
+                    .as("Conversion at year %d should be zero with no traditional balance", i)
+                    .isEqualTo(0.0);
+        }
+        assertThat(result.lifetimeTaxWith())
+                .as("Lifetime tax with and without conversions should be equal when traditional=0")
+                .isEqualTo(result.lifetimeTaxWithout());
+    }
+
+    @Test
+    void optimize_retirementAgeEqualsRmdStartAge_noConversions() {
+        // Birth year 1960 → RMD starts at 75. Retire at 75 → no conversion window.
+        int retirementAge = 75;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = buildOptimizer(
+                800_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1960, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+        assertThat(totalConversions)
+                .as("No pre-RMD conversion window when retiring at RMD age")
+                .isEqualTo(0.0);
+
+        boolean hasRmd = false;
+        for (double r : result.projectedRmd()) {
+            if (r > 0) {
+                hasRmd = true;
+                break;
+            }
+        }
+        assertThat(hasRmd)
+                .as("RMDs should be projected even with no conversion window")
+                .isTrue();
+    }
+
+    @Test
+    void optimize_negativeEffectiveIncome_lossExceedsOtherIncome() {
+        // REPS rental with $80K depreciation, $30K gross rent, $10K expenses, $3K property tax
+        // → net = $30K - $10K - $3K - $80K = -$63K loss (fully deductible via REPS)
+        // With $20K other income, effective income ≈ $20K - $63K = -$43K (negative).
+        // Negative income inflates the target balance, so the traditional balance
+        // ($1M growing to ~$2.1M at RMD age) stays below the inflated target.
+        // Result: zero conversions, but lifetime tax is lower because losses offset
+        // withdrawal income during the simulation years.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        int birthYear = 1963;
+
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+        java.util.Arrays.fill(otherIncome, 20_000);
+        java.util.Arrays.fill(taxableIncome, 20_000);
+
+        Map<Integer, BigDecimal> depreciationByYear = new java.util.HashMap<>();
+        int firstCalYear = birthYear + retirementAge;
+        for (int y = 0; y < years; y++) {
+            depreciationByYear.put(firstCalYear + y, new BigDecimal("80000"));
+        }
+
+        var repsSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "REPS Rental", "rental_property",
+                new BigDecimal("30000"), retirementAge, null,
+                BigDecimal.ZERO, false, "rental_active_reps",
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("3000"), "straight_line", depreciationByYear);
+
+        var withLargeRepsLoss = buildOptimizerWithRentals(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                List.of(repsSource), new RentalLossCalculator());
+
+        var withoutRentals = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var resultWith = withLargeRepsLoss.optimize();
+        var resultWithout = withoutRentals.optimize();
+
+        assertThat(resultWith).isNotNull();
+        // Negative effective income inflates the target balance beyond the projected
+        // traditional balance — optimizer correctly produces zero conversions.
+        double totalConversions = 0;
+        for (double c : resultWith.conversionByYear()) {
+            totalConversions += c;
+        }
+        assertThat(totalConversions)
+                .as("Large REPS loss inflates target balance past traditional projection — no conversions")
+                .isEqualTo(0.0);
+        // Rental losses still reduce lifetime tax by offsetting withdrawal income in simulation.
+        assertThat(resultWith.lifetimeTaxWith())
+                .as("Large REPS loss exceeding other income should reduce lifetime tax via offset during simulation")
+                .isLessThan(resultWithout.lifetimeTaxWith());
+    }
+
+    @Test
+    void optimize_nullWithdrawalOrder_defaultsToTaxableFirst() {
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizerNull = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, null);
+
+        var optimizerExplicit = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var resultNull = optimizerNull.optimize();
+        var resultExplicit = optimizerExplicit.optimize();
+
+        assertThat(resultNull.lifetimeTaxWith())
+                .as("null withdrawalOrder should produce the same lifetime tax as explicit taxable-first order")
+                .isEqualTo(resultExplicit.lifetimeTaxWith());
+    }
+
+    @Test
+    void optimize_blankWithdrawalOrder_defaultsToTaxableFirst() {
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizerBlank = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "  ");
+
+        var optimizerExplicit = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var resultBlank = optimizerBlank.optimize();
+        var resultExplicit = optimizerExplicit.optimize();
+
+        assertThat(resultBlank.lifetimeTaxWith())
+                .as("blank withdrawalOrder should produce the same lifetime tax as explicit taxable-first order")
+                .isEqualTo(resultExplicit.lifetimeTaxWith());
+    }
+
+    @Test
+    void optimize_essentialFloorExceedsPortfolio_gracefulDegradation() {
+        // Essential floor ($500K) far exceeds total portfolio ($200K traditional).
+        // The optimizer should not throw — it should return a result (possibly depleted).
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = buildOptimizer(
+                200_000, 0, 0,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                500_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void optimize_zeroReturnRate_noGrowthSimulation() {
+        // With returnMean=0.0, balances do not grow — they only decrease from
+        // conversions, withdrawals, or RMDs. The traditional balance must be
+        // monotonically non-increasing year-over-year.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = buildOptimizer(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.00,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        double[] trad = result.traditionalBalance();
+        for (int i = 1; i < years; i++) {
+            assertThat(trad[i])
+                    .as("Traditional balance at year %d should be <= year %d (no growth)", i, i - 1)
+                    .isLessThanOrEqualTo(trad[i - 1] + 1e-6); // small epsilon for floating-point
+        }
+    }
+
+    @Test
+    void optimize_largePassiveLosses_magiConvergenceStable() {
+        // Calling scheduleForFraction(0.5) twice with large passive losses should
+        // produce identical lifetimeTaxWith — MAGI convergence must be deterministic.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        int birthYear = 1963;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        Map<Integer, BigDecimal> depreciationByYear = new java.util.HashMap<>();
+        int firstCalYear = birthYear + retirementAge;
+        for (int y = 0; y < years; y++) {
+            depreciationByYear.put(firstCalYear + y, new BigDecimal("200000"));
+        }
+
+        var passiveSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Large Passive Rental", "rental_property",
+                new BigDecimal("30000"), retirementAge, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("3000"), "straight_line", depreciationByYear);
+
+        var optimizer = buildOptimizerWithRentals(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                List.of(passiveSource), new RentalLossCalculator());
+
+        var result1 = optimizer.scheduleForFraction(0.5);
+        var result2 = optimizer.scheduleForFraction(0.5);
+
+        assertThat(result1.lifetimeTaxWith())
+                .as("scheduleForFraction must be deterministic — same fraction must yield same tax")
+                .isEqualTo(result2.lifetimeTaxWith());
+    }
 }
