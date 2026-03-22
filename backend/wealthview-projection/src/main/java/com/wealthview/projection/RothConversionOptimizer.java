@@ -371,97 +371,10 @@ class RothConversionOptimizer {
 
             // Step 2: Roth conversions (pre-RMD years only)
             if (age < rmdStartAge && traditional > 0 && conversionFraction > 0) {
-                // MAGI-aware convergence: the rental loss deduction depends on MAGI,
-                // which includes the conversion amount. Iterate to find the stable
-                // conversion amount where the MAGI used for passive loss rules matches
-                // the actual MAGI produced by the conversion.
-                //
-                // For REPS/active properties this converges in 1 iteration (MAGI
-                // doesn't affect the deduction). For passive properties with the $25K
-                // exception, 2-3 iterations suffice.
-                var savedSuspended = new HashMap<>(suspendedLosses);
-                double convergedConversion = 0;
-                double convergedTax = 0;
-                double convergedEffectiveIncome = baseOtherIncome;
-
-                for (int conv = 0; conv < MAGI_CONVERGENCE_ITERATIONS; conv++) {
-                    // Restore suspended losses to pre-year state for each iteration
-                    var iterSuspended = new HashMap<>(savedSuspended);
-
-                    // Compute rental adjustment using MAGI = base income + conversion estimate
-                    double estimatedMagi = baseOtherIncome + convergedConversion;
-                    double rentalAdj = computeRentalAdjustmentForYear(
-                            yearIndex, estimatedMagi, iterSuspended);
-                    double effectiveIncome = baseOtherIncome + rentalAdj;
-
-                    // Compute bracket space and conversion amount
-                    double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
-                            BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus,
-                            BigDecimal.valueOf(inflationRate)).doubleValue();
-                    double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
-                    double maxConversion = bracketSpace * conversionFraction;
-
-                    // Loss utilization floor: when rental losses create tax-free
-                    // conversion capacity, convert at least enough to use the losses.
-                    // Wasting free conversion in loss years forces expensive conversion
-                    // in later years when losses are smaller.
-                    if (rentalAdj < 0) {
-                        double freeCapacity = Math.min(Math.abs(rentalAdj), bracketSpace);
-                        maxConversion = Math.max(maxConversion, freeCapacity);
-                    }
-
-                    // Cap conversions: don't convert below the target balance
-                    // projected back from RMD age to the current year
-                    double yearsToRmd = rmdStartAge - age;
-                    if (yearsToRmd > 0 && targetTraditionalBalance > 0) {
-                        double traditionalNeededNow = targetTraditionalBalance
-                                / Math.pow(1 + returnMean, yearsToRmd);
-                        double excessTraditional = Math.max(0, traditional - traditionalNeededNow);
-                        maxConversion = Math.min(maxConversion, excessTraditional);
-                    }
-
-                    if (age < EARLY_WITHDRAWAL_AGE) {
-                        double tentativeTax = computeIncrementalTax(
-                                maxConversion, effectiveIncome, calendarYear);
-                        double inflatedSpending = essentialFloor
-                                * Math.pow(1 + inflationRate, yearIndex);
-                        double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
-                        double available = taxable - netSpendingNeed;
-                        if (available <= 0) {
-                            maxConversion = 0;
-                        } else if (tentativeTax > available) {
-                            maxConversion = findMaxAffordableConversion(
-                                    maxConversion, effectiveIncome, calendarYear, available);
-                        }
-                    }
-
-                    double newConversion = Math.min(maxConversion, traditional);
-                    double newTax = newConversion > 0
-                            ? computeIncrementalTax(newConversion, effectiveIncome, calendarYear)
-                            : 0;
-
-                    // Check convergence
-                    if (Math.abs(newConversion - convergedConversion) < CONVERGENCE_THRESHOLD_DOLLARS) {
-                        // Converged — commit the suspended losses from this iteration
-                        suspendedLosses.putAll(iterSuspended);
-                        convergedConversion = newConversion;
-                        convergedTax = newTax;
-                        convergedEffectiveIncome = effectiveIncome;
-                        break;
-                    }
-
-                    convergedConversion = newConversion;
-                    convergedTax = newTax;
-                    convergedEffectiveIncome = effectiveIncome;
-
-                    // On last iteration, commit suspended losses
-                    if (conv == MAGI_CONVERGENCE_ITERATIONS - 1) {
-                        suspendedLosses.putAll(iterSuspended);
-                    }
-                }
-
-                conversionAmount = convergedConversion;
-                conversionTax = convergedTax;
+                var conv = convergeConversionAmount(traditional, taxable, baseOtherIncome,
+                        yearIndex, age, calendarYear, conversionFraction, suspendedLosses);
+                conversionAmount = conv.conversionAmount();
+                conversionTax = conv.conversionTax();
 
                 if (conversionAmount > 0) {
                     traditional -= conversionAmount;
@@ -561,6 +474,99 @@ class RothConversionOptimizer {
 
         return new SimResult(conversionByYear, conversionTaxByYear, traditionalBal,
                 rothBal, taxableBal, projectedRmd, lifetimeTax, exhaustionAge);
+    }
+
+    private record ConvergenceResult(double conversionAmount, double conversionTax) {}
+
+    /**
+     * Iterates to find the stable Roth conversion amount where the MAGI used for
+     * passive loss rules matches the actual MAGI produced by the conversion.
+     * For REPS/active properties this converges in 1 iteration; for passive
+     * properties with the $25K exception, 2-3 iterations suffice.
+     *
+     * @param suspendedLosses mutated in-place with the final iteration's suspended loss state
+     */
+    private ConvergenceResult convergeConversionAmount(
+            double traditional, double taxable, double baseOtherIncome,
+            int yearIndex, int age, int calendarYear, double conversionFraction,
+            Map<ProjectionIncomeSourceInput, BigDecimal> suspendedLosses) {
+
+        var savedSuspended = new HashMap<>(suspendedLosses);
+        double convergedConversion = 0;
+        double convergedTax = 0;
+
+        for (int conv = 0; conv < MAGI_CONVERGENCE_ITERATIONS; conv++) {
+            // Restore suspended losses to pre-year state for each iteration
+            var iterSuspended = new HashMap<>(savedSuspended);
+
+            // Compute rental adjustment using MAGI = base income + conversion estimate
+            double estimatedMagi = baseOtherIncome + convergedConversion;
+            double rentalAdj = computeRentalAdjustmentForYear(
+                    yearIndex, estimatedMagi, iterSuspended);
+            double effectiveIncome = baseOtherIncome + rentalAdj;
+
+            // Compute bracket space and conversion amount
+            double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
+                    BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus,
+                    BigDecimal.valueOf(inflationRate)).doubleValue();
+            double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
+            double maxConversion = bracketSpace * conversionFraction;
+
+            // Loss utilization floor: when rental losses create tax-free
+            // conversion capacity, convert at least enough to use the losses.
+            if (rentalAdj < 0) {
+                double freeCapacity = Math.min(Math.abs(rentalAdj), bracketSpace);
+                maxConversion = Math.max(maxConversion, freeCapacity);
+            }
+
+            // Cap conversions: don't convert below the target balance
+            // projected back from RMD age to the current year
+            double yearsToRmd = rmdStartAge - age;
+            if (yearsToRmd > 0 && targetTraditionalBalance > 0) {
+                double traditionalNeededNow = targetTraditionalBalance
+                        / Math.pow(1 + returnMean, yearsToRmd);
+                double excessTraditional = Math.max(0, traditional - traditionalNeededNow);
+                maxConversion = Math.min(maxConversion, excessTraditional);
+            }
+
+            if (age < EARLY_WITHDRAWAL_AGE) {
+                double tentativeTax = computeIncrementalTax(
+                        maxConversion, effectiveIncome, calendarYear);
+                double inflatedSpending = essentialFloor
+                        * Math.pow(1 + inflationRate, yearIndex);
+                double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
+                double available = taxable - netSpendingNeed;
+                if (available <= 0) {
+                    maxConversion = 0;
+                } else if (tentativeTax > available) {
+                    maxConversion = findMaxAffordableConversion(
+                            maxConversion, effectiveIncome, calendarYear, available);
+                }
+            }
+
+            double newConversion = Math.min(maxConversion, traditional);
+            double newTax = newConversion > 0
+                    ? computeIncrementalTax(newConversion, effectiveIncome, calendarYear)
+                    : 0;
+
+            // Check convergence
+            if (Math.abs(newConversion - convergedConversion) < CONVERGENCE_THRESHOLD_DOLLARS) {
+                suspendedLosses.putAll(iterSuspended);
+                convergedConversion = newConversion;
+                convergedTax = newTax;
+                break;
+            }
+
+            convergedConversion = newConversion;
+            convergedTax = newTax;
+
+            // On last iteration, commit suspended losses
+            if (conv == MAGI_CONVERGENCE_ITERATIONS - 1) {
+                suspendedLosses.putAll(iterSuspended);
+            }
+        }
+
+        return new ConvergenceResult(convergedConversion, convergedTax);
     }
 
     private double computeIncrementalTax(double additionalIncome, double baseIncome,
