@@ -136,7 +136,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     input.returnMean() != null ? input.returnMean().doubleValue() : 0.10,
                     essentialFloor, inflationRate,
                     filingStatus, taxCalculator, withdrawalOrder,
-                    input.incomeSources(), new RentalLossCalculator());
+                    input.incomeSources(), new RentalLossCalculator(),
+                    input.rmdBracketHeadroom() != null
+                            ? input.rmdBracketHeadroom().doubleValue() : 0.10);
 
             // Generate search paths with reduced trials for joint optimization search
             int searchTrials = Math.min(500, trialCount);
@@ -486,6 +488,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     input.rmdTargetBracketRate(),
                     input.traditionalExhaustionBuffer(),
                     toBD(mcExhaustionPct),
+                    toBD(convSchedule.targetTraditionalBalance()),
+                    input.rmdBracketHeadroom() != null
+                            ? input.rmdBracketHeadroom() : new BigDecimal("0.10"),
                     convYears);
         }
 

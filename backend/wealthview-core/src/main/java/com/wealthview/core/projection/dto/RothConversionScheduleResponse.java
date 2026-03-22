@@ -13,5 +13,7 @@ public record RothConversionScheduleResponse(
         BigDecimal rmdTargetBracketRate,
         int traditionalExhaustionBuffer,
         BigDecimal mcExhaustionPct,
+        BigDecimal targetTraditionalBalance,
+        BigDecimal rmdBracketHeadroom,
         List<ConversionYearDetail> years
 ) {}

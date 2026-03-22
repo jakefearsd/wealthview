@@ -122,6 +122,9 @@ public class GuardrailProfileService {
         entity.setTraditionalExhaustionBuffer(
                 request.traditionalExhaustionBuffer() != null
                         ? request.traditionalExhaustionBuffer() : 5);
+        entity.setRmdBracketHeadroom(
+                request.rmdBracketHeadroom() != null
+                        ? request.rmdBracketHeadroom() : new BigDecimal("0.10"));
 
         entity.setMedianFinalBalance(optimizerResult.medianFinalBalance());
         entity.setFailureRate(optimizerResult.failureRate());
@@ -200,7 +203,8 @@ public class GuardrailProfileService {
                 existing.getTraditionalExhaustionBuffer() != null,
                 existing.getConversionBracketRate(),
                 existing.getRmdTargetBracketRate(),
-                existing.getTraditionalExhaustionBuffer());
+                existing.getTraditionalExhaustionBuffer(),
+                existing.getRmdBracketHeadroom());
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -276,7 +280,9 @@ public class GuardrailProfileService {
                 request.conversionBracketRate(),
                 request.rmdTargetBracketRate(),
                 request.traditionalExhaustionBuffer() != null
-                        ? request.traditionalExhaustionBuffer() : 5
+                        ? request.traditionalExhaustionBuffer() : 5,
+                request.rmdBracketHeadroom() != null
+                        ? request.rmdBracketHeadroom() : new BigDecimal("0.10")
         );
     }
 

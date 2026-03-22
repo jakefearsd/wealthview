@@ -34,7 +34,8 @@ class RothConversionOptimizer {
             double lifetimeTaxWithout,
             int exhaustionAge,
             boolean exhaustionTargetMet,
-            double conversionFraction
+            double conversionFraction,
+            double targetTraditionalBalance
     ) {}
 
     private final double initTraditional;
@@ -58,6 +59,8 @@ class RothConversionOptimizer {
     private final int rmdStartAge;
     private final List<ProjectionIncomeSourceInput> rentalSources;
     private final RentalLossCalculator rentalLossCalculator;
+    private final double rmdBracketHeadroom;
+    private final double targetTraditionalBalance;
 
     RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
                             double[] otherIncomeByYear, double[] taxableIncomeByYear,
@@ -68,7 +71,8 @@ class RothConversionOptimizer {
                             FilingStatus filingStatus, FederalTaxCalculator taxCalculator,
                             String withdrawalOrder,
                             List<ProjectionIncomeSourceInput> incomeSources,
-                            RentalLossCalculator rentalLossCalculator) {
+                            RentalLossCalculator rentalLossCalculator,
+                            double rmdBracketHeadroom) {
         this.initTraditional = initTraditional;
         this.initRoth = initRoth;
         this.initTaxable = initTaxable;
@@ -94,6 +98,38 @@ class RothConversionOptimizer {
                         .filter(s -> "rental_property".equals(s.incomeType()))
                         .toList()
                 : List.of();
+        this.rmdBracketHeadroom = rmdBracketHeadroom;
+        this.targetTraditionalBalance = computeTargetTraditionalBalance();
+    }
+
+    /**
+     * Computes the target traditional IRA balance at RMD start age such that
+     * RMDs stay within the user's target bracket (with headroom for market variability).
+     *
+     * Formula: targetBalance = availableForRmd × distributionPeriod(rmdStartAge)
+     * where availableForRmd = grossBracketCeiling × (1 - headroom) - otherIncomeAtRmdAge
+     */
+    private double computeTargetTraditionalBalance() {
+        double distributionPeriod = RmdCalculator.distributionPeriod(rmdStartAge);
+        if (distributionPeriod <= 0) {
+            return 0;
+        }
+
+        // Estimate other income at RMD start age
+        int rmdYearIndex = rmdStartAge - retirementAge;
+        double otherIncomeAtRmd = rmdYearIndex >= 0 && rmdYearIndex < otherIncomeByYear.length
+                ? otherIncomeByYear[rmdYearIndex] : 0;
+
+        // Bracket ceiling with headroom
+        int rmdCalendarYear = birthYear + rmdStartAge;
+        double grossCeiling = taxCalculator.computeMaxIncomeForBracket(
+                BigDecimal.valueOf(rmdTargetBracketRate), rmdCalendarYear, filingStatus).doubleValue();
+        double availableForRmd = grossCeiling * (1 - rmdBracketHeadroom) - otherIncomeAtRmd;
+
+        if (availableForRmd <= 0) {
+            return 0;
+        }
+        return availableForRmd * distributionPeriod;
     }
 
     RothConversionSchedule optimize() {
@@ -198,15 +234,14 @@ class RothConversionOptimizer {
     }
 
     private double findOptimalFraction(SimResult baseline) {
-        int exhaustionTarget = endAge - exhaustionBuffer;
         double bestFraction = 0.0;
         double bestScore = baseline.lifetimeTax;
-        boolean bestFeasible = isFeasible(baseline, exhaustionTarget);
+        boolean bestFeasible = isFeasible(baseline);
 
         for (int i = 1; i <= GRID_SIZE; i++) {
             double fraction = (double) i / GRID_SIZE;
             var result = simulateForFraction(fraction);
-            boolean feasible = isFeasible(result, exhaustionTarget);
+            boolean feasible = isFeasible(result);
 
             if (isBetterCandidate(result.lifetimeTax, feasible, bestScore, bestFeasible)) {
                 bestScore = result.lifetimeTax;
@@ -224,8 +259,8 @@ class RothConversionOptimizer {
 
             var r1 = simulateForFraction(m1);
             var r2 = simulateForFraction(m2);
-            boolean f1 = isFeasible(r1, exhaustionTarget);
-            boolean f2 = isFeasible(r2, exhaustionTarget);
+            boolean f1 = isFeasible(r1);
+            boolean f2 = isFeasible(r2);
 
             double s1 = scoringValue(r1.lifetimeTax, f1);
             double s2 = scoringValue(r2.lifetimeTax, f2);
@@ -251,8 +286,20 @@ class RothConversionOptimizer {
         return bestFraction;
     }
 
-    private boolean isFeasible(SimResult result, int exhaustionTarget) {
-        return result.exhaustionAge <= exhaustionTarget;
+    /**
+     * A simulation result is feasible if the traditional balance at RMD start age
+     * is at or below the target balance (with 5% tolerance). If there's no target
+     * (e.g., already past RMD age), any result is feasible.
+     */
+    private boolean isFeasible(SimResult result) {
+        if (targetTraditionalBalance <= 0) {
+            return true;
+        }
+        int rmdYearIndex = rmdStartAge - retirementAge;
+        if (rmdYearIndex < 0 || rmdYearIndex >= result.traditionalBalance.length) {
+            return true;
+        }
+        return result.traditionalBalance[rmdYearIndex] <= targetTraditionalBalance * 1.05;
     }
 
     private boolean isBetterCandidate(double tax, boolean feasible, double bestTax, boolean bestFeasible) {
@@ -328,6 +375,16 @@ class RothConversionOptimizer {
                             .doubleValue();
                     double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
                     double maxConversion = bracketSpace * conversionFraction;
+
+                    // Cap conversions: don't convert below the target balance
+                    // projected back from RMD age to the current year
+                    double yearsToRmd = rmdStartAge - age;
+                    if (yearsToRmd > 0 && targetTraditionalBalance > 0) {
+                        double traditionalNeededNow = targetTraditionalBalance
+                                / Math.pow(1 + returnMean, yearsToRmd);
+                        double excessTraditional = Math.max(0, traditional - traditionalNeededNow);
+                        maxConversion = Math.min(maxConversion, excessTraditional);
+                    }
 
                     if (age < EARLY_WITHDRAWAL_AGE) {
                         double tentativeTax = computeIncrementalTax(
@@ -553,7 +610,8 @@ class RothConversionOptimizer {
                 baselineTax,
                 result.exhaustionAge,
                 result.exhaustionAge <= exhaustionTarget,
-                fraction
+                fraction,
+                targetTraditionalBalance
         );
     }
 

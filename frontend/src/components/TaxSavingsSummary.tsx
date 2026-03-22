@@ -60,9 +60,16 @@ export default function TaxSavingsSummary({ schedule }: Props) {
                 <span>
                     <strong style={{ color: '#666' }}>RMD Target Bracket:</strong> {pctFmt(schedule.rmd_target_bracket_rate)}
                 </span>
-                <span>
-                    <strong style={{ color: '#666' }}>Exhaustion Buffer:</strong> {schedule.traditional_exhaustion_buffer} years
-                </span>
+                {schedule.target_traditional_balance != null && schedule.target_traditional_balance > 0 && (
+                    <span>
+                        <strong style={{ color: '#666' }}>Target Trad. at RMD:</strong> {fmt(schedule.target_traditional_balance)}
+                    </span>
+                )}
+                {schedule.rmd_bracket_headroom != null && (
+                    <span>
+                        <strong style={{ color: '#666' }}>RMD Headroom:</strong> {pctFmt(schedule.rmd_bracket_headroom)}
+                    </span>
+                )}
                 <span>
                     <strong style={{ color: '#666' }}>Exhaustion Age:</strong> {schedule.exhaustion_age}
                 </span>

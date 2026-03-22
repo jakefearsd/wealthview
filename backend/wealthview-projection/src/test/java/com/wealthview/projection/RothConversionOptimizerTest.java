@@ -37,9 +37,19 @@ class RothConversionOptimizerTest {
                     return income.multiply(new BigDecimal("0.20"));
                 });
 
-        // Bracket ceiling at $100K
+        // Bracket ceiling: scales with rate. 22% → $100K, 10% → $45K, 12% → $55K, etc.
         when(taxCalculator.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(new BigDecimal("100000"));
+                .thenAnswer(invocation -> {
+                    BigDecimal rate = invocation.getArgument(0);
+                    // Simulate progressive bracket ceilings
+                    double r = rate.doubleValue();
+                    if (r <= 0.10) return new BigDecimal("45000");
+                    if (r <= 0.12) return new BigDecimal("55000");
+                    if (r <= 0.22) return new BigDecimal("100000");
+                    if (r <= 0.24) return new BigDecimal("190000");
+                    if (r <= 0.32) return new BigDecimal("245000");
+                    return new BigDecimal("600000");
+                });
     }
 
     private RothConversionOptimizer buildOptimizer(double initTraditional, double initRoth, double initTaxable,
@@ -58,7 +68,27 @@ class RothConversionOptimizerTest {
                 rmdTargetBracketRate, returnMean,
                 essentialFloor, inflationRate,
                 filingStatus, calc, withdrawalOrder,
-                null, null);
+                null, null, 0.10);
+    }
+
+    private RothConversionOptimizer buildOptimizerWithHeadroom(
+            double initTraditional, double initRoth, double initTaxable,
+            double[] otherIncome, double[] taxableIncome,
+            int birthYear, int retirementAge, int endAge,
+            int exhaustionBuffer, double conversionBracketRate,
+            double rmdTargetBracketRate, double returnMean,
+            double essentialFloor, double inflationRate,
+            FilingStatus filingStatus, FederalTaxCalculator calc,
+            String withdrawalOrder, double rmdBracketHeadroom) {
+        return new RothConversionOptimizer(
+                initTraditional, initRoth, initTaxable,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                exhaustionBuffer, conversionBracketRate,
+                rmdTargetBracketRate, returnMean,
+                essentialFloor, inflationRate,
+                filingStatus, calc, withdrawalOrder,
+                null, null, rmdBracketHeadroom);
     }
 
     private RothConversionOptimizer buildOptimizerWithRentals(
@@ -80,7 +110,7 @@ class RothConversionOptimizerTest {
                 rmdTargetBracketRate, returnMean,
                 essentialFloor, inflationRate,
                 filingStatus, calc, withdrawalOrder,
-                incomeSources, rentalLossCalculator);
+                incomeSources, rentalLossCalculator, 0.10);
     }
 
     @Test
@@ -95,7 +125,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -123,7 +153,7 @@ class RothConversionOptimizerTest {
                 0, 1_000_000, 200_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -138,7 +168,10 @@ class RothConversionOptimizerTest {
     }
 
     @Test
-    void optimize_exhaustionTargetMet_whenFeasible() {
+    void optimize_targetBalanceApproach_convertsExcess() {
+        // With $2M traditional at 6% for 13 years ≈ $4.27M at RMD age,
+        // which exceeds the target balance of $1.22M (12% bracket × 0.90 × 24.6).
+        // The optimizer should convert the excess.
         int retirementAge = 62;
         int endAge = 90;
         int years = endAge - retirementAge;
@@ -146,19 +179,26 @@ class RothConversionOptimizerTest {
         var taxableIncome = new double[years];
 
         var optimizer = buildOptimizer(
-                500_000, 0, 300_000,
+                2_000_000, 0, 300_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
         var result = optimizer.optimize();
 
         assertThat(result).isNotNull();
-        assertThat(result.exhaustionTargetMet()).isTrue();
-        // Should exhaust by endAge - buffer = 85
-        assertThat(result.exhaustionAge()).isLessThanOrEqualTo(endAge - 5);
+        // Target balance should be positive and reported
+        assertThat(result.targetTraditionalBalance()).isGreaterThan(0);
+        // Conversions should happen (excess above target)
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+        assertThat(totalConversions).isGreaterThan(0);
+        // But not the full $2M — the target preserves a portion
+        assertThat(totalConversions).isLessThan(2_000_000);
     }
 
     @Test
@@ -173,7 +213,7 @@ class RothConversionOptimizerTest {
                 800_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1959, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -201,7 +241,7 @@ class RothConversionOptimizerTest {
                 800_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1960, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -229,7 +269,7 @@ class RothConversionOptimizerTest {
                 500_000, 0, 300_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                3, 0.22, 0.22, 0.06,
+                3, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -237,7 +277,7 @@ class RothConversionOptimizerTest {
                 500_000, 0, 300_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                8, 0.22, 0.22, 0.06,
+                8, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -263,7 +303,7 @@ class RothConversionOptimizerTest {
                 500_000, 100_000, 300_000,
                 otherIncome, taxableIncome,
                 1970, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -278,7 +318,11 @@ class RothConversionOptimizerTest {
     }
 
     @Test
-    void optimize_ssIncomeMidStream_reducesConversions() {
+    void optimize_ssIncomeMidStream_affectsTargetBalance() {
+        // SS income at RMD age reduces the available space for RMDs within the target
+        // bracket, producing a SMALLER target balance. This means MORE of the traditional
+        // balance needs converting away (or the per-year conversion space is reduced by
+        // SS filling the bracket, leading to a different conversion trajectory).
         int retirementAge = 62;
         int endAge = 90;
         int years = endAge - retirementAge;
@@ -300,7 +344,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncomeNoSS, taxableIncomeNoSS,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -308,7 +352,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncomeWithSS, taxableIncomeWithSS,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -318,19 +362,11 @@ class RothConversionOptimizerTest {
         assertThat(resultNoSS).isNotNull();
         assertThat(resultWithSS).isNotNull();
 
-        boolean foundSmaller = false;
-        for (int i = 5; i < years; i++) {
-            int age = retirementAge + i;
-            if (age < RmdCalculator.rmdStartAge(1963) && resultNoSS.conversionByYear()[i] > 0) {
-                if (resultWithSS.conversionByYear()[i] < resultNoSS.conversionByYear()[i] - 1.0) {
-                    foundSmaller = true;
-                    break;
-                }
-            }
-        }
-        assertThat(foundSmaller)
-                .as("SS income should reduce conversions in at least one post-SS year")
-                .isTrue();
+        // SS income at RMD age reduces the target balance (less room for RMDs)
+        // so the optimizer should convert more aggressively overall
+        assertThat(resultWithSS.targetTraditionalBalance())
+                .as("SS income should produce a smaller target balance")
+                .isLessThan(resultNoSS.targetTraditionalBalance());
     }
 
     @Test
@@ -341,7 +377,7 @@ class RothConversionOptimizerTest {
         var otherIncome = new double[years];
         var taxableIncome = new double[years];
 
-        // MFJ calculator with a $200K bracket ceiling (double the Single $100K)
+        // MFJ calculator with double the bracket ceilings of Single
         var mfjCalc = mock(FederalTaxCalculator.class);
         when(mfjCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenAnswer(invocation -> {
@@ -352,21 +388,29 @@ class RothConversionOptimizerTest {
                     return income.multiply(new BigDecimal("0.20"));
                 });
         when(mfjCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(new BigDecimal("200000"));
+                .thenAnswer(invocation -> {
+                    BigDecimal rate = invocation.getArgument(0);
+                    double r = rate.doubleValue();
+                    if (r <= 0.10) return new BigDecimal("90000");
+                    if (r <= 0.12) return new BigDecimal("110000");
+                    if (r <= 0.22) return new BigDecimal("200000");
+                    return new BigDecimal("400000");
+                });
 
+        // Use $2M traditional so both Single and MFJ exceed their target balances
         var mfjOpt = buildOptimizer(
-                1_000_000, 0, 500_000,
+                2_000_000, 0, 500_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.MARRIED_FILING_JOINTLY, mfjCalc, "taxable,traditional,roth");
 
         var singleOpt = buildOptimizer(
-                1_000_000, 0, 500_000,
+                2_000_000, 0, 500_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -394,7 +438,7 @@ class RothConversionOptimizerTest {
                 500_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1955, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -426,7 +470,7 @@ class RothConversionOptimizerTest {
                 5_000_000, 0, 100_000,
                 otherIncome, taxableIncome,
                 1955, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -450,7 +494,7 @@ class RothConversionOptimizerTest {
                 800_000, 0, 50_000,
                 otherIncome, taxableIncome,
                 1970, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -493,7 +537,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(rentalSource), new RentalLossCalculator());
@@ -502,7 +546,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -552,7 +596,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(rentalSource), new RentalLossCalculator());
@@ -600,7 +644,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(rentalSource), new RentalLossCalculator());
@@ -609,7 +653,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -654,19 +698,19 @@ class RothConversionOptimizerTest {
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var activeOptimizer = buildOptimizerWithRentals(
-                1_000_000, 0, 200_000,
+                2_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(activeSource), new RentalLossCalculator());
 
         var passiveOptimizer = buildOptimizerWithRentals(
-                1_000_000, 0, 200_000,
+                2_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(passiveSource), new RentalLossCalculator());
@@ -727,13 +771,13 @@ class RothConversionOptimizerTest {
 
         var passiveOpt = buildOptimizerWithRentals(
                 500_000, 0, 200_000, otherIncome, taxableIncome,
-                birthYear, retirementAge, endAge, 5, 0.22, 0.22, 0.06,
+                birthYear, retirementAge, endAge, 5, 0.22, 0.12, 0.06,
                 30_000, 0.03, FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(passiveSource), new RentalLossCalculator());
 
         var activeOpt = buildOptimizerWithRentals(
                 500_000, 0, 200_000, otherIncome, taxableIncome,
-                birthYear, retirementAge, endAge, 5, 0.22, 0.22, 0.06,
+                birthYear, retirementAge, endAge, 5, 0.22, 0.12, 0.06,
                 30_000, 0.03, FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(activeSource), new RentalLossCalculator());
 
@@ -774,19 +818,19 @@ class RothConversionOptimizerTest {
                 BigDecimal.ZERO, "cost_seg", depByYear);
 
         var withLosses = buildOptimizerWithRentals(
-                500_000, 0, 200_000,
+                2_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 List.of(rentalSource), new RentalLossCalculator());
 
         var withoutLosses = buildOptimizer(
-                500_000, 0, 200_000,
+                2_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 birthYear, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 30_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -817,7 +861,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
 
@@ -825,7 +869,7 @@ class RothConversionOptimizerTest {
                 1_000_000, 0, 200_000,
                 otherIncome, taxableIncome,
                 1963, retirementAge, endAge,
-                5, 0.22, 0.22, 0.06,
+                5, 0.22, 0.12, 0.06,
                 40_000, 0.03,
                 FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
                 Collections.emptyList(), new RentalLossCalculator());
@@ -840,5 +884,182 @@ class RothConversionOptimizerTest {
         assertThat(resultEmpty.conversionFraction())
                 .as("Empty income sources should produce same fraction as null")
                 .isCloseTo(resultNull.conversionFraction(), org.assertj.core.data.Offset.offset(0.001));
+    }
+
+    // ---- Target balance constraint tests ----
+
+    @Test
+    void optimize_targetBalance_doesNotConvertBelowTarget() {
+        // With a $1M traditional and a high RMD target bracket (0.22 = high ceiling),
+        // the target balance at RMD age is large. The optimizer should only convert
+        // the excess above the target, not the full $1M.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        // Use 12% RMD target bracket → $55K ceiling → target balance ≈ $1.2M
+        // $1M traditional projected to RMD age ≈ $2.1M, so excess ≈ $900K
+        var optimizer = buildOptimizerWithHeadroom(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.10);
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+
+        // Conversions should be capped at the excess above the target trajectory.
+        // Without the target cap, the optimizer would convert much more aggressively.
+        // Total conversions should be less than the initial traditional balance
+        // because the target balance preserves a portion for RMDs within the bracket.
+        assertThat(totalConversions)
+                .as("Should only convert the excess above the target balance")
+                .isLessThan(1_000_000);
+
+        // Also verify the target traditional balance is reported
+        assertThat(result.targetTraditionalBalance())
+                .as("Target traditional balance should be positive")
+                .isGreaterThan(0);
+    }
+
+    @Test
+    void optimize_lowTargetBracket_convertsMoreAggressively() {
+        // With rmdTargetBracketRate = 0.10 (10% bracket, low ceiling),
+        // the target balance is small, so more of traditional needs converting.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        // Low RMD target bracket → small target → more conversions needed
+        var optimizerLow = buildOptimizerWithHeadroom(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.10, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.10);
+
+        // High RMD target bracket → large target → fewer conversions needed
+        var optimizerHigh = buildOptimizerWithHeadroom(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.10);
+
+        var resultLow = optimizerLow.optimize();
+        var resultHigh = optimizerHigh.optimize();
+
+        double totalLow = 0;
+        double totalHigh = 0;
+        for (int i = 0; i < years; i++) {
+            totalLow += resultLow.conversionByYear()[i];
+            totalHigh += resultHigh.conversionByYear()[i];
+        }
+
+        // Lower target bracket (10% → $45K ceiling) = smaller target balance = more conversions
+        // Higher target bracket (22% → $100K ceiling) = larger target balance = fewer conversions
+        assertThat(totalLow)
+                .as("Low target bracket should produce more conversions than high target bracket")
+                .isGreaterThan(totalHigh);
+    }
+
+    @Test
+    void optimize_higherHeadroom_smallerTargetBalance() {
+        // 25% headroom should produce a smaller target balance (and more conversions)
+        // than 5% headroom with the same bracket target.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizerLowHeadroom = buildOptimizerWithHeadroom(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.05);
+
+        var optimizerHighHeadroom = buildOptimizerWithHeadroom(
+                1_000_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.25);
+
+        var resultLow = optimizerLowHeadroom.optimize();
+        var resultHigh = optimizerHighHeadroom.optimize();
+
+        // Higher headroom → smaller target → more conversions
+        assertThat(resultHigh.targetTraditionalBalance())
+                .as("Higher headroom should produce a smaller target balance")
+                .isLessThan(resultLow.targetTraditionalBalance());
+
+        double totalLow = 0;
+        double totalHigh = 0;
+        for (int i = 0; i < years; i++) {
+            totalLow += resultLow.conversionByYear()[i];
+            totalHigh += resultHigh.conversionByYear()[i];
+        }
+
+        assertThat(totalHigh)
+                .as("Higher headroom should produce more conversions")
+                .isGreaterThanOrEqualTo(totalLow);
+    }
+
+    @Test
+    void optimize_traditionalBelowTarget_noConversions() {
+        // If the traditional balance (projected to RMD age) is already below
+        // the target, no conversions should be recommended.
+        // Use a small traditional balance with a high target bracket.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        // $100K traditional with 12% target bracket → $55K ceiling × 0.90 headroom
+        // × 24.6 distribution period ≈ $1.2M target. $100K projected to RMD age at 6%
+        // for ~13 years ≈ $213K — still well below $1.2M. No conversions needed.
+        var optimizer = buildOptimizerWithHeadroom(
+                100_000, 500_000, 200_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.12, 0.06,
+                40_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                0.10);
+
+        var result = optimizer.optimize();
+
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+
+        assertThat(totalConversions)
+                .as("No conversions needed when traditional is already below target")
+                .isEqualTo(0);
     }
 }

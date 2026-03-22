@@ -107,6 +107,9 @@ public class GuardrailSpendingProfileEntity {
     @Column(name = "traditional_exhaustion_buffer")
     private Integer traditionalExhaustionBuffer = 5;
 
+    @Column(name = "rmd_bracket_headroom", precision = 5, scale = 4)
+    private BigDecimal rmdBracketHeadroom = new BigDecimal("0.10");
+
     @Column(name = "is_stale", nullable = false)
     private boolean stale = false;
 
@@ -178,6 +181,8 @@ public class GuardrailSpendingProfileEntity {
     public void setRmdTargetBracketRate(BigDecimal rmdTargetBracketRate) { this.rmdTargetBracketRate = rmdTargetBracketRate; }
     public Integer getTraditionalExhaustionBuffer() { return traditionalExhaustionBuffer; }
     public void setTraditionalExhaustionBuffer(Integer traditionalExhaustionBuffer) { this.traditionalExhaustionBuffer = traditionalExhaustionBuffer; }
+    public BigDecimal getRmdBracketHeadroom() { return rmdBracketHeadroom; }
+    public void setRmdBracketHeadroom(BigDecimal rmdBracketHeadroom) { this.rmdBracketHeadroom = rmdBracketHeadroom; }
     public boolean isStale() { return stale; }
     public void setStale(boolean stale) { this.stale = stale; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

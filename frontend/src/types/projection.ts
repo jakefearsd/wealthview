@@ -323,6 +323,8 @@ export interface RothConversionScheduleResponse {
     rmd_target_bracket_rate: number;
     traditional_exhaustion_buffer: number;
     mc_exhaustion_pct: number | null;
+    target_traditional_balance: number | null;
+    rmd_bracket_headroom: number | null;
     years: ConversionYearDetail[];
 }
 
@@ -346,4 +348,5 @@ export interface GuardrailOptimizationRequest {
     conversion_bracket_rate?: number;
     rmd_target_bracket_rate?: number;
     traditional_exhaustion_buffer?: number;
+    rmd_bracket_headroom?: number;
 }
