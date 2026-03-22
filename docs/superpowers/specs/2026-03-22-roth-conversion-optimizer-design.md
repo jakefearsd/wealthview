@@ -125,9 +125,24 @@ for each year from retirement to endAge:
        b. bracketSpace = max(0, bracketCeiling - otherIncome[year])
        c. maxConversion = bracketSpace * conversionFraction
        d. If age < 59.5:
+            // Guard 1: taxable must cover conversion tax
             conversionTaxEstimate = computeMarginalTax(maxConversion, otherIncome)
             if taxableBalance < conversionTaxEstimate:
                 reduce maxConversion until taxableBalance can cover the tax
+            // Guard 2: spending feasibility — taxable must still cover
+            // this year's spending after paying conversion tax. Before 59.5,
+            // taxable is the ONLY source for both spending AND conversion tax.
+            // This naturally delays or reduces conversions when the taxable
+            // pool is tight (e.g., early retiree with small taxable balance),
+            // producing emergent "start conversions later" behavior without
+            // needing a separate startAge search dimension.
+            spendingNeed = essentialFloor * inflationFactor(year)
+            taxAfterConversion = computeMarginalTax(maxConversion, otherIncome)
+            availableForSpending = taxableBalance - taxAfterConversion
+            if availableForSpending < spendingNeed:
+                reduce maxConversion until
+                    taxableBalance - tax(reducedConversion) >= spendingNeed
+                (if no positive conversion satisfies this, set maxConversion = 0)
        e. actualConversion = min(maxConversion, traditionalBalance)
        f. traditional -= actualConversion; roth += actualConversion
        g. conversionTax = computeTax(actualConversion + otherIncome)
@@ -457,6 +472,7 @@ Phase 2.
 | All-Roth portfolio                  | No conversions recommended                                  |
 | Exhaustion buffer > remaining years | Immediate exhaustion needed; likely infeasible, warning      |
 | SS or other income fills bracket    | Conversion amounts decrease dynamically in those years       |
+| Early retiree, small taxable pool   | Spending feasibility guard reduces/defers conversions before 59.5 |
 | Market crash in MC trial            | `actualConversion = min(scheduled, pTraditional)` prevents negative balance |
 | Filing status change (spouse death) | Not modeled in v1; noted as known limitation                 |
 
@@ -522,6 +538,9 @@ reports what percentage of trials successfully exhaust traditional on time.
   (different bracket ceilings)
 - **Taxable depleted before 59.5:** Conversions stop when taxable can't cover
   tax, resume at 59.5 with cascade
+- **Small taxable, early retiree:** Conversions are reduced or deferred to
+  preserve taxable for spending before 59.5; conversions ramp up once spending
+  pressure eases (other income starts, or 59.5 unlocks traditional/Roth)
 - **Already past RMD age:** No conversion years, RMD trajectory only
 
 ### Integration: `MonteCarloSpendingOptimizerTest`
