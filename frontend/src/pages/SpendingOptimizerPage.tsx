@@ -269,6 +269,13 @@ export default function SpendingOptimizerPage() {
                 if (profile.phases.length > 0) {
                     setPhases(profile.phases);
                 }
+                // Restore Roth conversion strategy inputs
+                if (profile.conversion_schedule) {
+                    setOptimizeConversions(true);
+                    setConversionBracketRate(profile.conversion_schedule.conversion_bracket_rate);
+                    setRmdTargetBracketRate(profile.conversion_schedule.rmd_target_bracket_rate);
+                    setExhaustionBuffer(profile.conversion_schedule.traditional_exhaustion_buffer);
+                }
             }
         });
     }, [id]);
