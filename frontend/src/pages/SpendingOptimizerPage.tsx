@@ -6,6 +6,9 @@ import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptim
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import SpendingCorridorChart from '../components/SpendingCorridorChart';
 import PortfolioFanChart from '../components/PortfolioFanChart';
+import TaxSavingsSummary from '../components/TaxSavingsSummary';
+import ConversionScheduleTable from '../components/ConversionScheduleTable';
+import TraditionalBalanceChart from '../components/TraditionalBalanceChart';
 
 type OptimizerState = 'configure' | 'running' | 'results';
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
@@ -219,6 +222,12 @@ export default function SpendingOptimizerPage() {
     const [cashReserveYears, setCashReserveYears] = useState(2);
     const [cashReturnRate, setCashReturnRate] = useState(4);
 
+    // Roth conversion parameters
+    const [optimizeConversions, setOptimizeConversions] = useState(false);
+    const [conversionBracketRate, setConversionBracketRate] = useState(0.22);
+    const [rmdTargetBracketRate, setRmdTargetBracketRate] = useState(0.12);
+    const [exhaustionBuffer, setExhaustionBuffer] = useState(5);
+
     // Advanced parameters (collapsed by default)
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [trialCount, setTrialCount] = useState(5000);
@@ -282,6 +291,12 @@ export default function SpendingOptimizerPage() {
                 phase_blend_years: phaseBlendYears,
                 risk_tolerance: riskTolerance,
                 ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
+                ...(optimizeConversions ? {
+                    optimize_conversions: true,
+                    conversion_bracket_rate: conversionBracketRate,
+                    rmd_target_bracket_rate: rmdTargetBracketRate,
+                    traditional_exhaustion_buffer: exhaustionBuffer,
+                } : {}),
             };
             const profile = await optimizeSpending(id, request);
             setResult(profile);
@@ -639,6 +654,73 @@ export default function SpendingOptimizerPage() {
                         ))}
                     </div>
 
+                    <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: optimizeConversions ? '1rem' : 0 }}>
+                            <input type="checkbox" checked={optimizeConversions}
+                                onChange={e => setOptimizeConversions(e.target.checked)} />
+                            <h3 style={{ margin: 0 }}>Roth Conversion Strategy</h3>
+                        </label>
+                        {optimizeConversions && (
+                            <div>
+                                <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '1rem' }}>
+                                    Optimize Roth conversions alongside spending to minimize lifetime taxes.
+                                    Conversions shift money from Traditional to Roth accounts, paying tax now at a
+                                    lower bracket to avoid higher RMD-driven taxes later.
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                                    <div>
+                                        <label style={labelStyle}>Conversion Bracket</label>
+                                        <select style={selectStyle} value={conversionBracketRate}
+                                            onChange={e => {
+                                                const rate = Number(e.target.value);
+                                                setConversionBracketRate(rate);
+                                                if (rmdTargetBracketRate > rate) {
+                                                    setRmdTargetBracketRate(rate);
+                                                }
+                                            }}>
+                                            <option value={0.10}>10%</option>
+                                            <option value={0.12}>12%</option>
+                                            <option value={0.22}>22%</option>
+                                            <option value={0.24}>24%</option>
+                                            <option value={0.32}>32%</option>
+                                            <option value={0.35}>35%</option>
+                                            <option value={0.37}>37%</option>
+                                        </select>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Maximum tax bracket to fill with conversions each year
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>RMD Target Bracket</label>
+                                        <select style={selectStyle} value={rmdTargetBracketRate}
+                                            onChange={e => setRmdTargetBracketRate(Number(e.target.value))}>
+                                            {[0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
+                                                .filter(r => r <= conversionBracketRate)
+                                                .map(r => (
+                                                    <option key={r} value={r}>{(r * 100).toFixed(0)}%</option>
+                                                ))}
+                                        </select>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Target bracket for RMDs after conversions are complete
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style={labelStyle}>Exhaustion Buffer</label>
+                                        <div style={adornmentWrapStyle}>
+                                            <input style={adornedInputStyle} type="number" step="1" min="1" max="15"
+                                                value={exhaustionBuffer}
+                                                onChange={e => setExhaustionBuffer(Number(e.target.value))} />
+                                            <span style={adornmentSuffixStyle}>years</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                            Years before RMDs start to exhaust Traditional balance
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <button onClick={handleOptimize}
                         style={{ padding: '0.6rem 1.5rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
                         Run Optimization
@@ -880,6 +962,26 @@ export default function SpendingOptimizerPage() {
                             </tbody>
                         </table>
                     </div>
+
+                    {result.conversion_schedule && (
+                        <div style={{ marginTop: '2rem' }}>
+                            <h3 style={{ marginBottom: '1rem' }}>Roth Conversion Strategy</h3>
+                            <TaxSavingsSummary schedule={result.conversion_schedule} />
+
+                            <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                                <h4 style={{ marginBottom: '1rem', marginTop: 0 }}>Traditional &amp; Roth IRA Balance Trajectory</h4>
+                                <TraditionalBalanceChart
+                                    years={result.conversion_schedule.years}
+                                    exhaustionAge={result.conversion_schedule.exhaustion_age}
+                                />
+                            </div>
+
+                            <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }}>
+                                <h4 style={{ marginBottom: '1rem', marginTop: 0 }}>Conversion Schedule</h4>
+                                <ConversionScheduleTable years={result.conversion_schedule.years} />
+                            </div>
+                        </div>
+                    )}
 
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button onClick={() => setState('configure')}

@@ -78,6 +78,7 @@ const mockProfile: GuardrailProfileResponse = {
     risk_tolerance: 'moderate',
     cash_reserve_years: 2,
     cash_return_rate: 0.04,
+    conversion_schedule: null,
 };
 
 function renderPage() {
