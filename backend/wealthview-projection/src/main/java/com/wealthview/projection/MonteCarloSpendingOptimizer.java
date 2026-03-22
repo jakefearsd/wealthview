@@ -128,22 +128,29 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] conversionByYear = null;
         double[] conversionTaxByYear = null;
         if (input.optimizeConversions() && initTraditional > 0 && taxCalculator != null) {
-            var convOptimizer = new RothConversionOptimizer(
-                    initTraditional, initRoth, initTaxable,
-                    Arrays.stream(incomeData).mapToDouble(IncomeYearData::totalIncome).toArray(),
-                    Arrays.stream(incomeData).mapToDouble(IncomeYearData::taxableIncome).toArray(),
-                    input.birthYear(), retirementAge, endAge,
-                    input.traditionalExhaustionBuffer(),
-                    input.conversionBracketRate() != null
-                            ? input.conversionBracketRate().doubleValue() : 0.22,
-                    input.rmdTargetBracketRate() != null
-                            ? input.rmdTargetBracketRate().doubleValue() : 0.12,
-                    input.returnMean() != null ? input.returnMean().doubleValue() : 0.10,
-                    essentialFloor, inflationRate,
-                    filingStatus, taxCalculator, withdrawalOrder,
-                    input.incomeSources(), new RentalLossCalculator(),
-                    input.rmdBracketHeadroom() != null
-                            ? input.rmdBracketHeadroom().doubleValue() : 0.10);
+            var convOptimizer = RothConversionOptimizer.builder()
+                    .portfolio(initTraditional, initRoth, initTaxable)
+                    .income(
+                            Arrays.stream(incomeData)
+                                    .mapToDouble(IncomeYearData::totalIncome).toArray(),
+                            Arrays.stream(incomeData)
+                                    .mapToDouble(IncomeYearData::taxableIncome).toArray())
+                    .demographics(input.birthYear(), retirementAge, endAge)
+                    .taxConfig(
+                            input.conversionBracketRate() != null
+                                    ? input.conversionBracketRate().doubleValue() : 0.22,
+                            input.rmdTargetBracketRate() != null
+                                    ? input.rmdTargetBracketRate().doubleValue() : 0.12,
+                            input.rmdBracketHeadroom() != null
+                                    ? input.rmdBracketHeadroom().doubleValue() : 0.10,
+                            filingStatus, taxCalculator)
+                    .assumptions(
+                            input.returnMean() != null
+                                    ? input.returnMean().doubleValue() : 0.10,
+                            essentialFloor, inflationRate,
+                            input.traditionalExhaustionBuffer(), withdrawalOrder)
+                    .rentals(input.incomeSources(), new RentalLossCalculator())
+                    .build();
 
             // Generate search paths with reduced trials for joint optimization search
             int searchTrials = Math.min(JOINT_SEARCH_TRIALS, trialCount);
