@@ -700,4 +700,78 @@ class RothConversionOptimizer {
             double lifetimeTax,
             int exhaustionAge
     ) {}
+
+    static Builder builder() { return new Builder(); }
+
+    static class Builder {
+        private double traditional, roth, taxable;
+        private double[] otherIncomeByYear, taxableIncomeByYear;
+        private int birthYear, retirementAge, endAge, exhaustionBuffer;
+        private double conversionBracketRate, rmdTargetBracketRate, returnMean;
+        private double essentialFloor, inflationRate, rmdBracketHeadroom;
+        private FilingStatus filingStatus;
+        private FederalTaxCalculator taxCalculator;
+        private String withdrawalOrder;
+        private List<ProjectionIncomeSourceInput> incomeSources;
+        private RentalLossCalculator rentalLossCalculator;
+
+        Builder portfolio(double traditional, double roth, double taxable) {
+            this.traditional = traditional;
+            this.roth = roth;
+            this.taxable = taxable;
+            return this;
+        }
+
+        Builder income(double[] otherIncome, double[] taxableIncome) {
+            this.otherIncomeByYear = otherIncome;
+            this.taxableIncomeByYear = taxableIncome;
+            return this;
+        }
+
+        Builder demographics(int birthYear, int retirementAge, int endAge) {
+            this.birthYear = birthYear;
+            this.retirementAge = retirementAge;
+            this.endAge = endAge;
+            return this;
+        }
+
+        Builder taxConfig(double convBracket, double rmdTarget, double headroom,
+                          FilingStatus status, FederalTaxCalculator calc) {
+            this.conversionBracketRate = convBracket;
+            this.rmdTargetBracketRate = rmdTarget;
+            this.rmdBracketHeadroom = headroom;
+            this.filingStatus = status;
+            this.taxCalculator = calc;
+            return this;
+        }
+
+        Builder assumptions(double returnMean, double essentialFloor,
+                            double inflationRate, int exhaustionBuffer,
+                            String withdrawalOrder) {
+            this.returnMean = returnMean;
+            this.essentialFloor = essentialFloor;
+            this.inflationRate = inflationRate;
+            this.exhaustionBuffer = exhaustionBuffer;
+            this.withdrawalOrder = withdrawalOrder;
+            return this;
+        }
+
+        Builder rentals(List<ProjectionIncomeSourceInput> sources,
+                        RentalLossCalculator calc) {
+            this.incomeSources = sources;
+            this.rentalLossCalculator = calc;
+            return this;
+        }
+
+        RothConversionOptimizer build() {
+            return new RothConversionOptimizer(
+                    traditional, roth, taxable,
+                    otherIncomeByYear, taxableIncomeByYear,
+                    birthYear, retirementAge, endAge, exhaustionBuffer,
+                    conversionBracketRate, rmdTargetBracketRate, returnMean,
+                    essentialFloor, inflationRate, filingStatus, taxCalculator,
+                    withdrawalOrder, incomeSources, rentalLossCalculator,
+                    rmdBracketHeadroom);
+        }
+    }
 }
