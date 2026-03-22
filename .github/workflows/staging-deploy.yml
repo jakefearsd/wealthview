@@ -12,6 +12,7 @@ concurrency:
 env:
   DOCKER_HOST: unix:///var/run/docker.sock
   TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+  DOCKER_API_VERSION: "1.44"
 
 jobs:
   test:
