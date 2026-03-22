@@ -5,6 +5,9 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
@@ -17,6 +20,7 @@ import java.util.Map;
  */
 class RothConversionOptimizer {
 
+    private static final Logger log = LoggerFactory.getLogger(RothConversionOptimizer.class);
     private static final int GRID_SIZE = 50;
     private static final double REFINE_HALF_WIDTH = 0.05;
     private static final int REFINE_ITERATIONS = 20;
@@ -112,19 +116,37 @@ class RothConversionOptimizer {
     private double computeTargetTraditionalBalance() {
         double distributionPeriod = RmdCalculator.distributionPeriod(rmdStartAge);
         if (distributionPeriod <= 0) {
+            log.warn("Target balance: distributionPeriod <= 0 for rmdStartAge={}", rmdStartAge);
             return 0;
         }
 
-        // Estimate other income at RMD start age
+        // Estimate taxable income at RMD start age (excludes rental cash flow,
+        // which is not directly taxable — rental tax effects are handled separately
+        // via RentalLossCalculator). Using otherIncomeByYear here would include
+        // gross rental cash, inflating the "other income" and leaving no room for RMDs.
         int rmdYearIndex = rmdStartAge - retirementAge;
-        double otherIncomeAtRmd = rmdYearIndex >= 0 && rmdYearIndex < otherIncomeByYear.length
-                ? otherIncomeByYear[rmdYearIndex] : 0;
+        double otherIncomeAtRmd = rmdYearIndex >= 0 && rmdYearIndex < taxableIncomeByYear.length
+                ? taxableIncomeByYear[rmdYearIndex] : 0;
+        // Add rental tax adjustment at RMD age (can be negative for losses)
+        if (!rentalSources.isEmpty() && rentalLossCalculator != null) {
+            var tempSuspended = initSuspendedLosses();
+            double rentalAdj = computeRentalAdjustmentForYear(rmdYearIndex, otherIncomeAtRmd, tempSuspended);
+            otherIncomeAtRmd += rentalAdj;
+        }
 
         // Bracket ceiling with headroom
         int rmdCalendarYear = birthYear + rmdStartAge;
         double grossCeiling = taxCalculator.computeMaxIncomeForBracket(
                 BigDecimal.valueOf(rmdTargetBracketRate), rmdCalendarYear, filingStatus).doubleValue();
         double availableForRmd = grossCeiling * (1 - rmdBracketHeadroom) - otherIncomeAtRmd;
+
+        log.info("Target balance computation: rmdStartAge={}, distributionPeriod={}, " +
+                "rmdYearIndex={}, otherIncomeAtRmd={}, rmdCalendarYear={}, " +
+                "rmdTargetBracketRate={}, grossCeiling={}, headroom={}, availableForRmd={}, " +
+                "result={}",
+                rmdStartAge, distributionPeriod, rmdYearIndex, otherIncomeAtRmd,
+                rmdCalendarYear, rmdTargetBracketRate, grossCeiling, rmdBracketHeadroom,
+                availableForRmd, availableForRmd > 0 ? availableForRmd * distributionPeriod : 0);
 
         if (availableForRmd <= 0) {
             return 0;
