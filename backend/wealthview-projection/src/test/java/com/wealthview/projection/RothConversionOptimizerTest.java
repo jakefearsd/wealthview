@@ -689,6 +689,66 @@ class RothConversionOptimizerTest {
     }
 
     @Test
+    void optimize_passiveProperty_conversionPhasesOutException_lessAggressive() {
+        // The $25K passive loss exception phases out at MAGI $100K-$150K.
+        // A large conversion pushes MAGI above $150K, eliminating the exception.
+        // The optimizer must account for this: with passive properties, conversions
+        // that destroy the passive loss benefit should be penalized by higher tax.
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        int birthYear = 1963;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        Map<Integer, BigDecimal> depByYear = new java.util.HashMap<>();
+        int firstYear = birthYear + retirementAge;
+        for (int y = 0; y < years; y++) {
+            depByYear.put(firstYear + y, new BigDecimal("60000"));
+        }
+
+        // Net rental: $30K - $10K - $3K - $60K = -$33K loss
+        // Passive: only $25K deductible via exception (if MAGI < $100K)
+        // But any conversion > ~$85K pushes MAGI over $100K, reducing the exception
+        var passiveSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Passive Rental", "rental_property",
+                new BigDecimal("30000"), retirementAge, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("3000"), "straight_line", depByYear);
+
+        // Same property as active REPS — full deduction regardless of MAGI
+        var activeSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Active REPS", "rental_property",
+                new BigDecimal("30000"), retirementAge, null,
+                BigDecimal.ZERO, false, "rental_active_reps",
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("3000"), "straight_line", depByYear);
+
+        var passiveOpt = buildOptimizerWithRentals(
+                500_000, 0, 200_000, otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge, 5, 0.22, 0.22, 0.06,
+                30_000, 0.03, FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                List.of(passiveSource), new RentalLossCalculator());
+
+        var activeOpt = buildOptimizerWithRentals(
+                500_000, 0, 200_000, otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge, 5, 0.22, 0.22, 0.06,
+                30_000, 0.03, FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                List.of(activeSource), new RentalLossCalculator());
+
+        var passiveResult = passiveOpt.optimize();
+        var activeResult = activeOpt.optimize();
+
+        // Passive should have higher lifetime tax because the $25K exception
+        // is phased out by conversions, reducing the tax benefit
+        assertThat(passiveResult.lifetimeTaxWith())
+                .as("Passive property should have higher lifetime tax than REPS "
+                        + "(conversion MAGI phases out $25K exception)")
+                .isGreaterThan(activeResult.lifetimeTaxWith());
+    }
+
+    @Test
     void optimize_rentalLossesOffsetConversionTax_notJustBracketSpace() {
         // Regression test: rental losses must reduce the TAX on conversions,
         // not just increase bracket space. With a $100K REPS loss, converting
