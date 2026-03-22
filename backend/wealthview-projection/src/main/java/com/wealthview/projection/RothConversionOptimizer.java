@@ -399,6 +399,15 @@ class RothConversionOptimizer {
                     double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
                     double maxConversion = bracketSpace * conversionFraction;
 
+                    // Loss utilization floor: when rental losses create tax-free
+                    // conversion capacity, convert at least enough to use the losses.
+                    // Wasting free conversion in loss years forces expensive conversion
+                    // in later years when losses are smaller.
+                    if (rentalAdj < 0) {
+                        double freeCapacity = Math.min(Math.abs(rentalAdj), bracketSpace);
+                        maxConversion = Math.max(maxConversion, freeCapacity);
+                    }
+
                     // Cap conversions: don't convert below the target balance
                     // projected back from RMD age to the current year
                     double yearsToRmd = rmdStartAge - age;
