@@ -35,6 +35,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome);
 
+    default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
+                                                            BigDecimal overrideAmount) {
+        return executeRothConversion(year, effectiveOtherIncome);
+    }
+
     void floorAtZero();
 
     /**
@@ -389,6 +394,28 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
             BigDecimal actual = effectiveLimit.min(traditional);
+            traditional = traditional.subtract(actual);
+            roth = roth.add(actual);
+
+            if (taxCalculator != null) {
+                BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
+                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
+                BigDecimal tax = detailed.totalTax();
+                lastTaxBreakdown = detailed;
+                TaxSourceResult taxSource = deductFromPools(tax);
+                return new ConversionResult(actual, tax, taxSource);
+            }
+            return new ConversionResult(actual, BigDecimal.ZERO, TaxSourceResult.ZERO);
+        }
+
+        @Override
+        public ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
+                                                                BigDecimal overrideAmount) {
+            if (overrideAmount.compareTo(BigDecimal.ZERO) <= 0
+                    || traditional.compareTo(BigDecimal.ZERO) <= 0) {
+                return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
+            }
+            BigDecimal actual = overrideAmount.min(traditional);
             traditional = traditional.subtract(actual);
             roth = roth.add(actual);
 

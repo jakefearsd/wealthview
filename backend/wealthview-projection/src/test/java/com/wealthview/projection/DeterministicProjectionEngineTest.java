@@ -3964,4 +3964,136 @@ class DeterministicProjectionEngineTest {
                     .isLessThanOrEqualTo(year1.spendingSurplus().max(BigDecimal.ZERO).add(bd("1")));
         }
     }
+
+    // === Double-conversion fix: optimizer conversion schedule override ===
+
+    @Test
+    void run_withGuardrailConversionSchedule_usesOverrideInsteadOfFillBracket() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        // Guardrail spending with a conversion schedule: $25,000 conversion in year 1, $0 in year 2
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("72938"), bd("60000"),
+                        bd("90000"), bd("30000"), bd("42938"), BigDecimal.ZERO,
+                        bd("72938"), "Early"),
+                new GuardrailYearlySpending(currentYear + 1, 67, bd("73000"), bd("60000"),
+                        bd("90000"), bd("30000"), bd("43000"), BigDecimal.ZERO,
+                        bd("73000"), "Early"));
+
+        // Optimizer says: convert $25,000 in year 1, nothing in year 2
+        var conversionByYear = Map.of(currentYear, bd("25000"));
+
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears, conversionByYear);
+
+        // params_json has fill_bracket at 12% — which would normally convert much more
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Override Test",
+                LocalDate.now().minusYears(1), 68, bd("0.0300"),
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.0500", "traditional"),
+                        acct("100000", "0", "0.0500", "roth")),
+                null, null, List.of(), guardrailInput, List.of());
+
+        var result = engineTax.run(input);
+
+        // Year 1 should use the optimizer's $25,000 conversion, NOT fill_bracket
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isNotNull();
+        assertThat(year1.rothConversionAmount()).isEqualByComparingTo(bd("25000"));
+
+        // Year 2: no conversion in the schedule → $0 conversion (NOT fill_bracket)
+        var year2 = result.yearlyData().get(1);
+        // conversionByYear doesn't have an entry for year 2, so conversion should be zero
+        assertThat(year2.rothConversionAmount()).isNull();
+    }
+
+    @Test
+    void run_withGuardrailNullConversionSchedule_usesFillBracketNormally() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("72938"), bd("60000"),
+                        bd("90000"), bd("30000"), bd("42938"), BigDecimal.ZERO,
+                        bd("72938"), "Early"));
+
+        // null conversionByYear → should fall back to fill_bracket from params_json
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears, null);
+
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "No Override Test",
+                LocalDate.now().minusYears(1), 67, bd("0.0300"),
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.0500", "traditional"),
+                        acct("100000", "0", "0.0500", "roth")),
+                null, null, List.of(), guardrailInput, List.of());
+
+        var result = engineTax.run(input);
+
+        // Should use fill_bracket → conversion amount should be the bracket ceiling
+        // (standard deduction $15,700 + 12% bracket ceiling ~$48,475 = ~$64,175 total income space)
+        var year1 = result.yearlyData().getFirst();
+        assertThat(year1.rothConversionAmount()).isNotNull();
+        // fill_bracket at 12% converts more than $25,000 with $500k traditional balance
+        assertThat(year1.rothConversionAmount()).isGreaterThan(bd("25000"));
+    }
+
+    @Test
+    void run_withGuardrailConversionSchedule_feasibilityIsAlwaysTrue() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int birthYear = LocalDate.now().getYear() - 66;
+        int currentYear = LocalDate.now().getYear();
+
+        // Guardrail spending with conversion schedule — optimizer already validated sustainability
+        var guardrailYears = List.of(
+                new GuardrailYearlySpending(currentYear, 66, bd("72938"), bd("60000"),
+                        bd("90000"), bd("30000"), bd("42938"), BigDecimal.ZERO,
+                        bd("72938"), "Early"),
+                new GuardrailYearlySpending(currentYear + 1, 67, bd("73000"), bd("60000"),
+                        bd("90000"), bd("30000"), bd("43000"), BigDecimal.ZERO,
+                        bd("73000"), "Early"));
+
+        var conversionByYear = Map.of(
+                currentYear, bd("50000"),
+                currentYear + 1, bd("50000"));
+
+        var guardrailInput = new GuardrailSpendingInput(guardrailYears, conversionByYear);
+
+        // Large conversions that would create tax pushing feasibility negative
+        var input = new ProjectionInput(
+                UUID.randomUUID(), "Feasibility Override Test",
+                LocalDate.now().minusYears(1), 68, bd("0.0300"),
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.0500", "traditional"),
+                        acct("100000", "0", "0.0500", "roth")),
+                null, null, List.of(), guardrailInput, List.of());
+
+        var result = engineTax.run(input);
+
+        // Optimizer-validated plan should always be feasible
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+    }
 }
