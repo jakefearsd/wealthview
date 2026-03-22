@@ -25,5 +25,9 @@ public record GuardrailOptimizationInput(
         int cashReserveYears,
         BigDecimal cashReturnRate,
         String filingStatus,
-        String withdrawalOrder
+        String withdrawalOrder,
+        boolean optimizeConversions,
+        BigDecimal conversionBracketRate,
+        BigDecimal rmdTargetBracketRate,
+        int traditionalExhaustionBuffer
 ) {}

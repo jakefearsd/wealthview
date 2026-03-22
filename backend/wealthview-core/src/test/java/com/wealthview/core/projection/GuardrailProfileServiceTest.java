@@ -98,7 +98,8 @@ class GuardrailProfileServiceTest {
                         new BigDecimal("63000"), "Early")),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
                 new BigDecimal("100000"), new BigDecimal("500000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
 
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
@@ -111,7 +112,8 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 5000, new BigDecimal("0.95"), phases,
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         var result = service.optimize(tenantId, scenarioId, request);
 
@@ -129,7 +131,8 @@ class GuardrailProfileServiceTest {
                 scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         assertThatThrownBy(() -> service.optimize(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -161,7 +164,8 @@ class GuardrailProfileServiceTest {
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
                 new BigDecimal("100000"), new BigDecimal("500000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -171,7 +175,8 @@ class GuardrailProfileServiceTest {
                 scenarioId, "New Plan", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -292,7 +297,8 @@ class GuardrailProfileServiceTest {
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
                 new BigDecimal("100000"), new BigDecimal("500000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
@@ -302,7 +308,8 @@ class GuardrailProfileServiceTest {
                 scenarioId, "Guardrail", new BigDecimal("30000"), BigDecimal.ZERO,
                 null, null, null, null, List.of(),
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         service.optimize(tenantId, scenarioId, request);
 
@@ -349,7 +356,8 @@ class GuardrailProfileServiceTest {
                 List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
                 new BigDecimal("100000"), new BigDecimal("500000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
         when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))

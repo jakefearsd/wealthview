@@ -69,7 +69,8 @@ class GuardrailControllerTest {
                         new BigDecimal("63000"), "Early")),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
                 new BigDecimal("100000"), new BigDecimal("500000"),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
     }
 
     @Test
@@ -83,7 +84,8 @@ class GuardrailControllerTest {
                 BigDecimal.ZERO, null, null, null, null,
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
                         .with(authenticatedAdmin())
@@ -105,7 +107,8 @@ class GuardrailControllerTest {
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
                 BigDecimal.ZERO, null, null, null, null, List.of(),
                 null, null, null, null,
-                null, null);
+                null, null,
+                null, null, null, null);
 
         mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
                         .with(authenticatedAdmin())

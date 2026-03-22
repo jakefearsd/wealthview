@@ -172,7 +172,11 @@ public class GuardrailProfileService {
                 existing.getPhaseBlendYears(),
                 existing.getRiskTolerance(),
                 existing.getCashReserveYears(),
-                existing.getCashReturnRate());
+                existing.getCashReturnRate(),
+                existing.getTraditionalExhaustionBuffer() != null,
+                existing.getConversionBracketRate(),
+                existing.getRmdTargetBracketRate(),
+                existing.getTraditionalExhaustionBuffer());
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -243,7 +247,12 @@ public class GuardrailProfileService {
                 request.cashReturnRate() != null
                         ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE,
                 filingStatus,
-                withdrawalOrder != null ? withdrawalOrder : "taxable_first"
+                withdrawalOrder != null ? withdrawalOrder : "taxable_first",
+                request.optimizeConversions() != null && request.optimizeConversions(),
+                request.conversionBracketRate(),
+                request.rmdTargetBracketRate(),
+                request.traditionalExhaustionBuffer() != null
+                        ? request.traditionalExhaustionBuffer() : 5
         );
     }
 
