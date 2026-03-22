@@ -34,6 +34,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final double DEFAULT_BLOCK_LENGTH = 5.0;
+    private static final int JOINT_GRID_SIZE = 20;
+    private static final double JOINT_REFINE_HALF_WIDTH = 0.1;
+    private static final int JOINT_REFINE_ITERATIONS = 10;
+    private static final int JOINT_SEARCH_TRIALS = 500;
+    private static final double MAX_SPENDING_CEILING = 500_000;
 
     private final FederalTaxCalculator taxCalculator;
 
@@ -141,7 +146,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             ? input.rmdBracketHeadroom().doubleValue() : 0.10);
 
             // Generate search paths with reduced trials for joint optimization search
-            int searchTrials = Math.min(500, trialCount);
+            int searchTrials = Math.min(JOINT_SEARCH_TRIALS, trialCount);
             Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
             double[][] searchPaths = runMonteCarloTrials(
                     searchTrials, years, initialPortfolio, historicalReturns, searchRng, inflationRate);
@@ -156,7 +161,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     withdrawalOrder, searchMarginalRates);
 
             // Grid scan: evaluate spending at each fraction
-            int gridSize = 20;
+            int gridSize = JOINT_GRID_SIZE;
             double bestFraction = 0.0;
             double bestSpending = 0.0;
             RothConversionOptimizer.RothConversionSchedule bestSchedule = convOptimizer.baselineSchedule();
@@ -181,9 +186,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             // Ternary refinement around best fraction
-            double lo = Math.max(0.0, bestFraction - 0.1);
-            double hi = Math.min(1.0, bestFraction + 0.1);
-            for (int iter = 0; iter < 10; iter++) {
+            double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
+            double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
+            for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
                 double m1 = lo + (hi - lo) / 3.0;
                 double m2 = hi - (hi - lo) / 3.0;
 
@@ -782,7 +787,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double[] conversionByYear, double[] conversionTaxByYear, int birthYear) {
 
         double low = 0;
-        double high = 500_000;
+        double high = MAX_SPENDING_CEILING;
         double[] testDiscretionary = new double[years];
 
         for (int iter = 0; iter < 30; iter++) {
@@ -814,7 +819,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                               double[] conversionTaxByYear,
                                               int retirementAge, int birthYear) {
         double low = 0;
-        double high = 500_000;
+        double high = MAX_SPENDING_CEILING;
 
         for (int iter = 0; iter < 40; iter++) {
             double mid = (low + high) / 2;

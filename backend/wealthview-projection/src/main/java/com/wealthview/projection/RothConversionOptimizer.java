@@ -26,6 +26,8 @@ class RothConversionOptimizer {
     private static final int REFINE_ITERATIONS = 20;
     private static final int EARLY_WITHDRAWAL_AGE = 60; // proxy for 59.5
     private static final int MAGI_CONVERGENCE_ITERATIONS = 3;
+    private static final double CONVERGENCE_THRESHOLD_DOLLARS = 100;
+    private static final double FEASIBILITY_TOLERANCE = 1.05;
 
     record RothConversionSchedule(
             double[] conversionByYear,
@@ -322,7 +324,7 @@ class RothConversionOptimizer {
         if (rmdYearIndex < 0 || rmdYearIndex >= result.traditionalBalance.length) {
             return true;
         }
-        return result.traditionalBalance[rmdYearIndex] <= targetTraditionalBalance * 1.05;
+        return result.traditionalBalance[rmdYearIndex] <= targetTraditionalBalance * FEASIBILITY_TOLERANCE;
     }
 
     private boolean isBetterCandidate(double tax, boolean feasible, double bestTax, boolean bestFeasible) {
@@ -439,7 +441,7 @@ class RothConversionOptimizer {
                             : 0;
 
                     // Check convergence
-                    if (Math.abs(newConversion - convergedConversion) < 100) {
+                    if (Math.abs(newConversion - convergedConversion) < CONVERGENCE_THRESHOLD_DOLLARS) {
                         // Converged — commit the suspended losses from this iteration
                         suspendedLosses.putAll(iterSuspended);
                         convergedConversion = newConversion;
