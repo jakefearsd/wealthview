@@ -121,20 +121,47 @@ public class FederalTaxCalculator {
     }
 
     public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear, FilingStatus status) {
+        return computeMaxIncomeForBracket(targetRate, taxYear, status, null);
+    }
+
+    /**
+     * Returns the gross income ceiling for the given bracket rate, with optional
+     * inflation indexing. When brackets for the requested tax year are not seeded,
+     * falls back to the latest available year and inflates thresholds by
+     * {@code bracketInflationRate} per year gap — matching the IRS practice of
+     * annually indexing brackets to CPI.
+     */
+    public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear,
+                                                   FilingStatus status,
+                                                   BigDecimal bracketInflationRate) {
         var brackets = loadBrackets(taxYear, status);
+        BigDecimal inflationFactor = BigDecimal.ONE;
         if (brackets.isEmpty()) {
             Integer maxYear = taxBracketRepository.findMaxTaxYear();
             if (maxYear != null) {
                 brackets = loadBrackets(maxYear, status);
+                if (bracketInflationRate != null
+                        && bracketInflationRate.compareTo(BigDecimal.ZERO) > 0
+                        && taxYear > maxYear) {
+                    inflationFactor = BigDecimal.ONE.add(bracketInflationRate)
+                            .pow(taxYear - maxYear);
+                }
             }
         }
 
         BigDecimal deduction = loadStandardDeduction(taxYear, status);
+        if (inflationFactor.compareTo(BigDecimal.ONE) > 0) {
+            deduction = deduction.multiply(inflationFactor).setScale(SCALE, ROUNDING);
+        }
 
         for (var bracket : brackets) {
             if (bracket.getRate().compareTo(targetRate) == 0) {
                 if (bracket.getBracketCeiling() != null) {
-                    return bracket.getBracketCeiling().add(deduction);
+                    BigDecimal ceiling = bracket.getBracketCeiling();
+                    if (inflationFactor.compareTo(BigDecimal.ONE) > 0) {
+                        ceiling = ceiling.multiply(inflationFactor).setScale(SCALE, ROUNDING);
+                    }
+                    return ceiling.add(deduction);
                 }
                 return BigDecimal.ZERO;
             }

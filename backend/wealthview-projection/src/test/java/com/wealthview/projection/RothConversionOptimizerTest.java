@@ -14,6 +14,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -38,18 +39,23 @@ class RothConversionOptimizerTest {
                 });
 
         // Bracket ceiling: scales with rate. 22% → $100K, 10% → $45K, 12% → $55K, etc.
-        when(taxCalculator.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(invocation -> {
-                    BigDecimal rate = invocation.getArgument(0);
-                    // Simulate progressive bracket ceilings
-                    double r = rate.doubleValue();
-                    if (r <= 0.10) return new BigDecimal("45000");
-                    if (r <= 0.12) return new BigDecimal("55000");
-                    if (r <= 0.22) return new BigDecimal("100000");
-                    if (r <= 0.24) return new BigDecimal("190000");
-                    if (r <= 0.32) return new BigDecimal("245000");
-                    return new BigDecimal("600000");
-                });
+        // Stub both 3-arg and 4-arg overloads (4-arg adds inflation indexing).
+        org.mockito.stubbing.Answer<BigDecimal> bracketAnswer = invocation -> {
+            BigDecimal rate = invocation.getArgument(0);
+            double r = rate.doubleValue();
+            if (r <= 0.10) return new BigDecimal("45000");
+            if (r <= 0.12) return new BigDecimal("55000");
+            if (r <= 0.22) return new BigDecimal("100000");
+            if (r <= 0.24) return new BigDecimal("190000");
+            if (r <= 0.32) return new BigDecimal("245000");
+            return new BigDecimal("600000");
+        };
+        when(taxCalculator.computeMaxIncomeForBracket(
+                any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(bracketAnswer);
+        when(taxCalculator.computeMaxIncomeForBracket(
+                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
+                .thenAnswer(bracketAnswer);
     }
 
     private RothConversionOptimizer buildOptimizer(double initTraditional, double initRoth, double initTaxable,
@@ -387,15 +393,19 @@ class RothConversionOptimizerTest {
                     }
                     return income.multiply(new BigDecimal("0.20"));
                 });
+        org.mockito.stubbing.Answer<BigDecimal> mfjBracketAnswer = invocation -> {
+            BigDecimal rate = invocation.getArgument(0);
+            double r = rate.doubleValue();
+            if (r <= 0.10) return new BigDecimal("90000");
+            if (r <= 0.12) return new BigDecimal("110000");
+            if (r <= 0.22) return new BigDecimal("200000");
+            return new BigDecimal("400000");
+        };
         when(mfjCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(invocation -> {
-                    BigDecimal rate = invocation.getArgument(0);
-                    double r = rate.doubleValue();
-                    if (r <= 0.10) return new BigDecimal("90000");
-                    if (r <= 0.12) return new BigDecimal("110000");
-                    if (r <= 0.22) return new BigDecimal("200000");
-                    return new BigDecimal("400000");
-                });
+                .thenAnswer(mfjBracketAnswer);
+        when(mfjCalc.computeMaxIncomeForBracket(
+                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
+                .thenAnswer(mfjBracketAnswer);
 
         // Use $2M traditional so both Single and MFJ exceed their target balances
         var mfjOpt = buildOptimizer(
