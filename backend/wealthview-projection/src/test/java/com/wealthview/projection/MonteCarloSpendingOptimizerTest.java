@@ -1624,6 +1624,9 @@ class MonteCarloSpendingOptimizerTest {
                     if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
                     return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
                 });
+        // Bracket ceiling for RothConversionOptimizer
+        when(taxCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenReturn(new BigDecimal("100000"));
         return new MonteCarloSpendingOptimizer(taxCalc);
     }
 
@@ -1672,6 +1675,38 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(tradSpending).isLessThan(rothSpending);
         // The difference should be material (at least 10% less)
         assertThat(tradSpending).isLessThan(rothSpending * 0.90);
+    }
+
+    @Test
+    void optimize_withConversionSchedule_producesConversionScheduleResponse() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("800000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.conversionSchedule()).isNotNull();
+        assertThat(result.conversionSchedule().years()).isNotEmpty();
+        assertThat(result.conversionSchedule().lifetimeTaxWithConversions())
+                .isLessThan(result.conversionSchedule().lifetimeTaxWithout());
+        assertThat(result.conversionSchedule().taxSavings())
+                .isGreaterThan(BigDecimal.ZERO);
     }
 
     @Test
