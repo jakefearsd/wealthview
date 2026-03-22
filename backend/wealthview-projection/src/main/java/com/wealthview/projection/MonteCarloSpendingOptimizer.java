@@ -1160,7 +1160,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * Returns [fromTaxable, fromTraditional, fromRoth].
      * When preAge595 is true, only the taxable pool is available (59.5 early withdrawal rule).
      */
-    private static double[] splitWithdrawal(double taxable, double traditional, double roth,
+    static double[] splitWithdrawal(double taxable, double traditional, double roth,
                                               double need, String order, boolean preAge595) {
         if (need <= 0) return new double[]{0, 0, 0};
         if (preAge595) {
