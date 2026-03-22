@@ -19,6 +19,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify Docker access
+        run: |
+          echo "Groups: $(id -Gn)"
+          echo "Docker socket: $(ls -la /var/run/docker.sock)"
+          docker ps
+          echo "Docker is accessible"
+
       - name: Run tests
         run: cd backend && mvn clean test -T 1C -B
 
