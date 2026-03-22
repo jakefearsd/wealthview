@@ -7,10 +7,12 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.core.projection.dto.ConversionYearDetail;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
+import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
@@ -30,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -118,7 +121,20 @@ public class ProjectionInputBuilder {
         try {
             var yearlySpending = MAPPER.readValue(profile.getYearlySpending(),
                     new TypeReference<List<GuardrailYearlySpending>>() {});
-            return new GuardrailSpendingInput(yearlySpending);
+
+            Map<Integer, BigDecimal> conversionByYear = null;
+            if (profile.getConversionSchedule() != null && !profile.getConversionSchedule().isBlank()) {
+                var scheduleResponse = MAPPER.readValue(profile.getConversionSchedule(),
+                        RothConversionScheduleResponse.class);
+                if (scheduleResponse.years() != null && !scheduleResponse.years().isEmpty()) {
+                    conversionByYear = new HashMap<>();
+                    for (var detail : scheduleResponse.years()) {
+                        conversionByYear.put(detail.calendarYear(), detail.conversionAmount());
+                    }
+                }
+            }
+
+            return new GuardrailSpendingInput(yearlySpending, conversionByYear);
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             log.warn("Failed to parse guardrail yearly_spending", e);
             return null;

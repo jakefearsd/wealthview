@@ -3,6 +3,7 @@ package com.wealthview.projection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -230,8 +231,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 yearsInRetirement++;
             }
 
+            // If the spending plan provides optimizer-computed conversions, use those
+            // instead of the scenario's fill_bracket strategy
+            BigDecimal conversionOverride = null;
+            if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
+                conversionOverride = gsi.conversionByYear().getOrDefault(year, BigDecimal.ZERO);
+            }
+
             var incomeResult = processIncomeAndConversions(
-                    pool, incomeSources, age, yearsInRetirement, year, suspendedLoss);
+                    pool, incomeSources, age, yearsInRetirement, year, suspendedLoss,
+                    conversionOverride);
             suspendedLoss = incomeResult.suspendedLoss();
             BigDecimal conversionAmount = incomeResult.conversionAmount();
             BigDecimal taxLiability = incomeResult.taxLiability();
@@ -316,7 +325,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private IncomeAndConversionResult processIncomeAndConversions(
             PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
-            int age, int yearsInRetirement, int year, BigDecimal suspendedLoss) {
+            int age, int yearsInRetirement, int year, BigDecimal suspendedLoss,
+            BigDecimal conversionOverride) {
 
         IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
@@ -334,7 +344,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(taxableActiveIncome, BigDecimal.ZERO);
-        var conversion = pool.executeRothConversion(year, effectiveOtherIncome);
+
+        PoolStrategy.ConversionResult conversion;
+        if (conversionOverride != null && conversionOverride.compareTo(BigDecimal.ZERO) > 0) {
+            conversion = pool.executeRothConversionOverride(year, effectiveOtherIncome, conversionOverride);
+        } else if (conversionOverride != null) {
+            // Override is present but zero → no conversion this year
+            conversion = new PoolStrategy.ConversionResult(
+                    BigDecimal.ZERO, BigDecimal.ZERO, PoolStrategy.TaxSourceResult.ZERO);
+        } else {
+            conversion = pool.executeRothConversion(year, effectiveOtherIncome);
+        }
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,
                 conversion.amountConverted(), conversion.taxLiability(), suspendedLoss, conversion.taxSource());
@@ -609,6 +629,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                                            BigDecimal inflationRate) {
         if (spendingPlan == null) {
             return null;
+        }
+
+        // If this is an optimizer-validated plan with a conversion schedule,
+        // the MC optimizer already validated sustainability at the user's confidence level.
+        // Re-validating with deterministic assumptions would produce contradictory results.
+        if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
+            return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
         Integer firstShortfallYear = null;

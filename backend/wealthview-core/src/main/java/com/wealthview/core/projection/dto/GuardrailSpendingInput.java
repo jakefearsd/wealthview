@@ -7,8 +7,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public record GuardrailSpendingInput(
-        List<GuardrailYearlySpending> yearlySpending
+        List<GuardrailYearlySpending> yearlySpending,
+        Map<Integer, BigDecimal> conversionByYear
 ) implements SpendingPlan {
+
+    public GuardrailSpendingInput(List<GuardrailYearlySpending> yearlySpending) {
+        this(yearlySpending, null);
+    }
 
     public Map<Integer, GuardrailYearlySpending> byYear() {
         return yearlySpending.stream()
