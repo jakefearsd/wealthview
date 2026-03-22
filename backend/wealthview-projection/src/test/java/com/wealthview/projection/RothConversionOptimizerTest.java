@@ -689,6 +689,63 @@ class RothConversionOptimizerTest {
     }
 
     @Test
+    void optimize_rentalLossesOffsetConversionTax_notJustBracketSpace() {
+        // Regression test: rental losses must reduce the TAX on conversions,
+        // not just increase bracket space. With a $100K REPS loss, converting
+        // $100K should be nearly tax-free (loss offsets conversion income).
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        int birthYear = 1963;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        // REPS property with $100K depreciation → $100K loss (gross=0, just depreciation)
+        Map<Integer, BigDecimal> depByYear = new java.util.HashMap<>();
+        int firstYear = birthYear + retirementAge;
+        for (int y = 0; y < years; y++) {
+            depByYear.put(firstYear + y, new BigDecimal("100000"));
+        }
+        var rentalSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "High Depreciation", "rental_property",
+                BigDecimal.ZERO, retirementAge, null,
+                BigDecimal.ZERO, false, "rental_active_reps",
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, "cost_seg", depByYear);
+
+        var withLosses = buildOptimizerWithRentals(
+                500_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth",
+                List.of(rentalSource), new RentalLossCalculator());
+
+        var withoutLosses = buildOptimizer(
+                500_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                birthYear, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var resultWith = withLosses.optimize();
+        var resultWithout = withoutLosses.optimize();
+
+        // With $100K REPS losses, the conversion tax should be MUCH lower
+        // because losses offset conversion income (not just expand bracket space)
+        double taxPerDollarWith = resultWith.lifetimeTaxWith()
+                / java.util.Arrays.stream(resultWith.conversionByYear()).sum();
+        double taxPerDollarWithout = resultWithout.lifetimeTaxWith()
+                / java.util.Arrays.stream(resultWithout.conversionByYear()).sum();
+
+        assertThat(taxPerDollarWith)
+                .as("Tax per dollar converted with losses should be materially lower")
+                .isLessThan(taxPerDollarWithout * 0.75); // at least 25% lower effective rate
+    }
+
+    @Test
     void optimize_noRentalProperties_sameBehaviorAsBeforeEnhancement() {
         int retirementAge = 62;
         int endAge = 90;
