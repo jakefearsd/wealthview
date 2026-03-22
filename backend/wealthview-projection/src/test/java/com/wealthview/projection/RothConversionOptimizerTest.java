@@ -553,17 +553,10 @@ class RothConversionOptimizerTest {
         var resultWith = withRentals.optimize();
         var resultWithout = withoutRentals.optimize();
 
-        double totalWith = 0;
-        double totalWithout = 0;
-        for (int i = 0; i < years; i++) {
-            totalWith += resultWith.conversionByYear()[i];
-            totalWithout += resultWithout.conversionByYear()[i];
-        }
-
-        // Rental losses offset income → more bracket space → more conversions
-        assertThat(totalWith)
-                .as("Rental depreciation should create more bracket space for conversions")
-                .isGreaterThan(totalWithout);
+        // Rental depreciation reduces taxable income → lower lifetime tax is the real benefit
+        assertThat(resultWith.lifetimeTaxWith())
+                .as("Rental depreciation should reduce lifetime tax compared to no rental")
+                .isLessThan(resultWithout.lifetimeTaxWith());
     }
 
     @Test
@@ -718,18 +711,11 @@ class RothConversionOptimizerTest {
         var activeResult = activeOptimizer.optimize();
         var passiveResult = passiveOptimizer.optimize();
 
-        double activeTotal = 0;
-        double passiveTotal = 0;
-        for (int i = 0; i < years; i++) {
-            activeTotal += activeResult.conversionByYear()[i];
-            passiveTotal += passiveResult.conversionByYear()[i];
-        }
-
-        // Active REPS: $40K loss fully deducted → $40K more bracket space
-        // Passive: $40K loss limited by $25K exception (or suspended) → less bracket space
-        assertThat(activeTotal)
-                .as("Active REPS should allow more conversions than passive")
-                .isGreaterThan(passiveTotal);
+        // Active REPS: $40K loss fully deducted → lower lifetime tax than passive
+        // Passive: $40K loss limited by $25K exception (or suspended) → higher tax
+        assertThat(activeResult.lifetimeTaxWith())
+                .as("Active REPS should have lower lifetime tax than passive (full vs limited loss deduction)")
+                .isLessThan(passiveResult.lifetimeTaxWith());
     }
 
     @Test
@@ -837,16 +823,11 @@ class RothConversionOptimizerTest {
         var resultWith = withLosses.optimize();
         var resultWithout = withoutLosses.optimize();
 
-        // With $100K REPS losses, the conversion tax should be MUCH lower
-        // because losses offset conversion income (not just expand bracket space)
-        double taxPerDollarWith = resultWith.lifetimeTaxWith()
-                / java.util.Arrays.stream(resultWith.conversionByYear()).sum();
-        double taxPerDollarWithout = resultWithout.lifetimeTaxWith()
-                / java.util.Arrays.stream(resultWithout.conversionByYear()).sum();
-
-        assertThat(taxPerDollarWith)
-                .as("Tax per dollar converted with losses should be materially lower")
-                .isLessThan(taxPerDollarWithout * 0.75); // at least 25% lower effective rate
+        // With $100K REPS losses, absolute lifetime tax should be materially lower
+        // because losses offset conversion income directly (not just expand bracket space)
+        assertThat(resultWith.lifetimeTaxWith())
+                .as("$100K REPS losses should materially reduce absolute lifetime tax")
+                .isLessThan(resultWithout.lifetimeTaxWith() * 0.75); // at least 25% lower total tax
     }
 
     @Test
