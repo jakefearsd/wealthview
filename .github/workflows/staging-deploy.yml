@@ -1,0 +1,57 @@
+name: Staging Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-wealthview
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run tests
+        run: cd backend && mvn clean test -T 1C -B
+
+  build-and-deploy:
+    needs: test
+    runs-on: self-hosted
+    env:
+      STAGING_DIR: /home/jakefear/staging/wealthview
+      IMAGE_NAME: wealthview
+      IMAGE_TAG: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t $IMAGE_NAME:$IMAGE_TAG .
+
+      - name: Deploy to staging
+        run: |
+          cd $STAGING_DIR
+          docker compose down
+          docker compose up -d
+
+      - name: Wait for healthy
+        run: |
+          echo "Waiting for app to start..."
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8081/actuator/health > /dev/null 2>&1; then
+              echo "Staging is healthy!"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "WARNING: Health check timed out after 150s"
+          docker compose -f $STAGING_DIR/docker-compose.yml logs app --tail 50
+          exit 1
+
+      - name: Clean up old images
+        if: always()
+        run: docker image prune -f --filter "until=168h"
