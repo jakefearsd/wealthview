@@ -281,6 +281,7 @@ export interface GuardrailProfileResponse {
     risk_tolerance: string | null;
     cash_reserve_years: number;
     cash_return_rate: number;
+    conversion_schedule: RothConversionScheduleResponse | null;
 }
 
 export interface RentalPropertyYearDetail {
@@ -299,6 +300,32 @@ export interface RentalPropertyYearDetail {
     cash_flow: number;
 }
 
+export interface ConversionYearDetail {
+    calendar_year: number;
+    age: number;
+    conversion_amount: number;
+    estimated_tax: number;
+    traditional_balance_after: number;
+    roth_balance_after: number;
+    projected_rmd: number;
+    other_income: number;
+    total_taxable_income: number;
+    bracket_used: string;
+}
+
+export interface RothConversionScheduleResponse {
+    lifetime_tax_with_conversions: number;
+    lifetime_tax_without: number;
+    tax_savings: number;
+    exhaustion_age: number;
+    exhaustion_target_met: boolean;
+    conversion_bracket_rate: number;
+    rmd_target_bracket_rate: number;
+    traditional_exhaustion_buffer: number;
+    mc_exhaustion_pct: number | null;
+    years: ConversionYearDetail[];
+}
+
 export interface GuardrailOptimizationRequest {
     scenario_id: string;
     name: string;
@@ -315,4 +342,8 @@ export interface GuardrailOptimizationRequest {
     risk_tolerance?: 'conservative' | 'moderate' | 'aggressive';
     cash_reserve_years?: number;
     cash_return_rate?: number;
+    optimize_conversions?: boolean;
+    conversion_bracket_rate?: number;
+    rmd_target_bracket_rate?: number;
+    traditional_exhaustion_buffer?: number;
 }
