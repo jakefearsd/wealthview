@@ -87,7 +87,7 @@ class MonteCarloSpendingOptimizerTest {
                 cashReserveYears,
                 cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO,
                 null, null,
-                false, null, null, 5
+                false, null, null, 5, null
         );
     }
 
@@ -774,7 +774,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, null, null,
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var aggressiveInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -787,7 +787,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.50"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, null, null,
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var conservativeResult = optimizer.optimize(conservativeInput);
         var aggressiveResult = optimizer.optimize(aggressiveInput);
@@ -1430,7 +1430,7 @@ class MonteCarloSpendingOptimizerTest {
                 1000, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, null, null,
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var resultWithInflation = optimizer.optimize(withInflation);
         var resultNoInflation = optimizer.optimize(noInflation);
@@ -1468,7 +1468,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, null, null,
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var result = optimizer.optimize(zeroInflation);
 
@@ -1648,7 +1648,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         // All Traditional — withdrawals taxed at 20%
         var tradInput = new GuardrailOptimizationInput(
@@ -1662,7 +1662,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var taxOptimizer = taxAwareOptimizer();
         var rothResult = taxOptimizer.optimize(rothInput);
@@ -1697,7 +1697,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
 
         var taxOptimizer = progressiveTaxOptimizer();
         var result = taxOptimizer.optimize(input);
@@ -1740,7 +1740,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
         assertThat(result).isNotNull();
@@ -1762,7 +1762,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                false, null, null, 5);
+                false, null, null, 5, null);
         var result = optimizer.optimize(inputOld);
         assertThat(result.yearlySpending()).isNotEmpty();
         assertThat(result.conversionSchedule()).isNull();
@@ -1784,7 +1784,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
         assertThat(result.conversionSchedule()).isNotNull();
@@ -1809,7 +1809,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
         assertThat(result).isNotNull();
@@ -1870,7 +1870,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
 
         var taxOptimizer = progressiveTaxOptimizer();
         var result = taxOptimizer.optimize(input);
@@ -1905,7 +1905,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                false, null, null, 5);
+                false, null, null, 5, null);
 
         var noConvResult = taxOptimizer.optimize(noConvInput);
         double noConvSpending = noConvResult.yearlySpending().getFirst().recommended().doubleValue();
@@ -1934,7 +1934,7 @@ class MonteCarloSpendingOptimizerTest {
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
                 0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null);
 
         var taxOptimizer = progressiveTaxOptimizer();
         var result = taxOptimizer.optimize(input);

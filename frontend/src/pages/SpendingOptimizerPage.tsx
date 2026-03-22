@@ -227,6 +227,7 @@ export default function SpendingOptimizerPage() {
     const [conversionBracketRate, setConversionBracketRate] = useState(0.22);
     const [rmdTargetBracketRate, setRmdTargetBracketRate] = useState(0.12);
     const [exhaustionBuffer, setExhaustionBuffer] = useState(5);
+    const [rmdBracketHeadroom, setRmdBracketHeadroom] = useState(10);
 
     // Advanced parameters (collapsed by default)
     const [showAdvanced, setShowAdvanced] = useState(false);
@@ -275,6 +276,9 @@ export default function SpendingOptimizerPage() {
                     setConversionBracketRate(profile.conversion_schedule.conversion_bracket_rate);
                     setRmdTargetBracketRate(profile.conversion_schedule.rmd_target_bracket_rate);
                     setExhaustionBuffer(profile.conversion_schedule.traditional_exhaustion_buffer);
+                    if (profile.conversion_schedule.rmd_bracket_headroom != null) {
+                        setRmdBracketHeadroom(Math.round(profile.conversion_schedule.rmd_bracket_headroom * 100));
+                    }
                 }
             }
         });
@@ -303,6 +307,7 @@ export default function SpendingOptimizerPage() {
                     conversion_bracket_rate: conversionBracketRate,
                     rmd_target_bracket_rate: rmdTargetBracketRate,
                     traditional_exhaustion_buffer: exhaustionBuffer,
+                    rmd_bracket_headroom: rmdBracketHeadroom / 100,
                 } : {}),
             };
             const profile = await optimizeSpending(id, request);
@@ -712,15 +717,15 @@ export default function SpendingOptimizerPage() {
                                         </div>
                                     </div>
                                     <div>
-                                        <label style={labelStyle}>Exhaustion Buffer</label>
+                                        <label style={labelStyle}>RMD Bracket Headroom</label>
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="1" min="1" max="15"
-                                                value={exhaustionBuffer}
-                                                onChange={e => setExhaustionBuffer(Number(e.target.value))} />
-                                            <span style={adornmentSuffixStyle}>years</span>
+                                            <input style={adornedInputStyle} type="number" step="1" min="5" max="25"
+                                                value={rmdBracketHeadroom}
+                                                onChange={e => setRmdBracketHeadroom(Number(e.target.value))} />
+                                            <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                         <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Years before RMDs start to exhaust Traditional balance
+                                            Reserve headroom for market growth years. Higher = more conservative.
                                         </div>
                                     </div>
                                 </div>

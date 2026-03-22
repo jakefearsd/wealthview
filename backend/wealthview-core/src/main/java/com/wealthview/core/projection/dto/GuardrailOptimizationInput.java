@@ -29,5 +29,6 @@ public record GuardrailOptimizationInput(
         boolean optimizeConversions,
         BigDecimal conversionBracketRate,
         BigDecimal rmdTargetBracketRate,
-        int traditionalExhaustionBuffer
+        int traditionalExhaustionBuffer,
+        BigDecimal rmdBracketHeadroom
 ) {}
