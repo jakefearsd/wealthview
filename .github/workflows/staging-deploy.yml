@@ -9,6 +9,10 @@ concurrency:
   group: staging-wealthview
   cancel-in-progress: true
 
+env:
+  DOCKER_HOST: unix:///var/run/docker.sock
+  TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: /var/run/docker.sock
+
 jobs:
   test:
     runs-on: self-hosted
