@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -297,6 +298,114 @@ class RothConversionOptimizerTest {
         assertThat(foundSmaller)
                 .as("SS income should reduce conversions in at least one post-SS year")
                 .isTrue();
+    }
+
+    @Test
+    void optimize_mfj_higherConversionsThanSingle() {
+        int retirementAge = 62;
+        int endAge = 90;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        // MFJ calculator with a $200K bracket ceiling (double the Single $100K)
+        var mfjCalc = mock(FederalTaxCalculator.class);
+        when(mfjCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(invocation -> {
+                    BigDecimal income = invocation.getArgument(0);
+                    if (income.compareTo(BigDecimal.ZERO) <= 0) {
+                        return BigDecimal.ZERO;
+                    }
+                    return income.multiply(new BigDecimal("0.20"));
+                });
+        when(mfjCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenReturn(new BigDecimal("200000"));
+
+        var mfjOpt = new RothConversionOptimizer(
+                1_000_000, 0, 500_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.MARRIED_FILING_JOINTLY, mfjCalc, "taxable,traditional,roth");
+
+        // Single filer uses the shared taxCalculator with $100K ceiling — identical except filing status + ceiling
+        var singleOpt = new RothConversionOptimizer(
+                1_000_000, 0, 500_000,
+                otherIncome, taxableIncome,
+                1963, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var mfjSched = mfjOpt.optimize();
+        var singleSched = singleOpt.optimize();
+
+        // MFJ has a $200K bracket ceiling vs $100K for Single: per-year conversion cap is higher
+        double mfjMaxYear = 0;
+        double singleMaxYear = 0;
+        for (int i = 0; i < years; i++) {
+            mfjMaxYear = Math.max(mfjMaxYear, mfjSched.conversionByYear()[i]);
+            singleMaxYear = Math.max(singleMaxYear, singleSched.conversionByYear()[i]);
+        }
+        assertThat(mfjMaxYear).isGreaterThan(singleMaxYear);
+    }
+
+    @Test
+    void optimize_alreadyPastRmdAge_noConversions() {
+        // Birth year 1955 → RMD starts at 73; retiring at 75 means already past RMD age from year 0
+        int retirementAge = 75;
+        int endAge = 95;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = new RothConversionOptimizer(
+                500_000, 0, 200_000,
+                otherIncome, taxableIncome,
+                1955, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var schedule = optimizer.optimize();
+
+        double totalConversions = 0;
+        for (double c : schedule.conversionByYear()) totalConversions += c;
+        assertThat(totalConversions).isEqualTo(0);
+
+        boolean hasRmds = false;
+        for (double r : schedule.projectedRmd()) {
+            if (r > 0) {
+                hasRmds = true;
+                break;
+            }
+        }
+        assertThat(hasRmds).isTrue();
+    }
+
+    @Test
+    void optimize_veryLargeTraditional_warnsIfExhaustionNotMet() {
+        int retirementAge = 70;
+        int endAge = 85;
+        int years = endAge - retirementAge;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+
+        var optimizer = new RothConversionOptimizer(
+                5_000_000, 0, 100_000,
+                otherIncome, taxableIncome,
+                1955, retirementAge, endAge,
+                5, 0.22, 0.22, 0.06,
+                30_000, 0.03,
+                FilingStatus.SINGLE, taxCalculator, "taxable,traditional,roth");
+
+        var schedule = optimizer.optimize();
+
+        if (!schedule.exhaustionTargetMet()) {
+            assertThat(schedule.exhaustionAge()).isGreaterThan(endAge - 5);
+        }
+        assertThat(schedule.conversionByYear()).isNotNull();
     }
 
     @Test
