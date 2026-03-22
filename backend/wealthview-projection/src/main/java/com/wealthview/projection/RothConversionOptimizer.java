@@ -435,12 +435,15 @@ class RothConversionOptimizer {
         if (additionalIncome <= 0) {
             return 0;
         }
-        // Ensure base income is non-negative for tax calculation
-        double effectiveBase = Math.max(0, baseIncome);
+        // Do NOT clamp baseIncome to zero before adding additionalIncome.
+        // When baseIncome is negative (rental losses), the loss offsets the
+        // additional income: tax(base + additional) computes tax on the NET amount.
+        // The tax calculator itself handles negative input by returning $0.
         double taxWithout = taxCalculator.computeTax(
-                BigDecimal.valueOf(effectiveBase), calendarYear, filingStatus).doubleValue();
+                BigDecimal.valueOf(Math.max(0, baseIncome)), calendarYear, filingStatus).doubleValue();
         double taxWith = taxCalculator.computeTax(
-                BigDecimal.valueOf(effectiveBase + additionalIncome), calendarYear, filingStatus).doubleValue();
+                BigDecimal.valueOf(Math.max(0, baseIncome + additionalIncome)),
+                calendarYear, filingStatus).doubleValue();
         return Math.max(0, taxWith - taxWithout);
     }
 
