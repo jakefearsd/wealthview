@@ -9,6 +9,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.RentalLossCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
@@ -94,12 +95,21 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
         }
 
+        // Compute rental-aware taxable income for marginal rate pre-computation.
+        // This adjusts the base taxable income with rental property depreciation,
+        // passive loss rules, and carryforward so that MC trial withdrawal tax
+        // estimates reflect actual bracket positions.
+        double[] rentalAwareTaxableIncome = computeRentalAwareTaxableIncome(
+                taxableIncomeByYear, input.incomeSources(),
+                incomeData, retirementAge, input.birthYear(), years);
+
         // Stage 2: Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
                 portfolioPaths, incomeByYear, essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
 
-        double[] marginalRates = precomputeMarginalRates(taxableIncomeByYear, retirementYear, years, filingStatus);
+        double[] marginalRates = precomputeMarginalRates(
+                rentalAwareTaxableIncome, retirementYear, years, filingStatus);
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
                         withdrawalOrder, marginalRates)
@@ -122,7 +132,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             ? input.rmdTargetBracketRate().doubleValue() : 0.12,
                     input.returnMean() != null ? input.returnMean().doubleValue() : 0.10,
                     essentialFloor, inflationRate,
-                    filingStatus, taxCalculator, withdrawalOrder);
+                    filingStatus, taxCalculator, withdrawalOrder,
+                    input.incomeSources(), new RentalLossCalculator());
             convSchedule = convOptimizer.optimize();
             conversionByYear = convSchedule.conversionByYear();
             conversionTaxByYear = convSchedule.conversionTaxByYear();
@@ -1105,6 +1116,80 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private static double nullSafe(BigDecimal value) {
         return value != null ? value.doubleValue() : 0.0;
+    }
+
+    /**
+     * Enhances taxableIncomeByYear with rental property effects: depreciation
+     * deductions, passive loss rules, and suspended loss carryforward. This gives
+     * the MC trial withdrawal-tax estimates a more accurate baseline income.
+     */
+    private double[] computeRentalAwareTaxableIncome(double[] baseTaxableIncome,
+                                                      List<ProjectionIncomeSourceInput> sources,
+                                                      IncomeYearData[] incomeData,
+                                                      int retirementAge, int birthYear, int years) {
+        double[] result = Arrays.copyOf(baseTaxableIncome, years);
+        if (sources == null || sources.isEmpty()) {
+            return result;
+        }
+
+        var rentalSources = sources.stream()
+                .filter(s -> "rental_property".equals(s.incomeType()))
+                .toList();
+        if (rentalSources.isEmpty()) {
+            return result;
+        }
+
+        var calculator = new RentalLossCalculator();
+        var suspendedBySource = new java.util.HashMap<ProjectionIncomeSourceInput, BigDecimal>();
+        for (var source : rentalSources) {
+            suspendedBySource.put(source, BigDecimal.ZERO);
+        }
+
+        for (int y = 0; y < years; y++) {
+            int age = retirementAge + y;
+            int calendarYear = birthYear + age;
+            double baseOtherIncome = y < baseTaxableIncome.length ? baseTaxableIncome[y] : 0;
+            double yearAdjustment = 0;
+
+            for (var source : rentalSources) {
+                if (!isActiveForAge(source, age)) {
+                    continue;
+                }
+
+                double gross = source.annualAmount().doubleValue();
+                if (source.inflationRate() != null
+                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
+                    gross *= Math.pow(1 + source.inflationRate().doubleValue(), y);
+                }
+
+                double expenses = nullSafe(source.annualOperatingExpenses())
+                        + nullSafe(source.annualPropertyTax());
+                double depreciation = 0;
+                if (source.depreciationByYear() != null) {
+                    var depBd = source.depreciationByYear().get(calendarYear);
+                    if (depBd != null) {
+                        depreciation = depBd.doubleValue();
+                    }
+                }
+                double mortgageInterest = nullSafe(source.annualMortgageInterest());
+                double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
+
+                var priorSuspended = suspendedBySource.get(source);
+                var lossResult = calculator.applyLossRules(
+                        BigDecimal.valueOf(netRentalIncome),
+                        source.taxTreatment(),
+                        BigDecimal.ZERO,
+                        BigDecimal.valueOf(Math.max(0, baseOtherIncome)),
+                        priorSuspended);
+
+                suspendedBySource.put(source, lossResult.lossSuspended());
+                yearAdjustment += lossResult.netTaxableIncome().doubleValue();
+            }
+
+            result[y] = Math.max(0, result[y] + yearAdjustment);
+        }
+
+        return result;
     }
 
     private double totalPortfolio(List<ProjectionAccountInput> accounts) {
