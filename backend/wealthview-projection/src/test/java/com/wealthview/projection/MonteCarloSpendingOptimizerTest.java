@@ -1722,4 +1722,100 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(result.yearlySpending()).isNotEmpty();
         assertThat(result.failureRate()).isNotNull();
     }
+
+    @Test
+    void optimize_preAge595_withdrawalsFromTaxableOnly() {
+        var phases = List.of(new GuardrailPhaseInput("All", 55, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1975, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("300000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("700000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
+    }
+
+    @Test
+    void optimize_noConversions_identicalToExistingBehavior() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var inputOld = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5);
+        var result = optimizer.optimize(inputOld);
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.conversionSchedule()).isNull();
+    }
+
+    @Test
+    void optimize_withConversions_mcExhaustionPctIsReported() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+        assertThat(result.conversionSchedule()).isNotNull();
+        assertThat(result.conversionSchedule().mcExhaustionPct()).isNotNull();
+        assertThat(result.conversionSchedule().mcExhaustionPct())
+                .isBetween(BigDecimal.ZERO, BigDecimal.ONE);
+    }
+
+    @Test
+    void optimize_marketCrash_conversionCappedAtTraditionalBalance() {
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("400000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("100000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5);
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        for (var ys : result.yearlySpending()) {
+            assertThat(ys.recommended().doubleValue()).isGreaterThanOrEqualTo(0);
+            assertThat(Double.isNaN(ys.recommended().doubleValue())).isFalse();
+        }
+    }
 }
