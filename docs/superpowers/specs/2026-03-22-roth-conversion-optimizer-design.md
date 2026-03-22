@@ -85,7 +85,8 @@ or `MonteCarloSpendingOptimizer` with the required inputs.
 - Retirement age
 - End age and exhaustion buffer → exhaustion age = endAge - buffer
 - Conversion bracket rate and RMD target bracket rate
-- Filing status
+- Filing status (sourced from the scenario's `params_json`, piped through
+  `GuardrailProfileService` — not a new request field)
 - Expected return (`returnMean`) for deterministic growth projection
 - `FederalTaxCalculator` for bracket ceilings and tax computation
 
@@ -94,51 +95,67 @@ or `MonteCarloSpendingOptimizer` with the required inputs.
 **Search variable:** `conversionFraction` ∈ [0.0, 1.0] — the fraction of
 available conversion bracket space to use each year.
 
-**Search method:** Ternary search (not binary search). The lifetime tax function
-is approximately unimodal — conversion tax increases with fraction while RMD tax
-decreases. Ternary search correctly finds the minimum of a unimodal function by
-evaluating two interior points per iteration and eliminating the outer third that
-cannot contain the minimum. ~40 iterations yield precision to 10⁻¹² on the
-fraction, far more than needed.
+**Search method:** Hybrid grid scan + ternary refinement. The lifetime tax
+function is approximately unimodal, but income dynamics (SS starting,
+income sources ending) can introduce local irregularities. To guard against
+non-unimodality:
+
+1. **Coarse grid scan:** Evaluate lifetime tax at 50 evenly-spaced fractions
+   across [0.0, 1.0]. Filter to feasible candidates (traditional exhausts by
+   deadline). Record the fraction with minimum lifetime tax.
+2. **Ternary refinement:** Refine around the best grid point using ternary
+   search within a ±5% window (~30 iterations for sub-dollar precision).
+
+Each evaluation is one deterministic forward simulation of ~30 years —
+the full search completes in microseconds.
 
 **For each candidate fraction, forward-simulate the full retirement timeline:**
 
 ```
+Initialize: priorYearEndTraditional = initial traditional balance
+
 for each year from retirement to endAge:
     age = retirementAge + yearIndex
 
     1. Apply growth: all pools *= (1 + returnMean)
 
     2. If pre-RMD and traditional > 0:
-       a. bracketSpace = bracketCeiling(conversionBracketRate, filingStatus)
-                         - otherIncome[year]
-       b. maxConversion = bracketSpace * conversionFraction
-       c. If age < 59.5:
-            maxAffordableTax = estimateTaxOnConversion(maxConversion, otherIncome)
-            if taxableBalance < maxAffordableTax:
+       a. bracketCeiling = taxCalculator.computeMaxIncomeForTargetRate(
+              conversionBracketRate, calendarYear, filingStatus)
+       b. bracketSpace = max(0, bracketCeiling - otherIncome[year])
+       c. maxConversion = bracketSpace * conversionFraction
+       d. If age < 59.5:
+            conversionTaxEstimate = computeMarginalTax(maxConversion, otherIncome)
+            if taxableBalance < conversionTaxEstimate:
                 reduce maxConversion until taxableBalance can cover the tax
-       d. actualConversion = min(maxConversion, traditionalBalance)
-       e. traditional -= actualConversion; roth += actualConversion
-       f. conversionTax = computeTax(actualConversion + otherIncome) - computeTax(otherIncome)
-       g. Deduct conversionTax from pools:
+       e. actualConversion = min(maxConversion, traditionalBalance)
+       f. traditional -= actualConversion; roth += actualConversion
+       g. conversionTax = computeTax(actualConversion + otherIncome)
+                          - computeTax(otherIncome)
+       h. Deduct conversionTax from pools:
             - Before 59.5: taxable only
             - At 59.5+: taxable → traditional → roth cascade
 
     3. If RMD year (age ≥ rmdStartAge) and traditional > 0:
-       a. rmd = priorYearEndTraditionalBalance / distributionPeriod(age)
+       a. rmd = priorYearEndTraditional / distributionPeriod(age)
        b. Force withdraw max(rmd, spendingNeedFromTraditional)
-       c. If rmd > spending need: deposit excess to taxable (it's forced income)
+       c. If rmd > spending need: deposit excess to taxable (forced income)
+       d. Compute tax on traditional withdrawal amount
 
     4. Execute spending withdrawals:
        a. Before 59.5: taxable pool only
        b. At 59.5+: split across pools per withdrawal order
        c. Spending estimate: use essentialFloor as proxy (see Known Approximations)
 
-    5. Compute withdrawal tax on traditional withdrawals
+    5. Compute withdrawal tax on traditional withdrawals (if not already
+       computed in step 3)
 
     6. Accumulate lifetimeTax += conversionTax + withdrawalTax
 
-    7. Track traditionalBalance trajectory and exhaustion year
+    7. Set priorYearEndTraditional = current traditionalBalance
+       (after all operations — used for next year's RMD computation)
+
+    8. Track traditionalBalance trajectory and exhaustion year
 ```
 
 **Scoring:** `lifetimeTax` — lower is better. A candidate is **feasible** if
@@ -150,15 +167,24 @@ result with `exhaustionTargetMet = false` and a warning.
 **Baseline:** Also evaluate fraction=0.0 to compute "lifetime tax without
 conversions" for the comparison display.
 
+**Tax computation:** Uses `FederalTaxCalculator` for bracket ceilings. Lifetime
+tax totals include both federal and state tax (computed via `computeTax()` which
+accounts for both). Bracket ceilings are inflation-adjusted per year — the
+existing `FederalTaxCalculator` supports year-based bracket lookups, falling
+back to the latest available year when future years are not seeded.
+
 #### Output: `RothConversionSchedule`
 
-Internal record (not API-facing) consumed by `MonteCarloSpendingOptimizer`:
+Internal record (not API-facing) consumed by `MonteCarloSpendingOptimizer`.
+Uses `double` arrays for performance consistency with the MC hot loop:
 
 ```java
 record RothConversionSchedule(
     double[] conversionByYear,       // conversion amount per retirement year
     double[] conversionTaxByYear,    // tax cost per year
     double[] traditionalBalance,     // balance trajectory
+    double[] rothBalance,            // balance trajectory
+    double[] taxableBalance,         // balance trajectory
     double[] projectedRmd,           // RMD per year (0 for pre-RMD years)
     double lifetimeTaxWith,          // total tax with conversions
     double lifetimeTaxWithout,       // total tax without conversions
@@ -168,6 +194,10 @@ record RothConversionSchedule(
 )
 ```
 
+Conversion from `double[]` to `BigDecimal`-based API DTOs happens in the
+response builder within `GuardrailProfileService` (same pattern as existing
+`toBD()` conversion in the MC optimizer).
+
 ### New Component: `RmdCalculator`
 
 Package-private utility class in `wealthview-projection`.
@@ -176,7 +206,10 @@ Package-private utility class in `wealthview-projection`.
 
 1. **RMD start age:** `rmdStartAge(int birthYear)` → 73 or 75
 2. **RMD computation:** `computeRmd(double priorYearEndBalance, int age)` →
-   required distribution amount
+   required distribution amount. Returns 0 if balance ≤ 0 or age < 72.
+   The caller (`RothConversionOptimizer`, `MonteCarloSpendingOptimizer`) is
+   responsible for checking whether the individual has reached their personal
+   RMD start age (73 or 75) before calling this method.
 3. **Uniform Lifetime Table:** Full static `double[]` lookup for ages 72–120
    (IRS Publication 590-B, Table III)
 
@@ -184,10 +217,11 @@ Package-private utility class in `wealthview-projection`.
 `RothConversionOptimizer` and `MonteCarloSpendingOptimizer`.
 
 **RMD timing rule:** The RMD for a given year is based on the account balance
-as of December 31 of the **prior** year. The forward simulation computes RMD
-at the start of each year using the end-of-year balance from the prior year
-(which is the balance after growth, conversions, and withdrawals from the
-prior year).
+as of December 31 of the **prior** year. The forward simulation tracks this
+via a `priorYearEndTraditional` variable, set at the end of each loop
+iteration to the traditional balance after all that year's operations
+(growth, conversions, withdrawals). Initialized to the starting traditional
+balance for the first year.
 
 ### Integration with `MonteCarloSpendingOptimizer` (Phase 2)
 
@@ -207,33 +241,47 @@ prior year).
 
 Accept `double[] conversionByYear` and `double[] conversionTaxByYear` from
 the schedule (null when conversions not optimized — preserves existing behavior).
+Also accept `int retirementAge` and `int birthYear` to compute age per year
+for the 59.5 rule and RMD enforcement.
 
 For each year in each MC trial:
 
 ```
 1. Apply growth (existing)
-2. If conversionByYear[y] > 0:
-   a. pTraditional -= conversionByYear[y]
-   b. pRoth += conversionByYear[y]
-   c. Deduct conversionTaxByYear[y] from pools:
-      - Before 59.5: taxable only. If taxable insufficient, cap at what's available.
-      - At 59.5+: taxable → traditional → roth cascade
-3. If RMD year and pTraditional > 0:
-   a. Compute RMD from prior-year-end pTraditional
-   b. Force traditional withdrawal of at least RMD amount
-   c. Deposit excess (RMD - spending need from traditional) to taxable
+
+2. If conversionByYear != null and conversionByYear[y] > 0:
+   a. actualConversion = min(conversionByYear[y], pTraditional)
+   b. pTraditional -= actualConversion
+   c. pRoth += actualConversion
+   d. actualTax = conversionTaxByYear[y]
+          * (actualConversion / conversionByYear[y])   // scale if capped
+   e. Deduct actualTax from pools:
+      - If age < 59.5: taxable only
+      - If age ≥ 59.5: taxable → traditional → roth cascade
+
+3. If age ≥ rmdStartAge and pTraditional > 0:
+   a. Track priorYearEndTraditional per trial
+   b. rmd = RmdCalculator.computeRmd(priorYearEndTraditional, age)
+   c. Force traditional withdrawal of at least rmd
+   d. Deposit excess (rmd - spending need from traditional) to taxable
+
 4. Execute spending withdrawal (existing, but modified):
-   a. Before 59.5: draw from taxable only
-   b. At 59.5+: splitWithdrawal() per withdrawal order (existing)
+   a. If age < 59.5: draw from taxable only
+   b. If age ≥ 59.5: splitWithdrawal() per withdrawal order (existing)
+
 5. Compute withdrawal tax (existing)
+
 6. Surplus handling (existing)
+
+7. Set priorYearEndTraditional = pTraditional (for next year's RMD)
 ```
 
 #### Changes to `splitWithdrawal()`
 
-Add an `age` parameter (or a `boolean preAge595`). When `preAge595 = true`,
-return all withdrawal from taxable regardless of configured order. Traditional
-and Roth are excluded.
+Add a `boolean preAge595` parameter. When `preAge595 = true`, return all
+withdrawal from taxable regardless of configured order. Traditional and
+Roth pools are excluded. This preserves the existing method signature for
+callers that don't need age awareness (they pass `false`).
 
 #### What doesn't change
 
@@ -245,7 +293,7 @@ and Roth are excluded.
 
 #### Performance
 
-Phase 1 is microseconds (~40 deterministic forward simulations of ~30 years).
+Phase 1 is microseconds (~80 deterministic forward simulations of ~30 years).
 Phase 2 runs exactly as before — same trial count, same binary search depth.
 No meaningful performance impact.
 
@@ -272,6 +320,7 @@ record RothConversionScheduleResponse(
     BigDecimal conversionBracketRate,
     BigDecimal rmdTargetBracketRate,
     int traditionalExhaustionBuffer,
+    BigDecimal mcExhaustionPct,          // % of MC trials that exhaust on time
     List<ConversionYearDetail> years
 )
 
@@ -279,13 +328,13 @@ record ConversionYearDetail(
     int calendarYear,
     int age,
     BigDecimal conversionAmount,
-    BigDecimal estimatedTax,
+    BigDecimal estimatedTax,             // includes federal + state tax
     BigDecimal traditionalBalanceAfter,
     BigDecimal rothBalanceAfter,
     BigDecimal projectedRmd,
     BigDecimal otherIncome,
     BigDecimal totalTaxableIncome,
-    String bracketUsed
+    String bracketUsed                   // format: "22%" (human-readable)
 )
 ```
 
@@ -323,12 +372,15 @@ No new endpoints. The existing optimization flow handles everything:
   `conversion_schedule` from persisted entity (null if not optimized).
 
 - `POST /api/v1/projections/{scenarioId}/guardrail/reoptimize` — re-runs
-  with persisted conversion parameters.
+  with persisted conversion parameters. The `conversion_bracket_rate`,
+  `rmd_target_bracket_rate`, and `traditional_exhaustion_buffer` are
+  read from the persisted entity, matching the pattern used for other
+  guardrail parameters.
 
 ### Validation
 
 - `rmd_target_bracket_rate` must be ≤ `conversion_bracket_rate`
-- `traditional_exhaustion_buffer` must be ≥ 1 and ≤ 20
+- `traditional_exhaustion_buffer` must be ≥ 1 and ≤ 15
 - Both bracket rates must be valid federal bracket rates (0.10, 0.12, 0.22,
   0.24, 0.32, 0.35, 0.37)
 
@@ -357,6 +409,7 @@ Three new sections appear when `conversion_schedule` is non-null:
 - "Lifetime tax with conversions: $X"
 - "Lifetime tax without conversions: $Y"
 - "Estimated savings: $Z"
+- "X% of simulated scenarios exhaust traditional on time"
 - Warning banner if `exhaustionTargetMet = false`
 
 **2. Conversion Schedule Table**
@@ -372,7 +425,7 @@ Year-by-year table spanning full retirement (conversion years + RMD years):
 | Traditional Balance  | Balance after conversion/withdrawal    |
 | Roth Balance         | Balance after conversion               |
 | Projected RMD        | RMD amount (0 in pre-RMD era)          |
-| Bracket              | Federal bracket landed in              |
+| Bracket              | Federal bracket landed in (e.g., "22%")|
 
 This is the "hand it to your CPA" output.
 
@@ -398,12 +451,14 @@ Phase 2.
 |-------------------------------------|-------------------------------------------------------------|
 | No traditional balance              | Return no-op result, no conversions recommended             |
 | Already past RMD age at retirement  | No pre-RMD conversion years; compute RMD trajectory only    |
-| Taxable depleted before 59.5        | Conversions stop (can't pay tax); resume at 59.5 if traditional remains |
+| Taxable depleted before 59.5        | Conversions stop (can't pay tax); resume at 59.5 with cascade |
 | Very large traditional balance      | Maximum conversions may not exhaust on time; `exhaustionTargetMet = false` with warning |
 | Retirement age ≥ 59.5              | No 59.5 restriction applies                                 |
 | All-Roth portfolio                  | No conversions recommended                                  |
 | Exhaustion buffer > remaining years | Immediate exhaustion needed; likely infeasible, warning      |
 | SS or other income fills bracket    | Conversion amounts decrease dynamically in those years       |
+| Market crash in MC trial            | `actualConversion = min(scheduled, pTraditional)` prevents negative balance |
+| Filing status change (spouse death) | Not modeled in v1; noted as known limitation                 |
 
 ## Known Approximations
 
@@ -420,12 +475,22 @@ quickly but adds complexity. Deferred to a future version.
 **Growth rate:** Phase 1 uses `returnMean` for deterministic growth projection.
 Actual returns are stochastic. Phase 2's MC trials validate whether the plan
 works across market conditions and reports what percentage of trials exhaust
-traditional on time.
+traditional on time (`mcExhaustionPct`).
 
-**Tax computation:** Phase 1 uses `FederalTaxCalculator` for bracket ceilings
-and tax computation. State tax is computed on conversion amounts as a cost but
-does not gate the conversion bracket ceiling (consistent with existing
+**Tax computation:** Uses `FederalTaxCalculator` for bracket ceilings (which
+are inflation-adjusted per year via year-based bracket lookups, falling back to
+the latest available year when future years are not seeded). Lifetime tax totals
+include both federal and state tax when a `CombinedTaxCalculator` is available.
+The conversion bracket ceiling is based on federal brackets only — state tax is
+a cost of the conversion, not a gating factor (consistent with existing
 `CombinedTaxCalculator.computeMaxIncomeForTargetRate()` behavior).
+
+**Conversion schedule fixed across MC trials:** Phase 1 produces a deterministic
+conversion schedule applied identically to every MC trial. In trials where the
+market crashes and the traditional balance is lower than the scheduled conversion,
+the actual conversion is capped at the available traditional balance. This means
+some trials will under-convert relative to the plan. The `mcExhaustionPct` metric
+reports what percentage of trials successfully exhaust traditional on time.
 
 ## Test Strategy
 
@@ -468,15 +533,17 @@ does not gate the conversion bracket ceiling (consistent with existing
 - **59.5 rule:** Pre-59.5 withdrawals come only from taxable
 - **Conversion schedule in MC trials:** Pool balances shift as expected across
   trials (traditional declines, Roth grows)
-- **Exhaustion validation:** Report what % of MC trials exhaust traditional
-  by the target age
+- **MC exhaustion percentage:** Verify `mcExhaustionPct` is computed and
+  reported correctly
+- **Market crash capping:** Verify `actualConversion = min(scheduled, pTraditional)`
+  prevents negative traditional balance
 
 ### Controller/API Tests
 
 - `optimize_conversions=true` request round-trips correctly
 - Response includes `conversion_schedule` when enabled, null when disabled
 - Validation: RMD target bracket ≤ conversion bracket (400 response)
-- Validation: exhaustion buffer in range 1–20
+- Validation: exhaustion buffer in range 1–15
 
 ### Frontend Tests (Vitest + React Testing Library)
 
@@ -488,11 +555,12 @@ does not gate the conversion bracket ceiling (consistent with existing
   when null
 - Traditional balance chart renders data points
 - Warning banner appears when `exhaustionTargetMet = false`
+- MC exhaustion percentage displayed in summary
 
 ## Implementation Sequence
 
 1. `RmdCalculator` with Uniform Lifetime Table + tests
-2. `RothConversionOptimizer` with ternary search + tests
+2. `RothConversionOptimizer` with grid scan + ternary refinement + tests
 3. Flyway migration V043
 4. Data model changes (input record, response records, entity)
 5. `isSustainable()` changes (conversion-aware pool evolution, 59.5 rule,
