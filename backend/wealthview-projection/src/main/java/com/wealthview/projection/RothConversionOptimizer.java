@@ -137,7 +137,8 @@ class RothConversionOptimizer {
         // Bracket ceiling with headroom
         int rmdCalendarYear = birthYear + rmdStartAge;
         double grossCeiling = taxCalculator.computeMaxIncomeForBracket(
-                BigDecimal.valueOf(rmdTargetBracketRate), rmdCalendarYear, filingStatus).doubleValue();
+                BigDecimal.valueOf(rmdTargetBracketRate), rmdCalendarYear, filingStatus,
+                BigDecimal.valueOf(inflationRate)).doubleValue();
         double availableForRmd = grossCeiling * (1 - rmdBracketHeadroom) - otherIncomeAtRmd;
 
         log.info("Target balance computation: rmdStartAge={}, distributionPeriod={}, " +
@@ -393,8 +394,8 @@ class RothConversionOptimizer {
 
                     // Compute bracket space and conversion amount
                     double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
-                            BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus)
-                            .doubleValue();
+                            BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus,
+                            BigDecimal.valueOf(inflationRate)).doubleValue();
                     double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
                     double maxConversion = bracketSpace * conversionFraction;
 

@@ -16,6 +16,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -1624,8 +1625,11 @@ class MonteCarloSpendingOptimizerTest {
                     if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
                     return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
                 });
-        // Bracket ceiling for RothConversionOptimizer
+        // Bracket ceiling for RothConversionOptimizer (both 3-arg and 4-arg overloads)
         when(taxCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenReturn(new BigDecimal("100000"));
+        when(taxCalc.computeMaxIncomeForBracket(
+                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
         return new MonteCarloSpendingOptimizer(taxCalc);
     }
@@ -1843,8 +1847,11 @@ class MonteCarloSpendingOptimizerTest {
                     }
                     return BigDecimal.valueOf(tax).setScale(4, java.math.RoundingMode.HALF_UP);
                 });
-        // Bracket ceiling at 22% = $100K
+        // Bracket ceiling at 22% = $100K (both 3-arg and 4-arg overloads)
         when(taxCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenReturn(new BigDecimal("100000"));
+        when(taxCalc.computeMaxIncomeForBracket(
+                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
         return new MonteCarloSpendingOptimizer(taxCalc);
     }
