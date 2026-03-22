@@ -59,6 +59,21 @@ public class GuardrailProfileService {
     @Transactional
     public GuardrailProfileResponse optimize(UUID tenantId, UUID scenarioId,
                                               GuardrailOptimizationRequest request) {
+        if (Boolean.TRUE.equals(request.optimizeConversions())) {
+            if (request.rmdTargetBracketRate() != null
+                    && request.conversionBracketRate() != null
+                    && request.rmdTargetBracketRate().compareTo(request.conversionBracketRate()) > 0) {
+                throw new IllegalArgumentException(
+                        "RMD target bracket rate must be ≤ conversion bracket rate");
+            }
+            int buffer = request.traditionalExhaustionBuffer() != null
+                    ? request.traditionalExhaustionBuffer() : 5;
+            if (buffer < 1 || buffer > 15) {
+                throw new IllegalArgumentException(
+                        "Traditional exhaustion buffer must be between 1 and 15");
+            }
+        }
+
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
 
@@ -95,9 +110,18 @@ public class GuardrailProfileService {
                     optimizationInput.phases() != null ? optimizationInput.phases() : List.of()));
             entity.setYearlySpending(MAPPER.writeValueAsString(
                     optimizerResult.yearlySpending() != null ? optimizerResult.yearlySpending() : List.of()));
+            if (optimizerResult.conversionSchedule() != null) {
+                entity.setConversionSchedule(MAPPER.writeValueAsString(optimizerResult.conversionSchedule()));
+            }
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Failed to serialize guardrail data", e);
         }
+
+        entity.setConversionBracketRate(request.conversionBracketRate());
+        entity.setRmdTargetBracketRate(request.rmdTargetBracketRate());
+        entity.setTraditionalExhaustionBuffer(
+                request.traditionalExhaustionBuffer() != null
+                        ? request.traditionalExhaustionBuffer() : 5);
 
         entity.setMedianFinalBalance(optimizerResult.medianFinalBalance());
         entity.setFailureRate(optimizerResult.failureRate());
