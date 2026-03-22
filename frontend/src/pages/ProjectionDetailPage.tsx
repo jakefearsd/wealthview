@@ -191,11 +191,14 @@ export default function ProjectionDetailPage() {
     const hasSurplusReinvested = result?.yearly_data.some(y => y.surplus_reinvested != null && y.surplus_reinvested > 0) ?? false;
 
     const computeTotalSpending = (y: ProjectionYear): number | null => {
+        // For retired years, withdrawals + income reflects actual spending (including
+        // guardrail-recommended amounts). Profile-derived essential + discretionary may
+        // show the spending PROFILE's target, which can differ from the optimizer output.
+        if (y.retired && (y.withdrawals > 0 || (y.income_streams_total != null && y.income_streams_total > 0))) {
+            return y.withdrawals + (y.income_streams_total ?? 0);
+        }
         if (y.essential_expenses != null) {
             return y.essential_expenses + (y.discretionary_after_cuts ?? y.discretionary_expenses ?? 0);
-        }
-        if (y.withdrawals > 0 || (y.income_streams_total != null && y.income_streams_total > 0)) {
-            return y.withdrawals + (y.income_streams_total ?? 0);
         }
         return null;
     };

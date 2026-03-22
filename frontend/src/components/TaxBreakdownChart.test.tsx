@@ -6,7 +6,7 @@ import type { ProjectionYear } from '../types/projection';
 vi.mock('recharts', () => ({
     ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
     ComposedChart: ({ children }: any) => <div data-testid="composed-chart">{children}</div>,
-    Bar: ({ name }: any) => <div>{name}</div>,
+    Bar: ({ name, hide }: any) => hide ? null : <div>{name}</div>,
     Line: ({ name }: any) => <div>{name}</div>,
     XAxis: () => null,
     YAxis: () => null,
