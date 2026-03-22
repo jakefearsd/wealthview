@@ -420,44 +420,14 @@ class RothConversionOptimizer {
             }
 
             // Step 4: Spending withdrawals
-            double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
-            double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
-            double withdrawalTax = 0;
+            var withdrawal = processSpendingWithdrawal(taxable, traditional, roth,
+                    yearIndex, age, baseOtherIncome, effectiveOtherIncome,
+                    rmdAmount, conversionAmount, calendarYear);
+            taxable = withdrawal.taxable();
+            traditional = withdrawal.traditional();
+            roth = withdrawal.roth();
 
-            if (netSpendingNeed > 0) {
-                if (age < EARLY_WITHDRAWAL_AGE) {
-                    taxable -= netSpendingNeed;
-                    if (taxable < 0) taxable = 0;
-                } else {
-                    double remaining = netSpendingNeed;
-                    var pools = parseWithdrawalOrder();
-                    for (var pool : pools) {
-                        if (remaining <= 0) break;
-                        switch (pool) {
-                            case "taxable" -> {
-                                double draw = Math.min(remaining, taxable);
-                                taxable -= draw;
-                                remaining -= draw;
-                            }
-                            case "traditional" -> {
-                                double draw = Math.min(remaining, traditional);
-                                traditional -= draw;
-                                remaining -= draw;
-                                withdrawalTax += computeIncrementalTax(draw,
-                                        effectiveOtherIncome + rmdAmount + conversionAmount,
-                                        calendarYear);
-                            }
-                            case "roth" -> {
-                                double draw = Math.min(remaining, roth);
-                                roth -= draw;
-                                remaining -= draw;
-                            }
-                        }
-                    }
-                }
-            }
-
-            lifetimeTax += conversionTax + withdrawalTax + rmdTax;
+            lifetimeTax += conversionTax + withdrawal.withdrawalTax() + rmdTax;
 
             priorYearEndTraditional = traditional;
             conversionByYear[yearIndex] = conversionAmount;
@@ -477,6 +447,82 @@ class RothConversionOptimizer {
     }
 
     private record ConvergenceResult(double conversionAmount, double conversionTax) {}
+
+    private record WithdrawalResult(double taxable, double traditional, double roth,
+                                    double withdrawalTax) {}
+
+    private WithdrawalResult processSpendingWithdrawal(
+            double taxable, double traditional, double roth,
+            int yearIndex, int age, double baseOtherIncome,
+            double effectiveOtherIncome, double rmdAmount, double conversionAmount,
+            int calendarYear) {
+
+        double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
+        double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
+        double withdrawalTax = 0;
+
+        if (netSpendingNeed > 0) {
+            if (age < EARLY_WITHDRAWAL_AGE) {
+                taxable -= netSpendingNeed;
+                if (taxable < 0) taxable = 0;
+            } else {
+                double remaining = netSpendingNeed;
+                var pools = parseWithdrawalOrder();
+                for (var pool : pools) {
+                    if (remaining <= 0) break;
+                    switch (pool) {
+                        case "taxable" -> {
+                            double draw = Math.min(remaining, taxable);
+                            taxable -= draw;
+                            remaining -= draw;
+                        }
+                        case "traditional" -> {
+                            double draw = Math.min(remaining, traditional);
+                            traditional -= draw;
+                            remaining -= draw;
+                            withdrawalTax += computeIncrementalTax(draw,
+                                    effectiveOtherIncome + rmdAmount + conversionAmount,
+                                    calendarYear);
+                        }
+                        case "roth" -> {
+                            double draw = Math.min(remaining, roth);
+                            roth -= draw;
+                            remaining -= draw;
+                        }
+                    }
+                }
+            }
+        }
+
+        return new WithdrawalResult(taxable, traditional, roth, withdrawalTax);
+    }
+
+    /**
+     * Constrains the conversion amount so the tax on the conversion can be paid
+     * from the taxable account without depleting funds needed for essential spending.
+     * Only applies before age 59.5 (EARLY_WITHDRAWAL_AGE), when penalty-free
+     * traditional/Roth withdrawals are unavailable.
+     */
+    private double constrainConversionByAffordability(
+            double maxConversion, double effectiveIncome, double taxable,
+            double baseOtherIncome, int yearIndex, int age, int calendarYear) {
+        if (age >= EARLY_WITHDRAWAL_AGE) {
+            return maxConversion;
+        }
+        double tentativeTax = computeIncrementalTax(
+                maxConversion, effectiveIncome, calendarYear);
+        double inflatedSpending = essentialFloor
+                * Math.pow(1 + inflationRate, yearIndex);
+        double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
+        double available = taxable - netSpendingNeed;
+        if (available <= 0) {
+            return 0;
+        } else if (tentativeTax > available) {
+            return findMaxAffordableConversion(
+                    maxConversion, effectiveIncome, calendarYear, available);
+        }
+        return maxConversion;
+    }
 
     /**
      * Iterates to find the stable Roth conversion amount where the MAGI used for
@@ -529,20 +575,9 @@ class RothConversionOptimizer {
                 maxConversion = Math.min(maxConversion, excessTraditional);
             }
 
-            if (age < EARLY_WITHDRAWAL_AGE) {
-                double tentativeTax = computeIncrementalTax(
-                        maxConversion, effectiveIncome, calendarYear);
-                double inflatedSpending = essentialFloor
-                        * Math.pow(1 + inflationRate, yearIndex);
-                double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
-                double available = taxable - netSpendingNeed;
-                if (available <= 0) {
-                    maxConversion = 0;
-                } else if (tentativeTax > available) {
-                    maxConversion = findMaxAffordableConversion(
-                            maxConversion, effectiveIncome, calendarYear, available);
-                }
-            }
+            maxConversion = constrainConversionByAffordability(
+                    maxConversion, effectiveIncome, taxable, baseOtherIncome,
+                    yearIndex, age, calendarYear);
 
             double newConversion = Math.min(maxConversion, traditional);
             double newTax = newConversion > 0
