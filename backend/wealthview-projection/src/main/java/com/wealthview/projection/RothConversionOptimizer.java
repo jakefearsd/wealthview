@@ -110,6 +110,24 @@ class RothConversionOptimizer {
     }
 
     /**
+     * Produces the conversion schedule for a specific fraction. Used by the MC optimizer's
+     * joint search loop, which scores fractions by sustainable spending rather than lifetime tax.
+     */
+    RothConversionSchedule scheduleForFraction(double fraction) {
+        var result = simulateForFraction(fraction);
+        var baseline = simulateForFraction(0.0);
+        return buildSchedule(result, baseline.lifetimeTax, fraction);
+    }
+
+    /**
+     * Returns the baseline (no conversion) schedule.
+     */
+    RothConversionSchedule baselineSchedule() {
+        var baseline = simulateForFraction(0.0);
+        return buildSchedule(baseline, baseline.lifetimeTax, 0.0);
+    }
+
+    /**
      * Computes rental taxable income adjustment for a single year using
      * RentalLossCalculator with MAGI that includes the conversion amount.
      *
