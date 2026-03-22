@@ -6,6 +6,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -20,6 +21,7 @@ class RothConversionOptimizer {
     private static final double REFINE_HALF_WIDTH = 0.05;
     private static final int REFINE_ITERATIONS = 20;
     private static final int EARLY_WITHDRAWAL_AGE = 60; // proxy for 59.5
+    private static final int MAGI_CONVERGENCE_ITERATIONS = 3;
 
     record RothConversionSchedule(
             double[] conversionByYear,
@@ -54,11 +56,8 @@ class RothConversionOptimizer {
     private final String withdrawalOrder;
     private final int years;
     private final int rmdStartAge;
-    private final List<ProjectionIncomeSourceInput> incomeSources;
+    private final List<ProjectionIncomeSourceInput> rentalSources;
     private final RentalLossCalculator rentalLossCalculator;
-
-    /** Pre-computed rental adjustment per year (can be negative for losses). */
-    private final double[] rentalAdjustmentByYear;
 
     RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
                             double[] otherIncomeByYear, double[] taxableIncomeByYear,
@@ -89,13 +88,15 @@ class RothConversionOptimizer {
         this.withdrawalOrder = withdrawalOrder;
         this.years = endAge - retirementAge;
         this.rmdStartAge = RmdCalculator.rmdStartAge(birthYear);
-        this.incomeSources = incomeSources;
         this.rentalLossCalculator = rentalLossCalculator;
-        this.rentalAdjustmentByYear = computeRentalAdjustments();
+        this.rentalSources = incomeSources != null
+                ? incomeSources.stream()
+                        .filter(s -> "rental_property".equals(s.incomeType()))
+                        .toList()
+                : List.of();
     }
 
     RothConversionSchedule optimize() {
-        // Baseline: no conversions (fraction = 0)
         var baseline = simulateForFraction(0.0);
 
         if (initTraditional <= 0) {
@@ -109,92 +110,73 @@ class RothConversionOptimizer {
     }
 
     /**
-     * Pre-computes per-year rental taxable income adjustments using RentalLossCalculator
-     * with passive loss carryforward across years. Each rental property's net taxable
-     * contribution (gross - expenses - depreciation) is run through applyLossRules() to
-     * handle passive loss limits, $25K exception, and suspended loss carryforward.
+     * Computes rental taxable income adjustment for a single year using
+     * RentalLossCalculator with MAGI that includes the conversion amount.
      *
-     * The returned array values can be negative (losses that offset other income).
+     * For REPS/active properties, MAGI doesn't affect the result — all losses
+     * are fully deductible. For passive properties, high MAGI (from conversions)
+     * phases out the $25K exception, reducing the deductible loss.
+     *
+     * @param yearIndex   year within the simulation
+     * @param magi        modified adjusted gross income INCLUDING conversion amount
+     * @param suspended   per-source suspended loss map (mutated with new values)
+     * @return net rental taxable income adjustment (negative = loss offsetting income)
      */
-    private double[] computeRentalAdjustments() {
-        double[] adjustments = new double[years];
-        if (incomeSources == null || incomeSources.isEmpty() || rentalLossCalculator == null) {
-            return adjustments;
+    private double computeRentalAdjustmentForYear(int yearIndex, double magi,
+                                                   Map<ProjectionIncomeSourceInput, BigDecimal> suspended) {
+        if (rentalSources.isEmpty() || rentalLossCalculator == null) {
+            return 0;
         }
 
-        var rentalSources = incomeSources.stream()
-                .filter(s -> "rental_property".equals(s.incomeType()))
-                .toList();
-        if (rentalSources.isEmpty()) {
-            return adjustments;
-        }
+        int age = retirementAge + yearIndex;
+        int calendarYear = birthYear + age;
+        double yearAdjustment = 0;
 
-        // Track suspended losses per property across years
-        var suspendedBySource = new java.util.HashMap<ProjectionIncomeSourceInput, BigDecimal>();
         for (var source : rentalSources) {
-            suspendedBySource.put(source, BigDecimal.ZERO);
-        }
-
-        for (int yearIndex = 0; yearIndex < years; yearIndex++) {
-            int age = retirementAge + yearIndex;
-            int calendarYear = birthYear + age;
-            double baseOtherIncome = yearIndex < otherIncomeByYear.length
-                    ? otherIncomeByYear[yearIndex] : 0;
-            double yearAdjustment = 0;
-
-            for (var source : rentalSources) {
-                if (!isActiveForAge(source, age)) {
-                    continue;
-                }
-
-                double gross = source.annualAmount().doubleValue();
-                if (source.inflationRate() != null
-                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearIndex);
-                }
-
-                double expenses = nullSafe(source.annualOperatingExpenses())
-                        + nullSafe(source.annualPropertyTax());
-                double depreciation = 0;
-                if (source.depreciationByYear() != null) {
-                    var depBd = source.depreciationByYear().get(calendarYear);
-                    if (depBd != null) {
-                        depreciation = depBd.doubleValue();
-                    }
-                }
-
-                // Net rental income: gross - deductible expenses - depreciation
-                // (mortgage interest is deductible; mortgage principal is not)
-                double mortgageInterest = nullSafe(source.annualMortgageInterest());
-                double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
-
-                var priorSuspended = suspendedBySource.get(source);
-                var lossResult = rentalLossCalculator.applyLossRules(
-                        BigDecimal.valueOf(netRentalIncome),
-                        source.taxTreatment(),
-                        BigDecimal.ZERO, // otherPassiveIncome
-                        BigDecimal.valueOf(Math.max(0, baseOtherIncome)),
-                        priorSuspended);
-
-                suspendedBySource.put(source, lossResult.lossSuspended());
-                yearAdjustment += lossResult.netTaxableIncome().doubleValue();
+            if (!isActiveForAge(source, age)) {
+                continue;
             }
 
-            adjustments[yearIndex] = yearAdjustment;
+            double gross = source.annualAmount().doubleValue();
+            if (source.inflationRate() != null
+                    && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
+                gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearIndex);
+            }
+
+            double expenses = nullSafe(source.annualOperatingExpenses())
+                    + nullSafe(source.annualPropertyTax());
+            double depreciation = 0;
+            if (source.depreciationByYear() != null) {
+                var depBd = source.depreciationByYear().get(calendarYear);
+                if (depBd != null) {
+                    depreciation = depBd.doubleValue();
+                }
+            }
+
+            double mortgageInterest = nullSafe(source.annualMortgageInterest());
+            double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
+
+            var priorSuspended = suspended.getOrDefault(source, BigDecimal.ZERO);
+            var lossResult = rentalLossCalculator.applyLossRules(
+                    BigDecimal.valueOf(netRentalIncome),
+                    source.taxTreatment(),
+                    BigDecimal.ZERO,
+                    BigDecimal.valueOf(Math.max(0, magi)),
+                    priorSuspended);
+
+            suspended.put(source, lossResult.lossSuspended());
+            yearAdjustment += lossResult.netTaxableIncome().doubleValue();
         }
 
-        return adjustments;
+        return yearAdjustment;
     }
 
-    private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
-        if (age < source.startAge()) {
-            return false;
+    private Map<ProjectionIncomeSourceInput, BigDecimal> initSuspendedLosses() {
+        var map = new HashMap<ProjectionIncomeSourceInput, BigDecimal>();
+        for (var source : rentalSources) {
+            map.put(source, BigDecimal.ZERO);
         }
-        return source.endAge() == null || age <= source.endAge();
-    }
-
-    private double nullSafe(BigDecimal value) {
-        return value != null ? value.doubleValue() : 0;
+        return map;
     }
 
     private double findOptimalFraction(SimResult baseline) {
@@ -203,7 +185,6 @@ class RothConversionOptimizer {
         double bestScore = baseline.lifetimeTax;
         boolean bestFeasible = isFeasible(baseline, exhaustionTarget);
 
-        // Phase 1: Grid scan
         for (int i = 1; i <= GRID_SIZE; i++) {
             double fraction = (double) i / GRID_SIZE;
             var result = simulateForFraction(fraction);
@@ -216,7 +197,6 @@ class RothConversionOptimizer {
             }
         }
 
-        // Phase 2: Ternary refinement around the best fraction
         double lo = Math.max(0.0, bestFraction - REFINE_HALF_WIDTH);
         double hi = Math.min(1.0, bestFraction + REFINE_HALF_WIDTH);
 
@@ -238,7 +218,6 @@ class RothConversionOptimizer {
                 lo = m1;
             }
 
-            // Check if either midpoint is better than our current best
             if (isBetterCandidate(r1.lifetimeTax, f1, bestScore, bestFeasible)) {
                 bestScore = r1.lifetimeTax;
                 bestFraction = m1;
@@ -259,17 +238,12 @@ class RothConversionOptimizer {
     }
 
     private boolean isBetterCandidate(double tax, boolean feasible, double bestTax, boolean bestFeasible) {
-        if (feasible && !bestFeasible) {
-            return true;
-        }
-        if (!feasible && bestFeasible) {
-            return false;
-        }
+        if (feasible && !bestFeasible) return true;
+        if (!feasible && bestFeasible) return false;
         return tax < bestTax;
     }
 
     private double scoringValue(double tax, boolean feasible) {
-        // Penalize infeasible solutions heavily so ternary search prefers feasible ones
         return feasible ? tax : tax + 1e12;
     }
 
@@ -279,7 +253,7 @@ class RothConversionOptimizer {
         double taxable = initTaxable;
         double priorYearEndTraditional = initTraditional;
         double lifetimeTax = 0;
-        int exhaustionAge = endAge; // default: never exhausted
+        int exhaustionAge = endAge;
 
         var conversionByYear = new double[years];
         var conversionTaxByYear = new double[years];
@@ -288,15 +262,14 @@ class RothConversionOptimizer {
         var taxableBal = new double[years];
         var projectedRmd = new double[years];
 
+        // Each simulation run tracks its own suspended loss carryforward
+        var suspendedLosses = initSuspendedLosses();
+
         for (int yearIndex = 0; yearIndex < years; yearIndex++) {
             int age = retirementAge + yearIndex;
             int calendarYear = birthYear + age;
-            double otherIncome = yearIndex < otherIncomeByYear.length ? otherIncomeByYear[yearIndex] : 0;
-
-            // Rental-aware taxable income: base other income + rental adjustment
-            // The rental adjustment can be negative (losses offsetting income)
-            double rentalAdjustment = rentalAdjustmentByYear[yearIndex];
-            double effectiveOtherIncome = otherIncome + rentalAdjustment;
+            double baseOtherIncome = yearIndex < otherIncomeByYear.length
+                    ? otherIncomeByYear[yearIndex] : 0;
 
             // Step 1: Apply growth
             traditional *= (1 + returnMean);
@@ -306,79 +279,134 @@ class RothConversionOptimizer {
             double conversionAmount = 0;
             double conversionTax = 0;
 
-            // Step 2: Roth conversions (pre-RMD years only, and only if traditional > 0)
+            // Step 2: Roth conversions (pre-RMD years only)
             if (age < rmdStartAge && traditional > 0 && conversionFraction > 0) {
-                double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
-                        BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus).doubleValue();
-                double bracketSpace = Math.max(0, bracketCeiling - effectiveOtherIncome);
-                double maxConversion = bracketSpace * conversionFraction;
+                // MAGI-aware convergence: the rental loss deduction depends on MAGI,
+                // which includes the conversion amount. Iterate to find the stable
+                // conversion amount where the MAGI used for passive loss rules matches
+                // the actual MAGI produced by the conversion.
+                //
+                // For REPS/active properties this converges in 1 iteration (MAGI
+                // doesn't affect the deduction). For passive properties with the $25K
+                // exception, 2-3 iterations suffice.
+                var savedSuspended = new HashMap<>(suspendedLosses);
+                double convergedConversion = 0;
+                double convergedTax = 0;
+                double convergedEffectiveIncome = baseOtherIncome;
 
-                if (age < EARLY_WITHDRAWAL_AGE) {
-                    // Tax guard + spending guard: before 59.5, can only pay tax from taxable
-                    double tentativeTax = computeIncrementalTax(
-                            maxConversion, effectiveOtherIncome, calendarYear);
-                    double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
-                    double netSpendingNeed = Math.max(0, inflatedSpending - otherIncome);
+                for (int conv = 0; conv < MAGI_CONVERGENCE_ITERATIONS; conv++) {
+                    // Restore suspended losses to pre-year state for each iteration
+                    var iterSuspended = new HashMap<>(savedSuspended);
 
-                    // Taxable must cover: spending + conversion tax
-                    double available = taxable - netSpendingNeed;
-                    if (available <= 0) {
-                        maxConversion = 0;
-                    } else if (tentativeTax > available) {
-                        // Binary search for max conversion that keeps tax within budget
-                        maxConversion = findMaxAffordableConversion(
-                                maxConversion, effectiveOtherIncome, calendarYear, available);
+                    // Compute rental adjustment using MAGI = base income + conversion estimate
+                    double estimatedMagi = baseOtherIncome + convergedConversion;
+                    double rentalAdj = computeRentalAdjustmentForYear(
+                            yearIndex, estimatedMagi, iterSuspended);
+                    double effectiveIncome = baseOtherIncome + rentalAdj;
+
+                    // Compute bracket space and conversion amount
+                    double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
+                            BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus)
+                            .doubleValue();
+                    double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
+                    double maxConversion = bracketSpace * conversionFraction;
+
+                    if (age < EARLY_WITHDRAWAL_AGE) {
+                        double tentativeTax = computeIncrementalTax(
+                                maxConversion, effectiveIncome, calendarYear);
+                        double inflatedSpending = essentialFloor
+                                * Math.pow(1 + inflationRate, yearIndex);
+                        double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
+                        double available = taxable - netSpendingNeed;
+                        if (available <= 0) {
+                            maxConversion = 0;
+                        } else if (tentativeTax > available) {
+                            maxConversion = findMaxAffordableConversion(
+                                    maxConversion, effectiveIncome, calendarYear, available);
+                        }
+                    }
+
+                    double newConversion = Math.min(maxConversion, traditional);
+                    double newTax = newConversion > 0
+                            ? computeIncrementalTax(newConversion, effectiveIncome, calendarYear)
+                            : 0;
+
+                    // Check convergence
+                    if (Math.abs(newConversion - convergedConversion) < 100) {
+                        // Converged — commit the suspended losses from this iteration
+                        suspendedLosses.putAll(iterSuspended);
+                        convergedConversion = newConversion;
+                        convergedTax = newTax;
+                        convergedEffectiveIncome = effectiveIncome;
+                        break;
+                    }
+
+                    convergedConversion = newConversion;
+                    convergedTax = newTax;
+                    convergedEffectiveIncome = effectiveIncome;
+
+                    // On last iteration, commit suspended losses
+                    if (conv == MAGI_CONVERGENCE_ITERATIONS - 1) {
+                        suspendedLosses.putAll(iterSuspended);
                     }
                 }
 
-                conversionAmount = Math.min(maxConversion, traditional);
+                conversionAmount = convergedConversion;
+                conversionTax = convergedTax;
+
                 if (conversionAmount > 0) {
                     traditional -= conversionAmount;
                     roth += conversionAmount;
-                    conversionTax = computeIncrementalTax(
-                            conversionAmount, effectiveOtherIncome, calendarYear);
 
-                    // Deduct conversion tax
                     if (age < EARLY_WITHDRAWAL_AGE) {
-                        // Before 59.5: from taxable only
                         taxable -= conversionTax;
-                        if (taxable < 0) {
-                            taxable = 0;
-                        }
+                        if (taxable < 0) taxable = 0;
                     } else {
-                        // At 60+: cascade taxable → traditional → roth
-                        double[] afterDeduct = deductCascade(conversionTax, taxable, traditional, roth);
+                        double[] afterDeduct = deductCascade(conversionTax, taxable,
+                                traditional, roth);
                         taxable = afterDeduct[0];
                         traditional = afterDeduct[1];
                         roth = afterDeduct[2];
                     }
                 }
+            } else if (!rentalSources.isEmpty()) {
+                // Non-conversion year: still compute rental adjustments for loss
+                // carryforward tracking (losses accumulate even when not converting)
+                double magi = baseOtherIncome + conversionAmount;
+                computeRentalAdjustmentForYear(yearIndex, magi, suspendedLosses);
             }
 
             // Step 3: RMDs
             double rmdAmount = 0;
             double rmdTax = 0;
+            double effectiveOtherIncome = baseOtherIncome
+                    + (rentalSources.isEmpty() ? 0
+                        : computeRentalAdjustmentForYear(yearIndex,
+                            baseOtherIncome + conversionAmount,
+                            new HashMap<>(suspendedLosses)));
             if (age >= rmdStartAge && traditional > 0) {
                 rmdAmount = RmdCalculator.computeRmd(priorYearEndTraditional, age);
                 rmdAmount = Math.min(rmdAmount, traditional);
                 traditional -= rmdAmount;
                 rmdTax = computeIncrementalTax(rmdAmount, effectiveOtherIncome, calendarYear);
+
+                // Non-conversion RMD year: track rental loss carryforward
+                if (conversionAmount == 0 && !rentalSources.isEmpty()) {
+                    computeRentalAdjustmentForYear(yearIndex,
+                            baseOtherIncome + rmdAmount, suspendedLosses);
+                }
             }
 
             // Step 4: Spending withdrawals
             double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
-            double netSpendingNeed = Math.max(0, inflatedSpending - otherIncome);
+            double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
             double withdrawalTax = 0;
 
             if (netSpendingNeed > 0) {
                 if (age < EARLY_WITHDRAWAL_AGE) {
-                    // Before 59.5: draw from taxable only
                     taxable -= netSpendingNeed;
-                    if (taxable < 0) {
-                        taxable = 0;
-                    }
+                    if (taxable < 0) taxable = 0;
                 } else {
-                    // At 60+: draw per withdrawal order
                     double remaining = netSpendingNeed;
                     var pools = parseWithdrawalOrder();
                     for (var pool : pools) {
@@ -393,9 +421,7 @@ class RothConversionOptimizer {
                                 double draw = Math.min(remaining, traditional);
                                 traditional -= draw;
                                 remaining -= draw;
-                                // Tax on traditional withdrawal
-                                withdrawalTax += computeIncrementalTax(
-                                        draw,
+                                withdrawalTax += computeIncrementalTax(draw,
                                         effectiveOtherIncome + rmdAmount + conversionAmount,
                                         calendarYear);
                             }
@@ -409,10 +435,8 @@ class RothConversionOptimizer {
                 }
             }
 
-            // Step 6: Accumulate lifetime tax
             lifetimeTax += conversionTax + withdrawalTax + rmdTax;
 
-            // Step 7: Track balances and prior year end
             priorYearEndTraditional = traditional;
             conversionByYear[yearIndex] = conversionAmount;
             conversionTaxByYear[yearIndex] = conversionTax;
@@ -421,7 +445,6 @@ class RothConversionOptimizer {
             taxableBal[yearIndex] = taxable;
             projectedRmd[yearIndex] = rmdAmount;
 
-            // Step 8: Track exhaustion
             if (traditional <= 0 && exhaustionAge == endAge) {
                 exhaustionAge = age;
             }
@@ -431,16 +454,14 @@ class RothConversionOptimizer {
                 rothBal, taxableBal, projectedRmd, lifetimeTax, exhaustionAge);
     }
 
-    private double computeIncrementalTax(double additionalIncome, double baseIncome, int calendarYear) {
+    private double computeIncrementalTax(double additionalIncome, double baseIncome,
+                                          int calendarYear) {
         if (additionalIncome <= 0) {
             return 0;
         }
-        // Do NOT clamp baseIncome to zero before adding additionalIncome.
-        // When baseIncome is negative (rental losses), the loss offsets the
-        // additional income: tax(base + additional) computes tax on the NET amount.
-        // The tax calculator itself handles negative input by returning $0.
         double taxWithout = taxCalculator.computeTax(
-                BigDecimal.valueOf(Math.max(0, baseIncome)), calendarYear, filingStatus).doubleValue();
+                BigDecimal.valueOf(Math.max(0, baseIncome)), calendarYear, filingStatus)
+                .doubleValue();
         double taxWith = taxCalculator.computeTax(
                 BigDecimal.valueOf(Math.max(0, baseIncome + additionalIncome)),
                 calendarYear, filingStatus).doubleValue();
@@ -463,7 +484,8 @@ class RothConversionOptimizer {
         return lo;
     }
 
-    private double[] deductCascade(double amount, double taxable, double traditional, double roth) {
+    private double[] deductCascade(double amount, double taxable, double traditional,
+                                    double roth) {
         double remaining = amount;
         if (remaining > 0 && taxable > 0) {
             double draw = Math.min(remaining, taxable);
@@ -483,6 +505,15 @@ class RothConversionOptimizer {
         return new double[]{taxable, traditional, roth};
     }
 
+    private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
+        if (age < source.startAge()) return false;
+        return source.endAge() == null || age <= source.endAge();
+    }
+
+    private double nullSafe(BigDecimal value) {
+        return value != null ? value.doubleValue() : 0;
+    }
+
     private String[] parseWithdrawalOrder() {
         if (withdrawalOrder == null || withdrawalOrder.isBlank()) {
             return new String[]{"taxable", "traditional", "roth"};
@@ -490,7 +521,8 @@ class RothConversionOptimizer {
         return withdrawalOrder.split(",");
     }
 
-    private RothConversionSchedule buildSchedule(SimResult result, double baselineTax, double fraction) {
+    private RothConversionSchedule buildSchedule(SimResult result, double baselineTax,
+                                                   double fraction) {
         int exhaustionTarget = endAge - exhaustionBuffer;
         return new RothConversionSchedule(
                 result.conversionByYear,
