@@ -28,7 +28,7 @@ jobs:
           echo "Docker is accessible"
 
       - name: Run tests
-        run: cd backend && mvn clean test -T 1C -B
+        run: cd backend && mvn clean test -T 1C -B -Dsurefire.argLine="-Dapi.version=1.44"
 
   build-and-deploy:
     needs: test
