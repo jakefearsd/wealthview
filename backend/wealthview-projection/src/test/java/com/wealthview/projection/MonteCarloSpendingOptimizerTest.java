@@ -86,7 +86,8 @@ class MonteCarloSpendingOptimizerTest {
                 phaseBlendYears,
                 cashReserveYears,
                 cashReturnRate != null ? cashReturnRate : BigDecimal.ZERO,
-                null, null
+                null, null,
+                false, null, null, 5
         );
     }
 
@@ -772,7 +773,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null, null);
+                0, BigDecimal.ZERO, null, null,
+                false, null, null, 5);
 
         var aggressiveInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
@@ -784,7 +786,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.50"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null, null);
+                0, BigDecimal.ZERO, null, null,
+                false, null, null, 5);
 
         var conservativeResult = optimizer.optimize(conservativeInput);
         var aggressiveResult = optimizer.optimize(aggressiveInput);
@@ -1426,7 +1429,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 1000, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null, null);
+                0, BigDecimal.ZERO, null, null,
+                false, null, null, 5);
 
         var resultWithInflation = optimizer.optimize(withInflation);
         var resultNoInflation = optimizer.optimize(noInflation);
@@ -1463,7 +1467,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, null, null);
+                0, BigDecimal.ZERO, null, null,
+                false, null, null, 5);
 
         var result = optimizer.optimize(zeroInflation);
 
@@ -1639,7 +1644,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, "single", "taxable_first");
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5);
 
         // All Traditional — withdrawals taxed at 20%
         var tradInput = new GuardrailOptimizationInput(
@@ -1652,7 +1658,8 @@ class MonteCarloSpendingOptimizerTest {
                 new BigDecimal("0.10"), new BigDecimal("0.15"),
                 500, new BigDecimal("0.95"), phases, 42L,
                 BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, "single", "taxable_first");
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5);
 
         var taxOptimizer = taxAwareOptimizer();
         var rothResult = taxOptimizer.optimize(rothInput);

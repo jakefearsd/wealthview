@@ -33,7 +33,8 @@ public record GuardrailProfileResponse(
         int phaseBlendYears,
         String riskTolerance,
         int cashReserveYears,
-        BigDecimal cashReturnRate
+        BigDecimal cashReturnRate,
+        RothConversionScheduleResponse conversionSchedule
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -52,7 +53,7 @@ public record GuardrailProfileResponse(
                 phases, yearlySpending, medianFinalBalance, failureRate,
                 percentile10Final, percentile90Final, stale, createdAt, updatedAt,
                 BigDecimal.ZERO, null, 0, null,
-                2, new BigDecimal("0.04"));
+                2, new BigDecimal("0.04"), null);
     }
 
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
@@ -66,6 +67,16 @@ public record GuardrailProfileResponse(
         } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
             phases = List.of();
             yearlySpending = List.of();
+        }
+
+        RothConversionScheduleResponse conversionSchedule = null;
+        if (entity.getConversionSchedule() != null && !entity.getConversionSchedule().isBlank()) {
+            try {
+                conversionSchedule = MAPPER.readValue(entity.getConversionSchedule(),
+                        RothConversionScheduleResponse.class);
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                // leave null — entity predates conversion optimizer
+            }
         }
 
         return new GuardrailProfileResponse(
@@ -92,7 +103,8 @@ public record GuardrailProfileResponse(
                 entity.getPhaseBlendYears(),
                 entity.getRiskTolerance(),
                 entity.getCashReserveYears(),
-                entity.getCashReturnRate()
+                entity.getCashReturnRate(),
+                conversionSchedule
         );
     }
 }

@@ -94,6 +94,19 @@ public class GuardrailSpendingProfileEntity {
     @Column(name = "risk_tolerance")
     private String riskTolerance;
 
+    @Column(name = "conversion_schedule", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private String conversionSchedule;
+
+    @Column(name = "conversion_bracket_rate", precision = 5, scale = 4)
+    private BigDecimal conversionBracketRate;
+
+    @Column(name = "rmd_target_bracket_rate", precision = 5, scale = 4)
+    private BigDecimal rmdTargetBracketRate;
+
+    @Column(name = "traditional_exhaustion_buffer")
+    private Integer traditionalExhaustionBuffer = 5;
+
     @Column(name = "is_stale", nullable = false)
     private boolean stale = false;
 
@@ -157,6 +170,14 @@ public class GuardrailSpendingProfileEntity {
     public void setCashReturnRate(BigDecimal cashReturnRate) { this.cashReturnRate = cashReturnRate; }
     public String getRiskTolerance() { return riskTolerance; }
     public void setRiskTolerance(String riskTolerance) { this.riskTolerance = riskTolerance; }
+    public String getConversionSchedule() { return conversionSchedule; }
+    public void setConversionSchedule(String conversionSchedule) { this.conversionSchedule = conversionSchedule; }
+    public BigDecimal getConversionBracketRate() { return conversionBracketRate; }
+    public void setConversionBracketRate(BigDecimal conversionBracketRate) { this.conversionBracketRate = conversionBracketRate; }
+    public BigDecimal getRmdTargetBracketRate() { return rmdTargetBracketRate; }
+    public void setRmdTargetBracketRate(BigDecimal rmdTargetBracketRate) { this.rmdTargetBracketRate = rmdTargetBracketRate; }
+    public Integer getTraditionalExhaustionBuffer() { return traditionalExhaustionBuffer; }
+    public void setTraditionalExhaustionBuffer(Integer traditionalExhaustionBuffer) { this.traditionalExhaustionBuffer = traditionalExhaustionBuffer; }
     public boolean isStale() { return stale; }
     public void setStale(boolean stale) { this.stale = stale; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

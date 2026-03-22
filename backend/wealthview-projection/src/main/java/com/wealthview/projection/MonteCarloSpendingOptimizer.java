@@ -265,7 +265,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.phases(), yearlySpending,
                 toBD(medianFinal), toBD(failureRate),
                 toBD(p10Final), toBD(p90Final),
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
     }
 
     private double[][] runMonteCarloTrials(int trialCount, int years,
@@ -970,6 +971,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.phases(), List.of(),
                 BigDecimal.ZERO, BigDecimal.ZERO,
                 BigDecimal.ZERO, BigDecimal.ZERO,
-                false, OffsetDateTime.now(), OffsetDateTime.now());
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
     }
 }

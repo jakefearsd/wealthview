@@ -19,5 +19,9 @@ public record GuardrailOptimizationRequest(
         Integer phaseBlendYears,
         String riskTolerance,
         Integer cashReserveYears,
-        BigDecimal cashReturnRate
+        BigDecimal cashReturnRate,
+        Boolean optimizeConversions,
+        BigDecimal conversionBracketRate,
+        BigDecimal rmdTargetBracketRate,
+        Integer traditionalExhaustionBuffer
 ) {}
