@@ -4,6 +4,7 @@ import {
     Tooltip, ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts';
 import type { ConversionYearDetail } from '../types/projection';
+import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
 
 interface Props {
     years: ConversionYearDetail[];
@@ -19,13 +20,6 @@ export default function TraditionalBalanceChart({ years, exhaustionAge }: Props)
         }));
     }, [years]);
 
-    const fmt = (value: number) =>
-        Math.abs(value) >= 1_000_000
-            ? `$${(value / 1_000_000).toFixed(1)}M`
-            : `$${(value / 1_000).toFixed(0)}k`;
-
-    const tooltipFmt = (value: number) =>
-        value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
     if (data.length === 0) {
         return <p style={{ color: '#888' }}>No balance trajectory data available.</p>;
@@ -41,12 +35,12 @@ export default function TraditionalBalanceChart({ years, exhaustionAge }: Props)
                         label={{ value: 'Age', position: 'insideBottom', offset: -5 }}
                     />
                     <YAxis
-                        tickFormatter={fmt}
+                        tickFormatter={formatDollarAxis}
                         label={{ value: 'Balance ($)', angle: -90, position: 'insideLeft' }}
                         domain={[0, 'auto']}
                     />
                     <Tooltip
-                        formatter={(value: number, name: string) => [tooltipFmt(value), name]}
+                        formatter={(value: number, name: string) => [formatDollarTooltip(value), name]}
                         labelFormatter={(age) => `Age ${age}`}
                     />
                     <Legend />

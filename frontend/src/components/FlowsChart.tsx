@@ -3,6 +3,7 @@ import {
     ReferenceLine, Legend, CartesianGrid,
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import type { ProjectionYear } from '../types/projection';
 
 interface FlowsChartProps {
@@ -11,8 +12,6 @@ interface FlowsChartProps {
 }
 
 export default function FlowsChart({ data, retirementYear }: FlowsChartProps) {
-    const tickFormatter = (v: number) =>
-        Math.abs(v) >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`;
 
     const FlowsTooltipContent = ({ active, payload, label }: any) => {
         if (!active || !payload?.length) return null;
@@ -54,7 +53,7 @@ export default function FlowsChart({ data, retirementYear }: FlowsChartProps) {
             <BarChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 12 }} width={70} />
+                <YAxis tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
                 <Tooltip content={<FlowsTooltipContent />} />
                 <Legend />
                 {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}

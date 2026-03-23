@@ -4,6 +4,7 @@ import {
     ReferenceLine, ReferenceArea, Legend, CartesianGrid,
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
+import { formatDollarAxis } from '../utils/chartFormatters';
 import { findDepletionYear, findCrossoverYear } from '../utils/projectionCalcs';
 import { interpolateMonthly } from '../utils/monthlyInterpolation';
 import type { ProjectionYear } from '../types/projection';
@@ -83,8 +84,6 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
         return opt.filter(data, retirementYear);
     }, [data, range, rangeOptions, retirementYear]);
 
-    const tickFormatter = (v: number) =>
-        Math.abs(v) >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`;
 
     const monthlyData = useMemo(() => interpolateMonthly(filteredData), [filteredData]);
     const depletion = findDepletionYear(filteredData);
@@ -203,7 +202,7 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
                         tickFormatter={xTickFormatter}
                         interval={xTickInterval}
                     />
-                    <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 12 }} width={70} />
+                    <YAxis tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
                     <Tooltip content={<BalanceTooltipContent />} />
                     <Legend />
                     {retireLabelVisible && <ReferenceLine x={retireLabel!} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}

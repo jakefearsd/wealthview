@@ -4,6 +4,7 @@ import {
     Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import type { GuardrailYearlySpending } from '../types/projection';
+import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -23,13 +24,6 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
         }));
     }, [yearlySpending]);
 
-    const fmt = (value: number) =>
-        Math.abs(value) >= 1000000
-            ? `$${(value / 1000000).toFixed(1)}M`
-            : `$${(value / 1000).toFixed(0)}k`;
-
-    const tooltipFmt = (value: number) =>
-        value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
     if (data.length === 0) {
         return <p style={{ color: '#888' }}>No portfolio balance data available.</p>;
@@ -45,14 +39,14 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                         label={{ value: 'Age', position: 'insideBottom', offset: -5 }}
                     />
                     <YAxis
-                        tickFormatter={fmt}
+                        tickFormatter={formatDollarAxis}
                         label={{ value: 'Portfolio Balance ($)', angle: -90, position: 'insideLeft' }}
                         domain={[0, 'auto']}
                     />
                     <Tooltip
                         formatter={(value: number | number[], name: string) => {
                             if (Array.isArray(value)) return [null, null];
-                            return [tooltipFmt(value), name];
+                            return [formatDollarTooltip(value), name];
                         }}
                         labelFormatter={(age) => `Age ${age}`}
                         itemSorter={(item) => {
