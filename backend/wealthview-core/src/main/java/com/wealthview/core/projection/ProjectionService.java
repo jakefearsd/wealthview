@@ -90,6 +90,7 @@ public class ProjectionService {
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
+                request.dynamicSequencingBracketRate(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
                 request.rothConversionStartYear(), request.state(),
                 request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest());
@@ -142,6 +143,7 @@ public class ProjectionService {
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
+                request.dynamicSequencingBracketRate(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
                 request.rothConversionStartYear(), request.state(),
                 request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest()));
@@ -293,7 +295,7 @@ public class ProjectionService {
                                      String withdrawalStrategy, BigDecimal dynamicCeiling,
                                      BigDecimal dynamicFloor, String filingStatus,
                                      BigDecimal otherIncome, BigDecimal annualRothConversion,
-                                     String withdrawalOrder,
+                                     String withdrawalOrder, BigDecimal dynamicSequencingBracketRate,
                                      String rothConversionStrategy, BigDecimal targetBracketRate,
                                      Integer rothConversionStartYear,
                                      String state, BigDecimal primaryResidencePropertyTax,
@@ -309,6 +311,7 @@ public class ProjectionService {
         hasContent |= putIfNotNull(node, "other_income", otherIncome);
         hasContent |= putIfNotNull(node, "annual_roth_conversion", annualRothConversion);
         hasContent |= putIfNotNull(node, "withdrawal_order", withdrawalOrder);
+        hasContent |= putIfNotNull(node, "dynamic_sequencing_bracket_rate", dynamicSequencingBracketRate);
         hasContent |= putIfNotNull(node, "roth_conversion_strategy", rothConversionStrategy);
         hasContent |= putIfNotNull(node, "target_bracket_rate", targetBracketRate);
         hasContent |= putIfNotNull(node, "roth_conversion_start_year", rothConversionStartYear);
