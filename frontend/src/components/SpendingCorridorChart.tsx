@@ -45,8 +45,21 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                     <XAxis dataKey="age" label={{ value: 'Age', position: 'insideBottom', offset: -5 }} />
                     <YAxis tickFormatter={fmt} label={{ value: 'Annual Spending ($)', angle: -90, position: 'insideLeft' }} />
                     <Tooltip
-                        formatter={(value: number, name: string) => [tooltipFmt(value), name]}
+                        formatter={(value: number | number[], name: string) => {
+                            if (Array.isArray(value)) return [null, null];
+                            return [tooltipFmt(value), name];
+                        }}
                         labelFormatter={(age) => `Age ${age}`}
+                        itemSorter={(item) => {
+                            const order: Record<string, number> = {
+                                'Recommended Spending': 0,
+                                'Corridor High': 1,
+                                'Corridor Low': 2,
+                                'Essential Floor': 3,
+                                'Income Offset': 4,
+                            };
+                            return order[item.name ?? ''] ?? 5;
+                        }}
                     />
                     <Legend />
 
@@ -54,10 +67,11 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                     <Area
                         type="monotone"
                         dataKey="corridorRange"
-                        fill="#dbeafe"
+                        fill="#e2e8f0"
                         stroke="none"
-                        name="Spending Adjustment Range"
-                        fillOpacity={0.6}
+                        name="Adjustment Range"
+                        fillOpacity={0.4}
+                        legendType="rect"
                     />
 
                     {/* Income offset area */}
@@ -71,12 +85,34 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                         name="Income Offset"
                     />
 
+                    {/* Corridor High dashed line */}
+                    <Line
+                        type="monotone"
+                        dataKey="corridorHigh"
+                        stroke="#94a3b8"
+                        strokeWidth={1}
+                        strokeDasharray="4 4"
+                        dot={false}
+                        name="Corridor High"
+                    />
+
+                    {/* Corridor Low dashed line */}
+                    <Line
+                        type="monotone"
+                        dataKey="corridorLow"
+                        stroke="#94a3b8"
+                        strokeWidth={1}
+                        strokeDasharray="4 4"
+                        dot={false}
+                        name="Corridor Low"
+                    />
+
                     {/* Recommended spending line */}
                     <Line
                         type="monotone"
                         dataKey="recommended"
                         stroke="#2563eb"
-                        strokeWidth={2}
+                        strokeWidth={3}
                         dot={false}
                         name="Recommended Spending"
                     />

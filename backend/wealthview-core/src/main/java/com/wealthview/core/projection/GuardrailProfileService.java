@@ -313,9 +313,9 @@ public class GuardrailProfileService {
         }
         if (request.riskTolerance() != null) {
             return switch (request.riskTolerance()) {
-                case "conservative" -> new BigDecimal("0.90");
-                case "moderate" -> new BigDecimal("0.80");
-                case "aggressive" -> new BigDecimal("0.70");
+                case "conservative" -> new BigDecimal("0.85");
+                case "moderate" -> new BigDecimal("0.70");
+                case "aggressive" -> new BigDecimal("0.60");
                 default -> DEFAULT_CONFIDENCE;
             };
         }
