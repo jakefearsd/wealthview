@@ -46,15 +46,49 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         this.taxCalculator = taxCalculator;
     }
 
+    private record OptimizationContext(
+            int retirementYear, int retirementAge, int endAge, int years,
+            int trialCount, double initialPortfolio,
+            double initTaxable, double initTraditional, double initRoth,
+            String withdrawalOrder, double essentialFloor, double terminalTarget,
+            double confidenceLevel, int cashReserveYears, double cashReturnRate,
+            double inflationRate, double portfolioFloor,
+            FilingStatus filingStatus, double[][] portfolioPaths,
+            double[] incomeByYear, double[] taxableIncomeByYear, double[] surplusTaxByYear,
+            IncomeYearData[] incomeData, double[] rentalAwareTaxableIncome,
+            double[] adjustedFloors, double[] marginalRates, TaxContext taxCtx,
+            double[] dsBracketCeilingByYear
+    ) {}
+
+    private record ConversionResult(
+            double[] byYear, double[] taxByYear,
+            RothConversionOptimizer.RothConversionSchedule schedule
+    ) {}
+
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
+        var ctx = prepareContext(input);
+        if (ctx.years() <= 0) {
+            return emptyResult(input);
+        }
+
+        var conv = optimizeConversions(ctx, input);
+        var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
+        return buildResponse(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
+                conv.schedule());
+    }
+
+    private OptimizationContext prepareContext(GuardrailOptimizationInput input) {
         int retirementYear = input.retirementDate().getYear();
         int retirementAge = retirementYear - input.birthYear();
         int endAge = input.endAge();
         int years = endAge - retirementAge;
 
         if (years <= 0) {
-            return emptyResult(input);
+            return new OptimizationContext(
+                    retirementYear, retirementAge, endAge, years,
+                    0, 0, 0, 0, 0, null, 0, 0, 0, 0, 0, 0, 0,
+                    null, null, null, null, null, null, null, null, null, null, null);
         }
 
         int trialCount = input.trialCount();
@@ -78,7 +112,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double inflationRate = input.inflationRate() != null
                 ? input.inflationRate().doubleValue() : 0.0;
 
-        // Stage 1: Run MC trials (no withdrawals) to get portfolio trajectories using bootstrap
+        // Run MC trials (no withdrawals) to get portfolio trajectories using bootstrap.
         // Bootstrap returns are real (CPI-adjusted); convert to nominal via Fisher equation
         // so portfolio growth matches the nominal spending/income model.
         double[][] portfolioPaths = runMonteCarloTrials(
@@ -97,7 +131,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         for (int y = 0; y < years; y++) {
             incomeByYear[y] = incomeData[y].totalIncome();
             taxableIncomeByYear[y] = incomeData[y].taxableIncome();
-            surplusTaxByYear[y] = computeSurplusTax(incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
+            surplusTaxByYear[y] = computeSurplusTax(
+                    incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
         }
 
         // Compute rental-aware taxable income for marginal rate pre-computation.
@@ -108,7 +143,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 taxableIncomeByYear, input.incomeSources(),
                 incomeData, retirementAge, input.birthYear(), years);
 
-        // Stage 2: Verify essential floor feasibility (inflation-adjusted)
+        // Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
                 portfolioPaths, incomeByYear, essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
@@ -136,221 +171,266 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
 
-        // Joint optimization: search conversion fractions by sustainable spending
-        RothConversionOptimizer.RothConversionSchedule convSchedule = null;
-        double[] conversionByYear = null;
-        double[] conversionTaxByYear = null;
-        if (input.optimizeConversions() && initTraditional > 0 && taxCalculator != null) {
-            var convOptimizer = RothConversionOptimizer.builder()
-                    .portfolio(initTraditional, initRoth, initTaxable)
-                    .income(
-                            Arrays.stream(incomeData)
-                                    .mapToDouble(IncomeYearData::totalIncome).toArray(),
-                            Arrays.stream(incomeData)
-                                    .mapToDouble(IncomeYearData::taxableIncome).toArray())
-                    .demographics(input.birthYear(), retirementAge, endAge)
-                    .taxConfig(
-                            input.conversionBracketRate() != null
-                                    ? input.conversionBracketRate().doubleValue() : 0.22,
-                            input.rmdTargetBracketRate() != null
-                                    ? input.rmdTargetBracketRate().doubleValue() : 0.12,
-                            input.rmdBracketHeadroom() != null
-                                    ? input.rmdBracketHeadroom().doubleValue() : 0.10,
-                            filingStatus, taxCalculator)
-                    .assumptions(
-                            input.returnMean() != null
-                                    ? input.returnMean().doubleValue() : 0.10,
-                            essentialFloor, inflationRate,
-                            input.traditionalExhaustionBuffer(), withdrawalOrder)
-                    .rentals(input.incomeSources(), new RentalLossCalculator())
-                    .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
-                            ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
-                    .build();
+        return new OptimizationContext(
+                retirementYear, retirementAge, endAge, years,
+                trialCount, initialPortfolio,
+                initTaxable, initTraditional, initRoth,
+                withdrawalOrder, essentialFloor, terminalTarget,
+                confidenceLevel, cashReserveYears, cashReturnRate,
+                inflationRate, portfolioFloor,
+                filingStatus, portfolioPaths,
+                incomeByYear, taxableIncomeByYear, surplusTaxByYear,
+                incomeData, rentalAwareTaxableIncome,
+                adjustedFloors, marginalRates, taxCtx,
+                dsBracketCeilingByYear);
+    }
 
-            boolean useDynamicSequencing = "dynamic_sequencing".equals(withdrawalOrder);
-
-            if (useDynamicSequencing) {
-                // When Dynamic Sequencing is active, conversions and DS are complementary
-                // strategies — conversions happen first (Phase 1), then DS handles spending
-                // withdrawals from whatever Traditional remains. Use Phase 1's tax-minimization
-                // schedule directly; the joint search would incorrectly compete the two strategies
-                // (DS draws Traditional for spending, making conversions look expensive).
-                convSchedule = convOptimizer.optimize();
-                log.info("DS mode: using Phase 1 conversion schedule (fraction={})",
-                        convSchedule.conversionFraction());
-            } else {
-                // Joint optimization: search conversion fractions by sustainable spending.
-                // Each fraction is scored by how much the MC optimizer can sustain.
-                int searchTrials = Math.min(JOINT_SEARCH_TRIALS, trialCount);
-                Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
-                double[][] searchPaths = runMonteCarloTrials(
-                        searchTrials, years, initialPortfolio, historicalReturns, searchRng, inflationRate);
-
-                double[] searchFloors = verifyEssentialFloor(
-                        searchPaths, incomeByYear, essentialFloor,
-                        confidenceLevel, years, searchTrials, inflationRate);
-
-                double[] searchMarginalRates = precomputeMarginalRates(
-                        rentalAwareTaxableIncome, retirementYear, years, filingStatus);
-                TaxContext searchTaxCtx = new TaxContext(initTaxable, initTraditional, initRoth,
-                        withdrawalOrder, searchMarginalRates);
-
-                int gridSize = JOINT_GRID_SIZE;
-                double bestFraction = 0.0;
-                double bestSpending = 0.0;
-                RothConversionOptimizer.RothConversionSchedule bestSchedule =
-                        convOptimizer.baselineSchedule();
-
-                for (int i = 0; i <= gridSize; i++) {
-                    double fraction = (double) i / gridSize;
-                    var schedule = convOptimizer.scheduleForFraction(fraction);
-
-                    double spending = evaluateSustainableSpending(
-                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                            inflationRate, searchTaxCtx,
-                            schedule.conversionByYear(), schedule.conversionTaxByYear(),
-                            input.birthYear(), dsBracketCeilingByYear);
-
-                    if (spending > bestSpending) {
-                        bestSpending = spending;
-                        bestFraction = fraction;
-                        bestSchedule = schedule;
-                    }
-                }
-
-                double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
-                double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
-                for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
-                    double m1 = lo + (hi - lo) / 3.0;
-                    double m2 = hi - (hi - lo) / 3.0;
-
-                    var s1 = convOptimizer.scheduleForFraction(m1);
-                    var s2 = convOptimizer.scheduleForFraction(m2);
-
-                    double sp1 = evaluateSustainableSpending(
-                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                            inflationRate, searchTaxCtx,
-                            s1.conversionByYear(), s1.conversionTaxByYear(), input.birthYear(),
-                            dsBracketCeilingByYear);
-
-                    double sp2 = evaluateSustainableSpending(
-                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                            inflationRate, searchTaxCtx,
-                            s2.conversionByYear(), s2.conversionTaxByYear(), input.birthYear(),
-                            dsBracketCeilingByYear);
-
-                    if (sp1 > sp2) {
-                        hi = m2;
-                    } else {
-                        lo = m1;
-                    }
-
-                    if (sp1 > bestSpending) {
-                        bestSpending = sp1;
-                        bestFraction = m1;
-                        bestSchedule = s1;
-                    }
-                    if (sp2 > bestSpending) {
-                        bestSpending = sp2;
-                        bestFraction = m2;
-                        bestSchedule = s2;
-                    }
-                }
-
-                convSchedule = bestSchedule;
-                log.info("Joint optimization: best fraction={}, sustainable spending={}",
-                        bestFraction, bestSpending);
-            }
-
-            conversionByYear = convSchedule.conversionByYear();
-            conversionTaxByYear = convSchedule.conversionTaxByYear();
+    private ConversionResult optimizeConversions(OptimizationContext ctx,
+                                                 GuardrailOptimizationInput input) {
+        if (!input.optimizeConversions() || ctx.initTraditional() <= 0 || taxCalculator == null) {
+            return new ConversionResult(null, null, null);
         }
 
-        // Stage 3: Priority-weighted discretionary allocation
-        double[] discretionaryByYear = allocateSpending(
-                portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors, terminalTarget,
-                input.phases(), retirementAge, years, trialCount,
-                confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                inflationRate, taxCtx,
-                conversionByYear, conversionTaxByYear, input.birthYear(),
-                dsBracketCeilingByYear);
+        var convOptimizer = RothConversionOptimizer.builder()
+                .portfolio(ctx.initTraditional(), ctx.initRoth(), ctx.initTaxable())
+                .income(
+                        Arrays.stream(ctx.incomeData())
+                                .mapToDouble(IncomeYearData::totalIncome).toArray(),
+                        Arrays.stream(ctx.incomeData())
+                                .mapToDouble(IncomeYearData::taxableIncome).toArray())
+                .demographics(input.birthYear(), ctx.retirementAge(), ctx.endAge())
+                .taxConfig(
+                        input.conversionBracketRate() != null
+                                ? input.conversionBracketRate().doubleValue() : 0.22,
+                        input.rmdTargetBracketRate() != null
+                                ? input.rmdTargetBracketRate().doubleValue() : 0.12,
+                        input.rmdBracketHeadroom() != null
+                                ? input.rmdBracketHeadroom().doubleValue() : 0.10,
+                        ctx.filingStatus(), taxCalculator)
+                .assumptions(
+                        input.returnMean() != null
+                                ? input.returnMean().doubleValue() : 0.10,
+                        ctx.essentialFloor(), ctx.inflationRate(),
+                        input.traditionalExhaustionBuffer(), ctx.withdrawalOrder())
+                .rentals(input.incomeSources(), new RentalLossCalculator())
+                .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
+                        ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
+                .build();
 
-        // Stage 4: Post-processing — phase blending and YoY smoothing
+        boolean useDynamicSequencing = "dynamic_sequencing".equals(ctx.withdrawalOrder());
+        RothConversionOptimizer.RothConversionSchedule convSchedule;
+
+        if (useDynamicSequencing) {
+            // When Dynamic Sequencing is active, conversions and DS are complementary
+            // strategies — conversions happen first (Phase 1), then DS handles spending
+            // withdrawals from whatever Traditional remains. Use Phase 1's tax-minimization
+            // schedule directly; the joint search would incorrectly compete the two strategies
+            // (DS draws Traditional for spending, making conversions look expensive).
+            convSchedule = convOptimizer.optimize();
+            log.info("DS mode: using Phase 1 conversion schedule (fraction={})",
+                    convSchedule.conversionFraction());
+        } else {
+            convSchedule = jointSearchConversions(ctx, input, convOptimizer);
+        }
+
+        return new ConversionResult(
+                convSchedule.conversionByYear(), convSchedule.conversionTaxByYear(), convSchedule);
+    }
+
+    private RothConversionOptimizer.RothConversionSchedule jointSearchConversions(
+            OptimizationContext ctx, GuardrailOptimizationInput input,
+            RothConversionOptimizer convOptimizer) {
+        // Joint optimization: search conversion fractions by sustainable spending.
+        // Each fraction is scored by how much the MC optimizer can sustain.
+        int searchTrials = Math.min(JOINT_SEARCH_TRIALS, ctx.trialCount());
+        Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
+        double[] historicalReturns = HistoricalReturns.getReturns();
+        double[][] searchPaths = runMonteCarloTrials(
+                searchTrials, ctx.years(), ctx.initialPortfolio(), historicalReturns,
+                searchRng, ctx.inflationRate());
+
+        double[] searchFloors = verifyEssentialFloor(
+                searchPaths, ctx.incomeByYear(), ctx.essentialFloor(),
+                ctx.confidenceLevel(), ctx.years(), searchTrials, ctx.inflationRate());
+
+        double[] searchMarginalRates = precomputeMarginalRates(
+                ctx.rentalAwareTaxableIncome(), ctx.retirementYear(), ctx.years(),
+                ctx.filingStatus());
+        TaxContext searchTaxCtx = new TaxContext(ctx.initTaxable(), ctx.initTraditional(),
+                ctx.initRoth(), ctx.withdrawalOrder(), searchMarginalRates);
+
+        int gridSize = JOINT_GRID_SIZE;
+        double bestFraction = 0.0;
+        double bestSpending = 0.0;
+        RothConversionOptimizer.RothConversionSchedule bestSchedule =
+                convOptimizer.baselineSchedule();
+
+        for (int i = 0; i <= gridSize; i++) {
+            double fraction = (double) i / gridSize;
+            var schedule = convOptimizer.scheduleForFraction(fraction);
+
+            double spending = evaluateSustainableSpending(
+                    searchPaths, ctx.incomeByYear(), ctx.surplusTaxByYear(), searchFloors,
+                    ctx.terminalTarget(), input.phases(), ctx.retirementAge(), ctx.years(),
+                    searchTrials, ctx.confidenceLevel(), ctx.portfolioFloor(),
+                    ctx.cashReserveYears(), ctx.cashReturnRate(), ctx.inflationRate(),
+                    searchTaxCtx,
+                    schedule.conversionByYear(), schedule.conversionTaxByYear(),
+                    input.birthYear(), ctx.dsBracketCeilingByYear());
+
+            if (spending > bestSpending) {
+                bestSpending = spending;
+                bestFraction = fraction;
+                bestSchedule = schedule;
+            }
+        }
+
+        double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
+        double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
+        for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
+            double m1 = lo + (hi - lo) / 3.0;
+            double m2 = hi - (hi - lo) / 3.0;
+
+            var s1 = convOptimizer.scheduleForFraction(m1);
+            var s2 = convOptimizer.scheduleForFraction(m2);
+
+            double sp1 = evaluateSustainableSpending(
+                    searchPaths, ctx.incomeByYear(), ctx.surplusTaxByYear(), searchFloors,
+                    ctx.terminalTarget(), input.phases(), ctx.retirementAge(), ctx.years(),
+                    searchTrials, ctx.confidenceLevel(), ctx.portfolioFloor(),
+                    ctx.cashReserveYears(), ctx.cashReturnRate(), ctx.inflationRate(),
+                    searchTaxCtx,
+                    s1.conversionByYear(), s1.conversionTaxByYear(), input.birthYear(),
+                    ctx.dsBracketCeilingByYear());
+
+            double sp2 = evaluateSustainableSpending(
+                    searchPaths, ctx.incomeByYear(), ctx.surplusTaxByYear(), searchFloors,
+                    ctx.terminalTarget(), input.phases(), ctx.retirementAge(), ctx.years(),
+                    searchTrials, ctx.confidenceLevel(), ctx.portfolioFloor(),
+                    ctx.cashReserveYears(), ctx.cashReturnRate(), ctx.inflationRate(),
+                    searchTaxCtx,
+                    s2.conversionByYear(), s2.conversionTaxByYear(), input.birthYear(),
+                    ctx.dsBracketCeilingByYear());
+
+            if (sp1 > sp2) {
+                hi = m2;
+            } else {
+                lo = m1;
+            }
+
+            if (sp1 > bestSpending) {
+                bestSpending = sp1;
+                bestFraction = m1;
+                bestSchedule = s1;
+            }
+            if (sp2 > bestSpending) {
+                bestSpending = sp2;
+                bestFraction = m2;
+                bestSchedule = s2;
+            }
+        }
+
+        log.info("Joint optimization: best fraction={}, sustainable spending={}",
+                bestFraction, bestSpending);
+        return bestSchedule;
+    }
+
+    private double[] allocateAndSmooth(OptimizationContext ctx, GuardrailOptimizationInput input,
+                                       double[] conversionByYear, double[] conversionTaxByYear) {
+        // Priority-weighted discretionary allocation
+        double[] discretionaryByYear = allocateSpending(
+                ctx.portfolioPaths(), ctx.incomeByYear(), ctx.surplusTaxByYear(),
+                ctx.adjustedFloors(), ctx.terminalTarget(),
+                input.phases(), ctx.retirementAge(), ctx.years(), ctx.trialCount(),
+                ctx.confidenceLevel(), ctx.portfolioFloor(), ctx.cashReserveYears(),
+                ctx.cashReturnRate(), ctx.inflationRate(), ctx.taxCtx(),
+                conversionByYear, conversionTaxByYear, input.birthYear(),
+                ctx.dsBracketCeilingByYear());
+
+        // Post-processing — phase blending and YoY smoothing
         int phaseBlendYears = input.phaseBlendYears();
         if (phaseBlendYears > 0 && input.phases() != null && input.phases().size() > 1) {
-            applyPhaseBlending(discretionaryByYear, adjustedFloors, input.phases(),
-                    retirementAge, years, phaseBlendYears);
+            applyPhaseBlending(discretionaryByYear, ctx.adjustedFloors(), input.phases(),
+                    ctx.retirementAge(), ctx.years(), phaseBlendYears);
         }
 
         Double maxAdjRate = input.maxAnnualAdjustmentRate() != null
                 ? input.maxAnnualAdjustmentRate().doubleValue() : null;
         if (maxAdjRate != null && maxAdjRate > 0) {
-            applyYearOverYearSmoothing(discretionaryByYear, adjustedFloors, maxAdjRate, years,
-                    input.phases(), retirementAge);
+            applyYearOverYearSmoothing(discretionaryByYear, ctx.adjustedFloors(), maxAdjRate,
+                    ctx.years(), input.phases(), ctx.retirementAge());
 
             // Re-verify sustainability of smoothed plan; reduce if broken
-            if (!isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
-                    discretionaryByYear, terminalTarget, years, trialCount,
-                    confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, input.birthYear(),
-                    dsBracketCeilingByYear)) {
+            if (!isSustainable(ctx.portfolioPaths(), ctx.incomeByYear(), ctx.surplusTaxByYear(),
+                    ctx.adjustedFloors(), discretionaryByYear, ctx.terminalTarget(), ctx.years(),
+                    ctx.trialCount(), ctx.confidenceLevel(), ctx.portfolioFloor(),
+                    ctx.cashReserveYears(), ctx.cashReturnRate(), ctx.taxCtx(),
+                    conversionByYear, conversionTaxByYear, ctx.retirementAge(), input.birthYear(),
+                    ctx.dsBracketCeilingByYear())) {
                 for (int i = 0; i < 10; i++) {
-                    for (int y = 0; y < years; y++) {
+                    for (int y = 0; y < ctx.years(); y++) {
                         discretionaryByYear[y] *= 0.95;
                     }
-                    if (isSustainable(portfolioPaths, incomeByYear, surplusTaxByYear, adjustedFloors,
-                            discretionaryByYear, terminalTarget, years, trialCount,
-                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, taxCtx,
-                            conversionByYear, conversionTaxByYear, retirementAge, input.birthYear(),
-                            dsBracketCeilingByYear)) {
+                    if (isSustainable(ctx.portfolioPaths(), ctx.incomeByYear(),
+                            ctx.surplusTaxByYear(), ctx.adjustedFloors(), discretionaryByYear,
+                            ctx.terminalTarget(), ctx.years(), ctx.trialCount(),
+                            ctx.confidenceLevel(), ctx.portfolioFloor(), ctx.cashReserveYears(),
+                            ctx.cashReturnRate(), ctx.taxCtx(),
+                            conversionByYear, conversionTaxByYear, ctx.retirementAge(),
+                            input.birthYear(), ctx.dsBracketCeilingByYear())) {
                         break;
                     }
                 }
             }
         }
 
+        return discretionaryByYear;
+    }
+
+    private GuardrailProfileResponse buildResponse(OptimizationContext ctx,
+                                                    GuardrailOptimizationInput input,
+                                                    double[] discretionaryByYear,
+                                                    double[] conversionByYear,
+                                                    double[] conversionTaxByYear,
+                                                    RothConversionOptimizer.RothConversionSchedule convSchedule) {
         // Compute corridors + corridor smoothing
         double[][] corridors = computeCorridors(
-                portfolioPaths, incomeByYear, adjustedFloors, discretionaryByYear,
-                terminalTarget, years, trialCount);
-        smoothCorridors(corridors[0], corridors[1], years);
+                ctx.portfolioPaths(), ctx.incomeByYear(), ctx.adjustedFloors(),
+                discretionaryByYear, ctx.terminalTarget(), ctx.years(), ctx.trialCount());
+        smoothCorridors(corridors[0], corridors[1], ctx.years());
 
         // Clamp corridors to bracket recommended spending (smoothing can overshoot at phase boundaries)
-        for (int y = 0; y < years; y++) {
-            double recommended = adjustedFloors[y] + discretionaryByYear[y];
+        for (int y = 0; y < ctx.years(); y++) {
+            double recommended = ctx.adjustedFloors()[y] + discretionaryByYear[y];
             corridors[0][y] = Math.min(corridors[0][y], recommended);
             corridors[1][y] = Math.max(corridors[1][y], recommended);
         }
 
         // Simulate with withdrawals to get final balances and per-year median balances
         boolean simPools = conversionByYear != null
-                || (initTraditional > 0 || initRoth > 0);
-        var rng2 = input.seed() != null ? new Random(input.seed()) : rng;
-        double[][] yearBalances = new double[years][trialCount];
-        double[] finalBalances = new double[trialCount];
+                || (ctx.initTraditional() > 0 || ctx.initRoth() > 0);
+        double[] historicalReturns = HistoricalReturns.getReturns();
+        var rng2 = input.seed() != null ? new Random(input.seed()) : new Random();
+        double[][] yearBalances = new double[ctx.years()][ctx.trialCount()];
+        double[] finalBalances = new double[ctx.trialCount()];
         int tradExhaustedCount = 0;
-        int rmdStartAge = RmdCalculator.rmdStartAge(input.birthYear());
         int exhaustionDeadlineAge = convSchedule != null
-                ? convSchedule.exhaustionAge() : endAge;
-        for (int t = 0; t < trialCount; t++) {
-            var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng2);
-            double[] returnSequence = generator.generateReturnSequence(years);
+                ? convSchedule.exhaustionAge() : ctx.endAge();
+        for (int t = 0; t < ctx.trialCount(); t++) {
+            var generator = new BlockBootstrapReturnGenerator(
+                    historicalReturns, DEFAULT_BLOCK_LENGTH, rng2);
+            double[] returnSequence = generator.generateReturnSequence(ctx.years());
 
-            double pTaxable = simPools ? initTaxable : initialPortfolio;
-            double pTraditional = simPools ? initTraditional : 0;
-            double pRoth = simPools ? initRoth : 0;
-            String order = simPools && withdrawalOrder != null ? withdrawalOrder : "taxable_first";
+            double pTaxable = simPools ? ctx.initTaxable() : ctx.initialPortfolio();
+            double pTraditional = simPools ? ctx.initTraditional() : 0;
+            double pRoth = simPools ? ctx.initRoth() : 0;
+            String order = simPools && ctx.withdrawalOrder() != null
+                    ? ctx.withdrawalOrder() : "taxable_first";
 
             double cashBalance = 0;
-            if (cashReserveYears > 0) {
-                double annualSpending = adjustedFloors[0] + discretionaryByYear[0];
-                cashBalance = annualSpending * cashReserveYears;
+            if (ctx.cashReserveYears() > 0) {
+                double annualSpending = ctx.adjustedFloors()[0] + discretionaryByYear[0];
+                cashBalance = annualSpending * ctx.cashReserveYears();
                 double cashFromTaxable = Math.min(cashBalance, pTaxable);
                 pTaxable -= cashFromTaxable;
                 double remaining = cashBalance - cashFromTaxable;
@@ -365,17 +445,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double priorYearEndTraditional = pTraditional;
 
-            for (int y = 0; y < years; y++) {
+            for (int y = 0; y < ctx.years(); y++) {
                 double realReturn = returnSequence[y];
-                double nominalReturn = toNominal(realReturn, inflationRate);
+                double nominalReturn = toNominal(realReturn, ctx.inflationRate());
                 double growthFactor = 1 + nominalReturn;
 
                 pTaxable *= growthFactor;
                 pTraditional *= growthFactor;
                 pRoth *= growthFactor;
-                cashBalance *= (1 + cashReturnRate);
+                cashBalance *= (1 + ctx.cashReturnRate());
 
-                int age = retirementAge + y;
+                int age = ctx.retirementAge() + y;
 
                 // --- Roth conversion execution ---
                 if (conversionByYear != null && conversionByYear[y] > 0 && pTraditional > 0) {
@@ -397,17 +477,18 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     }
                 }
 
-                double spending = adjustedFloors[y] + discretionaryByYear[y];
-                double withdrawal = Math.max(0, spending - incomeByYear[y]);
+                double spending = ctx.adjustedFloors()[y] + discretionaryByYear[y];
+                double withdrawal = Math.max(0, spending - ctx.incomeByYear()[y]);
 
                 boolean preAge595 = conversionByYear != null && age < 60;
-                double dsCeiling = dsBracketCeilingByYear != null ? dsBracketCeilingByYear[y] : 0;
+                double dsCeiling = ctx.dsBracketCeilingByYear() != null
+                        ? ctx.dsBracketCeilingByYear()[y] : 0;
                 double dsConvAmt = conversionByYear != null ? conversionByYear[y] : 0;
                 var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth,
                         withdrawal, order, preAge595,
-                        dsCeiling, incomeByYear[y], dsConvAmt, 0);
+                        dsCeiling, ctx.incomeByYear()[y], dsConvAmt, 0);
 
-                if (cashReserveYears > 0) {
+                if (ctx.cashReserveYears() > 0) {
                     if (nominalReturn < 0) {
                         double totalDraw = withdrawal;
                         double cashDraw = Math.min(totalDraw, cashBalance);
@@ -424,7 +505,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         pTaxable -= drawn[0];
                         pTraditional -= drawn[1];
                         pRoth -= drawn[2];
-                        double targetCash = spending * cashReserveYears;
+                        double targetCash = spending * ctx.cashReserveYears();
                         double replenishment = Math.min(
                                 Math.max(0, targetCash - cashBalance),
                                 Math.max(0, pTaxable + pTraditional + pRoth) * 0.10);
@@ -439,9 +520,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 }
 
                 // Surplus: income exceeds spending — deposit after-tax surplus to taxable
-                if (incomeByYear[y] > spending) {
-                    double grossSurplus = incomeByYear[y] - spending;
-                    pTaxable += Math.max(0, grossSurplus - surplusTaxByYear[y]);
+                if (ctx.incomeByYear()[y] > spending) {
+                    double grossSurplus = ctx.incomeByYear()[y] - spending;
+                    pTaxable += Math.max(0, grossSurplus - ctx.surplusTaxByYear()[y]);
                 }
 
                 pTaxable = Math.max(0, pTaxable);
@@ -461,13 +542,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
         }
         double mcExhaustionPct = conversionByYear != null
-                ? (double) tradExhaustedCount / trialCount : 0;
+                ? (double) tradExhaustedCount / ctx.trialCount() : 0;
 
-        double[] medianBalanceByYear = new double[years];
-        double[] p10BalanceByYear = new double[years];
-        double[] p25BalanceByYear = new double[years];
-        double[] p55BalanceByYear = new double[years];
-        for (int y = 0; y < years; y++) {
+        double[] medianBalanceByYear = new double[ctx.years()];
+        double[] p10BalanceByYear = new double[ctx.years()];
+        double[] p25BalanceByYear = new double[ctx.years()];
+        double[] p55BalanceByYear = new double[ctx.years()];
+        for (int y = 0; y < ctx.years(); y++) {
             Arrays.sort(yearBalances[y]);
             p10BalanceByYear[y] = percentile(yearBalances[y], 0.10);
             p25BalanceByYear[y] = percentile(yearBalances[y], 0.25);
@@ -480,17 +561,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double p10Final = percentile(finalBalances, 0.10);
         double p55Final = percentile(finalBalances, 0.55);
         long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
-        double failureRate = (double) failures / trialCount;
+        double failureRate = (double) failures / ctx.trialCount();
 
         // Build yearly spending records
         var yearlySpending = new ArrayList<GuardrailYearlySpending>();
-        for (int y = 0; y < years; y++) {
-            int age = retirementAge + y;
-            int calendarYear = retirementYear + y;
-            double floor = adjustedFloors[y];
+        for (int y = 0; y < ctx.years(); y++) {
+            int age = ctx.retirementAge() + y;
+            int calendarYear = ctx.retirementYear() + y;
+            double floor = ctx.adjustedFloors()[y];
             double disc = discretionaryByYear[y];
             double recommended = floor + disc;
-            double income = incomeByYear[y];
+            double income = ctx.incomeByYear()[y];
             double withdrawal = Math.max(0, recommended - income);
             String phaseName = findPhaseName(input.phases(), age);
 
@@ -504,15 +585,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
-                trialCount, years, toBD(medianFinal));
+                ctx.trialCount(), ctx.years(), toBD(medianFinal));
 
         // Build conversion schedule response if conversions were optimized
         RothConversionScheduleResponse convScheduleResponse = null;
         if (convSchedule != null) {
             var convYears = new ArrayList<ConversionYearDetail>();
-            for (int y = 0; y < years; y++) {
-                int age = retirementAge + y;
-                int calendarYear = retirementYear + y;
+            for (int y = 0; y < ctx.years(); y++) {
+                int age = ctx.retirementAge() + y;
+                int calendarYear = ctx.retirementYear() + y;
                 if (convSchedule.conversionByYear()[y] > 0) {
                     convYears.add(new ConversionYearDetail(
                             calendarYear, age,
@@ -521,8 +602,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             toBD(convSchedule.traditionalBalance()[y]),
                             toBD(convSchedule.rothBalance()[y]),
                             toBD(convSchedule.projectedRmd()[y]),
-                            toBD(incomeByYear[y]),
-                            toBD(taxableIncomeByYear[y] + convSchedule.conversionByYear()[y]),
+                            toBD(ctx.incomeByYear()[y]),
+                            toBD(ctx.taxableIncomeByYear()[y]
+                                    + convSchedule.conversionByYear()[y]),
                             null));
                 }
             }
@@ -546,7 +628,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 null, null, "Optimized",
                 input.essentialFloor(), input.terminalBalanceTarget(),
                 input.returnMean(), input.returnStddev(),
-                trialCount, input.confidenceLevel(),
+                ctx.trialCount(), input.confidenceLevel(),
                 input.phases(), yearlySpending,
                 toBD(medianFinal), toBD(failureRate),
                 toBD(p10Final), toBD(p55Final),
