@@ -167,96 +167,109 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
                     .build();
 
-            // Generate search paths with reduced trials for joint optimization search
-            int searchTrials = Math.min(JOINT_SEARCH_TRIALS, trialCount);
-            Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
-            double[][] searchPaths = runMonteCarloTrials(
-                    searchTrials, years, initialPortfolio, historicalReturns, searchRng, inflationRate);
+            boolean useDynamicSequencing = "dynamic_sequencing".equals(withdrawalOrder);
 
-            double[] searchFloors = verifyEssentialFloor(
-                    searchPaths, incomeByYear, essentialFloor,
-                    confidenceLevel, years, searchTrials, inflationRate);
+            if (useDynamicSequencing) {
+                // When Dynamic Sequencing is active, conversions and DS are complementary
+                // strategies — conversions happen first (Phase 1), then DS handles spending
+                // withdrawals from whatever Traditional remains. Use Phase 1's tax-minimization
+                // schedule directly; the joint search would incorrectly compete the two strategies
+                // (DS draws Traditional for spending, making conversions look expensive).
+                convSchedule = convOptimizer.optimize();
+                log.info("DS mode: using Phase 1 conversion schedule (fraction={})",
+                        convSchedule.conversionFraction());
+            } else {
+                // Joint optimization: search conversion fractions by sustainable spending.
+                // Each fraction is scored by how much the MC optimizer can sustain.
+                int searchTrials = Math.min(JOINT_SEARCH_TRIALS, trialCount);
+                Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
+                double[][] searchPaths = runMonteCarloTrials(
+                        searchTrials, years, initialPortfolio, historicalReturns, searchRng, inflationRate);
 
-            double[] searchMarginalRates = precomputeMarginalRates(
-                    rentalAwareTaxableIncome, retirementYear, years, filingStatus);
-            TaxContext searchTaxCtx = new TaxContext(initTaxable, initTraditional, initRoth,
-                    withdrawalOrder, searchMarginalRates);
+                double[] searchFloors = verifyEssentialFloor(
+                        searchPaths, incomeByYear, essentialFloor,
+                        confidenceLevel, years, searchTrials, inflationRate);
 
-            // Grid scan: evaluate spending at each fraction
-            int gridSize = JOINT_GRID_SIZE;
-            double bestFraction = 0.0;
-            double bestSpending = 0.0;
-            RothConversionOptimizer.RothConversionSchedule bestSchedule = convOptimizer.baselineSchedule();
+                double[] searchMarginalRates = precomputeMarginalRates(
+                        rentalAwareTaxableIncome, retirementYear, years, filingStatus);
+                TaxContext searchTaxCtx = new TaxContext(initTaxable, initTraditional, initRoth,
+                        withdrawalOrder, searchMarginalRates);
 
-            for (int i = 0; i <= gridSize; i++) {
-                double fraction = (double) i / gridSize;
-                var schedule = convOptimizer.scheduleForFraction(fraction);
+                int gridSize = JOINT_GRID_SIZE;
+                double bestFraction = 0.0;
+                double bestSpending = 0.0;
+                RothConversionOptimizer.RothConversionSchedule bestSchedule =
+                        convOptimizer.baselineSchedule();
 
-                double spending = evaluateSustainableSpending(
-                        searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                        terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                        confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                        inflationRate, searchTaxCtx,
-                        schedule.conversionByYear(), schedule.conversionTaxByYear(),
-                        input.birthYear(), dsBracketCeilingByYear);
+                for (int i = 0; i <= gridSize; i++) {
+                    double fraction = (double) i / gridSize;
+                    var schedule = convOptimizer.scheduleForFraction(fraction);
 
-                if (spending > bestSpending) {
-                    bestSpending = spending;
-                    bestFraction = fraction;
-                    bestSchedule = schedule;
+                    double spending = evaluateSustainableSpending(
+                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
+                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
+                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
+                            inflationRate, searchTaxCtx,
+                            schedule.conversionByYear(), schedule.conversionTaxByYear(),
+                            input.birthYear(), dsBracketCeilingByYear);
+
+                    if (spending > bestSpending) {
+                        bestSpending = spending;
+                        bestFraction = fraction;
+                        bestSchedule = schedule;
+                    }
                 }
+
+                double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
+                double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
+                for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
+                    double m1 = lo + (hi - lo) / 3.0;
+                    double m2 = hi - (hi - lo) / 3.0;
+
+                    var s1 = convOptimizer.scheduleForFraction(m1);
+                    var s2 = convOptimizer.scheduleForFraction(m2);
+
+                    double sp1 = evaluateSustainableSpending(
+                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
+                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
+                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
+                            inflationRate, searchTaxCtx,
+                            s1.conversionByYear(), s1.conversionTaxByYear(), input.birthYear(),
+                            dsBracketCeilingByYear);
+
+                    double sp2 = evaluateSustainableSpending(
+                            searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
+                            terminalTarget, input.phases(), retirementAge, years, searchTrials,
+                            confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
+                            inflationRate, searchTaxCtx,
+                            s2.conversionByYear(), s2.conversionTaxByYear(), input.birthYear(),
+                            dsBracketCeilingByYear);
+
+                    if (sp1 > sp2) {
+                        hi = m2;
+                    } else {
+                        lo = m1;
+                    }
+
+                    if (sp1 > bestSpending) {
+                        bestSpending = sp1;
+                        bestFraction = m1;
+                        bestSchedule = s1;
+                    }
+                    if (sp2 > bestSpending) {
+                        bestSpending = sp2;
+                        bestFraction = m2;
+                        bestSchedule = s2;
+                    }
+                }
+
+                convSchedule = bestSchedule;
+                log.info("Joint optimization: best fraction={}, sustainable spending={}",
+                        bestFraction, bestSpending);
             }
 
-            // Ternary refinement around best fraction
-            double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
-            double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
-            for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
-                double m1 = lo + (hi - lo) / 3.0;
-                double m2 = hi - (hi - lo) / 3.0;
-
-                var s1 = convOptimizer.scheduleForFraction(m1);
-                var s2 = convOptimizer.scheduleForFraction(m2);
-
-                double sp1 = evaluateSustainableSpending(
-                        searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                        terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                        confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                        inflationRate, searchTaxCtx,
-                        s1.conversionByYear(), s1.conversionTaxByYear(), input.birthYear(),
-                        dsBracketCeilingByYear);
-
-                double sp2 = evaluateSustainableSpending(
-                        searchPaths, incomeByYear, surplusTaxByYear, searchFloors,
-                        terminalTarget, input.phases(), retirementAge, years, searchTrials,
-                        confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate,
-                        inflationRate, searchTaxCtx,
-                        s2.conversionByYear(), s2.conversionTaxByYear(), input.birthYear(),
-                        dsBracketCeilingByYear);
-
-                if (sp1 > sp2) {
-                    hi = m2;
-                } else {
-                    lo = m1;
-                }
-
-                if (sp1 > bestSpending) {
-                    bestSpending = sp1;
-                    bestFraction = m1;
-                    bestSchedule = s1;
-                }
-                if (sp2 > bestSpending) {
-                    bestSpending = sp2;
-                    bestFraction = m2;
-                    bestSchedule = s2;
-                }
-            }
-
-            convSchedule = bestSchedule;
             conversionByYear = convSchedule.conversionByYear();
             conversionTaxByYear = convSchedule.conversionTaxByYear();
-
-            log.info("Joint optimization: best fraction={}, sustainable spending={}",
-                    bestFraction, bestSpending);
         }
 
         // Stage 3: Priority-weighted discretionary allocation
