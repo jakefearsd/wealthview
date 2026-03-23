@@ -35,4 +35,10 @@ class WithdrawalOrderTest {
     void fromString_unknown_returnsTaxableFirst() {
         assertThat(WithdrawalOrder.fromString("garbage")).isEqualTo(WithdrawalOrder.TAXABLE_FIRST);
     }
+
+    @Test
+    void fromString_dynamicSequencing_returnsDynamicSequencing() {
+        assertThat(WithdrawalOrder.fromString("dynamic_sequencing"))
+                .isEqualTo(WithdrawalOrder.DYNAMIC_SEQUENCING);
+    }
 }
