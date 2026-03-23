@@ -19,6 +19,7 @@ public record UpdateScenarioRequest(
         BigDecimal otherIncome,
         BigDecimal annualRothConversion,
         String withdrawalOrder,
+        BigDecimal dynamicSequencingBracketRate,
         String rothConversionStrategy,
         BigDecimal targetBracketRate,
         Integer rothConversionStartYear,

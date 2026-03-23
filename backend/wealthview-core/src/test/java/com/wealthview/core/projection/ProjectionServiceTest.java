@@ -109,7 +109,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
@@ -150,7 +150,7 @@ class ProjectionServiceTest {
                 "vanguard_dynamic_spending",
                 new BigDecimal("0.05"),
                 new BigDecimal("-0.025"),
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
@@ -185,7 +185,7 @@ class ProjectionServiceTest {
                 1990,
                 new BigDecimal("0.04"),
                 null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
@@ -221,7 +221,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 null, null, null,
-                "traditional_first", null, null, null,
+                "traditional_first", null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
@@ -255,7 +255,7 @@ class ProjectionServiceTest {
                 new BigDecimal("0.04"),
                 null, null, null,
                 "single", null, null, null,
-                "fill_bracket", new BigDecimal("0.12"), null,
+                null, "fill_bracket", new BigDecimal("0.12"), null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null,
@@ -293,7 +293,7 @@ class ProjectionServiceTest {
         var request = new CreateScenarioRequest(
                 "Linked Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
@@ -442,7 +442,7 @@ class ProjectionServiceTest {
                 1985,
                 new BigDecimal("0.035"),
                 "dynamic_percentage",
-                null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
@@ -472,7 +472,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
@@ -497,7 +497,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
@@ -624,7 +624,7 @@ class ProjectionServiceTest {
         var request = new CreateScenarioRequest(
                 "Plan with Income", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
-                null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"),
@@ -654,7 +654,7 @@ class ProjectionServiceTest {
         var request = new CreateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(badId, null)));
@@ -687,7 +687,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Updated Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
@@ -752,7 +752,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Old Plan", LocalDate.of(2055, 1, 1), 95,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null, null);
 
@@ -786,7 +786,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null, null);
 
@@ -821,7 +821,7 @@ class ProjectionServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null,
                 "vanguard_dynamic_spending", null, null,
-                "married_filing_jointly", null, null, null, null, null, null,
+                "married_filing_jointly", null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null, null);
 
@@ -878,7 +878,7 @@ class ProjectionServiceTest {
         var request = new UpdateScenarioRequest(
                 "Updated", LocalDate.of(2060, 1, 1), 95,
                 new BigDecimal("0.02"), null, null, null, null, null,
-                null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
                 null, null, null,
                 List.of(), null, null, null);
 
