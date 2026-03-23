@@ -73,6 +73,9 @@ public class GuardrailSpendingProfileEntity {
     @Column(name = "percentile_90_final", precision = 19, scale = 4)
     private BigDecimal percentile90Final;
 
+    @Column(name = "percentile_55_final", precision = 19, scale = 4)
+    private BigDecimal percentile55Final;
+
     @Column(name = "scenario_hash", nullable = false)
     private String scenarioHash;
 
@@ -159,6 +162,8 @@ public class GuardrailSpendingProfileEntity {
     public void setPercentile10Final(BigDecimal percentile10Final) { this.percentile10Final = percentile10Final; }
     public BigDecimal getPercentile90Final() { return percentile90Final; }
     public void setPercentile90Final(BigDecimal percentile90Final) { this.percentile90Final = percentile90Final; }
+    public BigDecimal getPercentile55Final() { return percentile55Final; }
+    public void setPercentile55Final(BigDecimal percentile55Final) { this.percentile55Final = percentile55Final; }
     public String getScenarioHash() { return scenarioHash; }
     public void setScenarioHash(String scenarioHash) { this.scenarioHash = scenarioHash; }
     public BigDecimal getPortfolioFloor() { return portfolioFloor; }

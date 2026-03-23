@@ -24,7 +24,7 @@ public record GuardrailProfileResponse(
         BigDecimal medianFinalBalance,
         BigDecimal failureRate,
         BigDecimal percentile10Final,
-        BigDecimal percentile90Final,
+        BigDecimal percentile55Final,
         boolean stale,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
@@ -46,12 +46,12 @@ public record GuardrailProfileResponse(
                                      List<GuardrailPhaseInput> phases,
                                      List<GuardrailYearlySpending> yearlySpending,
                                      BigDecimal medianFinalBalance, BigDecimal failureRate,
-                                     BigDecimal percentile10Final, BigDecimal percentile90Final,
+                                     BigDecimal percentile10Final, BigDecimal percentile55Final,
                                      boolean stale, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this(id, scenarioId, name, essentialFloor, terminalBalanceTarget,
                 returnMean, returnStddev, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate,
-                percentile10Final, percentile90Final, stale, createdAt, updatedAt,
+                percentile10Final, percentile55Final, stale, createdAt, updatedAt,
                 BigDecimal.ZERO, null, 0, null,
                 2, new BigDecimal("0.04"), null);
     }
@@ -94,7 +94,7 @@ public record GuardrailProfileResponse(
                 entity.getMedianFinalBalance(),
                 entity.getFailureRate(),
                 entity.getPercentile10Final(),
-                entity.getPercentile90Final(),
+                entity.getPercentile55Final(),
                 entity.isStale(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),

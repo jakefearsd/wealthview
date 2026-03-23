@@ -829,9 +829,9 @@ export default function SpendingOptimizerPage() {
                             <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Median Final Balance</div>
                             <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.median_final_balance)}</div>
                         </div>
-                        <div data-testid="p90-card" style={{ ...cardStyle, textAlign: 'center' }}>
-                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>90th Percentile Final</div>
-                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile90_final)}</div>
+                        <div data-testid="p55-card" style={{ ...cardStyle, textAlign: 'center' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>55th Percentile Final</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile55_final)}</div>
                         </div>
                     </div>
 
@@ -853,8 +853,8 @@ export default function SpendingOptimizerPage() {
                                         </div>
                                     </div>
                                     <div style={{ textAlign: 'right' }}>
-                                        <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Optimistic (p90)</div>
-                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.percentile90_final)}</div>
+                                        <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Slightly above median (p55)</div>
+                                        <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.percentile55_final)}</div>
                                     </div>
                                 </div>
                                 <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
@@ -956,7 +956,7 @@ export default function SpendingOptimizerPage() {
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
                                     <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
-                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p75</th>
+                                    <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p55</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -982,7 +982,7 @@ export default function SpendingOptimizerPage() {
                                             {fmtShort(y.portfolio_balance_median)}
                                         </td>
                                         <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
-                                            {fmtShort(y.portfolio_balance_p75)}
+                                            {fmtShort(y.portfolio_balance_p55)}
                                         </td>
                                         <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
                                             {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}
