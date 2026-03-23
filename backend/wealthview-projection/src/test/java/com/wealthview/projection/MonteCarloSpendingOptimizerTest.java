@@ -1970,27 +1970,65 @@ class MonteCarloSpendingOptimizerTest {
         double need = 150;
 
         // taxable_first: draws 100 from taxable, 50 from traditional
-        var tf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "taxable_first", false);
+        var tf = MonteCarloSpendingOptimizer.splitWithdrawal(
+                taxable, traditional, roth, need, "taxable_first", false, 0, 0, 0, 0);
         assertThat(tf[0]).isEqualTo(100); // from taxable
         assertThat(tf[1]).isEqualTo(50);  // from traditional
         assertThat(tf[2]).isEqualTo(0);   // none from roth
 
         // traditional_first: draws 150 from traditional
-        var trf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "traditional_first", false);
+        var trf = MonteCarloSpendingOptimizer.splitWithdrawal(
+                taxable, traditional, roth, need, "traditional_first", false, 0, 0, 0, 0);
         assertThat(trf[0]).isEqualTo(0);
         assertThat(trf[1]).isEqualTo(150);
         assertThat(trf[2]).isEqualTo(0);
 
         // roth_first: draws 150 from roth (has 300)
-        var rf = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "roth_first", false);
+        var rf = MonteCarloSpendingOptimizer.splitWithdrawal(
+                taxable, traditional, roth, need, "roth_first", false, 0, 0, 0, 0);
         assertThat(rf[0]).isEqualTo(0);
         assertThat(rf[1]).isEqualTo(0);
         assertThat(rf[2]).isEqualTo(150);
 
         // preAge595: always from taxable only, regardless of order
-        var pre = MonteCarloSpendingOptimizer.splitWithdrawal(taxable, traditional, roth, need, "traditional_first", true);
+        var pre = MonteCarloSpendingOptimizer.splitWithdrawal(
+                taxable, traditional, roth, need, "traditional_first", true, 0, 0, 0, 0);
         assertThat(pre[0]).isEqualTo(100); // capped at available taxable
         assertThat(pre[1]).isEqualTo(0);
         assertThat(pre[2]).isEqualTo(0);
+    }
+
+    @Test
+    void splitWithdrawal_dynamicSequencing_drawsTraditionalUpToCeiling() {
+        // DS with bracket space: Traditional first up to ceiling
+        var ds = MonteCarloSpendingOptimizer.splitWithdrawal(
+                100, 200, 300, 150, "dynamic_sequencing", false, 180, 30, 0, 0);
+        // bracketSpace = 180 - 30 = 150. Draw 150 from Traditional.
+        assertThat(ds[0]).isEqualTo(0);   // taxable
+        assertThat(ds[1]).isEqualTo(150); // traditional
+        assertThat(ds[2]).isEqualTo(0);   // roth
+
+        // DS with zero bracket space: Taxable first, then Roth
+        var ds0 = MonteCarloSpendingOptimizer.splitWithdrawal(
+                100, 200, 300, 150, "dynamic_sequencing", false, 50, 60, 0, 0);
+        // bracketSpace = max(0, 50-60) = 0. fromTrad=0, fromTaxable=100, fromRoth=50
+        assertThat(ds0[0]).isEqualTo(100);
+        assertThat(ds0[1]).isEqualTo(0);
+        assertThat(ds0[2]).isEqualTo(50);
+
+        // DS with preAge595: Taxable only
+        var dsPre = MonteCarloSpendingOptimizer.splitWithdrawal(
+                100, 200, 300, 150, "dynamic_sequencing", true, 180, 30, 0, 0);
+        assertThat(dsPre[0]).isEqualTo(100);
+        assertThat(dsPre[1]).isEqualTo(0);
+        assertThat(dsPre[2]).isEqualTo(0);
+
+        // DS with RMD consuming bracket space
+        var dsRmd = MonteCarloSpendingOptimizer.splitWithdrawal(
+                100, 200, 300, 150, "dynamic_sequencing", false, 180, 30, 0, 100);
+        // bracketSpace = 180 - 30 - 0 - 100 = 50. fromTrad=50, fromTaxable=100, fromRoth=0
+        assertThat(dsRmd[0]).isEqualTo(100);
+        assertThat(dsRmd[1]).isEqualTo(50);
+        assertThat(dsRmd[2]).isEqualTo(0);
     }
 }
