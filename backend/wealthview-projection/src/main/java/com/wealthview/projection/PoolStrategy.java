@@ -516,7 +516,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null,
                     withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null,
                     null,
-                    fedTax, stTax, saltDed, usedItemized);
+                    fedTax, stTax, saltDed, usedItemized, null);
         }
 
         @Override

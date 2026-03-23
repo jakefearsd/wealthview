@@ -4248,4 +4248,108 @@ class DeterministicProjectionEngineTest {
         assertThat(year1.withdrawalFromTraditional()).isNull();
         assertThat(year1.withdrawalFromRoth()).isNull();
     }
+
+    // === IRMAA warning tests ===
+
+    @Test
+    void irmaaWarning_age63AboveBracket_warningTrue() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Person is 63, retired since 60. Large traditional balance → fill_bracket at 22% will
+        // convert up to the 22% ceiling ($118,350 for single). Plus other_income of $50K.
+        // Total income = other_income ($50K) + conversion (~$68,350) = ~$118,350, right at ceiling.
+        // Add an income source to push above the ceiling.
+        int currentAge = 63;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+
+        var input = createInput(
+                LocalDate.of(birthYear + 60, 1, 1), 70, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 50000,
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
+                 "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(
+                        acct("2000000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("10000"), null),
+                List.of(incomeSource("Pension", "80000", 60, null, "0")));
+
+        var result = engineTax.run(input);
+
+        // Find the year where age is 63
+        var age63Year = result.yearlyData().stream()
+                .filter(y -> y.age() == 63)
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(age63Year.irmaaWarning()).isTrue();
+    }
+
+    @Test
+    void irmaaWarning_age62AboveBracket_warningFalse() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Same high income scenario but at age 62 — below the IRMAA age threshold (63)
+        int currentAge = 62;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+
+        var input = createInput(
+                LocalDate.of(birthYear + 60, 1, 1), 65, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 50000,
+                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
+                 "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(
+                        acct("2000000", "0", "0.00", "traditional"),
+                        acct("100000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("30000"), bd("10000"), null),
+                List.of(incomeSource("Pension", "80000", 60, null, "0")));
+
+        var result = engineTax.run(input);
+
+        // Find the year where age is 62
+        var age62Year = result.yearlyData().stream()
+                .filter(y -> y.age() == 62)
+                .findFirst()
+                .orElseThrow();
+
+        // Age 62 is below IRMAA threshold — no warning regardless of income
+        assertThat(age62Year.irmaaWarning()).isNull();
+    }
+
+    @Test
+    void irmaaWarning_age63BelowBracket_warningFalse() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Age 63 but low income well within 22% bracket ceiling ($118,350 for single)
+        int currentAge = 63;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+
+        var input = createInput(
+                LocalDate.of(birthYear + 60, 1, 1), 70, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single",
+                 "withdrawal_rate": 0.04}
+                """.formatted(birthYear),
+                List.of(
+                        acct("100000", "0", "0.00", "traditional"),
+                        acct("50000", "0", "0.00", "taxable")),
+                new SpendingProfileInput(bd("5000"), bd("1000"), null));
+
+        var result = engineTax.run(input);
+
+        // Find the year where age is 63
+        var age63Year = result.yearlyData().stream()
+                .filter(y -> y.age() == 63)
+                .findFirst()
+                .orElseThrow();
+
+        // Income is well below 22% bracket ceiling — no IRMAA warning
+        assertThat(age63Year.irmaaWarning()).isNull();
+    }
 }

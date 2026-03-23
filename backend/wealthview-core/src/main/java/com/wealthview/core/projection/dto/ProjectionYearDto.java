@@ -48,7 +48,8 @@ public record ProjectionYearDto(
         BigDecimal federalTax,
         BigDecimal stateTax,
         BigDecimal saltDeduction,
-        Boolean usedItemizedDeduction) {
+        Boolean usedItemizedDeduction,
+        Boolean irmaaWarning) {
 
     public ProjectionYearDto withSurplusReinvested(BigDecimal surplusReinvested) {
         return new ProjectionYearDto(
@@ -68,7 +69,8 @@ public record ProjectionYearDto(
                 taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
                 withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
                 rentalPropertyDetails(),
-                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction());
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction(),
+                irmaaWarning());
     }
 
     public ProjectionYearDto withPropertyEquity(BigDecimal propertyEquity, BigDecimal totalNetWorth) {
@@ -89,7 +91,8 @@ public record ProjectionYearDto(
                 taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
                 withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
                 rentalPropertyDetails(),
-                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction());
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction(),
+                irmaaWarning());
     }
 
     public ProjectionYearDto withTaxBreakdown(BigDecimal federalTax, BigDecimal stateTax,
@@ -111,7 +114,30 @@ public record ProjectionYearDto(
                 taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
                 withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
                 rentalPropertyDetails(),
-                federalTax, stateTax, saltDeduction, usedItemizedDeduction);
+                federalTax, stateTax, saltDeduction, usedItemizedDeduction,
+                irmaaWarning());
+    }
+
+    public ProjectionYearDto withIrmaaWarning(Boolean irmaaWarning) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses(), discretionaryExpenses(),
+                incomeStreamsTotal(), netSpendingNeed(), spendingSurplus(),
+                discretionaryAfterCuts(),
+                rentalIncomeGross(), rentalExpensesTotal(), depreciationTotal(),
+                rentalLossApplied(), suspendedLossCarryforward(),
+                socialSecurityTaxable(), selfEmploymentTax(),
+                incomeBySource(),
+                propertyEquity(), totalNetWorth(), surplusReinvested(),
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails(),
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction(),
+                irmaaWarning);
     }
 
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
@@ -124,6 +150,6 @@ public record ProjectionYearDto(
                 null, null, null, null, null, null, null, null,
                 null, null, null,
                 null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
     }
 }
