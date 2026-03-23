@@ -37,7 +37,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -86,14 +88,14 @@ public class ProjectionService {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
-        String paramsJson = buildParamsJson(
+        String paramsJson = buildParamsJson(extractParamsFromRequest(
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
                 request.dynamicSequencingBracketRate(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
                 request.rothConversionStartYear(), request.state(),
-                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest());
+                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest()));
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -139,14 +141,14 @@ public class ProjectionService {
         scenario.setRetirementDate(request.retirementDate());
         scenario.setEndAge(request.endAge());
         scenario.setInflationRate(request.inflationRate());
-        scenario.setParamsJson(buildParamsJson(
+        scenario.setParamsJson(buildParamsJson(extractParamsFromRequest(
                 request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
                 request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
                 request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
                 request.dynamicSequencingBracketRate(),
                 request.rothConversionStrategy(), request.targetBracketRate(),
                 request.rothConversionStartYear(), request.state(),
-                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest()));
+                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest())));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -290,34 +292,41 @@ public class ProjectionService {
         }
     }
 
-    @SuppressWarnings("PMD.ExcessiveParameterList") // private helper assembling JSON from many fields
-    private String buildParamsJson(Integer birthYear, BigDecimal withdrawalRate,
-                                     String withdrawalStrategy, BigDecimal dynamicCeiling,
-                                     BigDecimal dynamicFloor, String filingStatus,
-                                     BigDecimal otherIncome, BigDecimal annualRothConversion,
-                                     String withdrawalOrder, BigDecimal dynamicSequencingBracketRate,
-                                     String rothConversionStrategy, BigDecimal targetBracketRate,
-                                     Integer rothConversionStartYear,
-                                     String state, BigDecimal primaryResidencePropertyTax,
-                                     BigDecimal primaryResidenceMortgageInterest) {
+    @SuppressWarnings("PMD.ExcessiveParameterList") // mirrors request record fields; used at two call sites
+    private Map<String, Object> extractParamsFromRequest(
+            Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
+            BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
+            BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
+            BigDecimal dynamicSequencingBracketRate, String rothConversionStrategy,
+            BigDecimal targetBracketRate, Integer rothConversionStartYear,
+            String state, BigDecimal primaryResidencePropertyTax,
+            BigDecimal primaryResidenceMortgageInterest) {
+        var params = new LinkedHashMap<String, Object>();
+        params.put("birth_year", birthYear);
+        params.put("withdrawal_rate", withdrawalRate);
+        params.put("withdrawal_strategy", withdrawalStrategy);
+        params.put("dynamic_ceiling", dynamicCeiling);
+        params.put("dynamic_floor", dynamicFloor);
+        params.put("filing_status", filingStatus);
+        params.put("other_income", otherIncome);
+        params.put("annual_roth_conversion", annualRothConversion);
+        params.put("withdrawal_order", withdrawalOrder);
+        params.put("dynamic_sequencing_bracket_rate", dynamicSequencingBracketRate);
+        params.put("roth_conversion_strategy", rothConversionStrategy);
+        params.put("target_bracket_rate", targetBracketRate);
+        params.put("roth_conversion_start_year", rothConversionStartYear);
+        params.put("state", state);
+        params.put("primary_residence_property_tax", primaryResidencePropertyTax);
+        params.put("primary_residence_mortgage_interest", primaryResidenceMortgageInterest);
+        return params;
+    }
+
+    private String buildParamsJson(Map<String, Object> params) {
         ObjectNode node = objectMapper.createObjectNode();
         boolean hasContent = false;
-        hasContent |= putIfNotNull(node, "birth_year", birthYear);
-        hasContent |= putIfNotNull(node, "withdrawal_rate", withdrawalRate);
-        hasContent |= putIfNotNull(node, "withdrawal_strategy", withdrawalStrategy);
-        hasContent |= putIfNotNull(node, "dynamic_ceiling", dynamicCeiling);
-        hasContent |= putIfNotNull(node, "dynamic_floor", dynamicFloor);
-        hasContent |= putIfNotNull(node, "filing_status", filingStatus);
-        hasContent |= putIfNotNull(node, "other_income", otherIncome);
-        hasContent |= putIfNotNull(node, "annual_roth_conversion", annualRothConversion);
-        hasContent |= putIfNotNull(node, "withdrawal_order", withdrawalOrder);
-        hasContent |= putIfNotNull(node, "dynamic_sequencing_bracket_rate", dynamicSequencingBracketRate);
-        hasContent |= putIfNotNull(node, "roth_conversion_strategy", rothConversionStrategy);
-        hasContent |= putIfNotNull(node, "target_bracket_rate", targetBracketRate);
-        hasContent |= putIfNotNull(node, "roth_conversion_start_year", rothConversionStartYear);
-        hasContent |= putIfNotNull(node, "state", state);
-        hasContent |= putIfNotNull(node, "primary_residence_property_tax", primaryResidencePropertyTax);
-        hasContent |= putIfNotNull(node, "primary_residence_mortgage_interest", primaryResidenceMortgageInterest);
+        for (var entry : params.entrySet()) {
+            hasContent |= putIfNotNull(node, entry.getKey(), entry.getValue());
+        }
         return hasContent ? node.toString() : null;
     }
 
