@@ -39,6 +39,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final int JOINT_REFINE_ITERATIONS = 10;
     private static final int JOINT_SEARCH_TRIALS = 500;
     private static final double MAX_SPENDING_CEILING = 500_000;
+    /** Binary search iterations used in {@link #evaluateSustainableSpending}. */
+    private static final int SPENDING_BINARY_SEARCH_ITERATIONS = 30;
+    /** Fraction of equity portfolio used each year to replenish the cash reserve bucket. */
+    private static final double CASH_REPLENISHMENT_RATE = 0.10;
+    /** Reduction factor applied per iteration when a smoothed plan fails sustainability. */
+    private static final double SUSTAINABILITY_REDUCTION_FACTOR = 0.95;
+    /** Proxy for age 59.5 — the minimum age for penalty-free retirement account withdrawals. */
+    private static final int EARLY_WITHDRAWAL_AGE = 60;
 
     private final FederalTaxCalculator taxCalculator;
 
@@ -93,9 +101,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         int trialCount = input.trialCount();
         double initialPortfolio = totalPortfolio(input.accounts());
-        double initTaxable = sumByType(input.accounts(), "taxable");
-        double initTraditional = sumByType(input.accounts(), "traditional");
-        double initRoth = sumByType(input.accounts(), "roth");
+        double initTaxable = sumByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
+        double initTraditional = sumByType(input.accounts(), PoolStrategy.POOL_TRADITIONAL);
+        double initRoth = sumByType(input.accounts(), PoolStrategy.POOL_ROTH);
         String withdrawalOrder = input.withdrawalOrder() != null ? input.withdrawalOrder() : "taxable_first";
         double essentialFloor = input.essentialFloor().doubleValue();
         double terminalTarget = input.terminalBalanceTarget().doubleValue();
@@ -157,7 +165,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         // Pre-compute DS bracket ceilings per year for dynamic_sequencing withdrawal order
         double[] dsBracketCeilingByYear = null;
-        if ("dynamic_sequencing".equals(withdrawalOrder)
+        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
                 && input.dynamicSequencingBracketRate() != null
                 && taxCalculator != null) {
             dsBracketCeilingByYear = new double[years];
@@ -217,7 +225,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
                 .build();
 
-        boolean useDynamicSequencing = "dynamic_sequencing".equals(ctx.withdrawalOrder());
+        boolean useDynamicSequencing = PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(ctx.withdrawalOrder());
         RothConversionOptimizer.RothConversionSchedule convSchedule;
 
         if (useDynamicSequencing) {
@@ -369,7 +377,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     ctx.dsBracketCeilingByYear())) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < ctx.years(); y++) {
-                        discretionaryByYear[y] *= 0.95;
+                        discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
                     }
                     if (isSustainable(ctx.portfolioPaths(), ctx.incomeByYear(),
                             ctx.surplusTaxByYear(), ctx.adjustedFloors(), discretionaryByYear,
@@ -465,7 +473,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     double actualTax = (actualConv < conversionByYear[y])
                             ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
                             : conversionTaxByYear[y];
-                    if (age < 60) {
+                    if (age < EARLY_WITHDRAWAL_AGE) {
                         pTaxable -= Math.min(actualTax, Math.max(0, pTaxable));
                     } else {
                         double taxRem = actualTax;
@@ -480,7 +488,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 double spending = ctx.adjustedFloors()[y] + discretionaryByYear[y];
                 double withdrawal = Math.max(0, spending - ctx.incomeByYear()[y]);
 
-                boolean preAge595 = conversionByYear != null && age < 60;
+                boolean preAge595 = conversionByYear != null && age < EARLY_WITHDRAWAL_AGE;
                 double dsCeiling = ctx.dsBracketCeilingByYear() != null
                         ? ctx.dsBracketCeilingByYear()[y] : 0;
                 double dsConvAmt = conversionByYear != null ? conversionByYear[y] : 0;
@@ -508,7 +516,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         double targetCash = spending * ctx.cashReserveYears();
                         double replenishment = Math.min(
                                 Math.max(0, targetCash - cashBalance),
-                                Math.max(0, pTaxable + pTraditional + pRoth) * 0.10);
+                                Math.max(0, pTaxable + pTraditional + pRoth) * CASH_REPLENISHMENT_RATE);
                         pTaxable -= replenishment;
                         if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
                         cashBalance += replenishment;
@@ -922,7 +930,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double high = MAX_SPENDING_CEILING;
         double[] testDiscretionary = new double[years];
 
-        for (int iter = 0; iter < 30; iter++) {
+        for (int iter = 0; iter < SPENDING_BINARY_SEARCH_ITERATIONS; iter++) {
             double mid = (low + high) / 2;
             Arrays.fill(testDiscretionary, mid);
 
@@ -1040,7 +1048,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     double actualTax = (actualConv < conversionByYear[y])
                             ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
                             : conversionTaxByYear[y];
-                    if (age < 60) {
+                    if (age < EARLY_WITHDRAWAL_AGE) {
                         pTaxable -= Math.min(actualTax, Math.max(0, pTaxable));
                     } else {
                         double taxRem = actualTax;
@@ -1056,7 +1064,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 double withdrawal = Math.max(0, spending - income[y]);
 
                 // Split withdrawal across pools (59.5 rule: taxable only before age 60)
-                boolean preAge595 = hasConversions && age < 60;
+                boolean preAge595 = hasConversions && age < EARLY_WITHDRAWAL_AGE;
                 double dsCeiling = dsBracketCeilingByYear != null
                         ? dsBracketCeilingByYear[y] : 0;
                 double dsConvAmt = conversionByYear != null ? conversionByYear[y] : 0;
@@ -1102,7 +1110,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         double targetCash = spending * cashReserveYears;
                         double replenishment = Math.min(
                                 Math.max(0, targetCash - cashBalance),
-                                Math.max(0, pTaxable + pTraditional + pRoth) * 0.10);
+                                Math.max(0, pTaxable + pTraditional + pRoth) * CASH_REPLENISHMENT_RATE);
                         pTaxable -= replenishment;
                         if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
                         cashBalance += replenishment;
@@ -1316,7 +1324,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
 
         // Dynamic Sequencing: Traditional first up to bracket space, then taxable, then Roth
-        if ("dynamic_sequencing".equals(order)) {
+        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(order)) {
             double bracketSpace = Math.max(0,
                     dsBracketCeiling - otherIncome - conversionAmount - rmdAmount);
             double fromTrad = Math.min(bracketSpace, Math.min(Math.max(0, traditional), need));
