@@ -93,6 +93,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             List<ProjectionPropertyInput> properties) {
     }
 
+    /** Bundles all immutable per-run inputs so {@code runProjection} has a single context param. */
+    private record ProjectionRunContext(
+            ProjectionInput input,
+            PoolStrategy pool,
+            WithdrawalStrategy strategy,
+            int currentYear,
+            int birthYear,
+            int retirementYear,
+            int endYear,
+            BigDecimal inflationRate,
+            SpendingPlan spendingPlan,
+            List<ProjectionIncomeSourceInput> incomeSources,
+            List<ProjectionPropertyInput> properties,
+            TaxCalculationStrategy taxStrategy) {
+    }
+
     private ProjectionResultResponse runInternal(ProjectionInput input) {
         var accounts = input.accounts();
         var params = parseParams(input.paramsJson());
@@ -106,9 +122,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var taxStrategy = buildTaxStrategy(params);
         var pool = buildPoolStrategy(accounts, params, taxStrategy);
 
-        return runProjection(input, pool, resolved.strategy(), resolved.currentYear(), resolved.birthYear(),
-                resolved.retirementYear(), resolved.endYear(), resolved.inflationRate(),
-                resolved.spendingPlan(), resolved.incomeSources(), resolved.properties(), taxStrategy);
+        var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
+                resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
+                resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
+                resolved.properties(), taxStrategy);
+        return runProjection(ctx);
     }
 
     private ResolvedParams resolveProjectionParams(ProjectionInput input, ScenarioParams params) {
@@ -199,15 +217,19 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         return new FederalOnlyTaxStrategy(taxCalculator);
     }
 
-    private ProjectionResultResponse runProjection(
-            ProjectionInput input,
-            PoolStrategy pool,
-            WithdrawalStrategy strategy,
-            int currentYear, int birthYear, int retirementYear, int endYear,
-            BigDecimal inflationRate, SpendingPlan spendingPlan,
-            List<ProjectionIncomeSourceInput> incomeSources,
-            List<ProjectionPropertyInput> properties,
-            TaxCalculationStrategy taxStrategy) {
+    private ProjectionResultResponse runProjection(ProjectionRunContext ctx) {
+        var input = ctx.input();
+        var pool = ctx.pool();
+        var strategy = ctx.strategy();
+        int currentYear = ctx.currentYear();
+        int birthYear = ctx.birthYear();
+        int retirementYear = ctx.retirementYear();
+        int endYear = ctx.endYear();
+        var inflationRate = ctx.inflationRate();
+        var spendingPlan = ctx.spendingPlan();
+        var incomeSources = ctx.incomeSources();
+        var properties = ctx.properties();
+        var taxStrategy = ctx.taxStrategy();
 
         var yearlyData = new ArrayList<ProjectionYearDto>();
         int yearsInRetirement = 0;
@@ -253,11 +275,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal wdFromRoth = BigDecimal.ZERO;
             PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
             if (retired) {
-                var retirementResult = processRetirementWithdrawals(
-                        pool, strategy, spendingPlan, age, yearsInRetirement,
+                var rwCtx = new RetirementWithdrawalContext(
+                        pool, strategy, spendingPlan, age, yearsInRetirement, year,
                         inflationRate, incomeResult.totalActiveIncome(), startBalance,
                         previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                        year, incomeResult.isResult(), taxStrategy);
+                        incomeResult.isResult(), taxStrategy);
+                var retirementResult = processRetirementWithdrawals(rwCtx);
                 withdrawals = retirementResult.withdrawals();
                 taxLiability = taxLiability.add(retirementResult.taxLiability());
                 previousWithdrawal = retirementResult.previousWithdrawal();
@@ -287,30 +310,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (surplusReinvested != null) {
                 yearDto = applySurplusReinvested(yearDto, surplusReinvested);
             }
-            if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
-                BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
-                        .add(incomeResult.effectiveOtherIncome());
-                var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
-                var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
-                BigDecimal fedTax = breakdown.federalTax();
-                BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
-                        ? breakdown.stateTax() : null;
-                BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
-                        ? breakdown.saltDeduction() : null;
-                yearDto = yearDto.withTaxBreakdown(fedTax, stTax, saltDed, breakdown.usedItemized());
-            }
-            if (retired && age >= 63 && taxStrategy != null) {
-                BigDecimal totalIncome = incomeResult.effectiveOtherIncome()
-                        .add(conversionAmount)
-                        .add(wdFromTraditional);
-                var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
-                BigDecimal irmaaCeiling = taxStrategy.computeMaxIncomeForTargetRate(
-                        IRMAA_BRACKET_RATE, year, filingStatus);
-                if (irmaaCeiling.compareTo(BigDecimal.ZERO) > 0
-                        && totalIncome.compareTo(irmaaCeiling) > 0) {
-                    yearDto = yearDto.withIrmaaWarning(true);
-                }
-            }
+            yearDto = applyRetirementTaxAnnotations(yearDto, retired, age, year,
+                    wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
+                    taxLiability, pool, taxStrategy);
             yearlyData.add(yearDto);
         }
 
@@ -325,6 +327,40 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
                 yearsInRetirement, feasibility, finalNetWorth);
+    }
+
+    /**
+     * Applies the detailed federal/state tax breakdown and IRMAA warning to the year DTO.
+     * Only meaningful for retired years with a non-null tax strategy.
+     */
+    private ProjectionYearDto applyRetirementTaxAnnotations(
+            ProjectionYearDto yearDto, boolean retired, int age, int year,
+            BigDecimal wdFromTraditional, BigDecimal conversionAmount, BigDecimal effectiveOtherIncome,
+            BigDecimal taxLiability, PoolStrategy pool, TaxCalculationStrategy taxStrategy) {
+
+        if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
+            BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
+                    .add(effectiveOtherIncome);
+            var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+            var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
+            BigDecimal fedTax = breakdown.federalTax();
+            BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
+                    ? breakdown.stateTax() : null;
+            BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
+                    ? breakdown.saltDeduction() : null;
+            yearDto = yearDto.withTaxBreakdown(fedTax, stTax, saltDed, breakdown.usedItemized());
+        }
+        if (retired && age >= 63 && taxStrategy != null) {
+            BigDecimal totalIncome = effectiveOtherIncome.add(conversionAmount).add(wdFromTraditional);
+            var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+            BigDecimal irmaaCeiling = taxStrategy.computeMaxIncomeForTargetRate(
+                    IRMAA_BRACKET_RATE, year, filingStatus);
+            if (irmaaCeiling.compareTo(BigDecimal.ZERO) > 0
+                    && totalIncome.compareTo(irmaaCeiling) > 0) {
+                yearDto = yearDto.withIrmaaWarning(true);
+            }
+        }
+        return yearDto;
     }
 
     private record IncomeAndConversionResult(
@@ -385,14 +421,39 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             PoolStrategy.TaxSourceResult withdrawalTaxSource) {
     }
 
-    @SuppressWarnings("PMD.ExcessiveParameterList")
-    private RetirementWithdrawalResult processRetirementWithdrawals(
-            PoolStrategy pool, WithdrawalStrategy strategy, SpendingPlan spendingPlan,
-            int age, int yearsInRetirement, BigDecimal inflationRate,
-            BigDecimal totalActiveIncome, BigDecimal startBalance, BigDecimal previousWithdrawal,
-            BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, int year,
+    /** Bundles the per-year inputs needed by {@code processRetirementWithdrawals}. */
+    private record RetirementWithdrawalContext(
+            PoolStrategy pool,
+            WithdrawalStrategy strategy,
+            SpendingPlan spendingPlan,
+            int age,
+            int yearsInRetirement,
+            int year,
+            BigDecimal inflationRate,
+            BigDecimal totalActiveIncome,
+            BigDecimal startBalance,
+            BigDecimal previousWithdrawal,
+            BigDecimal effectiveOtherIncome,
+            BigDecimal conversionAmount,
             IncomeSourceProcessor.IncomeSourceYearResult isResult,
             TaxCalculationStrategy taxStrategy) {
+    }
+
+    private RetirementWithdrawalResult processRetirementWithdrawals(RetirementWithdrawalContext rwCtx) {
+        var pool = rwCtx.pool();
+        var strategy = rwCtx.strategy();
+        var spendingPlan = rwCtx.spendingPlan();
+        int age = rwCtx.age();
+        int yearsInRetirement = rwCtx.yearsInRetirement();
+        int year = rwCtx.year();
+        var inflationRate = rwCtx.inflationRate();
+        var totalActiveIncome = rwCtx.totalActiveIncome();
+        var startBalance = rwCtx.startBalance();
+        var previousWithdrawal = rwCtx.previousWithdrawal();
+        var effectiveOtherIncome = rwCtx.effectiveOtherIncome();
+        var conversionAmount = rwCtx.conversionAmount();
+        var isResult = rwCtx.isResult();
+        var taxStrategy = rwCtx.taxStrategy();
 
         BigDecimal aggBalance = pool.getTotal();
         BigDecimal portfolioNeed;
