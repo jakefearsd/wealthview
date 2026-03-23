@@ -174,9 +174,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
             return new PoolStrategy.MultiPool(grouped,
                     computeWeightedReturn(accounts,
-                            sumInitialBalances(grouped.getOrDefault("taxable", List.of()))
-                                    .add(sumInitialBalances(grouped.getOrDefault("traditional", List.of())))
-                                    .add(sumInitialBalances(grouped.getOrDefault("roth", List.of())))),
+                            sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_TAXABLE, List.of()))
+                                    .add(sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_TRADITIONAL, List.of())))
+                                    .add(sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_ROTH, List.of())))),
                     filingStatus, otherIncome, annualRothConversion,
                     params.rothConversionStrategy(), params.targetBracketRate(),
                     params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy,
@@ -525,7 +525,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 .distinct()
                 .count();
         boolean hasNonTaxable = accounts.stream()
-                .anyMatch(a -> !"taxable".equals(a.accountType()));
+                .anyMatch(a -> !PoolStrategy.POOL_TAXABLE.equals(a.accountType()));
         return distinctTypes > 1 || hasNonTaxable;
     }
 

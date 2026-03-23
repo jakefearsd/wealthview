@@ -22,6 +22,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     static final int SCALE = 4;
     static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
+    /** Account type keys used for grouping and pool map lookups. */
+    static final String POOL_TAXABLE = "taxable";
+    static final String POOL_TRADITIONAL = "traditional";
+    static final String POOL_ROTH = "roth";
+
+    /** Withdrawal order string for the dynamic sequencing strategy. */
+    static final String WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING = "dynamic_sequencing";
+
     BigDecimal getTotal();
 
     BigDecimal getWeightedReturn();
@@ -257,13 +265,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                   WithdrawalOrder withdrawalOrder,
                   TaxCalculationStrategy taxCalculator,
                   BigDecimal dynamicSequencingBracketRate) {
-            this.taxable = sumBalances(grouped.getOrDefault("taxable", List.of()));
-            this.traditional = sumBalances(grouped.getOrDefault("traditional", List.of()));
-            this.roth = sumBalances(grouped.getOrDefault("roth", List.of()));
+            this.taxable = sumBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()));
+            this.traditional = sumBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
+            this.roth = sumBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
 
-            this.tradContrib = sumContribs(grouped.getOrDefault("traditional", List.of()));
-            this.rothContrib = sumContribs(grouped.getOrDefault("roth", List.of()));
-            this.taxableContrib = sumContribs(grouped.getOrDefault("taxable", List.of()));
+            this.tradContrib = sumContribs(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
+            this.rothContrib = sumContribs(grouped.getOrDefault(POOL_ROTH, List.of()));
+            this.taxableContrib = sumContribs(grouped.getOrDefault(POOL_TAXABLE, List.of()));
 
             this.weightedReturn = weightedReturn;
             this.filingStatus = filingStatus;

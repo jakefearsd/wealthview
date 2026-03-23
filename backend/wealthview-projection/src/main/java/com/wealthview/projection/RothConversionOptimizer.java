@@ -28,6 +28,8 @@ class RothConversionOptimizer {
     private static final int MAGI_CONVERGENCE_ITERATIONS = 3;
     private static final double CONVERGENCE_THRESHOLD_DOLLARS = 100;
     private static final double FEASIBILITY_TOLERANCE = 1.05;
+    /** Binary search iterations used to find the maximum affordable conversion amount. */
+    private static final int AFFORDABILITY_BINARY_SEARCH_ITERATIONS = 30;
 
     record RothConversionSchedule(
             double[] conversionByYear,
@@ -468,7 +470,7 @@ class RothConversionOptimizer {
             if (age < EARLY_WITHDRAWAL_AGE) {
                 taxable -= netSpendingNeed;
                 if (taxable < 0) taxable = 0;
-            } else if ("dynamic_sequencing".equals(withdrawalOrder) && dynamicSequencingBracketRate > 0) {
+            } else if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder) && dynamicSequencingBracketRate > 0) {
                 double remaining = netSpendingNeed;
                 // DS: Traditional up to bracket ceiling, then Taxable, then Roth
                 double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
@@ -493,12 +495,12 @@ class RothConversionOptimizer {
                 for (var pool : pools) {
                     if (remaining <= 0) break;
                     switch (pool) {
-                        case "taxable" -> {
+                        case PoolStrategy.POOL_TAXABLE -> {
                             double draw = Math.min(remaining, taxable);
                             taxable -= draw;
                             remaining -= draw;
                         }
-                        case "traditional" -> {
+                        case PoolStrategy.POOL_TRADITIONAL -> {
                             double draw = Math.min(remaining, traditional);
                             traditional -= draw;
                             remaining -= draw;
@@ -506,7 +508,7 @@ class RothConversionOptimizer {
                                     effectiveOtherIncome + rmdAmount + conversionAmount,
                                     calendarYear);
                         }
-                        case "roth" -> {
+                        case PoolStrategy.POOL_ROTH -> {
                             double draw = Math.min(remaining, roth);
                             roth -= draw;
                             remaining -= draw;
@@ -644,7 +646,7 @@ class RothConversionOptimizer {
                                                 int calendarYear, double taxBudget) {
         double lo = 0;
         double hi = maxConversion;
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < AFFORDABILITY_BINARY_SEARCH_ITERATIONS; i++) {
             double mid = (lo + hi) / 2.0;
             double tax = computeIncrementalTax(mid, otherIncome, calendarYear);
             if (tax <= taxBudget) {
@@ -688,7 +690,7 @@ class RothConversionOptimizer {
 
     private String[] parseWithdrawalOrder() {
         if (withdrawalOrder == null || withdrawalOrder.isBlank()) {
-            return new String[]{"taxable", "traditional", "roth"};
+            return new String[]{PoolStrategy.POOL_TAXABLE, PoolStrategy.POOL_TRADITIONAL, PoolStrategy.POOL_ROTH};
         }
         return withdrawalOrder.split(",");
     }
