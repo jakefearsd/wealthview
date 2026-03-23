@@ -27,19 +27,9 @@ const WITHDRAWAL_ORDER_OPTIONS = [
         description: 'Draw from taxable accounts first, then traditional, then Roth. Preserves tax-advantaged growth longest.',
     },
     {
-        value: 'traditional_first',
-        title: 'Traditional First',
-        description: 'Draw from traditional accounts first. Reduces future RMDs but triggers early tax.',
-    },
-    {
-        value: 'roth_first',
-        title: 'Roth First',
-        description: 'Draw from Roth first. Unusual but useful for specific tax planning scenarios.',
-    },
-    {
-        value: 'pro_rata',
-        title: 'Pro Rata',
-        description: 'Withdraw proportionally from all pools based on balance. Smooths tax impact across years.',
+        value: 'dynamic_sequencing',
+        title: 'Dynamic Sequencing',
+        description: 'Draws from Traditional IRA first up to the selected bracket ceiling to burn down the balance at low tax rates, then switches to Taxable. Helps manage RMDs and avoid IRMAA surcharges.',
     },
 ] as const;
 
@@ -52,6 +42,8 @@ export interface WithdrawalStrategySectionProps {
     onDynamicFloorChange: (value: number) => void;
     withdrawalOrder: string;
     onWithdrawalOrderChange: (value: string) => void;
+    dynamicSequencingBracketRate: number;
+    onDynamicSequencingBracketRateChange: (rate: number) => void;
 }
 
 export default function WithdrawalStrategySection({
@@ -63,6 +55,8 @@ export default function WithdrawalStrategySection({
     onDynamicFloorChange,
     withdrawalOrder,
     onWithdrawalOrderChange,
+    dynamicSequencingBracketRate,
+    onDynamicSequencingBracketRateChange,
 }: WithdrawalStrategySectionProps) {
     return (
         <>
@@ -122,6 +116,22 @@ export default function WithdrawalStrategySection({
                     </div>
                 ))}
             </div>
+            {withdrawalOrder === 'dynamic_sequencing' && (
+                <div style={{ marginBottom: '1rem' }}>
+                    <label style={labelStyle}>Traditional Withdrawal Bracket Ceiling</label>
+                    <select style={inputStyle}
+                        value={dynamicSequencingBracketRate}
+                        onChange={e => onDynamicSequencingBracketRateChange(parseFloat(e.target.value))}
+                    >
+                        <option value={0.10}>10%</option>
+                        <option value={0.12}>12%</option>
+                        <option value={0.22}>22%</option>
+                    </select>
+                    <div style={{ fontSize: '0.8rem', color: '#666', marginTop: '0.25rem' }}>
+                        Maximum tax bracket for Traditional IRA withdrawals
+                    </div>
+                </div>
+            )}
         </>
     );
 }

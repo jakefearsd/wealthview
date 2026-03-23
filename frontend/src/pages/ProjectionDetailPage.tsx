@@ -898,7 +898,15 @@ export default function ProjectionDetailPage() {
                                                         background: y.retired ? '#fff8e1' : 'transparent',
                                                     }}
                                                 >
-                                                    <td style={{ padding: '0.5rem' }}>{y.year}</td>
+                                                    <td style={{ padding: '0.5rem' }}>
+                                                        {y.year}
+                                                        {y.irmaa_warning && (
+                                                            <span title="Income exceeds 22% bracket — review IRMAA implications for Medicare (2-year lookback)"
+                                                                  style={{ color: '#d32f2f', marginLeft: 4, cursor: 'help', fontSize: '0.9rem' }}>
+                                                                &#9888;
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.age}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(y.start_balance)}</td>
                                                     <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{y.contributions > 0 ? formatCurrency(y.contributions) : '-'}</td>

@@ -66,6 +66,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     const [targetBracketRate, setTargetBracketRate] = useState<number>(toPercent(parsedParams.target_bracket_rate ?? 0.12));
     const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
     const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
+    const [dynamicSequencingBracketRate, setDynamicSequencingBracketRate] = useState(
+        parsedParams.dynamic_sequencing_bracket_rate ?? 0.12
+    );
     const [state, setState] = useState<string>(parsedParams.state ?? '');
     const [primaryResidencePropertyTax, setPrimaryResidencePropertyTax] = useState<number>(parsedParams.primary_residence_property_tax ?? 0);
     const [primaryResidenceMortgageInterest, setPrimaryResidenceMortgageInterest] = useState<number>(parsedParams.primary_residence_mortgage_interest ?? 0);
@@ -134,6 +137,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 other_income: (rothConversionStrategy === 'fill_bracket' || annualRothConversion > 0) ? otherIncome : null,
                 annual_roth_conversion: rothConversionStrategy === 'fixed_amount' && annualRothConversion > 0 ? annualRothConversion : null,
                 withdrawal_order: withdrawalOrder !== 'taxable_first' ? withdrawalOrder : null,
+                ...(withdrawalOrder === 'dynamic_sequencing' ? {
+                    dynamic_sequencing_bracket_rate: dynamicSequencingBracketRate,
+                } : {}),
                 roth_conversion_strategy: rothConversionStrategy !== 'fixed_amount' ? rothConversionStrategy : null,
                 target_bracket_rate: rothConversionStrategy === 'fill_bracket' ? targetBracketRate / 100 : null,
                 roth_conversion_start_year: rothConversionStartYear || null,
@@ -264,6 +270,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 onDynamicFloorChange={setDynamicFloor}
                 withdrawalOrder={withdrawalOrder}
                 onWithdrawalOrderChange={setWithdrawalOrder}
+                dynamicSequencingBracketRate={dynamicSequencingBracketRate}
+                onDynamicSequencingBracketRateChange={setDynamicSequencingBracketRate}
             />
 
             <RothConversionSection

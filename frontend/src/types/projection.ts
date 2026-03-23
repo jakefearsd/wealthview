@@ -93,6 +93,7 @@ export interface ProjectionYear {
     state_tax: number | null;
     salt_deduction: number | null;
     used_itemized_deduction: boolean | null;
+    irmaa_warning?: boolean;
 }
 
 export interface SpendingFeasibility {
@@ -137,6 +138,7 @@ export interface CreateScenarioRequest {
     other_income?: number | null;
     annual_roth_conversion?: number | null;
     withdrawal_order?: string | null;
+    dynamic_sequencing_bracket_rate?: number | null;
     roth_conversion_strategy?: string | null;
     target_bracket_rate?: number | null;
     roth_conversion_start_year?: number | null;
