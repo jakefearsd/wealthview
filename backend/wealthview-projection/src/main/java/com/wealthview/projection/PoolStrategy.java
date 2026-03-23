@@ -329,49 +329,24 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
 
-            BigDecimal fromTaxable;
-            BigDecimal fromTraditional;
-            BigDecimal fromRoth;
+            WithdrawalOrderStrategy strategy = switch (withdrawalOrder) {
+                case DYNAMIC_SEQUENCING -> new DynamicSequencingOrder(
+                        dynamicSequencingBracketRate, taxCalculator, filingStatus,
+                        effectiveOtherIncome, conversionAmount, rmdAmount, age, year,
+                        withdrawalOrder);
+                case PRO_RATA -> new ProRataOrder();
+                default -> new OrderedWithdrawalOrder(withdrawalOrder);
+            };
 
-            if (withdrawalOrder == WithdrawalOrder.DYNAMIC_SEQUENCING) {
-                if (age < EARLY_WITHDRAWAL_AGE) {
-                    // Before 59.5 (using 60 as proxy): taxable only to avoid early withdrawal penalties
-                    fromTaxable = totalNeed.min(taxable);
-                    fromTraditional = BigDecimal.ZERO;
-                    fromRoth = BigDecimal.ZERO;
-                } else if (dynamicSequencingBracketRate != null && taxCalculator != null) {
-                    BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForTargetRate(
-                            dynamicSequencingBracketRate, year, filingStatus);
-                    BigDecimal bracketSpace = bracketCeiling.subtract(effectiveOtherIncome)
-                            .subtract(conversionAmount).subtract(rmdAmount).max(BigDecimal.ZERO);
-                    fromTraditional = bracketSpace.min(traditional).min(totalNeed);
-                    BigDecimal remaining = totalNeed.subtract(fromTraditional);
-                    fromTaxable = remaining.min(taxable);
-                    remaining = remaining.subtract(fromTaxable);
-                    fromRoth = remaining.min(roth);
-                } else {
-                    // Fallback to taxable_first if no bracket rate configured
-                    var ordered = executeOrderedWithdrawals(totalNeed);
-                    fromTaxable = ordered[0];
-                    fromTraditional = ordered[1];
-                    fromRoth = ordered[2];
-                }
-            } else if (withdrawalOrder == WithdrawalOrder.PRO_RATA) {
-                BigDecimal total = getTotal();
-                if (total.compareTo(BigDecimal.ZERO) <= 0) {
-                    return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
-                }
-                BigDecimal need = totalNeed.min(total);
-                fromTaxable = need.multiply(taxable).divide(total, SCALE, ROUNDING).min(taxable);
-                fromTraditional = need.multiply(traditional).divide(total, SCALE, ROUNDING).min(traditional);
-                fromRoth = need.subtract(fromTaxable).subtract(fromTraditional).min(roth).max(BigDecimal.ZERO);
-            } else {
-                var ordered = executeOrderedWithdrawals(totalNeed);
-                fromTaxable = ordered[0];
-                fromTraditional = ordered[1];
-                fromRoth = ordered[2];
+            WithdrawalOrderStrategy.Result allocation = strategy.execute(totalNeed, taxable, traditional, roth);
+            if (allocation == null) {
+                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
+
+            BigDecimal fromTaxable = allocation.fromTaxable();
+            BigDecimal fromTraditional = allocation.fromTraditional();
+            BigDecimal fromRoth = allocation.fromRoth();
 
             taxable = taxable.subtract(fromTaxable);
             traditional = traditional.subtract(fromTraditional);
@@ -547,6 +522,112 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         @Override
         public String logTag() {
             return "Projection with pools";
+        }
+
+        // --- WithdrawalOrderStrategy and implementations ---
+
+        private sealed interface WithdrawalOrderStrategy
+                permits MultiPool.DynamicSequencingOrder, MultiPool.ProRataOrder, MultiPool.OrderedWithdrawalOrder {
+            record Result(BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth) {}
+
+            /**
+             * Returns the allocation of a withdrawal across pools, or null if the total balance is zero
+             * and the caller should return an empty result (PRO_RATA case only).
+             */
+            Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth);
+        }
+
+        private final class DynamicSequencingOrder implements WithdrawalOrderStrategy {
+            private final BigDecimal bracketRate;
+            private final TaxCalculationStrategy taxCalc;
+            private final FilingStatus filing;
+            private final BigDecimal effectiveOtherIncome;
+            private final BigDecimal conversionAmount;
+            private final BigDecimal rmdAmount;
+            private final int age;
+            private final int year;
+            private final WithdrawalOrder fallbackOrder;
+
+            DynamicSequencingOrder(BigDecimal bracketRate, TaxCalculationStrategy taxCalc,
+                                   FilingStatus filing, BigDecimal effectiveOtherIncome,
+                                   BigDecimal conversionAmount, BigDecimal rmdAmount,
+                                   int age, int year, WithdrawalOrder fallbackOrder) {
+                this.bracketRate = bracketRate;
+                this.taxCalc = taxCalc;
+                this.filing = filing;
+                this.effectiveOtherIncome = effectiveOtherIncome;
+                this.conversionAmount = conversionAmount;
+                this.rmdAmount = rmdAmount;
+                this.age = age;
+                this.year = year;
+                this.fallbackOrder = fallbackOrder;
+            }
+
+            @Override
+            public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
+                if (age < EARLY_WITHDRAWAL_AGE) {
+                    // Before 59.5 (using 60 as proxy): taxable only to avoid early withdrawal penalties
+                    return new Result(need.min(taxable), BigDecimal.ZERO, BigDecimal.ZERO);
+                } else if (bracketRate != null && taxCalc != null) {
+                    BigDecimal bracketCeiling = taxCalc.computeMaxIncomeForTargetRate(bracketRate, year, filing);
+                    BigDecimal bracketSpace = bracketCeiling.subtract(effectiveOtherIncome)
+                            .subtract(conversionAmount).subtract(rmdAmount).max(BigDecimal.ZERO);
+                    BigDecimal fromTraditional = bracketSpace.min(traditional).min(need);
+                    BigDecimal remaining = need.subtract(fromTraditional);
+                    BigDecimal fromTaxable = remaining.min(taxable);
+                    remaining = remaining.subtract(fromTaxable);
+                    BigDecimal fromRoth = remaining.min(roth);
+                    return new Result(fromTaxable, fromTraditional, fromRoth);
+                } else {
+                    // Fallback to taxable_first if no bracket rate configured
+                    return new OrderedWithdrawalOrder(fallbackOrder).execute(need, taxable, traditional, roth);
+                }
+            }
+        }
+
+        private static final class ProRataOrder implements WithdrawalOrderStrategy {
+            @Override
+            public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
+                BigDecimal total = taxable.add(traditional).add(roth);
+                if (total.compareTo(BigDecimal.ZERO) <= 0) {
+                    return null; // signals caller to return empty result
+                }
+                BigDecimal capped = need.min(total);
+                BigDecimal fromTaxable = capped.multiply(taxable).divide(total, SCALE, ROUNDING).min(taxable);
+                BigDecimal fromTraditional = capped.multiply(traditional).divide(total, SCALE, ROUNDING).min(traditional);
+                BigDecimal fromRoth = capped.subtract(fromTaxable).subtract(fromTraditional).min(roth).max(BigDecimal.ZERO);
+                return new Result(fromTaxable, fromTraditional, fromRoth);
+            }
+        }
+
+        private static final class OrderedWithdrawalOrder implements WithdrawalOrderStrategy {
+            private final WithdrawalOrder order;
+
+            OrderedWithdrawalOrder(WithdrawalOrder order) {
+                this.order = order;
+            }
+
+            @Override
+            public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
+                BigDecimal remaining = need;
+                BigDecimal[] pools = switch (order) {
+                    case TRADITIONAL_FIRST -> new BigDecimal[]{traditional, taxable, roth};
+                    case ROTH_FIRST -> new BigDecimal[]{roth, taxable, traditional};
+                    default -> new BigDecimal[]{taxable, traditional, roth};
+                };
+
+                BigDecimal[] drawn = new BigDecimal[3];
+                for (int i = 0; i < 3; i++) {
+                    drawn[i] = remaining.min(pools[i]);
+                    remaining = remaining.subtract(drawn[i]);
+                }
+
+                return switch (order) {
+                    case TRADITIONAL_FIRST -> new Result(drawn[1], drawn[0], drawn[2]);
+                    case ROTH_FIRST -> new Result(drawn[1], drawn[2], drawn[0]);
+                    default -> new Result(drawn[0], drawn[1], drawn[2]);
+                };
+            }
         }
 
         private BigDecimal[] executeOrderedWithdrawals(BigDecimal totalNeed) {
