@@ -79,6 +79,7 @@ class RothConversionOptimizerTest {
         private List<ProjectionIncomeSourceInput> incomeSources = null;
         private RentalLossCalculator rentalLossCalculator = null;
         private double rmdBracketHeadroom = 0.10;
+        private double dynamicSequencingBracketRate = 0.0;
 
         OptimizerTestBuilder traditional(double v) { this.traditional = v; return this; }
         OptimizerTestBuilder roth(double v) { this.roth = v; return this; }
@@ -103,6 +104,9 @@ class RothConversionOptimizerTest {
             return this;
         }
         OptimizerTestBuilder rmdBracketHeadroom(double v) { this.rmdBracketHeadroom = v; return this; }
+        OptimizerTestBuilder dynamicSequencingBracketRate(double v) {
+            this.dynamicSequencingBracketRate = v; return this;
+        }
 
         RothConversionOptimizer build() {
             int years = endAge - retirementAge;
@@ -114,7 +118,7 @@ class RothConversionOptimizerTest {
                     conversionBracketRate, rmdTargetBracketRate, returnMean,
                     essentialFloor, inflationRate, filingStatus, calc,
                     withdrawalOrder, incomeSources, rentalLossCalculator,
-                    rmdBracketHeadroom);
+                    rmdBracketHeadroom, dynamicSequencingBracketRate);
         }
     }
 
@@ -1013,5 +1017,31 @@ class RothConversionOptimizerTest {
         assertThat(result1.lifetimeTaxWith())
                 .as("scheduleForFraction must be deterministic — same fraction must yield same tax")
                 .isEqualTo(result2.lifetimeTaxWith());
+    }
+
+    // ---- Dynamic Sequencing tests ----
+
+    @Test
+    void optimize_dynamicSequencing_lowerLifetimeTaxThanTaxableFirst() {
+        var dsOptimizer = testBuilder()
+                .traditional(1_000_000)
+                .taxable(200_000)
+                .withdrawalOrder("dynamic_sequencing")
+                .dynamicSequencingBracketRate(0.12)
+                .build();
+
+        var tfOptimizer = testBuilder()
+                .traditional(1_000_000)
+                .taxable(200_000)
+                .build();  // defaults to "taxable,traditional,roth"
+
+        var dsResult = dsOptimizer.optimize();
+        var tfResult = tfOptimizer.optimize();
+
+        // DS should draw Traditional at low brackets for spending,
+        // reducing the balance more efficiently
+        assertThat(dsResult.lifetimeTaxWith())
+                .as("DS should produce lower or equal lifetime tax")
+                .isLessThanOrEqualTo(tfResult.lifetimeTaxWith());
     }
 }

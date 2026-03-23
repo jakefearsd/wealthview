@@ -163,6 +163,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             essentialFloor, inflationRate,
                             input.traditionalExhaustionBuffer(), withdrawalOrder)
                     .rentals(input.incomeSources(), new RentalLossCalculator())
+                    .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
+                            ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
                     .build();
 
             // Generate search paths with reduced trials for joint optimization search

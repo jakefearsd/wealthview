@@ -67,6 +67,7 @@ class RothConversionOptimizer {
     private final RentalLossCalculator rentalLossCalculator;
     private final double rmdBracketHeadroom;
     private final double targetTraditionalBalance;
+    private final double dynamicSequencingBracketRate;
 
     RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
                             double[] otherIncomeByYear, double[] taxableIncomeByYear,
@@ -78,7 +79,8 @@ class RothConversionOptimizer {
                             String withdrawalOrder,
                             List<ProjectionIncomeSourceInput> incomeSources,
                             RentalLossCalculator rentalLossCalculator,
-                            double rmdBracketHeadroom) {
+                            double rmdBracketHeadroom,
+                            double dynamicSequencingBracketRate) {
         this.initTraditional = initTraditional;
         this.initRoth = initRoth;
         this.initTaxable = initTaxable;
@@ -105,6 +107,7 @@ class RothConversionOptimizer {
                         .toList()
                 : List.of();
         this.rmdBracketHeadroom = rmdBracketHeadroom;
+        this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
         this.targetTraditionalBalance = computeTargetTraditionalBalance();
     }
 
@@ -465,6 +468,25 @@ class RothConversionOptimizer {
             if (age < EARLY_WITHDRAWAL_AGE) {
                 taxable -= netSpendingNeed;
                 if (taxable < 0) taxable = 0;
+            } else if ("dynamic_sequencing".equals(withdrawalOrder) && dynamicSequencingBracketRate > 0) {
+                double remaining = netSpendingNeed;
+                // DS: Traditional up to bracket ceiling, then Taxable, then Roth
+                double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
+                        BigDecimal.valueOf(dynamicSequencingBracketRate), calendarYear, filingStatus,
+                        BigDecimal.valueOf(inflationRate)).doubleValue();
+                double bracketSpace = Math.max(0, bracketCeiling - effectiveOtherIncome
+                        - rmdAmount - conversionAmount);
+                double tradDraw = Math.min(bracketSpace, Math.min(traditional, remaining));
+                traditional -= tradDraw;
+                remaining -= tradDraw;
+                withdrawalTax += computeIncrementalTax(tradDraw,
+                        effectiveOtherIncome + rmdAmount + conversionAmount, calendarYear);
+                double taxDraw = Math.min(remaining, taxable);
+                taxable -= taxDraw;
+                remaining -= taxDraw;
+                double rothDraw = Math.min(remaining, roth);
+                roth -= rothDraw;
+                remaining -= rothDraw;
             } else {
                 double remaining = netSpendingNeed;
                 var pools = parseWithdrawalOrder();
@@ -709,6 +731,7 @@ class RothConversionOptimizer {
         private int birthYear, retirementAge, endAge, exhaustionBuffer;
         private double conversionBracketRate, rmdTargetBracketRate, returnMean;
         private double essentialFloor, inflationRate, rmdBracketHeadroom;
+        private double dynamicSequencingBracketRate = 0.0;
         private FilingStatus filingStatus;
         private FederalTaxCalculator taxCalculator;
         private String withdrawalOrder;
@@ -763,6 +786,11 @@ class RothConversionOptimizer {
             return this;
         }
 
+        Builder dynamicSequencingBracketRate(double rate) {
+            this.dynamicSequencingBracketRate = rate;
+            return this;
+        }
+
         RothConversionOptimizer build() {
             return new RothConversionOptimizer(
                     traditional, roth, taxable,
@@ -771,7 +799,7 @@ class RothConversionOptimizer {
                     conversionBracketRate, rmdTargetBracketRate, returnMean,
                     essentialFloor, inflationRate, filingStatus, taxCalculator,
                     withdrawalOrder, incomeSources, rentalLossCalculator,
-                    rmdBracketHeadroom);
+                    rmdBracketHeadroom, dynamicSequencingBracketRate);
         }
     }
 }
