@@ -538,9 +538,9 @@ export default function SpendingOptimizerPage() {
                                     ))}
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                    {riskTolerance === 'conservative' && '90% confidence \u2014 lowest failure risk'}
-                                    {riskTolerance === 'moderate' && '80% confidence \u2014 balanced approach'}
-                                    {riskTolerance === 'aggressive' && '70% confidence \u2014 higher spending, more risk'}
+                                    {riskTolerance === 'conservative' && '85% confidence \u2014 Very likely sustainable without adjustments'}
+                                    {riskTolerance === 'moderate' && '70% confidence \u2014 Sustainable with occasional adjustments in bad markets'}
+                                    {riskTolerance === 'aggressive' && '60% confidence \u2014 Expected spending, requires active management in downturns'}
                                 </div>
                             </div>
                             <div>
@@ -929,11 +929,21 @@ export default function SpendingOptimizerPage() {
 
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}>Portfolio Balance Projections</h3>
+                        <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                            Portfolio balance projections across thousands of market simulations. The dark line shows the
+                            median outcome. The shaded bands show the range between pessimistic (10th percentile) and
+                            slightly-above-average (55th percentile) scenarios. The red dashed line is the worst-case floor.
+                        </p>
                         <PortfolioFanChart yearlySpending={result.yearly_spending} />
                     </div>
 
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}>Spending Corridor</h3>
+                        <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem', lineHeight: 1.5 }}>
+                            The blue line shows recommended spending at your confidence level. The shaded band shows the
+                            adjustment range — spend near the top in good markets, cut toward the bottom in downturns.
+                            The green area represents income that offsets portfolio withdrawals.
+                        </p>
                         <SpendingCorridorChart yearlySpending={result.yearly_spending} phases={result.phases} />
                     </div>
 

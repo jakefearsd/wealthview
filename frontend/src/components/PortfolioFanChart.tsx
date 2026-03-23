@@ -50,8 +50,20 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                         domain={[0, 'auto']}
                     />
                     <Tooltip
-                        formatter={(value: number, name: string) => [tooltipFmt(value), name]}
+                        formatter={(value: number | number[], name: string) => {
+                            if (Array.isArray(value)) return [null, null];
+                            return [tooltipFmt(value), name];
+                        }}
                         labelFormatter={(age) => `Age ${age}`}
+                        itemSorter={(item) => {
+                            const order: Record<string, number> = {
+                                '55th Percentile': 0,
+                                'Median (p50)': 1,
+                                '25th Percentile': 2,
+                                '10th Percentile': 3,
+                            };
+                            return order[item.name ?? ''] ?? 5;
+                        }}
                     />
                     <Legend />
 
@@ -59,28 +71,52 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                     <Area
                         type="monotone"
                         dataKey="outerBand"
-                        fill="#e3f2fd"
+                        fill="#c7d2fe"
                         stroke="none"
                         name="10th-55th Percentile"
                         fillOpacity={0.5}
+                        legendType="rect"
                     />
 
                     {/* Inner band: p25 to p50 */}
                     <Area
                         type="monotone"
                         dataKey="innerBand"
-                        fill="#90caf9"
+                        fill="#818cf8"
                         stroke="none"
                         name="25th-50th Percentile"
-                        fillOpacity={0.5}
+                        fillOpacity={0.3}
+                        legendType="rect"
+                    />
+
+                    {/* p55 line (upper boundary) */}
+                    <Line
+                        type="monotone"
+                        dataKey="p55"
+                        stroke="#a5b4fc"
+                        strokeWidth={1}
+                        strokeDasharray="3 3"
+                        dot={false}
+                        name="55th Percentile"
+                    />
+
+                    {/* p25 line */}
+                    <Line
+                        type="monotone"
+                        dataKey="p25"
+                        stroke="#6366f1"
+                        strokeWidth={1}
+                        strokeDasharray="6 3"
+                        dot={false}
+                        name="25th Percentile"
                     />
 
                     {/* Median line */}
                     <Line
                         type="monotone"
                         dataKey="median"
-                        stroke="#1565c0"
-                        strokeWidth={2}
+                        stroke="#1e1b4b"
+                        strokeWidth={2.5}
                         dot={false}
                         name="Median (p50)"
                     />
@@ -90,7 +126,7 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                         type="monotone"
                         dataKey="p10"
                         stroke="#ef5350"
-                        strokeWidth={1}
+                        strokeWidth={1.5}
                         strokeDasharray="5 5"
                         dot={false}
                         name="10th Percentile"
