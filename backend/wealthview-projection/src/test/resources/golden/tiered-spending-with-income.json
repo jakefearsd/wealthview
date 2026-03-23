@@ -44,7 +44,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2026,
     "age" : 66,
@@ -89,7 +90,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2027,
     "age" : 67,
@@ -136,7 +138,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2028,
     "age" : 68,
@@ -183,7 +186,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2029,
     "age" : 69,
@@ -230,7 +234,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2030,
     "age" : 70,
@@ -277,7 +282,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2031,
     "age" : 71,
@@ -324,7 +330,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2032,
     "age" : 72,
@@ -371,7 +378,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2033,
     "age" : 73,
@@ -418,7 +426,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2034,
     "age" : 74,
@@ -465,7 +474,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2035,
     "age" : 75,
@@ -512,7 +522,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2036,
     "age" : 76,
@@ -559,7 +570,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2037,
     "age" : 77,
@@ -606,7 +618,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2038,
     "age" : 78,
@@ -653,7 +666,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2039,
     "age" : 79,
@@ -700,7 +714,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2040,
     "age" : 80,
@@ -747,7 +762,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2041,
     "age" : 81,
@@ -794,7 +810,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2042,
     "age" : 82,
@@ -841,7 +858,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2043,
     "age" : 83,
@@ -888,7 +906,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   }, {
     "year" : 2044,
     "age" : 84,
@@ -935,7 +954,8 @@
     "federalTax" : null,
     "stateTax" : null,
     "saltDeduction" : null,
-    "usedItemizedDeduction" : null
+    "usedItemizedDeduction" : null,
+    "irmaaWarning" : null
   } ],
   "finalBalance" : 489252.7551,
   "yearsInRetirement" : 20,

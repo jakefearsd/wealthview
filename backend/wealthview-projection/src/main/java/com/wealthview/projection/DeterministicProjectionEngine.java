@@ -51,6 +51,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
     private static final BigDecimal SHORTFALL_TOLERANCE = new BigDecimal("-10");
+    private static final BigDecimal IRMAA_BRACKET_RATE = new BigDecimal("0.22");
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
@@ -297,6 +298,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
                         ? breakdown.saltDeduction() : null;
                 yearDto = yearDto.withTaxBreakdown(fedTax, stTax, saltDed, breakdown.usedItemized());
+            }
+            if (retired && age >= 63 && taxStrategy != null) {
+                BigDecimal totalIncome = incomeResult.effectiveOtherIncome()
+                        .add(conversionAmount)
+                        .add(wdFromTraditional);
+                var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+                BigDecimal irmaaCeiling = taxStrategy.computeMaxIncomeForTargetRate(
+                        IRMAA_BRACKET_RATE, year, filingStatus);
+                if (irmaaCeiling.compareTo(BigDecimal.ZERO) > 0
+                        && totalIncome.compareTo(irmaaCeiling) > 0) {
+                    yearDto = yearDto.withIrmaaWarning(true);
+                }
             }
             yearlyData.add(yearDto);
         }
@@ -745,7 +758,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
                 base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
                 base.rentalPropertyDetails(),
-                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction());
+                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction(),
+                base.irmaaWarning());
     }
 
     private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
@@ -778,7 +792,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
                 base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
                 isResult.rentalPropertyDetails().isEmpty() ? null : isResult.rentalPropertyDetails(),
-                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction());
+                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction(),
+                base.irmaaWarning());
     }
 
     private ProjectionYearDto applySurplusReinvested(ProjectionYearDto base, BigDecimal surplusReinvested) {
