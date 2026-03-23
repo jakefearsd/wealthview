@@ -160,7 +160,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                     .add(sumInitialBalances(grouped.getOrDefault("roth", List.of())))),
                     filingStatus, otherIncome, annualRothConversion,
                     params.rothConversionStrategy(), params.targetBracketRate(),
-                    params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy);
+                    params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy,
+                    params.dynamicSequencingBracketRate());
         } else {
             BigDecimal balance = sumInitialBalances(accounts);
             return new PoolStrategy.SinglePool(balance, sumContributions(accounts),
@@ -430,7 +431,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         var withdrawalResult = pool.executeWithdrawals(
-                portfolioNeed, year, effectiveOtherIncome, conversionAmount);
+                portfolioNeed, year, effectiveOtherIncome, conversionAmount, BigDecimal.ZERO, age);
         BigDecimal taxLiability = withdrawalResult.taxLiability().add(surplusTax);
 
         if (pool.tracksSETax() && isResult != null

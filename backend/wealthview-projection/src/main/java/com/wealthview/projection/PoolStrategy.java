@@ -31,7 +31,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     GrowthResult applyGrowth();
 
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
-                                           BigDecimal conversionAmount);
+                                           BigDecimal conversionAmount, BigDecimal rmdAmount, int age);
 
     ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome);
 
@@ -150,7 +150,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         @Override
         public WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year,
                                                       BigDecimal effectiveOtherIncome,
-                                                      BigDecimal conversionAmount) {
+                                                      BigDecimal conversionAmount,
+                                                      BigDecimal rmdAmount, int age) {
             // Simple path: withdrawal is just min(need, balance), no tax tracking
             BigDecimal withdrawn = need.min(balance);
             balance = balance.subtract(withdrawn);
@@ -241,6 +242,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final Integer rothConversionStartYear;
         private final WithdrawalOrder withdrawalOrder;
         private final TaxCalculationStrategy taxCalculator;
+        private final BigDecimal dynamicSequencingBracketRate;
+
+        private static final int EARLY_WITHDRAWAL_AGE = 60; // proxy for 59.5
 
         MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
                   BigDecimal weightedReturn,
@@ -251,7 +255,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                   BigDecimal targetBracketRate,
                   Integer rothConversionStartYear,
                   WithdrawalOrder withdrawalOrder,
-                  TaxCalculationStrategy taxCalculator) {
+                  TaxCalculationStrategy taxCalculator,
+                  BigDecimal dynamicSequencingBracketRate) {
             this.taxable = sumBalances(grouped.getOrDefault("taxable", List.of()));
             this.traditional = sumBalances(grouped.getOrDefault("traditional", List.of()));
             this.roth = sumBalances(grouped.getOrDefault("roth", List.of()));
@@ -269,6 +274,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             this.rothConversionStartYear = rothConversionStartYear;
             this.withdrawalOrder = withdrawalOrder;
             this.taxCalculator = taxCalculator;
+            this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
         }
 
         private static BigDecimal sumBalances(List<ProjectionAccountInput> accounts) {
@@ -316,7 +322,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         @Override
         public WithdrawalTaxResult executeWithdrawals(BigDecimal totalNeed, int year,
                                                       BigDecimal effectiveOtherIncome,
-                                                      BigDecimal conversionAmount) {
+                                                      BigDecimal conversionAmount,
+                                                      BigDecimal rmdAmount, int age) {
             if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
                 return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
@@ -326,7 +333,30 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal fromTraditional;
             BigDecimal fromRoth;
 
-            if (withdrawalOrder == WithdrawalOrder.PRO_RATA) {
+            if (withdrawalOrder == WithdrawalOrder.DYNAMIC_SEQUENCING) {
+                if (age < EARLY_WITHDRAWAL_AGE) {
+                    // Before 59.5 (using 60 as proxy): taxable only to avoid early withdrawal penalties
+                    fromTaxable = totalNeed.min(taxable);
+                    fromTraditional = BigDecimal.ZERO;
+                    fromRoth = BigDecimal.ZERO;
+                } else if (dynamicSequencingBracketRate != null && taxCalculator != null) {
+                    BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForTargetRate(
+                            dynamicSequencingBracketRate, year, filingStatus);
+                    BigDecimal bracketSpace = bracketCeiling.subtract(effectiveOtherIncome)
+                            .subtract(conversionAmount).subtract(rmdAmount).max(BigDecimal.ZERO);
+                    fromTraditional = bracketSpace.min(traditional).min(totalNeed);
+                    BigDecimal remaining = totalNeed.subtract(fromTraditional);
+                    fromTaxable = remaining.min(taxable);
+                    remaining = remaining.subtract(fromTaxable);
+                    fromRoth = remaining.min(roth);
+                } else {
+                    // Fallback to taxable_first if no bracket rate configured
+                    var ordered = executeOrderedWithdrawals(totalNeed);
+                    fromTaxable = ordered[0];
+                    fromTraditional = ordered[1];
+                    fromRoth = ordered[2];
+                }
+            } else if (withdrawalOrder == WithdrawalOrder.PRO_RATA) {
                 BigDecimal total = getTotal();
                 if (total.compareTo(BigDecimal.ZERO) <= 0) {
                     return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,

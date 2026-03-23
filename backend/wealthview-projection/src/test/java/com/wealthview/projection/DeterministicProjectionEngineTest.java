@@ -4096,4 +4096,156 @@ class DeterministicProjectionEngineTest {
         assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
         assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
     }
+
+    // === Dynamic Sequencing withdrawal tests ===
+
+    @Test
+    void run_dynamicSequencing_drawsTraditionalUpToBracketCeilingThenTaxableThenRoth() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Traditional $500K, Taxable $200K, Roth $100K
+        // 0% return, 0% inflation → predictable amounts
+        // withdrawal_rate=0.10 → need = 10% of $800K = $80K
+        // 12% bracket ceiling for single: $48,475 taxable + $15,000 std deduction = $63,475 gross
+        // bracketSpace = $63,475 - $0(other) - $0(conversion) - $0(rmd) = $63,475
+        // fromTraditional = min($63,475, $500K, $80K) = $63,475
+        // remaining = $80K - $63,475 = $16,525
+        // fromTaxable = min($16,525, $200K) = $16,525
+        // fromRoth = $0
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.10, "filing_status": "single",
+                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Traditional should be drawn up to bracket ceiling ($63,475)
+        assertThat(year1.withdrawalFromTraditional()).isNotNull();
+        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("63475"));
+
+        // Taxable covers the remainder ($80K - $63,475 = $16,525)
+        assertThat(year1.withdrawalFromTaxable()).isNotNull();
+        assertThat(year1.withdrawalFromTaxable()).isEqualByComparingTo(bd("16525"));
+
+        // Roth should not be touched
+        assertThat(year1.withdrawalFromRoth()).isNull();
+    }
+
+    @Test
+    void run_dynamicSequencing_traditionalLessThanBracketSpace_drawsAllTraditionalThenTaxable() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Traditional $30K (less than bracket space of $63,475)
+        // Need = 10% of $330K = $33K
+        // bracketSpace = $63,475
+        // fromTraditional = min($63,475, $30K, $33K) = $30K
+        // remaining = $33K - $30K = $3K
+        // fromTaxable = min($3K, $200K) = $3K
+        // fromRoth = $0
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.10, "filing_status": "single",
+                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("30000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // All traditional should be drawn ($30K < bracket space)
+        assertThat(year1.withdrawalFromTraditional()).isNotNull();
+        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("30000"));
+
+        // Taxable covers the remainder ($33K - $30K = $3K)
+        assertThat(year1.withdrawalFromTaxable()).isNotNull();
+        assertThat(year1.withdrawalFromTaxable()).isEqualByComparingTo(bd("3000"));
+
+        // Roth should not be touched
+        assertThat(year1.withdrawalFromRoth()).isNull();
+    }
+
+    @Test
+    void run_dynamicSequencing_conversionExceedsBracket_traditionalWithdrawalIsZero() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 66;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Conversion of $70K exceeds bracket ceiling of $63,475
+        // bracketSpace = max($63,475 - $0 - $70K - $0, 0) = $0
+        // fromTraditional = min($0, $500K, need) = $0
+        // All withdrawal should come from taxable
+        var input = createRetiredInput(
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12,
+                 "annual_roth_conversion": 70000}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Conversion consumed all bracket space → no traditional withdrawal
+        assertThat(year1.withdrawalFromTraditional()).isNull();
+
+        // All withdrawal from taxable
+        assertThat(year1.withdrawalFromTaxable()).isNotNull();
+        assertThat(year1.withdrawalFromTaxable()).isGreaterThan(BigDecimal.ZERO);
+
+        // Roth should not be touched for withdrawals
+        assertThat(year1.withdrawalFromRoth()).isNull();
+    }
+
+    @Test
+    void run_dynamicSequencing_beforeAge60_taxableOnlyRegardlessOfDS() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Age 55 at retirement → before 59.5 threshold (use 60 as proxy)
+        int retireAge = 55;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        // Even with DS configured, before age 60, only taxable should be drawn
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable"),
+                        acct("100000", "0", "0.00", "roth")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        // Before age 60: only taxable should be drawn, traditional and roth untouched
+        assertThat(year1.withdrawalFromTaxable()).isNotNull();
+        assertThat(year1.withdrawalFromTaxable()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.withdrawalFromTraditional()).isNull();
+        assertThat(year1.withdrawalFromRoth()).isNull();
+    }
 }
