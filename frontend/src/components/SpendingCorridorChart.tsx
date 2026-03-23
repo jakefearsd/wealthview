@@ -4,6 +4,7 @@ import {
     Tooltip, ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts';
 import type { GuardrailYearlySpending, GuardrailPhase } from '../types/projection';
+import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -27,11 +28,6 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
         }));
     }, [yearlySpending]);
 
-    const fmt = (value: number) =>
-        `$${(value / 1000).toFixed(0)}k`;
-
-    const tooltipFmt = (value: number) =>
-        value.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
     if (data.length === 0) {
         return <p className="text-gray-500">No spending data available.</p>;
@@ -43,11 +39,11 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                 <ComposedChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="age" label={{ value: 'Age', position: 'insideBottom', offset: -5 }} />
-                    <YAxis tickFormatter={fmt} label={{ value: 'Annual Spending ($)', angle: -90, position: 'insideLeft' }} />
+                    <YAxis tickFormatter={formatDollarAxis} label={{ value: 'Annual Spending ($)', angle: -90, position: 'insideLeft' }} />
                     <Tooltip
                         formatter={(value: number | number[], name: string) => {
                             if (Array.isArray(value)) return [null, null];
-                            return [tooltipFmt(value), name];
+                            return [formatDollarTooltip(value), name];
                         }}
                         labelFormatter={(age) => `Age ${age}`}
                         itemSorter={(item) => {
