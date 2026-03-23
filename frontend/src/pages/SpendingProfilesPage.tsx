@@ -351,9 +351,9 @@ export default function SpendingProfilesPage() {
                                             </div>
                                         </div>
                                         <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Balance Range (P10-P90)</div>
+                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Balance Range (P10-P55)</div>
                                             <div style={{ color: '#444' }}>
-                                                {formatCurrency(g.percentile10_final)} &ndash; {formatCurrency(g.percentile90_final)}
+                                                {formatCurrency(g.percentile10_final)} &ndash; {formatCurrency(g.percentile55_final)}
                                             </div>
                                         </div>
                                     </div>

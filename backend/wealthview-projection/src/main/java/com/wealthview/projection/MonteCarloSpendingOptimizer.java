@@ -466,19 +466,19 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] medianBalanceByYear = new double[years];
         double[] p10BalanceByYear = new double[years];
         double[] p25BalanceByYear = new double[years];
-        double[] p75BalanceByYear = new double[years];
+        double[] p55BalanceByYear = new double[years];
         for (int y = 0; y < years; y++) {
             Arrays.sort(yearBalances[y]);
             p10BalanceByYear[y] = percentile(yearBalances[y], 0.10);
             p25BalanceByYear[y] = percentile(yearBalances[y], 0.25);
             medianBalanceByYear[y] = percentile(yearBalances[y], 0.50);
-            p75BalanceByYear[y] = percentile(yearBalances[y], 0.75);
+            p55BalanceByYear[y] = percentile(yearBalances[y], 0.55);
         }
 
         Arrays.sort(finalBalances);
         double medianFinal = percentile(finalBalances, 0.50);
         double p10Final = percentile(finalBalances, 0.10);
-        double p90Final = percentile(finalBalances, 0.90);
+        double p55Final = percentile(finalBalances, 0.55);
         long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
         double failureRate = (double) failures / trialCount;
 
@@ -500,7 +500,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName,
                     toBD(medianBalanceByYear[y]),
                     toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y]),
-                    toBD(p75BalanceByYear[y])));
+                    toBD(p55BalanceByYear[y])));
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -549,7 +549,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 trialCount, input.confidenceLevel(),
                 input.phases(), yearlySpending,
                 toBD(medianFinal), toBD(failureRate),
-                toBD(p10Final), toBD(p90Final),
+                toBD(p10Final), toBD(p55Final),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"),
                 convScheduleResponse);

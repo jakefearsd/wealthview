@@ -16,7 +16,7 @@ public record GuardrailYearlySpending(
         BigDecimal portfolioBalanceMedian,
         BigDecimal portfolioBalanceP10,
         BigDecimal portfolioBalanceP25,
-        BigDecimal portfolioBalanceP75
+        BigDecimal portfolioBalanceP55
 ) {
 
     public GuardrailYearlySpending(int year, int age, BigDecimal recommended,

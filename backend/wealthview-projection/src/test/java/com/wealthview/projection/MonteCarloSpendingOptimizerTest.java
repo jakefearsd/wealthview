@@ -123,7 +123,7 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(firstYear.portfolioBalanceMedian()).isNotNull();
         assertThat(firstYear.portfolioBalanceP10()).isNotNull();
         assertThat(firstYear.portfolioBalanceP25()).isNotNull();
-        assertThat(firstYear.portfolioBalanceP75()).isNotNull();
+        assertThat(firstYear.portfolioBalanceP55()).isNotNull();
     }
 
     @Test
@@ -482,8 +482,8 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(result.failureRate()).isNotNull();
         assertThat(result.failureRate()).isBetween(BigDecimal.ZERO, BigDecimal.ONE);
         assertThat(result.percentile10Final()).isNotNull();
-        assertThat(result.percentile90Final()).isNotNull();
-        assertThat(result.percentile90Final())
+        assertThat(result.percentile55Final()).isNotNull();
+        assertThat(result.percentile55Final())
                 .isGreaterThanOrEqualTo(result.percentile10Final());
     }
 
@@ -1302,8 +1302,8 @@ class MonteCarloSpendingOptimizerTest {
             assertThat(year.portfolioBalanceP25())
                     .as("p25 should be non-null for age %d", year.age())
                     .isNotNull();
-            assertThat(year.portfolioBalanceP75())
-                    .as("p75 should be non-null for age %d", year.age())
+            assertThat(year.portfolioBalanceP55())
+                    .as("p55 should be non-null for age %d", year.age())
                     .isNotNull();
             assertThat(year.portfolioBalanceP10())
                     .as("p10 <= p25 for age %d", year.age())
@@ -1312,8 +1312,8 @@ class MonteCarloSpendingOptimizerTest {
                     .as("p25 <= median for age %d", year.age())
                     .isLessThanOrEqualTo(year.portfolioBalanceMedian());
             assertThat(year.portfolioBalanceMedian())
-                    .as("median <= p75 for age %d", year.age())
-                    .isLessThanOrEqualTo(year.portfolioBalanceP75());
+                    .as("median <= p55 for age %d", year.age())
+                    .isLessThanOrEqualTo(year.portfolioBalanceP55());
         }
     }
 

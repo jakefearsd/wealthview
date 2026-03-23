@@ -16,9 +16,9 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
             p10: y.portfolio_balance_p10,
             p25: y.portfolio_balance_p25,
             median: y.portfolio_balance_median,
-            p75: y.portfolio_balance_p75,
+            p55: y.portfolio_balance_p55,
             // Bands for Recharts Area: [low, high]
-            outerBand: [y.portfolio_balance_p10, y.portfolio_balance_p75],
+            outerBand: [y.portfolio_balance_p10, y.portfolio_balance_p55],
             innerBand: [y.portfolio_balance_p25, y.portfolio_balance_median],
         }));
     }, [yearlySpending]);
@@ -55,13 +55,13 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                     />
                     <Legend />
 
-                    {/* Outer band: p10 to p75 */}
+                    {/* Outer band: p10 to p55 */}
                     <Area
                         type="monotone"
                         dataKey="outerBand"
                         fill="#e3f2fd"
                         stroke="none"
-                        name="10th-75th Percentile"
+                        name="10th-55th Percentile"
                         fillOpacity={0.5}
                     />
 
