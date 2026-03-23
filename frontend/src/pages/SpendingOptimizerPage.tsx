@@ -414,7 +414,29 @@ export default function SpendingOptimizerPage() {
                 </Link>
             </div>
 
-            <h2 style={{ marginBottom: '0.75rem' }}>Spending Optimizer</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                <h2 style={{ margin: 0 }}>Spending Optimizer</h2>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {state === 'configure' && (
+                        <button onClick={handleOptimize}
+                            style={{ padding: '0.5rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            Run Optimization
+                        </button>
+                    )}
+                    {state === 'results' && (
+                        <>
+                            <button onClick={() => setState('configure')}
+                                style={{ padding: '0.5rem 1rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                Adjust &amp; Re-run
+                            </button>
+                            <button onClick={() => navigate(`/projections/${id}`)}
+                                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                                Back to Scenario
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
             <div style={{
                 background: '#f8f9fa', border: '1px solid #e0e0e0', borderRadius: '6px',
                 padding: '0.75rem 1rem', marginBottom: '1.5rem', fontSize: '0.85rem',
@@ -733,10 +755,6 @@ export default function SpendingOptimizerPage() {
                         )}
                     </div>
 
-                    <button onClick={handleOptimize}
-                        style={{ padding: '0.6rem 1.5rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.95rem' }}>
-                        Run Optimization
-                    </button>
                 </div>
             )}
 
@@ -996,14 +1014,6 @@ export default function SpendingOptimizerPage() {
                     )}
 
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
-                        <button onClick={() => setState('configure')}
-                            style={{ padding: '0.5rem 1rem', background: '#fff', color: '#333', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>
-                            Adjust &amp; Re-run
-                        </button>
-                        <button onClick={() => navigate(`/projections/${id}`)}
-                            style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
-                            Back to Scenario
-                        </button>
                     </div>
                 </div>
                 );
