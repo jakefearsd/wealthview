@@ -519,7 +519,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     parseOptionalInt(node, "roth_conversion_start_year"),
                     parseOptionalString(node, "state"),
                     parseOptionalBigDecimal(node, "primary_residence_property_tax"),
-                    parseOptionalBigDecimal(node, "primary_residence_mortgage_interest"));
+                    parseOptionalBigDecimal(node, "primary_residence_mortgage_interest"),
+                    parseOptionalBigDecimal(node, "dynamic_sequencing_bracket_rate"));
         } catch (com.fasterxml.jackson.core.JsonProcessingException | NumberFormatException e) {
             log.warn("Failed to parse params_json", e);
             return defaultParams();
@@ -528,7 +529,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private ScenarioParams defaultParams() {
         return new ScenarioParams(null, null, null, null, null, null, null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null, null, null, null, null);
+                WithdrawalOrder.TAXABLE_FIRST, null, null, null, null, null, null, null);
     }
 
     private BigDecimal parseOptionalBigDecimal(JsonNode node, String fieldName) {
@@ -558,7 +559,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             Integer rothConversionStartYear,
             String state,
             BigDecimal primaryResidencePropertyTax,
-            BigDecimal primaryResidenceMortgageInterest) {
+            BigDecimal primaryResidenceMortgageInterest,
+            BigDecimal dynamicSequencingBracketRate) {
     }
 
 

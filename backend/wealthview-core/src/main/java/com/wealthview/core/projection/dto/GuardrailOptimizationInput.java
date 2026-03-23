@@ -30,5 +30,6 @@ public record GuardrailOptimizationInput(
         BigDecimal conversionBracketRate,
         BigDecimal rmdTargetBracketRate,
         int traditionalExhaustionBuffer,
-        BigDecimal rmdBracketHeadroom
+        BigDecimal rmdBracketHeadroom,
+        BigDecimal dynamicSequencingBracketRate
 ) {}

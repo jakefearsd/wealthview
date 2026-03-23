@@ -24,5 +24,6 @@ public record GuardrailOptimizationRequest(
         BigDecimal conversionBracketRate,
         BigDecimal rmdTargetBracketRate,
         Integer traditionalExhaustionBuffer,
-        BigDecimal rmdBracketHeadroom
+        BigDecimal rmdBracketHeadroom,
+        BigDecimal dynamicSequencingBracketRate
 ) {}
