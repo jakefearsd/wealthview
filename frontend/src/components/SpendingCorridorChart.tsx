@@ -36,7 +36,7 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
     return (
         <div>
             <ResponsiveContainer width="100%" height={400}>
-                <ComposedChart data={data} margin={{ top: 10, right: 30, left: 20, bottom: 10 }}>
+                <ComposedChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="age" label={{ value: 'Age', position: 'insideBottom', offset: -5 }} />
                     <YAxis tickFormatter={formatDollarAxis} label={{ value: 'Annual Spending ($)', angle: -90, position: 'insideLeft' }} />
@@ -131,7 +131,7 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                             x={phase.start_age}
                             stroke={PHASE_COLORS[i % PHASE_COLORS.length]}
                             strokeDasharray="3 3"
-                            label={{ value: phase.name, position: 'top', fontSize: 10 }}
+                            label={{ value: phase.name, position: 'insideTopLeft', fontSize: 10, fill: '#374151', offset: 15 }}
                         />
                     ))}
                 </ComposedChart>
