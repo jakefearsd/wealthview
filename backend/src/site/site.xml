@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/DECORATION/1.8.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/DECORATION/1.8.0
+                             https://maven.apache.org/xsd/decoration-1.8.0.xsd"
+         name="WealthView">
+
+    <skin>
+        <groupId>org.apache.maven.skins</groupId>
+        <artifactId>maven-fluido-skin</artifactId>
+        <version>2.0.0-M9</version>
+    </skin>
+
+    <custom>
+        <fluidoSkin>
+            <topBarEnabled>true</topBarEnabled>
+            <sideBarEnabled>true</sideBarEnabled>
+            <sourceLineNumbersEnabled>true</sourceLineNumbersEnabled>
+        </fluidoSkin>
+    </custom>
+
+    <bannerLeft>
+        <name>WealthView</name>
+        <href>index.html</href>
+    </bannerLeft>
+
+    <bannerRight>
+        <name>Personal Finance Platform — v1.0.0</name>
+    </bannerRight>
+
+    <publishDate position="right"/>
+    <version position="right"/>
+
+    <body>
+
+        <links>
+            <item name="GitHub" href="https://github.com/jakefearsd/wealthview"/>
+            <item name="Issues" href="https://github.com/jakefearsd/wealthview/issues"/>
+        </links>
+
+        <menu name="Overview">
+            <item name="Introduction" href="index.html"/>
+            <item name="Architecture" href="architecture.html"/>
+            <item name="Data Model" href="data-model.html"/>
+            <item name="REST API Guide" href="api-guide.html"/>
+            <item name="Projection Engine" href="projection-engine.html"/>
+            <item name="Development Guide" href="development-guide.html"/>
+            <item name="Code Quality" href="code-quality.html"/>
+        </menu>
+
+        <menu name="Modules">
+            <item name="wealthview-persistence" href="wealthview-persistence/index.html"/>
+            <item name="wealthview-core" href="wealthview-core/index.html"/>
+            <item name="wealthview-api" href="wealthview-api/index.html"/>
+            <item name="wealthview-import" href="wealthview-import/index.html"/>
+            <item name="wealthview-projection" href="wealthview-projection/index.html"/>
+            <item name="wealthview-app" href="wealthview-app/index.html"/>
+        </menu>
+
+        <menu ref="reports" inherit="bottom"/>
+
+    </body>
+
+</project>
