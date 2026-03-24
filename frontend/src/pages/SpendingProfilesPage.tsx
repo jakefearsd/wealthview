@@ -147,12 +147,12 @@ export default function SpendingProfilesPage() {
                         </div>
                         <div>
                             <label style={labelStyle}>Essential Expenses (annual)</label>
-                            <CurrencyInput style={inputStyle} value={essentialExpenses} onChange={v => setFormData(prev => ({ ...prev, essential_expenses: Number(v) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={essentialExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, essential_expenses: Number(v) || 0 }))} />
                             <HelpText>Default non-negotiable annual costs when no spending tier matches the current age.</HelpText>
                         </div>
                         <div>
                             <label style={labelStyle}>Discretionary Expenses (annual)</label>
-                            <CurrencyInput style={inputStyle} value={discretionaryExpenses} onChange={v => setFormData(prev => ({ ...prev, discretionary_expenses: Number(v) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={discretionaryExpenses || ''} onChange={v => setFormData(prev => ({ ...prev, discretionary_expenses: Number(v) || 0 }))} />
                             <HelpText>Default flexible annual spending when no spending tier matches the current age.</HelpText>
                         </div>
                     </div>
@@ -180,7 +180,7 @@ export default function SpendingProfilesPage() {
                             </div>
                             <div>
                                 <label style={labelStyle}>Start Age</label>
-                                <input style={inputStyle} type="number" value={tier.start_age} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
+                                <input style={inputStyle} type="number" value={tier.start_age || ''} onChange={e => updateTier(idx, 'start_age', Number(e.target.value))} />
                             </div>
                             <div>
                                 <label style={labelStyle}>End Age (blank = forever)</label>
@@ -188,11 +188,11 @@ export default function SpendingProfilesPage() {
                             </div>
                             <div>
                                 <label style={labelStyle}>Essential (annual)</label>
-                                <CurrencyInput style={inputStyle} value={tier.essential_expenses} onChange={v => updateTier(idx, 'essential_expenses', Number(v) || 0)} />
+                                <CurrencyInput style={inputStyle} value={tier.essential_expenses || ''} onChange={v => updateTier(idx, 'essential_expenses', Number(v) || 0)} />
                             </div>
                             <div>
                                 <label style={labelStyle}>Discretionary (annual)</label>
-                                <CurrencyInput style={inputStyle} value={tier.discretionary_expenses} onChange={v => updateTier(idx, 'discretionary_expenses', Number(v) || 0)} />
+                                <CurrencyInput style={inputStyle} value={tier.discretionary_expenses || ''} onChange={v => updateTier(idx, 'discretionary_expenses', Number(v) || 0)} />
                             </div>
                             <div>
                                 <button

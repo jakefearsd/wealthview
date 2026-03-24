@@ -303,11 +303,11 @@ export default function IncomeSourcesPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: oneTime ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Amount' : propertyId ? 'Annual Rent Amount' : 'Annual Amount'}</label>
-                            <CurrencyInput style={inputStyle} value={annualAmount} onChange={v => setFormData(prev => ({ ...prev, annual_amount: Number(v) || 0 }))} />
+                            <CurrencyInput style={inputStyle} value={annualAmount || ''} onChange={v => setFormData(prev => ({ ...prev, annual_amount: Number(v) || 0 }))} />
                         </div>
                         <div>
                             <label style={labelStyle}>{oneTime ? 'Payment Age' : 'Start Age'}</label>
-                            <input style={inputStyle} type="number" value={startAge} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
+                            <input style={inputStyle} type="number" value={startAge || ''} onChange={e => setFormData(prev => ({ ...prev, start_age: Number(e.target.value) }))} />
                             <HelpText>{oneTime ? 'Age when the one-time payment occurs.' : 'Age when this income begins.'}</HelpText>
                         </div>
                         {!oneTime && (
@@ -319,7 +319,7 @@ export default function IncomeSourcesPage() {
                                 </div>
                                 <div>
                                     <label style={labelStyle}>Inflation Rate (%)</label>
-                                    <input style={inputStyle} type="number" step="0.1" value={inflationRate} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
+                                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setFormData(prev => ({ ...prev, inflation_rate: Number(e.target.value) || 0 }))} />
                                     <HelpText>Annual adjustment rate (e.g., 2 = 2%). SS COLA is typically ~2%.</HelpText>
                                 </div>
                             </>

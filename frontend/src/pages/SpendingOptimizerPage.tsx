@@ -396,7 +396,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={essentialFloor}
+                                        value={essentialFloor || ''}
                                         onChange={v => setEssentialFloor(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
@@ -407,7 +407,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={terminalTarget}
+                                        value={terminalTarget || ''}
                                         onChange={v => setTerminalTarget(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
@@ -418,7 +418,7 @@ export default function SpendingOptimizerPage() {
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
                                         style={adornedInputStyle}
-                                        value={portfolioFloor}
+                                        value={portfolioFloor || ''}
                                         onChange={v => setPortfolioFloor(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
@@ -447,7 +447,7 @@ export default function SpendingOptimizerPage() {
                                 <label style={labelStyle}>Spending Flexibility</label>
                                 <div style={adornmentWrapStyle}>
                                     <input style={adornedInputStyle} type="number" step="1" min="0" max="50"
-                                        value={spendingFlexibility}
+                                        value={spendingFlexibility || ''}
                                         onChange={e => setSpendingFlexibility(Number(e.target.value))} />
                                     <span style={adornmentSuffixStyle}>%/yr</span>
                                 </div>
@@ -497,7 +497,7 @@ export default function SpendingOptimizerPage() {
                                     <div>
                                         <label style={labelStyle}>Cash Rate</label>
                                         <div style={adornmentWrapStyle}>
-                                            <input style={adornedInputStyle} type="number" step="0.1" value={cashReturnRate}
+                                            <input style={adornedInputStyle} type="number" step="0.1" value={cashReturnRate || ''}
                                                 onChange={e => setCashReturnRate(Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
@@ -591,7 +591,7 @@ export default function SpendingOptimizerPage() {
                                         <label style={labelStyle}>RMD Bracket Headroom</label>
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="5" max="25"
-                                                value={rmdBracketHeadroom}
+                                                value={rmdBracketHeadroom || ''}
                                                 onChange={e => setRmdBracketHeadroom(Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
