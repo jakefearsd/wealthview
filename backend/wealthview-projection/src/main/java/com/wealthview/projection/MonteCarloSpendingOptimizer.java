@@ -502,18 +502,18 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         double totalDraw = withdrawal;
                         double cashDraw = Math.min(totalDraw, cashBalance);
                         double equityDraw = totalDraw - cashDraw;
-                        double drawnTotal = drawn[0] + drawn[1] + drawn[2];
+                        double drawnTotal = drawn.total();
                         if (drawnTotal > 0 && equityDraw > 0) {
                             double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                            pTaxable -= drawn[0] * scale;
-                            pTraditional -= drawn[1] * scale;
-                            pRoth -= drawn[2] * scale;
+                            pTaxable -= drawn.taxable() * scale;
+                            pTraditional -= drawn.traditional() * scale;
+                            pRoth -= drawn.roth() * scale;
                         }
                         cashBalance -= cashDraw;
                     } else {
-                        pTaxable -= drawn[0];
-                        pTraditional -= drawn[1];
-                        pRoth -= drawn[2];
+                        pTaxable -= drawn.taxable();
+                        pTraditional -= drawn.traditional();
+                        pRoth -= drawn.roth();
                         double targetCash = spending * ctx.cashReserveYears();
                         double replenishment = Math.min(
                                 Math.max(0, targetCash - cashBalance),
@@ -523,9 +523,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         cashBalance += replenishment;
                     }
                 } else {
-                    pTaxable -= drawn[0];
-                    pTraditional -= drawn[1];
-                    pRoth -= drawn[2];
+                    pTaxable -= drawn.taxable();
+                    pTraditional -= drawn.traditional();
+                    pRoth -= drawn.roth();
                 }
 
                 // Surplus: income exceeds spending — deposit after-tax surplus to taxable
@@ -1086,8 +1086,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
                 // Estimate tax on traditional withdrawal using pre-computed marginal rate
                 double withdrawalTax = 0;
-                if (hasPools && drawn[1] > 0) {
-                    withdrawalTax = estimateWithdrawalTax(drawn[1], taxCtx.marginalRateByYear[y]);
+                if (hasPools && drawn.traditional() > 0) {
+                    withdrawalTax = estimateWithdrawalTax(drawn.traditional(), taxCtx.marginalRateByYear[y]);
                 }
 
                 double totalDraw = withdrawal + withdrawalTax;
@@ -1096,22 +1096,22 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     if (equityReturn < 0) {
                         double cashDraw = Math.min(totalDraw, cashBalance);
                         double equityDraw = totalDraw - cashDraw;
-                        double drawnTotal = drawn[0] + drawn[1] + drawn[2];
+                        double drawnTotal = drawn.total();
                         if (drawnTotal > 0 && equityDraw > 0) {
                             double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                            pTaxable -= drawn[0] * scale
+                            pTaxable -= drawn.taxable() * scale
                                     + withdrawalTax * Math.min(pTaxable, withdrawalTax)
                                     / Math.max(1, pTaxable + pTraditional + pRoth);
                         } else {
-                            pTaxable -= drawn[0];
-                            pTraditional -= drawn[1];
-                            pRoth -= drawn[2];
+                            pTaxable -= drawn.taxable();
+                            pTraditional -= drawn.traditional();
+                            pRoth -= drawn.roth();
                         }
                         cashBalance -= cashDraw;
                     } else {
-                        pTaxable -= drawn[0];
-                        pTraditional -= drawn[1];
-                        pRoth -= drawn[2];
+                        pTaxable -= drawn.taxable();
+                        pTraditional -= drawn.traditional();
+                        pRoth -= drawn.roth();
                         double taxRem = withdrawalTax;
                         double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
                         pTaxable -= taxFromTax; taxRem -= taxFromTax;
@@ -1128,9 +1128,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         cashBalance += replenishment;
                     }
                 } else {
-                    pTaxable -= drawn[0];
-                    pTraditional -= drawn[1];
-                    pRoth -= drawn[2];
+                    pTaxable -= drawn.taxable();
+                    pTraditional -= drawn.traditional();
+                    pRoth -= drawn.roth();
                     double taxRem = withdrawalTax;
                     double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
                     pTaxable -= taxFromTax; taxRem -= taxFromTax;
@@ -1322,17 +1322,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     /**
      * Split a withdrawal need across three pools using the specified ordering.
-     * Returns [fromTaxable, fromTraditional, fromRoth].
+     * Returns a {@link PoolWithdrawal} describing how much comes from each pool.
      * When preAge595 is true, only the taxable pool is available (59.5 early withdrawal rule).
      */
-    static double[] splitWithdrawal(double taxable, double traditional, double roth,
-                                     double need, String order, boolean preAge595,
-                                     double dsBracketCeiling, double otherIncome,
-                                     double conversionAmount, double rmdAmount) {
-        if (need <= 0) return new double[]{0, 0, 0};
+    static PoolWithdrawal splitWithdrawal(double taxable, double traditional, double roth,
+                                           double need, String order, boolean preAge595,
+                                           double dsBracketCeiling, double otherIncome,
+                                           double conversionAmount, double rmdAmount) {
+        if (need <= 0) return new PoolWithdrawal(0, 0, 0);
         if (preAge595) {
             double drawn = Math.min(need, Math.max(0, taxable));
-            return new double[]{drawn, 0, 0};
+            return new PoolWithdrawal(drawn, 0, 0);
         }
 
         // Dynamic Sequencing: Traditional first up to bracket space, then taxable, then Roth
@@ -1344,7 +1344,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double fromTax = Math.min(remaining, Math.max(0, taxable));
             remaining -= fromTax;
             double fromRoth = Math.min(remaining, Math.max(0, roth));
-            return new double[]{fromTax, fromTrad, fromRoth};
+            return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
         }
 
         double[] pools;
@@ -1361,15 +1361,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             mapping = new int[]{0, 1, 2};
         }
 
-        double[] result = new double[3];
+        double[] amounts = new double[3];
         double remaining = need;
         for (int i = 0; i < 3; i++) {
             double drawn = Math.min(remaining, Math.max(0, pools[i]));
-            result[mapping[i]] = drawn;
+            amounts[mapping[i]] = drawn;
             remaining -= drawn;
             if (remaining <= 0) break;
         }
-        return result;
+        return new PoolWithdrawal(amounts[0], amounts[1], amounts[2]);
     }
 
     /**
