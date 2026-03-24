@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
@@ -95,7 +96,7 @@ class ProjectionGoldenFileTest {
                 sourceList.add(new ProjectionIncomeSourceInput(
                         UUID.fromString(item.get("id").asText()),
                         item.get("name").asText(),
-                        item.get("incomeType").asText(),
+                        IncomeSourceType.fromString(item.get("incomeType").asText()),
                         new BigDecimal(item.get("annualAmount").asText()),
                         item.get("startAge").asInt(),
                         item.has("endAge") && !item.get("endAge").isNull() ? item.get("endAge").asInt() : null,

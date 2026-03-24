@@ -7,7 +7,7 @@ import java.util.UUID;
 public record ProjectionIncomeSourceInput(
         UUID id,
         String name,
-        String incomeType,
+        IncomeSourceType incomeType,
         BigDecimal annualAmount,
         int startAge,
         Integer endAge,

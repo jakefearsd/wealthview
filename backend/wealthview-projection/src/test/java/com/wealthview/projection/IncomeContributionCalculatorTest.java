@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +24,7 @@ class IncomeContributionCalculatorTest {
     private ProjectionIncomeSourceInput source(String name, String amount, int startAge,
                                                 Integer endAge, String inflationRate) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), name, "other",
+                UUID.randomUUID(), name, IncomeSourceType.OTHER,
                 new BigDecimal(amount), startAge, endAge,
                 new BigDecimal(inflationRate), false,
                 "taxable",
@@ -32,7 +33,7 @@ class IncomeContributionCalculatorTest {
 
     private ProjectionIncomeSourceInput oneTimeSource(String name, String amount, int startAge) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), name, "other",
+                UUID.randomUUID(), name, IncomeSourceType.OTHER,
                 new BigDecimal(amount), startAge, startAge + 1,
                 new BigDecimal("0.02"), true,
                 "taxable",
@@ -212,7 +213,7 @@ class IncomeContributionCalculatorTest {
     @Test
     void compute_rentalPropertyWithExpenses_returnsNetAmount() {
         var rental = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental", "rental_property",
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 60, null,
                 new BigDecimal("0"), false, "active_participation",
                 new BigDecimal("3600"),   // operating expenses
@@ -230,7 +231,7 @@ class IncomeContributionCalculatorTest {
     @Test
     void compute_rentalPropertyNoExpenses_returnsGrossAmount() {
         var rental = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental", "rental_property",
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 60, null,
                 new BigDecimal("0"), false, "active_participation",
                 null, null, null, null, null, null);

@@ -4,6 +4,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -225,7 +226,7 @@ public class ProjectionInputBuilder {
         }
 
         return new ProjectionIncomeSourceInput(
-                source.getId(), source.getName(), source.getIncomeType(),
+                source.getId(), source.getName(), IncomeSourceType.fromString(source.getIncomeType()),
                 amount, source.getStartAge(), source.getEndAge(),
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
                 annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,

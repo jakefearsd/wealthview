@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
@@ -1855,7 +1856,7 @@ class DeterministicProjectionEngineTest {
         var spending = new SpendingProfileInput(bd("40000"), bd("20000"), "[]");
 
         var ssSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Social Security", "social_security",
+                UUID.randomUUID(), "Social Security", IncomeSourceType.SOCIAL_SECURITY,
                 bd("30000"), 60, null, bd("0.02"), false,
                 "partially_taxable",
                 null, null, null, null, null, null);
@@ -1894,7 +1895,7 @@ class DeterministicProjectionEngineTest {
                 currentYear + 2, bd("10000"));
 
         var rentalSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental Property", "rental_property",
+                UUID.randomUUID(), "Rental Property", IncomeSourceType.RENTAL_PROPERTY,
                 bd("24000"), 60, null, BigDecimal.ZERO, false,
                 "rental_passive",
                 bd("6000"), bd("4000"), null, bd("3000"),
@@ -1926,7 +1927,7 @@ class DeterministicProjectionEngineTest {
         var spending = new SpendingProfileInput(bd("40000"), bd("10000"), "[]");
 
         var ptSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Consulting", "part_time_work",
+                UUID.randomUUID(), "Consulting", IncomeSourceType.PART_TIME_WORK,
                 bd("50000"), 60, 70, BigDecimal.ZERO, false,
                 "self_employment",
                 null, null, null, null, null, null);
@@ -1956,13 +1957,13 @@ class DeterministicProjectionEngineTest {
         var spending = new SpendingProfileInput(bd("50000"), bd("10000"), "[]");
 
         var ssSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "SS", "social_security",
+                UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
                 bd("24000"), 67, null, bd("0.02"), false,
                 "partially_taxable",
                 null, null, null, null, null, null);
 
         var pensionSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Pension", "pension",
+                UUID.randomUUID(), "Pension", IncomeSourceType.PENSION,
                 bd("20000"), 65, null, BigDecimal.ZERO, false,
                 "taxable",
                 null, null, null, null, null, null);
@@ -2541,7 +2542,7 @@ class DeterministicProjectionEngineTest {
         // Cash inflow = $90k - $10k opex = $80k
         // Taxable income = $90k - $10k opex - $180k dep = -$100k (deeply negative)
         var rentalWithDepreciation = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental with CostSeg", "rental_property",
+                UUID.randomUUID(), "Rental with CostSeg", IncomeSourceType.RENTAL_PROPERTY,
                 bd("90000"), 0, null, bd("0"), false,
                 "active_participation",
                 bd("10000"), null, null, null,
@@ -2550,7 +2551,7 @@ class DeterministicProjectionEngineTest {
 
         // Baseline: same cash but NO depreciation
         var rentalNoDepreciation = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental no dep", "rental_property",
+                UUID.randomUUID(), "Rental no dep", IncomeSourceType.RENTAL_PROPERTY,
                 bd("90000"), 0, null, bd("0"), false,
                 "active_participation",
                 bd("10000"), null, null, null,
@@ -3213,7 +3214,7 @@ class DeterministicProjectionEngineTest {
         var depSchedule = Map.of(currentYear, bd("40000"));
 
         var rentalSource = new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Rental", "rental_property",
+                UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 bd("24000"), 60, null, BigDecimal.ZERO, false,
                 "rental_passive",
                 bd("6000"), bd("4000"), null, bd("3000"),

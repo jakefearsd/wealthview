@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 
 import java.math.BigDecimal;
@@ -55,7 +56,7 @@ class IncomeContributionCalculator {
                     .pow(yearsInRetirement - 1);
             gross = source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
         }
-        if ("rental_property".equals(source.incomeType())) {
+        if (source.incomeType() == IncomeSourceType.RENTAL_PROPERTY) {
             gross = gross.subtract(sumExpenses(source));
         }
         return gross;
