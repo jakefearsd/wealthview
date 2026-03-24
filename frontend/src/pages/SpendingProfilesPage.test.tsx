@@ -43,7 +43,7 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
         { name: 'Early', start_age: 62, end_age: 72, priority_weight: 3, target_spending: 80000 },
     ],
     yearly_spending: [
-        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000 },
+        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
     ],
     median_final_balance: 250000,
     failure_rate: 0.05,
