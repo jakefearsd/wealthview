@@ -7,15 +7,6 @@ interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>,
     onChange: (rawValue: string) => void;
 }
 
-function commasBefore(str: string, rawOffset: number): number {
-    let raw = 0, commas = 0;
-    for (let i = 0; i < str.length; i++) {
-        if (raw >= rawOffset) break;
-        str[i] === ',' ? commas++ : raw++;
-    }
-    return commas;
-}
-
 export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInputProps) {
     const inputRef = useRef<HTMLInputElement>(null);
     const cursorRef = useRef<number | null>(null);
@@ -27,15 +18,70 @@ export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInpu
         }
     });
 
+    function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+        const el = e.currentTarget;
+        const pos = el.selectionStart ?? 0;
+        const val = el.value;
+
+        if (e.key === 'Backspace' && pos > 0 && val[pos - 1] === ',') {
+            // Backspace at a comma: skip the comma and delete the digit before it
+            e.preventDefault();
+            const before = val.slice(0, pos - 2); // skip comma AND the digit before it
+            const after = val.slice(pos);
+            const newVal = before + after;
+            const raw = parseCurrencyInput(newVal);
+            const newFormatted = formatCurrencyInput(raw);
+            const digitsBefore = before.replace(/[^0-9.]/g, '').length;
+            let digits = 0;
+            let newCursor = 0;
+            for (let i = 0; i < newFormatted.length; i++) {
+                if (digits >= digitsBefore) break;
+                if (newFormatted[i] !== ',') digits++;
+                newCursor = i + 1;
+            }
+            cursorRef.current = newCursor;
+            onChange(raw);
+        } else if (e.key === 'Delete' && pos < val.length && val[pos] === ',') {
+            // Delete at a comma: skip the comma and delete the digit after it
+            e.preventDefault();
+            const before = val.slice(0, pos);
+            const after = val.slice(pos + 2); // skip comma AND the digit after it
+            const newVal = before + after;
+            const raw = parseCurrencyInput(newVal);
+            const newFormatted = formatCurrencyInput(raw);
+            const digitsBefore = before.replace(/[^0-9.]/g, '').length;
+            let digits = 0;
+            let newCursor = 0;
+            for (let i = 0; i < newFormatted.length; i++) {
+                if (digits >= digitsBefore) break;
+                if (newFormatted[i] !== ',') digits++;
+                newCursor = i + 1;
+            }
+            cursorRef.current = newCursor;
+            onChange(raw);
+        }
+    }
+
     function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const selStart = e.target.selectionStart ?? e.target.value.length;
-        const commaCount = (e.target.value.slice(0, selStart).match(/,/g) ?? []).length;
-        const rawOffset = selStart - commaCount;
+        const el = e.target;
+        const cursorPos = el.selectionStart ?? el.value.length;
 
-        const raw = parseCurrencyInput(e.target.value);
+        // Count digits (and dots) before cursor in the current displayed value
+        const digitsBefore = el.value.slice(0, cursorPos).replace(/[^0-9.]/g, '').length;
+
+        const raw = parseCurrencyInput(el.value);
         const newFormatted = formatCurrencyInput(raw);
-        cursorRef.current = rawOffset + commasBefore(newFormatted, rawOffset);
 
+        // Find cursor position in new formatted string with same digit count before it
+        let digits = 0;
+        let newCursor = 0;
+        for (let i = 0; i < newFormatted.length; i++) {
+            if (digits >= digitsBefore) break;
+            if (newFormatted[i] !== ',') digits++;
+            newCursor = i + 1;
+        }
+
+        cursorRef.current = newCursor;
         onChange(raw);
     }
 
@@ -45,6 +91,7 @@ export default function CurrencyInput({ value, onChange, ...rest }: CurrencyInpu
             type="text"
             inputMode="decimal"
             value={formatCurrencyInput(value)}
+            onKeyDown={handleKeyDown}
             onChange={handleChange}
             {...rest}
         />

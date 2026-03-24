@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { GuardrailPhase } from '../types/projection';
+import CurrencyInput from './CurrencyInput';
 
 interface PhaseEditorProps {
     phases: GuardrailPhase[];
@@ -153,10 +154,12 @@ export default function PhaseEditor({ phases, onPhasesChange }: PhaseEditorProps
                     <span style={smallLabelStyle}>$ Target</span>
                     <div style={smallAdornmentWrapStyle}>
                         <span style={smallAdornmentStyle}>$</span>
-                        <input style={smallAdornedInputStyle} type="text" inputMode="numeric"
-                            value={phase.target_spending != null ? phase.target_spending.toLocaleString('en-US') : ''}
+                        <CurrencyInput
+                            style={smallAdornedInputStyle}
+                            value={phase.target_spending ?? ''}
                             placeholder="Annual"
-                            onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); updatePhase(i, 'target_spending', isNaN(v) ? null : v); }} />
+                            onChange={v => updatePhase(i, 'target_spending', v === '' ? null : Number(v))}
+                        />
                     </div>
                     <button onClick={() => removePhase(i)}
                         style={{ padding: '0.25rem 0.5rem', background: '#ef5350', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>

@@ -17,8 +17,14 @@ export function formatCurrencyInput(value: string | number): string {
     const str = String(value);
     if (str === '' || str === '-') return str;
     const parts = str.split('.');
-    const intPart = parts[0].replace(/,/g, '');
+    let intPart = parts[0].replace(/,/g, '');
     if (intPart === '' || intPart === '-') return str;
+    // Strip leading zeros (but keep a single "0")
+    if (intPart.length > 1 && intPart[0] !== '-') {
+        intPart = intPart.replace(/^0+/, '') || '0';
+    } else if (intPart.length > 2 && intPart[0] === '-') {
+        intPart = '-' + (intPart.slice(1).replace(/^0+/, '') || '0');
+    }
     const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     if (parts.length > 1) {
         const dec = parts[1].length > 2 ? parts[1].slice(0, 2) : parts[1];

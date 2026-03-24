@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
+import CurrencyInput from '../components/CurrencyInput';
 import PhaseEditor from '../components/PhaseEditor';
 import OptimizerResultsView from '../components/OptimizerResultsView';
 
@@ -393,27 +394,33 @@ export default function SpendingOptimizerPage() {
                                 <label style={labelStyle}>Essential Spending Floor (per year)</label>
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
-                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
-                                        value={essentialFloor.toLocaleString('en-US')}
-                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setEssentialFloor(v); }} />
+                                    <CurrencyInput
+                                        style={adornedInputStyle}
+                                        value={essentialFloor}
+                                        onChange={v => setEssentialFloor(v === '' ? 0 : Number(v))}
+                                    />
                                 </div>
                             </div>
                             <div>
                                 <label style={labelStyle}>Terminal Balance Target</label>
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
-                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
-                                        value={terminalTarget.toLocaleString('en-US')}
-                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setTerminalTarget(v); }} />
+                                    <CurrencyInput
+                                        style={adornedInputStyle}
+                                        value={terminalTarget}
+                                        onChange={v => setTerminalTarget(v === '' ? 0 : Number(v))}
+                                    />
                                 </div>
                             </div>
                             <div>
                                 <label style={labelStyle}>Portfolio Safety Net</label>
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
-                                    <input style={adornedInputStyle} type="text" inputMode="numeric"
-                                        value={portfolioFloor.toLocaleString('en-US')}
-                                        onChange={e => { const v = Number(e.target.value.replace(/[^0-9]/g, '')); if (!isNaN(v)) setPortfolioFloor(v); }} />
+                                    <CurrencyInput
+                                        style={adornedInputStyle}
+                                        value={portfolioFloor}
+                                        onChange={v => setPortfolioFloor(v === '' ? 0 : Number(v))}
+                                    />
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
                                     Minimum portfolio balance to maintain during retirement
