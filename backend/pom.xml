@@ -16,6 +16,49 @@
     <version>1.0.0</version>
     <packaging>pom</packaging>
     <name>WealthView Parent</name>
+    <description>
+        Self-hosted, multi-tenant personal finance platform covering investment portfolio monitoring,
+        rental property tracking, and tax-aware retirement projection modeling.
+        Built on Java 21 / Spring Boot 3.3 / PostgreSQL 16.
+    </description>
+    <url>https://github.com/jakefearsd/wealthview</url>
+    <inceptionYear>2024</inceptionYear>
+
+    <licenses>
+        <license>
+            <name>Private / Personal Use</name>
+            <distribution>manual</distribution>
+            <comments>Not open-sourced. For personal and family use only.</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>jfear</id>
+            <name>Jake Fear</name>
+            <roles>
+                <role>Architect</role>
+                <role>Lead Developer</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/jakefearsd/wealthview.git</connection>
+        <developerConnection>scm:git:https://github.com/jakefearsd/wealthview.git</developerConnection>
+        <url>https://github.com/jakefearsd/wealthview</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/jakefearsd/wealthview/issues</url>
+    </issueManagement>
+
+    <ciManagement>
+        <system>GitHub Actions</system>
+        <url>https://github.com/jakefearsd/wealthview/actions</url>
+    </ciManagement>
 
     <modules>
         <module>wealthview-persistence</module>
@@ -33,10 +76,17 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.7</ofx4j.version>
         <jsoup.version>1.21.2</jsoup.version>
+        <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.9.4.2</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco-plugin.version>0.8.14</jacoco-plugin.version>
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
+        <!-- Site tool versions -->
+        <maven-site-plugin.version>3.21.0</maven-site-plugin.version>
+        <project-info-reports-plugin.version>3.8.0</project-info-reports-plugin.version>
+        <maven-javadoc-plugin.version>3.11.2</maven-javadoc-plugin.version>
+        <maven-surefire-report-plugin.version>3.5.3</maven-surefire-report-plugin.version>
+        <versions-maven-plugin.version>2.18.0</versions-maven-plugin.version>
     </properties>
 
     <dependencyManagement>
@@ -133,6 +183,31 @@
         <pluginManagement>
             <plugins>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-site-plugin</artifactId>
+                    <version>${maven-site-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-project-info-reports-plugin</artifactId>
+                    <version>${project-info-reports-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>${maven-javadoc-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-report-plugin</artifactId>
+                    <version>${maven-surefire-report-plugin.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>${versions-maven-plugin.version}</version>
+                </plugin>
+                <plugin>
                     <groupId>com.github.spotbugs</groupId>
                     <artifactId>spotbugs-maven-plugin</artifactId>
                     <version>${spotbugs-maven-plugin.version}</version>
@@ -170,7 +245,7 @@
                         <targetJdk>21</targetJdk>
                         <failOnViolation>false</failOnViolation>
                         <printFailingErrors>true</printFailingErrors>
-                        <linkXRef>false</linkXRef>
+                        <linkXRef>true</linkXRef>
                         <rulesets>
                             <ruleset>pmd-ruleset.xml</ruleset>
                         </rulesets>
@@ -224,4 +299,198 @@
             </plugin>
         </plugins>
     </build>
+
+    <reporting>
+        <plugins>
+
+            <!-- ── Project Information ────────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-project-info-reports-plugin</artifactId>
+                <version>${project-info-reports-plugin.version}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>index</report>
+                            <report>summary</report>
+                            <report>team</report>
+                            <report>scm</report>
+                            <report>ci-management</report>
+                            <report>issue-management</report>
+                            <report>dependency-info</report>
+                            <report>dependencies</report>
+                            <report>dependency-convergence</report>
+                            <report>modules</report>
+                            <report>plugins</report>
+                            <report>plugin-management</report>
+                            <report>licenses</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+
+            <!-- ── Test Results ───────────────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-report-plugin</artifactId>
+                <version>${maven-surefire-report-plugin.version}</version>
+                <configuration>
+                    <linkXRef>true</linkXRef>
+                </configuration>
+            </plugin>
+
+            <!-- ── Javadoc: per-module + aggregate at parent ─────────────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc-plugin.version}</version>
+                <configuration>
+                    <source>21</source>
+                    <linksource>true</linksource>
+                    <failOnError>false</failOnError>
+                    <doclint>none</doclint>
+                    <quiet>true</quiet>
+                    <detectJavaApiLink>true</detectJavaApiLink>
+                    <links>
+                        <link>https://docs.spring.io/spring-framework/docs/6.1.x/javadoc-api/</link>
+                        <link>https://docs.spring.io/spring-data/commons/docs/current/api/</link>
+                    </links>
+                    <groups>
+                        <group>
+                            <title>Persistence Layer</title>
+                            <packages>com.wealthview.persistence.*</packages>
+                        </group>
+                        <group>
+                            <title>Core / Business Logic</title>
+                            <packages>com.wealthview.core.*</packages>
+                        </group>
+                        <group>
+                            <title>REST API</title>
+                            <packages>com.wealthview.api.*</packages>
+                        </group>
+                        <group>
+                            <title>Import</title>
+                            <packages>com.wealthview.importmodule.*</packages>
+                        </group>
+                        <group>
+                            <title>Projection Engine</title>
+                            <packages>com.wealthview.projection.*</packages>
+                        </group>
+                    </groups>
+                </configuration>
+                <reportSets>
+                    <!-- Aggregate Javadoc at parent level only -->
+                    <reportSet>
+                        <id>aggregate</id>
+                        <inherited>false</inherited>
+                        <reports>
+                            <report>aggregate</report>
+                        </reports>
+                    </reportSet>
+                    <!-- Per-module Javadoc for child modules -->
+                    <reportSet>
+                        <id>default</id>
+                        <reports>
+                            <report>javadoc</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+
+            <!-- ── Code Coverage (JaCoCo) ─────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-plugin.version}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+
+            <!-- ── Bug Detection (SpotBugs) ──────────────────────────────────── -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Max</effort>
+                    <threshold>Medium</threshold>
+                    <failOnError>false</failOnError>
+                    <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
+                </configuration>
+            </plugin>
+
+            <!-- ── Style Conformance (Checkstyle) ───────────────────────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${checkstyle-plugin.version}</version>
+                <configuration>
+                    <configLocation>google_checks.xml</configLocation>
+                    <failsOnError>false</failsOnError>
+                    <linkXRef>true</linkXRef>
+                    <propertyExpansion>
+                        org.checkstyle.google.checks.indentation.basicOffset=4
+                        org.checkstyle.google.checks.indentation.braceAdjustment=0
+                        org.checkstyle.google.checks.indentation.caseIndent=4
+                        org.checkstyle.google.checks.indentation.throwsIndent=8
+                        org.checkstyle.google.checks.indentation.arrayInitIndent=4
+                        org.checkstyle.google.checks.indentation.lineWrappingIndentation=8
+                    </propertyExpansion>
+                </configuration>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>checkstyle</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+
+            <!-- ── Code Quality + Copy-Paste Detection (PMD / CPD) ──────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
+                <version>${pmd-plugin.version}</version>
+                <configuration>
+                    <targetJdk>21</targetJdk>
+                    <linkXRef>true</linkXRef>
+                    <failOnViolation>false</failOnViolation>
+                    <rulesets>
+                        <ruleset>pmd-ruleset.xml</ruleset>
+                    </rulesets>
+                </configuration>
+            </plugin>
+
+            <!-- ── Dependency Version Currency ──────────────────────────────── -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
+                <version>${versions-maven-plugin.version}</version>
+                <reportSets>
+                    <reportSet>
+                        <reports>
+                            <report>dependency-updates-report</report>
+                            <report>plugin-updates-report</report>
+                            <report>property-updates-report</report>
+                        </reports>
+                    </reportSet>
+                </reportSets>
+            </plugin>
+
+        </plugins>
+    </reporting>
+
+    <distributionManagement>
+        <site>
+            <id>local</id>
+            <name>WealthView Site</name>
+            <url>file://${maven.multiModuleProjectDirectory}/target/site-deploy</url>
+        </site>
+    </distributionManagement>
+
 </project>
