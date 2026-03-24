@@ -5,6 +5,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -137,7 +138,7 @@ class MonteCarloSpendingOptimizerTest {
         // Income covers the floor, so floor spending has zero portfolio cost.
         // A large terminal target should NOT crush the floor to $0.
         var income = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "SS", "social_security",
+                java.util.UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
                 new BigDecimal("50000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
                 null, null, null, null, null, null);
@@ -406,7 +407,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var ssBenefit = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Social Security", "social_security",
+                java.util.UUID.randomUUID(), "Social Security", IncomeSourceType.SOCIAL_SECURITY,
                 new BigDecimal("24000"), 67, null,
                 new BigDecimal("0.02"), false, "partially_taxable",
                 null, null, null, null, null, null);
@@ -513,7 +514,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var ssBenefit = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "SS", "social_security",
+                java.util.UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
                 new BigDecimal("24000"), 67, null,
                 BigDecimal.ZERO, false, "partially_taxable",
                 null, null, null, null, null, null);
@@ -595,7 +596,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var oneTimeIncome = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Inheritance", "other",
+                java.util.UUID.randomUUID(), "Inheritance", IncomeSourceType.OTHER,
                 new BigDecimal("100000"), 65, 66,
                 BigDecimal.ZERO, true, "taxable",
                 null, null, null, null, null, null);
@@ -625,7 +626,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var ssBenefit = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "SS", "social_security",
+                java.util.UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
                 new BigDecimal("24000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
                 null, null, null, null, null, null);
@@ -659,7 +660,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var rentalGross = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("100000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("25000"),   // operating expenses (insurance + maintenance)
@@ -705,7 +706,7 @@ class MonteCarloSpendingOptimizerTest {
                 new GuardrailPhaseInput("All", 62, null, 1));
 
         var ssIncome = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "SS", "social_security",
+                java.util.UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "partially_taxable",
                 null, null, null, null, null, null);
@@ -1499,7 +1500,7 @@ class MonteCarloSpendingOptimizerTest {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
 
         var rentalWithPrincipal = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("100000"), 60, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 null,                      // no operating expenses (keep simple)
@@ -1538,7 +1539,7 @@ class MonteCarloSpendingOptimizerTest {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
 
         var oneTime = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Inheritance", "other",
+                java.util.UUID.randomUUID(), "Inheritance", IncomeSourceType.OTHER,
                 new BigDecimal("60000"), 65, 66,
                 BigDecimal.ZERO, true, "taxable",
                 null, null, null, null, null, null);
@@ -1582,7 +1583,7 @@ class MonteCarloSpendingOptimizerTest {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
 
         var rentalInflating = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("100000"), 62, null,
                 new BigDecimal("0.10"), false, "rental_passive",
                 new BigDecimal("30000"),   // operating expenses (fixed, don't inflate)

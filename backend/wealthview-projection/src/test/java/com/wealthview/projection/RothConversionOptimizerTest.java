@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -439,7 +440,7 @@ class RothConversionOptimizerTest {
         }
 
         var rentalSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Rental Property", "rental_property",
+                java.util.UUID.randomUUID(), "Rental Property", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -474,7 +475,7 @@ class RothConversionOptimizerTest {
         }
 
         var rentalSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Cost Seg Property", "rental_property",
+                java.util.UUID.randomUUID(), "Cost Seg Property", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -509,7 +510,7 @@ class RothConversionOptimizerTest {
         }
 
         var rentalSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Passive Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -542,14 +543,14 @@ class RothConversionOptimizerTest {
         }
 
         var activeSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Active REPS", "rental_property",
+                java.util.UUID.randomUUID(), "Active REPS", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("3000"), "straight_line", depreciationByYear);
 
         var passiveSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Passive Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -592,7 +593,7 @@ class RothConversionOptimizerTest {
         // Passive: only $25K deductible via exception (if MAGI < $100K)
         // But any conversion > ~$85K pushes MAGI over $100K, reducing the exception
         var passiveSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Passive Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -600,7 +601,7 @@ class RothConversionOptimizerTest {
 
         // Same property as active REPS — full deduction regardless of MAGI
         var activeSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Active REPS", "rental_property",
+                java.util.UUID.randomUUID(), "Active REPS", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -641,7 +642,7 @@ class RothConversionOptimizerTest {
             depByYear.put(firstYear + y, new BigDecimal("100000"));
         }
         var rentalSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "High Depreciation", "rental_property",
+                java.util.UUID.randomUUID(), "High Depreciation", IncomeSourceType.RENTAL_PROPERTY,
                 BigDecimal.ZERO, 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
@@ -885,7 +886,7 @@ class RothConversionOptimizerTest {
         }
 
         var repsSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "REPS Rental", "rental_property",
+                java.util.UUID.randomUUID(), "REPS Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -1001,7 +1002,7 @@ class RothConversionOptimizerTest {
         }
 
         var passiveSource = new ProjectionIncomeSourceInput(
-                java.util.UUID.randomUUID(), "Large Passive Rental", "rental_property",
+                java.util.UUID.randomUUID(), "Large Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("30000"), 62, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,

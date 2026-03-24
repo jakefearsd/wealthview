@@ -2,6 +2,7 @@ package com.wealthview.projection.testutil;
 
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
@@ -34,7 +35,7 @@ public final class ProjectionTestFixtures {
                                                             int startAge, Integer endAge,
                                                             String inflationRate) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), name, "other",
+                UUID.randomUUID(), name, IncomeSourceType.OTHER,
                 bd(amount), startAge, endAge, bd(inflationRate), false,
                 "taxable",
                 null, null, null, null, null, null);
@@ -43,7 +44,7 @@ public final class ProjectionTestFixtures {
     public static ProjectionIncomeSourceInput oneTimeIncomeSource(String name, String amount,
                                                                     int startAge) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), name, "other",
+                UUID.randomUUID(), name, IncomeSourceType.OTHER,
                 bd(amount), startAge, startAge + 1, bd("0"), true,
                 "taxable",
                 null, null, null, null, null, null);
@@ -103,7 +104,7 @@ public final class ProjectionTestFixtures {
     public static ProjectionIncomeSourceInput selfEmploymentSource(String name, String amount,
                                                                       int startAge, Integer endAge) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), name, "part_time_work",
+                UUID.randomUUID(), name, IncomeSourceType.PART_TIME_WORK,
                 bd(amount), startAge, endAge, bd("0"), false,
                 "self_employment",
                 null, null, null, null, null, null);
@@ -111,7 +112,7 @@ public final class ProjectionTestFixtures {
 
     public static ProjectionIncomeSourceInput socialSecuritySource(String amount, int startAge) {
         return new ProjectionIncomeSourceInput(
-                UUID.randomUUID(), "Social Security", "social_security",
+                UUID.randomUUID(), "Social Security", IncomeSourceType.SOCIAL_SECURITY,
                 bd(amount), startAge, null, bd("0"), false,
                 "taxable",
                 null, null, null, null, null, null);

@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
@@ -79,7 +80,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_ageBeforeStartAge_sourceInactive() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -92,7 +93,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_ageEqualsStartAge_halvesAmount() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -105,7 +106,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_ageOneBeforeEndAge_sourceActive() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -118,7 +119,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_ageEqualsEndAge_halvesAmount() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -131,7 +132,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_ageAfterEndAge_sourceInactive() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -144,7 +145,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_midRange_fullAmount() {
-        var source = makeSource("pension", new BigDecimal("24000"), 65, 70,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, null);
 
         var result = processor.process(
@@ -161,7 +162,7 @@ class IncomeSourceProcessorTest {
     void process_inflationApplied_nominalAmountInflatesForYearsInRetirement() {
         var inflationRate = new BigDecimal("0.03");
         var annualAmount = new BigDecimal("10000");
-        var source = makeSource("pension", annualAmount, 60, null,
+        var source = makeSource(IncomeSourceType.PENSION, annualAmount, 60, null,
                 inflationRate, null);
 
         // yearsInRetirement = 4 means 3 years of compounding: 10000 * 1.03^3
@@ -179,7 +180,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_yearsInRetirementOne_halvesAtStartAge() {
-        var source = makeSource("pension", new BigDecimal("10000"), 60, null,
+        var source = makeSource(IncomeSourceType.PENSION, new BigDecimal("10000"), 60, null,
                 new BigDecimal("0.05"), null);
 
         var result = processor.process(
@@ -193,7 +194,7 @@ class IncomeSourceProcessorTest {
 
     @Test
     void process_taxFreeIncome_includedInCashInflowButNotTaxableIncome() {
-        var source = makeSource("annuity", new BigDecimal("18000"), 60, null,
+        var source = makeSource(IncomeSourceType.ANNUITY, new BigDecimal("18000"), 60, null,
                 BigDecimal.ZERO, "tax_free");
 
         var result = processor.process(
@@ -248,7 +249,7 @@ class IncomeSourceProcessorTest {
     void process_rentalWithExpenses_incomeBySourceContainsNetCashFlow() {
         var rentalId = UUID.randomUUID();
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "Rental", "rental_property",
+                rentalId, "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses (insurance+maintenance)
@@ -276,7 +277,7 @@ class IncomeSourceProcessorTest {
     void process_pensionSource_incomeBySourceContainsNominal() {
         var pensionId = UUID.randomUUID();
         var pension = new ProjectionIncomeSourceInput(
-                pensionId, "Pension", "pension",
+                pensionId, "Pension", IncomeSourceType.PENSION,
                 new BigDecimal("30000"), 65, null,
                 BigDecimal.ZERO, false, "taxable",
                 null, null, null, null, null, null);
@@ -295,12 +296,12 @@ class IncomeSourceProcessorTest {
         var rentalId = UUID.randomUUID();
         var pensionId = UUID.randomUUID();
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "Rental", "rental_property",
+                rentalId, "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("6000"), null, null, null, null, null);
         var pension = new ProjectionIncomeSourceInput(
-                pensionId, "Pension", "pension",
+                pensionId, "Pension", IncomeSourceType.PENSION,
                 new BigDecimal("20000"), 65, null,
                 BigDecimal.ZERO, false, "taxable",
                 null, null, null, null, null, null);
@@ -326,7 +327,7 @@ class IncomeSourceProcessorTest {
     void process_inactiveSource_notInIncomeBySource() {
         var pensionId = UUID.randomUUID();
         var pension = new ProjectionIncomeSourceInput(
-                pensionId, "Pension", "pension",
+                pensionId, "Pension", IncomeSourceType.PENSION,
                 new BigDecimal("30000"), 70, null,
                 BigDecimal.ZERO, false, "taxable",
                 null, null, null, null, null, null);
@@ -354,7 +355,7 @@ class IncomeSourceProcessorTest {
         var rentalId = UUID.randomUUID();
         // gross=$96k, opEx=$5.5k, interest=$26k, principal=$22.5k, propTax=$14k
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "AirBnB", "rental_property",
+                rentalId, "AirBnB", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("96000"), 60, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("5500"),   // annualOperatingExpenses
@@ -383,7 +384,7 @@ class IncomeSourceProcessorTest {
     void processRentalProperty_withNullMortgagePrincipal_treatsAsZero() {
         var rentalId = UUID.randomUUID();
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "Rental", "rental_property",
+                rentalId, "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("6000"),   // annualOperatingExpenses
@@ -411,7 +412,7 @@ class IncomeSourceProcessorTest {
     void process_rentalAtEndAge_halvesExpensesAndGross() {
         var rentalId = UUID.randomUUID();
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "Rental", "rental_property",
+                rentalId, "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),   // annualOperatingExpenses
@@ -441,7 +442,7 @@ class IncomeSourceProcessorTest {
     void process_rentalAtStartAge_halvesExpensesAndGross() {
         var rentalId = UUID.randomUUID();
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "Rental", "rental_property",
+                rentalId, "Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, 70,
                 BigDecimal.ZERO, false, "active_participation",
                 new BigDecimal("3600"),
@@ -478,7 +479,7 @@ class IncomeSourceProcessorTest {
                 .thenReturn(lossResult);
 
         var rental = new ProjectionIncomeSourceInput(
-                rentalId, "123 Main St Rental", "rental_property",
+                rentalId, "123 Main St Rental", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 65, null,
                 BigDecimal.ZERO, false, "rental_active_reps",
                 new BigDecimal("3600"), new BigDecimal("9600"),
@@ -509,12 +510,12 @@ class IncomeSourceProcessorTest {
                 .thenReturn(lossResult);
 
         var rental1 = new ProjectionIncomeSourceInput(
-                id1, "Property A", "rental_property",
+                id1, "Property A", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("24000"), 60, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 null, null, null, null, null, null);
         var rental2 = new ProjectionIncomeSourceInput(
-                id2, "Property B", "rental_property",
+                id2, "Property B", IncomeSourceType.RENTAL_PROPERTY,
                 new BigDecimal("36000"), 60, null,
                 BigDecimal.ZERO, false, "rental_active_str",
                 null, null, null, null, null, null);
@@ -532,7 +533,7 @@ class IncomeSourceProcessorTest {
     void process_noRentalProperties_returnsEmptyDetails() {
         var pensionId = UUID.randomUUID();
         var pension = new ProjectionIncomeSourceInput(
-                pensionId, "Pension", "pension",
+                pensionId, "Pension", IncomeSourceType.PENSION,
                 new BigDecimal("30000"), 65, null,
                 BigDecimal.ZERO, false, "taxable",
                 null, null, null, null, null, null);
@@ -551,7 +552,7 @@ class IncomeSourceProcessorTest {
         return new ProjectionIncomeSourceInput(
                 UUID.randomUUID(),
                 "One-time event",
-                "other",
+                IncomeSourceType.OTHER,
                 annualAmount,
                 startAge,
                 startAge + 1,
@@ -569,7 +570,7 @@ class IncomeSourceProcessorTest {
         var realSeTaxCalc = new SelfEmploymentTaxCalculator();
         var processorWithRealSE = new IncomeSourceProcessor(rentalLossCalculator, ssTaxCalculator, realSeTaxCalc);
 
-        var source = makeSource("part_time_work", new BigDecimal("50000"),
+        var source = makeSource(IncomeSourceType.PART_TIME_WORK, new BigDecimal("50000"),
                 60, null, BigDecimal.ZERO, "self_employment");
 
         var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
@@ -593,7 +594,7 @@ class IncomeSourceProcessorTest {
         var realSeTaxCalc = new SelfEmploymentTaxCalculator();
         var processorWithRealSE = new IncomeSourceProcessor(rentalLossCalculator, ssTaxCalculator, realSeTaxCalc);
 
-        var source = makeSource("part_time_work", new BigDecimal("50000"),
+        var source = makeSource(IncomeSourceType.PART_TIME_WORK, new BigDecimal("50000"),
                 60, null, BigDecimal.ZERO, "self_employment");
 
         var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
@@ -604,11 +605,11 @@ class IncomeSourceProcessorTest {
     }
 
     private static ProjectionIncomeSourceInput makeSource(
-            String incomeType, BigDecimal annualAmount, int startAge, Integer endAge,
+            IncomeSourceType incomeType, BigDecimal annualAmount, int startAge, Integer endAge,
             BigDecimal inflationRate, String taxTreatment) {
         return new ProjectionIncomeSourceInput(
                 UUID.randomUUID(),
-                "Test " + incomeType,
+                "Test " + incomeType.getValue(),
                 incomeType,
                 annualAmount,
                 startAge,

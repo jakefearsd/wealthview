@@ -6,6 +6,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -712,7 +713,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 // matching IncomeSourceProcessor: operating expenses, mortgage interest,
                 // property tax, AND mortgage principal (principal reduces available cash even
                 // though it is not tax-deductible).
-                if ("rental_property".equals(source.incomeType())) {
+                if (source.incomeType() == IncomeSourceType.RENTAL_PROPERTY) {
                     amount -= nullSafe(source.annualOperatingExpenses());
                     amount -= nullSafe(source.annualMortgageInterest());
                     amount -= nullSafe(source.annualPropertyTax());
@@ -731,7 +732,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
                 // All non-rental income is treated as taxable for MC purposes.
                 // Rental net cash is excluded (complex passive-loss rules not applicable here).
-                if (!"rental_property".equals(source.incomeType())) {
+                if (source.incomeType() != IncomeSourceType.RENTAL_PROPERTY) {
                     taxableIncome += amount;
                 }
             }
@@ -1436,7 +1437,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
 
         var rentalSources = sources.stream()
-                .filter(s -> "rental_property".equals(s.incomeType()))
+                .filter(s -> s.incomeType() == IncomeSourceType.RENTAL_PROPERTY)
                 .toList();
         if (rentalSources.isEmpty()) {
             return result;

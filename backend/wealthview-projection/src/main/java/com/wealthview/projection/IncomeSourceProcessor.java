@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -84,7 +85,7 @@ class IncomeSourceProcessor {
             BigDecimal multiplier = transitionMultiplier(source, age);
             BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
-            if ("social_security".equals(source.incomeType())) {
+            if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY) {
                 ssBenefit = ssBenefit.add(nominal);
             } else {
                 nonSSIncome = nonSSIncome.add(nominal);
@@ -102,7 +103,7 @@ class IncomeSourceProcessor {
 
             String sourceKey = source.id().toString();
             switch (source.incomeType()) {
-                case "rental_property" -> {
+                case RENTAL_PROPERTY -> {
                     var rental = processRentalProperty(source, nominal, taxYear, magi, suspendedLoss, multiplier);
                     rentalIncomeGross = rentalIncomeGross.add(nominal);
                     rentalExpensesTotal = rentalExpensesTotal.add(rental.expenses());
@@ -121,7 +122,7 @@ class IncomeSourceProcessor {
                             rental.newSuspendedLoss(),
                             rental.cashFlow()));
                 }
-                case "social_security" -> {
+                case SOCIAL_SECURITY -> {
                     totalCashInflow = totalCashInflow.add(nominal);
                     var taxableAmount = ssTaxCalculator.computeTaxableAmount(
                             nominal,
@@ -131,7 +132,7 @@ class IncomeSourceProcessor {
                     totalTaxableIncome = totalTaxableIncome.add(taxableAmount);
                     incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
                 }
-                case "part_time_work" -> {
+                case PART_TIME_WORK -> {
                     totalCashInflow = totalCashInflow.add(nominal);
                     if ("self_employment".equals(source.taxTreatment())) {
                         var tax = seTaxCalculator.computeSETax(nominal, taxYear);

@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -105,7 +106,7 @@ class RothConversionOptimizer {
         this.rentalLossCalculator = rentalLossCalculator;
         this.rentalSources = incomeSources != null
                 ? incomeSources.stream()
-                        .filter(s -> "rental_property".equals(s.incomeType()))
+                        .filter(s -> s.incomeType() == IncomeSourceType.RENTAL_PROPERTY)
                         .toList()
                 : List.of();
         this.rmdBracketHeadroom = rmdBracketHeadroom;
