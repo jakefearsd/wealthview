@@ -6,6 +6,7 @@ import PortfolioFanChart from './PortfolioFanChart';
 import TaxSavingsSummary from './TaxSavingsSummary';
 import ConversionScheduleTable from './ConversionScheduleTable';
 import TraditionalBalanceChart from './TraditionalBalanceChart';
+import ContingentSpendingTable from './ContingentSpendingTable';
 
 interface OptimizerResultsViewProps {
     result: GuardrailProfileResponse;
@@ -252,6 +253,11 @@ export default function OptimizerResultsView({
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+            <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', marginTop: 0 }}>Adaptive Spending Guide</h3>
+                <ContingentSpendingTable yearlySpending={result.yearly_spending} />
             </div>
 
             {result.conversion_schedule && (
