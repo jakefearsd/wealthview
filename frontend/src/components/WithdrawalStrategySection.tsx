@@ -83,12 +83,12 @@ export default function WithdrawalStrategySection({
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                     <div>
                         <label style={labelStyle}>Ceiling (max increase, %)</label>
-                        <input style={inputStyle} type="number" step="0.1" value={dynamicCeiling} onChange={e => onDynamicCeilingChange(Number(e.target.value))} />
+                        <input style={inputStyle} type="number" step="0.1" value={dynamicCeiling || ''} onChange={e => onDynamicCeilingChange(Number(e.target.value))} />
                         <HelpText>Maximum year-over-year spending increase (e.g., 5 = 5%)</HelpText>
                     </div>
                     <div>
                         <label style={labelStyle}>Floor (max decrease, %)</label>
-                        <input style={inputStyle} type="number" step="0.1" value={dynamicFloor} onChange={e => onDynamicFloorChange(Number(e.target.value))} />
+                        <input style={inputStyle} type="number" step="0.1" value={dynamicFloor || ''} onChange={e => onDynamicFloorChange(Number(e.target.value))} />
                         <HelpText>Maximum year-over-year spending decrease (e.g., -2.5 = 2.5%)</HelpText>
                     </div>
                 </div>

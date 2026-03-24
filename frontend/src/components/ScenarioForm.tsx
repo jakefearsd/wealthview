@@ -180,12 +180,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 </div>
                 <div>
                     <label style={labelStyle}>Inflation Rate (%)</label>
-                    <input style={inputStyle} type="number" step="0.1" value={inflationRate} onChange={e => setInflationRate(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setInflationRate(Number(e.target.value))} />
                     <HelpText>Annual rate of price increases. 3 = 3%, the historical U.S. average.</HelpText>
                 </div>
                 <div>
                     <label style={labelStyle}>Withdrawal Rate (%)</label>
-                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate} onChange={e => setWithdrawalRate(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate || ''} onChange={e => setWithdrawalRate(Number(e.target.value))} />
                     <HelpText>Percentage of portfolio to withdraw annually in retirement. 4 = 4%.</HelpText>
                 </div>
                 <div>
@@ -310,7 +310,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 <label style={labelStyle}>Primary Residence Property Tax</label>
                                 <CurrencyInput
                                     style={inputStyle}
-                                    value={primaryResidencePropertyTax}
+                                    value={primaryResidencePropertyTax || ''}
                                     onChange={v => setPrimaryResidencePropertyTax(Number(v) || 0)}
                                 />
                                 <HelpText>Annual property tax on your primary residence. Feeds SALT deduction (capped at $10K with state income tax).</HelpText>
@@ -319,7 +319,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 <label style={labelStyle}>Primary Residence Mortgage Interest</label>
                                 <CurrencyInput
                                     style={inputStyle}
-                                    value={primaryResidenceMortgageInterest}
+                                    value={primaryResidenceMortgageInterest || ''}
                                     onChange={v => setPrimaryResidenceMortgageInterest(Number(v) || 0)}
                                 />
                                 <HelpText>Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.</HelpText>
@@ -389,18 +389,18 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <label style={labelStyle}>Initial Balance{acct.linked_account_id ? ' (live)' : ''}</label>
                             <CurrencyInput
                                 style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
-                                value={acct.initial_balance}
+                                value={acct.initial_balance || ''}
                                 onChange={v => updateAccount(idx, 'initial_balance', Number(v) || 0)}
                                 readOnly={!!acct.linked_account_id}
                             />
                         </div>
                         <div>
                             <label style={labelStyle}>Annual Contribution</label>
-                            <CurrencyInput style={inputStyle} value={acct.annual_contribution} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
+                            <CurrencyInput style={inputStyle} value={acct.annual_contribution || ''} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
                         </div>
                         <div>
                             <label style={labelStyle}>Expected Return (%)</label>
-                            <input style={inputStyle} type="number" step="0.1" value={acct.expected_return} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
+                            <input style={inputStyle} type="number" step="0.1" value={acct.expected_return || ''} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
                         </div>
                     </div>
                 </div>
