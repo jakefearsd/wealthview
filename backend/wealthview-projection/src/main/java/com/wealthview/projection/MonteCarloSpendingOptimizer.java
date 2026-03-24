@@ -571,6 +571,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
         double failureRate = (double) failures / ctx.trialCount();
 
+        // Compute contingent spending for each year at P25, Median, P55 portfolio levels
+        double[] contingentP25 = new double[ctx.years()];
+        double[] contingentMedian = new double[ctx.years()];
+        double[] contingentP55 = new double[ctx.years()];
+        computeContingentSpending(
+                contingentP25, contingentMedian, contingentP55,
+                p25BalanceByYear, medianBalanceByYear, p55BalanceByYear,
+                ctx, input);
+
         // Build yearly spending records
         var yearlySpending = new ArrayList<GuardrailYearlySpending>();
         for (int y = 0; y < ctx.years(); y++) {
@@ -589,7 +598,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName,
                     toBD(medianBalanceByYear[y]),
                     toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y]),
-                    toBD(p55BalanceByYear[y])));
+                    toBD(p55BalanceByYear[y]),
+                    toBD(contingentP25[y]), toBD(contingentMedian[y]),
+                    toBD(contingentP55[y])));
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -1516,6 +1527,93 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private static BigDecimal toBD(double value) {
         return BigDecimal.valueOf(value).setScale(SCALE, ROUNDING);
+    }
+
+    /**
+     * Computes contingent spending for each retirement year at P25, Median, and P55
+     * portfolio levels. For each balance level, runs a binary search to find the
+     * maximum uniform annual spending sustainable from that year to endAge.
+     */
+    private void computeContingentSpending(
+            double[] contingentP25, double[] contingentMedian, double[] contingentP55,
+            double[] p25BalanceByYear, double[] medianBalanceByYear, double[] p55BalanceByYear,
+            OptimizationContext ctx, GuardrailOptimizationInput input) {
+        double[] historicalReturns = HistoricalReturns.getReturns();
+        double inflationRate = ctx.inflationRate();
+        double terminalTarget = ctx.terminalTarget();
+        double confidenceLevel = ctx.confidenceLevel();
+        int contingentTrials = 200;
+        Random rng = input.seed() != null ? new Random(input.seed() + 99) : new Random();
+
+        for (int y = 0; y < ctx.years(); y++) {
+            int remainingYears = ctx.years() - y;
+            if (remainingYears <= 0) {
+                contingentP25[y] = 0;
+                contingentMedian[y] = 0;
+                contingentP55[y] = 0;
+                continue;
+            }
+
+            contingentP25[y] = findSustainableSpendingFromYear(
+                    p25BalanceByYear[y], y, ctx.years(), historicalReturns,
+                    inflationRate, terminalTarget, confidenceLevel,
+                    contingentTrials, rng);
+
+            contingentMedian[y] = findSustainableSpendingFromYear(
+                    medianBalanceByYear[y], y, ctx.years(), historicalReturns,
+                    inflationRate, terminalTarget, confidenceLevel,
+                    contingentTrials, rng);
+
+            contingentP55[y] = findSustainableSpendingFromYear(
+                    p55BalanceByYear[y], y, ctx.years(), historicalReturns,
+                    inflationRate, terminalTarget, confidenceLevel,
+                    contingentTrials, rng);
+        }
+    }
+
+    private double findSustainableSpendingFromYear(
+            double startingBalance, int fromYear, int toYear,
+            double[] historicalReturns, double inflationRate,
+            double terminalTarget, double confidenceLevel,
+            int trialCount, Random rng) {
+        double low = 0;
+        double high = startingBalance * 0.15;
+
+        for (int iter = 0; iter < 25; iter++) {
+            double mid = (low + high) / 2;
+            if (canSustainSpending(startingBalance, mid, fromYear, toYear,
+                    historicalReturns, inflationRate, terminalTarget,
+                    confidenceLevel, trialCount, rng)) {
+                low = mid;
+            } else {
+                high = mid;
+            }
+        }
+        return low;
+    }
+
+    private boolean canSustainSpending(
+            double balance, double annualSpending, int fromYear, int toYear,
+            double[] historicalReturns, double inflationRate,
+            double terminalTarget, double confidenceLevel,
+            int trialCount, Random rng) {
+        int successes = 0;
+        int remainingYears = toYear - fromYear;
+        for (int t = 0; t < trialCount; t++) {
+            double bal = balance;
+            var generator = new BlockBootstrapReturnGenerator(
+                    historicalReturns, DEFAULT_BLOCK_LENGTH, rng);
+            double[] returns = generator.generateReturnSequence(remainingYears);
+            for (int y = 0; y < remainingYears; y++) {
+                double nominalReturn = toNominal(returns[y], inflationRate);
+                bal *= (1 + nominalReturn);
+                double inflatedSpending = annualSpending * Math.pow(1 + inflationRate, y);
+                bal -= inflatedSpending;
+                if (bal <= 0) break;
+            }
+            if (bal >= terminalTarget) successes++;
+        }
+        return (double) successes / trialCount >= confidenceLevel;
     }
 
     private GuardrailProfileResponse emptyResult(GuardrailOptimizationInput input) {
