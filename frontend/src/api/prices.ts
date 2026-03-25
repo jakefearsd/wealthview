@@ -10,3 +10,8 @@ export async function getLatestPrice(symbol: string): Promise<Price> {
     const { data } = await client.get<Price>(`/prices/${symbol}/latest`);
     return data;
 }
+
+export async function listLatestPrices(): Promise<Price[]> {
+    const { data } = await client.get<Price[]>('/prices');
+    return data;
+}
