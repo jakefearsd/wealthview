@@ -75,6 +75,30 @@ class PriceServiceTest {
     }
 
     @Test
+    void listLatestPrices_returnsLatestPerSymbolSortedBySymbol() {
+        var aaplPrice = new PriceEntity("AAPL", LocalDate.of(2025, 1, 15), new BigDecimal("185.50"), "yahoo");
+        var msftPrice = new PriceEntity("MSFT", LocalDate.of(2025, 1, 15), new BigDecimal("420.00"), "manual");
+        when(priceRepository.findLatestPerSymbol()).thenReturn(List.of(aaplPrice, msftPrice));
+
+        var result = priceService.listLatestPrices();
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).symbol()).isEqualTo("AAPL");
+        assertThat(result.get(0).closePrice()).isEqualByComparingTo("185.50");
+        assertThat(result.get(1).symbol()).isEqualTo("MSFT");
+        assertThat(result.get(1).closePrice()).isEqualByComparingTo("420.00");
+    }
+
+    @Test
+    void listLatestPrices_noPrices_returnsEmptyList() {
+        when(priceRepository.findLatestPerSymbol()).thenReturn(List.of());
+
+        var result = priceService.listLatestPrices();
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
     void getSyncStatus_returnsStatusForEachSymbol() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("AAPL", "MSFT"));
         when(priceRepository.findFirstBySymbolOrderByDateDesc("AAPL"))

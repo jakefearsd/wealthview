@@ -64,6 +64,13 @@ public class PriceService {
     }
 
     @Transactional(readOnly = true)
+    public List<PriceResponse> listLatestPrices() {
+        return priceRepository.findLatestPerSymbol().stream()
+                .map(PriceResponse::from)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Optional<PriceResponse> findLatestPrice(String symbol) {
         return priceRepository.findFirstBySymbolOrderByDateDesc(symbol)
                 .map(PriceResponse::from);

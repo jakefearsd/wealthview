@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/prices")
 public class PriceController {
@@ -21,6 +23,11 @@ public class PriceController {
 
     public PriceController(PriceService priceService) {
         this.priceService = priceService;
+    }
+
+    @GetMapping
+    public List<PriceResponse> listLatestPrices() {
+        return priceService.listLatestPrices();
     }
 
     @PostMapping

@@ -21,6 +21,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -43,6 +45,21 @@ class PriceControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @Test
+    void listLatestPrices_returns200WithPriceList() throws Exception {
+        var prices = List.of(
+                new PriceResponse("AAPL", LocalDate.of(2025, 1, 15), new BigDecimal("185.50"), "yahoo"),
+                new PriceResponse("MSFT", LocalDate.of(2025, 1, 15), new BigDecimal("420.00"), "manual"));
+        when(priceService.listLatestPrices()).thenReturn(prices);
+
+        mockMvc.perform(get("/api/v1/prices")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$[1].symbol").value("MSFT"))
+                .andExpect(jsonPath("$").isArray());
+    }
 
     @Test
     void create_validInput_returns201() throws Exception {

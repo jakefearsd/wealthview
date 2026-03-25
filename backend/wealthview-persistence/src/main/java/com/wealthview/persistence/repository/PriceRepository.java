@@ -25,4 +25,7 @@ public interface PriceRepository extends JpaRepository<PriceEntity, PriceId> {
             AND p.date = (SELECT MAX(p2.date) FROM PriceEntity p2 WHERE p2.symbol = p.symbol)
             """)
     List<PriceEntity> findLatestBySymbolIn(@Param("symbols") List<String> symbols);
+
+    @Query(value = "SELECT DISTINCT ON (symbol) * FROM prices ORDER BY symbol, date DESC", nativeQuery = true)
+    List<PriceEntity> findLatestPerSymbol();
 }
