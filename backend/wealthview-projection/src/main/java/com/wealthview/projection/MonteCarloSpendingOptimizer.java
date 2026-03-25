@@ -13,6 +13,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -96,15 +97,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
-        var ctx = prepareContext(input);
-        if (ctx.sim().years() <= 0) {
-            return emptyResult(input);
-        }
+        MDC.put("operation", "mc-optimize");
+        try {
+            var ctx = prepareContext(input);
+            if (ctx.sim().years() <= 0) {
+                return emptyResult(input);
+            }
 
-        var conv = optimizeConversions(ctx, input);
-        var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
-        return buildResponse(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
-                conv.schedule());
+            var conv = optimizeConversions(ctx, input);
+            var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
+            return buildResponse(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
+                    conv.schedule());
+        } finally {
+            MDC.remove("operation");
+        }
     }
 
     private OptimizationSetup prepareContext(GuardrailOptimizationInput input) {

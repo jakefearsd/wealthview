@@ -116,6 +116,7 @@ public class IncomeSourceService {
 
         entity.setUpdatedAt(OffsetDateTime.now());
         entity = incomeSourceRepository.save(entity);
+        log.info("Income source '{}' ({}) updated for tenant {}", entity.getName(), sourceId, tenantId);
         return IncomeSourceResponse.from(entity);
     }
 

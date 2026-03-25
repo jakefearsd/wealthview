@@ -84,6 +84,8 @@ public class HoldingService {
         holding.setAsOfDate(LocalDate.now());
         holding.setUpdatedAt(OffsetDateTime.now());
         holding = holdingRepository.save(holding);
+        log.info("Manual holding updated for account {} symbol {} ({})", holding.getAccount().getId(),
+                holding.getSymbol(), holdingId);
 
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "UPDATE", "holding",
                 holdingId, Map.of("symbol", holding.getSymbol())));

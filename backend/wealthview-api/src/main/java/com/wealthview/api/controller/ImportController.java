@@ -4,6 +4,8 @@ import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.importservice.ImportService;
 import com.wealthview.core.importservice.PositionImportService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -22,6 +24,8 @@ import java.util.UUID;
 @RequestMapping("/api/v1/import")
 public class ImportController {
 
+    private static final Logger log = LoggerFactory.getLogger(ImportController.class);
+
     private final ImportService importService;
     private final PositionImportService positionImportService;
 
@@ -37,6 +41,8 @@ public class ImportController {
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String format) throws IOException {
+        log.info("CSV import requested for account {} file='{}' size={}B format={}",
+                accountId, file.getOriginalFilename(), file.getSize(), format);
         var result = (format != null && !format.isBlank())
                 ? importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format)
                 : importService.importCsv(principal.tenantId(), accountId, file.getInputStream());
@@ -49,6 +55,9 @@ public class ImportController {
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String format) throws IOException {
+        log.info("Positions import requested for account {} file='{}' size={}B format={}",
+                accountId, file.getOriginalFilename(), file.getSize(),
+                format != null ? format : "fidelityPositions");
         var result = positionImportService.importPositions(
                 principal.tenantId(), accountId, file.getInputStream(),
                 format != null ? format : "fidelityPositions");
@@ -60,6 +69,8 @@ public class ImportController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file) throws IOException {
+        log.info("OFX import requested for account {} file='{}' size={}B",
+                accountId, file.getOriginalFilename(), file.getSize());
         var result = importService.importOfx(principal.tenantId(), accountId, file.getInputStream());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }

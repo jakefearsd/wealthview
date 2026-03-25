@@ -14,6 +14,7 @@ import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -59,6 +60,9 @@ public class GuardrailProfileService {
     @Transactional
     public GuardrailProfileResponse optimize(UUID tenantId, UUID scenarioId,
                                               GuardrailOptimizationRequest request) {
+        MDC.put("operation", "guardrail-optimize");
+        MDC.put("scenarioId", scenarioId.toString());
+        try {
         if (Boolean.TRUE.equals(request.optimizeConversions())) {
             if (request.rmdTargetBracketRate() != null
                     && request.conversionBracketRate() != null
@@ -148,6 +152,10 @@ public class GuardrailProfileService {
 
         log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
         return GuardrailProfileResponse.from(saved);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("scenarioId");
+        }
     }
 
     @Transactional(readOnly = true)
