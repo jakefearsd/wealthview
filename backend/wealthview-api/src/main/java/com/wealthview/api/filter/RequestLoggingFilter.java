@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -25,7 +26,9 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
 
         long duration = System.currentTimeMillis() - startTime;
-        log.info("{} {} {} {}ms", request.getMethod(), request.getRequestURI(),
-                response.getStatus(), duration);
+        log.info("{} {} → {} ({}ms) [tenant={} user={}]",
+                request.getMethod(), request.getRequestURI(),
+                response.getStatus(), duration,
+                MDC.get("tenantId"), MDC.get("userId"));
     }
 }

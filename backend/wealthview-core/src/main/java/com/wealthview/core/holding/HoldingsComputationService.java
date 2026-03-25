@@ -43,7 +43,7 @@ public class HoldingsComputationService {
             return;
         }
 
-        log.debug("Recomputing holdings for account {} symbol {}", account.getId(), symbol);
+        log.info("Recomputing holdings for account {} symbol {}", account.getId(), symbol);
 
         var existingHolding = holdingRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
 
