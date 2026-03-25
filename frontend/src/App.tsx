@@ -21,6 +21,7 @@ import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import IncomeSourcesPage from './pages/IncomeSourcesPage';
 import HoldingDetailPage from './pages/HoldingDetailPage';
 import AdminPage from './pages/AdminPage';
+import AdminPriceManagementPage from './pages/AdminPriceManagementPage';
 import AuditLogPage from './pages/AuditLogPage';
 import DataExportPage from './pages/DataExportPage';
 import SettingsPage from './pages/SettingsPage';
@@ -51,6 +52,7 @@ export default function App() {
                         <Route path="properties" element={<PropertiesListPage />} />
                         <Route path="properties/:id" element={<PropertyDetailPage />} />
                         <Route path="admin" element={<AdminPage />} />
+                        <Route path="admin/prices" element={<AdminPriceManagementPage />} />
                         <Route path="audit-log" element={<AuditLogPage />} />
                         <Route path="export" element={<DataExportPage />} />
                         <Route path="settings" element={<SettingsPage />} />
