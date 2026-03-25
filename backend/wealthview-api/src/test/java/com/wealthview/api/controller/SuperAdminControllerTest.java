@@ -6,6 +6,11 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.price.PriceService;
+import com.wealthview.core.price.dto.CsvImportResult;
+import com.wealthview.core.price.dto.PriceResponse;
+import com.wealthview.core.price.dto.PriceSyncStatus;
+import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -15,13 +20,15 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
-
-import java.time.OffsetDateTime;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
@@ -31,6 +38,7 @@ import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,6 +59,9 @@ class SuperAdminControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private PriceService priceService;
 
     private TenantEntity createTenantEntity() throws Exception {
         var tenant = new TenantEntity("Test Tenant");
@@ -152,5 +163,108 @@ class SuperAdminControllerTest {
                                 {"active": false}
                                 """))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void getPriceStatus_superAdmin_returns200() throws Exception {
+        var statuses = List.of(
+                new PriceSyncStatus("AAPL", LocalDate.of(2024, 3, 20), "finnhub", false),
+                new PriceSyncStatus("MSFT", LocalDate.of(2024, 3, 15), "manual", true));
+        when(priceService.getSyncStatus()).thenReturn(statuses);
+
+        mockMvc.perform(get("/api/v1/admin/prices/status")
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$[0].stale").value(false))
+                .andExpect(jsonPath("$[1].symbol").value("MSFT"))
+                .andExpect(jsonPath("$[1].stale").value(true));
+    }
+
+    @Test
+    void getPriceStatus_nonSuperAdmin_returns403() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/prices/status")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void syncFromYahoo_superAdmin_returns200() throws Exception {
+        when(priceService.getSyncStatus()).thenReturn(
+                List.of(new PriceSyncStatus("AAPL", LocalDate.now(), "finnhub", false)));
+        when(priceService.syncFromYahoo(List.of("AAPL")))
+                .thenReturn(new YahooSyncResult(2, 0, List.of()));
+
+        mockMvc.perform(post("/api/v1/admin/prices/yahoo/sync")
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inserted").value(2))
+                .andExpect(jsonPath("$.updated").value(0))
+                .andExpect(jsonPath("$.failed").isEmpty());
+    }
+
+    @Test
+    void fetchFromYahoo_superAdmin_returns200() throws Exception {
+        when(priceService.fetchFromYahoo(any())).thenReturn(List.of(
+                new PriceResponse("AAPL", LocalDate.of(2024, 1, 2),
+                        new BigDecimal("185.50"), "yahoo")));
+
+        mockMvc.perform(post("/api/v1/admin/prices/yahoo/fetch")
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "symbols": ["AAPL"],
+                                    "from_date": "2024-01-01",
+                                    "to_date": "2024-01-05"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].symbol").value("AAPL"))
+                .andExpect(jsonPath("$[0].close_price").value(185.50));
+    }
+
+    @Test
+    void saveYahooPrices_superAdmin_returns204() throws Exception {
+        when(priceService.bulkUpsertPrices(any(), eq("yahoo"))).thenReturn(2);
+
+        mockMvc.perform(post("/api/v1/admin/prices/yahoo/save")
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "prices": [
+                                        {"symbol": "AAPL", "date": "2024-01-02", "close_price": 185.50},
+                                        {"symbol": "MSFT", "date": "2024-01-02", "close_price": 370.25}
+                                    ]
+                                }
+                                """))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void importCsv_superAdmin_returns200() throws Exception {
+        when(priceService.importCsv(any())).thenReturn(new CsvImportResult(3, List.of()));
+
+        var file = new MockMultipartFile("file", "prices.csv", "text/csv",
+                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/admin/prices/csv")
+                        .file(file)
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.imported").value(3))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void importCsv_nonSuperAdmin_returns403() throws Exception {
+        var file = new MockMultipartFile("file", "prices.csv", "text/csv",
+                "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes());
+
+        mockMvc.perform(multipart("/api/v1/admin/prices/csv")
+                        .file(file)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isForbidden());
     }
 }
