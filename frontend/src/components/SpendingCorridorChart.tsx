@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import type { GuardrailYearlySpending, GuardrailPhase } from '../types/projection';
 import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
+import ChartTooltip from './ChartTooltip';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -40,23 +41,34 @@ export default function SpendingCorridorChart({ yearlySpending, phases }: Props)
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="age" label={{ value: 'Age', position: 'insideBottom', offset: -5 }} />
                     <YAxis tickFormatter={formatDollarAxis} label={{ value: 'Annual Spending ($)', angle: -90, position: 'insideLeft' }} />
-                    <Tooltip
-                        formatter={(value: number | number[], name: string) => {
-                            if (Array.isArray(value)) return [null, null];
-                            return [formatDollarTooltip(value), name];
-                        }}
-                        labelFormatter={(age) => `Age ${age}`}
-                        itemSorter={(item) => {
-                            const order: Record<string, number> = {
-                                'Recommended Spending': 0,
-                                'Corridor High': 1,
-                                'Corridor Low': 2,
-                                'Essential Floor': 3,
-                                'Income Offset': 4,
-                            };
-                            return order[item.name ?? ''] ?? 5;
-                        }}
-                    />
+                    <Tooltip content={
+                        <ChartTooltip renderContent={(age) => {
+                            const d = data.find(y => y.age === age);
+                            if (!d) return null;
+                            return (
+                                <>
+                                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Age {d.age}</div>
+                                    <div style={{ color: '#2563eb' }}>
+                                        Recommended: {formatDollarTooltip(d.recommended)}
+                                    </div>
+                                    <div style={{ color: '#94a3b8' }}>
+                                        Corridor High: {formatDollarTooltip(d.corridorHigh)}
+                                    </div>
+                                    <div style={{ color: '#94a3b8' }}>
+                                        Corridor Low: {formatDollarTooltip(d.corridorLow)}
+                                    </div>
+                                    <div style={{ color: '#dc2626' }}>
+                                        Essential Floor: {formatDollarTooltip(d.essentialFloor)}
+                                    </div>
+                                    {d.incomeOffset > 0 && (
+                                        <div style={{ color: '#22c55e' }}>
+                                            Income Offset: {formatDollarTooltip(d.incomeOffset)}
+                                        </div>
+                                    )}
+                                </>
+                            );
+                        }} />
+                    } />
                     <Legend />
 
                     {/* Corridor band */}

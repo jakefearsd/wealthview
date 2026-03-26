@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import type { GuardrailYearlySpending } from '../types/projection';
 import { formatDollarAxis, formatDollarTooltip } from '../utils/chartFormatters';
+import ChartTooltip from './ChartTooltip';
 
 interface Props {
     yearlySpending: GuardrailYearlySpending[];
@@ -43,22 +44,29 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                         label={{ value: 'Portfolio Balance ($)', angle: -90, position: 'insideLeft' }}
                         domain={[0, 'auto']}
                     />
-                    <Tooltip
-                        formatter={(value: number | number[], name: string) => {
-                            if (Array.isArray(value)) return [null, null];
-                            return [formatDollarTooltip(value), name];
-                        }}
-                        labelFormatter={(age) => `Age ${age}`}
-                        itemSorter={(item) => {
-                            const order: Record<string, number> = {
-                                '55th Percentile': 0,
-                                'Median (p50)': 1,
-                                '25th Percentile': 2,
-                                '10th Percentile': 3,
-                            };
-                            return order[item.name ?? ''] ?? 5;
-                        }}
-                    />
+                    <Tooltip content={
+                        <ChartTooltip renderContent={(age) => {
+                            const d = data.find(y => y.age === age);
+                            if (!d) return null;
+                            return (
+                                <>
+                                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Age {d.age}</div>
+                                    <div style={{ color: '#a5b4fc' }}>
+                                        55th Percentile: {formatDollarTooltip(d.p55 ?? 0)}
+                                    </div>
+                                    <div style={{ color: '#1e1b4b' }}>
+                                        Median (p50): {formatDollarTooltip(d.median ?? 0)}
+                                    </div>
+                                    <div style={{ color: '#6366f1' }}>
+                                        25th Percentile: {formatDollarTooltip(d.p25 ?? 0)}
+                                    </div>
+                                    <div style={{ color: '#ef5350' }}>
+                                        10th Percentile: {formatDollarTooltip(d.p10 ?? 0)}
+                                    </div>
+                                </>
+                            );
+                        }} />
+                    } />
                     <Legend />
 
                     {/* Outer band: p10 to p55 */}
