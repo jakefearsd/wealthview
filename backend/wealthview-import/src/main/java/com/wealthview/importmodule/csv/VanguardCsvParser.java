@@ -70,16 +70,8 @@ public class VanguardCsvParser extends AbstractBrokerCsvParser {
         transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, amount));
     }
 
-    private BigDecimal parseOptionalAmount(String value) {
-        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
-    }
-
     private BigDecimal parseOptionalAbsAmount(String value) {
         return (value != null && !value.isBlank()) ? parseAmount(value).abs() : null;
-    }
-
-    private String parseOptionalSymbol(String symbol) {
-        return (symbol != null && !symbol.isBlank()) ? symbol : null;
     }
 
     String mapAction(String transactionType) {

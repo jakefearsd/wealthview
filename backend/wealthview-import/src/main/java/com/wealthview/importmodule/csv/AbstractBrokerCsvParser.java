@@ -118,6 +118,20 @@ public abstract class AbstractBrokerCsvParser implements CsvParser {
         return new BigDecimal(cleaned);
     }
 
+    /**
+     * Parses the value as an amount if non-blank, otherwise returns null.
+     */
+    protected BigDecimal parseOptionalAmount(String value) {
+        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
+    }
+
+    /**
+     * Returns the symbol if non-blank, otherwise returns null.
+     */
+    protected String parseOptionalSymbol(String symbol) {
+        return (symbol != null && !symbol.isBlank()) ? symbol : null;
+    }
+
     protected LocalDate parseDate(String raw) {
         return LocalDate.parse(raw.trim(), getDateFormat());
     }

@@ -6,6 +6,7 @@ import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
@@ -69,7 +70,7 @@ public class SchwabCsvParser extends AbstractBrokerCsvParser {
             return;
         }
 
-        java.time.LocalDate date;
+        LocalDate date;
         try {
             date = parseDate(dateStr);
         } catch (DateTimeParseException e) {
@@ -87,14 +88,6 @@ public class SchwabCsvParser extends AbstractBrokerCsvParser {
         var absAmount = amount != null ? amount.abs() : null;
         var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
         transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, absAmount));
-    }
-
-    private BigDecimal parseOptionalAmount(String value) {
-        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
-    }
-
-    private String parseOptionalSymbol(String symbol) {
-        return (symbol != null && !symbol.isBlank()) ? symbol : null;
     }
 
     private boolean isFooterRow(String dateStr) {

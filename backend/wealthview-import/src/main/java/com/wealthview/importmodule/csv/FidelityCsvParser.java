@@ -64,14 +64,6 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
         transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, absAmount));
     }
 
-    private BigDecimal parseOptionalAmount(String value) {
-        return (value != null && !value.isBlank()) ? parseAmount(value) : null;
-    }
-
-    private String parseOptionalSymbol(String symbol) {
-        return (symbol != null && !symbol.isBlank()) ? symbol : null;
-    }
-
     String mapAction(String action, BigDecimal amount) {
         if (action == null) {
             return null;
