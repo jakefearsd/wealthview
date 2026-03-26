@@ -95,6 +95,25 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             RothConversionOptimizer.RothConversionSchedule schedule
     ) {}
 
+    /** Per-trial simulation result. */
+    private record TrialResult(
+            double finalBalance,
+            double minBalance,
+            double[] yearBalances,       // null when trackYearBalances is false
+            boolean traditionalExhausted
+    ) {}
+
+    /** Configuration shared across all trials in a simulation run. */
+    private record SimulationConfig(
+            double initTaxable, double initTraditional, double initRoth,
+            String withdrawalOrder, double[] marginalRateByYear,
+            double[] conversionByYear, double[] conversionTaxByYear,
+            int retirementAge,
+            double[] dsBracketCeilingByYear,
+            int cashReserveYears, double cashReturnRate,
+            boolean trackYearBalances
+    ) {}
+
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
         MDC.put("operation", "mc-optimize");
@@ -442,6 +461,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         // Simulate with withdrawals to get final balances and per-year median balances
         boolean simPools = conversionByYear != null
                 || (ctx.portfolio().initTraditional() > 0 || ctx.portfolio().initRoth() > 0);
+        double initTaxable = simPools
+                ? ctx.portfolio().initTaxable() : ctx.portfolio().initialPortfolio();
+        double initTraditional = simPools ? ctx.portfolio().initTraditional() : 0;
+        double initRoth = simPools ? ctx.portfolio().initRoth() : 0;
+        String order = simPools && ctx.portfolio().withdrawalOrder() != null
+                ? ctx.portfolio().withdrawalOrder() : "taxable_first";
+
+        // marginalRateByYear is null — buildResponse does not model withdrawal tax
+        var simConfig = new SimulationConfig(
+                initTaxable, initTraditional, initRoth, order, null,
+                conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
+                ctx.taxIncome().dsBracketCeilingByYear(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true);
+
         double[] historicalReturns = HistoricalReturns.getReturns();
         var rng2 = input.seed() != null ? new Random(input.seed()) : new Random();
         double[][] yearBalances = new double[ctx.sim().years()][ctx.sim().trialCount()];
@@ -453,124 +486,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             var generator = new BlockBootstrapReturnGenerator(
                     historicalReturns, DEFAULT_BLOCK_LENGTH, rng2);
             double[] returnSequence = generator.generateReturnSequence(ctx.sim().years());
-
-            double pTaxable = simPools ? ctx.portfolio().initTaxable() : ctx.portfolio().initialPortfolio();
-            double pTraditional = simPools ? ctx.portfolio().initTraditional() : 0;
-            double pRoth = simPools ? ctx.portfolio().initRoth() : 0;
-            String order = simPools && ctx.portfolio().withdrawalOrder() != null
-                    ? ctx.portfolio().withdrawalOrder() : "taxable_first";
-
-            double cashBalance = 0;
-            if (ctx.portfolio().cashReserveYears() > 0) {
-                double annualSpending = ctx.taxIncome().adjustedFloors()[0] + discretionaryByYear[0];
-                cashBalance = annualSpending * ctx.portfolio().cashReserveYears();
-                double cashFromTaxable = Math.min(cashBalance, pTaxable);
-                pTaxable -= cashFromTaxable;
-                double remaining = cashBalance - cashFromTaxable;
-                if (remaining > 0) {
-                    double fromTrad = Math.min(remaining, pTraditional);
-                    pTraditional -= fromTrad;
-                    remaining -= fromTrad;
-                    pRoth -= remaining;
-                    pRoth = Math.max(0, pRoth);
-                }
-            }
-
-            double priorYearEndTraditional = pTraditional;
-
+            double[] nominalReturns = new double[ctx.sim().years()];
             for (int y = 0; y < ctx.sim().years(); y++) {
-                double realReturn = returnSequence[y];
-                double nominalReturn = toNominal(realReturn, ctx.sim().inflationRate());
-                double growthFactor = 1 + nominalReturn;
-
-                pTaxable *= growthFactor;
-                pTraditional *= growthFactor;
-                pRoth *= growthFactor;
-                cashBalance *= (1 + ctx.portfolio().cashReturnRate());
-
-                int age = ctx.sim().retirementAge() + y;
-
-                // --- Roth conversion execution ---
-                if (conversionByYear != null && conversionByYear[y] > 0 && pTraditional > 0) {
-                    double actualConv = Math.min(conversionByYear[y], pTraditional);
-                    pTraditional -= actualConv;
-                    pRoth += actualConv;
-                    double actualTax = (actualConv < conversionByYear[y])
-                            ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
-                            : conversionTaxByYear[y];
-                    if (age < EARLY_WITHDRAWAL_AGE) {
-                        pTaxable -= Math.min(actualTax, Math.max(0, pTaxable));
-                    } else {
-                        double taxRem = actualTax;
-                        double t1 = Math.min(taxRem, Math.max(0, pTaxable));
-                        pTaxable -= t1; taxRem -= t1;
-                        double t2 = Math.min(taxRem, Math.max(0, pTraditional));
-                        pTraditional -= t2; taxRem -= t2;
-                        pRoth -= taxRem;
-                    }
-                }
-
-                double spending = ctx.taxIncome().adjustedFloors()[y] + discretionaryByYear[y];
-                double withdrawal = Math.max(0, spending - ctx.taxIncome().incomeByYear()[y]);
-
-                boolean preAge595 = conversionByYear != null && age < EARLY_WITHDRAWAL_AGE;
-                double dsCeiling = ctx.taxIncome().dsBracketCeilingByYear() != null
-                        ? ctx.taxIncome().dsBracketCeilingByYear()[y] : 0;
-                double dsConvAmt = conversionByYear != null ? conversionByYear[y] : 0;
-                var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth,
-                        withdrawal, order, preAge595,
-                        dsCeiling, ctx.taxIncome().incomeByYear()[y], dsConvAmt, 0);
-
-                if (ctx.portfolio().cashReserveYears() > 0) {
-                    if (nominalReturn < 0) {
-                        double totalDraw = withdrawal;
-                        double cashDraw = Math.min(totalDraw, cashBalance);
-                        double equityDraw = totalDraw - cashDraw;
-                        double drawnTotal = drawn.total();
-                        if (drawnTotal > 0 && equityDraw > 0) {
-                            double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                            pTaxable -= drawn.taxable() * scale;
-                            pTraditional -= drawn.traditional() * scale;
-                            pRoth -= drawn.roth() * scale;
-                        }
-                        cashBalance -= cashDraw;
-                    } else {
-                        pTaxable -= drawn.taxable();
-                        pTraditional -= drawn.traditional();
-                        pRoth -= drawn.roth();
-                        double targetCash = spending * ctx.portfolio().cashReserveYears();
-                        double replenishment = Math.min(
-                                Math.max(0, targetCash - cashBalance),
-                                Math.max(0, pTaxable + pTraditional + pRoth) * CASH_REPLENISHMENT_RATE);
-                        pTaxable -= replenishment;
-                        if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
-                        cashBalance += replenishment;
-                    }
-                } else {
-                    pTaxable -= drawn.taxable();
-                    pTraditional -= drawn.traditional();
-                    pRoth -= drawn.roth();
-                }
-
-                // Surplus: income exceeds spending — deposit after-tax surplus to taxable
-                if (ctx.taxIncome().incomeByYear()[y] > spending) {
-                    double grossSurplus = ctx.taxIncome().incomeByYear()[y] - spending;
-                    pTaxable += Math.max(0, grossSurplus - ctx.taxIncome().surplusTaxByYear()[y]);
-                }
-
-                pTaxable = Math.max(0, pTaxable);
-                pTraditional = Math.max(0, pTraditional);
-                pRoth = Math.max(0, pRoth);
-                cashBalance = Math.max(0, cashBalance);
-
-                double totalBalance = pTaxable + pTraditional + pRoth + cashBalance;
-                yearBalances[y][t] = totalBalance;
-                priorYearEndTraditional = pTraditional;
+                nominalReturns[y] = toNominal(returnSequence[y], ctx.sim().inflationRate());
             }
-            finalBalances[t] = Math.max(0, pTaxable + pTraditional + pRoth + cashBalance);
 
-            // Track traditional exhaustion for mcExhaustionPct
-            if (conversionByYear != null && pTraditional <= 0) {
+            var result = simulateTrial(nominalReturns,
+                    ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
+                    ctx.taxIncome().adjustedFloors(), discretionaryByYear,
+                    ctx.sim().years(), simConfig);
+            for (int y = 0; y < ctx.sim().years(); y++) {
+                yearBalances[y][t] = result.yearBalances()[y];
+            }
+            finalBalances[t] = result.finalBalance();
+            if (result.traditionalExhausted()) {
                 tradExhaustedCount++;
             }
         }
@@ -1021,103 +950,109 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return low;
     }
 
-    private boolean isSustainable(double[][] paths, double[] income, double[] surplusTax,
-                                   double[] floors, double[] discretionary,
-                                   double terminalTarget, int years, int trialCount,
-                                   double confidenceLevel, double portfolioFloor,
-                                   int cashReserveYears, double cashReturnRate,
-                                   TaxContext taxCtx,
-                                   double[] conversionByYear,
-                                   double[] conversionTaxByYear,
-                                   int retirementAge, int birthYear,
-                                   double[] dsBracketCeilingByYear) {
-        double[] finalBalances = new double[trialCount];
-        double[] minBalances = new double[trialCount];
+    /**
+     * Simulates a single MC trial: year-by-year portfolio evolution with growth,
+     * Roth conversions, withdrawals, tax, surplus, and floor enforcement.
+     *
+     * <p>When {@code config.marginalRateByYear()} is non-null, withdrawal tax is
+     * estimated and deducted from pools (used by {@code isSustainable}). When null,
+     * no withdrawal tax is applied (used by {@code buildResponse}).
+     *
+     * <p>When {@code config.trackYearBalances()} is true, per-year total balances are
+     * recorded in the returned {@link TrialResult#yearBalances()}.
+     */
+    private TrialResult simulateTrial(
+            double[] nominalReturns,
+            double[] income, double[] surplusTax,
+            double[] floors, double[] discretionary,
+            int years, SimulationConfig config) {
 
-        boolean hasPools = taxCtx != null && (taxCtx.initTraditional > 0 || taxCtx.initRoth > 0);
-        boolean hasConversions = conversionByYear != null;
+        boolean hasConversions = config.conversionByYear() != null;
+        boolean hasPools = config.marginalRateByYear() != null;
 
-        for (int t = 0; t < trialCount; t++) {
-            double initialBalance = paths[t][0];
+        double pTaxable = config.initTaxable();
+        double pTraditional = config.initTraditional();
+        double pRoth = config.initRoth();
+        String order = config.withdrawalOrder();
 
-            // Pool tracking for tax-aware withdrawals
-            double pTaxable = hasPools ? taxCtx.initTaxable : initialBalance;
-            double pTraditional = hasPools ? taxCtx.initTraditional : 0;
-            double pRoth = hasPools ? taxCtx.initRoth : 0;
-            String order = hasPools ? taxCtx.withdrawalOrder : "taxable_first";
+        double cashBalance = 0;
+        if (config.cashReserveYears() > 0) {
+            double annualSpending = floors[0] + discretionary[0];
+            cashBalance = annualSpending * config.cashReserveYears();
+            double cashFromTaxable = Math.min(cashBalance, pTaxable);
+            pTaxable -= cashFromTaxable;
+            double remaining = cashBalance - cashFromTaxable;
+            if (remaining > 0) {
+                double fromTrad = Math.min(remaining, pTraditional);
+                pTraditional -= fromTrad;
+                remaining -= fromTrad;
+                pRoth -= remaining;
+                pRoth = Math.max(0, pRoth);
+            }
+        }
 
-            double cashBalance = 0;
-            if (cashReserveYears > 0) {
-                double annualSpending = floors[0] + discretionary[0];
-                cashBalance = annualSpending * cashReserveYears;
-                double cashFromTaxable = Math.min(cashBalance, pTaxable);
-                pTaxable -= cashFromTaxable;
-                double remaining = cashBalance - cashFromTaxable;
-                if (remaining > 0) {
-                    double fromTrad = Math.min(remaining, pTraditional);
-                    pTraditional -= fromTrad;
-                    remaining -= fromTrad;
-                    pRoth -= remaining;
-                    pRoth = Math.max(0, pRoth);
+        double minBalance = pTaxable + pTraditional + pRoth + cashBalance;
+        double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
+        @SuppressWarnings("unused")
+        double priorYearEndTraditional = pTraditional;
+
+        for (int y = 0; y < years; y++) {
+            double nominalReturn = nominalReturns[y];
+            double growthFactor = 1 + nominalReturn;
+
+            pTaxable *= growthFactor;
+            pTraditional *= growthFactor;
+            pRoth *= growthFactor;
+            cashBalance *= (1 + config.cashReturnRate());
+
+            int age = config.retirementAge() + y;
+
+            // --- Roth conversion execution ---
+            if (hasConversions && config.conversionByYear()[y] > 0 && pTraditional > 0) {
+                double actualConv = Math.min(config.conversionByYear()[y], pTraditional);
+                pTraditional -= actualConv;
+                pRoth += actualConv;
+                double actualTax = (actualConv < config.conversionByYear()[y])
+                        ? config.conversionTaxByYear()[y] * (actualConv / config.conversionByYear()[y])
+                        : config.conversionTaxByYear()[y];
+                if (age < EARLY_WITHDRAWAL_AGE) {
+                    pTaxable -= Math.min(actualTax, Math.max(0, pTaxable));
+                } else {
+                    double taxRem = actualTax;
+                    double t1 = Math.min(taxRem, Math.max(0, pTaxable));
+                    pTaxable -= t1; taxRem -= t1;
+                    double t2 = Math.min(taxRem, Math.max(0, pTraditional));
+                    pTraditional -= t2; taxRem -= t2;
+                    pRoth -= taxRem;
                 }
             }
 
-            double minBalance = pTaxable + pTraditional + pRoth + cashBalance;
-            double priorYearEndTraditional = pTraditional;
+            double spending = floors[y] + discretionary[y];
+            double withdrawal = Math.max(0, spending - income[y]);
 
-            for (int y = 0; y < years; y++) {
-                double growthFactor = paths[t][y + 1] / paths[t][y];
-                double equityReturn = growthFactor - 1.0;
+            // Split withdrawal across pools (59.5 rule: taxable only before age 60)
+            boolean preAge595 = hasConversions && age < EARLY_WITHDRAWAL_AGE;
+            double dsCeiling = config.dsBracketCeilingByYear() != null
+                    ? config.dsBracketCeilingByYear()[y] : 0;
+            double dsConvAmt = config.conversionByYear() != null
+                    ? config.conversionByYear()[y] : 0;
+            var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth,
+                    withdrawal, order, preAge595,
+                    dsCeiling, income[y], dsConvAmt, 0);
 
-                pTaxable *= growthFactor;
-                pTraditional *= growthFactor;
-                pRoth *= growthFactor;
-                cashBalance *= (1 + cashReturnRate);
+            // Estimate tax on traditional withdrawal using pre-computed marginal rate
+            double withdrawalTax = 0;
+            if (hasPools && drawn.traditional() > 0) {
+                withdrawalTax = estimateWithdrawalTax(
+                        drawn.traditional(), config.marginalRateByYear()[y]);
+            }
 
-                int age = retirementAge + y;
+            double totalDraw = withdrawal + withdrawalTax;
 
-                // --- Roth conversion execution ---
-                if (hasConversions && conversionByYear[y] > 0 && pTraditional > 0) {
-                    double actualConv = Math.min(conversionByYear[y], pTraditional);
-                    pTraditional -= actualConv;
-                    pRoth += actualConv;
-                    double actualTax = (actualConv < conversionByYear[y])
-                            ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
-                            : conversionTaxByYear[y];
-                    if (age < EARLY_WITHDRAWAL_AGE) {
-                        pTaxable -= Math.min(actualTax, Math.max(0, pTaxable));
-                    } else {
-                        double taxRem = actualTax;
-                        double t1 = Math.min(taxRem, Math.max(0, pTaxable));
-                        pTaxable -= t1; taxRem -= t1;
-                        double t2 = Math.min(taxRem, Math.max(0, pTraditional));
-                        pTraditional -= t2; taxRem -= t2;
-                        pRoth -= taxRem;
-                    }
-                }
-
-                double spending = floors[y] + discretionary[y];
-                double withdrawal = Math.max(0, spending - income[y]);
-
-                // Split withdrawal across pools (59.5 rule: taxable only before age 60)
-                boolean preAge595 = hasConversions && age < EARLY_WITHDRAWAL_AGE;
-                double dsCeiling = dsBracketCeilingByYear != null
-                        ? dsBracketCeilingByYear[y] : 0;
-                double dsConvAmt = conversionByYear != null ? conversionByYear[y] : 0;
-                var drawn = splitWithdrawal(pTaxable, pTraditional, pRoth,
-                        withdrawal, order, preAge595,
-                        dsCeiling, income[y], dsConvAmt, 0);
-
-                // Estimate tax on traditional withdrawal using pre-computed marginal rate
-                double withdrawalTax = 0;
-                if (hasPools && drawn.traditional() > 0) {
-                    withdrawalTax = estimateWithdrawalTax(drawn.traditional(), taxCtx.marginalRateByYear[y]);
-                }
-
-                double totalDraw = withdrawal + withdrawalTax;
-
-                if (cashReserveYears > 0) {
-                    if (equityReturn < 0) {
+            if (config.cashReserveYears() > 0) {
+                if (nominalReturn < 0) {
+                    if (hasPools) {
+                        // isSustainable path: tax-aware cash reserve draw
                         double cashDraw = Math.min(totalDraw, cashBalance);
                         double equityDraw = totalDraw - cashDraw;
                         double drawnTotal = drawn.total();
@@ -1133,28 +1068,44 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         }
                         cashBalance -= cashDraw;
                     } else {
-                        pTaxable -= drawn.taxable();
-                        pTraditional -= drawn.traditional();
-                        pRoth -= drawn.roth();
+                        // buildResponse path: simple cash reserve draw (no withdrawal tax)
+                        double cashDraw = Math.min(withdrawal, cashBalance);
+                        double equityDraw = withdrawal - cashDraw;
+                        double drawnTotal = drawn.total();
+                        if (drawnTotal > 0 && equityDraw > 0) {
+                            double scale = equityDraw / Math.max(drawnTotal, equityDraw);
+                            pTaxable -= drawn.taxable() * scale;
+                            pTraditional -= drawn.traditional() * scale;
+                            pRoth -= drawn.roth() * scale;
+                        }
+                        cashBalance -= cashDraw;
+                    }
+                } else {
+                    pTaxable -= drawn.taxable();
+                    pTraditional -= drawn.traditional();
+                    pRoth -= drawn.roth();
+                    if (hasPools) {
                         double taxRem = withdrawalTax;
                         double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
                         pTaxable -= taxFromTax; taxRem -= taxFromTax;
                         double taxFromTrad = Math.min(taxRem, Math.max(0, pTraditional));
                         pTraditional -= taxFromTrad; taxRem -= taxFromTrad;
                         pRoth -= taxRem;
-
-                        double targetCash = spending * cashReserveYears;
-                        double replenishment = Math.min(
-                                Math.max(0, targetCash - cashBalance),
-                                Math.max(0, pTaxable + pTraditional + pRoth) * CASH_REPLENISHMENT_RATE);
-                        pTaxable -= replenishment;
-                        if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
-                        cashBalance += replenishment;
                     }
-                } else {
-                    pTaxable -= drawn.taxable();
-                    pTraditional -= drawn.traditional();
-                    pRoth -= drawn.roth();
+                    double targetCash = spending * config.cashReserveYears();
+                    double replenishment = Math.min(
+                            Math.max(0, targetCash - cashBalance),
+                            Math.max(0, pTaxable + pTraditional + pRoth)
+                                    * CASH_REPLENISHMENT_RATE);
+                    pTaxable -= replenishment;
+                    if (pTaxable < 0) { pTraditional += pTaxable; pTaxable = 0; }
+                    cashBalance += replenishment;
+                }
+            } else {
+                pTaxable -= drawn.taxable();
+                pTraditional -= drawn.traditional();
+                pRoth -= drawn.roth();
+                if (hasPools) {
                     double taxRem = withdrawalTax;
                     double taxFromTax = Math.min(taxRem, Math.max(0, pTaxable));
                     pTaxable -= taxFromTax; taxRem -= taxFromTax;
@@ -1162,24 +1113,76 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     pTraditional -= taxFromTrad; taxRem -= taxFromTrad;
                     pRoth -= taxRem;
                 }
-
-                // Surplus: income exceeds spending — deposit after-tax surplus to taxable
-                if (income[y] > spending) {
-                    double grossSurplus = income[y] - spending;
-                    pTaxable += Math.max(0, grossSurplus - surplusTax[y]);
-                }
-
-                pTaxable = Math.max(0, pTaxable);
-                pTraditional = Math.max(0, pTraditional);
-                pRoth = Math.max(0, pRoth);
-                cashBalance = Math.max(0, cashBalance);
-
-                double totalBalance = pTaxable + pTraditional + pRoth + cashBalance;
-                minBalance = Math.min(minBalance, totalBalance);
-                priorYearEndTraditional = pTraditional;
             }
-            finalBalances[t] = pTaxable + pTraditional + pRoth + cashBalance;
-            minBalances[t] = minBalance;
+
+            // Surplus: income exceeds spending — deposit after-tax surplus to taxable
+            if (income[y] > spending) {
+                double grossSurplus = income[y] - spending;
+                pTaxable += Math.max(0, grossSurplus - surplusTax[y]);
+            }
+
+            pTaxable = Math.max(0, pTaxable);
+            pTraditional = Math.max(0, pTraditional);
+            pRoth = Math.max(0, pRoth);
+            cashBalance = Math.max(0, cashBalance);
+
+            double totalBalance = pTaxable + pTraditional + pRoth + cashBalance;
+            minBalance = Math.min(minBalance, totalBalance);
+            if (yearBalances != null) {
+                yearBalances[y] = totalBalance;
+            }
+            priorYearEndTraditional = pTraditional;
+        }
+
+        double finalBalance = Math.max(0, pTaxable + pTraditional + pRoth + cashBalance);
+        boolean traditionalExhausted = config.conversionByYear() != null && pTraditional <= 0;
+
+        return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted);
+    }
+
+    private boolean isSustainable(double[][] paths, double[] income, double[] surplusTax,
+                                   double[] floors, double[] discretionary,
+                                   double terminalTarget, int years, int trialCount,
+                                   double confidenceLevel, double portfolioFloor,
+                                   int cashReserveYears, double cashReturnRate,
+                                   TaxContext taxCtx,
+                                   double[] conversionByYear,
+                                   double[] conversionTaxByYear,
+                                   int retirementAge, int birthYear,
+                                   double[] dsBracketCeilingByYear) {
+        double[] finalBalances = new double[trialCount];
+        double[] minBalances = new double[trialCount];
+
+        boolean hasPools = taxCtx != null && (taxCtx.initTraditional > 0 || taxCtx.initRoth > 0);
+        double initTaxable = hasPools ? taxCtx.initTaxable : paths[0][0];
+        double initTraditional = hasPools ? taxCtx.initTraditional : 0;
+        double initRoth = hasPools ? taxCtx.initRoth : 0;
+        String order = hasPools ? taxCtx.withdrawalOrder : "taxable_first";
+        double[] marginalRates = hasPools ? taxCtx.marginalRateByYear : null;
+
+        var config = new SimulationConfig(
+                initTaxable, initTraditional, initRoth, order, marginalRates,
+                conversionByYear, conversionTaxByYear, retirementAge,
+                dsBracketCeilingByYear, cashReserveYears, cashReturnRate, false);
+
+        for (int t = 0; t < trialCount; t++) {
+            // Derive nominal returns from pre-computed path ratios
+            double[] nominalReturns = new double[years];
+            for (int y = 0; y < years; y++) {
+                nominalReturns[y] = paths[t][y + 1] / paths[t][y] - 1.0;
+            }
+
+            // For non-pool trials, initial balance varies per trial
+            SimulationConfig trialConfig = hasPools ? config
+                    : new SimulationConfig(
+                            paths[t][0], 0, 0, order, null,
+                            conversionByYear, conversionTaxByYear, retirementAge,
+                            dsBracketCeilingByYear, cashReserveYears, cashReturnRate, false);
+
+            var result = simulateTrial(nominalReturns, income, surplusTax,
+                    floors, discretionary, years, trialConfig);
+            finalBalances[t] = result.finalBalance();
+            minBalances[t] = result.minBalance();
         }
 
         Arrays.sort(finalBalances);
