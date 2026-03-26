@@ -406,19 +406,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
-            BigDecimal actual = effectiveLimit.min(traditional);
-            traditional = traditional.subtract(actual);
-            roth = roth.add(actual);
-
-            if (taxCalculator != null) {
-                BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
-                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
-                BigDecimal tax = detailed.totalTax();
-                lastTaxBreakdown = detailed;
-                TaxSourceResult taxSource = deductFromPools(tax);
-                return new ConversionResult(actual, tax, taxSource);
-            }
-            return new ConversionResult(actual, BigDecimal.ZERO, TaxSourceResult.ZERO);
+            return executeConversionWithAmount(effectiveLimit, year, effectiveOtherIncome);
         }
 
         @Override
@@ -428,7 +416,18 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
-            BigDecimal actual = overrideAmount.min(traditional);
+            return executeConversionWithAmount(overrideAmount, year, effectiveOtherIncome);
+        }
+
+        /**
+         * Executes a Roth conversion of the given amount: transfers from traditional to Roth,
+         * computes tax on the conversion, and deducts tax from pools. Shared by both
+         * executeRothConversion (bracket/fixed amount) and executeRothConversionOverride
+         * (optimizer-scheduled amount).
+         */
+        private ConversionResult executeConversionWithAmount(BigDecimal conversionLimit, int year,
+                                                               BigDecimal effectiveOtherIncome) {
+            BigDecimal actual = conversionLimit.min(traditional);
             traditional = traditional.subtract(actual);
             roth = roth.add(actual);
 
