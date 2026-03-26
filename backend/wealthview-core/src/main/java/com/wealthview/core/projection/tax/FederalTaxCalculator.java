@@ -33,46 +33,13 @@ public class FederalTaxCalculator {
         if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-
         BigDecimal deduction = loadStandardDeduction(taxYear, status);
         BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
-
         if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-
-        var brackets = loadBrackets(taxYear, status);
-        if (brackets.isEmpty()) {
-            Integer maxYear = taxBracketRepository.findMaxTaxYear();
-            if (maxYear != null) {
-                brackets = loadBrackets(maxYear, status);
-            }
-        }
-        if (brackets.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-
-        BigDecimal totalTax = BigDecimal.ZERO;
-        BigDecimal remaining = taxableIncome;
-
-        for (var bracket : brackets) {
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-
-            BigDecimal bracketWidth;
-            if (bracket.getBracketCeiling() != null) {
-                bracketWidth = bracket.getBracketCeiling().subtract(bracket.getBracketFloor());
-            } else {
-                bracketWidth = remaining;
-            }
-
-            BigDecimal taxableInBracket = remaining.min(bracketWidth);
-            totalTax = totalTax.add(taxableInBracket.multiply(bracket.getRate()));
-            remaining = remaining.subtract(taxableInBracket);
-        }
-
-        return totalTax.setScale(SCALE, ROUNDING);
+        var brackets = loadBracketsWithFallback(taxYear, status);
+        return iterateBrackets(taxableIncome, brackets);
     }
 
     public BigDecimal computeTaxWithDeduction(BigDecimal grossIncome, BigDecimal deduction,
@@ -80,44 +47,12 @@ public class FederalTaxCalculator {
         if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-
         BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
         if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-
-        var brackets = loadBrackets(taxYear, status);
-        if (brackets.isEmpty()) {
-            Integer maxYear = taxBracketRepository.findMaxTaxYear();
-            if (maxYear != null) {
-                brackets = loadBrackets(maxYear, status);
-            }
-        }
-        if (brackets.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-
-        BigDecimal totalTax = BigDecimal.ZERO;
-        BigDecimal remaining = taxableIncome;
-
-        for (var bracket : brackets) {
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-
-            BigDecimal bracketWidth;
-            if (bracket.getBracketCeiling() != null) {
-                bracketWidth = bracket.getBracketCeiling().subtract(bracket.getBracketFloor());
-            } else {
-                bracketWidth = remaining;
-            }
-
-            BigDecimal taxableInBracket = remaining.min(bracketWidth);
-            totalTax = totalTax.add(taxableInBracket.multiply(bracket.getRate()));
-            remaining = remaining.subtract(taxableInBracket);
-        }
-
-        return totalTax.setScale(SCALE, ROUNDING);
+        var brackets = loadBracketsWithFallback(taxYear, status);
+        return iterateBrackets(taxableIncome, brackets);
     }
 
     public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear, FilingStatus status) {
@@ -175,14 +110,7 @@ public class FederalTaxCalculator {
      * or is the top bracket (which has no ceiling).
      */
     BigDecimal findBracketCeiling(BigDecimal targetRate, int taxYear, FilingStatus status) {
-        var brackets = loadBrackets(taxYear, status);
-        if (brackets.isEmpty()) {
-            Integer maxYear = taxBracketRepository.findMaxTaxYear();
-            if (maxYear != null) {
-                brackets = loadBrackets(maxYear, status);
-            }
-        }
-
+        var brackets = loadBracketsWithFallback(taxYear, status);
         for (var bracket : brackets) {
             if (bracket.getRate().compareTo(targetRate) == 0) {
                 return bracket.getBracketCeiling() != null ? bracket.getBracketCeiling() : BigDecimal.ZERO;
@@ -218,5 +146,36 @@ public class FederalTaxCalculator {
         return bracketCache.computeIfAbsent(key,
                 k -> taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
                         taxYear, status.value()));
+    }
+
+    private List<TaxBracketEntity> loadBracketsWithFallback(int taxYear, FilingStatus status) {
+        var brackets = loadBrackets(taxYear, status);
+        if (brackets.isEmpty()) {
+            Integer maxYear = taxBracketRepository.findMaxTaxYear();
+            if (maxYear != null) {
+                brackets = loadBrackets(maxYear, status);
+            }
+        }
+        return brackets;
+    }
+
+    private BigDecimal iterateBrackets(BigDecimal taxableIncome, List<TaxBracketEntity> brackets) {
+        if (brackets.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal totalTax = BigDecimal.ZERO;
+        BigDecimal remaining = taxableIncome;
+        for (var bracket : brackets) {
+            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            BigDecimal bracketWidth = bracket.getBracketCeiling() != null
+                    ? bracket.getBracketCeiling().subtract(bracket.getBracketFloor())
+                    : remaining;
+            BigDecimal taxableInBracket = remaining.min(bracketWidth);
+            totalTax = totalTax.add(taxableInBracket.multiply(bracket.getRate()));
+            remaining = remaining.subtract(taxableInBracket);
+        }
+        return totalTax.setScale(SCALE, ROUNDING);
     }
 }
