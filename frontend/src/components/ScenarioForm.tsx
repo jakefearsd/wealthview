@@ -5,12 +5,12 @@ import { listSpendingProfiles } from '../api/spendingProfiles';
 import { listIncomeSources } from '../api/incomeSources';
 import { formatCurrency, toPercent } from '../utils/format';
 import CurrencyInput from './CurrencyInput';
-import HelpText from './HelpText';
+import FormField from './FormField';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
 import type { Account } from '../types/account';
 import type { Scenario, CreateScenarioRequest, ScenarioAccountInput, ScenarioIncomeSourceInput } from '../types/projection';
-import { inputStyle, labelStyle } from '../utils/styles';
+import { inputStyle } from '../utils/styles';
 
 const ACCOUNT_TYPE_HELP: Record<string, string> = {
     taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
@@ -160,36 +160,28 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
     return (
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <div>
-                    <label style={labelStyle}>Name</label>
+                <FormField label="Name">
                     <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Retirement Plan" />
-                </div>
-                <div>
-                    <label style={labelStyle}>Retirement Date</label>
+                </FormField>
+                <FormField label="Retirement Date">
                     <input style={inputStyle} type="date" value={retirementDate} onChange={e => setRetirementDate(e.target.value)} />
-                </div>
-                <div>
-                    <label style={labelStyle}>Birth Year</label>
+                </FormField>
+                <FormField label="Birth Year" helpText="Used to calculate your age at each projection year.">
                     <input style={inputStyle} type="number" value={birthYear} onChange={e => setBirthYear(Number(e.target.value))} />
-                    <HelpText>Used to calculate your age at each projection year.</HelpText>
-                </div>
-                <div>
-                    <label style={labelStyle}>End Age</label>
+                </FormField>
+                <FormField label="End Age" helpText="Age at which the projection ends. Plan beyond your expected lifespan for safety.">
                     <input style={inputStyle} type="number" value={endAge} onChange={e => setEndAge(Number(e.target.value))} />
-                    <HelpText>Age at which the projection ends. Plan beyond your expected lifespan for safety.</HelpText>
-                </div>
-                <div>
-                    <label style={labelStyle}>Inflation Rate (%)</label>
+                </FormField>
+                <FormField label="Inflation Rate (%)" helpText="Annual rate of price increases. 3 = 3%, the historical U.S. average.">
                     <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setInflationRate(Number(e.target.value))} />
-                    <HelpText>Annual rate of price increases. 3 = 3%, the historical U.S. average.</HelpText>
-                </div>
-                <div>
-                    <label style={labelStyle}>Withdrawal Rate (%)</label>
+                </FormField>
+                <FormField label="Withdrawal Rate (%)" helpText="Percentage of portfolio to withdraw annually in retirement. 4 = 4%.">
                     <input style={inputStyle} type="number" step="0.1" value={withdrawalRate || ''} onChange={e => setWithdrawalRate(Number(e.target.value))} />
-                    <HelpText>Percentage of portfolio to withdraw annually in retirement. 4 = 4%.</HelpText>
-                </div>
-                <div>
-                    <label style={labelStyle}>Spending Plan</label>
+                </FormField>
+                <FormField
+                    label="Spending Plan"
+                    helpText="Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income."
+                >
                     <select style={inputStyle} value={spendingPlanSelection} onChange={e => setSpendingPlanSelection(e.target.value)}>
                         <option value="">None (use withdrawal rate)</option>
                         {profiles?.map(p => (
@@ -206,8 +198,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             Guardrail profile no longer available. Please select another spending plan.
                         </div>
                     )}
-                    <HelpText>Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income.</HelpText>
-                </div>
+                </FormField>
             </div>
 
             {availableIncomeSources && availableIncomeSources.length > 0 && (
@@ -292,8 +283,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
                 <h4 style={{ marginBottom: '0.75rem' }}>Tax Configuration</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                    <div>
-                        <label style={labelStyle}>State</label>
+                    <FormField label="State" helpText="State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.">
                         <select style={inputStyle} value={state} onChange={e => setState(e.target.value)}>
                             <option value="">None (federal only)</option>
                             <option value="AZ">AZ - Arizona</option>
@@ -302,28 +292,23 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <option value="OR">OR - Oregon</option>
                             <option value="WA">WA - Washington (no income tax)</option>
                         </select>
-                        <HelpText>State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.</HelpText>
-                    </div>
+                    </FormField>
                     {state && (
                         <>
-                            <div>
-                                <label style={labelStyle}>Primary Residence Property Tax</label>
+                            <FormField label="Primary Residence Property Tax" helpText="Annual property tax on your primary residence. Feeds SALT deduction (capped at $10K with state income tax).">
                                 <CurrencyInput
                                     style={inputStyle}
                                     value={primaryResidencePropertyTax || ''}
                                     onChange={v => setPrimaryResidencePropertyTax(Number(v) || 0)}
                                 />
-                                <HelpText>Annual property tax on your primary residence. Feeds SALT deduction (capped at $10K with state income tax).</HelpText>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Primary Residence Mortgage Interest</label>
+                            </FormField>
+                            <FormField label="Primary Residence Mortgage Interest" helpText="Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.">
                                 <CurrencyInput
                                     style={inputStyle}
                                     value={primaryResidenceMortgageInterest || ''}
                                     onChange={v => setPrimaryResidenceMortgageInterest(Number(v) || 0)}
                                 />
-                                <HelpText>Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.</HelpText>
-                            </div>
+                            </FormField>
                         </>
                     )}
                 </div>
@@ -344,8 +329,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             {accounts.map((acct, idx) => (
                 <div key={idx} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
-                        <div>
-                            <label style={labelStyle}>Link Existing Account</label>
+                        <FormField
+                            label="Link Existing Account"
+                            helpText={acct.linked_account_id
+                                ? 'Balance updates automatically each time the projection runs.'
+                                : 'Enter values manually, or select an existing account above.'}
+                        >
                             <select
                                 style={inputStyle}
                                 value={acct.linked_account_id ?? ''}
@@ -358,12 +347,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                     </option>
                                 ))}
                             </select>
-                            <HelpText>
-                                {acct.linked_account_id
-                                    ? 'Balance updates automatically each time the projection runs.'
-                                    : 'Enter values manually, or select an existing account above.'}
-                            </HelpText>
-                        </div>
+                        </FormField>
                         <div>
                             {accounts.length > 1 && (
                                 <button
@@ -376,32 +360,27 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'start' }}>
-                        <div>
-                            <label style={labelStyle}>Account Type</label>
+                        <FormField label="Account Type" helpText={ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}>
                             <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
                                 <option value="taxable">Taxable</option>
                                 <option value="traditional">Traditional (Pre-tax)</option>
                                 <option value="roth">Roth</option>
                             </select>
-                            <HelpText>{ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}</HelpText>
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Initial Balance{acct.linked_account_id ? ' (live)' : ''}</label>
+                        </FormField>
+                        <FormField label={`Initial Balance${acct.linked_account_id ? ' (live)' : ''}`}>
                             <CurrencyInput
                                 style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
                                 value={acct.initial_balance || ''}
                                 onChange={v => updateAccount(idx, 'initial_balance', Number(v) || 0)}
                                 readOnly={!!acct.linked_account_id}
                             />
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Annual Contribution</label>
+                        </FormField>
+                        <FormField label="Annual Contribution">
                             <CurrencyInput style={inputStyle} value={acct.annual_contribution || ''} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Expected Return (%)</label>
+                        </FormField>
+                        <FormField label="Expected Return (%)">
                             <input style={inputStyle} type="number" step="0.1" value={acct.expected_return || ''} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
-                        </div>
+                        </FormField>
                     </div>
                 </div>
             ))}
