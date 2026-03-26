@@ -51,6 +51,61 @@ public record ProjectionYearDto(
         Boolean usedItemizedDeduction,
         Boolean irmaaWarning) {
 
+    public ProjectionYearDto withViability(BigDecimal essentialExpenses, BigDecimal discretionaryExpenses,
+                                            BigDecimal incomeStreamsTotal, BigDecimal netSpendingNeed,
+                                            BigDecimal spendingSurplus, BigDecimal discretionaryAfterCuts) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses, discretionaryExpenses,
+                incomeStreamsTotal, netSpendingNeed, spendingSurplus,
+                discretionaryAfterCuts,
+                rentalIncomeGross(), rentalExpensesTotal(), depreciationTotal(),
+                rentalLossApplied(), suspendedLossCarryforward(),
+                socialSecurityTaxable(), selfEmploymentTax(),
+                incomeBySource(),
+                propertyEquity(), totalNetWorth(), surplusReinvested(),
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails(),
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction(),
+                irmaaWarning());
+    }
+
+    public ProjectionYearDto withIncomeSourceFields(BigDecimal incomeStreamsTotal,
+                                                      BigDecimal rentalIncomeGross,
+                                                      BigDecimal rentalExpensesTotal,
+                                                      BigDecimal depreciationTotal,
+                                                      BigDecimal rentalLossApplied,
+                                                      BigDecimal suspendedLossCarryforward,
+                                                      BigDecimal socialSecurityTaxable,
+                                                      BigDecimal selfEmploymentTax,
+                                                      Map<String, BigDecimal> incomeBySource,
+                                                      List<RentalPropertyYearDetail> rentalPropertyDetails) {
+        return new ProjectionYearDto(
+                year(), age(), startBalance(), contributions(),
+                growth(), withdrawals(), endBalance(), retired(),
+                traditionalBalance(), rothBalance(), taxableBalance(),
+                rothConversionAmount(), taxLiability(),
+                essentialExpenses(), discretionaryExpenses(),
+                incomeStreamsTotal, netSpendingNeed(), spendingSurplus(),
+                discretionaryAfterCuts(),
+                rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
+                rentalLossApplied, suspendedLossCarryforward,
+                socialSecurityTaxable, selfEmploymentTax,
+                incomeBySource,
+                propertyEquity(), totalNetWorth(), surplusReinvested(),
+                taxableGrowth(), traditionalGrowth(), rothGrowth(),
+                taxPaidFromTaxable(), taxPaidFromTraditional(), taxPaidFromRoth(),
+                withdrawalFromTaxable(), withdrawalFromTraditional(), withdrawalFromRoth(),
+                rentalPropertyDetails,
+                federalTax(), stateTax(), saltDeduction(), usedItemizedDeduction(),
+                irmaaWarning());
+    }
+
     public ProjectionYearDto withSurplusReinvested(BigDecimal surplusReinvested) {
         return new ProjectionYearDto(
                 year(), age(), startBalance(), contributions(),

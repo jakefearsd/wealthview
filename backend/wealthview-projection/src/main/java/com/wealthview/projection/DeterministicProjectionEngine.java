@@ -308,7 +308,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
             }
             if (surplusReinvested != null) {
-                yearDto = applySurplusReinvested(yearDto, surplusReinvested);
+                yearDto = yearDto.withSurplusReinvested(surplusReinvested);
             }
             yearDto = applyRetirementTaxAnnotations(yearDto, retired, age, year,
                     wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
@@ -804,42 +804,22 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             discAfterCuts = discretionary;
         }
 
-        return new ProjectionYearDto(
-                base.year(), base.age(), base.startBalance(), base.contributions(),
-                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
-                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
-                base.rothConversionAmount(), base.taxLiability(),
-                essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts,
-                base.rentalIncomeGross(), base.rentalExpensesTotal(), base.depreciationTotal(),
-                base.rentalLossApplied(), base.suspendedLossCarryforward(),
-                base.socialSecurityTaxable(), base.selfEmploymentTax(),
-                base.incomeBySource(),
-                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
-                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
-                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
-                base.rentalPropertyDetails(),
-                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction(),
-                base.irmaaWarning());
+        return base.withViability(essential, discretionary, activeIncome, netNeed, surplus, discAfterCuts);
     }
 
-    private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base, IncomeSourceProcessor.IncomeSourceYearResult isResult) {
+    private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base,
+                                                        IncomeSourceProcessor.IncomeSourceYearResult isResult) {
         if (isResult == null) {
             return base;
         }
 
         BigDecimal totalIncome = isResult.totalCashInflow();
-
         var incomeBySource = isResult.incomeBySource().isEmpty() ? null : isResult.incomeBySource();
+        var rentalDetails = isResult.rentalPropertyDetails().isEmpty()
+                ? null : isResult.rentalPropertyDetails();
 
-        return new ProjectionYearDto(
-                base.year(), base.age(), base.startBalance(), base.contributions(),
-                base.growth(), base.withdrawals(), base.endBalance(), base.retired(),
-                base.traditionalBalance(), base.rothBalance(), base.taxableBalance(),
-                base.rothConversionAmount(), base.taxLiability(),
-                base.essentialExpenses(), base.discretionaryExpenses(),
+        return base.withIncomeSourceFields(
                 positiveOrDefault(totalIncome, base.incomeStreamsTotal()),
-                base.netSpendingNeed(), base.spendingSurplus(), base.discretionaryAfterCuts(),
                 nullIfZero(isResult.rentalIncomeGross()),
                 nullIfZero(isResult.rentalExpensesTotal()),
                 nullIfZero(isResult.depreciationTotal()),
@@ -848,17 +828,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 nullIfZero(isResult.socialSecurityTaxable()),
                 nullIfZero(isResult.selfEmploymentTax()),
                 incomeBySource,
-                base.propertyEquity(), base.totalNetWorth(), base.surplusReinvested(),
-                base.taxableGrowth(), base.traditionalGrowth(), base.rothGrowth(),
-                base.taxPaidFromTaxable(), base.taxPaidFromTraditional(), base.taxPaidFromRoth(),
-                base.withdrawalFromTaxable(), base.withdrawalFromTraditional(), base.withdrawalFromRoth(),
-                isResult.rentalPropertyDetails().isEmpty() ? null : isResult.rentalPropertyDetails(),
-                base.federalTax(), base.stateTax(), base.saltDeduction(), base.usedItemizedDeduction(),
-                base.irmaaWarning());
-    }
-
-    private ProjectionYearDto applySurplusReinvested(ProjectionYearDto base, BigDecimal surplusReinvested) {
-        return base.withSurplusReinvested(surplusReinvested);
+                rentalDetails);
     }
 
     private BigDecimal nullIfZero(BigDecimal value) {
