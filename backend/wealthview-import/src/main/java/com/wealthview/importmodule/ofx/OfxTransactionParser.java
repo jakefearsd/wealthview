@@ -40,12 +40,36 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Adapter from OFX4J's {@link ResponseEnvelope} format to the app's {@link CsvParseResult}.
+ *
+ * <p>This class implements {@link CsvParser} — a functional interface whose single method accepts
+ * an {@link InputStream} and returns a {@link CsvParseResult}. The interface name is a historical
+ * artifact: it really represents "any file parser that produces a list of transactions and errors".
+ * OFX/QFX files are not CSVs, but the contract is identical, so this Adapter fits without any
+ * interface changes.
+ *
+ * <p>Adapter mapping:
+ * <ul>
+ *   <li>Adaptee: OFX4J {@link AggregateUnmarshaller} producing a {@link ResponseEnvelope}</li>
+ *   <li>Target: {@link CsvParser#parse(InputStream)} returning {@link CsvParseResult}</li>
+ *   <li>Investment transactions (buy/sell/income/reinvest) → {@link ParsedTransaction}</li>
+ *   <li>Banking transactions (deposits/withdrawals) → {@link ParsedTransaction}</li>
+ * </ul>
+ *
+ * <p>Bean name {@code "ofxParser"} is resolved by {@code ImportService} for OFX/QFX uploads.
+ */
 @Component("ofxParser")
 @SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class OfxTransactionParser implements CsvParser {
 
     private static final Logger log = LoggerFactory.getLogger(OfxTransactionParser.class);
 
+    /**
+     * Maps OFX4J {@link TransactionType} enum values to the app's internal transaction type strings.
+     * Types not present in this map fall back to sign-based inference in
+     * {@link #mapBankTransactionType(TransactionType, BigDecimal)}.
+     */
     private static final Map<TransactionType, String> BANK_TXN_TYPE_MAP;
     static {
         var map = new EnumMap<TransactionType, String>(TransactionType.class);
@@ -63,6 +87,11 @@ public class OfxTransactionParser implements CsvParser {
         BANK_TXN_TYPE_MAP = Map.copyOf(map);
     }
 
+    /**
+     * Adapter entry point. Unmarshals the OFX/QFX stream via OFX4J, then delegates to
+     * {@link #extractInvestmentTransactions} and {@link #extractBankTransactions} to convert
+     * the domain-specific OFX model into the generic {@link CsvParseResult}.
+     */
     @Override
     public CsvParseResult parse(InputStream inputStream) throws IOException {
         var transactions = new ArrayList<ParsedTransaction>();
