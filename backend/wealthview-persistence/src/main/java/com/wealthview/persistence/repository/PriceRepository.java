@@ -3,8 +3,10 @@ package com.wealthview.persistence.repository;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -28,4 +30,11 @@ public interface PriceRepository extends JpaRepository<PriceEntity, PriceId> {
 
     @Query(value = "SELECT DISTINCT ON (symbol) * FROM prices ORDER BY symbol, date DESC", nativeQuery = true)
     List<PriceEntity> findLatestPerSymbol();
+
+    List<PriceEntity> findBySymbolAndDateBetweenOrderByDateDesc(String symbol, LocalDate from, LocalDate to);
+
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM PriceEntity p WHERE p.symbol = :symbol AND p.date = :date")
+    void deleteBySymbolAndDate(@Param("symbol") String symbol, @Param("date") LocalDate date);
 }
