@@ -63,20 +63,26 @@ public class ProjectionInputBuilder {
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {
-        var accounts = resolveAccounts(scenario, tenantId);
-        var spendingProfile = scenario.getSpendingProfile() != null
-                ? new SpendingProfileInput(
-                        scenario.getSpendingProfile().getEssentialExpenses(),
-                        scenario.getSpendingProfile().getDiscretionaryExpenses(),
-                        scenario.getSpendingProfile().getSpendingTiers())
-                : null;
-        var incomeSources = resolveIncomeSources(scenario.getId());
+        var accounts        = resolveAccounts(scenario, tenantId);
+        var spendingProfile = resolveSpendingProfile(scenario);
+        var incomeSources   = resolveIncomeSources(scenario.getId());
         var guardrailSpending = resolveGuardrailSpending(scenario);
-        var properties = resolveProperties(tenantId);
+        var properties      = resolveProperties(tenantId);
         return new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
                 accounts, spendingProfile, null, incomeSources, guardrailSpending, properties);
+    }
+
+    private SpendingProfileInput resolveSpendingProfile(ProjectionScenarioEntity scenario) {
+        var profile = scenario.getSpendingProfile();
+        if (profile == null) {
+            return null;
+        }
+        return new SpendingProfileInput(
+                profile.getEssentialExpenses(),
+                profile.getDiscretionaryExpenses(),
+                profile.getSpendingTiers());
     }
 
     private List<ProjectionPropertyInput> resolveProperties(UUID tenantId) {
