@@ -94,6 +94,11 @@ public class TenantService {
 
     @Transactional
     public InviteCodeEntity generateInviteCode(UUID tenantId, UUID createdByUserId) {
+        return generateInviteCode(tenantId, createdByUserId, 7);
+    }
+
+    @Transactional
+    public InviteCodeEntity generateInviteCode(UUID tenantId, UUID createdByUserId, int expiryDays) {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
@@ -102,15 +107,37 @@ public class TenantService {
 
         var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.US);
         var invite = new InviteCodeEntity(tenant, code, creator,
-                OffsetDateTime.now().plusDays(7));
+                OffsetDateTime.now().plusDays(expiryDays));
         invite = inviteCodeRepository.save(invite);
 
-        log.info("Invite code generated for tenant {}: {}", tenantId, code);
+        log.info("Invite code generated for tenant {} with {} day expiry: {}", tenantId, expiryDays, code);
         return invite;
     }
 
     @Transactional(readOnly = true)
     public List<InviteCodeEntity> getInviteCodes(UUID tenantId) {
         return inviteCodeRepository.findByTenant_Id(tenantId);
+    }
+
+    @Transactional
+    public void revokeInviteCode(UUID tenantId, UUID codeId) {
+        var invite = inviteCodeRepository.findById(codeId)
+                .orElseThrow(() -> new EntityNotFoundException("Invite code not found"));
+
+        if (!invite.getTenant().getId().equals(tenantId)) {
+            throw new EntityNotFoundException("Invite code not found");
+        }
+
+        invite.setRevoked(true);
+        invite.setUpdatedAt(OffsetDateTime.now());
+        inviteCodeRepository.save(invite);
+        log.info("Invite code {} revoked for tenant {}", codeId, tenantId);
+    }
+
+    @Transactional
+    public int deleteUsedCodes(UUID tenantId) {
+        int count = inviteCodeRepository.deleteByTenant_IdAndConsumedByIsNotNull(tenantId);
+        log.info("Deleted {} used invite codes for tenant {}", count, tenantId);
+        return count;
     }
 }

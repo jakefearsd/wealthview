@@ -3,8 +3,8 @@ package com.wealthview.core.auth;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
 import com.wealthview.core.exception.DuplicateEntityException;
-import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.core.exception.InvalidInviteCodeException;
+import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
@@ -26,8 +26,11 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,11 +48,16 @@ class AuthServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private LoginActivityService loginActivityService;
+
     private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
 
     private TenantEntity tenant;
     private UserEntity user;
+
+    private static final String TEST_IP = "127.0.0.1";
 
     @BeforeEach
     void setUp() {
@@ -57,7 +65,7 @@ class AuthServiceTest {
                 "test-secret-key-that-is-at-least-32-characters-long",
                 3600000, 86400000);
         authService = new AuthService(userRepository, inviteCodeRepository,
-                passwordEncoder, jwtTokenProvider, eventPublisher);
+                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService);
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
@@ -70,27 +78,61 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
 
-        var response = authService.login(new LoginRequest("test@example.com", "password"));
+        var response = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.email()).isEqualTo("test@example.com");
+        verify(loginActivityService).record("test@example.com", user.getTenantId(), true, TEST_IP);
     }
 
     @Test
-    void login_badPassword_throwsBadCredentials() {
+    void login_badPassword_throwsBadCredentialsAndRecordsFailure() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "wrong")))
+        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "wrong"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class);
+
+        verify(loginActivityService).record("test@example.com", user.getTenantId(), false, TEST_IP);
     }
 
     @Test
-    void login_unknownEmail_throwsBadCredentials() {
+    void login_unknownEmail_throwsBadCredentialsAndRecordsFailure() {
         when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("nobody@example.com", "pass")))
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("nobody@example.com", "pass"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class);
+
+        verify(loginActivityService).record(eq("nobody@example.com"), isNull(), eq(false), eq(TEST_IP));
+    }
+
+    @Test
+    void login_disabledUser_throwsBadCredentials() {
+        user.setActive(false);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("test@example.com", "password"), TEST_IP))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Account is disabled");
+
+        verify(loginActivityService).record("test@example.com", user.getTenantId(), false, TEST_IP);
+    }
+
+    @Test
+    void login_disabledTenant_throwsBadCredentials() {
+        tenant.setActive(false);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("test@example.com", "password"), TEST_IP))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("disabled");
+
+        verify(loginActivityService).record("test@example.com", user.getTenantId(), false, TEST_IP);
     }
 
     @Test
@@ -154,14 +196,18 @@ class AuthServiceTest {
     }
 
     @Test
-    void login_disabledTenant_throwsBadCredentials() {
-        tenant.setActive(false);
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+    void register_revokedInvite_throwsInvalidInviteCode() {
+        var revoked = new InviteCodeEntity(tenant, "REVOKED", user,
+                OffsetDateTime.now().plusDays(7));
+        revoked.setRevoked(true);
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "password")))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("disabled");
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(inviteCodeRepository.findByCode("REVOKED")).thenReturn(Optional.of(revoked));
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("new@example.com", "password123", "REVOKED")))
+                .isInstanceOf(InvalidInviteCodeException.class)
+                .hasMessageContaining("revoked");
     }
 
     @Test
