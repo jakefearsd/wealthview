@@ -50,6 +50,20 @@ class IncomeSourceProcessor {
             List<RentalPropertyYearDetail> rentalPropertyDetails
     ) {}
 
+    /**
+     * Sealed result hierarchy for per-income-type processing.
+     * Each implementation carries the common fields (cashInflow, taxableIncome) plus
+     * any type-specific fields that feed separate accumulators in the main loop.
+     */
+    private sealed interface IncomeTypeResult
+            permits IncomeSourceProcessor.RentalResult,
+                    IncomeSourceProcessor.SocialSecurityResult,
+                    IncomeSourceProcessor.EmploymentResult,
+                    IncomeSourceProcessor.DefaultResult {
+        BigDecimal cashInflow();
+        BigDecimal taxableIncome();
+    }
+
     IncomeSourceYearResult process(
             List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
             int taxYear, BigDecimal magi, String filingStatus, BigDecimal priorSuspendedLoss) {
@@ -102,57 +116,35 @@ class IncomeSourceProcessor {
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
 
             String sourceKey = source.id().toString();
-            switch (source.incomeType()) {
-                case RENTAL_PROPERTY -> {
-                    var rental = processRentalProperty(source, nominal, taxYear, magi, suspendedLoss, multiplier);
-                    rentalIncomeGross = rentalIncomeGross.add(nominal);
-                    rentalExpensesTotal = rentalExpensesTotal.add(rental.expenses());
-                    depreciationTotal = depreciationTotal.add(rental.depreciation());
-                    totalCashInflow = totalCashInflow.add(rental.cashFlow());
-                    rentalLossApplied = rentalLossApplied.add(rental.lossApplied());
-                    suspendedLoss = rental.newSuspendedLoss();
-                    totalTaxableIncome = totalTaxableIncome.add(rental.taxableIncome());
-                    incomeBySource.merge(sourceKey, rental.cashFlow(), BigDecimal::add);
-                    rentalDetails.add(new RentalPropertyYearDetail(
-                            rental.incomeSourceId(), rental.propertyName(), rental.taxTreatment(),
-                            rental.grossRent(), rental.operatingExpenses(),
-                            rental.mortgageInterest(), rental.propertyTax(),
-                            rental.depreciation(), rental.taxableIncome(),
-                            rental.lossApplied(), rental.newSuspendedLoss(),
-                            rental.newSuspendedLoss(),
-                            rental.cashFlow()));
-                }
-                case SOCIAL_SECURITY -> {
-                    totalCashInflow = totalCashInflow.add(nominal);
-                    var taxableAmount = ssTaxCalculator.computeTaxableAmount(
-                            nominal,
-                            nonSSIncome.add(magi),
-                            "married_filing_jointly".equals(filingStatus) ? "married_filing_jointly" : "single");
-                    ssTaxable = ssTaxable.add(taxableAmount);
-                    totalTaxableIncome = totalTaxableIncome.add(taxableAmount);
-                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
-                }
-                case PART_TIME_WORK -> {
-                    totalCashInflow = totalCashInflow.add(nominal);
-                    if ("self_employment".equals(source.taxTreatment())) {
-                        var tax = seTaxCalculator.computeSETax(nominal, taxYear);
-                        seTax = seTax.add(tax);
-                        // IRS allows deducting 50% of SE tax from gross income (Schedule 1, line 15)
-                        BigDecimal seDeduction = seTaxCalculator.deductibleAmount(tax);
-                        totalTaxableIncome = totalTaxableIncome.add(nominal).subtract(seDeduction);
-                    } else {
-                        totalTaxableIncome = totalTaxableIncome.add(nominal);
-                    }
-                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
-                }
-                default -> {
-                    // pension, annuity, other — fully taxable unless tax_free
-                    totalCashInflow = totalCashInflow.add(nominal);
-                    if (!"tax_free".equals(source.taxTreatment())) {
-                        totalTaxableIncome = totalTaxableIncome.add(nominal);
-                    }
-                    incomeBySource.merge(sourceKey, nominal, BigDecimal::add);
-                }
+            var result = switch (source.incomeType()) {
+                case RENTAL_PROPERTY -> processRentalIncome(source, nominal, taxYear, magi, suspendedLoss, multiplier);
+                case SOCIAL_SECURITY -> processSocialSecurityIncome(source, nominal, nonSSIncome, magi, filingStatus);
+                case PART_TIME_WORK  -> processEmploymentIncome(source, nominal, taxYear);
+                default              -> processDefaultIncome(source, nominal);
+            };
+
+            totalCashInflow = totalCashInflow.add(result.cashInflow());
+            totalTaxableIncome = totalTaxableIncome.add(result.taxableIncome());
+            incomeBySource.merge(sourceKey, result.cashInflow(), BigDecimal::add);
+
+            if (result instanceof RentalResult r) {
+                rentalIncomeGross = rentalIncomeGross.add(nominal);
+                rentalExpensesTotal = rentalExpensesTotal.add(r.expenses());
+                depreciationTotal = depreciationTotal.add(r.depreciation());
+                rentalLossApplied = rentalLossApplied.add(r.lossApplied());
+                suspendedLoss = r.newSuspendedLoss();
+                rentalDetails.add(new RentalPropertyYearDetail(
+                        r.incomeSourceId(), r.propertyName(), r.taxTreatment(),
+                        r.grossRent(), r.operatingExpenses(),
+                        r.mortgageInterest(), r.propertyTax(),
+                        r.depreciation(), r.taxableIncome(),
+                        r.lossApplied(), r.newSuspendedLoss(),
+                        r.newSuspendedLoss(),
+                        r.cashInflow()));
+            } else if (result instanceof SocialSecurityResult r) {
+                ssTaxable = ssTaxable.add(r.ssTaxable());
+            } else if (result instanceof EmploymentResult r) {
+                seTax = seTax.add(r.seTax());
             }
         }
 
@@ -163,15 +155,33 @@ class IncomeSourceProcessor {
                 Map.copyOf(incomeBySource), List.copyOf(rentalDetails));
     }
 
+    // --- Per-type result records ---
+
     private record RentalResult(
-            BigDecimal cashFlow, BigDecimal taxableIncome, BigDecimal expenses,
+            BigDecimal cashInflow, BigDecimal taxableIncome, BigDecimal expenses,
             BigDecimal depreciation, BigDecimal lossApplied, BigDecimal newSuspendedLoss,
             UUID incomeSourceId, String propertyName, String taxTreatment,
             BigDecimal grossRent, BigDecimal mortgageInterest, BigDecimal propertyTax,
-            BigDecimal operatingExpenses) {
+            BigDecimal operatingExpenses) implements IncomeTypeResult {
     }
 
-    private RentalResult processRentalProperty(
+    private record SocialSecurityResult(
+            BigDecimal cashInflow, BigDecimal taxableIncome, BigDecimal ssTaxable)
+            implements IncomeTypeResult {
+    }
+
+    private record EmploymentResult(
+            BigDecimal cashInflow, BigDecimal taxableIncome, BigDecimal seTax)
+            implements IncomeTypeResult {
+    }
+
+    private record DefaultResult(
+            BigDecimal cashInflow, BigDecimal taxableIncome) implements IncomeTypeResult {
+    }
+
+    // --- Per-type processing methods ---
+
+    private RentalResult processRentalIncome(
             ProjectionIncomeSourceInput source, BigDecimal nominal,
             int taxYear, BigDecimal magi, BigDecimal suspendedLoss,
             BigDecimal transitionMultiplier) {
@@ -214,6 +224,41 @@ class IncomeSourceProcessor {
                 source.id(), source.name(), source.taxTreatment(),
                 nominal, scaledMortInt, scaledPropTax, scaledOpExp);
     }
+
+    private SocialSecurityResult processSocialSecurityIncome(
+            ProjectionIncomeSourceInput source, BigDecimal nominal,
+            BigDecimal nonSSIncome, BigDecimal magi, String filingStatus) {
+
+        var taxableAmount = ssTaxCalculator.computeTaxableAmount(
+                nominal,
+                nonSSIncome.add(magi),
+                "married_filing_jointly".equals(filingStatus) ? "married_filing_jointly" : "single");
+        return new SocialSecurityResult(nominal, taxableAmount, taxableAmount);
+    }
+
+    private EmploymentResult processEmploymentIncome(
+            ProjectionIncomeSourceInput source, BigDecimal nominal, int taxYear) {
+
+        if ("self_employment".equals(source.taxTreatment())) {
+            var tax = seTaxCalculator.computeSETax(nominal, taxYear);
+            // IRS allows deducting 50% of SE tax from gross income (Schedule 1, line 15)
+            BigDecimal seDeduction = seTaxCalculator.deductibleAmount(tax);
+            BigDecimal taxableIncome = nominal.subtract(seDeduction);
+            return new EmploymentResult(nominal, taxableIncome, tax);
+        }
+        return new EmploymentResult(nominal, nominal, BigDecimal.ZERO);
+    }
+
+    private DefaultResult processDefaultIncome(
+            ProjectionIncomeSourceInput source, BigDecimal nominal) {
+        // pension, annuity, other — fully taxable unless tax_free
+        BigDecimal taxableIncome = "tax_free".equals(source.taxTreatment())
+                ? BigDecimal.ZERO
+                : nominal;
+        return new DefaultResult(nominal, taxableIncome);
+    }
+
+    // --- Utility methods ---
 
     boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
         if (source.oneTime()) {
