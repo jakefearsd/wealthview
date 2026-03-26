@@ -457,6 +457,129 @@ class RothConversionOptimizer {
     private record WithdrawalResult(double taxable, double traditional, double roth,
                                     double withdrawalTax) {}
 
+    /**
+     * Strategy for computing spending withdrawals from the three account pools.
+     * Each implementation encodes a different withdrawal sequencing policy.
+     */
+    private sealed interface SpendingWithdrawalStrategy {
+        WithdrawalResult withdraw(double taxable, double traditional, double roth,
+                                  double need, double effectiveOtherIncome,
+                                  double rmdAmount, double conversionAmount,
+                                  int calendarYear);
+    }
+
+    /** Before age 59.5: draw only from taxable to avoid early withdrawal penalties. */
+    private record EarlyWithdrawalStrategy() implements SpendingWithdrawalStrategy {
+        @Override
+        public WithdrawalResult withdraw(double taxable, double traditional, double roth,
+                                         double need, double effectiveOtherIncome,
+                                         double rmdAmount, double conversionAmount,
+                                         int calendarYear) {
+            taxable -= need;
+            if (taxable < 0) taxable = 0;
+            return new WithdrawalResult(taxable, traditional, roth, 0);
+        }
+    }
+
+    /**
+     * Dynamic sequencing: Traditional up to bracket ceiling, then Taxable, then Roth.
+     * Maximizes tax-efficient traditional draws within a target bracket.
+     */
+    private final class DynamicSequencingWithdrawalStrategy implements SpendingWithdrawalStrategy {
+        private final double bracketRate;
+
+        DynamicSequencingWithdrawalStrategy(double bracketRate) {
+            this.bracketRate = bracketRate;
+        }
+
+        @Override
+        public WithdrawalResult withdraw(double taxable, double traditional, double roth,
+                                         double need, double effectiveOtherIncome,
+                                         double rmdAmount, double conversionAmount,
+                                         int calendarYear) {
+            double remaining = need;
+            double withdrawalTax = 0;
+
+            double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
+                    BigDecimal.valueOf(bracketRate), calendarYear, filingStatus,
+                    BigDecimal.valueOf(inflationRate)).doubleValue();
+            double bracketSpace = Math.max(0, bracketCeiling - effectiveOtherIncome
+                    - rmdAmount - conversionAmount);
+            double tradDraw = Math.min(bracketSpace, Math.min(traditional, remaining));
+            traditional -= tradDraw;
+            remaining -= tradDraw;
+            withdrawalTax += computeIncrementalTax(tradDraw,
+                    effectiveOtherIncome + rmdAmount + conversionAmount, calendarYear);
+
+            double taxDraw = Math.min(remaining, taxable);
+            taxable -= taxDraw;
+            remaining -= taxDraw;
+
+            double rothDraw = Math.min(remaining, roth);
+            roth -= rothDraw;
+
+            return new WithdrawalResult(taxable, traditional, roth, withdrawalTax);
+        }
+    }
+
+    /**
+     * Ordered withdrawal: draws from pools in a configurable comma-separated order
+     * (e.g., "taxable,traditional,roth"). Traditional draws incur incremental tax.
+     */
+    private final class OrderedWithdrawalStrategy implements SpendingWithdrawalStrategy {
+        private final String[] pools;
+
+        OrderedWithdrawalStrategy(String[] pools) {
+            this.pools = pools;
+        }
+
+        @Override
+        public WithdrawalResult withdraw(double taxable, double traditional, double roth,
+                                         double need, double effectiveOtherIncome,
+                                         double rmdAmount, double conversionAmount,
+                                         int calendarYear) {
+            double remaining = need;
+            double withdrawalTax = 0;
+
+            for (var pool : pools) {
+                if (remaining <= 0) break;
+                switch (pool) {
+                    case PoolStrategy.POOL_TAXABLE -> {
+                        double draw = Math.min(remaining, taxable);
+                        taxable -= draw;
+                        remaining -= draw;
+                    }
+                    case PoolStrategy.POOL_TRADITIONAL -> {
+                        double draw = Math.min(remaining, traditional);
+                        traditional -= draw;
+                        remaining -= draw;
+                        withdrawalTax += computeIncrementalTax(draw,
+                                effectiveOtherIncome + rmdAmount + conversionAmount,
+                                calendarYear);
+                    }
+                    case PoolStrategy.POOL_ROTH -> {
+                        double draw = Math.min(remaining, roth);
+                        roth -= draw;
+                        remaining -= draw;
+                    }
+                }
+            }
+
+            return new WithdrawalResult(taxable, traditional, roth, withdrawalTax);
+        }
+    }
+
+    private SpendingWithdrawalStrategy selectWithdrawalStrategy(int age) {
+        if (age < EARLY_WITHDRAWAL_AGE) {
+            return new EarlyWithdrawalStrategy();
+        }
+        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
+                && dynamicSequencingBracketRate > 0) {
+            return new DynamicSequencingWithdrawalStrategy(dynamicSequencingBracketRate);
+        }
+        return new OrderedWithdrawalStrategy(parseWithdrawalOrder());
+    }
+
     private WithdrawalResult processSpendingWithdrawal(
             double taxable, double traditional, double roth,
             int yearIndex, int age, double baseOtherIncome,
@@ -465,61 +588,14 @@ class RothConversionOptimizer {
 
         double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
         double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
-        double withdrawalTax = 0;
 
-        if (netSpendingNeed > 0) {
-            if (age < EARLY_WITHDRAWAL_AGE) {
-                taxable -= netSpendingNeed;
-                if (taxable < 0) taxable = 0;
-            } else if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder) && dynamicSequencingBracketRate > 0) {
-                double remaining = netSpendingNeed;
-                // DS: Traditional up to bracket ceiling, then Taxable, then Roth
-                double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
-                        BigDecimal.valueOf(dynamicSequencingBracketRate), calendarYear, filingStatus,
-                        BigDecimal.valueOf(inflationRate)).doubleValue();
-                double bracketSpace = Math.max(0, bracketCeiling - effectiveOtherIncome
-                        - rmdAmount - conversionAmount);
-                double tradDraw = Math.min(bracketSpace, Math.min(traditional, remaining));
-                traditional -= tradDraw;
-                remaining -= tradDraw;
-                withdrawalTax += computeIncrementalTax(tradDraw,
-                        effectiveOtherIncome + rmdAmount + conversionAmount, calendarYear);
-                double taxDraw = Math.min(remaining, taxable);
-                taxable -= taxDraw;
-                remaining -= taxDraw;
-                double rothDraw = Math.min(remaining, roth);
-                roth -= rothDraw;
-                remaining -= rothDraw;
-            } else {
-                double remaining = netSpendingNeed;
-                var pools = parseWithdrawalOrder();
-                for (var pool : pools) {
-                    if (remaining <= 0) break;
-                    switch (pool) {
-                        case PoolStrategy.POOL_TAXABLE -> {
-                            double draw = Math.min(remaining, taxable);
-                            taxable -= draw;
-                            remaining -= draw;
-                        }
-                        case PoolStrategy.POOL_TRADITIONAL -> {
-                            double draw = Math.min(remaining, traditional);
-                            traditional -= draw;
-                            remaining -= draw;
-                            withdrawalTax += computeIncrementalTax(draw,
-                                    effectiveOtherIncome + rmdAmount + conversionAmount,
-                                    calendarYear);
-                        }
-                        case PoolStrategy.POOL_ROTH -> {
-                            double draw = Math.min(remaining, roth);
-                            roth -= draw;
-                            remaining -= draw;
-                        }
-                    }
-                }
-            }
+        if (netSpendingNeed <= 0) {
+            return new WithdrawalResult(taxable, traditional, roth, 0);
         }
 
-        return new WithdrawalResult(taxable, traditional, roth, withdrawalTax);
+        var strategy = selectWithdrawalStrategy(age);
+        return strategy.withdraw(taxable, traditional, roth, netSpendingNeed,
+                effectiveOtherIncome, rmdAmount, conversionAmount, calendarYear);
     }
 
     /**
