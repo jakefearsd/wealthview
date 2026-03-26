@@ -216,7 +216,20 @@ public class ProjectionService {
     }
 
     private ScenarioResponse toScenarioResponse(ProjectionScenarioEntity scenario, UUID tenantId) {
-        var accounts = scenario.getAccounts().stream()
+        var accounts = mapAccounts(scenario, tenantId);
+        var profile = scenario.getSpendingProfile() != null
+                ? SpendingProfileResponse.from(scenario.getSpendingProfile())
+                : null;
+        var guardrail = mapGuardrailProfile(scenario);
+        var incomeSources = mapIncomeSources(scenario);
+        return new ScenarioResponse(
+                scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
+                scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
+                accounts, profile, guardrail, incomeSources, scenario.getCreatedAt(), scenario.getUpdatedAt());
+    }
+
+    private List<ProjectionAccountResponse> mapAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {
+        return scenario.getAccounts().stream()
                 .map(acct -> {
                     var balance = acct.getLinkedAccount() != null
                             ? accountService.computeBalance(acct.getLinkedAccount(), tenantId)
@@ -230,14 +243,17 @@ public class ProjectionService {
                             acct.getAccountType());
                 })
                 .toList();
-        var profile = scenario.getSpendingProfile() != null
-                ? SpendingProfileResponse.from(scenario.getSpendingProfile())
-                : null;
+    }
+
+    private GuardrailProfileSummary mapGuardrailProfile(ProjectionScenarioEntity scenario) {
         var guardrailEntity = guardrailProfileRepository.findByScenario_Id(scenario.getId()).orElse(null);
-        var guardrail = guardrailEntity != null
+        return guardrailEntity != null
                 ? GuardrailProfileSummary.from(guardrailEntity, scenario.getGuardrailProfile() != null)
                 : null;
-        var incomeSources = scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()).stream()
+    }
+
+    private List<ScenarioIncomeSourceResponse> mapIncomeSources(ProjectionScenarioEntity scenario) {
+        return scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()).stream()
                 .map(link -> {
                     var src = link.getIncomeSource();
                     var effective = link.getOverrideAnnualAmount() != null
@@ -252,10 +268,6 @@ public class ProjectionService {
                             src.getInflationRate(), src.isOneTime());
                 })
                 .toList();
-        return new ScenarioResponse(
-                scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
-                scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, profile, guardrail, incomeSources, scenario.getCreatedAt(), scenario.getUpdatedAt());
     }
 
     private void saveIncomeSourceLinks(ProjectionScenarioEntity scenario, UUID tenantId,
