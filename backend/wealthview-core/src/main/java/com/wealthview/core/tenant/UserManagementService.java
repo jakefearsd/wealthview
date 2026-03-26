@@ -72,4 +72,31 @@ public class UserManagementService {
         userRepository.save(user);
         log.info("User {} in tenant {} set active={}", userId, tenantId, active);
     }
+
+    @Transactional(readOnly = true)
+    public List<UserEntity> getAllUsers() {
+        return userRepository.findAll();
+    }
+
+    @Transactional
+    public void resetPasswordByUserId(UUID userId, String newPassword) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setUpdatedAt(OffsetDateTime.now());
+        userRepository.save(user);
+        log.info("Password reset for user {} by super_admin", userId);
+    }
+
+    @Transactional
+    public void setUserActiveById(UUID userId, boolean active) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+
+        user.setActive(active);
+        user.setUpdatedAt(OffsetDateTime.now());
+        userRepository.save(user);
+        log.info("User {} set active={} by super_admin", userId, active);
+    }
 }
