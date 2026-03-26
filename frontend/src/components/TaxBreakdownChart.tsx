@@ -5,6 +5,7 @@ import {
 import { formatCurrency } from '../utils/format';
 import { formatDollarAxis, formatPercentAxis } from '../utils/chartFormatters';
 import type { ProjectionYear } from '../types/projection';
+import ChartTooltip from './ChartTooltip';
 
 interface TaxBreakdownChartProps {
     data: ProjectionYear[];
@@ -56,55 +57,6 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
     });
 
 
-    const TaxTooltipContent = ({ active, payload, label }: any) => {
-        if (!active || !payload?.length) return null;
-        const d = chartData.find(y => y.year === label);
-        if (!d) return null;
-
-        return (
-            <div style={{ background: '#fff', border: '1px solid #ccc', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                    {label} (age {d.age})
-                </div>
-                <div style={{ color: '#d32f2f' }}>
-                    Federal Tax: {formatCurrency(d.federal_tax)}
-                </div>
-                {hasStateTax && d.state_tax > 0 && (
-                    <div style={{ color: '#e65100' }}>
-                        State Tax: {formatCurrency(d.state_tax)}
-                    </div>
-                )}
-                {d.self_employment_tax > 0 && (
-                    <div style={{ color: '#795548' }}>
-                        SE Tax: {formatCurrency(d.self_employment_tax)}
-                    </div>
-                )}
-                <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
-                <div style={{ fontWeight: 600, color: '#555' }}>
-                    Total Tax: {formatCurrency(d.tax_liability)}
-                </div>
-                <div style={{ color: '#1976d2' }}>
-                    Effective Rate: {d.effective_rate}%
-                </div>
-                {hasStateTax && d.salt_deduction != null && (
-                    <div style={{ color: '#666' }}>
-                        SALT: {formatCurrency(d.salt_deduction)}
-                    </div>
-                )}
-                {hasStateTax && d.used_itemized_deduction != null && (
-                    <div style={{ color: '#666' }}>
-                        Deduction: {d.used_itemized_deduction ? 'Itemized' : 'Standard'}
-                    </div>
-                )}
-                {d.roth_conversion_amount != null && d.roth_conversion_amount > 0 && (
-                    <div style={{ color: '#666' }}>
-                        Roth Conversion: {formatCurrency(d.roth_conversion_amount)}
-                    </div>
-                )}
-            </div>
-        );
-    };
-
     return (
         <ResponsiveContainer width="100%" height={450}>
             <ComposedChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
@@ -112,7 +64,54 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis yAxisId="dollars" tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
                 <YAxis yAxisId="pct" orientation="right" tickFormatter={formatPercentAxis} tick={{ fontSize: 12 }} width={50} />
-                <Tooltip content={<TaxTooltipContent />} />
+                <Tooltip content={
+                    <ChartTooltip renderContent={(label) => {
+                        const d = chartData.find(y => y.year === label);
+                        if (!d) return null;
+                        return (
+                            <>
+                                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                    {label} (age {d.age})
+                                </div>
+                                <div style={{ color: '#d32f2f' }}>
+                                    Federal Tax: {formatCurrency(d.federal_tax)}
+                                </div>
+                                {hasStateTax && d.state_tax > 0 && (
+                                    <div style={{ color: '#e65100' }}>
+                                        State Tax: {formatCurrency(d.state_tax)}
+                                    </div>
+                                )}
+                                {d.self_employment_tax > 0 && (
+                                    <div style={{ color: '#795548' }}>
+                                        SE Tax: {formatCurrency(d.self_employment_tax)}
+                                    </div>
+                                )}
+                                <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
+                                <div style={{ fontWeight: 600, color: '#555' }}>
+                                    Total Tax: {formatCurrency(d.tax_liability)}
+                                </div>
+                                <div style={{ color: '#1976d2' }}>
+                                    Effective Rate: {d.effective_rate}%
+                                </div>
+                                {hasStateTax && d.salt_deduction != null && (
+                                    <div style={{ color: '#666' }}>
+                                        SALT: {formatCurrency(d.salt_deduction)}
+                                    </div>
+                                )}
+                                {hasStateTax && d.used_itemized_deduction != null && (
+                                    <div style={{ color: '#666' }}>
+                                        Deduction: {d.used_itemized_deduction ? 'Itemized' : 'Standard'}
+                                    </div>
+                                )}
+                                {d.roth_conversion_amount != null && d.roth_conversion_amount > 0 && (
+                                    <div style={{ color: '#666' }}>
+                                        Roth Conversion: {formatCurrency(d.roth_conversion_amount)}
+                                    </div>
+                                )}
+                            </>
+                        );
+                    }} />
+                } />
                 <Legend />
                 {retirementYear && <ReferenceLine yAxisId="dollars" x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
                 <Bar yAxisId="dollars" dataKey="federal_tax" stackId="tax" fill="#d32f2f" name="Federal Tax" />
