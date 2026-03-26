@@ -28,6 +28,7 @@ import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedMember;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
@@ -83,13 +84,30 @@ class TenantManagementControllerTest {
         return user;
     }
 
+    // --- Existing tests ---
+
     @Test
     void generateInviteCode_admin_returns201() throws Exception {
-        when(tenantService.generateInviteCode(TENANT_ID, USER_ID))
+        when(tenantService.generateInviteCode(TENANT_ID, USER_ID, 7))
                 .thenReturn(createInviteCode());
 
         mockMvc.perform(post("/api/v1/tenant/invite-codes")
                         .with(authenticatedAdmin()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.code").value("ABC123"));
+    }
+
+    @Test
+    void generateInviteCode_withExpiryDays_returns201() throws Exception {
+        when(tenantService.generateInviteCode(eq(TENANT_ID), eq(USER_ID), eq(14)))
+                .thenReturn(createInviteCode());
+
+        mockMvc.perform(post("/api/v1/tenant/invite-codes")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"expiry_days": 14}
+                                """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value("ABC123"));
     }
@@ -173,6 +191,46 @@ class TenantManagementControllerTest {
     void deleteUser_nonAdmin_returns403() throws Exception {
         var targetUserId = UUID.randomUUID();
         mockMvc.perform(delete("/api/v1/tenant/users/{id}", targetUserId)
+                        .with(authenticatedMember()))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- New: revoke invite code ---
+
+    @Test
+    void revokeInviteCode_admin_returns204() throws Exception {
+        var codeId = UUID.randomUUID();
+        doNothing().when(tenantService).revokeInviteCode(TENANT_ID, codeId);
+
+        mockMvc.perform(put("/api/v1/tenant/invite-codes/{id}/revoke", codeId)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void revokeInviteCode_nonAdmin_returns403() throws Exception {
+        var codeId = UUID.randomUUID();
+
+        mockMvc.perform(put("/api/v1/tenant/invite-codes/{id}/revoke", codeId)
+                        .with(authenticatedMember()))
+                .andExpect(status().isForbidden());
+    }
+
+    // --- New: delete used codes ---
+
+    @Test
+    void deleteUsedCodes_admin_returnsCount() throws Exception {
+        when(tenantService.deleteUsedCodes(TENANT_ID)).thenReturn(3);
+
+        mockMvc.perform(delete("/api/v1/tenant/invite-codes/used")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(3));
+    }
+
+    @Test
+    void deleteUsedCodes_nonAdmin_returns403() throws Exception {
+        mockMvc.perform(delete("/api/v1/tenant/invite-codes/used")
                         .with(authenticatedMember()))
                 .andExpect(status().isForbidden());
     }

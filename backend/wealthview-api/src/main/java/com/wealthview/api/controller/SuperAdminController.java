@@ -1,5 +1,11 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.core.auth.LoginActivityService;
+import com.wealthview.core.auth.dto.LoginActivityResponse;
+import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.core.config.SystemStatsService;
+import com.wealthview.core.config.dto.SystemConfigResponse;
+import com.wealthview.core.config.dto.SystemStatsResponse;
 import com.wealthview.core.price.PriceService;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.CsvImportResult;
@@ -9,7 +15,8 @@ import com.wealthview.core.price.dto.YahooFetchRequest;
 import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.core.pricefeed.PriceSyncService;
 import com.wealthview.core.tenant.TenantService;
-import org.springframework.lang.Nullable;
+import com.wealthview.core.tenant.UserManagementService;
+import com.wealthview.core.tenant.dto.AdminUserResponse;
 import com.wealthview.core.tenant.dto.SetActiveRequest;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.core.tenant.dto.TenantRequest;
@@ -17,6 +24,8 @@ import com.wealthview.core.tenant.dto.TenantResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -28,7 +37,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -39,14 +50,28 @@ public class SuperAdminController {
     @Nullable
     private final PriceSyncService priceSyncService;
     private final PriceService priceService;
+    private final SystemStatsService systemStatsService;
+    private final LoginActivityService loginActivityService;
+    private final UserManagementService userManagementService;
+    private final SystemConfigService systemConfigService;
 
     public SuperAdminController(TenantService tenantService,
                                 @Nullable PriceSyncService priceSyncService,
-                                PriceService priceService) {
+                                PriceService priceService,
+                                SystemStatsService systemStatsService,
+                                LoginActivityService loginActivityService,
+                                UserManagementService userManagementService,
+                                SystemConfigService systemConfigService) {
         this.tenantService = tenantService;
         this.priceSyncService = priceSyncService;
         this.priceService = priceService;
+        this.systemStatsService = systemStatsService;
+        this.loginActivityService = loginActivityService;
+        this.userManagementService = userManagementService;
+        this.systemConfigService = systemConfigService;
     }
+
+    // --- Tenant CRUD ---
 
     @PostMapping("/tenants")
     public ResponseEntity<TenantResponse> createTenant(@Valid @RequestBody TenantRequest request) {
@@ -79,6 +104,8 @@ public class SuperAdminController {
         tenantService.setTenantActive(id, request.active());
         return ResponseEntity.noContent().build();
     }
+
+    // --- Price endpoints ---
 
     @PostMapping("/prices/sync")
     public ResponseEntity<Void> triggerPriceSync() {
@@ -119,5 +146,73 @@ public class SuperAdminController {
             throws IOException {
         var result = priceService.importCsv(file.getInputStream());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/prices/{symbol}/history")
+    public List<PriceResponse> browseSymbolPrices(@PathVariable String symbol,
+            @RequestParam LocalDate from, @RequestParam LocalDate to) {
+        return priceService.browseSymbol(symbol, from, to);
+    }
+
+    @DeleteMapping("/prices/{symbol}/{date}")
+    public ResponseEntity<Void> deletePrice(@PathVariable String symbol,
+            @PathVariable LocalDate date) {
+        priceService.deletePrice(symbol, date);
+        return ResponseEntity.noContent().build();
+    }
+
+    // --- System stats ---
+
+    @GetMapping("/system-stats")
+    public SystemStatsResponse getSystemStats() {
+        return systemStatsService.getStats();
+    }
+
+    // --- Login activity ---
+
+    @GetMapping("/login-activity")
+    public List<LoginActivityResponse> getLoginActivity(
+            @RequestParam(defaultValue = "50") int limit) {
+        return loginActivityService.getRecent(limit);
+    }
+
+    // --- User management (super_admin level) ---
+
+    @GetMapping("/users")
+    public List<AdminUserResponse> getAllUsers() {
+        return userManagementService.getAllUsers().stream()
+                .map(AdminUserResponse::from)
+                .toList();
+    }
+
+    @PutMapping("/users/{userId}/password")
+    public ResponseEntity<Void> resetPassword(@PathVariable UUID userId,
+            @RequestBody Map<String, String> body) {
+        var newPassword = body.get("newPassword");
+        userManagementService.resetPasswordByUserId(userId, newPassword);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/users/{userId}/active")
+    public ResponseEntity<Void> setUserActive(@PathVariable UUID userId,
+            @RequestBody Map<String, Boolean> body) {
+        var active = body.get("active");
+        userManagementService.setUserActiveById(userId, Boolean.TRUE.equals(active));
+        return ResponseEntity.noContent().build();
+    }
+
+    // --- System config ---
+
+    @GetMapping("/config")
+    public List<SystemConfigResponse> getConfig() {
+        return systemConfigService.getAll();
+    }
+
+    @PutMapping("/config/{key}")
+    public ResponseEntity<Void> setConfig(@PathVariable String key,
+            @RequestBody Map<String, String> body) {
+        var value = body.get("value");
+        systemConfigService.set(key, value);
+        return ResponseEntity.noContent().build();
     }
 }
