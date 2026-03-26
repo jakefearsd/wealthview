@@ -188,16 +188,7 @@ public class PropertyService {
     private DepreciationScheduleResult buildScheduleResult(String method, BigDecimal depreciableBasis,
                                                              BigDecimal usefulLifeYears, LocalDate inServiceDate,
                                                              Map<Integer, BigDecimal> schedule) {
-        var cumulative = BigDecimal.ZERO;
-        var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
-        for (var entry : schedule.entrySet()) {
-            cumulative = cumulative.add(entry.getValue());
-            entries.add(new DepreciationScheduleResult.YearEntry(
-                    entry.getKey(),
-                    entry.getValue(),
-                    cumulative,
-                    depreciableBasis.subtract(cumulative)));
-        }
+        var entries = buildYearEntries(depreciableBasis, schedule);
         return new DepreciationScheduleResult(method, depreciableBasis, usefulLifeYears, inServiceDate, entries);
     }
 
@@ -207,17 +198,7 @@ public class PropertyService {
         var schedule = depreciationCalculator.computeCostSegregation(
                 allocations, bonusRate, property.getInServiceDate(), property.getCostSegStudyYear());
 
-        var cumulative = BigDecimal.ZERO;
-        var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
-        for (var entry : schedule.entrySet()) {
-            cumulative = cumulative.add(entry.getValue());
-            entries.add(new DepreciationScheduleResult.YearEntry(
-                    entry.getKey(),
-                    entry.getValue(),
-                    cumulative,
-                    depreciableBasis.subtract(cumulative)));
-        }
-
+        var entries = buildYearEntries(depreciableBasis, schedule);
         var classBreakdowns = buildClassBreakdowns(allocations, bonusRate);
 
         return new DepreciationScheduleResult(
@@ -229,6 +210,21 @@ public class PropertyService {
                 bonusRate,
                 allocations,
                 classBreakdowns);
+    }
+
+    private List<DepreciationScheduleResult.YearEntry> buildYearEntries(BigDecimal depreciableBasis,
+                                                                         Map<Integer, BigDecimal> schedule) {
+        var cumulative = BigDecimal.ZERO;
+        var entries = new ArrayList<DepreciationScheduleResult.YearEntry>();
+        for (var entry : schedule.entrySet()) {
+            cumulative = cumulative.add(entry.getValue());
+            entries.add(new DepreciationScheduleResult.YearEntry(
+                    entry.getKey(),
+                    entry.getValue(),
+                    cumulative,
+                    depreciableBasis.subtract(cumulative)));
+        }
+        return entries;
     }
 
     private List<DepreciationScheduleResult.ClassBreakdown> buildClassBreakdowns(
@@ -296,37 +292,13 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<MonthlyCashFlowEntry> getMonthlyCashFlow(UUID tenantId, UUID propertyId,
                                                           YearMonth from, YearMonth to) {
-        var ctx = loadCashFlowContext(tenantId, propertyId, from, to);
-        var property = ctx.property();
-        var expenses = ctx.expenses();
-
-        Map<YearMonth, BigDecimal> expenseByMonth = new HashMap<>();
-        for (var expense : expenses) {
-            spreadEntry(expense.getDate(), expense.getAmount(), expense.getFrequency(),
-                    from, to, expenseByMonth);
-        }
-
-        var derivedTotal = computeDerivedMonthlyExpenses(property).values().stream()
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        var entries = new ArrayList<MonthlyCashFlowEntry>();
-        var current = from;
-        var formatter = DateTimeFormatter.ofPattern("yyyy-MM");
-
-        while (!current.isAfter(to)) {
-            var monthExpense = expenseByMonth.getOrDefault(current, BigDecimal.ZERO).add(derivedTotal);
-
-            entries.add(new MonthlyCashFlowEntry(
-                    current.format(formatter),
-                    BigDecimal.ZERO,
-                    monthExpense,
-                    BigDecimal.ZERO.subtract(monthExpense)
-            ));
-
-            current = current.plusMonths(1);
-        }
-
-        return entries;
+        return getMonthlyCashFlowDetail(tenantId, propertyId, from, to).stream()
+                .map(detail -> new MonthlyCashFlowEntry(
+                        detail.month(),
+                        detail.totalIncome(),
+                        detail.totalExpenses(),
+                        detail.netCashFlow()))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -408,26 +380,6 @@ public class PropertyService {
             if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
                 bucket.computeIfAbsent(month, k -> new HashMap<>())
                         .merge(category, amount, BigDecimal::add);
-            }
-        }
-    }
-
-    private void spreadEntry(LocalDate entryDate, BigDecimal amount, String frequency,
-                              YearMonth rangeFrom, YearMonth rangeTo,
-                              Map<YearMonth, BigDecimal> bucket) {
-        if ("annual".equals(frequency)) {
-            var monthlyAmount = amount.divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
-            var entryMonth = YearMonth.from(entryDate);
-            for (int i = 0; i < 12; i++) {
-                var month = entryMonth.plusMonths(i);
-                if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
-                    bucket.merge(month, monthlyAmount, BigDecimal::add);
-                }
-            }
-        } else {
-            var month = YearMonth.from(entryDate);
-            if (!month.isBefore(rangeFrom) && !month.isAfter(rangeTo)) {
-                bucket.merge(month, amount, BigDecimal::add);
             }
         }
     }
