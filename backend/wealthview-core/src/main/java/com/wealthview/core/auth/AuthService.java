@@ -31,37 +31,50 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final ApplicationEventPublisher eventPublisher;
+    private final LoginActivityService loginActivityService;
 
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider,
-                       ApplicationEventPublisher eventPublisher) {
+                       ApplicationEventPublisher eventPublisher,
+                       LoginActivityService loginActivityService) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.eventPublisher = eventPublisher;
+        this.loginActivityService = loginActivityService;
     }
 
-    @Transactional(readOnly = true)
-    public AuthResponse login(LoginRequest request) {
+    @Transactional
+    public AuthResponse login(LoginRequest request, String ipAddress) {
         var user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> {
                     log.warn("Login failed: unknown email");
+                    loginActivityService.record(request.email(), null, false, ipAddress);
                     return new BadCredentialsException("Invalid email or password");
                 });
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("Login failed: wrong password for user {}", user.getId());
+            loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
             throw new BadCredentialsException("Invalid email or password");
+        }
+
+        if (!user.isActive()) {
+            log.warn("Login failed: user {} is disabled", user.getId());
+            loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
+            throw new BadCredentialsException("Account is disabled");
         }
 
         if (!user.getTenant().isActive()) {
             log.warn("Login failed: tenant {} disabled for user {}", user.getTenantId(), user.getId());
+            loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
 
+        loginActivityService.record(request.email(), user.getTenantId(), true, ipAddress);
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
                 user.getId(), Map.of("email", user.getEmail())));
@@ -84,6 +97,11 @@ public class AuthService {
         if (inviteCode.isConsumed()) {
             log.warn("Registration failed: invite code already consumed");
             throw new InvalidInviteCodeException("Invite code has already been used");
+        }
+
+        if (inviteCode.isRevoked()) {
+            log.warn("Registration failed: invite code revoked");
+            throw new InvalidInviteCodeException("Invite code has been revoked");
         }
 
         if (inviteCode.isExpired()) {

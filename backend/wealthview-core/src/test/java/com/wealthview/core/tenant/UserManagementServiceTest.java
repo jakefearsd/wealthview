@@ -7,9 +7,9 @@ import com.wealthview.persistence.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
@@ -27,7 +27,9 @@ class UserManagementServiceTest {
     @Mock
     private UserRepository userRepository;
 
-    @InjectMocks
+    @Mock
+    private PasswordEncoder passwordEncoder;
+
     private UserManagementService service;
 
     private TenantEntity tenant;
@@ -35,6 +37,7 @@ class UserManagementServiceTest {
 
     @BeforeEach
     void setUp() {
+        service = new UserManagementService(userRepository, passwordEncoder);
         tenant = new TenantEntity("Test");
         tenantId = UUID.randomUUID();
     }
@@ -81,5 +84,64 @@ class UserManagementServiceTest {
         service.deleteUser(tenantId, userId);
 
         verify(userRepository).delete(user);
+    }
+
+    @Test
+    void resetPassword_validUser_updatesPasswordHash() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "old-hash", "member");
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newpass123")).thenReturn("new-encoded-hash");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.resetPassword(tenantId, userId, "newpass123");
+
+        assertThat(user.getPasswordHash()).isEqualTo("new-encoded-hash");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPassword_nonExistent_throwsNotFound() {
+        var userId = UUID.randomUUID();
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resetPassword(tenantId, userId, "newpass"))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void setUserActive_deactivatesUser() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "hash", "member");
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setUserActive(tenantId, userId, false);
+
+        assertThat(user.isActive()).isFalse();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void setUserActive_activatesUser() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "hash", "member");
+        user.setActive(false);
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setUserActive(tenantId, userId, true);
+
+        assertThat(user.isActive()).isTrue();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void setUserActive_nonExistent_throwsNotFound() {
+        var userId = UUID.randomUUID();
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.setUserActive(tenantId, userId, false))
+                .isInstanceOf(EntityNotFoundException.class);
     }
 }

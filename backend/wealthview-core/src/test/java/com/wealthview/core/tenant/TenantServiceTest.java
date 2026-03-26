@@ -2,7 +2,6 @@ package com.wealthview.core.tenant;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
-import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -18,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -85,6 +85,25 @@ class TenantServiceTest {
 
         assertThat(result.getCode()).isNotBlank();
         assertThat(result.getCode()).hasSize(8);
+    }
+
+    @Test
+    void generateInviteCode_withCustomExpiry_setsCorrectExpiry() {
+        var tenant = new TenantEntity("Test");
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var tenantId = UUID.randomUUID();
+        var userId = UUID.randomUUID();
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = tenantService.generateInviteCode(tenantId, userId, 30);
+
+        assertThat(result.getCode()).isNotBlank();
+        assertThat(result.getExpiresAt()).isAfter(OffsetDateTime.now().plusDays(29));
+        assertThat(result.getExpiresAt()).isBefore(OffsetDateTime.now().plusDays(31));
     }
 
     @Test
@@ -158,5 +177,70 @@ class TenantServiceTest {
 
         assertThat(tenant.isActive()).isFalse();
         verify(tenantRepository).save(tenant);
+    }
+
+    @Test
+    void revokeInviteCode_validCode_setsRevoked() {
+        var tenant = new TenantEntity("Test");
+        var tenantId = UUID.randomUUID();
+        TestEntityHelper.setId(tenant, tenantId);
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var invite = new InviteCodeEntity(tenant, "CODE1234", user, OffsetDateTime.now().plusDays(7));
+        var codeId = UUID.randomUUID();
+        TestEntityHelper.setId(invite, codeId);
+
+        when(inviteCodeRepository.findById(codeId)).thenReturn(Optional.of(invite));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        tenantService.revokeInviteCode(tenantId, codeId);
+
+        assertThat(invite.isRevoked()).isTrue();
+        verify(inviteCodeRepository).save(invite);
+    }
+
+    @Test
+    void revokeInviteCode_wrongTenant_throwsNotFound() {
+        var tenant = new TenantEntity("Test");
+        var tenantId = UUID.randomUUID();
+        TestEntityHelper.setId(tenant, tenantId);
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var invite = new InviteCodeEntity(tenant, "CODE1234", user, OffsetDateTime.now().plusDays(7));
+        var codeId = UUID.randomUUID();
+        TestEntityHelper.setId(invite, codeId);
+
+        when(inviteCodeRepository.findById(codeId)).thenReturn(Optional.of(invite));
+
+        var wrongTenantId = UUID.randomUUID();
+        assertThatThrownBy(() -> tenantService.revokeInviteCode(wrongTenantId, codeId))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void revokeInviteCode_notFound_throwsNotFound() {
+        var codeId = UUID.randomUUID();
+        when(inviteCodeRepository.findById(codeId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> tenantService.revokeInviteCode(UUID.randomUUID(), codeId))
+                .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void deleteUsedCodes_returnsDeletedCount() {
+        var tenantId = UUID.randomUUID();
+        when(inviteCodeRepository.deleteByTenant_IdAndConsumedByIsNotNull(tenantId)).thenReturn(3);
+
+        var result = tenantService.deleteUsedCodes(tenantId);
+
+        assertThat(result).isEqualTo(3);
+    }
+
+    @Test
+    void deleteUsedCodes_noUsedCodes_returnsZero() {
+        var tenantId = UUID.randomUUID();
+        when(inviteCodeRepository.deleteByTenant_IdAndConsumedByIsNotNull(tenantId)).thenReturn(0);
+
+        var result = tenantService.deleteUsedCodes(tenantId);
+
+        assertThat(result).isEqualTo(0);
     }
 }

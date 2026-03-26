@@ -275,4 +275,58 @@ class PriceServiceTest {
         assertThat(result.imported()).isEqualTo(1);
         assertThat(result.errors()).hasSize(1);
     }
+
+    @Test
+    void browseSymbol_returnsPricesInDateRange() {
+        var from = LocalDate.of(2024, 1, 1);
+        var to = LocalDate.of(2024, 1, 5);
+        var prices = List.of(
+                new PriceEntity("AAPL", LocalDate.of(2024, 1, 3), new BigDecimal("185.00"), "yahoo"),
+                new PriceEntity("AAPL", LocalDate.of(2024, 1, 2), new BigDecimal("184.50"), "yahoo")
+        );
+        when(priceRepository.findBySymbolAndDateBetweenOrderByDateDesc("AAPL", from, to))
+                .thenReturn(prices);
+
+        var result = priceService.browseSymbol("AAPL", from, to);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(0).symbol()).isEqualTo("AAPL");
+        assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2024, 1, 3));
+        assertThat(result.get(1).date()).isEqualTo(LocalDate.of(2024, 1, 2));
+    }
+
+    @Test
+    void browseSymbol_noPrices_returnsEmptyList() {
+        var from = LocalDate.of(2024, 1, 1);
+        var to = LocalDate.of(2024, 1, 5);
+        when(priceRepository.findBySymbolAndDateBetweenOrderByDateDesc("XYZ", from, to))
+                .thenReturn(List.of());
+
+        var result = priceService.browseSymbol("XYZ", from, to);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void deletePrice_existing_deletesSuccessfully() {
+        var symbol = "AAPL";
+        var date = LocalDate.of(2024, 1, 2);
+        when(priceRepository.existsById(new PriceId(symbol, date))).thenReturn(true);
+
+        priceService.deletePrice(symbol, date);
+
+        verify(priceRepository).deleteBySymbolAndDate(symbol, date);
+    }
+
+    @Test
+    void deletePrice_notFound_throwsEntityNotFound() {
+        var symbol = "XYZ";
+        var date = LocalDate.of(2024, 1, 2);
+        when(priceRepository.existsById(new PriceId(symbol, date))).thenReturn(false);
+
+        assertThatThrownBy(() -> priceService.deletePrice(symbol, date))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining("XYZ")
+                .hasMessageContaining("2024-01-02");
+    }
 }

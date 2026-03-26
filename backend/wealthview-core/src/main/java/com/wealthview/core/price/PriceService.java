@@ -169,6 +169,24 @@ public class PriceService {
         return new CsvImportResult(imported, parseResult.errors());
     }
 
+    @Transactional(readOnly = true)
+    public List<PriceResponse> browseSymbol(String symbol, LocalDate from, LocalDate to) {
+        return priceRepository.findBySymbolAndDateBetweenOrderByDateDesc(symbol, from, to).stream()
+                .map(PriceResponse::from)
+                .toList();
+    }
+
+    @Transactional
+    public void deletePrice(String symbol, LocalDate date) {
+        var priceId = new PriceId(symbol, date);
+        if (!priceRepository.existsById(priceId)) {
+            throw new EntityNotFoundException(
+                    "Price not found for symbol %s on %s".formatted(symbol, date));
+        }
+        priceRepository.deleteBySymbolAndDate(symbol, date);
+        log.info("Deleted price for {} on {}", symbol, date);
+    }
+
     /**
      * Upserts a price. Returns true if an existing record was updated, false if a new one was inserted.
      */

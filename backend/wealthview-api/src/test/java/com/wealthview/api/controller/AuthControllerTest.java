@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -46,7 +47,7 @@ class AuthControllerTest {
     void login_validCredentials_returns200() throws Exception {
         var response = new AuthResponse("access", "refresh",
                 UUID.randomUUID(), UUID.randomUUID(), "test@example.com", "admin");
-        when(authService.login(any(LoginRequest.class))).thenReturn(response);
+        when(authService.login(any(LoginRequest.class), anyString())).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -60,7 +61,7 @@ class AuthControllerTest {
 
     @Test
     void login_invalidCredentials_returns401() throws Exception {
-        when(authService.login(any(LoginRequest.class)))
+        when(authService.login(any(LoginRequest.class), anyString()))
                 .thenThrow(new BadCredentialsException("Invalid email or password"));
 
         mockMvc.perform(post("/api/v1/auth/login")
