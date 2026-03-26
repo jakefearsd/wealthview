@@ -19,7 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 
 @Service
 @Transactional(readOnly = true)
@@ -63,60 +65,74 @@ public class DataExportService {
 
     public String exportAccountsCsv(UUID tenantId) {
         log.info("Starting accounts CSV export for tenant {}", tenantId);
-        var sb = new StringBuilder("id,name,type,institution,created_at\n");
-        for (AccountEntity a : accountRepository.findByTenant_Id(tenantId)) {
-            sb.append(a.getId()).append(',')
-                    .append(a.getName()).append(',')
-                    .append(a.getType()).append(',')
-                    .append(a.getInstitution()).append(',')
-                    .append(a.getCreatedAt()).append('\n');
-        }
-        return sb.toString();
+        return toCsv("id,name,type,institution,created_at",
+                accountRepository.findByTenant_Id(tenantId),
+                a -> String.join(",",
+                        String.valueOf(a.getId()),
+                        csvEscape(a.getName()),
+                        csvEscape(a.getType()),
+                        csvEscape(a.getInstitution()),
+                        String.valueOf(a.getCreatedAt())));
     }
 
     public String exportTransactionsCsv(UUID tenantId) {
         log.info("Starting transactions CSV export for tenant {}", tenantId);
-        var sb = new StringBuilder("id,account_id,date,type,symbol,quantity,amount,created_at\n");
-        for (TransactionEntity t : transactionRepository.findByTenant_Id(tenantId)) {
-            sb.append(t.getId()).append(',')
-                    .append(t.getAccountId()).append(',')
-                    .append(t.getDate()).append(',')
-                    .append(t.getType()).append(',')
-                    .append(t.getSymbol() != null ? t.getSymbol() : "").append(',')
-                    .append(t.getQuantity() != null ? t.getQuantity() : "").append(',')
-                    .append(t.getAmount()).append(',')
-                    .append(t.getCreatedAt()).append('\n');
-        }
-        return sb.toString();
+        return toCsv("id,account_id,date,type,symbol,quantity,amount,created_at",
+                transactionRepository.findByTenant_Id(tenantId),
+                t -> String.join(",",
+                        String.valueOf(t.getId()),
+                        String.valueOf(t.getAccountId()),
+                        String.valueOf(t.getDate()),
+                        csvEscape(t.getType()),
+                        t.getSymbol() != null ? t.getSymbol() : "",
+                        t.getQuantity() != null ? t.getQuantity().toString() : "",
+                        t.getAmount().toString(),
+                        String.valueOf(t.getCreatedAt())));
     }
 
     public String exportHoldingsCsv(UUID tenantId) {
         log.info("Starting holdings CSV export for tenant {}", tenantId);
-        var sb = new StringBuilder("id,account_id,symbol,quantity,cost_basis,is_manual_override,as_of_date\n");
-        for (HoldingEntity h : holdingRepository.findByTenant_Id(tenantId)) {
-            sb.append(h.getId()).append(',')
-                    .append(h.getAccountId()).append(',')
-                    .append(h.getSymbol()).append(',')
-                    .append(h.getQuantity()).append(',')
-                    .append(h.getCostBasis()).append(',')
-                    .append(h.isManualOverride()).append(',')
-                    .append(h.getAsOfDate()).append('\n');
-        }
-        return sb.toString();
+        return toCsv("id,account_id,symbol,quantity,cost_basis,is_manual_override,as_of_date",
+                holdingRepository.findByTenant_Id(tenantId),
+                h -> String.join(",",
+                        String.valueOf(h.getId()),
+                        String.valueOf(h.getAccountId()),
+                        csvEscape(h.getSymbol()),
+                        h.getQuantity().toString(),
+                        h.getCostBasis().toString(),
+                        String.valueOf(h.isManualOverride()),
+                        String.valueOf(h.getAsOfDate())));
     }
 
     public String exportPropertiesCsv(UUID tenantId) {
         log.info("Starting properties CSV export for tenant {}", tenantId);
-        var sb = new StringBuilder("id,address,purchase_price,purchase_date,current_value,mortgage_balance,property_type\n");
-        for (PropertyEntity p : propertyRepository.findByTenant_Id(tenantId)) {
-            sb.append(p.getId()).append(',')
-                    .append(p.getAddress()).append(',')
-                    .append(p.getPurchasePrice()).append(',')
-                    .append(p.getPurchaseDate()).append(',')
-                    .append(p.getCurrentValue()).append(',')
-                    .append(p.getMortgageBalance()).append(',')
-                    .append(p.getPropertyType()).append('\n');
+        return toCsv("id,address,purchase_price,purchase_date,current_value,mortgage_balance,property_type",
+                propertyRepository.findByTenant_Id(tenantId),
+                p -> String.join(",",
+                        String.valueOf(p.getId()),
+                        csvEscape(p.getAddress()),
+                        p.getPurchasePrice().toString(),
+                        String.valueOf(p.getPurchaseDate()),
+                        p.getCurrentValue().toString(),
+                        p.getMortgageBalance().toString(),
+                        csvEscape(p.getPropertyType())));
+    }
+
+    private <T> String toCsv(String header, List<T> entities, Function<T, String> rowFormatter) {
+        var sb = new StringBuilder(header).append('\n');
+        for (T entity : entities) {
+            sb.append(rowFormatter.apply(entity)).append('\n');
         }
         return sb.toString();
+    }
+
+    private String csvEscape(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 }
