@@ -3,8 +3,9 @@ import { useParams, useNavigate, Link } from 'react-router';
 import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
-import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
+import { cardStyle, inputStyle } from '../utils/styles';
 import CurrencyInput from '../components/CurrencyInput';
+import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
 import OptimizerResultsView from '../components/OptimizerResultsView';
 
@@ -385,13 +386,11 @@ export default function SpendingOptimizerPage() {
                     <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                         <h3 style={{ marginBottom: '1rem' }}>Optimization Parameters</h3>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                            <div>
-                                <label style={labelStyle}>Profile Name</label>
+                            <FormField label="Profile Name">
                                 <input style={inputStyle} type="text" value={name}
                                     onChange={e => setName(e.target.value)} />
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Essential Spending Floor (per year)</label>
+                            </FormField>
+                            <FormField label="Essential Spending Floor (per year)">
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
@@ -400,9 +399,8 @@ export default function SpendingOptimizerPage() {
                                         onChange={v => setEssentialFloor(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Terminal Balance Target</label>
+                            </FormField>
+                            <FormField label="Terminal Balance Target">
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
@@ -411,9 +409,8 @@ export default function SpendingOptimizerPage() {
                                         onChange={v => setTerminalTarget(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Portfolio Safety Net</label>
+                            </FormField>
+                            <FormField label="Portfolio Safety Net" helpText="Minimum portfolio balance to maintain during retirement">
                                 <div style={adornmentWrapStyle}>
                                     <span style={adornmentStyle}>$</span>
                                     <CurrencyInput
@@ -422,12 +419,12 @@ export default function SpendingOptimizerPage() {
                                         onChange={v => setPortfolioFloor(v === '' ? 0 : Number(v))}
                                     />
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                    Minimum portfolio balance to maintain during retirement
-                                </div>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Risk Tolerance</label>
+                            </FormField>
+                            <FormField label="Risk Tolerance" helpText={
+                                riskTolerance === 'conservative' ? '85% confidence \u2014 Very likely sustainable without adjustments'
+                                : riskTolerance === 'moderate' ? '70% confidence \u2014 Sustainable with occasional adjustments in bad markets'
+                                : '60% confidence \u2014 Expected spending, requires active management in downturns'
+                            }>
                                 <div style={pillContainerStyle}>
                                     {(['conservative', 'moderate', 'aggressive'] as RiskTolerance[]).map(level => (
                                         <button key={level} type="button"
@@ -437,39 +434,26 @@ export default function SpendingOptimizerPage() {
                                         </button>
                                     ))}
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                    {riskTolerance === 'conservative' && '85% confidence \u2014 Very likely sustainable without adjustments'}
-                                    {riskTolerance === 'moderate' && '70% confidence \u2014 Sustainable with occasional adjustments in bad markets'}
-                                    {riskTolerance === 'aggressive' && '60% confidence \u2014 Expected spending, requires active management in downturns'}
-                                </div>
-                            </div>
-                            <div>
-                                <label style={labelStyle}>Spending Flexibility</label>
+                            </FormField>
+                            <FormField label="Spending Flexibility" helpText="Maximum annual spending change">
                                 <div style={adornmentWrapStyle}>
                                     <input style={adornedInputStyle} type="number" step="1" min="0" max="50"
                                         value={spendingFlexibility || ''}
                                         onChange={e => setSpendingFlexibility(Number(e.target.value))} />
                                     <span style={adornmentSuffixStyle}>%/yr</span>
                                 </div>
-                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                    Maximum annual spending change
-                                </div>
-                            </div>
+                            </FormField>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
-                            <div>
-                                <label style={labelStyle}>Phase Blending</label>
+                            <FormField label="Phase Blending" helpText="Smooth transitions between life phases">
                                 <select style={selectStyle} value={phaseBlendYears}
                                     onChange={e => setPhaseBlendYears(Number(e.target.value))}>
                                     <option value={0}>Off</option>
                                     <option value={1}>1 year</option>
                                     <option value={2}>2 years</option>
                                 </select>
-                                <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                    Smooth transitions between life phases
-                                </div>
-                            </div>
+                            </FormField>
                         </div>
 
                         {/* Advanced Settings */}
@@ -481,8 +465,7 @@ export default function SpendingOptimizerPage() {
                             </button>
                             {showAdvanced && (
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
-                                    <div>
-                                        <label style={labelStyle}>Cash Reserve</label>
+                                    <FormField label="Cash Reserve" helpText="Years of spending held in cash to avoid selling during downturns">
                                         <select style={selectStyle} value={cashReserveYears}
                                             onChange={e => setCashReserveYears(Number(e.target.value))}>
                                             <option value={0}>0 years</option>
@@ -490,23 +473,15 @@ export default function SpendingOptimizerPage() {
                                             <option value={2}>2 years</option>
                                             <option value={3}>3 years</option>
                                         </select>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Years of spending held in cash to avoid selling during downturns
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Cash Rate</label>
+                                    </FormField>
+                                    <FormField label="Cash Rate" helpText="Expected annual return on cash reserves (money market rate)">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="0.1" value={cashReturnRate || ''}
                                                 onChange={e => setCashReturnRate(Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Expected annual return on cash reserves (money market rate)
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Trial Count</label>
+                                    </FormField>
+                                    <FormField label="Trial Count">
                                         <select style={selectStyle} value={trialCount}
                                             onChange={e => setTrialCount(Number(e.target.value))}>
                                             <option value={1000}>1,000</option>
@@ -514,9 +489,8 @@ export default function SpendingOptimizerPage() {
                                             <option value={5000}>5,000</option>
                                             <option value={10000}>10,000</option>
                                         </select>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>Confidence Level</label>
+                                    </FormField>
+                                    <FormField label="Confidence Level" helpText="Override for risk tolerance">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="50" max="99"
                                                 value={confidenceLevel ?? ''}
@@ -524,10 +498,7 @@ export default function SpendingOptimizerPage() {
                                                 onChange={e => setConfidenceLevel(e.target.value ? Number(e.target.value) : null)} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Override for risk tolerance
-                                        </div>
-                                    </div>
+                                    </FormField>
                                 </div>
                             )}
                         </div>
@@ -551,8 +522,7 @@ export default function SpendingOptimizerPage() {
                                     lower bracket to avoid higher RMD-driven taxes later.
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                                    <div>
-                                        <label style={labelStyle}>Conversion Bracket</label>
+                                    <FormField label="Conversion Bracket" helpText="Maximum tax bracket to fill with conversions each year">
                                         <select style={selectStyle} value={conversionBracketRate}
                                             onChange={e => {
                                                 const rate = Number(e.target.value);
@@ -569,12 +539,8 @@ export default function SpendingOptimizerPage() {
                                             <option value={0.35}>35%</option>
                                             <option value={0.37}>37%</option>
                                         </select>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Maximum tax bracket to fill with conversions each year
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>RMD Target Bracket</label>
+                                    </FormField>
+                                    <FormField label="RMD Target Bracket" helpText="Target bracket for RMDs after conversions are complete">
                                         <select style={selectStyle} value={rmdTargetBracketRate}
                                             onChange={e => setRmdTargetBracketRate(Number(e.target.value))}>
                                             {[0.10, 0.12, 0.22, 0.24, 0.32, 0.35, 0.37]
@@ -583,22 +549,15 @@ export default function SpendingOptimizerPage() {
                                                     <option key={r} value={r}>{(r * 100).toFixed(0)}%</option>
                                                 ))}
                                         </select>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Target bracket for RMDs after conversions are complete
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label style={labelStyle}>RMD Bracket Headroom</label>
+                                    </FormField>
+                                    <FormField label="RMD Bracket Headroom" helpText="Reserve headroom for market growth years. Higher = more conservative.">
                                         <div style={adornmentWrapStyle}>
                                             <input style={adornedInputStyle} type="number" step="1" min="5" max="25"
                                                 value={rmdBracketHeadroom || ''}
                                                 onChange={e => setRmdBracketHeadroom(Number(e.target.value))} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
-                                        <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
-                                            Reserve headroom for market growth years. Higher = more conservative.
-                                        </div>
-                                    </div>
+                                    </FormField>
                                 </div>
                             </div>
                         )}
