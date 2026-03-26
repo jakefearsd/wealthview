@@ -1,15 +1,11 @@
 package com.wealthview.core.projection.strategy;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 public record VanguardDynamicSpendingWithdrawal(
         BigDecimal rate,
         BigDecimal ceiling,
         BigDecimal floor) implements WithdrawalStrategy {
-
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     @Override
     public BigDecimal computeWithdrawal(WithdrawalContext ctx) {
