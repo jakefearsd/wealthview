@@ -37,6 +37,9 @@ public class UserEntity {
     @Column(name = "is_super_admin", nullable = false)
     private boolean isSuperAdmin = false;
 
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -95,6 +98,14 @@ public class UserEntity {
 
     public void setSuperAdmin(boolean superAdmin) {
         isSuperAdmin = superAdmin;
+    }
+
+    public boolean isActive() {
+        return isActive;
+    }
+
+    public void setActive(boolean active) {
+        isActive = active;
     }
 
     public OffsetDateTime getCreatedAt() {
