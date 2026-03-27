@@ -10,6 +10,9 @@ public record InviteCodeResponse(
         String code,
         OffsetDateTime expiresAt,
         boolean consumed,
+        boolean isRevoked,
+        String usedByEmail,
+        String createdByEmail,
         OffsetDateTime createdAt
 ) {
     public static InviteCodeResponse from(InviteCodeEntity entity) {
@@ -18,6 +21,9 @@ public record InviteCodeResponse(
                 entity.getCode(),
                 entity.getExpiresAt(),
                 entity.isConsumed(),
+                entity.isRevoked(),
+                entity.getConsumedBy() != null ? entity.getConsumedBy().getEmail() : null,
+                entity.getCreatedBy() != null ? entity.getCreatedBy().getEmail() : null,
                 entity.getCreatedAt()
         );
     }

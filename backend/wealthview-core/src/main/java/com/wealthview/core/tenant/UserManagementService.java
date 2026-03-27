@@ -75,7 +75,7 @@ public class UserManagementService {
 
     @Transactional(readOnly = true)
     public List<UserEntity> getAllUsers() {
-        return userRepository.findAll();
+        return userRepository.findAllWithTenant();
     }
 
     @Transactional

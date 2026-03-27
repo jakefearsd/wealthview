@@ -3,6 +3,9 @@ export interface InviteCode {
     code: string;
     expires_at: string;
     consumed: boolean;
+    is_revoked: boolean;
+    used_by_email: string | null;
+    created_by_email: string | null;
     created_at: string;
 }
 
