@@ -26,7 +26,7 @@ class UserControllerIT extends AbstractApiIntegrationTest {
     void updateRole_asAdmin_returns200() {
         var inviteCode = authHelper.createInviteCode();
         var memberToken = authHelper.registerAndGetToken(restTemplate,
-                "member@test.com", "TestPassword1", inviteCode);
+                "member@test.com", "mytestpass", inviteCode);
 
         var users = restTemplate.exchange("/api/v1/tenant/users",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
@@ -45,7 +45,7 @@ class UserControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void deleteUser_asAdmin_returns204() {
-        var userId = authHelper.createUserDirectly("todelete@test.com", "TestPassword1", "member");
+        var userId = authHelper.createUserDirectly("todelete@test.com", "mytestpass", "member");
 
         var response = restTemplate.exchange("/api/v1/tenant/users/" + userId,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
@@ -58,7 +58,7 @@ class UserControllerIT extends AbstractApiIntegrationTest {
         // Use registerAndGetToken to get a valid member token via the API
         var inviteCode = authHelper.createInviteCode();
         var memberToken = authHelper.registerAndGetToken(restTemplate,
-                "viewer@test.com", "TestPassword1", inviteCode);
+                "viewer@test.com", "mytestpass", inviteCode);
 
         // Verify token was obtained (registration succeeded)
         assertThat(memberToken).as("Member registration should succeed").isNotNull();

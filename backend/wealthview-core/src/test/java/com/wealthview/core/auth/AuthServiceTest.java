@@ -67,7 +67,7 @@ class AuthServiceTest {
                 3600000, 86400000);
         authService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry(), new LoginAttemptService());
+                new SimpleMeterRegistry(), new LoginAttemptService(), new CommonPasswordChecker());
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
@@ -144,7 +144,7 @@ class AuthServiceTest {
 
         when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(inviteCodeRepository.findByCode("VALID")).thenReturn(Optional.of(invite));
-        when(passwordEncoder.encode("password123")).thenReturn("encoded");
+        when(passwordEncoder.encode("mytestpass")).thenReturn("encoded");
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
             UserEntity saved = inv.getArgument(0);
             TestEntityHelper.setId(saved, UUID.randomUUID());
@@ -152,7 +152,7 @@ class AuthServiceTest {
         });
         when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = authService.register(new RegisterRequest("new@example.com", "password123", "VALID"));
+        var response = authService.register(new RegisterRequest("new@example.com", "mytestpass", "VALID"));
 
         assertThat(response.email()).isEqualTo("new@example.com");
         assertThat(response.role()).isEqualTo("member");
@@ -163,7 +163,7 @@ class AuthServiceTest {
         when(userRepository.existsByEmail("exists@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.register(
-                new RegisterRequest("exists@example.com", "password123", "CODE")))
+                new RegisterRequest("exists@example.com", "mytestpass", "CODE")))
                 .isInstanceOf(DuplicateEntityException.class);
     }
 
@@ -176,7 +176,7 @@ class AuthServiceTest {
         when(inviteCodeRepository.findByCode("EXPIRED")).thenReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> authService.register(
-                new RegisterRequest("new@example.com", "password123", "EXPIRED")))
+                new RegisterRequest("new@example.com", "mytestpass", "EXPIRED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
     }
@@ -192,7 +192,7 @@ class AuthServiceTest {
         when(inviteCodeRepository.findByCode("USED")).thenReturn(Optional.of(consumed));
 
         assertThatThrownBy(() -> authService.register(
-                new RegisterRequest("new@example.com", "password123", "USED")))
+                new RegisterRequest("new@example.com", "mytestpass", "USED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
     }
@@ -207,7 +207,7 @@ class AuthServiceTest {
         when(inviteCodeRepository.findByCode("REVOKED")).thenReturn(Optional.of(revoked));
 
         assertThatThrownBy(() -> authService.register(
-                new RegisterRequest("new@example.com", "password123", "REVOKED")))
+                new RegisterRequest("new@example.com", "mytestpass", "REVOKED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
     }
@@ -302,11 +302,39 @@ class AuthServiceTest {
         }
         var lockedAuthService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry(), attemptService);
+                new SimpleMeterRegistry(), attemptService, new CommonPasswordChecker());
 
         assertThatThrownBy(() -> lockedAuthService.login(
                 new LoginRequest("test@example.com", "password"), "127.0.0.1"))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("temporarily locked");
+    }
+
+    @Test
+    void register_commonPassword_throwsIllegalArgument() {
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("new@example.com", "password123", "CODE")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too common");
+    }
+
+    @Test
+    void register_uncommonPassword_succeeds() {
+        var inviteCode = new InviteCodeEntity(tenant, "VALID", user,
+                OffsetDateTime.now().plusDays(7));
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(inviteCodeRepository.findByCode("VALID")).thenReturn(Optional.of(inviteCode));
+        when(passwordEncoder.encode("myuniquephrase")).thenReturn("encoded");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity saved = inv.getArgument(0);
+            TestEntityHelper.setId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(inviteCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = authService.register(
+                new RegisterRequest("new@example.com", "myuniquephrase", "VALID"));
+
+        assertThat(response.accessToken()).isNotBlank();
     }
 }
