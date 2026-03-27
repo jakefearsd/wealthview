@@ -36,6 +36,7 @@ public class AuthService {
     private final LoginActivityService loginActivityService;
     private final MeterRegistry meterRegistry;
     private final LoginAttemptService loginAttemptService;
+    private final CommonPasswordChecker commonPasswordChecker;
 
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
@@ -44,7 +45,8 @@ public class AuthService {
                        ApplicationEventPublisher eventPublisher,
                        LoginActivityService loginActivityService,
                        MeterRegistry meterRegistry,
-                       LoginAttemptService loginAttemptService) {
+                       LoginAttemptService loginAttemptService,
+                       CommonPasswordChecker commonPasswordChecker) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -53,6 +55,7 @@ public class AuthService {
         this.loginActivityService = loginActivityService;
         this.meterRegistry = meterRegistry;
         this.loginAttemptService = loginAttemptService;
+        this.commonPasswordChecker = commonPasswordChecker;
     }
 
     @Transactional
@@ -106,6 +109,10 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (commonPasswordChecker.isCommon(request.password())) {
+            throw new IllegalArgumentException("This password is too common and easily guessed. Please choose a different password.");
+        }
+
         if (userRepository.existsByEmail(request.email())) {
             log.warn("Registration failed: duplicate email");
             meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "duplicate_email").increment();
