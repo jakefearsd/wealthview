@@ -7,6 +7,7 @@ import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +34,9 @@ class SpendingProfileServiceTest {
 
     @Mock
     private SpendingProfileRepository profileRepository;
+
+    @Mock
+    private ProjectionScenarioRepository scenarioRepository;
 
     @Mock
     private TenantRepository tenantRepository;
@@ -150,9 +155,28 @@ class SpendingProfileServiceTest {
         var entity = new SpendingProfileEntity(tenant,"Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]");
         when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
                 .thenReturn(Optional.of(entity));
+        when(scenarioRepository.findBySpendingProfile(entity))
+                .thenReturn(List.of());
 
         service.deleteProfile(tenantId, profileId);
 
+        verify(profileRepository).delete(entity);
+    }
+
+    @Test
+    void deleteProfile_referencedByScenarios_clearsReferenceThenDeletes() {
+        var entity = new SpendingProfileEntity(tenant, "Plan", new BigDecimal("40000"), new BigDecimal("20000"), "[]");
+        when(profileRepository.findByTenant_IdAndId(tenantId, profileId))
+                .thenReturn(Optional.of(entity));
+
+        var scenario = mock(com.wealthview.persistence.entity.ProjectionScenarioEntity.class);
+        when(scenarioRepository.findBySpendingProfile(entity))
+                .thenReturn(List.of(scenario));
+
+        service.deleteProfile(tenantId, profileId);
+
+        verify(scenario).setSpendingProfile(null);
+        verify(scenarioRepository).saveAll(List.of(scenario));
         verify(profileRepository).delete(entity);
     }
 

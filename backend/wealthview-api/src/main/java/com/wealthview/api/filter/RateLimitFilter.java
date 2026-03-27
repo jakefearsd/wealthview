@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -37,6 +38,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"))) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         var ip = getClientIp(request);
         var isAuth = path.startsWith("/api/v1/auth/");
 
@@ -46,7 +53,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             key = ip + ":auth";
             limit = AUTH_LIMIT_PER_IP;
         } else {
-            var auth = SecurityContextHolder.getContext().getAuthentication();
             var principal = (auth != null && auth.isAuthenticated()) ? auth.getName() : ip;
             key = principal + ":api";
             limit = API_LIMIT_PER_USER;

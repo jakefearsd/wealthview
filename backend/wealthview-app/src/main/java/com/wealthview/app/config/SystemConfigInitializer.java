@@ -46,6 +46,7 @@ public class SystemConfigInitializer implements CommandLineRunner {
         }
         defaults.put("finnhub.rate-limit-ms", finnhubRateLimit);
         defaults.put("yahoo.rate-limit-ms", yahooRateLimit);
+        defaults.put("zillow.scraper.enabled", "false");
         configService.seedDefaults(defaults);
         log.info("System config defaults seeded ({} entries)", defaults.size());
     }

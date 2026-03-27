@@ -18,6 +18,7 @@ import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
@@ -54,6 +55,7 @@ public class PropertyService {
     private final PropertyRepository propertyRepository;
     private final PropertyExpenseRepository expenseRepository;
     private final PropertyIncomeRepository incomeRepository;
+    private final IncomeSourceRepository incomeSourceRepository;
     private final TenantRepository tenantRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final DepreciationCalculator depreciationCalculator;
@@ -61,12 +63,14 @@ public class PropertyService {
     public PropertyService(PropertyRepository propertyRepository,
                            PropertyExpenseRepository expenseRepository,
                            PropertyIncomeRepository incomeRepository,
+                           IncomeSourceRepository incomeSourceRepository,
                            TenantRepository tenantRepository,
                            ApplicationEventPublisher eventPublisher,
                            DepreciationCalculator depreciationCalculator) {
         this.propertyRepository = propertyRepository;
         this.expenseRepository = expenseRepository;
         this.incomeRepository = incomeRepository;
+        this.incomeSourceRepository = incomeSourceRepository;
         this.tenantRepository = tenantRepository;
         this.eventPublisher = eventPublisher;
         this.depreciationCalculator = depreciationCalculator;
@@ -136,6 +140,17 @@ public class PropertyService {
     public void delete(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+
+        var linkedSources = incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId);
+        if (!linkedSources.isEmpty()) {
+            var names = linkedSources.stream()
+                    .map(s -> s.getName())
+                    .toList();
+            throw new IllegalStateException(
+                    "Cannot delete property — it is linked to %d income source(s): %s. Delete these income sources first."
+                            .formatted(names.size(), String.join(", ", names)));
+        }
+
         propertyRepository.delete(property);
         log.info("Property {} deleted for tenant {}", propertyId, tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "property",

@@ -10,6 +10,8 @@ import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
+import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
@@ -50,6 +52,9 @@ class PropertyServiceTest {
 
     @Mock
     private PropertyIncomeRepository incomeRepository;
+
+    @Mock
+    private IncomeSourceRepository incomeSourceRepository;
 
     @Mock
     private TenantRepository tenantRepository;
@@ -270,6 +275,45 @@ class PropertyServiceTest {
         var result = propertyService.update(tenantId, UUID.randomUUID(), request);
 
         assertThat(result.propertyType()).isEqualTo("vacation");
+    }
+
+    @Test
+    void delete_withLinkedIncomeSources_throwsIllegalState() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var source1 = new IncomeSourceEntity(tenant, "Rental Income", "rental_income",
+                new BigDecimal("24000"), 30, null, BigDecimal.ZERO, false, "ordinary");
+        source1.setProperty(property);
+        var source2 = new IncomeSourceEntity(tenant, "Airbnb", "rental_income",
+                new BigDecimal("18000"), 30, null, BigDecimal.ZERO, false, "ordinary");
+        source2.setProperty(property);
+        when(incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId))
+                .thenReturn(List.of(source1, source2));
+
+        assertThatThrownBy(() -> propertyService.delete(tenantId, propertyId))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Rental Income")
+                .hasMessageContaining("Airbnb")
+                .hasMessageContaining("Delete these income sources first");
+    }
+
+    @Test
+    void delete_noLinkedIncomeSources_deletes() {
+        var propertyId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+        when(incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId))
+                .thenReturn(List.of());
+
+        propertyService.delete(tenantId, propertyId);
+
+        verify(propertyRepository).delete(property);
     }
 
     @Test

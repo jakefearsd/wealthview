@@ -118,7 +118,7 @@ function buildRequest(data: PropertyFormData) {
 
 export default function PropertiesListPage() {
     const { role } = useAuth();
-    const canWrite = role === 'admin' || role === 'member';
+    const canWrite = role === 'admin' || role === 'member' || role === 'super_admin';
     const { data: properties, loading, error, refetch } = useApiQuery(listProperties);
     const [showForm, setShowForm] = useState(false);
 

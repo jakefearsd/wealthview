@@ -9,6 +9,7 @@ import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
+import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.slf4j.Logger;
@@ -26,12 +27,15 @@ public class SpendingProfileService {
     private static final Logger log = LoggerFactory.getLogger(SpendingProfileService.class);
 
     private final SpendingProfileRepository profileRepository;
+    private final ProjectionScenarioRepository scenarioRepository;
     private final TenantRepository tenantRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SpendingProfileService(SpendingProfileRepository profileRepository,
+                                   ProjectionScenarioRepository scenarioRepository,
                                    TenantRepository tenantRepository) {
         this.profileRepository = profileRepository;
+        this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
     }
 
@@ -86,6 +90,14 @@ public class SpendingProfileService {
     public void deleteProfile(UUID tenantId, UUID profileId) {
         var entity = profileRepository.findByTenant_IdAndId(tenantId, profileId)
                 .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
+
+        var referencingScenarios = scenarioRepository.findBySpendingProfile(entity);
+        if (!referencingScenarios.isEmpty()) {
+            referencingScenarios.forEach(s -> s.setSpendingProfile(null));
+            scenarioRepository.saveAll(referencingScenarios);
+            log.info("Cleared spending profile reference from {} scenario(s)", referencingScenarios.size());
+        }
+
         profileRepository.delete(entity);
         log.info("Spending profile {} deleted for tenant {}", profileId, tenantId);
     }
