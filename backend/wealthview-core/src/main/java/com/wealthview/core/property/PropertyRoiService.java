@@ -4,6 +4,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.HoldScenarioResult;
 import com.wealthview.core.property.dto.RoiAnalysisResponse;
 import com.wealthview.core.property.dto.SellScenarioResult;
+import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import org.slf4j.Logger;
@@ -59,7 +60,8 @@ public class PropertyRoiService {
                 property.getCostSegStudyYear(),
                 investmentReturn, years);
 
-        var hold = computeHoldScenario();
+        var hold = computeHoldScenario(property, incomeSource.getAnnualAmount(), years,
+                rentGrowth, expenseInflation);
 
         var sellEnding = sell.endingNetWorth();
         var holdEnding = hold.endingNetWorth();
@@ -158,10 +160,86 @@ public class PropertyRoiService {
         return accumulated.setScale(SCALE, ROUNDING);
     }
 
-    private HoldScenarioResult computeHoldScenario() {
-        // STUB: Task 3 fills this in
-        return new HoldScenarioResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+    HoldScenarioResult computeHoldScenario(PropertyEntity property,
+                                             BigDecimal annualRent, int years,
+                                             BigDecimal rentGrowth,
+                                             BigDecimal expenseInflation) {
+        var appreciationRate = property.getAnnualAppreciationRate() != null
+                ? property.getAnnualAppreciationRate() : BigDecimal.ZERO;
+
+        // Project property value
+        var endingPropertyValue = compound(property.getCurrentValue(), appreciationRate, years);
+
+        // Project mortgage balance
+        BigDecimal endingMortgageBalance;
+        BigDecimal annualMortgagePayment;
+        if (property.hasLoanDetails()) {
+            var futureDate = LocalDate.now().plusYears(years);
+            endingMortgageBalance = AmortizationCalculator.remainingBalance(
+                    property.getLoanAmount(), property.getAnnualInterestRate(),
+                    property.getLoanTermMonths(), property.getLoanStartDate(), futureDate);
+            annualMortgagePayment = AmortizationCalculator.monthlyPayment(
+                    property.getLoanAmount(), property.getAnnualInterestRate(),
+                    property.getLoanTermMonths()).multiply(new BigDecimal("12"));
+        } else {
+            endingMortgageBalance = BigDecimal.ZERO;
+            annualMortgagePayment = BigDecimal.ZERO;
+        }
+
+        // Annual operating expenses from property entity
+        var baseExpenses = sumNullable(
+                property.getAnnualPropertyTax(),
+                property.getAnnualInsuranceCost(),
+                property.getAnnualMaintenanceCost());
+
+        // Accumulate net cash flow year by year
+        var cumulativeNetCashFlow = BigDecimal.ZERO;
+        var currentRent = annualRent;
+        var currentExpenses = baseExpenses;
+        var rentMultiplier = BigDecimal.ONE.add(rentGrowth);
+        var expenseMultiplier = BigDecimal.ONE.add(expenseInflation);
+
+        for (int y = 0; y < years; y++) {
+            // Mortgage payment stops once loan is paid off
+            BigDecimal mortgageThisYear = BigDecimal.ZERO;
+            if (property.hasLoanDetails()) {
+                var yearStartDate = LocalDate.now().plusYears(y);
+                var yearStartBalance = AmortizationCalculator.remainingBalance(
+                        property.getLoanAmount(), property.getAnnualInterestRate(),
+                        property.getLoanTermMonths(), property.getLoanStartDate(),
+                        yearStartDate);
+                if (yearStartBalance.compareTo(BigDecimal.ZERO) > 0) {
+                    mortgageThisYear = annualMortgagePayment;
+                }
+            }
+
+            var netCashFlow = currentRent.subtract(currentExpenses).subtract(mortgageThisYear);
+            cumulativeNetCashFlow = cumulativeNetCashFlow.add(netCashFlow);
+
+            currentRent = currentRent.multiply(rentMultiplier);
+            currentExpenses = currentExpenses.multiply(expenseMultiplier);
+        }
+
+        cumulativeNetCashFlow = cumulativeNetCashFlow.setScale(SCALE, ROUNDING);
+        endingPropertyValue = endingPropertyValue.setScale(SCALE, ROUNDING);
+        endingMortgageBalance = endingMortgageBalance.setScale(SCALE, ROUNDING);
+
+        var endingNetWorth = endingPropertyValue
+                .subtract(endingMortgageBalance)
+                .add(cumulativeNetCashFlow);
+
+        return new HoldScenarioResult(endingPropertyValue, endingMortgageBalance,
+                cumulativeNetCashFlow, endingNetWorth);
+    }
+
+    private BigDecimal sumNullable(BigDecimal... values) {
+        var sum = BigDecimal.ZERO;
+        for (var v : values) {
+            if (v != null) {
+                sum = sum.add(v);
+            }
+        }
+        return sum;
     }
 
     private BigDecimal compound(BigDecimal principal, BigDecimal annualRate, int years) {

@@ -127,6 +127,106 @@ class PropertyRoiServiceTest {
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
+    @Test
+    void computeRoiAnalysis_holdScenario_noMortgage() {
+        // Property: 300k purchase, 400k current value, 3% appreciation
+        // Rent: 24k/year, rent growth 3%, expenses: tax 4k + ins 2k + maint 1k = 7k, exp inflation 3%
+        var property = createInvestmentProperty(
+                new BigDecimal("300000"), new BigDecimal("400000"), "none");
+        property.setAnnualAppreciationRate(new BigDecimal("0.03"));
+        property.setAnnualPropertyTax(new BigDecimal("4000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2000"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1000"));
+
+        var incomeSource = createIncomeSource(property, "Rental", new BigDecimal("24000"));
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, property.getId()))
+                .thenReturn(Optional.of(property));
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSource.getId()))
+                .thenReturn(Optional.of(incomeSource));
+
+        var result = roiService.computeRoiAnalysis(tenantId, property.getId(),
+                incomeSource.getId(), 10,
+                new BigDecimal("0.07"), new BigDecimal("0.03"), new BigDecimal("0.03"));
+
+        var hold = result.hold();
+
+        // Property value after 10 years: 400,000 * 1.03^10
+        assertThat(hold.endingPropertyValue()).isGreaterThan(new BigDecimal("530000"));
+        // No mortgage
+        assertThat(hold.endingMortgageBalance()).isEqualByComparingTo("0");
+        // Cumulative net cash flow should be positive (rent > expenses)
+        assertThat(hold.cumulativeNetCashFlow()).isGreaterThan(new BigDecimal("170000"));
+        // Ending net worth = property value + cash flow - mortgage
+        assertThat(hold.endingNetWorth()).isEqualByComparingTo(
+                hold.endingPropertyValue()
+                        .subtract(hold.endingMortgageBalance())
+                        .add(hold.cumulativeNetCashFlow()));
+    }
+
+    @Test
+    void computeRoiAnalysis_holdScenario_withMortgage() {
+        var property = createInvestmentPropertyWithLoan(
+                new BigDecimal("300000"), new BigDecimal("400000"),
+                new BigDecimal("240000"), new BigDecimal("0.065"),
+                360, LocalDate.of(2020, 1, 1));
+        property.setAnnualAppreciationRate(new BigDecimal("0.03"));
+        property.setAnnualPropertyTax(new BigDecimal("4000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2000"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1000"));
+
+        var incomeSource = createIncomeSource(property, "Rental", new BigDecimal("30000"));
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, property.getId()))
+                .thenReturn(Optional.of(property));
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSource.getId()))
+                .thenReturn(Optional.of(incomeSource));
+
+        var result = roiService.computeRoiAnalysis(tenantId, property.getId(),
+                incomeSource.getId(), 10,
+                new BigDecimal("0.07"), new BigDecimal("0.03"), new BigDecimal("0.03"));
+
+        var hold = result.hold();
+
+        // Property value grows
+        assertThat(hold.endingPropertyValue()).isGreaterThan(new BigDecimal("400000"));
+        // Mortgage should still have a balance (30yr loan, only ~16 years in)
+        assertThat(hold.endingMortgageBalance()).isGreaterThan(BigDecimal.ZERO);
+        // Net worth = property value - mortgage + cumulative cash flow
+        assertThat(hold.endingNetWorth()).isEqualByComparingTo(
+                hold.endingPropertyValue()
+                        .subtract(hold.endingMortgageBalance())
+                        .add(hold.cumulativeNetCashFlow()));
+    }
+
+    @Test
+    void computeRoiAnalysis_advantageField_reflectsWinner() {
+        var property = createInvestmentProperty(
+                new BigDecimal("300000"), new BigDecimal("400000"), "none");
+        property.setAnnualAppreciationRate(new BigDecimal("0.03"));
+        property.setAnnualPropertyTax(new BigDecimal("4000"));
+        property.setAnnualInsuranceCost(new BigDecimal("2000"));
+        property.setAnnualMaintenanceCost(new BigDecimal("1000"));
+
+        var incomeSource = createIncomeSource(property, "Rental", new BigDecimal("24000"));
+
+        when(propertyRepository.findByTenant_IdAndId(tenantId, property.getId()))
+                .thenReturn(Optional.of(property));
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSource.getId()))
+                .thenReturn(Optional.of(incomeSource));
+
+        var result = roiService.computeRoiAnalysis(tenantId, property.getId(),
+                incomeSource.getId(), 10,
+                new BigDecimal("0.07"), new BigDecimal("0.03"), new BigDecimal("0.03"));
+
+        assertThat(result.advantage()).isIn("hold", "sell");
+        assertThat(result.advantageAmount()).isGreaterThanOrEqualTo(BigDecimal.ZERO);
+
+        var expectedAdvantageAmount = result.hold().endingNetWorth()
+                .subtract(result.sell().endingNetWorth()).abs();
+        assertThat(result.advantageAmount()).isEqualByComparingTo(expectedAdvantageAmount);
+    }
+
     // --- Helper methods ---
 
     private PropertyEntity createInvestmentProperty(BigDecimal purchasePrice,
