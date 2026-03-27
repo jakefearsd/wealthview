@@ -15,7 +15,7 @@ app:
     allowed-origins: http://localhost:5173
   super-admin:
     email: admin@wealthview.local
-    password: admin123
+    password: ${SUPER_ADMIN_PASSWORD:DevPass123!}
   jwt:
     secret: dev-secret-key-min-32-chars-long-for-hs256
     access-token-expiration: 3600000

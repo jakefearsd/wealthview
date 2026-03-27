@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class AuthService {
@@ -34,6 +35,7 @@ public class AuthService {
     private final ApplicationEventPublisher eventPublisher;
     private final LoginActivityService loginActivityService;
     private final MeterRegistry meterRegistry;
+    private final LoginAttemptService loginAttemptService;
 
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
@@ -41,7 +43,8 @@ public class AuthService {
                        JwtTokenProvider jwtTokenProvider,
                        ApplicationEventPublisher eventPublisher,
                        LoginActivityService loginActivityService,
-                       MeterRegistry meterRegistry) {
+                       MeterRegistry meterRegistry,
+                       LoginAttemptService loginAttemptService) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -49,15 +52,22 @@ public class AuthService {
         this.eventPublisher = eventPublisher;
         this.loginActivityService = loginActivityService;
         this.meterRegistry = meterRegistry;
+        this.loginAttemptService = loginAttemptService;
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request, String ipAddress) {
+        if (loginAttemptService.isBlocked(request.email())) {
+            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "account_locked").increment();
+            throw new BadCredentialsException("Account temporarily locked due to too many failed attempts");
+        }
+
         var user = userRepository.findByEmail(request.email())
                 .orElseThrow(() -> {
                     log.warn("Login failed: unknown email");
                     loginActivityService.record(request.email(), null, false, ipAddress);
                     meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "unknown_email").increment();
+                    loginAttemptService.recordFailure(request.email());
                     return new BadCredentialsException("Invalid email or password");
                 });
 
@@ -65,6 +75,7 @@ public class AuthService {
             log.warn("Login failed: wrong password for user {}", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
             meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "wrong_password").increment();
+            loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Invalid email or password");
         }
 
@@ -72,6 +83,7 @@ public class AuthService {
             log.warn("Login failed: user {} is disabled", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
             meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_user").increment();
+            loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Account is disabled");
         }
 
@@ -79,9 +91,11 @@ public class AuthService {
             log.warn("Login failed: tenant {} disabled for user {}", user.getTenantId(), user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
             meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_tenant").increment();
+            loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
 
+        loginAttemptService.recordSuccess(request.email());
         loginActivityService.record(request.email(), user.getTenantId(), true, ipAddress);
         meterRegistry.counter("wealthview.auth.login", "result", "success").increment();
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
@@ -102,25 +116,14 @@ public class AuthService {
                 .orElseThrow(() -> {
                     log.warn("Registration failed: invalid invite code");
                     meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
-                    return new InvalidInviteCodeException("Invalid invite code");
+                    return new InvalidInviteCodeException("Invalid or expired invite code");
                 });
 
-        if (inviteCode.isConsumed()) {
-            log.warn("Registration failed: invite code already consumed");
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "consumed_invite").increment();
-            throw new InvalidInviteCodeException("Invite code has already been used");
-        }
-
-        if (inviteCode.isRevoked()) {
-            log.warn("Registration failed: invite code revoked");
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "revoked_invite").increment();
-            throw new InvalidInviteCodeException("Invite code has been revoked");
-        }
-
-        if (inviteCode.isExpired()) {
-            log.warn("Registration failed: invite code expired");
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "expired_invite").increment();
-            throw new InvalidInviteCodeException("Invite code has expired");
+        if (inviteCode.isConsumed() || inviteCode.isRevoked() || inviteCode.isExpired()) {
+            log.warn("Registration failed: invite code unusable (consumed={}, revoked={}, expired={})",
+                    inviteCode.isConsumed(), inviteCode.isRevoked(), inviteCode.isExpired());
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
+            throw new InvalidInviteCodeException("Invalid or expired invite code");
         }
 
         var user = new UserEntity(
@@ -142,10 +145,10 @@ public class AuthService {
         return buildAuthResponse(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse refresh(String refreshToken) {
-        if (!jwtTokenProvider.validateToken(refreshToken)) {
-            log.warn("Token refresh failed: invalid refresh token");
+        if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
+            log.warn("Token refresh failed: invalid or non-refresh token");
             throw new BadCredentialsException("Invalid refresh token");
         }
 
@@ -153,14 +156,45 @@ public class AuthService {
         var user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
+        if (!user.isActive()) {
+            log.warn("Token refresh failed: user {} is disabled", userId);
+            throw new BadCredentialsException("Account is disabled");
+        }
+
+        if (!user.getTenant().isActive()) {
+            log.warn("Token refresh failed: tenant {} is disabled for user {}", user.getTenantId(), userId);
+            throw new BadCredentialsException("Account disabled — contact your administrator");
+        }
+
+        var tokenGeneration = jwtTokenProvider.extractGeneration(refreshToken);
+        if (tokenGeneration != user.getTokenGeneration()) {
+            log.warn("Token refresh failed: stale generation for user {} (token={}, current={})",
+                    userId, tokenGeneration, user.getTokenGeneration());
+            throw new BadCredentialsException("Refresh token has been revoked");
+        }
+
+        user.setTokenGeneration(user.getTokenGeneration() + 1);
+        user.setUpdatedAt(OffsetDateTime.now());
+        userRepository.save(user);
+
         return buildAuthResponse(user);
+    }
+
+    @Transactional
+    public void logout(UUID userId) {
+        var user = userRepository.findById(userId)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        user.setTokenGeneration(user.getTokenGeneration() + 1);
+        user.setUpdatedAt(OffsetDateTime.now());
+        userRepository.save(user);
+        log.info("User {} logged out (token generation incremented)", userId);
     }
 
     private AuthResponse buildAuthResponse(UserEntity user) {
         var role = user.isSuperAdmin() ? "super_admin" : user.getRole();
         var accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(), user.getTenantId(), role, user.getEmail());
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getTokenGeneration());
 
         return new AuthResponse(
                 accessToken,

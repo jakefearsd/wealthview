@@ -67,7 +67,7 @@ class AuthServiceTest {
                 3600000, 86400000);
         authService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), new LoginAttemptService());
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
@@ -178,7 +178,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.register(
                 new RegisterRequest("new@example.com", "password123", "EXPIRED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
-                .hasMessageContaining("expired");
+                .hasMessageContaining("Invalid or expired invite code");
     }
 
     @Test
@@ -194,7 +194,7 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.register(
                 new RegisterRequest("new@example.com", "password123", "USED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
-                .hasMessageContaining("already been used");
+                .hasMessageContaining("Invalid or expired invite code");
     }
 
     @Test
@@ -209,13 +209,14 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.register(
                 new RegisterRequest("new@example.com", "password123", "REVOKED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
-                .hasMessageContaining("revoked");
+                .hasMessageContaining("Invalid or expired invite code");
     }
 
     @Test
     void refresh_validToken_returnsNewAuthResponse() {
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var response = authService.refresh(refreshToken);
 
@@ -227,5 +228,85 @@ class AuthServiceTest {
     void refresh_invalidToken_throwsBadCredentials() {
         assertThatThrownBy(() -> authService.refresh("invalid.token"))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void refresh_withAccessTokenInsteadOfRefresh_throwsBadCredentials() {
+        var accessToken = jwtTokenProvider.generateAccessToken(
+                user.getId(), tenant.getId(), "admin", "test@example.com");
+
+        assertThatThrownBy(() -> authService.refresh(accessToken))
+                .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void refresh_withDisabledUser_throwsBadCredentials() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        user.setActive(false);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void refresh_withDisabledTenant_throwsBadCredentials() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        tenant.setActive(false);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("disabled");
+    }
+
+    @Test
+    void refresh_staleGeneration_throwsBadCredentials() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        user.setTokenGeneration(1);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("revoked");
+    }
+
+    @Test
+    void refresh_incrementsGeneration() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.refresh(refreshToken);
+
+        assertThat(user.getTokenGeneration()).isEqualTo(1);
+    }
+
+    @Test
+    void logout_incrementsTokenGeneration() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.logout(user.getId());
+
+        assertThat(user.getTokenGeneration()).isEqualTo(1);
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void login_accountLocked_throwsBadCredentials() {
+        var attemptService = new LoginAttemptService();
+        for (int i = 0; i < 5; i++) {
+            attemptService.recordFailure("test@example.com");
+        }
+        var lockedAuthService = new AuthService(userRepository, inviteCodeRepository,
+                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
+                new SimpleMeterRegistry(), attemptService);
+
+        assertThatThrownBy(() -> lockedAuthService.login(
+                new LoginRequest("test@example.com", "password"), "127.0.0.1"))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("temporarily locked");
     }
 }

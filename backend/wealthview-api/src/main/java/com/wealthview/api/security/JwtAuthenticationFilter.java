@@ -36,7 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             var token = extractToken(request);
 
-            if (token != null && jwtTokenProvider.validateToken(token)) {
+            if (token != null && jwtTokenProvider.validateAccessToken(token)) {
                 var userId = jwtTokenProvider.extractUserId(token);
                 var tenantId = jwtTokenProvider.extractTenantId(token);
                 var role = jwtTokenProvider.extractRole(token);

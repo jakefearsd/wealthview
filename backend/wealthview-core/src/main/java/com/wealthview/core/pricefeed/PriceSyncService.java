@@ -54,6 +54,7 @@ public class PriceSyncService {
         MDC.put("requestId", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         try {
             long startTime = System.currentTimeMillis();
+            // Prices are shared reference data — intentionally aggregated across all tenants
             var symbols = holdingRepository.findDistinctSymbols();
             log.info("Starting daily price sync for {} symbols", symbols.size());
 

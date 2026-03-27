@@ -21,7 +21,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
         var inviteCode = authHelper.createInviteCode();
         var body = Map.of(
                 "email", "newuser@test.com",
-                "password", "password123",
+                "password", "TestPassword1",
                 "invite_code", inviteCode
         );
 
@@ -39,7 +39,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
         var expiredCode = authHelper.createExpiredInviteCode();
         var body = Map.of(
                 "email", "expired@test.com",
-                "password", "password123",
+                "password", "TestPassword1",
                 "invite_code", expiredCode
         );
 
@@ -54,7 +54,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
         var inviteCode = authHelper.createInviteCode();
         var body = Map.of(
                 "email", "newuser2@test.com",
-                "password", "password123",
+                "password", "TestPassword1",
                 "invite_code", inviteCode
         );
         restTemplate.exchange("/api/v1/auth/register",
@@ -63,7 +63,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
         var inviteCode2 = authHelper.createInviteCode();
         var body2 = Map.of(
                 "email", "newuser2@test.com",
-                "password", "password456",
+                "password", "TestPassword2",
                 "invite_code", inviteCode2
         );
 

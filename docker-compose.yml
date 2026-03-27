@@ -21,6 +21,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-wv_dev_pass}
       SPRING_PROFILES_ACTIVE: docker
       JWT_SECRET: ${JWT_SECRET:-production-secret-key-must-be-at-least-32-characters}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-admin123}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     depends_on:
       db:

@@ -40,6 +40,9 @@ public class UserEntity {
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
 
+    @Column(name = "token_generation", nullable = false)
+    private int tokenGeneration = 0;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -118,5 +121,13 @@ public class UserEntity {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public int getTokenGeneration() {
+        return tokenGeneration;
+    }
+
+    public void setTokenGeneration(int tokenGeneration) {
+        this.tokenGeneration = tokenGeneration;
     }
 }

@@ -39,6 +39,7 @@ public final class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(userId.toString())
+                .claim("type", "access")
                 .claim("tenant_id", tenantId.toString())
                 .claim("role", role)
                 .claim("email", email)
@@ -48,17 +49,23 @@ public final class JwtTokenProvider {
                 .compact();
     }
 
-    public String generateRefreshToken(UUID userId) {
+    public String generateRefreshToken(UUID userId, int generation) {
         var now = new Date();
         var expiry = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
                 .subject(userId.toString())
                 .claim("type", "refresh")
+                .claim("generation", generation)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
                 .compact();
+    }
+
+    public int extractGeneration(String token) {
+        var gen = getClaims(token).get("generation", Integer.class);
+        return gen != null ? gen : 0;
     }
 
     public UUID extractUserId(String token) {
@@ -92,6 +99,25 @@ public final class JwtTokenProvider {
             log.warn("JWT token invalid: {}", e.getMessage());
             return false;
         }
+    }
+
+    public boolean validateAccessToken(String token) {
+        if (!validateToken(token)) {
+            return false;
+        }
+        var type = extractTokenType(token);
+        return !"refresh".equals(type);
+    }
+
+    public boolean validateRefreshToken(String token) {
+        if (!validateToken(token)) {
+            return false;
+        }
+        return "refresh".equals(extractTokenType(token));
+    }
+
+    public String extractTokenType(String token) {
+        return getClaims(token).get("type", String.class);
     }
 
     private Claims getClaims(String token) {

@@ -144,4 +144,29 @@ class UserManagementServiceTest {
         assertThatThrownBy(() -> service.setUserActive(tenantId, userId, false))
                 .isInstanceOf(EntityNotFoundException.class);
     }
+
+    @Test
+    void updateUserRole_invalidRole_throwsIllegalArgument() {
+        assertThatThrownBy(() -> service.updateUserRole(tenantId, UUID.randomUUID(), "super_admin"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid role");
+    }
+
+    @Test
+    void updateUserRole_emptyRole_throwsIllegalArgument() {
+        assertThatThrownBy(() -> service.updateUserRole(tenantId, UUID.randomUUID(), ""))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void updateUserRole_superAdminUser_throwsIllegalState() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "superadmin@test.com", "hash", "admin");
+        user.setSuperAdmin(true);
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> service.updateUserRole(tenantId, userId, "member"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Cannot modify super admin role");
+    }
 }

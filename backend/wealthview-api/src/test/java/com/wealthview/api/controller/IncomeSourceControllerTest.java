@@ -130,9 +130,9 @@ class IncomeSourceControllerTest {
                         .with(authenticatedAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"name": "Updated SS", "annual_amount": 35000,
-                                 "start_age": 68, "inflation_rate": 0.025,
-                                 "tax_treatment": "partially_taxable"}
+                                {"name": "Updated SS", "income_type": "social_security",
+                                 "annual_amount": 35000, "start_age": 68,
+                                 "inflation_rate": 0.025, "tax_treatment": "partially_taxable"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Updated SS"))

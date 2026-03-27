@@ -53,7 +53,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "test@example.com", "password": "password123"}
+                                {"email": "test@example.com", "password": "TestPassword1"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").value("access"))
@@ -83,7 +83,7 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"email": "new@example.com", "password": "password123", "invite_code": "ABC123"}
+                                {"email": "new@example.com", "password": "TestPassword1", "invite_code": "ABC123"}
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.email").value("new@example.com"))

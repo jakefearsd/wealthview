@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -25,6 +26,12 @@ import java.util.UUID;
 public class ImportController {
 
     private static final Logger log = LoggerFactory.getLogger(ImportController.class);
+
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "text/csv", "text/plain", "application/octet-stream",
+            "application/vnd.ms-excel", "application/xml", "text/xml",
+            "application/x-ofx", "application/x-qfx"
+    );
 
     private final ImportService importService;
     private final PositionImportService positionImportService;
@@ -41,6 +48,7 @@ public class ImportController {
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String format) throws IOException {
+        validateFileType(file);
         log.info("CSV import requested for account {} file='{}' size={}B format={}",
                 accountId, file.getOriginalFilename(), file.getSize(), format);
         var result = (format != null && !format.isBlank())
@@ -55,6 +63,7 @@ public class ImportController {
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file,
             @RequestParam(required = false) String format) throws IOException {
+        validateFileType(file);
         log.info("Positions import requested for account {} file='{}' size={}B format={}",
                 accountId, file.getOriginalFilename(), file.getSize(),
                 format != null ? format : "fidelityPositions");
@@ -69,6 +78,7 @@ public class ImportController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @RequestParam UUID accountId,
             @RequestParam("file") MultipartFile file) throws IOException {
+        validateFileType(file);
         log.info("OFX import requested for account {} file='{}' size={}B",
                 accountId, file.getOriginalFilename(), file.getSize());
         var result = importService.importOfx(principal.tenantId(), accountId, file.getInputStream());
@@ -79,5 +89,11 @@ public class ImportController {
     public ResponseEntity<List<ImportJobResponse>> listJobs(
             @AuthenticationPrincipal TenantUserPrincipal principal) {
         return ResponseEntity.ok(importService.listJobs(principal.tenantId()));
+    }
+
+    private void validateFileType(MultipartFile file) {
+        if (file.getContentType() != null && !ALLOWED_CONTENT_TYPES.contains(file.getContentType())) {
+            throw new IllegalArgumentException("Unsupported file type: " + file.getContentType());
+        }
     }
 }
