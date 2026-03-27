@@ -10,6 +10,7 @@ import type {
     PropertyAnalyticsResponse,
     ValuationRefreshResponse,
     DepreciationScheduleResponse,
+    RoiAnalysisResponse,
 } from '../types/property';
 
 export async function listProperties(): Promise<Property[]> {
@@ -112,6 +113,25 @@ export async function getPropertyAnalytics(
 export async function getDepreciationSchedule(propertyId: string): Promise<DepreciationScheduleResponse> {
     const { data } = await client.get<DepreciationScheduleResponse>(
         `/properties/${propertyId}/depreciation-schedule`
+    );
+    return data;
+}
+
+export async function getRoiAnalysis(
+    propertyId: string,
+    sourceId: string,
+    params: { years: number; investmentReturn: number; rentGrowth: number; expenseInflation: number }
+): Promise<RoiAnalysisResponse> {
+    const { data } = await client.get<RoiAnalysisResponse>(
+        `/properties/${propertyId}/income-sources/${sourceId}/roi-analysis`,
+        {
+            params: {
+                years: params.years,
+                investment_return: params.investmentReturn,
+                rent_growth: params.rentGrowth,
+                expense_inflation: params.expenseInflation,
+            },
+        }
     );
     return data;
 }
