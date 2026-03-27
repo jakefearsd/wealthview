@@ -3,6 +3,7 @@ package com.wealthview.api.controller;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
+import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.export.DataExportService;
@@ -32,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(DataExportController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
 class DataExportControllerTest {
 
     @Autowired

@@ -30,6 +30,7 @@ import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -73,6 +74,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         this.incomeContributionCalculator = new IncomeContributionCalculator();
     }
 
+    @Timed("wealthview.projection.run")
     @Override
     public ProjectionResultResponse run(ProjectionInput input) {
         MDC.put("operation", "projection");

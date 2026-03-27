@@ -10,6 +10,7 @@ import com.wealthview.core.exception.InvalidInviteCodeException;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.UserRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,19 +33,22 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final ApplicationEventPublisher eventPublisher;
     private final LoginActivityService loginActivityService;
+    private final MeterRegistry meterRegistry;
 
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider jwtTokenProvider,
                        ApplicationEventPublisher eventPublisher,
-                       LoginActivityService loginActivityService) {
+                       LoginActivityService loginActivityService,
+                       MeterRegistry meterRegistry) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.eventPublisher = eventPublisher;
         this.loginActivityService = loginActivityService;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -53,28 +57,33 @@ public class AuthService {
                 .orElseThrow(() -> {
                     log.warn("Login failed: unknown email");
                     loginActivityService.record(request.email(), null, false, ipAddress);
+                    meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "unknown_email").increment();
                     return new BadCredentialsException("Invalid email or password");
                 });
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("Login failed: wrong password for user {}", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
+            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "wrong_password").increment();
             throw new BadCredentialsException("Invalid email or password");
         }
 
         if (!user.isActive()) {
             log.warn("Login failed: user {} is disabled", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
+            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_user").increment();
             throw new BadCredentialsException("Account is disabled");
         }
 
         if (!user.getTenant().isActive()) {
             log.warn("Login failed: tenant {} disabled for user {}", user.getTenantId(), user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
+            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_tenant").increment();
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
 
         loginActivityService.record(request.email(), user.getTenantId(), true, ipAddress);
+        meterRegistry.counter("wealthview.auth.login", "result", "success").increment();
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
                 user.getId(), Map.of("email", user.getEmail())));
@@ -85,27 +94,32 @@ public class AuthService {
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.email())) {
             log.warn("Registration failed: duplicate email");
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "duplicate_email").increment();
             throw new DuplicateEntityException("Email already registered");
         }
 
         var inviteCode = inviteCodeRepository.findByCode(request.inviteCode())
                 .orElseThrow(() -> {
                     log.warn("Registration failed: invalid invite code");
+                    meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
                     return new InvalidInviteCodeException("Invalid invite code");
                 });
 
         if (inviteCode.isConsumed()) {
             log.warn("Registration failed: invite code already consumed");
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "consumed_invite").increment();
             throw new InvalidInviteCodeException("Invite code has already been used");
         }
 
         if (inviteCode.isRevoked()) {
             log.warn("Registration failed: invite code revoked");
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "revoked_invite").increment();
             throw new InvalidInviteCodeException("Invite code has been revoked");
         }
 
         if (inviteCode.isExpired()) {
             log.warn("Registration failed: invite code expired");
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "expired_invite").increment();
             throw new InvalidInviteCodeException("Invite code has expired");
         }
 
@@ -121,6 +135,7 @@ public class AuthService {
         inviteCode.setConsumedAt(OffsetDateTime.now());
         inviteCodeRepository.save(inviteCode);
 
+        meterRegistry.counter("wealthview.auth.registration", "result", "success").increment();
         log.info("User {} registered for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "REGISTER", "user",
                 user.getId(), Map.of("email", request.email())));

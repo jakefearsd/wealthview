@@ -13,6 +13,8 @@ import com.wealthview.persistence.entity.ImportJobEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -43,6 +45,7 @@ public class ImportService {
     private final HoldingsComputationService holdingsComputationService;
     private final CsvParser csvParser;
     private final Map<String, CsvParser> namedParsers;
+    private final MeterRegistry meterRegistry;
 
     public ImportService(ImportJobRepository importJobRepository,
                          AccountRepository accountRepository,
@@ -50,7 +53,8 @@ public class ImportService {
                          TransactionService transactionService,
                          HoldingsComputationService holdingsComputationService,
                          CsvParser csvParser,
-                         Map<String, CsvParser> namedParsers) {
+                         Map<String, CsvParser> namedParsers,
+                         MeterRegistry meterRegistry) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
@@ -58,6 +62,7 @@ public class ImportService {
         this.holdingsComputationService = holdingsComputationService;
         this.csvParser = csvParser;
         this.namedParsers = namedParsers;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -100,6 +105,7 @@ public class ImportService {
         return processImport(tenantId, accountId, parseResult, "csv");
     }
 
+    @Timed("wealthview.import.process")
     @Transactional
     public ImportJobResponse processImport(UUID tenantId, UUID accountId,
                                             CsvParseResult parseResult, String source) {
@@ -119,6 +125,9 @@ public class ImportService {
 
             var result = importTransactions(parseResult.transactions(), tenantId, accountId, account);
             finalizeJob(job, result, parseResult.errors().size());
+            meterRegistry.counter("wealthview.import.rows", "outcome", "imported").increment(result.successCount());
+            meterRegistry.counter("wealthview.import.rows", "outcome", "duplicate").increment(result.skippedDuplicates());
+            meterRegistry.counter("wealthview.import.rows", "outcome", "error").increment(result.failedCount() + parseResult.errors().size());
 
             log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
                     source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());

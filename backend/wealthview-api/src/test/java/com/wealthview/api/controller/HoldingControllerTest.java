@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
+import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingService;
@@ -34,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(HoldingController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class})
+@Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
 class HoldingControllerTest {
 
     @Autowired

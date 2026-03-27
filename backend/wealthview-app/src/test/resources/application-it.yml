@@ -11,6 +11,16 @@ spring:
     serialization:
       write-dates-as-timestamps: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
 app:
   rate-limit:
     enabled: false

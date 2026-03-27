@@ -4,6 +4,8 @@ import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.MDC;
 import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
@@ -30,17 +32,21 @@ public class PriceSyncService {
     private final PriceRepository priceRepository;
     private final HoldingRepository holdingRepository;
     private final long rateLimitMs;
+    private final MeterRegistry meterRegistry;
 
     public PriceSyncService(PriceFeedClient priceFeedClient,
                             PriceRepository priceRepository,
                             HoldingRepository holdingRepository,
-                            @Value("${app.finnhub.rate-limit-ms:1100}") long rateLimitMs) {
+                            @Value("${app.finnhub.rate-limit-ms:1100}") long rateLimitMs,
+                            MeterRegistry meterRegistry) {
         this.priceFeedClient = priceFeedClient;
         this.priceRepository = priceRepository;
         this.holdingRepository = holdingRepository;
         this.rateLimitMs = rateLimitMs;
+        this.meterRegistry = meterRegistry;
     }
 
+    @Timed("wealthview.pricefeed.sync")
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public void syncDailyPrices() {
@@ -72,6 +78,8 @@ public class PriceSyncService {
                 }
             }
 
+            meterRegistry.counter("wealthview.pricefeed.symbols", "status", "success").increment(successCount);
+            meterRegistry.counter("wealthview.pricefeed.symbols", "status", "failure").increment(failCount);
             log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
                     successCount, failCount, System.currentTimeMillis() - startTime);
         } finally {

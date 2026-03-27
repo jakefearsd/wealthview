@@ -8,6 +8,7 @@ import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +41,7 @@ public class DashboardService {
         this.propertyRepository = propertyRepository;
     }
 
+    @Timed("wealthview.dashboard.summary")
     @Transactional(readOnly = true)
     public DashboardSummaryResponse getSummary(UUID tenantId) {
         log.debug("Computing dashboard summary for tenant {}", tenantId);
