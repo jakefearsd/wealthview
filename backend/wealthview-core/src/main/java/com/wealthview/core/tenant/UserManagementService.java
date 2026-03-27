@@ -11,12 +11,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class UserManagementService {
 
     private static final Logger log = LoggerFactory.getLogger(UserManagementService.class);
+    private static final Set<String> VALID_ROLES = Set.of("member", "admin");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -33,8 +35,16 @@ public class UserManagementService {
 
     @Transactional
     public UserEntity updateUserRole(UUID tenantId, UUID userId, String newRole) {
+        if (!VALID_ROLES.contains(newRole)) {
+            throw new IllegalArgumentException("Invalid role: " + newRole);
+        }
+
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        if (user.isSuperAdmin()) {
+            throw new IllegalStateException("Cannot modify super admin role");
+        }
 
         user.setRole(newRole);
         user.setUpdatedAt(OffsetDateTime.now());

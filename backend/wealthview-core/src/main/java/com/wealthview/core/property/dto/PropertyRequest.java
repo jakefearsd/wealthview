@@ -1,5 +1,6 @@
 package com.wealthview.core.property.dto;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -11,11 +12,11 @@ import java.util.List;
 
 public record PropertyRequest(
         @NotBlank String address,
-        @NotNull BigDecimal purchasePrice,
+        @NotNull @DecimalMin("0") BigDecimal purchasePrice,
         @NotNull LocalDate purchaseDate,
-        @NotNull BigDecimal currentValue,
-        BigDecimal mortgageBalance,
-        BigDecimal loanAmount,
+        @NotNull @DecimalMin("0") BigDecimal currentValue,
+        @DecimalMin("0") BigDecimal mortgageBalance,
+        @DecimalMin("0") BigDecimal loanAmount,
         BigDecimal annualInterestRate,
         Integer loanTermMonths,
         LocalDate loanStartDate,

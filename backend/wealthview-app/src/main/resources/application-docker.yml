@@ -3,7 +3,7 @@ app:
     allowed-origins: http://localhost
   super-admin:
     email: admin@wealthview.local
-    password: ${SUPER_ADMIN_PASSWORD:admin123}
+    password: ${SUPER_ADMIN_PASSWORD}
 
 logging:
   level:

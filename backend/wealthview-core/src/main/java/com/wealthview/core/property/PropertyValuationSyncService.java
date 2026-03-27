@@ -47,26 +47,29 @@ public class PropertyValuationSyncService {
         try {
             long startTime = System.currentTimeMillis();
             log.info("Starting property valuation sync");
-            var properties = propertyRepository.findAll();
+            var tenantIds = propertyRepository.findDistinctTenantIds();
             int success = 0;
             int skipped = 0;
 
-            for (var property : properties) {
-                try {
-                    var resultOpt = valuationClient.getValuation(property.getAddress());
-                    if (resultOpt.isPresent()) {
-                        var result = resultOpt.orElseThrow();
-                        valuationService.recordValuation(
-                                property.getTenantId(), property.getId(),
-                                result.date(), result.value(), "zillow");
-                        success++;
-                    } else {
+            for (var tenantId : tenantIds) {
+                var properties = propertyRepository.findByTenant_Id(tenantId);
+                for (var property : properties) {
+                    try {
+                        var resultOpt = valuationClient.getValuation(property.getAddress());
+                        if (resultOpt.isPresent()) {
+                            var result = resultOpt.orElseThrow();
+                            valuationService.recordValuation(
+                                    property.getTenantId(), property.getId(),
+                                    result.date(), result.value(), "zillow");
+                            success++;
+                        } else {
+                            skipped++;
+                        }
+                    } catch (Exception e) {
+                        log.warn("Failed to sync valuation for property {}",
+                                property.getId(), e);
                         skipped++;
                     }
-                } catch (Exception e) {
-                    log.warn("Failed to sync valuation for property {}",
-                            property.getId(), e);
-                    skipped++;
                 }
             }
 

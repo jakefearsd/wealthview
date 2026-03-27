@@ -17,6 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.nio.charset.StandardCharsets;
 
@@ -169,6 +170,15 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().message()).contains("Unexpected token");
         assertCounter("HttpMessageNotReadableException", "400", 1);
+    }
+
+    @Test
+    void handleMaxUpload_returns413() {
+        var ex = new MaxUploadSizeExceededException(10485760);
+        var response = handler.handleMaxUpload(ex, request);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
+        assertThat(response.getBody().status()).isEqualTo(413);
+        assertCounter("MaxUploadSizeExceededException", "413", 1);
     }
 
     @Test

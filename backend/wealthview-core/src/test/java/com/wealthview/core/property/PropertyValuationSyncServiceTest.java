@@ -65,7 +65,8 @@ class PropertyValuationSyncServiceTest {
         com.wealthview.core.testutil.TestEntityHelper.setId(tenant, tenantId);
         com.wealthview.core.testutil.TestEntityHelper.setId(property, propertyId);
 
-        when(propertyRepository.findAll()).thenReturn(List.of(property));
+        when(propertyRepository.findDistinctTenantIds()).thenReturn(List.of(tenantId));
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
         when(valuationClient.getValuation("123 Main St"))
                 .thenReturn(Optional.of(new PropertyValuationResult(
                         new BigDecimal("400000"), LocalDate.of(2025, 3, 1))));
@@ -85,7 +86,8 @@ class PropertyValuationSyncServiceTest {
         com.wealthview.core.testutil.TestEntityHelper.setId(tenant, tenantId);
         com.wealthview.core.testutil.TestEntityHelper.setId(property, propertyId);
 
-        when(propertyRepository.findAll()).thenReturn(List.of(property));
+        when(propertyRepository.findDistinctTenantIds()).thenReturn(List.of(tenantId));
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
         when(valuationClient.getValuation("123 Main St")).thenReturn(Optional.empty());
 
         syncService.syncAll();

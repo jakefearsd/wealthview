@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.dto.AuthResponse;
 import com.wealthview.core.auth.dto.LoginRequest;
@@ -9,6 +10,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,5 +41,11 @@ public class AuthController {
     @PostMapping("/refresh")
     public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
         return ResponseEntity.ok(authService.refresh(request.refreshToken()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal TenantUserPrincipal principal) {
+        authService.logout(principal.userId());
+        return ResponseEntity.noContent().build();
     }
 }

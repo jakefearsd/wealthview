@@ -17,6 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -128,6 +129,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST",
                         "Invalid request body: " + ex.getMostSpecificCause().getMessage(), 400));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUpload(MaxUploadSizeExceededException ex, HttpServletRequest request) {
+        log.warn("{} {} - File too large: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        recordError(ex, HttpStatus.PAYLOAD_TOO_LARGE);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(new ErrorResponse("PAYLOAD_TOO_LARGE", "File size exceeds the 10MB limit", 413));
     }
 
     @ExceptionHandler(Exception.class)

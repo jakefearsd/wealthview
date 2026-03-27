@@ -78,9 +78,65 @@ class JwtTokenProviderTest {
 
     @Test
     void generateRefreshToken_validInput_returnsToken() {
-        var token = tokenProvider.generateRefreshToken(userId);
+        var token = tokenProvider.generateRefreshToken(userId, 0);
 
         assertThat(token).isNotBlank();
         assertThat(tokenProvider.extractUserId(token)).isEqualTo(userId);
+    }
+
+    @Test
+    void validateAccessToken_withAccessToken_returnsTrue() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.validateAccessToken(token)).isTrue();
+    }
+
+    @Test
+    void validateAccessToken_withRefreshToken_returnsFalse() {
+        var token = tokenProvider.generateRefreshToken(userId, 0);
+
+        assertThat(tokenProvider.validateAccessToken(token)).isFalse();
+    }
+
+    @Test
+    void validateRefreshToken_withRefreshToken_returnsTrue() {
+        var token = tokenProvider.generateRefreshToken(userId, 0);
+
+        assertThat(tokenProvider.validateRefreshToken(token)).isTrue();
+    }
+
+    @Test
+    void validateRefreshToken_withAccessToken_returnsFalse() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.validateRefreshToken(token)).isFalse();
+    }
+
+    @Test
+    void extractTokenType_accessToken_returnsAccess() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.extractTokenType(token)).isEqualTo("access");
+    }
+
+    @Test
+    void extractTokenType_refreshToken_returnsRefresh() {
+        var token = tokenProvider.generateRefreshToken(userId, 0);
+
+        assertThat(tokenProvider.extractTokenType(token)).isEqualTo("refresh");
+    }
+
+    @Test
+    void extractGeneration_refreshToken_returnsGeneration() {
+        var token = tokenProvider.generateRefreshToken(userId, 5);
+
+        assertThat(tokenProvider.extractGeneration(token)).isEqualTo(5);
+    }
+
+    @Test
+    void extractGeneration_accessToken_returnsZero() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.extractGeneration(token)).isEqualTo(0);
     }
 }
