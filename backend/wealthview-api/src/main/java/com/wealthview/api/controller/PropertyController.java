@@ -3,6 +3,7 @@ package com.wealthview.api.controller;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.api.dto.DepreciationScheduleResponse;
 import com.wealthview.core.property.PropertyAnalyticsService;
+import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
@@ -15,6 +16,7 @@ import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
+import com.wealthview.core.property.dto.RoiAnalysisResponse;
 import com.wealthview.core.property.dto.SelectZpidRequest;
 import com.wealthview.core.property.dto.ValuationRefreshResponse;
 import jakarta.validation.Valid;
@@ -32,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.UUID;
@@ -43,15 +46,18 @@ public class PropertyController {
     private final PropertyService propertyService;
     private final PropertyValuationService valuationService;
     private final PropertyAnalyticsService analyticsService;
+    private final PropertyRoiService roiService;
     private final @Nullable PropertyValuationSyncService syncService;
 
     public PropertyController(PropertyService propertyService,
                               PropertyValuationService valuationService,
                               PropertyAnalyticsService analyticsService,
+                              PropertyRoiService roiService,
                               @Nullable PropertyValuationSyncService syncService) {
         this.propertyService = propertyService;
         this.valuationService = valuationService;
         this.analyticsService = analyticsService;
+        this.roiService = roiService;
         this.syncService = syncService;
     }
 
@@ -196,5 +202,19 @@ public class PropertyController {
         }
         var result = syncService.selectZpid(principal.tenantId(), id, request.zpid());
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/{propertyId}/income-sources/{sourceId}/roi-analysis")
+    public ResponseEntity<RoiAnalysisResponse> getRoiAnalysis(
+            @AuthenticationPrincipal TenantUserPrincipal principal,
+            @PathVariable UUID propertyId,
+            @PathVariable UUID sourceId,
+            @RequestParam(defaultValue = "10") int years,
+            @RequestParam(name = "investment_return", defaultValue = "0.07") BigDecimal investmentReturn,
+            @RequestParam(name = "rent_growth", defaultValue = "0.03") BigDecimal rentGrowth,
+            @RequestParam(name = "expense_inflation", defaultValue = "0.03") BigDecimal expenseInflation) {
+        return ResponseEntity.ok(roiService.computeRoiAnalysis(
+                principal.tenantId(), propertyId, sourceId,
+                years, investmentReturn, rentGrowth, expenseInflation));
     }
 }
