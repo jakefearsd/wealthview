@@ -42,8 +42,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Component
 @SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
@@ -164,30 +162,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts, ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy) {
-        if (hasMultipleAccountTypes(accounts)) {
-            Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
-                    .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
-
-            FilingStatus filingStatus = params.filingStatus != null
-                    ? FilingStatus.fromString(params.filingStatus) : FilingStatus.SINGLE;
-            BigDecimal otherIncome = params.otherIncome != null ? params.otherIncome : BigDecimal.ZERO;
-            BigDecimal annualRothConversion = params.annualRothConversion != null
-                    ? params.annualRothConversion : BigDecimal.ZERO;
-
-            return new PoolStrategy.MultiPool(grouped,
-                    computeWeightedReturn(accounts,
-                            sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_TAXABLE, List.of()))
-                                    .add(sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_TRADITIONAL, List.of())))
-                                    .add(sumInitialBalances(grouped.getOrDefault(PoolStrategy.POOL_ROTH, List.of())))),
-                    filingStatus, otherIncome, annualRothConversion,
-                    params.rothConversionStrategy(), params.targetBracketRate(),
-                    params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy,
-                    params.dynamicSequencingBracketRate());
-        } else {
-            BigDecimal balance = sumInitialBalances(accounts);
-            return new PoolStrategy.SinglePool(balance, sumContributions(accounts),
-                    computeWeightedReturn(accounts, balance));
-        }
+        var config = new PoolStrategy.PoolConfig(
+                params.filingStatus != null ? FilingStatus.fromString(params.filingStatus) : FilingStatus.SINGLE,
+                params.otherIncome != null ? params.otherIncome : BigDecimal.ZERO,
+                params.annualRothConversion != null ? params.annualRothConversion : BigDecimal.ZERO,
+                params.rothConversionStrategy(), params.targetBracketRate(),
+                params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy,
+                params.dynamicSequencingBracketRate());
+        return PoolStrategy.create(accounts, config);
     }
 
     private TaxCalculationStrategy buildTaxStrategy(ScenarioParams params) {
@@ -521,27 +503,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 withdrawalResult.fromRoth(), withdrawalResult.taxSource());
     }
 
-    private boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {
-        long distinctTypes = accounts.stream()
-                .map(ProjectionAccountInput::accountType)
-                .distinct()
-                .count();
-        boolean hasNonTaxable = accounts.stream()
-                .anyMatch(a -> !PoolStrategy.POOL_TAXABLE.equals(a.accountType()));
-        return distinctTypes > 1 || hasNonTaxable;
-    }
-
-    private BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
-        return accounts.stream()
-                .map(ProjectionAccountInput::initialBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private BigDecimal sumContributions(List<ProjectionAccountInput> accounts) {
-        return accounts.stream()
-                .map(ProjectionAccountInput::annualContribution)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
 
     private WithdrawalStrategy resolveStrategy(ScenarioParams params, BigDecimal withdrawalRate) {
         if (params.withdrawalStrategy == null || params.withdrawalStrategy.isBlank()) {
@@ -560,17 +521,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         };
     }
 
-    private BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts, BigDecimal totalBalance) {
-        if (totalBalance.compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal weightedSum = BigDecimal.ZERO;
-        for (var account : accounts) {
-            weightedSum = weightedSum.add(
-                    account.initialBalance().multiply(account.expectedReturn()));
-        }
-        return weightedSum.divide(totalBalance, SCALE + 4, ROUNDING);
-    }
 
     private ScenarioParams parseParams(String paramsJson) {
         if (paramsJson == null || paramsJson.isBlank()) {

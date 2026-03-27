@@ -12,6 +12,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Strategy for managing investment pool balances during projection year-loop.
@@ -118,6 +119,81 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
                                BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
                                TaxSourceResult taxSource) {}
+
+    // --- PoolConfig + Factory Method ---
+
+    /** Configuration record encapsulating multi-pool construction parameters. */
+    record PoolConfig(
+            FilingStatus filingStatus,
+            BigDecimal otherIncome,
+            BigDecimal annualRothConversion,
+            String rothConversionStrategy,
+            BigDecimal targetBracketRate,
+            Integer rothConversionStartYear,
+            WithdrawalOrder withdrawalOrder,
+            TaxCalculationStrategy taxCalculator,
+            BigDecimal dynamicSequencingBracketRate) {}
+
+    /**
+     * Factory method that decides whether to create a SinglePool or MultiPool based on the
+     * account types present, and encapsulates all construction details.
+     */
+    static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
+        if (hasMultipleAccountTypes(accounts)) {
+            Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
+                    .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
+
+            BigDecimal totalBalance = sumInitialBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()))
+                    .add(sumInitialBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of())))
+                    .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
+
+            return new MultiPool(grouped,
+                    computeWeightedReturn(accounts, totalBalance),
+                    config.filingStatus(), config.otherIncome(), config.annualRothConversion(),
+                    config.rothConversionStrategy(), config.targetBracketRate(),
+                    config.rothConversionStartYear(), config.withdrawalOrder(), config.taxCalculator(),
+                    config.dynamicSequencingBracketRate());
+        } else {
+            BigDecimal balance = sumInitialBalances(accounts);
+            return new SinglePool(balance, sumContributions(accounts),
+                    computeWeightedReturn(accounts, balance));
+        }
+    }
+
+    private static boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {
+        long distinctTypes = accounts.stream()
+                .map(ProjectionAccountInput::accountType)
+                .distinct()
+                .count();
+        boolean hasNonTaxable = accounts.stream()
+                .anyMatch(a -> !POOL_TAXABLE.equals(a.accountType()));
+        return distinctTypes > 1 || hasNonTaxable;
+    }
+
+    private static BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
+        return accounts.stream()
+                .map(ProjectionAccountInput::initialBalance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal sumContributions(List<ProjectionAccountInput> accounts) {
+        return accounts.stream()
+                .map(ProjectionAccountInput::annualContribution)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts,
+                                                     BigDecimal totalBalance) {
+        if (totalBalance.compareTo(BigDecimal.ZERO) == 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal weightedSum = BigDecimal.ZERO;
+        for (var account : accounts) {
+            weightedSum = weightedSum.add(
+                    account.initialBalance().multiply(account.expectedReturn()));
+        }
+        return weightedSum.divide(totalBalance, SCALE + 4, ROUNDING);
+    }
 
     // --- SinglePool ---
 
