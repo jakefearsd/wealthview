@@ -170,3 +170,29 @@ export interface DepreciationScheduleResponse {
     cost_seg_allocations: CostSegAllocation[] | null;
     class_breakdowns: ClassBreakdown[] | null;
 }
+
+export interface HoldScenarioResult {
+    ending_property_value: number;
+    ending_mortgage_balance: number;
+    cumulative_net_cash_flow: number;
+    ending_net_worth: number;
+}
+
+export interface SellScenarioResult {
+    gross_proceeds: number;
+    selling_costs: number;
+    depreciation_recapture_tax: number;
+    capital_gains_tax: number;
+    net_proceeds: number;
+    ending_net_worth: number;
+}
+
+export interface RoiAnalysisResponse {
+    income_source_name: string;
+    annual_rent: number;
+    comparison_years: number;
+    hold: HoldScenarioResult;
+    sell: SellScenarioResult;
+    advantage: 'hold' | 'sell';
+    advantage_amount: number;
+}
