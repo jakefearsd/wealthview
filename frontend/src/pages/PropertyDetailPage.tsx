@@ -11,6 +11,7 @@ import { cardStyle } from '../utils/styles';
 import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
 import PropertyValuationSection from '../components/PropertyValuationSection';
 import PropertyCashFlowSection from '../components/PropertyCashFlowSection';
+import PropertyRoiCard from '../components/PropertyRoiCard';
 import PropertyForm from '../components/PropertyForm';
 import toast from 'react-hot-toast';
 
@@ -154,9 +155,9 @@ export default function PropertyDetailPage() {
     const { data: allIncomeSources } = useApiQuery(listIncomeSources);
     const { data: expenses, refetch: refetchExpenses } = useApiQuery(() => listPropertyExpenses(id!));
 
-    const linkedIncomeSource = useMemo(() => {
-        if (!allIncomeSources || !id) return null;
-        return allIncomeSources.find(s => s.property_id === id) ?? null;
+    const linkedIncomeSources = useMemo(() => {
+        if (!allIncomeSources || !id) return [];
+        return allIncomeSources.filter(s => s.property_id === id);
     }, [allIncomeSources, id]);
 
     const onEditSuccess = useCallback(() => {
@@ -418,22 +419,28 @@ export default function PropertyDetailPage() {
 
             {property && (
                 <div style={{ ...cardStyle, marginBottom: '2rem', padding: '1rem 1.5rem' }}>
-                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#444' }}>Linked Income Source</h4>
-                    {linkedIncomeSource ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                            <div>
-                                <div style={{ fontWeight: 600 }}>{linkedIncomeSource.name}</div>
-                                <div style={{ fontSize: '0.9rem', color: '#666' }}>
-                                    {formatCurrency(linkedIncomeSource.annual_amount)}/year ({formatCurrency(linkedIncomeSource.annual_amount / 12)}/month)
+                    <h4 style={{ margin: '0 0 0.5rem', fontSize: '0.95rem', color: '#444' }}>Linked Income Sources</h4>
+                    {linkedIncomeSources.length > 0 ? (
+                        linkedIncomeSources.map(source => (
+                            <div key={source.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.5rem 0' }}>
+                                <div>
+                                    <div style={{ fontWeight: 600 }}>{source.name}</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#666' }}>
+                                        {formatCurrency(source.annual_amount)}/year ({formatCurrency(source.annual_amount / 12)}/month)
+                                    </div>
                                 </div>
                             </div>
-                            <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none', fontSize: '0.85rem', marginLeft: 'auto' }}>
-                                View on Income Sources page
-                            </Link>
-                        </div>
+                        ))
                     ) : (
                         <div style={{ color: '#999', fontSize: '0.9rem' }}>
                             No income source linked. <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none' }}>Create one on the Income Sources page.</Link>
+                        </div>
+                    )}
+                    {linkedIncomeSources.length > 0 && (
+                        <div style={{ marginTop: '0.5rem' }}>
+                            <Link to="/income-sources" style={{ color: '#1976d2', textDecoration: 'none', fontSize: '0.85rem' }}>
+                                Manage on Income Sources page
+                            </Link>
                         </div>
                     )}
                 </div>
@@ -448,6 +455,19 @@ export default function PropertyDetailPage() {
                     propertyId={id!}
                     depreciationMethod={property?.depreciation_method || 'none'}
                 />
+            )}
+
+            {property?.property_type === 'investment' && linkedIncomeSources.length > 0 && (
+                <div style={{ marginBottom: '2rem' }}>
+                    <h3 style={{ marginBottom: '1rem' }}>Hold vs. Sell Analysis</h3>
+                    {linkedIncomeSources.map(source => (
+                        <PropertyRoiCard
+                            key={source.id}
+                            propertyId={id!}
+                            incomeSource={source}
+                        />
+                    ))}
+                </div>
             )}
 
             <PropertyValuationSection
