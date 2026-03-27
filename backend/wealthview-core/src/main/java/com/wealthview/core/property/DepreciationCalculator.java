@@ -1,6 +1,12 @@
 package com.wealthview.core.property;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.property.dto.CostSegAllocation;
+import com.wealthview.persistence.entity.PropertyEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -14,6 +20,8 @@ import java.util.Set;
 @Component
 public class DepreciationCalculator {
 
+    private static final Logger log = LoggerFactory.getLogger(DepreciationCalculator.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
@@ -189,5 +197,62 @@ public class DepreciationCalculator {
         // straight_line
         var schedule = computeStraightLine(purchasePrice, landValue, inServiceDate, usefulLifeYears);
         return schedule.getOrDefault(taxYear, BigDecimal.ZERO);
+    }
+
+    /**
+     * Computes the full depreciation schedule for a property based on its method.
+     * This is the Strategy dispatch point — callers no longer need to check the method string.
+     *
+     * @return depreciation schedule (year -> amount), or empty map for "none"
+     */
+    public Map<Integer, BigDecimal> computeSchedule(PropertyEntity property) {
+        var method = property.getDepreciationMethod();
+        if (method == null || "none".equals(method)) {
+            return Map.of();
+        }
+
+        var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
+        var inServiceDate = property.getInServiceDate();
+        if (inServiceDate == null) {
+            return Map.of();
+        }
+
+        if ("cost_segregation".equals(method)) {
+            var allocations = parseCostSegAllocations(property.getCostSegAllocations());
+            if (allocations.isEmpty()) {
+                return Map.of();
+            }
+            return computeCostSegregation(allocations, property.getBonusDepreciationRate(),
+                    inServiceDate, property.getCostSegStudyYear());
+        }
+
+        // straight_line
+        return computeStraightLine(property.getPurchasePrice(), landValue,
+                inServiceDate, property.getUsefulLifeYears());
+    }
+
+    /**
+     * Sums depreciation from a schedule through a given year (inclusive).
+     */
+    public static BigDecimal accumulatedThrough(Map<Integer, BigDecimal> schedule, int throughYear) {
+        var total = BigDecimal.ZERO;
+        for (var entry : schedule.entrySet()) {
+            if (entry.getKey() <= throughYear) {
+                total = total.add(entry.getValue());
+            }
+        }
+        return total.setScale(SCALE, ROUNDING);
+    }
+
+    private static List<CostSegAllocation> parseCostSegAllocations(String json) {
+        if (json == null || json.isBlank() || "[]".equals(json)) {
+            return List.of();
+        }
+        try {
+            return MAPPER.readValue(json, new TypeReference<>() {});
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to parse cost_seg_allocations JSON", e);
+            return List.of();
+        }
     }
 }
