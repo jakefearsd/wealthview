@@ -482,23 +482,25 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             }
             lastTaxBreakdown = null;
 
-            return new ProjectionYearDto(
-                    year, age, startBalance, contributions, totalGrowth, withdrawals, getTotal(), retired,
-                    traditional, roth, taxable,
-                    conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null,
-                    taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null,
-                    null, null, null, null, null, null,
-                    null, null, null, null, null, null, null, null,
-                    null, null, null,
-                    growthResult.taxable(), growthResult.traditional(), growthResult.roth(),
-                    combinedTaxSource.fromTaxable().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTaxable() : null,
-                    combinedTaxSource.fromTraditional().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTraditional() : null,
-                    combinedTaxSource.fromRoth().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromRoth() : null,
-                    withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTaxable : null,
-                    withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null,
-                    withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null,
-                    null,
-                    fedTax, stTax, saltDed, usedItemized, null);
+            return ProjectionYearDto.builder()
+                    .year(year).age(age).startBalance(startBalance)
+                    .contributions(contributions).growth(totalGrowth)
+                    .withdrawals(withdrawals).endBalance(getTotal()).retired(retired)
+                    .traditionalBalance(traditional).rothBalance(roth).taxableBalance(taxable)
+                    .rothConversionAmount(conversionAmount.compareTo(BigDecimal.ZERO) > 0 ? conversionAmount : null)
+                    .taxLiability(taxLiability.compareTo(BigDecimal.ZERO) > 0 ? taxLiability : null)
+                    .taxableGrowth(growthResult.taxable())
+                    .traditionalGrowth(growthResult.traditional())
+                    .rothGrowth(growthResult.roth())
+                    .taxPaidFromTaxable(combinedTaxSource.fromTaxable().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTaxable() : null)
+                    .taxPaidFromTraditional(combinedTaxSource.fromTraditional().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTraditional() : null)
+                    .taxPaidFromRoth(combinedTaxSource.fromRoth().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromRoth() : null)
+                    .withdrawalFromTaxable(withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTaxable : null)
+                    .withdrawalFromTraditional(withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null)
+                    .withdrawalFromRoth(withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null)
+                    .federalTax(fedTax).stateTax(stTax).saltDeduction(saltDed)
+                    .usedItemizedDeduction(usedItemized)
+                    .build();
         }
 
         @Override
