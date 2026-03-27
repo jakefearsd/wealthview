@@ -71,6 +71,13 @@ public class GlobalExceptionHandler {
                 .body(new ErrorResponse("FORBIDDEN", ex.getMessage(), 403));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+        log.warn("{} {} - Illegal state: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse("CONFLICT", ex.getMessage(), 409));
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
         log.warn("{} {} - Illegal argument: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());

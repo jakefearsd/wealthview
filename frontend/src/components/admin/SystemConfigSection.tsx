@@ -5,6 +5,7 @@ import { cardStyle } from '../../utils/styles';
 import toast from 'react-hot-toast';
 
 const SENSITIVE_KEYS = ['finnhub.api-key'];
+const BOOLEAN_KEYS = new Set(['zillow.scraper.enabled']);
 
 const CONFIG_SECTIONS: { title: string; keys: string[] }[] = [
     {
@@ -90,6 +91,21 @@ export default function SystemConfigSection() {
         }
     }
 
+    async function handleBooleanToggle(key: string) {
+        const current = getConfigValue(key);
+        const newVal = current === 'true' ? 'false' : 'true';
+        setSaving(true);
+        try {
+            await setConfig(key, newVal);
+            toast.success('Config updated');
+            loadConfigs();
+        } catch {
+            toast.error('Failed to save config');
+        } finally {
+            setSaving(false);
+        }
+    }
+
     if (loading) return <div>Loading config...</div>;
 
     return (
@@ -107,7 +123,36 @@ export default function SystemConfigSection() {
                                         {key}
                                     </td>
                                     <td style={{ padding: '0.5rem' }}>
-                                        {editingKey === key ? (
+                                        {BOOLEAN_KEYS.has(key) ? (
+                                            <button
+                                                onClick={() => handleBooleanToggle(key)}
+                                                disabled={saving}
+                                                style={{
+                                                    position: 'relative',
+                                                    width: '44px',
+                                                    height: '24px',
+                                                    borderRadius: '12px',
+                                                    border: 'none',
+                                                    background: getConfigValue(key) === 'true' ? '#4caf50' : '#ccc',
+                                                    cursor: saving ? 'default' : 'pointer',
+                                                    transition: 'background 0.2s',
+                                                    padding: 0,
+                                                }}
+                                                title={getConfigValue(key) === 'true' ? 'Enabled' : 'Disabled'}
+                                            >
+                                                <span style={{
+                                                    position: 'absolute',
+                                                    top: '2px',
+                                                    left: getConfigValue(key) === 'true' ? '22px' : '2px',
+                                                    width: '20px',
+                                                    height: '20px',
+                                                    borderRadius: '50%',
+                                                    background: '#fff',
+                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                                    transition: 'left 0.2s',
+                                                }} />
+                                            </button>
+                                        ) : editingKey === key ? (
                                             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                                                 <input
                                                     type={isSensitive(key) ? 'password' : 'text'}
