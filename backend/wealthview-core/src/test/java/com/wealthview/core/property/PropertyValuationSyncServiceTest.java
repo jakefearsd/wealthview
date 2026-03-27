@@ -8,10 +8,10 @@ import com.wealthview.core.property.dto.ZillowSearchResult;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -42,7 +42,6 @@ class PropertyValuationSyncServiceTest {
     @Mock
     private PropertyValuationService valuationService;
 
-    @InjectMocks
     private PropertyValuationSyncService syncService;
 
     private TenantEntity tenant;
@@ -52,6 +51,8 @@ class PropertyValuationSyncServiceTest {
 
     @BeforeEach
     void setUp() {
+        syncService = new PropertyValuationSyncService(
+                propertyRepository, valuationClient, valuationService, new SimpleMeterRegistry());
         tenantId = UUID.randomUUID();
         propertyId = UUID.randomUUID();
         tenant = new TenantEntity("Test");

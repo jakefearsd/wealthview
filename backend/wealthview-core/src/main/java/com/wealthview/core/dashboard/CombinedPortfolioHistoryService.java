@@ -13,6 +13,7 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.PropertyValuationRepository;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +61,7 @@ public class CombinedPortfolioHistoryService {
         this.propertyValuationRepository = propertyValuationRepository;
     }
 
+    @Timed("wealthview.dashboard.portfolio.history")
     @Transactional(readOnly = true)
     public CombinedPortfolioHistoryResponse computeHistory(UUID tenantId, int years) {
         var clampedYears = Math.max(MIN_YEARS, Math.min(MAX_YEARS, years));

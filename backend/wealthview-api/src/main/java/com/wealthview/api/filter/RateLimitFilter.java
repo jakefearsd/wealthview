@@ -1,5 +1,6 @@
 package com.wealthview.api.filter;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,7 +28,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final int AUTH_LIMIT_PER_IP = 60;
     private static final long WINDOW_MS = 60_000;
 
+    private final MeterRegistry meterRegistry;
     private final ConcurrentMap<String, RateWindow> windows = new ConcurrentHashMap<>();
+
+    public RateLimitFilter(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -69,6 +75,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
         if (window.count.get() > limit) {
             log.warn("Rate limit exceeded: key={} count={} limit={}", key, window.count.get(), limit);
+            meterRegistry.counter("wealthview.ratelimit.exceeded", "type", isAuth ? "ip" : "user").increment();
             response.setStatus(429);
             response.setContentType("application/json");
             response.getWriter().write("""

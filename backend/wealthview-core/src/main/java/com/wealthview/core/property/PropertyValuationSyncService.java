@@ -4,6 +4,8 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.property.dto.ValuationRefreshResponse;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -24,15 +26,19 @@ public class PropertyValuationSyncService {
     private final PropertyRepository propertyRepository;
     private final PropertyValuationClient valuationClient;
     private final PropertyValuationService valuationService;
+    private final MeterRegistry meterRegistry;
 
     public PropertyValuationSyncService(PropertyRepository propertyRepository,
                                          PropertyValuationClient valuationClient,
-                                         PropertyValuationService valuationService) {
+                                         PropertyValuationService valuationService,
+                                         MeterRegistry meterRegistry) {
         this.propertyRepository = propertyRepository;
         this.valuationClient = valuationClient;
         this.valuationService = valuationService;
+        this.meterRegistry = meterRegistry;
     }
 
+    @Timed("wealthview.property.valuation.sync")
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-property resilience
     @Scheduled(cron = "${app.zillow.sync-cron:0 0 6 * * SUN}")
     public void syncAll() {
@@ -64,6 +70,8 @@ public class PropertyValuationSyncService {
                 }
             }
 
+            meterRegistry.counter("wealthview.property.valuations", "status", "success").increment(success);
+            meterRegistry.counter("wealthview.property.valuations", "status", "skipped").increment(skipped);
             log.info("Property valuation sync complete: {} updated, {} skipped, {}ms",
                     success, skipped, System.currentTimeMillis() - startTime);
         } finally {

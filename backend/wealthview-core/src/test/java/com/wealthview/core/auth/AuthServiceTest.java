@@ -10,6 +10,7 @@ import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.UserRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -65,7 +66,8 @@ class AuthServiceTest {
                 "test-secret-key-that-is-at-least-32-characters-long",
                 3600000, 86400000);
         authService = new AuthService(userRepository, inviteCodeRepository,
-                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService);
+                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
+                new SimpleMeterRegistry());
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
