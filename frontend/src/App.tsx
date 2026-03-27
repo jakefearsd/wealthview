@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProjectionCacheProvider } from './context/ProjectionCacheContext';
@@ -20,11 +20,8 @@ import SpendingOptimizerPage from './pages/SpendingOptimizerPage';
 import SpendingProfilesPage from './pages/SpendingProfilesPage';
 import IncomeSourcesPage from './pages/IncomeSourcesPage';
 import HoldingDetailPage from './pages/HoldingDetailPage';
-import AdminPage from './pages/AdminPage';
-import AdminPriceManagementPage from './pages/AdminPriceManagementPage';
-import AuditLogPage from './pages/AuditLogPage';
+import AdminAreaPage from './pages/AdminAreaPage';
 import DataExportPage from './pages/DataExportPage';
-import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 export default function App() {
@@ -51,11 +48,11 @@ export default function App() {
                         <Route path="income-sources" element={<IncomeSourcesPage />} />
                         <Route path="properties" element={<PropertiesListPage />} />
                         <Route path="properties/:id" element={<PropertyDetailPage />} />
-                        <Route path="admin" element={<AdminPage />} />
-                        <Route path="admin/prices" element={<AdminPriceManagementPage />} />
-                        <Route path="audit-log" element={<AuditLogPage />} />
+                        <Route path="admin" element={<AdminAreaPage />} />
+                        <Route path="admin/prices" element={<Navigate to="/admin" replace />} />
+                        <Route path="audit-log" element={<Navigate to="/admin" replace />} />
                         <Route path="export" element={<DataExportPage />} />
-                        <Route path="settings" element={<SettingsPage />} />
+                        <Route path="settings" element={<Navigate to="/admin" replace />} />
                         <Route path="*" element={<NotFoundPage />} />
                     </Route>
                 </Routes>
