@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -53,12 +52,7 @@ public class PropertyRoiService {
         var incomeSource = incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId)
                 .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
 
-        var sell = computeSellScenario(property.getCurrentValue(), property.getPurchasePrice(),
-                property.getDepreciationMethod(), property.getLandValue(),
-                property.getInServiceDate(), property.getUsefulLifeYears(),
-                property.getCostSegAllocations(), property.getBonusDepreciationRate(),
-                property.getCostSegStudyYear(),
-                investmentReturn, years);
+        var sell = computeSellScenario(property, investmentReturn, years);
 
         var hold = computeHoldScenario(property, incomeSource.getAnnualAmount(), years,
                 rentGrowth, expenseInflation);
@@ -92,24 +86,17 @@ public class PropertyRoiService {
         );
     }
 
-    private SellScenarioResult computeSellScenario(BigDecimal currentValue, BigDecimal purchasePrice,
-                                                     String depreciationMethod, BigDecimal landValue,
-                                                     LocalDate inServiceDate, BigDecimal usefulLifeYears,
-                                                     String costSegAllocationsJson,
-                                                     BigDecimal bonusDepreciationRate,
-                                                     Integer costSegStudyYear,
+    private SellScenarioResult computeSellScenario(PropertyEntity property,
                                                      BigDecimal investmentReturn, int years) {
-        var grossProceeds = currentValue;
+        var grossProceeds = property.getCurrentValue();
         var sellingCosts = grossProceeds.multiply(SELLING_COST_RATE).setScale(SCALE, ROUNDING);
 
-        var accumulatedDepreciation = computeAccumulatedDepreciation(
-                depreciationMethod, purchasePrice, landValue, inServiceDate,
-                usefulLifeYears, costSegAllocationsJson, bonusDepreciationRate, costSegStudyYear);
+        var accumulatedDepreciation = computeAccumulatedDepreciation(property);
 
         var depreciationRecaptureTax = accumulatedDepreciation
                 .multiply(DEPRECIATION_RECAPTURE_RATE).setScale(SCALE, ROUNDING);
 
-        var totalGain = grossProceeds.subtract(purchasePrice).subtract(sellingCosts);
+        var totalGain = grossProceeds.subtract(property.getPurchasePrice()).subtract(sellingCosts);
 
         var ltcgPortion = totalGain.subtract(accumulatedDepreciation).max(BigDecimal.ZERO);
         var capitalGainsTax = ltcgPortion.multiply(CAPITAL_GAINS_RATE).setScale(SCALE, ROUNDING);
@@ -125,39 +112,9 @@ public class PropertyRoiService {
                 capitalGainsTax, netProceeds, endingNetWorth);
     }
 
-    private BigDecimal computeAccumulatedDepreciation(String depreciationMethod,
-                                                        BigDecimal purchasePrice,
-                                                        BigDecimal landValue,
-                                                        LocalDate inServiceDate,
-                                                        BigDecimal usefulLifeYears,
-                                                        String costSegAllocationsJson,
-                                                        BigDecimal bonusDepreciationRate,
-                                                        Integer costSegStudyYear) {
-        if ("none".equals(depreciationMethod) || depreciationMethod == null) {
-            return BigDecimal.ZERO;
-        }
-
-        var effectiveLandValue = landValue != null ? landValue : BigDecimal.ZERO;
-        int currentYear = LocalDate.now().getYear();
-
-        Map<Integer, BigDecimal> schedule;
-        if ("cost_segregation".equals(depreciationMethod)) {
-            var allocations = PropertyService.parseCostSegAllocations(costSegAllocationsJson);
-            schedule = depreciationCalculator.computeCostSegregation(
-                    allocations, bonusDepreciationRate, inServiceDate, costSegStudyYear);
-        } else {
-            // straight_line
-            schedule = depreciationCalculator.computeStraightLine(
-                    purchasePrice, effectiveLandValue, inServiceDate, usefulLifeYears);
-        }
-
-        var accumulated = BigDecimal.ZERO;
-        for (var entry : schedule.entrySet()) {
-            if (entry.getKey() <= currentYear) {
-                accumulated = accumulated.add(entry.getValue());
-            }
-        }
-        return accumulated.setScale(SCALE, ROUNDING);
+    private BigDecimal computeAccumulatedDepreciation(PropertyEntity property) {
+        var schedule = depreciationCalculator.computeSchedule(property);
+        return DepreciationCalculator.accumulatedThrough(schedule, LocalDate.now().getYear());
     }
 
     HoldScenarioResult computeHoldScenario(PropertyEntity property,

@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,6 +64,8 @@ class ProjectionInputBuilderTest {
     void setUp() {
         tenantId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
+        lenient().when(depreciationCalculator.computeSchedule(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Map.of());
     }
 
     @Test
@@ -174,9 +177,7 @@ class ProjectionInputBuilderTest {
                 .thenReturn(List.of(link));
 
         var depByYear = Map.of(2020, new BigDecimal("4629.63"), 2021, new BigDecimal("9259.26"));
-        when(depreciationCalculator.computeStraightLine(
-                new BigDecimal("300000"), new BigDecimal("50000"),
-                LocalDate.of(2020, 6, 1), new BigDecimal("27")))
+        when(depreciationCalculator.computeSchedule(property))
                 .thenReturn(depByYear);
 
         var result = builder.build(scenario, tenantId);
@@ -546,11 +547,7 @@ class ProjectionInputBuilderTest {
                 .thenReturn(List.of(link));
 
         var expectedSchedule = Map.of(2021, new BigDecimal("184462.1212"));
-        when(depreciationCalculator.computeCostSegregation(
-                org.mockito.ArgumentMatchers.anyList(),
-                org.mockito.ArgumentMatchers.eq(new BigDecimal("1.0000")),
-                org.mockito.ArgumentMatchers.eq(LocalDate.of(2021, 7, 1)),
-                org.mockito.ArgumentMatchers.isNull()))
+        when(depreciationCalculator.computeSchedule(property))
                 .thenReturn(expectedSchedule);
 
         var result = builder.build(scenario, tenantId);

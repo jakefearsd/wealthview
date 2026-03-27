@@ -8,7 +8,6 @@ import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wealthview.core.projection.dto.ConversionYearDetail;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -17,7 +16,6 @@ import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
-import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -215,19 +213,9 @@ public class ProjectionInputBuilder {
 
             depreciationMethod = property.getDepreciationMethod();
 
-            if ("cost_segregation".equals(depreciationMethod)) {
-                var allocations = parseCostSegAllocations(property.getCostSegAllocations());
-                if (!allocations.isEmpty()) {
-                    depreciationByYear = depreciationCalculator.computeCostSegregation(
-                            allocations, property.getBonusDepreciationRate(),
-                            property.getInServiceDate(), property.getCostSegStudyYear());
-                }
-            } else if ("straight_line".equals(depreciationMethod)
-                    && property.getInServiceDate() != null) {
-                var landValue = property.getLandValue() != null ? property.getLandValue() : BigDecimal.ZERO;
-                depreciationByYear = depreciationCalculator.computeStraightLine(
-                        property.getPurchasePrice(), landValue,
-                        property.getInServiceDate(), property.getUsefulLifeYears());
+            var schedule = depreciationCalculator.computeSchedule(property);
+            if (!schedule.isEmpty()) {
+                depreciationByYear = schedule;
             }
         }
 
@@ -237,19 +225,6 @@ public class ProjectionInputBuilder {
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
                 annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
                 depreciationMethod, depreciationByYear);
-    }
-
-    private List<com.wealthview.core.property.dto.CostSegAllocation> parseCostSegAllocations(String json) {
-        if (json == null || json.isBlank() || "[]".equals(json)) {
-            return List.of();
-        }
-        try {
-            return MAPPER.readValue(json,
-                    new com.fasterxml.jackson.core.type.TypeReference<List<com.wealthview.core.property.dto.CostSegAllocation>>() {});
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
-            log.warn("Failed to parse cost_seg_allocations JSON", e);
-            return List.of();
-        }
     }
 
     private BigDecimal sumNullable(BigDecimal... values) {
