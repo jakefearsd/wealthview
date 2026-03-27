@@ -6,6 +6,7 @@ import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.property.PropertyAnalyticsService;
+import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
 import com.wealthview.core.property.PropertyValuationService;
 import com.wealthview.core.property.PropertyValuationSyncService;
@@ -49,6 +50,9 @@ class PropertyControllerAnalyticsTest {
 
     @MockBean
     private PropertyAnalyticsService analyticsService;
+
+    @MockBean
+    private PropertyRoiService roiService;
 
     @MockBean(name = "propertyValuationSyncService")
     private PropertyValuationSyncService syncService;
