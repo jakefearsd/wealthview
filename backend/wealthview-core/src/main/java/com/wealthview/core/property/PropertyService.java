@@ -271,7 +271,7 @@ public class PropertyService {
         return breakdowns;
     }
 
-    static List<CostSegAllocation> parseCostSegAllocations(String json) {
+    public static List<CostSegAllocation> parseCostSegAllocations(String json) {
         if (json == null || json.isBlank() || "[]".equals(json)) {
             return List.of();
         }
