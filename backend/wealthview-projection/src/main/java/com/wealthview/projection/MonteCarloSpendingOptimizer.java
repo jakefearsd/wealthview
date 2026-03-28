@@ -1496,35 +1496,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
-
-                double gross = source.annualAmount().doubleValue();
-                if (source.inflationRate() != null
-                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    gross *= Math.pow(1 + source.inflationRate().doubleValue(), y);
-                }
-
-                double expenses = nullSafe(source.annualOperatingExpenses())
-                        + nullSafe(source.annualPropertyTax());
-                double depreciation = 0;
-                if (source.depreciationByYear() != null) {
-                    var depBd = source.depreciationByYear().get(calendarYear);
-                    if (depBd != null) {
-                        depreciation = depBd.doubleValue();
-                    }
-                }
-                double mortgageInterest = nullSafe(source.annualMortgageInterest());
-                double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
-
-                var priorSuspended = suspendedBySource.get(source);
-                var lossResult = calculator.applyLossRules(
-                        BigDecimal.valueOf(netRentalIncome),
-                        source.taxTreatment(),
-                        BigDecimal.ZERO,
-                        BigDecimal.valueOf(Math.max(0, baseOtherIncome)),
-                        priorSuspended);
-
-                suspendedBySource.put(source, lossResult.lossSuspended());
-                yearAdjustment += lossResult.netTaxableIncome().doubleValue();
+                var rentalResult = RentalIncomeHelper.computeForSource(
+                        source, y, calendarYear, baseOtherIncome,
+                        suspendedBySource.get(source), calculator);
+                suspendedBySource.put(source, rentalResult.newSuspendedLoss());
+                yearAdjustment += rentalResult.netTaxableIncome();
             }
 
             result[y] = Math.max(0, result[y] + yearAdjustment);
