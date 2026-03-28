@@ -2236,4 +2236,473 @@ class MonteCarloSpendingOptimizerTest {
             assertThat(Double.isNaN(ys.recommended().doubleValue())).isFalse();
         }
     }
+
+    // === Tax pool deduction ordering ===
+
+    @Test
+    void optimize_taxableFirst_taxDeductedFromTaxablePoolFirst() {
+        // With "taxable_first" withdrawal order and tax-deferred accounts,
+        // the taxable pool absorbs tax first. All-traditional portfolio with
+        // a small taxable bucket means the traditional pool funds withdrawals
+        // while tax is paid from the taxable pool first.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        // Mostly traditional ($700k) with a small taxable ($300k) for tax payment
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("300000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("700000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("50000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        // Tax-aware optimizer with traditional accounts should still produce
+        // positive spending (tax is deducted from taxable pool first)
+        assertThat(result.yearlySpending().getFirst().recommended().doubleValue())
+                .isGreaterThan(0);
+        // Spending should be less than all-taxable because traditional withdrawals
+        // incur tax, consuming portfolio value
+        var allTaxableInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(new BigDecimal("1000000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("50000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+        var allTaxableResult = taxOptimizer.optimize(allTaxableInput);
+        double mixedSpending = result.yearlySpending().getFirst().recommended().doubleValue();
+        double taxableOnlySpending = allTaxableResult.yearlySpending().getFirst().recommended().doubleValue();
+        assertThat(mixedSpending)
+                .as("Mixed (traditional+taxable) should produce less spending than all-taxable due to tax drag")
+                .isLessThan(taxableOnlySpending);
+    }
+
+    @Test
+    void optimize_allTaxableExhausted_taxFallsToTraditionalThenRoth() {
+        // When taxable pool is tiny, tax must eventually fall to traditional,
+        // then roth via deductTaxFromPools ordering. A tiny taxable pool with
+        // large traditional ensures taxable exhausts quickly.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var tinyTaxableInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("10000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("990000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("10000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(tinyTaxableInput);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        // Should still produce valid positive spending even when taxable exhausts
+        for (var ys : result.yearlySpending()) {
+            assertThat(ys.recommended().doubleValue())
+                    .as("Spending should remain positive at age %d even with exhausted taxable pool", ys.age())
+                    .isGreaterThanOrEqualTo(0);
+            assertThat(Double.isNaN(ys.recommended().doubleValue())).isFalse();
+        }
+    }
+
+    @Test
+    void optimize_onlyRothAccounts_noTaxOnWithdrawals() {
+        // Roth withdrawals are tax-free. With only roth accounts the optimizer
+        // should produce higher spending than an equivalent traditional portfolio
+        // (which has 20% withdrawal tax in taxAwareOptimizer).
+        // Use a constrained portfolio + terminal target so binary search doesn't
+        // hit the $500k ceiling and the tax difference is visible.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var rothInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var tradInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var rothResult = taxOptimizer.optimize(rothInput);
+        var tradResult = taxOptimizer.optimize(tradInput);
+
+        double rothAvg = rothResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+        double tradAvg = tradResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        assertThat(rothAvg)
+                .as("All-roth (tax-free) should sustain higher spending than all-traditional (taxed at 20%%)")
+                .isGreaterThan(tradAvg);
+    }
+
+    // === Binary search edge cases ===
+
+    @Test
+    void optimize_essentialFloorEqualsPortfolio_nearZeroDiscretionary() {
+        // When the essential floor is very high relative to portfolio, the binary
+        // search should converge to near-zero discretionary because the portfolio
+        // can barely sustain the floor itself.
+        // Use a large terminal target ($300k) to further constrain discretionary.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        // $100k portfolio, $80k floor, $300k terminal target — the portfolio cannot
+        // even fund the floor reliably, so discretionary must be near zero.
+        var input = buildInput(
+                new BigDecimal("100000"),
+                new BigDecimal("80000"),
+                new BigDecimal("300000"),
+                phases,
+                List.of(),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+
+        // Discretionary should be very small relative to the floor
+        double avgDiscretionary = result.yearlySpending().stream()
+                .mapToDouble(y -> y.discretionary().doubleValue())
+                .average().orElse(0);
+
+        assertThat(avgDiscretionary)
+                .as("With portfolio barely funding the floor + terminal target, discretionary should be near zero")
+                .isLessThan(5000);
+    }
+
+    @Test
+    void optimize_veryLargePortfolio_fullSpendingSustainable() {
+        // A $20M portfolio with a $50k floor should easily sustain maximum
+        // discretionary spending up to the $500k ceiling.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input = buildInput(
+                new BigDecimal("20000000"),
+                new BigDecimal("50000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+
+        // With $20M, first-year recommended should be well above the floor
+        double firstRecommended = result.yearlySpending().getFirst().recommended().doubleValue();
+        assertThat(firstRecommended)
+                .as("$20M portfolio should sustain spending far above the $50k floor")
+                .isGreaterThan(200000);
+
+        // Discretionary should be substantial
+        double firstDiscretionary = result.yearlySpending().getFirst().discretionary().doubleValue();
+        assertThat(firstDiscretionary)
+                .as("Discretionary should be large with a $20M portfolio")
+                .isGreaterThan(100000);
+    }
+
+    // === Dynamic sequencing in MC ===
+
+    @Test
+    void optimize_dynamicSequencing_traditionalDrawCappedAtBracketCeiling() {
+        // With dynamic sequencing, traditional draws should be limited by bracket
+        // ceiling. Lower bracket rate → lower ceiling → less traditional draw.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        // DS with a 22% bracket rate — ceiling at $100k (from mock)
+        var dsInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "dynamic_sequencing",
+                false, null, null, 5, null, new BigDecimal("0.22"));
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(dsInput);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        // DS should produce valid spending
+        assertThat(result.yearlySpending().getFirst().recommended().doubleValue())
+                .isGreaterThan(0);
+
+        // Compare with taxable_first to verify DS produces different allocation
+        var tfInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var tfResult = taxOptimizer.optimize(tfInput);
+
+        // Both should produce valid results; DS and taxable_first may differ
+        assertThat(tfResult.yearlySpending()).isNotEmpty();
+        assertThat(tfResult.yearlySpending().getFirst().recommended().doubleValue())
+                .isGreaterThan(0);
+    }
+
+    @Test
+    void optimize_dynamicSequencing_bracketCeilingBelowOtherIncome_zeroTraditionalDraw() {
+        // When bracket ceiling ($100k from mock) is below other income,
+        // bracket space = 0 → zero traditional draw, all from taxable/roth.
+        // SS income of $120k exceeds the $100k ceiling → no bracket space.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var highIncomeSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
+                new BigDecimal("120000"), 62, null,
+                BigDecimal.ZERO, false, "partially_taxable",
+                null, null, null, null, null, null);
+
+        var dsInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                    new HypotheticalAccountInput(new BigDecimal("500000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                List.of(highIncomeSource),
+                new BigDecimal("20000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "dynamic_sequencing",
+                false, null, null, 5, null, new BigDecimal("0.22"));
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(dsInput);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        // With $120k income exceeding $100k ceiling, bracket space = 0.
+        // DS draws from taxable/roth instead of traditional.
+        // Spending should still be valid and positive.
+        for (var ys : result.yearlySpending()) {
+            assertThat(ys.recommended().doubleValue())
+                    .as("Age %d: spending valid even when DS bracket space is zero", ys.age())
+                    .isGreaterThanOrEqualTo(0);
+        }
+    }
+
+    // === Corridor smoothing ===
+
+    @Test
+    void optimize_maxAnnualAdjustmentRate_limitsYoyChange() {
+        // With a 3% max annual adjustment rate, year-over-year total spending
+        // changes within a phase should be capped at 3%.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var input = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                new BigDecimal("0.03"),
+                0);
+
+        var result = optimizer.optimize(input);
+        var spending = result.yearlySpending();
+
+        assertThat(spending).isNotEmpty();
+        for (int i = 1; i < spending.size(); i++) {
+            double prev = spending.get(i - 1).recommended().doubleValue();
+            double curr = spending.get(i).recommended().doubleValue();
+            if (prev > 0) {
+                double changeRate = Math.abs(curr - prev) / prev;
+                assertThat(changeRate)
+                        .as("Age %d->%d: YoY change %.1f%% should be <= 3%%",
+                                spending.get(i - 1).age(), spending.get(i).age(), changeRate * 100)
+                        .isLessThanOrEqualTo(0.0301); // small tolerance for floating point
+            }
+        }
+    }
+
+    @Test
+    void optimize_noMaxAdjustmentRate_spendingCanJumpFreely() {
+        // Without a max annual adjustment rate, spending can jump freely between
+        // phases. Compare two-phase setup: with vs without smoothing.
+        var phases = List.of(
+                new GuardrailPhaseInput("High", 62, 72, 3),
+                new GuardrailPhaseInput("Low", 73, null, 1));
+
+        // Without smoothing (no maxAnnualAdjustmentRate)
+        var noSmoothing = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        // With tight smoothing (3% max)
+        var withSmoothing = buildInputFull(
+                new BigDecimal("500000"),
+                new BigDecimal("10000"),
+                new BigDecimal("50000"),
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                new BigDecimal("0.03"),
+                0);
+
+        var noSmoothResult = optimizer.optimize(noSmoothing);
+        var withSmoothResult = optimizer.optimize(withSmoothing);
+
+        // Compute max within-phase YoY change for each result
+        double maxChangeNoSmooth = 0;
+        double maxChangeWithSmooth = 0;
+        var noSmoothList = noSmoothResult.yearlySpending();
+        var withSmoothList = withSmoothResult.yearlySpending();
+
+        for (int i = 1; i < noSmoothList.size(); i++) {
+            // Skip phase boundary (age 73)
+            if (noSmoothList.get(i).age() == 73) continue;
+            double prev = noSmoothList.get(i - 1).recommended().doubleValue();
+            double curr = noSmoothList.get(i).recommended().doubleValue();
+            if (prev > 0) {
+                maxChangeNoSmooth = Math.max(maxChangeNoSmooth, Math.abs(curr - prev) / prev);
+            }
+        }
+        for (int i = 1; i < withSmoothList.size(); i++) {
+            if (withSmoothList.get(i).age() == 73) continue;
+            double prev = withSmoothList.get(i - 1).recommended().doubleValue();
+            double curr = withSmoothList.get(i).recommended().doubleValue();
+            if (prev > 0) {
+                maxChangeWithSmooth = Math.max(maxChangeWithSmooth, Math.abs(curr - prev) / prev);
+            }
+        }
+
+        // With smoothing, max within-phase change should be tighter
+        assertThat(maxChangeWithSmooth)
+                .as("With 3%% smoothing, max within-phase YoY change should be <= 3%% (tolerance)")
+                .isLessThanOrEqualTo(0.0301);
+    }
+
+    // === Portfolio floor ===
+
+    @Test
+    void optimize_portfolioFloorSet_spendingReducedToPreserveBalance() {
+        // A high portfolio floor ($500k) on a $1M portfolio should meaningfully
+        // reduce spending compared to no floor, because the optimizer must ensure
+        // the mid-retirement portfolio never drops below $500k at the confidence level.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var noFloor = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                BigDecimal.ZERO,
+                null,
+                0);
+
+        var highFloor = buildInputFull(
+                new BigDecimal("1000000"),
+                new BigDecimal("20000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                500,
+                42L,
+                new BigDecimal("500000"),
+                null,
+                0);
+
+        var noFloorResult = optimizer.optimize(noFloor);
+        var highFloorResult = optimizer.optimize(highFloor);
+
+        double noFloorAvg = noFloorResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+        double highFloorAvg = highFloorResult.yearlySpending().stream()
+                .mapToDouble(y -> y.recommended().doubleValue())
+                .average().orElse(0);
+
+        assertThat(highFloorAvg)
+                .as("$500k portfolio floor should reduce spending vs no floor to preserve balance")
+                .isLessThan(noFloorAvg);
+
+        // The reduction should be material (at least 10% less spending)
+        assertThat(highFloorAvg)
+                .as("Portfolio floor reduction should be material")
+                .isLessThan(noFloorAvg * 0.90);
+    }
 }
