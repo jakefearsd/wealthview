@@ -1045,4 +1045,374 @@ class RothConversionOptimizerTest {
                 .as("DS should produce lower or equal lifetime tax")
                 .isLessThanOrEqualTo(tfResult.lifetimeTaxWith());
     }
+
+    // ---- Affordability constraint tests (constrainConversionByAffordability) ----
+
+    @Test
+    void optimize_earlyWithdrawalAge_taxableTooLowForConversionTax_conversionReducedToZero() {
+        // Early retiree (age 55) with $1 taxable — not enough to pay tax on any conversion.
+        // essentialFloor = $40K spending need, so netSpendingNeed = $40K.
+        // available = $1 - $40K = negative → conversion constrained to zero.
+        var optimizer = testBuilder()
+                .traditional(800_000)
+                .taxable(1)
+                .roth(0)
+                .birthYear(1970)
+                .retirementAge(55)
+                .endAge(90)
+                .essentialFloor(40_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        // Before age 60 (years 0-4), conversions should be zero because taxable
+        // balance cannot cover both spending and conversion tax
+        for (int i = 0; i < 5; i++) {
+            assertThat(result.conversionByYear()[i])
+                    .as("Conversion at age %d should be zero (no taxable to pay tax)", 55 + i)
+                    .isEqualTo(0.0);
+        }
+    }
+
+    @Test
+    void optimize_earlyWithdrawalAge_barelyEnoughTaxable_conversionLimitedByAffordability() {
+        // Early retiree (age 55) with $150K taxable, $40K essential floor.
+        // Year 0: available = $150K * 1.06 (growth) - $40K spending = ~$119K for tax.
+        // At 20% tax, the binary search should allow a conversion whose tax fits in ~$119K.
+        // Compare against an optimizer with $500K taxable (unconstrained).
+        var constrainedOpt = testBuilder()
+                .traditional(800_000)
+                .taxable(150_000)
+                .birthYear(1970)
+                .retirementAge(55)
+                .endAge(90)
+                .essentialFloor(40_000)
+                .build();
+
+        var unconstrainedOpt = testBuilder()
+                .traditional(800_000)
+                .taxable(500_000)
+                .birthYear(1970)
+                .retirementAge(55)
+                .endAge(90)
+                .essentialFloor(40_000)
+                .build();
+
+        var constrainedResult = constrainedOpt.optimize();
+        var unconstrainedResult = unconstrainedOpt.optimize();
+
+        // Sum pre-60 conversions for each
+        double constrainedPreSixty = 0;
+        double unconstrainedPreSixty = 0;
+        for (int i = 0; i < 5; i++) {
+            constrainedPreSixty += constrainedResult.conversionByYear()[i];
+            unconstrainedPreSixty += unconstrainedResult.conversionByYear()[i];
+        }
+
+        // Constrained should have fewer pre-60 conversions due to affordability cap
+        assertThat(constrainedPreSixty)
+                .as("Limited taxable should constrain pre-60 conversions")
+                .isLessThan(unconstrainedPreSixty);
+    }
+
+    @Test
+    void optimize_ageAbove60_noAffordabilityConstraint() {
+        // Retiree at age 62 (above EARLY_WITHDRAWAL_AGE=60) — affordability constraint
+        // does NOT apply. Even with small taxable balance, conversions proceed because
+        // the deductCascade can use traditional/roth to pay tax post-60.
+        var optimizer = testBuilder()
+                .traditional(800_000)
+                .taxable(5_000)
+                .roth(50_000)
+                .birthYear(1963)
+                .retirementAge(62)
+                .endAge(90)
+                .essentialFloor(30_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+        // Post-60 retiree: conversions should still happen because tax is paid via
+        // deductCascade (taxable -> traditional -> roth), not constrained by taxable alone
+        assertThat(totalConversions)
+                .as("Post-60 retiree should still convert despite small taxable (no affordability limit)")
+                .isGreaterThan(0);
+    }
+
+    // ---- MAGI convergence tests (convergeConversionAmount) ----
+
+    @Test
+    void optimize_withPassiveRentalAtModerateMAGI_conversionReflectsPartialLossPhaseout() {
+        // Passive rental at MAGI ~$110K triggers partial $25K exception phaseout.
+        // At $110K MAGI, the exception is $25K - ($110K-$100K)*0.5 = $20K.
+        // Conversion amount should differ from a scenario at MAGI $80K (full exception).
+        int years = 28;
+        int firstCalYear = 1963 + 62;
+        Map<Integer, BigDecimal> depByYear = new java.util.HashMap<>();
+        for (int y = 0; y < years; y++) {
+            // net: $30K - $10K - $3K - $50K = -$33K loss
+            depByYear.put(firstCalYear + y, new BigDecimal("50000"));
+        }
+
+        var passiveSource = new ProjectionIncomeSourceInput(
+                java.util.UUID.randomUUID(), "Passive Rental", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("30000"), 62, null,
+                BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("10000"), BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("3000"), "straight_line", depByYear);
+
+        // Moderate other income at $50K taxable income, pushing MAGI near $110K with conversions
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+        java.util.Arrays.fill(otherIncome, 50_000);
+        java.util.Arrays.fill(taxableIncome, 50_000);
+
+        var moderateOpt = testBuilder()
+                .otherIncome(otherIncome)
+                .taxableIncome(taxableIncome)
+                .withRentals(List.of(passiveSource))
+                .build();
+
+        // Zero other income — MAGI stays low, full $25K exception applies
+        var lowOpt = testBuilder()
+                .withRentals(List.of(passiveSource))
+                .build();
+
+        var moderateResult = moderateOpt.optimize();
+        var lowResult = lowOpt.optimize();
+
+        // Higher MAGI phases out the passive exception, increasing effective tax
+        assertThat(moderateResult.lifetimeTaxWith())
+                .as("Moderate MAGI (partial phaseout) should produce higher lifetime tax than low MAGI (full exception)")
+                .isGreaterThan(lowResult.lifetimeTaxWith());
+    }
+
+    @Test
+    void optimize_noRentalSources_convergenceFirstIteration() {
+        // Without rental properties, there's no MAGI-dependent phaseout.
+        // The convergeConversionAmount loop should converge on the first iteration.
+        // Verify by comparing scheduleForFraction at the same fraction — deterministic result.
+        var optimizer = testBuilder()
+                .traditional(1_000_000)
+                .taxable(200_000)
+                .build();
+
+        var result1 = optimizer.scheduleForFraction(0.5);
+        var result2 = optimizer.scheduleForFraction(0.5);
+
+        // Without rentals, conversion amounts are deterministic from the first iteration
+        assertThat(result1.lifetimeTaxWith())
+                .as("No rentals: scheduleForFraction must produce identical results (converges in 1 iteration)")
+                .isEqualTo(result2.lifetimeTaxWith());
+
+        int years = 28;
+        for (int i = 0; i < years; i++) {
+            assertThat(result1.conversionByYear()[i])
+                    .as("Conversion at year %d should be identical across calls", i)
+                    .isEqualTo(result2.conversionByYear()[i]);
+        }
+    }
+
+    // ---- Target traditional balance tests (computeTargetTraditionalBalance) ----
+
+    @Test
+    void optimize_otherIncomeExceedsBracketCeilingAtRmd_targetBalanceIsZero() {
+        // At RMD age, other income ($60K taxable) exceeds the 12% bracket ceiling ($55K).
+        // Available for RMD = $55K * 0.90 - $60K = negative → target balance = 0.
+        // With target balance = 0, the optimizer converts everything it can.
+        int years = 28;
+        var otherIncome = new double[years];
+        var taxableIncome = new double[years];
+        java.util.Arrays.fill(otherIncome, 60_000);
+        java.util.Arrays.fill(taxableIncome, 60_000);
+
+        var optimizer = testBuilder()
+                .traditional(1_000_000)
+                .taxable(300_000)
+                .otherIncome(otherIncome)
+                .taxableIncome(taxableIncome)
+                .rmdTargetBracketRate(0.12)
+                .essentialFloor(30_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result.targetTraditionalBalance())
+                .as("Other income exceeds bracket ceiling at RMD age — target balance should be zero")
+                .isEqualTo(0.0);
+    }
+
+    @Test
+    void optimize_veryLowOtherIncomeAtRmd_largeTargetBalance() {
+        // Zero other income at RMD age → all bracket space available for RMDs.
+        // With 12% bracket ceiling = $55K, headroom 10%:
+        // availableForRmd = $55K * 0.90 = $49.5K
+        // target = $49.5K * distributionPeriod(75) = $49.5K * 24.6 = $1,217,700
+        var optimizer = testBuilder()
+                .traditional(2_000_000)
+                .taxable(300_000)
+                .rmdTargetBracketRate(0.12)
+                .essentialFloor(30_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        // With zero other income, all bracket space goes to RMDs → large target
+        assertThat(result.targetTraditionalBalance())
+                .as("Zero other income at RMD age should produce a large target balance")
+                .isGreaterThan(1_000_000);
+    }
+
+    // ---- Withdrawal strategy selection tests ----
+
+    @Test
+    void optimize_ageBefore60_onlyTaxableUsedForSpending() {
+        // Early retiree (age 55): EarlyWithdrawalStrategy draws only from taxable.
+        // Traditional and Roth balances should not decrease from spending withdrawals
+        // (only from conversions and growth).
+        var optimizer = testBuilder()
+                .traditional(500_000)
+                .roth(100_000)
+                .taxable(500_000)
+                .birthYear(1970)
+                .retirementAge(55)
+                .endAge(90)
+                .essentialFloor(30_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        // For years before age 60 (indices 0-4), the Roth balance should only grow
+        // (no spending withdrawals from Roth in early withdrawal strategy).
+        // Roth grows by returnMean (6%) each year plus any conversions.
+        for (int i = 1; i < 5; i++) {
+            assertThat(result.rothBalance()[i])
+                    .as("Roth balance at age %d should be >= prior year (no early Roth spending draws)", 55 + i)
+                    .isGreaterThanOrEqualTo(result.rothBalance()[i - 1]);
+        }
+    }
+
+    @Test
+    void optimize_dynamicSequencing_traditionalDrawsUpToBracketCeiling() {
+        // Dynamic sequencing: traditional draws up to bracket ceiling first,
+        // then taxable, then roth. This should produce different withdrawal tax
+        // than taxable-first ordering due to active traditional draws.
+        var dsOpt = testBuilder()
+                .traditional(1_000_000)
+                .taxable(200_000)
+                .roth(100_000)
+                .withdrawalOrder("dynamic_sequencing")
+                .dynamicSequencingBracketRate(0.12)
+                .essentialFloor(30_000)
+                .build();
+
+        var orderedOpt = testBuilder()
+                .traditional(1_000_000)
+                .taxable(200_000)
+                .roth(100_000)
+                .essentialFloor(30_000)
+                .build();
+
+        var dsResult = dsOpt.optimize();
+        var orderedResult = orderedOpt.optimize();
+
+        // DS draws from traditional for spending (up to bracket ceiling) rather than
+        // only from taxable. The two strategies should produce different lifetime tax
+        // profiles — DS should be equal or lower.
+        assertThat(dsResult.lifetimeTaxWith())
+                .as("DS should produce lower or equal lifetime tax than taxable-first")
+                .isLessThanOrEqualTo(orderedResult.lifetimeTaxWith());
+
+        // Verify taxable balance differs — DS preserves taxable by drawing traditional
+        // for spending within the bracket ceiling, leading to higher taxable at some point.
+        boolean balancesDiffer = false;
+        for (int i = 0; i < dsResult.taxableBalance().length; i++) {
+            if (Math.abs(dsResult.taxableBalance()[i] - orderedResult.taxableBalance()[i]) > 1.0) {
+                balancesDiffer = true;
+                break;
+            }
+        }
+        assertThat(balancesDiffer)
+                .as("DS and ordered strategies should produce different taxable balance trajectories")
+                .isTrue();
+    }
+
+    // ---- Edge case tests ----
+
+    @Test
+    void optimize_zeroYears_emptyScheduleNoConversions() {
+        // retirementAge == endAge → years = 0, no simulation loop
+        var optimizer = testBuilder()
+                .traditional(1_000_000)
+                .birthYear(1963)
+                .retirementAge(70)
+                .endAge(70)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        assertThat(result.conversionByYear()).isEmpty();
+        assertThat(result.projectedRmd()).isEmpty();
+        assertThat(result.traditionalBalance()).isEmpty();
+    }
+
+    @Test
+    void optimize_traditionalAlreadyBelowTarget_conversionsCappedToZero() {
+        // Small traditional ($50K) well below the target balance (~$1.2M for 12% bracket).
+        // The optimizer should produce zero conversions because traditional projected to
+        // RMD age stays below the target.
+        var optimizer = testBuilder()
+                .traditional(50_000)
+                .roth(500_000)
+                .taxable(200_000)
+                .rmdTargetBracketRate(0.12)
+                .build();
+
+        var result = optimizer.optimize();
+
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+        assertThat(totalConversions)
+                .as("Traditional below target — no conversions should occur")
+                .isEqualTo(0.0);
+    }
+
+    @Test
+    void optimize_allAccountsAtZero_noConversionsNoErrors() {
+        var optimizer = testBuilder()
+                .traditional(0)
+                .roth(0)
+                .taxable(0)
+                .essentialFloor(30_000)
+                .build();
+
+        var result = optimizer.optimize();
+
+        assertThat(result).isNotNull();
+        double totalConversions = 0;
+        for (double c : result.conversionByYear()) {
+            totalConversions += c;
+        }
+        assertThat(totalConversions)
+                .as("All accounts at zero should produce zero conversions")
+                .isEqualTo(0.0);
+
+        // Lifetime tax should also be zero (no income to tax)
+        assertThat(result.lifetimeTaxWith())
+                .as("All accounts at zero should produce zero lifetime tax")
+                .isEqualTo(0.0);
+
+        // Should not throw — graceful degradation
+        assertThat(result.conversionByYear()).hasSize(28);
+    }
 }
