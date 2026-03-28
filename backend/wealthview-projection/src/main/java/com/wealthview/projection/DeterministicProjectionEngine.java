@@ -228,27 +228,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal contributions = BigDecimal.ZERO;
             BigDecimal withdrawals = BigDecimal.ZERO;
 
-            if (!retired) {
+            if (retired) {
+                yearsInRetirement++;
+            } else {
                 contributions = pool.applyContributions();
             }
 
             var growthResult = pool.applyGrowth();
             BigDecimal totalGrowth = growthResult.total();
 
-            if (retired) {
-                yearsInRetirement++;
-            }
-
-            // If the spending plan provides optimizer-computed conversions, use those
-            // instead of the scenario's fill_bracket strategy
-            BigDecimal conversionOverride = null;
-            if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
-                conversionOverride = gsi.conversionByYear().getOrDefault(year, BigDecimal.ZERO);
-            }
-
             var incomeResult = processIncomeAndConversions(
                     pool, incomeSources, age, yearsInRetirement, year, suspendedLoss,
-                    conversionOverride);
+                    resolveConversionOverride(spendingPlan, year));
             suspendedLoss = incomeResult.suspendedLoss();
             BigDecimal conversionAmount = incomeResult.conversionAmount();
             BigDecimal taxLiability = incomeResult.taxLiability();
@@ -288,12 +279,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             yearDto = applyPropertyEquity(yearDto, propertyEquity);
             yearDto = applyViability(yearDto, spendingPlan, year, age, yearsInRetirement, inflationRate,
                     incomeResult.totalActiveIncome());
-            if (incomeResult.isResult() != null) {
-                yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
-            }
-            if (surplusReinvested != null) {
-                yearDto = yearDto.withSurplusReinvested(surplusReinvested);
-            }
+            yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
+            yearDto = yearDto.withSurplusReinvested(surplusReinvested);
             yearDto = applyRetirementTaxAnnotations(yearDto, retired, age, year,
                     wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
                     taxLiability, pool, taxStrategy);
@@ -311,6 +298,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
                 yearsInRetirement, feasibility, finalNetWorth);
+    }
+
+    private BigDecimal resolveConversionOverride(SpendingPlan spendingPlan, int year) {
+        if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
+            return gsi.conversionByYear().getOrDefault(year, BigDecimal.ZERO);
+        }
+        return null;
     }
 
     /**

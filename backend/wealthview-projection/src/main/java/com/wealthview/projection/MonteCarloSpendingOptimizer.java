@@ -103,6 +103,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             boolean traditionalExhausted
     ) {}
 
+    /** Pre-computed per-year income and tax arrays for the optimization run. */
+    private record IncomeArrays(double[] incomeByYear, double[] taxableIncomeByYear,
+                                double[] surplusTaxByYear) {}
+
     /** Configuration shared across all trials in a simulation run. */
     private record SimulationConfig(
             double initTaxable, double initTraditional, double initRoth,
@@ -178,28 +182,19 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         FilingStatus filingStatus = input.filingStatus() != null
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
-        double[] incomeByYear = new double[years];
-        double[] taxableIncomeByYear = new double[years];
-        // Pre-compute surplus tax once per year to avoid calling the tax calculator inside hot loops.
-        double[] surplusTaxByYear = new double[years];
-        for (int y = 0; y < years; y++) {
-            incomeByYear[y] = incomeData[y].totalIncome();
-            taxableIncomeByYear[y] = incomeData[y].taxableIncome();
-            surplusTaxByYear[y] = computeSurplusTax(
-                    incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
-        }
+        var incomeArrays = computeIncomeArrays(incomeData, years, retirementYear, filingStatus);
 
         // Compute rental-aware taxable income for marginal rate pre-computation.
         // This adjusts the base taxable income with rental property depreciation,
         // passive loss rules, and carryforward so that MC trial withdrawal tax
         // estimates reflect actual bracket positions.
         double[] rentalAwareTaxableIncome = computeRentalAwareTaxableIncome(
-                taxableIncomeByYear, input.incomeSources(),
+                incomeArrays.taxableIncomeByYear(), input.incomeSources(),
                 incomeData, retirementAge, input.birthYear(), years);
 
         // Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
-                portfolioPaths, incomeByYear, essentialFloor,
+                portfolioPaths, incomeArrays.incomeByYear(), essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
 
         double[] marginalRates = precomputeMarginalRates(
@@ -209,18 +204,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         withdrawalOrder, marginalRates)
                 : null;
 
-        // Pre-compute DS bracket ceilings per year for dynamic_sequencing withdrawal order
-        double[] dsBracketCeilingByYear = null;
-        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
-                && input.dynamicSequencingBracketRate() != null
-                && taxCalculator != null) {
-            dsBracketCeilingByYear = new double[years];
-            for (int y = 0; y < years; y++) {
-                dsBracketCeilingByYear[y] = taxCalculator.computeMaxIncomeForBracket(
-                        input.dynamicSequencingBracketRate(), retirementYear + y, filingStatus,
-                        input.inflationRate()).doubleValue();
-            }
-        }
+        double[] dsBracketCeilingByYear = computeDsBracketCeilings(
+                withdrawalOrder, input.dynamicSequencingBracketRate(),
+                years, retirementYear, filingStatus, input.inflationRate());
 
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
@@ -232,9 +218,43 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths),
                 new TaxIncomeContext(filingStatus, essentialFloor,
-                        incomeByYear, taxableIncomeByYear, surplusTaxByYear,
+                        incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
+                        incomeArrays.surplusTaxByYear(),
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, marginalRates,
                         taxCtx, dsBracketCeilingByYear));
+    }
+
+    private IncomeArrays computeIncomeArrays(IncomeYearData[] incomeData, int years,
+                                              int retirementYear, FilingStatus filingStatus) {
+        double[] incomeByYear = new double[years];
+        double[] taxableIncomeByYear = new double[years];
+        double[] surplusTaxByYear = new double[years];
+        for (int y = 0; y < years; y++) {
+            incomeByYear[y] = incomeData[y].totalIncome();
+            taxableIncomeByYear[y] = incomeData[y].taxableIncome();
+            surplusTaxByYear[y] = computeSurplusTax(
+                    incomeData[y].taxableIncome(), retirementYear + y, filingStatus);
+        }
+        return new IncomeArrays(incomeByYear, taxableIncomeByYear, surplusTaxByYear);
+    }
+
+    private double[] computeDsBracketCeilings(String withdrawalOrder,
+                                               BigDecimal dynamicSequencingBracketRate,
+                                               int years, int retirementYear,
+                                               FilingStatus filingStatus,
+                                               BigDecimal inflationRate) {
+        if (!PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
+                || dynamicSequencingBracketRate == null
+                || taxCalculator == null) {
+            return null;
+        }
+        double[] ceilings = new double[years];
+        for (int y = 0; y < years; y++) {
+            ceilings[y] = taxCalculator.computeMaxIncomeForBracket(
+                    dynamicSequencingBracketRate, retirementYear + y, filingStatus,
+                    inflationRate).doubleValue();
+        }
+        return ceilings;
     }
 
     private ConversionResult optimizeConversions(OptimizationSetup ctx,
