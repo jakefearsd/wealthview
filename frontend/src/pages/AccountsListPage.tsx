@@ -5,6 +5,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import type { Account, AccountRequest } from '../types/account';
 import { cardStyle } from '../utils/styles';
+import { formatCurrency } from '../utils/format';
 import toast from 'react-hot-toast';
 
 export default function AccountsListPage() {
@@ -15,12 +16,14 @@ export default function AccountsListPage() {
     const [name, setName] = useState('');
     const [type, setType] = useState('brokerage');
     const [institution, setInstitution] = useState('');
+    const [currency, setCurrency] = useState('USD');
     const { data, loading, error, refetch } = useApiQuery(() => listAccounts(0, 100));
 
     function resetForm() {
         setName('');
         setType('brokerage');
         setInstitution('');
+        setCurrency('USD');
         setEditingId(null);
         setShowForm(false);
     }
@@ -29,12 +32,18 @@ export default function AccountsListPage() {
         setName(account.name);
         setType(account.type);
         setInstitution(account.institution ?? '');
+        setCurrency(account.currency ?? 'USD');
         setEditingId(account.id);
         setShowForm(true);
     }
 
     async function handleSave() {
-        const request: AccountRequest = { name, type, institution: institution || undefined };
+        const request: AccountRequest = {
+            name,
+            type,
+            institution: institution || undefined,
+            currency: currency || 'USD',
+        };
         try {
             if (editingId) {
                 await updateAccount(editingId, request);
@@ -74,7 +83,7 @@ export default function AccountsListPage() {
             {showForm && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Account' : 'Create Account'}</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
                         <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         <select value={type} onChange={(e) => setType(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}>
                             <option value="brokerage">Brokerage</option>
@@ -84,6 +93,13 @@ export default function AccountsListPage() {
                             <option value="bank">Bank</option>
                         </select>
                         <input placeholder="Institution" value={institution} onChange={(e) => setInstitution(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                        <input
+                            placeholder="Currency (e.g. USD, EUR)"
+                            value={currency}
+                            onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+                            maxLength={3}
+                            style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                        />
                     </div>
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
                         <button onClick={handleSave} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editingId ? 'Save' : 'Create'}</button>
@@ -106,9 +122,22 @@ export default function AccountsListPage() {
                                 }}>
                                     {account.type === '401k' ? '401(k)' : account.type === 'ira' ? 'IRA' : account.type === 'roth' ? 'Roth IRA' : account.type.charAt(0).toUpperCase() + account.type.slice(1)}
                                 </span>
+                                {account.currency !== 'USD' && (
+                                    <span style={{
+                                        padding: '0.2rem 0.6rem',
+                                        background: '#fce4ec',
+                                        color: '#c62828',
+                                        borderRadius: '4px',
+                                        fontSize: '0.75rem',
+                                        fontWeight: 600,
+                                        marginLeft: '0.5rem',
+                                    }}>
+                                        {account.currency}
+                                    </span>
+                                )}
                             </div>
                             <div style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
-                                ${account.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatCurrency(account.balance, account.currency)}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
                                 <div>
