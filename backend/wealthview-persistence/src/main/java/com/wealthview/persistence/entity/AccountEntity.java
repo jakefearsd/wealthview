@@ -33,6 +33,9 @@ public class AccountEntity {
 
     private String institution;
 
+    @Column(nullable = false)
+    private String currency = "USD";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
 
@@ -43,10 +46,15 @@ public class AccountEntity {
     }
 
     public AccountEntity(TenantEntity tenant, String name, String type, String institution) {
+        this(tenant, name, type, institution, "USD");
+    }
+
+    public AccountEntity(TenantEntity tenant, String name, String type, String institution, String currency) {
         this.tenant = tenant;
         this.name = name;
         this.type = type;
         this.institution = institution;
+        this.currency = currency != null ? currency : "USD";
     }
 
     public UUID getId() {
@@ -83,6 +91,14 @@ public class AccountEntity {
 
     public void setInstitution(String institution) {
         this.institution = institution;
+    }
+
+    public String getCurrency() {
+        return currency;
+    }
+
+    public void setCurrency(String currency) {
+        this.currency = currency;
     }
 
     public OffsetDateTime getCreatedAt() {
