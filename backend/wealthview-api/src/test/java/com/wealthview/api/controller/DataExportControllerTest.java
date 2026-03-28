@@ -48,7 +48,7 @@ class DataExportControllerTest {
     @Test
     void exportJson_returnsJsonWithContentDisposition() throws Exception {
         var export = new TenantExportDto(
-                List.of(new AccountResponse(UUID.randomUUID(), "Brokerage", "taxable", "Fidelity",
+                List.of(new AccountResponse(UUID.randomUUID(), "Brokerage", "taxable", "Fidelity", "USD",
                         BigDecimal.ZERO, OffsetDateTime.now())),
                 List.of(),
                 List.of(),
