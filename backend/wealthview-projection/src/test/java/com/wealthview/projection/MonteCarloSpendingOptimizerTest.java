@@ -2116,4 +2116,124 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(lastYear.contingentSpendingMedian()).isNotNull();
         assertThat(lastYear.contingentSpendingP55()).isNotNull();
     }
+
+    // === simulateTrial branch coverage: multi-pool + cash buffer + conversions ===
+
+    @Test
+    void optimize_multiPool_withCashBuffer_taxAwareWithdrawal() {
+        // Multi-pool (traditional + taxable) with cash buffer + tax awareness.
+        // Exercises the hasPools + cashReserveYears > 0 branches in simulateTrial.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("300000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("700000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                2, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        // Multi-pool + cash buffer should produce valid spending
+        assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
+
+        // Compare with same input WITHOUT cash buffer
+        var noCashInput = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("300000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("700000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                List.of(),
+                new BigDecimal("20000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+        var noCashResult = taxOptimizer.optimize(noCashInput);
+        // Both should produce valid, comparable results
+        assertThat(noCashResult.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
+    }
+
+    @Test
+    void optimize_multiPool_conversionsAndWithdrawalTax_combinedPath() {
+        // Traditional-heavy portfolio with conversions enabled — exercises both
+        // conversion tax deduction and withdrawal tax branches in simulateTrial.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("600000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                List.of(),
+                new BigDecimal("20000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"),
+                5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        assertThat(result.yearlySpending().getFirst().recommended().doubleValue()).isGreaterThan(0);
+        // With conversions enabled, should produce a conversion schedule
+        assertThat(result.conversionSchedule()).isNotNull();
+    }
+
+    @Test
+    void optimize_multiPool_cashBufferAndConversions_allBranchesCombined() {
+        // The most complex scenario — exercises ALL major branches in simulateTrial
+        // simultaneously: multi-pool, cash buffer, and Roth conversions.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                    new HypotheticalAccountInput(new BigDecimal("600000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                    new HypotheticalAccountInput(new BigDecimal("200000"),
+                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                List.of(),
+                new BigDecimal("20000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                2, BigDecimal.ZERO, "single", "taxable_first",
+                true, new BigDecimal("0.22"), new BigDecimal("0.12"),
+                5, null, null);
+
+        var taxOptimizer = taxAwareOptimizer();
+        var result = taxOptimizer.optimize(input);
+
+        assertThat(result).isNotNull();
+        assertThat(result.yearlySpending()).isNotEmpty();
+        double spending = result.yearlySpending().getFirst().recommended().doubleValue();
+        assertThat(spending).isGreaterThan(0);
+        // Should not produce NaN or negative values
+        for (var ys : result.yearlySpending()) {
+            assertThat(ys.recommended().doubleValue()).isGreaterThanOrEqualTo(0);
+            assertThat(Double.isNaN(ys.recommended().doubleValue())).isFalse();
+        }
+    }
 }
