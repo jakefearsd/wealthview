@@ -3,8 +3,8 @@ export function toPercent(decimal: number): number {
     return parseFloat((decimal * 100).toPrecision(10));
 }
 
-export function formatCurrency(value: number): string {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+export function formatCurrency(value: number, currency: string = 'USD'): string {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(value);
 }
 
 /** Strip commas from a display string to get a raw numeric string. */
