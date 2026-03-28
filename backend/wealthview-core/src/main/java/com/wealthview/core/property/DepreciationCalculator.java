@@ -1,12 +1,7 @@
 package com.wealthview.core.property;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.persistence.entity.PropertyEntity;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -20,8 +15,6 @@ import java.util.Set;
 @Component
 public class DepreciationCalculator {
 
-    private static final Logger log = LoggerFactory.getLogger(DepreciationCalculator.class);
-    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
@@ -218,7 +211,7 @@ public class DepreciationCalculator {
         }
 
         if ("cost_segregation".equals(method)) {
-            var allocations = parseCostSegAllocations(property.getCostSegAllocations());
+            var allocations = PropertyService.parseCostSegAllocations(property.getCostSegAllocations());
             if (allocations.isEmpty()) {
                 return Map.of();
             }
@@ -244,15 +237,4 @@ public class DepreciationCalculator {
         return total.setScale(SCALE, ROUNDING);
     }
 
-    private static List<CostSegAllocation> parseCostSegAllocations(String json) {
-        if (json == null || json.isBlank() || "[]".equals(json)) {
-            return List.of();
-        }
-        try {
-            return MAPPER.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to parse cost_seg_allocations JSON", e);
-            return List.of();
-        }
-    }
 }
