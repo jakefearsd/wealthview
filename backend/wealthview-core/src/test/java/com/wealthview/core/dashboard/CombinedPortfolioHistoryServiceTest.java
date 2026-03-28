@@ -2,6 +2,7 @@ package com.wealthview.core.dashboard;
 
 import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -41,6 +42,7 @@ class CombinedPortfolioHistoryServiceTest {
     private static final UUID TENANT_ID = UUID.randomUUID();
 
     @Mock private AccountRepository accountRepository;
+    @Mock private ExchangeRateService exchangeRateService;
     @Mock private HoldingRepository holdingRepository;
     @Mock private PriceRepository priceRepository;
     @Mock private PropertyRepository propertyRepository;
@@ -50,8 +52,11 @@ class CombinedPortfolioHistoryServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
         service = new CombinedPortfolioHistoryService(
-                accountRepository, holdingRepository, priceRepository,
+                accountRepository, exchangeRateService, holdingRepository, priceRepository,
                 propertyRepository, propertyValuationRepository);
     }
 
@@ -349,6 +354,7 @@ class CombinedPortfolioHistoryServiceTest {
         lenient().when(account.getId()).thenReturn(id);
         lenient().when(account.getType()).thenReturn(type);
         lenient().when(account.getName()).thenReturn(type + " account");
+        lenient().when(account.getCurrency()).thenReturn("USD");
         return account;
     }
 

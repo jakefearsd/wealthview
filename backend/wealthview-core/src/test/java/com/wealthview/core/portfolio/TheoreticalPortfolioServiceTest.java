@@ -1,6 +1,7 @@
 package com.wealthview.core.portfolio;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +36,9 @@ class TheoreticalPortfolioServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private ExchangeRateService exchangeRateService;
 
     @Mock
     private HoldingRepository holdingRepository;
@@ -57,6 +62,9 @@ class TheoreticalPortfolioServiceTest {
         tenant = new TenantEntity("Test");
         brokerageAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
         bankAccount = new AccountEntity(tenant, "Checking", "bank", "Chase");
+
+        lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test

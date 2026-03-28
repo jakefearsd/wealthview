@@ -2,6 +2,7 @@ package com.wealthview.core.dashboard;
 
 import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -44,17 +45,20 @@ public class CombinedPortfolioHistoryService {
     private static final int MAX_YEARS = 10;
 
     private final AccountRepository accountRepository;
+    private final ExchangeRateService exchangeRateService;
     private final HoldingRepository holdingRepository;
     private final PriceRepository priceRepository;
     private final PropertyRepository propertyRepository;
     private final PropertyValuationRepository propertyValuationRepository;
 
     public CombinedPortfolioHistoryService(AccountRepository accountRepository,
+                                            ExchangeRateService exchangeRateService,
                                             HoldingRepository holdingRepository,
                                             PriceRepository priceRepository,
                                             PropertyRepository propertyRepository,
                                             PropertyValuationRepository propertyValuationRepository) {
         this.accountRepository = accountRepository;
+        this.exchangeRateService = exchangeRateService;
         this.holdingRepository = holdingRepository;
         this.priceRepository = priceRepository;
         this.propertyRepository = propertyRepository;
@@ -109,34 +113,36 @@ public class CombinedPortfolioHistoryService {
                 .filter(h -> !h.isMoneyMarket())
                 .toList();
 
-        var moneyMarketTotal = moneyMarketHoldings.stream()
-                .map(h -> h.getQuantity().multiply(BigDecimal.ONE))
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
         var regularSymbols = regularHoldings.stream()
                 .map(HoldingEntity::getSymbol)
                 .distinct()
                 .sorted()
                 .toList();
 
-        var quantityBySymbol = new HashMap<String, BigDecimal>();
+        // Group holdings by account currency
+        var currencyByAccountId = investmentAccounts.stream()
+                .collect(Collectors.toMap(AccountEntity::getId, AccountEntity::getCurrency));
+
+        var holdingsByCurrency = new HashMap<String, List<HoldingEntity>>();
         for (var h : regularHoldings) {
-            quantityBySymbol.merge(h.getSymbol(), h.getQuantity(), BigDecimal::add);
+            var currency = currencyByAccountId.getOrDefault(h.getAccountId(), "USD");
+            holdingsByCurrency.computeIfAbsent(currency, k -> new ArrayList<>()).add(h);
+        }
+
+        var mmTotalByCurrency = new HashMap<String, BigDecimal>();
+        for (var h : moneyMarketHoldings) {
+            var currency = currencyByAccountId.getOrDefault(h.getAccountId(), "USD");
+            mmTotalByCurrency.merge(currency, h.getQuantity(), BigDecimal::add);
         }
 
         // Build price map
         Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap;
-        List<String> pricedSymbols;
         if (!regularSymbols.isEmpty()) {
             var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
                     regularSymbols, startDate, endDate);
             priceMap = buildPriceMap(prices);
-            pricedSymbols = regularSymbols.stream()
-                    .filter(priceMap::containsKey)
-                    .toList();
         } else {
             priceMap = new HashMap<>();
-            pricedSymbols = List.of();
         }
 
         // Build property valuation maps
@@ -146,8 +152,29 @@ public class CombinedPortfolioHistoryService {
         // Compute weekly data points
         var dataPoints = new ArrayList<CombinedPortfolioDataPointDto>();
         for (var friday : fridays) {
-            var investmentValue = computeInvestmentValue(
-                    friday, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
+            var investmentValue = BigDecimal.ZERO;
+
+            for (var entry : holdingsByCurrency.entrySet()) {
+                var currency = entry.getKey();
+                var holdings = entry.getValue();
+                var qtyBySymbol = new HashMap<String, BigDecimal>();
+                for (var h : holdings) {
+                    qtyBySymbol.merge(h.getSymbol(), h.getQuantity(), BigDecimal::add);
+                }
+                var symbols = qtyBySymbol.keySet().stream()
+                        .filter(priceMap::containsKey)
+                        .sorted().toList();
+                var currencyValue = computeInvestmentValue(
+                        friday, symbols, qtyBySymbol, priceMap, BigDecimal.ZERO);
+                investmentValue = investmentValue.add(
+                        exchangeRateService.convertToUsd(currencyValue, currency, tenantId));
+            }
+
+            for (var mmEntry : mmTotalByCurrency.entrySet()) {
+                investmentValue = investmentValue.add(
+                        exchangeRateService.convertToUsd(mmEntry.getValue(), mmEntry.getKey(), tenantId));
+            }
+
             var propertyEquity = computePropertyEquity(friday, properties, valuationsByProperty);
             var totalValue = investmentValue.add(propertyEquity);
             dataPoints.add(new CombinedPortfolioDataPointDto(friday, totalValue,

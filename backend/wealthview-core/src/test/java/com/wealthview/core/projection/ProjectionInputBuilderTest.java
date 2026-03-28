@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -33,6 +34,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -41,6 +44,9 @@ class ProjectionInputBuilderTest {
 
     @Mock
     private AccountService accountService;
+
+    @Mock
+    private ExchangeRateService exchangeRateService;
 
     @Mock
     private ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
@@ -66,6 +72,8 @@ class ProjectionInputBuilderTest {
         tenant = new TenantEntity("Test");
         lenient().when(depreciationCalculator.computeSchedule(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(Map.of());
+        lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test

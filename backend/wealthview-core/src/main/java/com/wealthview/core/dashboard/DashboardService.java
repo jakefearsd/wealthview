@@ -4,6 +4,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
@@ -31,13 +32,16 @@ public class DashboardService {
 
     private final AccountRepository accountRepository;
     private final AccountService accountService;
+    private final ExchangeRateService exchangeRateService;
     private final PropertyRepository propertyRepository;
 
     public DashboardService(AccountRepository accountRepository,
                             AccountService accountService,
+                            ExchangeRateService exchangeRateService,
                             PropertyRepository propertyRepository) {
         this.accountRepository = accountRepository;
         this.accountService = accountService;
+        this.exchangeRateService = exchangeRateService;
         this.propertyRepository = propertyRepository;
     }
 
@@ -54,16 +58,18 @@ public class DashboardService {
 
         for (var account : accounts) {
             var accountBalance = accountService.computeBalance(account, tenantId);
+            var accountBalanceUsd = exchangeRateService.convertToUsd(
+                    accountBalance, account.getCurrency(), tenantId);
 
             if ("bank".equals(account.getType())) {
-                totalCash = totalCash.add(accountBalance);
+                totalCash = totalCash.add(accountBalanceUsd);
             } else {
-                totalInvestments = totalInvestments.add(accountBalance);
+                totalInvestments = totalInvestments.add(accountBalanceUsd);
             }
 
             accountSummaries.add(new AccountSummary(
-                    account.getName(), account.getType(), accountBalance));
-            allocationMap.merge(account.getType(), accountBalance, BigDecimal::add);
+                    account.getName(), account.getType(), accountBalanceUsd));
+            allocationMap.merge(account.getType(), accountBalanceUsd, BigDecimal::add);
         }
 
         var totalPropertyEquity = computePropertySummaries(tenantId, accountSummaries, allocationMap);
