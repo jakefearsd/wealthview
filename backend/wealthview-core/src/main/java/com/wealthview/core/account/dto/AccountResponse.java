@@ -11,6 +11,7 @@ public record AccountResponse(
         String name,
         String type,
         String institution,
+        String currency,
         BigDecimal balance,
         OffsetDateTime createdAt
 ) {
@@ -20,6 +21,7 @@ public record AccountResponse(
                 entity.getName(),
                 entity.getType(),
                 entity.getInstitution(),
+                entity.getCurrency(),
                 balance,
                 entity.getCreatedAt()
         );
