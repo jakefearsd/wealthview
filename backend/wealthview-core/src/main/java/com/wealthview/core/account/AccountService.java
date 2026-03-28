@@ -56,7 +56,8 @@ public class AccountService {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
-        var account = new AccountEntity(tenant, request.name(), request.type(), request.institution());
+        var currency = request.currency() != null ? request.currency() : "USD";
+        var account = new AccountEntity(tenant, request.name(), request.type(), request.institution(), currency);
         account = accountRepository.save(account);
         log.info("Account {} created for tenant {}", account.getId(), tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "CREATE", "account",
@@ -85,6 +86,7 @@ public class AccountService {
         account.setName(request.name());
         account.setType(request.type());
         account.setInstitution(request.institution());
+        account.setCurrency(request.currency() != null ? request.currency() : account.getCurrency());
         account.setUpdatedAt(OffsetDateTime.now());
         account = accountRepository.save(account);
         log.info("Account {} updated for tenant {}", accountId, tenantId);

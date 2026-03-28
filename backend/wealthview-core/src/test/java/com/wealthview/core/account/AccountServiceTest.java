@@ -73,7 +73,7 @@ class AccountServiceTest {
         when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard"));
+        var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard", null));
 
         assertThat(result.name()).isEqualTo("My IRA");
         assertThat(result.type()).isEqualTo("ira");
@@ -124,7 +124,7 @@ class AccountServiceTest {
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = accountService.update(tenantId, accountId,
-                new AccountRequest("New Name", "ira", "New Inst"));
+                new AccountRequest("New Name", "ira", "New Inst", null));
 
         assertThat(result.name()).isEqualTo("New Name");
         assertThat(result.type()).isEqualTo("ira");
@@ -238,5 +238,25 @@ class AccountServiceTest {
         var result = accountService.get(tenantId, accountId);
 
         assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("1500.00"));
+    }
+
+    @Test
+    void create_withCurrency_setsAccountCurrency() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = accountService.create(tenantId, new AccountRequest("Euro IRA", "ira", "Degiro", "EUR"));
+
+        assertThat(result.currency()).isEqualTo("EUR");
+    }
+
+    @Test
+    void create_withNullCurrency_defaultsToUsd() {
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard", null));
+
+        assertThat(result.currency()).isEqualTo("USD");
     }
 }

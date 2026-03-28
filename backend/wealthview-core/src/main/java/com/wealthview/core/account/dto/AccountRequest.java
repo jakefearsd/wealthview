@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Pattern;
 public record AccountRequest(
         @NotBlank String name,
         @NotBlank @Pattern(regexp = "brokerage|ira|401k|roth|bank") String type,
-        String institution
+        String institution,
+        String currency
 ) {
 }
