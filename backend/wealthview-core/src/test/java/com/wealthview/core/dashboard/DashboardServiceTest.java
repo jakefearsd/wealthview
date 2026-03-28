@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -62,13 +63,14 @@ class DashboardServiceTest {
 
     @Test
     void getSummary_withHoldingsAndPrices_calculatesNetWorth() {
+        var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        TestEntityHelper.setId(account, UUID.randomUUID());
+        TestEntityHelper.setId(account, accountId);
 
         when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(account)));
-        when(accountService.computeBalance(account, tenantId))
-                .thenReturn(new BigDecimal("2000.0000"));
+        when(accountService.computeAllBalances(tenantId))
+                .thenReturn(Map.of(accountId, new BigDecimal("2000.0000")));
 
         var result = dashboardService.getSummary(tenantId);
 
@@ -78,13 +80,14 @@ class DashboardServiceTest {
 
     @Test
     void getSummary_missingPrice_fallsBackToCostBasis() {
+        var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "IRA", "ira", "Vanguard");
-        TestEntityHelper.setId(account, UUID.randomUUID());
+        TestEntityHelper.setId(account, accountId);
 
         when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(account)));
-        when(accountService.computeBalance(account, tenantId))
-                .thenReturn(new BigDecimal("1000"));
+        when(accountService.computeAllBalances(tenantId))
+                .thenReturn(Map.of(accountId, new BigDecimal("1000")));
 
         var result = dashboardService.getSummary(tenantId);
 
@@ -93,13 +96,14 @@ class DashboardServiceTest {
 
     @Test
     void getSummary_withBankAccounts_includesCashBalance() {
+        var bankId = UUID.randomUUID();
         var bank = new AccountEntity(tenant, "Checking", "bank", "Chase");
-        TestEntityHelper.setId(bank, UUID.randomUUID());
+        TestEntityHelper.setId(bank, bankId);
 
         when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(bank)));
-        when(accountService.computeBalance(bank, tenantId))
-                .thenReturn(new BigDecimal("4000"));
+        when(accountService.computeAllBalances(tenantId))
+                .thenReturn(Map.of(bankId, new BigDecimal("4000")));
 
         var result = dashboardService.getSummary(tenantId);
 
@@ -130,16 +134,17 @@ class DashboardServiceTest {
 
     @Test
     void getSummary_withInvestmentsAndProperties_combinesNetWorth() {
+        var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        TestEntityHelper.setId(account, UUID.randomUUID());
+        TestEntityHelper.setId(account, accountId);
         var property = new PropertyEntity(tenant, "456 Oak Ave",
                 new BigDecimal("250000"), LocalDate.of(2021, 6, 15),
                 new BigDecimal("280000"), new BigDecimal("180000"));
 
         when(accountRepository.findByTenant_Id(eq(tenantId), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(account)));
-        when(accountService.computeBalance(account, tenantId))
-                .thenReturn(new BigDecimal("1500"));
+        when(accountService.computeAllBalances(tenantId))
+                .thenReturn(Map.of(accountId, new BigDecimal("1500")));
         when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
 
         var result = dashboardService.getSummary(tenantId);
