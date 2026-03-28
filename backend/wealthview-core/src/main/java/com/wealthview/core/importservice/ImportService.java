@@ -18,6 +18,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +47,7 @@ public class ImportService {
     private final CsvParser csvParser;
     private final Map<String, CsvParser> namedParsers;
     private final MeterRegistry meterRegistry;
+    private final CacheManager cacheManager;
 
     public ImportService(ImportJobRepository importJobRepository,
                          AccountRepository accountRepository,
@@ -54,7 +56,8 @@ public class ImportService {
                          HoldingsComputationService holdingsComputationService,
                          CsvParser csvParser,
                          Map<String, CsvParser> namedParsers,
-                         MeterRegistry meterRegistry) {
+                         MeterRegistry meterRegistry,
+                         CacheManager cacheManager) {
         this.importJobRepository = importJobRepository;
         this.accountRepository = accountRepository;
         this.transactionRepository = transactionRepository;
@@ -63,6 +66,7 @@ public class ImportService {
         this.csvParser = csvParser;
         this.namedParsers = namedParsers;
         this.meterRegistry = meterRegistry;
+        this.cacheManager = cacheManager;
     }
 
     @Transactional
@@ -124,6 +128,12 @@ public class ImportService {
             job = importJobRepository.save(job);
 
             var result = importTransactions(parseResult.transactions(), tenantId, accountId, account);
+
+            var accountBalancesCache = cacheManager.getCache("accountBalances");
+            if (accountBalancesCache != null) {
+                accountBalancesCache.evict(tenantId);
+            }
+
             finalizeJob(job, result, parseResult.errors().size());
             meterRegistry.counter("wealthview.import.rows", "outcome", "imported").increment(result.successCount());
             meterRegistry.counter("wealthview.import.rows", "outcome", "duplicate").increment(result.skippedDuplicates());

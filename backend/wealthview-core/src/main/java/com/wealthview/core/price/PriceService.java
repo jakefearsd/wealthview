@@ -14,6 +14,7 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +48,7 @@ public class PriceService {
         this.yahooPriceClient = yahooPriceClient;
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public PriceResponse createPrice(PriceRequest request) {
         var price = new PriceEntity(request.symbol(), request.date(),
@@ -94,6 +96,7 @@ public class PriceService {
                 .toList();
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public YahooSyncResult syncFromYahoo(List<String> symbols) {
         if (yahooPriceClient == null) {
@@ -145,6 +148,7 @@ public class PriceService {
         return responses;
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public int bulkUpsertPrices(List<BulkPriceRequest.PriceEntry> prices, String source) {
         int count = 0;
@@ -155,6 +159,7 @@ public class PriceService {
         return count;
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public CsvImportResult importCsv(InputStream inputStream) throws IOException {
         var parser = new PriceCsvParser();
@@ -176,6 +181,7 @@ public class PriceService {
                 .toList();
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public void deletePrice(String symbol, LocalDate date) {
         var priceId = new PriceId(symbol, date);

@@ -11,6 +11,7 @@ import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ public class TransactionService {
         this.eventPublisher = eventPublisher;
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public TransactionResponse create(UUID tenantId, UUID accountId, TransactionRequest request) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
@@ -104,6 +106,7 @@ public class TransactionService {
         return PageResponse.from(page, TransactionResponse::from);
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public TransactionResponse update(UUID tenantId, UUID transactionId, TransactionRequest request) {
         var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)
@@ -131,6 +134,7 @@ public class TransactionService {
         return TransactionResponse.from(txn);
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenantId")
     @Transactional
     public void delete(UUID tenantId, UUID transactionId) {
         var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)

@@ -11,6 +11,8 @@ import com.wealthview.persistence.repository.ExchangeRateRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +39,7 @@ public class ExchangeRateService {
         this.accountRepository = accountRepository;
     }
 
+    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
     @Transactional
     public ExchangeRateResponse create(UUID tenantId, ExchangeRateRequest request) {
         if ("USD".equals(request.currencyCode())) {
@@ -59,6 +62,7 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
+    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
     @Transactional
     public ExchangeRateResponse update(UUID tenantId, String currencyCode, BigDecimal rateToUsd) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)
@@ -72,6 +76,7 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
+    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
     @Transactional
     public void delete(UUID tenantId, String currencyCode) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)
@@ -91,6 +96,7 @@ public class ExchangeRateService {
         log.info("Exchange rate deleted: {} for tenant {}", currencyCode, tenantId);
     }
 
+    @Cacheable(value = "exchangeRates", key = "#tenantId")
     @Transactional(readOnly = true)
     public List<ExchangeRateResponse> list(UUID tenantId) {
         return exchangeRateRepository.findByTenant_Id(tenantId).stream()

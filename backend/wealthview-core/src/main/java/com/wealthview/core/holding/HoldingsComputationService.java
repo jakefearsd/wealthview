@@ -8,6 +8,7 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ public class HoldingsComputationService {
         this.eventPublisher = eventPublisher;
     }
 
+    @CacheEvict(value = "accountBalances", key = "#tenant.id")
     @Transactional
     public void recomputeForAccountAndSymbol(AccountEntity account, TenantEntity tenant, String symbol) {
         if (symbol == null || symbol.isBlank()) {

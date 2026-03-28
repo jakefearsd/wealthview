@@ -7,6 +7,7 @@ import com.wealthview.persistence.repository.PriceRepository;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.MDC;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataAccessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,7 @@ public class PriceSyncService {
         this.meterRegistry = meterRegistry;
     }
 
+    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Timed("wealthview.pricefeed.sync")
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
