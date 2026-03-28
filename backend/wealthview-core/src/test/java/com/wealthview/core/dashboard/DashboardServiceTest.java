@@ -1,6 +1,7 @@
 package com.wealthview.core.dashboard;
 
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.testutil.TestEntityHelper;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -25,6 +26,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,6 +37,9 @@ class DashboardServiceTest {
 
     @Mock
     private AccountService accountService;
+
+    @Mock
+    private ExchangeRateService exchangeRateService;
 
     @Mock
     private PropertyRepository propertyRepository;
@@ -50,6 +55,9 @@ class DashboardServiceTest {
         tenantId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
         TestEntityHelper.setId(tenant, tenantId);
+
+        lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
     }
 
     @Test

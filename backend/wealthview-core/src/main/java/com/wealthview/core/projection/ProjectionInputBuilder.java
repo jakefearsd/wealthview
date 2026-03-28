@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -43,17 +44,20 @@ public class ProjectionInputBuilder {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AccountService accountService;
+    private final ExchangeRateService exchangeRateService;
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final DepreciationCalculator depreciationCalculator;
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final PropertyRepository propertyRepository;
 
     public ProjectionInputBuilder(AccountService accountService,
+                                  ExchangeRateService exchangeRateService,
                                   ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                   DepreciationCalculator depreciationCalculator,
                                   GuardrailSpendingProfileRepository guardrailRepository,
                                   PropertyRepository propertyRepository) {
         this.accountService = accountService;
+        this.exchangeRateService = exchangeRateService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.depreciationCalculator = depreciationCalculator;
         this.guardrailRepository = guardrailRepository;
@@ -154,7 +158,9 @@ public class ProjectionInputBuilder {
 
     private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId) {
         if (entity.getLinkedAccount() != null) {
-            var liveBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
+            var nativeBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
+            var liveBalance = exchangeRateService.convertToUsd(
+                    nativeBalance, entity.getLinkedAccount().getCurrency(), tenantId);
             return new LinkedAccountInput(
                     entity.getLinkedAccount().getId(), liveBalance,
                     entity.getAnnualContribution(), entity.getExpectedReturn(),

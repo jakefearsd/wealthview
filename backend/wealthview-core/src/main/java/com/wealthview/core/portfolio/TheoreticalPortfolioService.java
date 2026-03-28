@@ -1,6 +1,7 @@
 package com.wealthview.core.portfolio;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -35,13 +36,16 @@ public class TheoreticalPortfolioService {
     private static final int MAX_YEARS = 10;
 
     private final AccountRepository accountRepository;
+    private final ExchangeRateService exchangeRateService;
     private final HoldingRepository holdingRepository;
     private final PriceRepository priceRepository;
 
     public TheoreticalPortfolioService(AccountRepository accountRepository,
+                                       ExchangeRateService exchangeRateService,
                                        HoldingRepository holdingRepository,
                                        PriceRepository priceRepository) {
         this.accountRepository = accountRepository;
+        this.exchangeRateService = exchangeRateService;
         this.holdingRepository = holdingRepository;
         this.priceRepository = priceRepository;
     }
@@ -94,6 +98,19 @@ public class TheoreticalPortfolioService {
         var hasMoneyMarket = !moneyMarketHoldings.isEmpty();
         var dataPoints = computeWeeklyValuesWithMoneyMarket(
                 fridays, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
+
+        var currency = account.getCurrency();
+        if (!"USD".equals(currency)) {
+            var convertedPoints = new ArrayList<PortfolioDataPointDto>();
+            for (var dp : dataPoints) {
+                var convertedValue = exchangeRateService.convertToUsd(dp.totalValue(), currency, tenantId);
+                convertedPoints.add(new PortfolioDataPointDto(dp.date(), convertedValue));
+            }
+            dataPoints = convertedPoints;
+            if (hasMoneyMarket) {
+                moneyMarketTotal = exchangeRateService.convertToUsd(moneyMarketTotal, currency, tenantId);
+            }
+        }
 
         var allSymbols = buildCombinedSymbolList(pricedSymbols, moneyMarketHoldings);
 
