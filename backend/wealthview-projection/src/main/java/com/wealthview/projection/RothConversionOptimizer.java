@@ -218,7 +218,7 @@ class RothConversionOptimizer {
         double yearAdjustment = 0;
 
         for (var source : rentalSources) {
-            if (!isActiveForAge(source, age)) {
+            if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 continue;
             }
 
@@ -756,10 +756,6 @@ class RothConversionOptimizer {
         return new double[]{taxable, traditional, roth};
     }
 
-    private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
-        if (age < source.startAge()) return false;
-        return source.endAge() == null || age <= source.endAge();
-    }
 
     private double nullSafe(BigDecimal value) {
         return value != null ? value.doubleValue() : 0;
