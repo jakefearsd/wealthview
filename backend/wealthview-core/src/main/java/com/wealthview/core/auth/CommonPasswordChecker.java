@@ -14,13 +14,13 @@ import java.util.stream.Collectors;
 @Component
 public class CommonPasswordChecker {
 
-    private final Set<String> commonPasswords;
+    private static final Set<String> COMMON_PASSWORDS = loadPasswords();
 
-    public CommonPasswordChecker() {
+    private static Set<String> loadPasswords() {
         try (var reader = new BufferedReader(new InputStreamReader(
                 new ClassPathResource("common-passwords.txt").getInputStream(),
                 StandardCharsets.UTF_8))) {
-            commonPasswords = reader.lines()
+            return reader.lines()
                     .map(line -> line.trim().toLowerCase(Locale.US))
                     .filter(line -> !line.isEmpty() && !line.startsWith("#"))
                     .collect(Collectors.toUnmodifiableSet());
@@ -30,6 +30,6 @@ public class CommonPasswordChecker {
     }
 
     public boolean isCommon(String password) {
-        return commonPasswords.contains(password.toLowerCase(Locale.US));
+        return COMMON_PASSWORDS.contains(password.toLowerCase(Locale.US));
     }
 }

@@ -480,8 +480,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[][] yearBalances = new double[ctx.sim().years()][ctx.sim().trialCount()];
         double[] finalBalances = new double[ctx.sim().trialCount()];
         int tradExhaustedCount = 0;
-        int exhaustionDeadlineAge = convSchedule != null
-                ? convSchedule.exhaustionAge() : ctx.sim().endAge();
         for (int t = 0; t < ctx.sim().trialCount(); t++) {
             var generator = new BlockBootstrapReturnGenerator(
                     historicalReturns, DEFAULT_BLOCK_LENGTH, rng2);
