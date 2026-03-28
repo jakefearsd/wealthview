@@ -61,10 +61,11 @@ public class SnapshotProjectionService {
         }
 
         // Compute per-account current value and CAGR
+        var balances = accountService.computeAllBalances(tenantId);
         var accountProjections = new ArrayList<AccountProjection>();
         for (var account : accounts) {
             if ("bank".equals(account.getType())) {
-                var balance = accountService.computeBalance(account, tenantId);
+                var balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
                 accountProjections.add(new AccountProjection(balance, BigDecimal.ZERO));
             } else {
                 var projection = computeInvestmentProjection(tenantId, account, clampedLookback);
