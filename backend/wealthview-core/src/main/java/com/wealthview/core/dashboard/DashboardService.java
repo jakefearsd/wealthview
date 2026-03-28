@@ -56,10 +56,12 @@ public class DashboardService {
         var accountSummaries = new ArrayList<AccountSummary>();
         var allocationMap = new HashMap<String, BigDecimal>();
 
+        var balances = accountService.computeAllBalances(tenantId);
+
         for (var account : accounts) {
-            var accountBalance = accountService.computeBalance(account, tenantId);
+            var nativeBalance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
             var accountBalanceUsd = exchangeRateService.convertToUsd(
-                    accountBalance, account.getCurrency(), tenantId);
+                    nativeBalance, account.getCurrency(), tenantId);
 
             if ("bank".equals(account.getType())) {
                 totalCash = totalCash.add(accountBalanceUsd);
