@@ -93,6 +93,9 @@ public record ProjectionYearDto(
     }
 
     public ProjectionYearDto withSurplusReinvested(BigDecimal surplusReinvested) {
+        if (surplusReinvested == null) {
+            return this;
+        }
         return Builder.from(this)
                 .surplusReinvested(surplusReinvested)
                 .build();

@@ -348,76 +348,41 @@ class RothConversionOptimizer {
             roth *= (1 + returnMean);
             taxable *= (1 + returnMean);
 
-            double conversionAmount = 0;
-            double conversionTax = 0;
-
-            // Step 2: Roth conversions (pre-RMD years only)
-            if (age < rmdStartAge && traditional > 0 && conversionFraction > 0) {
-                var conv = convergeConversionAmount(traditional, taxable, baseOtherIncome,
-                        yearIndex, age, calendarYear, conversionFraction, suspendedLosses);
-                conversionAmount = conv.conversionAmount();
-                conversionTax = conv.conversionTax();
-
-                if (conversionAmount > 0) {
-                    traditional -= conversionAmount;
-                    roth += conversionAmount;
-
-                    if (age < EARLY_WITHDRAWAL_AGE) {
-                        taxable -= conversionTax;
-                        if (taxable < 0) taxable = 0;
-                    } else {
-                        double[] afterDeduct = deductCascade(conversionTax, taxable,
-                                traditional, roth);
-                        taxable = afterDeduct[0];
-                        traditional = afterDeduct[1];
-                        roth = afterDeduct[2];
-                    }
-                }
-            } else if (!rentalSources.isEmpty()) {
-                // Non-conversion year: still compute rental adjustments for loss
-                // carryforward tracking (losses accumulate even when not converting)
-                double magi = baseOtherIncome + conversionAmount;
-                computeRentalAdjustmentForYear(yearIndex, magi, suspendedLosses);
-            }
+            // Step 2: Roth conversions (or rental loss tracking for non-conversion years)
+            var convResult = applyConversions(traditional, roth, taxable, age,
+                    calendarYear, yearIndex, baseOtherIncome, conversionFraction, suspendedLosses);
+            traditional = convResult.traditional();
+            roth = convResult.roth();
+            taxable = convResult.taxable();
 
             // Step 3: RMDs
-            double rmdAmount = 0;
-            double rmdTax = 0;
             double effectiveOtherIncome = baseOtherIncome
                     + (rentalSources.isEmpty() ? 0
                         : computeRentalAdjustmentForYear(yearIndex,
-                            baseOtherIncome + conversionAmount,
+                            baseOtherIncome + convResult.conversionAmount(),
                             new HashMap<>(suspendedLosses)));
-            if (age >= rmdStartAge && traditional > 0) {
-                rmdAmount = RmdCalculator.computeRmd(priorYearEndTraditional, age);
-                rmdAmount = Math.min(rmdAmount, traditional);
-                traditional -= rmdAmount;
-                rmdTax = computeIncrementalTax(rmdAmount, effectiveOtherIncome, calendarYear);
-
-                // Non-conversion RMD year: track rental loss carryforward
-                if (conversionAmount == 0 && !rentalSources.isEmpty()) {
-                    computeRentalAdjustmentForYear(yearIndex,
-                            baseOtherIncome + rmdAmount, suspendedLosses);
-                }
-            }
+            var rmdResult = applyRmds(traditional, priorYearEndTraditional, age,
+                    calendarYear, yearIndex, baseOtherIncome, effectiveOtherIncome,
+                    convResult.conversionAmount(), suspendedLosses);
+            traditional = rmdResult.traditional();
 
             // Step 4: Spending withdrawals
             var withdrawal = processSpendingWithdrawal(taxable, traditional, roth,
                     yearIndex, age, baseOtherIncome, effectiveOtherIncome,
-                    rmdAmount, conversionAmount, calendarYear);
+                    rmdResult.rmdAmount(), convResult.conversionAmount(), calendarYear);
             taxable = withdrawal.taxable();
             traditional = withdrawal.traditional();
             roth = withdrawal.roth();
 
-            lifetimeTax += conversionTax + withdrawal.withdrawalTax() + rmdTax;
+            lifetimeTax += convResult.conversionTax() + withdrawal.withdrawalTax() + rmdResult.rmdTax();
 
             priorYearEndTraditional = traditional;
-            conversionByYear[yearIndex] = conversionAmount;
-            conversionTaxByYear[yearIndex] = conversionTax;
+            conversionByYear[yearIndex] = convResult.conversionAmount();
+            conversionTaxByYear[yearIndex] = convResult.conversionTax();
             traditionalBal[yearIndex] = traditional;
             rothBal[yearIndex] = roth;
             taxableBal[yearIndex] = taxable;
-            projectedRmd[yearIndex] = rmdAmount;
+            projectedRmd[yearIndex] = rmdResult.rmdAmount();
 
             if (traditional <= 0 && exhaustionAge == endAge) {
                 exhaustionAge = age;
@@ -428,7 +393,78 @@ class RothConversionOptimizer {
                 rothBal, taxableBal, projectedRmd, lifetimeTax, exhaustionAge);
     }
 
+    private ConversionStepResult applyConversions(
+            double traditional, double roth, double taxable,
+            int age, int calendarYear, int yearIndex, double baseOtherIncome,
+            double conversionFraction,
+            Map<ProjectionIncomeSourceInput, BigDecimal> suspendedLosses) {
+
+        double conversionAmount = 0;
+        double conversionTax = 0;
+
+        if (age < rmdStartAge && traditional > 0 && conversionFraction > 0) {
+            var conv = convergeConversionAmount(traditional, taxable, baseOtherIncome,
+                    yearIndex, age, calendarYear, conversionFraction, suspendedLosses);
+            conversionAmount = conv.conversionAmount();
+            conversionTax = conv.conversionTax();
+
+            if (conversionAmount > 0) {
+                traditional -= conversionAmount;
+                roth += conversionAmount;
+
+                if (age < EARLY_WITHDRAWAL_AGE) {
+                    taxable -= conversionTax;
+                    if (taxable < 0) taxable = 0;
+                } else {
+                    double[] afterDeduct = deductCascade(conversionTax, taxable,
+                            traditional, roth);
+                    taxable = afterDeduct[0];
+                    traditional = afterDeduct[1];
+                    roth = afterDeduct[2];
+                }
+            }
+        } else if (!rentalSources.isEmpty()) {
+            // Non-conversion year: still compute rental adjustments for loss
+            // carryforward tracking (losses accumulate even when not converting)
+            double magi = baseOtherIncome + conversionAmount;
+            computeRentalAdjustmentForYear(yearIndex, magi, suspendedLosses);
+        }
+
+        return new ConversionStepResult(traditional, roth, taxable, conversionAmount, conversionTax);
+    }
+
+    private RmdStepResult applyRmds(
+            double traditional, double priorYearEndTraditional,
+            int age, int calendarYear, int yearIndex,
+            double baseOtherIncome, double effectiveOtherIncome,
+            double conversionAmount,
+            Map<ProjectionIncomeSourceInput, BigDecimal> suspendedLosses) {
+
+        double rmdAmount = 0;
+        double rmdTax = 0;
+
+        if (age >= rmdStartAge && traditional > 0) {
+            rmdAmount = RmdCalculator.computeRmd(priorYearEndTraditional, age);
+            rmdAmount = Math.min(rmdAmount, traditional);
+            traditional -= rmdAmount;
+            rmdTax = computeIncrementalTax(rmdAmount, effectiveOtherIncome, calendarYear);
+
+            // Non-conversion RMD year: track rental loss carryforward
+            if (conversionAmount == 0 && !rentalSources.isEmpty()) {
+                computeRentalAdjustmentForYear(yearIndex,
+                        baseOtherIncome + rmdAmount, suspendedLosses);
+            }
+        }
+
+        return new RmdStepResult(traditional, rmdAmount, rmdTax);
+    }
+
     private record ConvergenceResult(double conversionAmount, double conversionTax) {}
+
+    private record ConversionStepResult(double traditional, double roth, double taxable,
+                                        double conversionAmount, double conversionTax) {}
+
+    private record RmdStepResult(double traditional, double rmdAmount, double rmdTax) {}
 
     private record WithdrawalResult(double taxable, double traditional, double roth,
                                     double withdrawalTax) {}
