@@ -538,6 +538,7 @@ class RothConversionOptimizer {
                         roth -= draw;
                         remaining -= draw;
                     }
+                    default -> { /* unrecognized pool type — skip */ }
                 }
             }
 

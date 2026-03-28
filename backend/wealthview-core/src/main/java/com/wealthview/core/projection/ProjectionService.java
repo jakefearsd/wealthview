@@ -156,12 +156,10 @@ public class ProjectionService {
                     .orElse(null);
             scenario.setSpendingProfile(profile);
             scenario.setGuardrailProfile(null);
-        } else if (Boolean.TRUE.equals(request.useGuardrailProfile())) {
-            scenario.setSpendingProfile(null);
         } else {
-            // No explicit spending plan selected — clear spending profile but preserve
-            // any existing guardrail profile. Guardrail profiles are managed by the
-            // optimizer (create/reoptimize/delete), not by the scenario edit form.
+            // No spending profile selected — clear it. Preserve any existing guardrail
+            // profile unless a new spending profile was explicitly chosen (handled above).
+            // Guardrail profiles are managed by the optimizer, not the scenario edit form.
             scenario.setSpendingProfile(null);
         }
 
