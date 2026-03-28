@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -258,5 +259,67 @@ class AccountServiceTest {
         var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard", null));
 
         assertThat(result.currency()).isEqualTo("USD");
+    }
+
+    @Test
+    void computeAllBalances_mixedAccountTypes_returnsAllBalances() {
+        var bankAccount = new AccountEntity(tenant, "Checking", "bank", "Chase");
+        var brokerageAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var bankId = UUID.randomUUID();
+        var brokerageId = UUID.randomUUID();
+        ReflectionTestUtils.setField(bankAccount, "id", bankId);
+        ReflectionTestUtils.setField(brokerageAccount, "id", brokerageId);
+
+        when(accountRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(bankAccount, brokerageAccount));
+
+        Object[] bankRow = {bankId, new BigDecimal("5000.00")};
+        when(transactionRepository.computeBalancesByAccountIds(eq(tenantId), any()))
+                .thenReturn(List.<Object[]>of(bankRow));
+
+        var holding = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.00"));
+        when(holdingRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(holding));
+        var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
+        when(priceRepository.findLatestBySymbolIn(List.of("AAPL")))
+                .thenReturn(List.of(price));
+
+        var result = accountService.computeAllBalances(tenantId);
+
+        assertThat(result).hasSize(2);
+        assertThat(result.get(bankId)).isEqualByComparingTo(new BigDecimal("5000.00"));
+        assertThat(result.get(brokerageId)).isEqualByComparingTo(new BigDecimal("2000.00"));
+    }
+
+    @Test
+    void computeAllBalances_noAccounts_returnsEmptyMap() {
+        when(accountRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of());
+
+        var result = accountService.computeAllBalances(tenantId);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void computeAllBalances_investmentWithNoPrice_fallsToCostBasis() {
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var accountId = UUID.randomUUID();
+        ReflectionTestUtils.setField(account, "id", accountId);
+
+        when(accountRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(account));
+
+        var holding = new HoldingEntity(account, tenant, "XYZ",
+                new BigDecimal("10"), new BigDecimal("1500.00"));
+        when(holdingRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(holding));
+        when(priceRepository.findLatestBySymbolIn(List.of("XYZ")))
+                .thenReturn(List.of());
+
+        var result = accountService.computeAllBalances(tenantId);
+
+        assertThat(result.get(accountId)).isEqualByComparingTo(new BigDecimal("1500.00"));
     }
 }
