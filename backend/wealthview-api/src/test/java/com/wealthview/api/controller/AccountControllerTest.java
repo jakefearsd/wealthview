@@ -65,7 +65,7 @@ class AccountControllerTest {
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
     private AccountResponse sampleResponse() {
-        return new AccountResponse(ACCOUNT_ID, "Brokerage", "brokerage", "Fidelity", new BigDecimal("12500.00"), OffsetDateTime.now());
+        return new AccountResponse(ACCOUNT_ID, "Brokerage", "brokerage", "Fidelity", "USD", new BigDecimal("12500.00"), OffsetDateTime.now());
     }
 
     @Test
