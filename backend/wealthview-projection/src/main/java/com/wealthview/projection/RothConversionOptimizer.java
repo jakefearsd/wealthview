@@ -221,36 +221,12 @@ class RothConversionOptimizer {
             if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 continue;
             }
-
-            double gross = source.annualAmount().doubleValue();
-            if (source.inflationRate() != null
-                    && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearIndex);
-            }
-
-            double expenses = nullSafe(source.annualOperatingExpenses())
-                    + nullSafe(source.annualPropertyTax());
-            double depreciation = 0;
-            if (source.depreciationByYear() != null) {
-                var depBd = source.depreciationByYear().get(calendarYear);
-                if (depBd != null) {
-                    depreciation = depBd.doubleValue();
-                }
-            }
-
-            double mortgageInterest = nullSafe(source.annualMortgageInterest());
-            double netRentalIncome = gross - expenses - mortgageInterest - depreciation;
-
-            var priorSuspended = suspended.getOrDefault(source, BigDecimal.ZERO);
-            var lossResult = rentalLossCalculator.applyLossRules(
-                    BigDecimal.valueOf(netRentalIncome),
-                    source.taxTreatment(),
-                    BigDecimal.ZERO,
-                    BigDecimal.valueOf(Math.max(0, magi)),
-                    priorSuspended);
-
-            suspended.put(source, lossResult.lossSuspended());
-            yearAdjustment += lossResult.netTaxableIncome().doubleValue();
+            var rentalResult = RentalIncomeHelper.computeForSource(
+                    source, yearIndex, calendarYear, magi,
+                    suspended.getOrDefault(source, BigDecimal.ZERO),
+                    rentalLossCalculator);
+            suspended.put(source, rentalResult.newSuspendedLoss());
+            yearAdjustment += rentalResult.netTaxableIncome();
         }
 
         return yearAdjustment;
@@ -754,11 +730,6 @@ class RothConversionOptimizer {
             remaining -= draw;
         }
         return new double[]{taxable, traditional, roth};
-    }
-
-
-    private double nullSafe(BigDecimal value) {
-        return value != null ? value.doubleValue() : 0;
     }
 
     private String[] parseWithdrawalOrder() {
