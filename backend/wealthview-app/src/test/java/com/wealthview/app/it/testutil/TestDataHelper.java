@@ -168,6 +168,20 @@ public class TestDataHelper {
         return (String) response.getBody().get("id");
     }
 
+    // ── Exchange Rates ──────────────────────────────────────────────────
+    public void createExchangeRate(String currencyCode, double rateToUsd) {
+        var body = Map.of("currency_code", currencyCode, "rate_to_usd", rateToUsd);
+        restTemplate.exchange("/api/v1/exchange-rates",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+    }
+
+    public String createAccountWithCurrencyAndGetId(String name, String type, String currency) {
+        var body = Map.of("name", name, "type", type, "currency", currency);
+        var response = restTemplate.exchange("/api/v1/accounts",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        return (String) response.getBody().get("id");
+    }
+
     // ── Spending Profiles ────────────────────────────────────────────────
 
     public Map<String, Object> spendingProfileBody(String name) {

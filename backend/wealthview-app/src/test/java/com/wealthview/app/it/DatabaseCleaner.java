@@ -30,6 +30,7 @@ public class DatabaseCleaner {
                     import_jobs,
                     holdings,
                     transactions,
+                    exchange_rates,
                     accounts,
                     invite_codes,
                     users,
