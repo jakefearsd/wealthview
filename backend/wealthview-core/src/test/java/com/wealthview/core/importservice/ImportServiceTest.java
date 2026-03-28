@@ -19,6 +19,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -36,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -57,6 +60,10 @@ class ImportServiceTest {
     private HoldingsComputationService holdingsComputationService;
     @Mock
     private CsvParser csvParser;
+    @Mock
+    private CacheManager cacheManager;
+    @Mock
+    private Cache accountBalancesCache;
 
     private ImportService importService;
 
@@ -65,10 +72,11 @@ class ImportServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(cacheManager.getCache("accountBalances")).thenReturn(accountBalancesCache);
         importService = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser, Map.of(),
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), cacheManager);
     }
 
     private void setupAccountAndJobMocks() {
@@ -226,7 +234,8 @@ class ImportServiceTest {
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
-                Map.of("fidelityCsvParser", fidelityParser), new SimpleMeterRegistry());
+                Map.of("fidelityCsvParser", fidelityParser), new SimpleMeterRegistry(),
+                cacheManager);
 
         var parser = serviceWithParsers.resolveParser("fidelity");
         assertThat(parser).isSameAs(fidelityParser);
@@ -264,7 +273,8 @@ class ImportServiceTest {
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
-                Map.of("fidelityCsvParser", fidelityParser), new SimpleMeterRegistry());
+                Map.of("fidelityCsvParser", fidelityParser), new SimpleMeterRegistry(),
+                cacheManager);
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
@@ -288,7 +298,8 @@ class ImportServiceTest {
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
-                Map.of("ofxParser", ofxParser), new SimpleMeterRegistry());
+                Map.of("ofxParser", ofxParser), new SimpleMeterRegistry(),
+                cacheManager);
 
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
