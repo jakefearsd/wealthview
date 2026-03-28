@@ -92,7 +92,7 @@ class IncomeSourceProcessor {
         BigDecimal ssBenefit = BigDecimal.ZERO;
 
         for (var source : sources) {
-            if (!isActiveForAge(source, age)) {
+            if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 continue;
             }
 
@@ -107,7 +107,7 @@ class IncomeSourceProcessor {
         }
 
         for (var source : sources) {
-            if (!isActiveForAge(source, age)) {
+            if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 continue;
             }
 
@@ -259,16 +259,6 @@ class IncomeSourceProcessor {
     }
 
     // --- Utility methods ---
-
-    boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
-        if (source.oneTime()) {
-            return age == source.startAge();
-        }
-        if (age < source.startAge()) {
-            return false;
-        }
-        return source.endAge() == null || age <= source.endAge();
-    }
 
     private BigDecimal transitionMultiplier(ProjectionIncomeSourceInput source, int age) {
         if (source.oneTime()) {

@@ -650,7 +650,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double totalIncome = 0;
             double taxableIncome = 0;
             for (var source : sources) {
-                if (!isActiveForAge(source, age)) {
+                if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
                 double gross = source.annualAmount().doubleValue();
@@ -694,18 +694,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return result;
     }
 
-    private boolean isActiveForAge(ProjectionIncomeSourceInput source, int age) {
-        if (age < source.startAge()) {
-            return false;
-        }
-        if (source.endAge() != null && age > source.endAge()) {
-            return false;
-        }
-        if (source.oneTime() && age != source.startAge()) {
-            return false;
-        }
-        return true;
-    }
 
     private double[] verifyEssentialFloor(double[][] paths, double[] income,
                                            double essentialFloor,
@@ -1505,7 +1493,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double yearAdjustment = 0;
 
             for (var source : rentalSources) {
-                if (!isActiveForAge(source, age)) {
+                if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
 
