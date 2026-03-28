@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -109,12 +110,13 @@ class SnapshotProjectionServiceTest {
     @Test
     void computeProjection_bankAccount_projectedFlat() {
         var account = mockAccount("bank");
+        var bankId = account.getId();
         when(accountRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of(account));
         when(propertyRepository.findByTenant_Id(TENANT_ID)).thenReturn(List.of());
 
         // Bank account with $5000 balance
-        when(accountService.computeBalance(account, TENANT_ID))
-                .thenReturn(new BigDecimal("5000"));
+        when(accountService.computeAllBalances(TENANT_ID))
+                .thenReturn(Map.of(bankId, new BigDecimal("5000")));
 
         var result = service.computeProjection(TENANT_ID, 5, 10);
 
@@ -265,8 +267,9 @@ class SnapshotProjectionServiceTest {
                 .thenReturn(history);
 
         // Bank: $10,000 balance
-        when(accountService.computeBalance(bankAccount, TENANT_ID))
-                .thenReturn(new BigDecimal("10000"));
+        var bankId = bankAccount.getId();
+        when(accountService.computeAllBalances(TENANT_ID))
+                .thenReturn(Map.of(bankId, new BigDecimal("10000")));
 
         // Property: $300,000 value, no mortgage, no appreciation
         var property = mockProperty(new BigDecimal("300000"), null, BigDecimal.ZERO, false);
