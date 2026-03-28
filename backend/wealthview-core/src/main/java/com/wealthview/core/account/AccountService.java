@@ -24,6 +24,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -101,6 +103,67 @@ public class AccountService {
         log.info("Account {} deleted for tenant {}", accountId, tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "account",
                 accountId, Map.of()));
+    }
+
+    @Transactional(readOnly = true)
+    public Map<UUID, BigDecimal> computeAllBalances(UUID tenantId) {
+        var accounts = accountRepository.findByTenant_Id(tenantId);
+        if (accounts.isEmpty()) {
+            return Map.of();
+        }
+
+        var bankAccountIds = accounts.stream()
+                .filter(a -> "bank".equals(a.getType()))
+                .map(AccountEntity::getId)
+                .toList();
+
+        // Bulk bank balances — 1 query
+        var bankBalances = new HashMap<UUID, BigDecimal>();
+        if (!bankAccountIds.isEmpty()) {
+            for (var row : transactionRepository.computeBalancesByAccountIds(tenantId, bankAccountIds)) {
+                bankBalances.put((UUID) row[0], (BigDecimal) row[1]);
+            }
+        }
+
+        // All holdings for tenant — 1 query
+        var allHoldings = holdingRepository.findByTenant_Id(tenantId);
+
+        // Group holdings by account
+        var holdingsByAccount = allHoldings.stream()
+                .collect(Collectors.groupingBy(HoldingEntity::getAccountId));
+
+        // All distinct symbols — 1 query for latest prices
+        var allSymbols = allHoldings.stream()
+                .map(HoldingEntity::getSymbol)
+                .distinct()
+                .toList();
+
+        var latestPrices = allSymbols.isEmpty()
+                ? Map.<String, BigDecimal>of()
+                : priceRepository.findLatestBySymbolIn(allSymbols).stream()
+                        .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+
+        // Compute per-account balances
+        var result = new HashMap<UUID, BigDecimal>();
+        for (var account : accounts) {
+            if ("bank".equals(account.getType())) {
+                result.put(account.getId(), bankBalances.getOrDefault(account.getId(), BigDecimal.ZERO));
+            } else {
+                var holdings = holdingsByAccount.getOrDefault(account.getId(), List.of());
+                var value = BigDecimal.ZERO;
+                for (var holding : holdings) {
+                    var price = latestPrices.get(holding.getSymbol());
+                    if (price != null) {
+                        value = value.add(holding.getQuantity().multiply(price)
+                                .setScale(4, RoundingMode.HALF_UP));
+                    } else {
+                        value = value.add(holding.getCostBasis());
+                    }
+                }
+                result.put(account.getId(), value);
+            }
+        }
+        return result;
     }
 
     public BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
