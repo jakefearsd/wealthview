@@ -45,5 +45,17 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             """)
     BigDecimal computeBalance(@Param("accountId") UUID accountId, @Param("tenantId") UUID tenantId);
 
+    @Query("""
+            SELECT t.account.id, COALESCE(
+                SUM(CASE WHEN t.type = 'deposit' THEN t.amount ELSE -t.amount END),
+                0)
+            FROM TransactionEntity t
+            WHERE t.tenant.id = :tenantId
+            AND t.account.id IN :accountIds
+            GROUP BY t.account.id
+            """)
+    List<Object[]> computeBalancesByAccountIds(@Param("tenantId") UUID tenantId,
+                                               @Param("accountIds") List<UUID> accountIds);
+
     void deleteByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 }
