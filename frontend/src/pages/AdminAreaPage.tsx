@@ -4,11 +4,12 @@ import DashboardSection from '../components/admin/DashboardSection';
 import UsersSection from '../components/admin/UsersSection';
 import TenantsSection from '../components/admin/TenantsSection';
 import PricesSection from '../components/admin/PricesSection';
+import ExchangeRatesSection from '../components/admin/ExchangeRatesSection';
 import InviteCodesSection from '../components/admin/InviteCodesSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import AuditLogSection from '../components/admin/AuditLogSection';
 
-type AdminSection = 'dashboard' | 'users' | 'tenants' | 'prices' | 'invite-codes' | 'system-config' | 'audit-log';
+type AdminSection = 'dashboard' | 'users' | 'tenants' | 'prices' | 'exchange-rates' | 'invite-codes' | 'system-config' | 'audit-log';
 
 interface SidebarItem {
     key: AdminSection;
@@ -21,6 +22,7 @@ const sidebarItems: SidebarItem[] = [
     { key: 'users', label: 'Users' },
     { key: 'tenants', label: 'Tenants', superAdminOnly: true },
     { key: 'prices', label: 'Prices', superAdminOnly: true },
+    { key: 'exchange-rates', label: 'Exchange Rates' },
     { key: 'invite-codes', label: 'Invite Codes' },
     { key: 'system-config', label: 'System Config', superAdminOnly: true },
     { key: 'audit-log', label: 'Audit Log' },
@@ -45,6 +47,7 @@ export default function AdminAreaPage() {
             case 'users': return <UsersSection />;
             case 'tenants': return <TenantsSection />;
             case 'prices': return <PricesSection />;
+            case 'exchange-rates': return <ExchangeRatesSection />;
             case 'invite-codes': return <InviteCodesSection />;
             case 'system-config': return <SystemConfigSection />;
             case 'audit-log': return <AuditLogSection />;
