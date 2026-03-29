@@ -721,9 +721,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         int confidenceIndex = (int) Math.ceil((1 - confidenceLevel) * trialCount) - 1;
         confidenceIndex = Math.max(0, Math.min(confidenceIndex, trialCount - 1));
 
+        // Pre-compute inflation-adjusted floor withdrawals per year
+        double[] inflatedFloors = new double[years];
+        double[] floorWithdrawals = new double[years];
         for (int y = 0; y < years; y++) {
-            double inflatedFloor = essentialFloor * Math.pow(1 + inflationRate, y);
+            inflatedFloors[y] = essentialFloor * Math.pow(1 + inflationRate, y);
+            floorWithdrawals[y] = Math.max(0, inflatedFloors[y] - income[y]);
+        }
 
+        for (int y = 0; y < years; y++) {
             double[] balancesAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
                 // Simulate year-by-year balance with floor withdrawals and compounded growth.
@@ -733,8 +739,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 for (int py = 0; py <= y; py++) {
                     double growthFactor = paths[t][py + 1] / paths[t][py];
                     balance *= growthFactor;
-                    double floorAtPy = essentialFloor * Math.pow(1 + inflationRate, py);
-                    balance -= Math.max(0, floorAtPy - income[py]);
+                    balance -= floorWithdrawals[py];
                     balance = Math.max(0, balance);
                 }
                 balancesAtYear[t] = balance;
@@ -747,10 +752,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             // The terminal target constrains discretionary spending via isSustainable().
             double capacityForFloor = availableAtConfidence + income[y];
 
-            if (capacityForFloor >= inflatedFloor) {
-                floors[y] = inflatedFloor;
+            if (capacityForFloor >= inflatedFloors[y]) {
+                floors[y] = inflatedFloors[y];
             } else {
-                floors[y] = Math.max(0, Math.min(inflatedFloor, capacityForFloor));
+                floors[y] = Math.max(0, Math.min(inflatedFloors[y], capacityForFloor));
             }
         }
         return floors;
@@ -1193,9 +1198,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 conversionByYear, conversionTaxByYear, retirementAge,
                 dsBracketCeilingByYear, cashReserveYears, cashReturnRate, false);
 
+        double[] nominalReturns = new double[years];
         for (int t = 0; t < trialCount; t++) {
             // Derive nominal returns from pre-computed path ratios
-            double[] nominalReturns = new double[years];
             for (int y = 0; y < years; y++) {
                 nominalReturns[y] = paths[t][y + 1] / paths[t][y] - 1.0;
             }
@@ -1236,20 +1241,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] corridorLow = new double[years];
         double[] corridorHigh = new double[years];
 
+        // Maintain running balances per trial, updated incrementally each year.
+        // This avoids re-simulating all prior years for each year (O(n²) → O(n)).
+        double[] runningBalance = new double[trialCount];
+        for (int t = 0; t < trialCount; t++) {
+            runningBalance[t] = paths[t][0];
+        }
+
+        double[] sustainableAtYear = new double[trialCount];
         for (int y = 0; y < years; y++) {
             double baseSpending = floors[y] + discretionary[y];
 
-            double[] sustainableAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
-                double balance = paths[t][0];
-                for (int py = 0; py < y; py++) {
-                    double gf = paths[t][py + 1] / paths[t][py];
-                    double spending = floors[py] + discretionary[py];
-                    double withdrawal = Math.max(0, spending - income[py]);
-                    balance = Math.max(0, balance * gf - withdrawal);
-                }
                 double gf = paths[t][y + 1] / paths[t][y];
-                double availableThisYear = balance * gf + income[y];
+                double availableThisYear = runningBalance[t] * gf + income[y];
                 sustainableAtYear[t] = availableThisYear;
             }
             Arrays.sort(sustainableAtYear);
@@ -1259,6 +1264,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             corridorLow[y] = Math.max(floors[y], Math.min(p10, baseSpending));
             corridorHigh[y] = Math.max(baseSpending, Math.min(p90, baseSpending * 3));
+
+            // Advance running balances: apply growth and withdraw spending
+            double withdrawal = Math.max(0, baseSpending - income[y]);
+            for (int t = 0; t < trialCount; t++) {
+                double gf = paths[t][y + 1] / paths[t][y];
+                runningBalance[t] = Math.max(0, runningBalance[t] * gf - withdrawal);
+            }
         }
 
         return new double[][]{corridorLow, corridorHigh};
