@@ -22,7 +22,6 @@ function makeYearlySpending(overrides: Partial<GuardrailYearlySpending> = {}): G
         essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000,
         phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000,
         portfolio_balance_p25: 350000, portfolio_balance_p55: 650000,
-        contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null,
         ...overrides,
     };
 }

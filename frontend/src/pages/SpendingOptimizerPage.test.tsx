@@ -61,9 +61,9 @@ const mockProfile: GuardrailProfileResponse = {
         { name: 'Mid', start_age: 73, end_age: 82, priority_weight: 1, target_spending: 60000 },
     ],
     yearly_spending: [
-        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
-        { year: 2031, age: 63, recommended: 74000, corridor_low: 61000, corridor_high: 90000, essential_floor: 30000, discretionary: 44000, income_offset: 0, portfolio_withdrawal: 74000, phase_name: 'Early', portfolio_balance_median: 440000, portfolio_balance_p10: 180000, portfolio_balance_p25: 320000, portfolio_balance_p55: 600000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
-        { year: 2041, age: 73, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 300000, portfolio_balance_p10: 50000, portfolio_balance_p25: 180000, portfolio_balance_p55: 500000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+        { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000 },
+        { year: 2031, age: 63, recommended: 74000, corridor_low: 61000, corridor_high: 90000, essential_floor: 30000, discretionary: 44000, income_offset: 0, portfolio_withdrawal: 74000, phase_name: 'Early', portfolio_balance_median: 440000, portfolio_balance_p10: 180000, portfolio_balance_p25: 320000, portfolio_balance_p55: 600000 },
+        { year: 2041, age: 73, recommended: 50000, corridor_low: 40000, corridor_high: 65000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Mid', portfolio_balance_median: 300000, portfolio_balance_p10: 50000, portfolio_balance_p25: 180000, portfolio_balance_p55: 500000 },
     ],
     median_final_balance: 250000,
     failure_rate: 0.05,
@@ -181,11 +181,7 @@ describe('SpendingOptimizerPage', () => {
     it('renders near-term spending guide section', async () => {
         const profileWithContingent = {
             ...mockProfile,
-            yearly_spending: mockProfile.yearly_spending.map((y, i) =>
-                i < 2
-                    ? { ...y, contingent_spending_p25: 55000 + i * 1000, contingent_spending_median: 68000 + i * 1000, contingent_spending_p55: 78000 + i * 1000 }
-                    : y,
-            ),
+            yearly_spending: mockProfile.yearly_spending,
         };
         mockGetProfile.mockResolvedValue(profileWithContingent);
         renderPage();
@@ -419,8 +415,8 @@ describe('SpendingOptimizerPage', () => {
                 { name: 'Only', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
             ],
             yearly_spending: [
-                { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
-                { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 460000, portfolio_balance_p10: 190000, portfolio_balance_p25: 330000, portfolio_balance_p55: 620000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+                { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 650000 },
+                { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 30000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Only', portfolio_balance_median: 460000, portfolio_balance_p10: 190000, portfolio_balance_p25: 330000, portfolio_balance_p55: 620000 },
             ],
             failure_rate: 0.03,
         };
@@ -442,8 +438,8 @@ describe('computePlanDiagnostics', () => {
             { name: 'Late', start_age: 73, end_age: null, priority_weight: 1, target_spending: 40000 },
         ];
         const yearly: GuardrailYearlySpending[] = [
-            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Early', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p55: 1200000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
-            { year: 2041, age: 73, recommended: 40000, corridor_low: 35000, corridor_high: 50000, essential_floor: 20000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 40000, phase_name: 'Late', portfolio_balance_median: 500000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 700000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'Early', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p55: 1200000 },
+            { year: 2041, age: 73, recommended: 40000, corridor_low: 35000, corridor_high: 50000, essential_floor: 20000, discretionary: 20000, income_offset: 0, portfolio_withdrawal: 40000, phase_name: 'Late', portfolio_balance_median: 500000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000, portfolio_balance_p55: 700000 },
         ];
 
         const result = computePlanDiagnostics(phases, yearly, 0.05);
@@ -460,7 +456,7 @@ describe('computePlanDiagnostics', () => {
             { name: 'Expensive', start_age: 62, end_age: null, priority_weight: 1, target_spending: 100000 },
         ];
         const yearly: GuardrailYearlySpending[] = [
-            { year: 2030, age: 62, recommended: 60000, corridor_low: 50000, corridor_high: 70000, essential_floor: 20000, discretionary: 40000, income_offset: 0, portfolio_withdrawal: 60000, phase_name: 'Expensive', portfolio_balance_median: 400000, portfolio_balance_p10: 150000, portfolio_balance_p25: 280000, portfolio_balance_p55: 550000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+            { year: 2030, age: 62, recommended: 60000, corridor_low: 50000, corridor_high: 70000, essential_floor: 20000, discretionary: 40000, income_offset: 0, portfolio_withdrawal: 60000, phase_name: 'Expensive', portfolio_balance_median: 400000, portfolio_balance_p10: 150000, portfolio_balance_p25: 280000, portfolio_balance_p55: 550000 },
         ];
 
         const result = computePlanDiagnostics(phases, yearly, 0.05);
@@ -474,8 +470,8 @@ describe('computePlanDiagnostics', () => {
             { name: 'All', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
         ];
         const yearly: GuardrailYearlySpending[] = [
-            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 100000, portfolio_balance_p25: 400000, portfolio_balance_p55: 1200000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
-            { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 800000, portfolio_balance_p10: 0, portfolio_balance_p25: 300000, portfolio_balance_p55: 1100000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 100000, portfolio_balance_p25: 400000, portfolio_balance_p55: 1200000 },
+            { year: 2031, age: 63, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 800000, portfolio_balance_p10: 0, portfolio_balance_p25: 300000, portfolio_balance_p55: 1100000 },
         ];
 
         const result = computePlanDiagnostics(phases, yearly, 0.05);
@@ -489,7 +485,7 @@ describe('computePlanDiagnostics', () => {
             { name: 'All', start_age: 62, end_age: null, priority_weight: 1, target_spending: 50000 },
         ];
         const yearly: GuardrailYearlySpending[] = [
-            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p55: 1200000, contingent_spending_p25: null, contingent_spending_median: null, contingent_spending_p55: null },
+            { year: 2030, age: 62, recommended: 50000, corridor_low: 40000, corridor_high: 60000, essential_floor: 20000, discretionary: 30000, income_offset: 0, portfolio_withdrawal: 50000, phase_name: 'All', portfolio_balance_median: 900000, portfolio_balance_p10: 400000, portfolio_balance_p25: 650000, portfolio_balance_p55: 1200000 },
         ];
 
         const result = computePlanDiagnostics(phases, yearly, 0.05);

@@ -6,7 +6,6 @@ import PortfolioFanChart from './PortfolioFanChart';
 import TaxSavingsSummary from './TaxSavingsSummary';
 import ConversionScheduleTable from './ConversionScheduleTable';
 import TraditionalBalanceChart from './TraditionalBalanceChart';
-import ContingentSpendingTable from './ContingentSpendingTable';
 import NearTermSpendingGuide from './NearTermSpendingGuide';
 
 interface OptimizerResultsViewProps {
@@ -264,11 +263,6 @@ export default function OptimizerResultsView({
                     yearlySpending={result.yearly_spending}
                     retirementDate={retirementDate}
                 />
-            </div>
-
-            <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
-                <h3 style={{ marginBottom: '1rem', marginTop: 0 }}>Adaptive Spending Guide</h3>
-                <ContingentSpendingTable yearlySpending={result.yearly_spending} />
             </div>
 
             {result.conversion_schedule && (
