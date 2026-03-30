@@ -17,9 +17,6 @@ function makeYear(overrides: Partial<GuardrailYearlySpending> & { year: number; 
         portfolio_balance_p10: 1200000,
         portfolio_balance_p25: 1800000,
         portfolio_balance_p55: 2800000,
-        contingent_spending_p25: null,
-        contingent_spending_median: null,
-        contingent_spending_p55: null,
         ...overrides,
     };
 }

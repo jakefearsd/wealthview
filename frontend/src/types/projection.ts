@@ -256,9 +256,6 @@ export interface GuardrailYearlySpending {
     portfolio_balance_p10: number | null;
     portfolio_balance_p25: number | null;
     portfolio_balance_p55: number | null;
-    contingent_spending_p25: number | null;
-    contingent_spending_median: number | null;
-    contingent_spending_p55: number | null;
 }
 
 export interface GuardrailProfileResponse {
