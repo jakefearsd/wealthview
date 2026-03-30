@@ -7,10 +7,13 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 import toast from 'react-hot-toast';
 import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
 import TransactionForm from '../components/TransactionForm';
+import Button from '../components/Button';
 
 export default function AccountDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -59,7 +62,7 @@ export default function AccountDetailPage() {
         }
     }
 
-    if (acctLoading || holdLoading || txnLoading) return <div>Loading...</div>;
+    if (acctLoading || holdLoading || txnLoading) return <LoadingState message="Loading account details..." />;
 
     return (
         <div>
@@ -74,20 +77,20 @@ export default function AccountDetailPage() {
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h3>Holdings</h3>
                     </div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Symbol</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Cost Basis</th>
-                                <th style={{ textAlign: 'center', padding: '0.5rem' }}>Override</th>
-                                {canWrite && <th style={{ padding: '0.5rem' }}></th>}
+                            <tr>
+                                <th style={thStyle}>Symbol</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Cost Basis</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Override</th>
+                                {canWrite && <th style={thStyle}></th>}
                             </tr>
                         </thead>
                         <tbody>
                             {holdings?.map((h) => (
-                                <tr key={h.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>
+                                <tr key={h.id} style={trHoverStyle}>
+                                    <td style={tdStyle}>
                                         <Link to={`/holdings/${h.id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
                                             {h.symbol}
                                         </Link>
@@ -95,25 +98,25 @@ export default function AccountDetailPage() {
                                     </td>
                                     {editingHoldingId === h.id ? (
                                         <>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <CurrencyInput value={editCostBasis} onChange={setEditCostBasis} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                 <button onClick={() => handleSaveHolding(h.id, h.symbol)} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: 'pointer', marginRight: '0.25rem' }}>Save</button>
                                                 <button onClick={() => setEditingHoldingId(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Cancel</button>
                                             </td>
                                         </>
                                     ) : (
                                         <>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{h.quantity}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{h.quantity}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
                                             {canWrite && (
-                                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                     <button onClick={() => startEditHolding(h)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer' }}>Edit</button>
                                                 </td>
                                             )}
@@ -121,7 +124,7 @@ export default function AccountDetailPage() {
                                     )}
                                 </tr>
                             ))}
-                            {holdings?.length === 0 && <tr><td colSpan={canWrite ? 5 : 4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No holdings</td></tr>}
+                            {holdings?.length === 0 && <tr><td colSpan={canWrite ? 5 : 4}><EmptyState title="No holdings" /></td></tr>}
                         </tbody>
                     </table>
                 </div>
@@ -142,7 +145,7 @@ export default function AccountDetailPage() {
             <div style={cardStyle}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3>Transactions</h3>
-                    {canWrite && <button onClick={() => setShowAdd(true)} style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Add Transaction</button>}
+                    {canWrite && <Button onClick={() => setShowAdd(true)}>Add Transaction</Button>}
                 </div>
 
                 {showAdd && (
@@ -153,15 +156,15 @@ export default function AccountDetailPage() {
                     />
                 )}
 
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={tableStyle}>
                     <thead>
-                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Symbol</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>Amount</th>
-                            {canWrite && <th style={{ padding: '0.5rem' }}></th>}
+                        <tr>
+                            <th style={thStyle}>Date</th>
+                            <th style={thStyle}>Type</th>
+                            <th style={thStyle}>Symbol</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
+                            {canWrite && <th style={thStyle}></th>}
                         </tr>
                     </thead>
                     <tbody>
@@ -178,14 +181,14 @@ export default function AccountDetailPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                <tr key={txn.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{txn.date}</td>
-                                    <td style={{ padding: '0.5rem' }}>{txn.type}</td>
-                                    <td style={{ padding: '0.5rem' }}>{txn.symbol || '-'}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
+                                <tr key={txn.id} style={trHoverStyle}>
+                                    <td style={tdStyle}>{txn.date}</td>
+                                    <td style={tdStyle}>{txn.type}</td>
+                                    <td style={tdStyle}>{txn.symbol || '-'}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
                                     {canWrite && (
-                                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
                                             <button onClick={() => setEditingTxnId(txn.id)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', marginRight: '0.5rem' }}>Edit</button>
                                             <button onClick={() => handleDeleteTxn(txn.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}>Delete</button>
                                         </td>
@@ -193,7 +196,7 @@ export default function AccountDetailPage() {
                                 </tr>
                             )
                         ))}
-                        {txnPage?.data.length === 0 && <tr><td colSpan={canWrite ? 6 : 5} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No transactions</td></tr>}
+                        {txnPage?.data.length === 0 && <tr><td colSpan={canWrite ? 6 : 5}><EmptyState title="No transactions" /></td></tr>}
                     </tbody>
                 </table>
             </div>

@@ -11,6 +11,7 @@ import RothConversionSection from './RothConversionSection';
 import type { Account } from '../types/account';
 import type { Scenario, CreateScenarioRequest, ScenarioAccountInput, ScenarioIncomeSourceInput } from '../types/projection';
 import { inputStyle } from '../utils/styles';
+import Button from './Button';
 
 const ACCOUNT_TYPE_HELP: Record<string, string> = {
     taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
@@ -350,12 +351,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         </FormField>
                         <div>
                             {accounts.length > 1 && (
-                                <button
+                                <Button
                                     onClick={() => removeAccount(idx)}
-                                    style={{ padding: '0.5rem', background: 'none', border: '1px solid #d32f2f', color: '#d32f2f', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                                    variant="danger"
+                                    size="sm"
+                                    style={{ background: 'none', border: '1px solid #d32f2f', color: '#d32f2f' }}
                                 >
                                     Remove
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -385,13 +388,13 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 </div>
             ))}
 
-            <button
+            <Button
                 onClick={handleSubmit}
                 disabled={saving}
-                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '0.5rem' }}
+                style={{ marginTop: '0.5rem' }}
             >
                 {saving ? 'Saving...' : submitLabel}
-            </button>
+            </Button>
         </div>
     );
 }

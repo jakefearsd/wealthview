@@ -6,7 +6,10 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import Button from '../components/Button';
 import type { Transaction } from '../types/transaction';
 import toast from 'react-hot-toast';
 
@@ -57,8 +60,8 @@ export default function HoldingDetailPage() {
         }
     }
 
-    if (holdingLoading) return <div>Loading...</div>;
-    if (!holding) return <div>Holding not found</div>;
+    if (holdingLoading) return <LoadingState message="Loading holding..." />;
+    if (!holding) return <EmptyState title="Holding not found" />;
 
     return (
         <div>
@@ -72,9 +75,9 @@ export default function HoldingDetailPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3>Holding Summary</h3>
                     {canWrite && !editing && (
-                        <button onClick={startEdit} style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                        <Button onClick={startEdit}>
                             Edit Override
-                        </button>
+                        </Button>
                     )}
                 </div>
 
@@ -91,8 +94,8 @@ export default function HoldingDetailPage() {
                                 style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
                         <div style={{ gridColumn: '1 / -1' }}>
-                            <button onClick={handleSave} style={{ padding: '0.4rem 0.8rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '0.5rem' }}>Save</button>
-                            <button onClick={() => setEditing(false)} style={{ padding: '0.4rem 0.8rem', background: '#666', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                            <Button onClick={handleSave} style={{ background: '#2e7d32', marginRight: '0.5rem' }}>Save</Button>
+                            <Button onClick={() => setEditing(false)} style={{ background: '#666' }}>Cancel</Button>
                         </div>
                     </div>
                 ) : (
@@ -114,28 +117,28 @@ export default function HoldingDetailPage() {
             <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Transactions for {holding.symbol}</h3>
                 {txnLoading ? (
-                    <div>Loading transactions...</div>
+                    <LoadingState message="Loading transactions..." />
                 ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Qty</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Amount</th>
+                            <tr>
+                                <th style={thStyle}>Date</th>
+                                <th style={thStyle}>Type</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Amount</th>
                             </tr>
                         </thead>
                         <tbody>
                             {transactions.map((txn) => (
-                                <tr key={txn.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{txn.date}</td>
-                                    <td style={{ padding: '0.5rem' }}>{txn.type}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
+                                <tr key={txn.id} style={trHoverStyle}>
+                                    <td style={tdStyle}>{txn.date}</td>
+                                    <td style={tdStyle}>{txn.type}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{txn.quantity ?? '-'}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(txn.amount)}</td>
                                 </tr>
                             ))}
                             {transactions.length === 0 && (
-                                <tr><td colSpan={4} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No transactions for {holding.symbol}</td></tr>
+                                <tr><td colSpan={4}><EmptyState title={`No transactions for ${holding.symbol}`} /></td></tr>
                             )}
                         </tbody>
                     </table>

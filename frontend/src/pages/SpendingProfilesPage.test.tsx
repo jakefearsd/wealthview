@@ -105,7 +105,8 @@ describe('SpendingProfilesPage', () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
         renderWithRouter(<SpendingProfilesPage />);
 
-        expect(screen.getByText(/no spending profiles yet/i)).toBeInTheDocument();
+        expect(screen.getByText('No spending profiles')).toBeInTheDocument();
+        expect(screen.getByText('Create one to attach to your retirement scenarios.')).toBeInTheDocument();
     });
 
     it('shows create form on New Profile click', async () => {
@@ -162,7 +163,7 @@ describe('SpendingProfilesPage', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: true, error: null, refetch: vi.fn() });
         renderWithRouter(<SpendingProfilesPage />);
 
-        expect(screen.getByText('Loading...')).toBeInTheDocument();
+        expect(screen.getByText('Loading spending profiles...')).toBeInTheDocument();
     });
 
     it('shows guardrail profiles section when profiles exist', async () => {

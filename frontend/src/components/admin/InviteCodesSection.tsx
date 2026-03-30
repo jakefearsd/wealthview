@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { listInviteCodes, generateInviteCodeWithExpiry, revokeInviteCode, deleteUsedCodes } from '../../api/tenant';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 const EXPIRY_OPTIONS = [
@@ -96,36 +97,28 @@ export default function InviteCodesSection() {
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                     </select>
-                    <button
-                        onClick={handleGenerate}
-                        disabled={generating}
-                        style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >
+                    <Button onClick={handleGenerate} disabled={generating}>
                         {generating ? 'Generating...' : 'Generate Code'}
-                    </button>
+                    </Button>
                     {hasUsedCodes && (
-                        <button
-                            onClick={handleDeleteUsed}
-                            disabled={deleting}
-                            style={{ padding: '0.5rem 1rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginLeft: 'auto' }}
-                        >
+                        <Button onClick={handleDeleteUsed} disabled={deleting} variant="danger" style={{ marginLeft: 'auto' }}>
                             {deleting ? 'Deleting...' : 'Delete Used Codes'}
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>
 
             <div style={cardStyle}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={tableStyle}>
                     <thead>
-                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Code</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Created By</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Created</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Expires</th>
-                            <th style={{ textAlign: 'center', padding: '0.5rem' }}>Status</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Used By</th>
-                            <th style={{ textAlign: 'center', padding: '0.5rem' }}>Actions</th>
+                        <tr>
+                            <th style={thStyle}>Code</th>
+                            <th style={thStyle}>Created By</th>
+                            <th style={thStyle}>Created</th>
+                            <th style={thStyle}>Expires</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                            <th style={thStyle}>Used By</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -133,20 +126,20 @@ export default function InviteCodesSection() {
                             const status = getStatus(code);
                             const statusStyle = getStatusColor(status);
                             return (
-                                <tr key={code.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem', fontFamily: 'monospace', fontSize: '0.9rem' }}>
+                                <tr key={code.id} style={trHoverStyle}>
+                                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: '0.9rem' }}>
                                         {code.code}
                                     </td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                         {code.created_by_email ?? '-'}
                                     </td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                         {new Date(code.created_at).toLocaleDateString()}
                                     </td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                         {new Date(code.expires_at).toLocaleDateString()}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <span style={{
                                             padding: '0.15rem 0.4rem',
                                             borderRadius: '4px',
@@ -156,10 +149,10 @@ export default function InviteCodesSection() {
                                             {status}
                                         </span>
                                     </td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                         {code.used_by_email ?? '-'}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                             <button
                                                 onClick={() => handleCopy(code.code)}

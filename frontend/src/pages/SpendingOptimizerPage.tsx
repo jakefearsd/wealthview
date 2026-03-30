@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
 import { cardStyle, inputStyle } from '../utils/styles';
+import LoadingState from '../components/LoadingState';
 import CurrencyInput from '../components/CurrencyInput';
 import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
@@ -298,7 +299,7 @@ export default function SpendingOptimizerPage() {
     const pct = (n: number | null | undefined) => n != null ? `${(n * 100).toFixed(1)}%` : '--';
 
     if (!scenario) {
-        return <div>Loading scenario...</div>;
+        return <LoadingState message="Loading scenario..." />;
     }
 
     return (

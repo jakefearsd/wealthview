@@ -5,7 +5,8 @@ import { listUsers, updateUserRole, deleteUser } from '../../api/tenant';
 import type { AdminUser } from '../../api/adminUsers';
 import type { TenantUser } from '../../types/tenant';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 export default function UsersSection() {
@@ -75,22 +76,22 @@ export default function UsersSection() {
             <h2 style={{ marginBottom: '1.5rem' }}>Users</h2>
 
             <div style={cardStyle}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={tableStyle}>
                     <thead>
-                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Email</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Role</th>
-                            {isSuperAdmin && <th style={{ textAlign: 'left', padding: '0.5rem' }}>Tenant</th>}
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Joined</th>
-                            {isSuperAdmin && <th style={{ textAlign: 'center', padding: '0.5rem' }}>Status</th>}
-                            <th style={{ textAlign: 'center', padding: '0.5rem' }}>Actions</th>
+                        <tr>
+                            <th style={thStyle}>Email</th>
+                            <th style={thStyle}>Role</th>
+                            {isSuperAdmin && <th style={thStyle}>Tenant</th>}
+                            <th style={thStyle}>Joined</th>
+                            {isSuperAdmin && <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>}
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {isSuperAdmin && users?.map((user) => (
-                            <tr key={user.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                <td style={{ padding: '0.5rem' }}>{user.email}</td>
-                                <td style={{ padding: '0.5rem' }}>
+                            <tr key={user.id} style={trHoverStyle}>
+                                <td style={tdStyle}>{user.email}</td>
+                                <td style={tdStyle}>
                                     <select
                                         value={user.role}
                                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -102,13 +103,13 @@ export default function UsersSection() {
                                         <option value="viewer">Viewer</option>
                                     </select>
                                 </td>
-                                <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                     {user.tenant_name}
                                 </td>
-                                <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                     {new Date(user.created_at).toLocaleDateString()}
                                 </td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <span style={{
                                         padding: '0.15rem 0.4rem',
                                         borderRadius: '4px',
@@ -119,7 +120,7 @@ export default function UsersSection() {
                                         {user.is_active ? 'Active' : 'Disabled'}
                                     </span>
                                 </td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
                                         <button
                                             onClick={() => setResetModal({ userId: user.id, email: user.email })}
@@ -144,9 +145,9 @@ export default function UsersSection() {
                             </tr>
                         ))}
                         {!isSuperAdmin && tenantUsers?.map((user) => (
-                            <tr key={user.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                <td style={{ padding: '0.5rem' }}>{user.email}</td>
-                                <td style={{ padding: '0.5rem' }}>
+                            <tr key={user.id} style={trHoverStyle}>
+                                <td style={tdStyle}>{user.email}</td>
+                                <td style={tdStyle}>
                                     <select
                                         value={user.role}
                                         onChange={(e) => handleRoleChange(user.id, e.target.value)}
@@ -157,10 +158,10 @@ export default function UsersSection() {
                                         <option value="viewer">Viewer</option>
                                     </select>
                                 </td>
-                                <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                     {new Date(user.created_at).toLocaleDateString()}
                                 </td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <button
                                         onClick={() => handleDelete(user.id)}
                                         style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer' }}
@@ -206,19 +207,19 @@ export default function UsersSection() {
                             style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '1rem', boxSizing: 'border-box' }}
                         />
                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <button
+                            <Button
                                 onClick={() => { setResetModal(null); setNewPassword(''); }}
-                                style={{ padding: '0.5rem 1rem', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', background: '#fff' }}
+                                variant="secondary"
+                                style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}
                             >
                                 Cancel
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={handleResetPassword}
                                 disabled={resetting || !newPassword.trim()}
-                                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                             >
                                 {resetting ? 'Resetting...' : 'Reset Password'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>

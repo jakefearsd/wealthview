@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency } from '../utils/format';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import HelpText from './HelpText';
 import InfoSection from './InfoSection';
 import { getDepreciationSchedule } from '../api/properties';
@@ -181,26 +181,26 @@ export default function PropertyAnalyticsSection({
                     {depreciationSchedule.class_breakdowns && depreciationSchedule.class_breakdowns.length > 0 && (
                         <div style={{ marginBottom: '1.5rem' }}>
                             <h4 style={{ marginBottom: '0.5rem', fontSize: '0.9rem', color: '#444' }}>Asset Class Breakdown</h4>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                            <table style={{ ...tableStyle, marginBottom: '1rem' }}>
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
-                                        <th style={{ padding: '0.4rem 0.5rem' }}>Class</th>
-                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Allocation</th>
-                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Bonus</th>
-                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>Annual SL</th>
-                                        <th style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>SL Years</th>
+                                    <tr>
+                                        <th style={thStyle}>Class</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Allocation</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Bonus</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Annual SL</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>SL Years</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {depreciationSchedule.class_breakdowns.map((cb) => (
-                                        <tr key={cb.asset_class} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '0.4rem 0.5rem', fontWeight: 600 }}>
+                                        <tr key={cb.asset_class} style={trHoverStyle}>
+                                            <td style={{ ...tdStyle, fontWeight: 600 }}>
                                                 {cb.asset_class === '27_5yr' ? '27.5-Year' : cb.asset_class.replace('yr', '-Year')}
                                             </td>
-                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{formatCurrency(cb.allocation)}</td>
-                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{formatCurrency(cb.bonus_amount)}</td>
-                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{cb.annual_straight_line > 0 ? formatCurrency(cb.annual_straight_line) : '—'}</td>
-                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{cb.straight_line_years > 0 ? cb.straight_line_years : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(cb.allocation)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(cb.bonus_amount)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{cb.annual_straight_line > 0 ? formatCurrency(cb.annual_straight_line) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{cb.straight_line_years > 0 ? cb.straight_line_years : '—'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -208,13 +208,13 @@ export default function PropertyAnalyticsSection({
                         </div>
                     )}
 
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
-                                <th style={{ padding: '0.5rem' }}>Tax Year</th>
-                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Annual Depreciation</th>
-                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Cumulative Taken</th>
-                                <th style={{ padding: '0.5rem', textAlign: 'right' }}>Remaining Basis</th>
+                            <tr>
+                                <th style={thStyle}>Tax Year</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Annual Depreciation</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Cumulative Taken</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Remaining Basis</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -222,20 +222,20 @@ export default function PropertyAnalyticsSection({
                                 <tr
                                     key={row.tax_year}
                                     style={{
-                                        borderBottom: '1px solid #eee',
+                                        ...trHoverStyle,
                                         background: row.tax_year === currentYear ? '#fff8e1' : undefined,
                                     }}
                                 >
-                                    <td style={{ padding: '0.5rem', fontWeight: row.tax_year === currentYear ? 600 : 400 }}>
+                                    <td style={{ ...tdStyle, fontWeight: row.tax_year === currentYear ? 600 : 400 }}>
                                         {row.tax_year}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
                                         {formatCurrency(row.annual_depreciation)}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
                                         {formatCurrency(row.cumulative_taken)}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>
                                         {formatCurrency(row.remaining_basis)}
                                     </td>
                                 </tr>

@@ -2,6 +2,10 @@ import { useState, type ChangeEvent } from 'react';
 import { useParams, Link } from 'react-router';
 import { importCsv, importOfx, importPositions, listImportJobs } from '../api/import';
 import { useApiQuery } from '../hooks/useApiQuery';
+import Button from '../components/Button';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
+import { tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import toast from 'react-hot-toast';
 
 type TabType = 'transactions' | 'positions';
@@ -97,9 +101,9 @@ export default function ImportPage() {
                                 <option value="ofx">OFX / QFX</option>
                             </select>
                             <input type="file" accept={txnFormat === 'ofx' ? '.ofx,.qfx' : '.csv'} onChange={handleFileChange} />
-                            <button onClick={handleUploadTransactions} disabled={!file || uploading} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            <Button onClick={handleUploadTransactions} disabled={!file || uploading}>
                                 {uploading ? 'Uploading...' : 'Upload'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -117,9 +121,9 @@ export default function ImportPage() {
                                 <option value="fidelityPositions">Fidelity</option>
                             </select>
                             <input type="file" accept=".csv" onChange={handleFileChange} />
-                            <button onClick={handleUploadPositions} disabled={!file || uploading} style={{ padding: '0.5rem 1rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            <Button onClick={handleUploadPositions} disabled={!file || uploading} variant="danger">
                                 {uploading ? 'Uploading...' : 'Replace & Import'}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 )}
@@ -127,30 +131,30 @@ export default function ImportPage() {
 
             <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Import History</h3>
-                {loading ? <div>Loading...</div> : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                {loading ? <LoadingState message="Loading import history..." /> : (
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Source</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Status</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Success</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Failed</th>
+                            <tr>
+                                <th style={thStyle}>Date</th>
+                                <th style={thStyle}>Source</th>
+                                <th style={thStyle}>Status</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Success</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Failed</th>
                             </tr>
                         </thead>
                         <tbody>
                             {jobs?.map((job) => (
-                                <tr key={job.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{new Date(job.created_at).toLocaleDateString()}</td>
-                                    <td style={{ padding: '0.5rem' }}>{job.source}</td>
-                                    <td style={{ padding: '0.5rem' }}>{job.status}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{job.total_rows}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: '#2e7d32' }}>{job.successful_rows}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right', color: job.failed_rows > 0 ? '#d32f2f' : 'inherit' }}>{job.failed_rows}</td>
+                                <tr key={job.id} style={trHoverStyle}>
+                                    <td style={tdStyle}>{new Date(job.created_at).toLocaleDateString()}</td>
+                                    <td style={tdStyle}>{job.source}</td>
+                                    <td style={tdStyle}>{job.status}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{job.total_rows}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', color: '#2e7d32' }}>{job.successful_rows}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', color: job.failed_rows > 0 ? '#d32f2f' : 'inherit' }}>{job.failed_rows}</td>
                                 </tr>
                             ))}
-                            {jobs?.length === 0 && <tr><td colSpan={6} style={{ padding: '1rem', color: '#999', textAlign: 'center' }}>No import history</td></tr>}
+                            {jobs?.length === 0 && <tr><td colSpan={6}><EmptyState title="No import history" /></td></tr>}
                         </tbody>
                     </table>
                 )}

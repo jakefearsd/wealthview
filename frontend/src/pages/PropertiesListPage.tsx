@@ -6,6 +6,10 @@ import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { toPercent } from '../utils/format';
 import PropertyForm from '../components/PropertyForm';
+import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import Button from '../components/Button';
 import type { Property } from '../types/property';
 
 function formatCurrency(value: number): string {
@@ -200,14 +204,14 @@ export default function PropertiesListPage() {
         setShowForm(true);
     }
 
-    if (loading) return <div>Loading properties...</div>;
-    if (error) return <div style={{ color: '#d32f2f' }}>Error: {error}</div>;
+    if (loading) return <LoadingState message="Loading properties..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>Properties</h2>
-                {canWrite && <button onClick={() => setShowForm(true)} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>New Property</button>}
+                {canWrite && <Button onClick={() => setShowForm(true)}>New Property</Button>}
             </div>
 
             {showForm && (
@@ -306,13 +310,18 @@ export default function PropertiesListPage() {
                         </Link>
                         {canWrite && (
                             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', gap: '0.5rem' }}>
-                                <button onClick={() => startEdit(p)} style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
-                                <button onClick={() => handleDelete(p.id)} style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
+                                <Button onClick={() => startEdit(p)} size="sm">Edit</Button>
+                                <Button onClick={() => handleDelete(p.id)} variant="danger" size="sm">Delete</Button>
                             </div>
                         )}
                     </div>
                 ))}
-                {properties?.length === 0 && <div style={{ color: '#999' }}>No properties yet.</div>}
+                {properties?.length === 0 && (
+                    <EmptyState
+                        title="No properties"
+                        message="Add a property to track its value and equity."
+                    />
+                )}
             </div>
         </div>
     );

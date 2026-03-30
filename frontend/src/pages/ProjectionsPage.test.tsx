@@ -73,7 +73,8 @@ describe('ProjectionsPage', () => {
         mockUseApiQuery.mockReturnValue({ data: [], loading: false, error: null, refetch: vi.fn() });
         renderWithRouter(<ProjectionsPage />);
 
-        expect(screen.getByText(/no scenarios yet/i)).toBeInTheDocument();
+        expect(screen.getByText('No scenarios')).toBeInTheDocument();
+        expect(screen.getByText('Create one to get started.')).toBeInTheDocument();
     });
 
     it('shows create form on button click', async () => {

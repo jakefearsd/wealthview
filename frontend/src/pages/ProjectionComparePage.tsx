@@ -3,7 +3,8 @@ import { Link } from 'react-router';
 import { listScenarios, compareScenarios } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
-import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
+import { cardStyle, inputStyle, labelStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import LoadingState from '../components/LoadingState';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
@@ -44,7 +45,7 @@ export default function ProjectionComparePage() {
         }
     }
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <LoadingState message="Loading scenarios..." />;
 
     const tickFormatter = (v: number) =>
         Math.abs(v) >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`;
@@ -134,51 +135,51 @@ export default function ProjectionComparePage() {
 
                     <div style={cardStyle}>
                         <h3 style={{ marginBottom: '1rem' }}>Summary</h3>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={tableStyle}>
                             <thead>
-                                <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Metric</th>
+                                <tr>
+                                    <th style={thStyle}>Metric</th>
                                     {result.results.map((r, i) => {
                                         const name = scenarios?.find(s => s.id === r.scenario_id)?.name || `Scenario ${i + 1}`;
-                                        return <th key={i} style={{ textAlign: 'right', padding: '0.5rem', color: COLORS[i] }}>{name}</th>;
+                                        return <th key={i} style={{ ...thStyle, textAlign: 'right', color: COLORS[i] }}>{name}</th>;
                                     })}
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Final Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Portfolio value at projection end</span></td>
+                                <tr style={trHoverStyle}>
+                                    <td style={tdStyle}>Final Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Portfolio value at projection end</span></td>
                                     {result.results.map((r, i) => (
-                                        <td key={i} style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600, color: r.final_balance > 0 ? '#2e7d32' : '#d32f2f' }}>
+                                        <td key={i} style={{ ...tdStyle, textAlign: 'right', fontWeight: 600, color: r.final_balance > 0 ? '#2e7d32' : '#d32f2f' }}>
                                             {formatCurrency(r.final_balance)}
                                         </td>
                                     ))}
                                 </tr>
-                                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Peak Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Highest value reached</span></td>
+                                <tr style={trHoverStyle}>
+                                    <td style={tdStyle}>Peak Balance<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Highest value reached</span></td>
                                     {result.results.map((r, i) => {
                                         const peak = findPeakBalance(r.yearly_data);
                                         return (
-                                            <td key={i} style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                            <td key={i} style={{ ...tdStyle, textAlign: 'right' }}>
                                                 {formatCurrency(peak.balance)} ({peak.year})
                                             </td>
                                         );
                                     })}
                                 </tr>
-                                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>Depletion Year<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Year portfolio reaches $0</span></td>
+                                <tr style={trHoverStyle}>
+                                    <td style={tdStyle}>Depletion Year<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Year portfolio reaches $0</span></td>
                                     {result.results.map((r, i) => {
                                         const depletion = findDepletionYear(r.yearly_data);
                                         return (
-                                            <td key={i} style={{ padding: '0.5rem', textAlign: 'right', color: depletion ? '#d32f2f' : '#2e7d32' }}>
+                                            <td key={i} style={{ ...tdStyle, textAlign: 'right', color: depletion ? '#d32f2f' : '#2e7d32' }}>
                                                 {depletion ? `${depletion.year} (age ${depletion.age})` : 'Never'}
                                             </td>
                                         );
                                     })}
                                 </tr>
                                 <tr>
-                                    <td style={{ padding: '0.5rem' }}>Years in Retirement<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Retirement to projection end</span></td>
+                                    <td style={tdStyle}>Years in Retirement<br /><span style={{ fontSize: '0.7rem', color: '#999', fontWeight: 'normal' }}>Retirement to projection end</span></td>
                                     {result.results.map((r, i) => (
-                                        <td key={i} style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                        <td key={i} style={{ ...tdStyle, textAlign: 'right' }}>
                                             {r.years_in_retirement}
                                         </td>
                                     ))}

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { listExchangeRates, createExchangeRate, updateExchangeRate, deleteExchangeRate } from '../../api/exchangeRates';
 import type { ExchangeRate } from '../../types/exchangeRate';
 import { cardStyle } from '../../utils/styles';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 export default function ExchangeRatesSection() {
@@ -84,12 +85,9 @@ export default function ExchangeRatesSection() {
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>Exchange Rates</h2>
-                <button
-                    onClick={() => setShowAdd(true)}
-                    style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
+                <Button onClick={() => setShowAdd(true)}>
                     Add Currency
-                </button>
+                </Button>
             </div>
 
             {showAdd && (
@@ -118,14 +116,13 @@ export default function ExchangeRatesSection() {
                             />
                         </div>
                         <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-end' }}>
-                            <button onClick={handleAdd} disabled={saving}
-                                    style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            <Button onClick={handleAdd} disabled={saving} style={{ background: '#2e7d32' }}>
                                 {saving ? '...' : 'Save'}
-                            </button>
-                            <button onClick={() => { setShowAdd(false); setNewCode(''); setNewRate(''); }}
-                                    style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            </Button>
+                            <Button onClick={() => { setShowAdd(false); setNewCode(''); setNewRate(''); }}
+                                    variant="secondary" style={{ background: '#eee', color: '#333', border: 'none' }}>
                                 Cancel
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -159,14 +156,13 @@ export default function ExchangeRatesSection() {
                                                     style={{ padding: '0.4rem', border: '1px solid #ccc', borderRadius: '4px', width: '120px' }}
                                                     autoFocus
                                                 />
-                                                <button onClick={() => handleUpdate(rate.currency_code)} disabled={saving}
-                                                        style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                <Button onClick={() => handleUpdate(rate.currency_code)} disabled={saving} size="sm">
                                                     {saving ? '...' : 'Save'}
-                                                </button>
-                                                <button onClick={() => setEditingCode(null)}
-                                                        style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                </Button>
+                                                <Button onClick={() => setEditingCode(null)} variant="secondary" size="sm"
+                                                        style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}>
                                                     Cancel
-                                                </button>
+                                                </Button>
                                             </div>
                                         ) : (
                                             <span style={{ fontFamily: 'monospace' }}>
@@ -180,14 +176,12 @@ export default function ExchangeRatesSection() {
                                     <td style={{ padding: '0.5rem', textAlign: 'right' }}>
                                         {editingCode !== rate.currency_code && (
                                             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                                <button onClick={() => { setEditingCode(rate.currency_code); setEditRate(String(rate.rate_to_usd)); }}
-                                                        style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                                <Button onClick={() => { setEditingCode(rate.currency_code); setEditRate(String(rate.rate_to_usd)); }} size="sm">
                                                     Edit
-                                                </button>
-                                                <button onClick={() => handleDelete(rate.currency_code)}
-                                                        style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>
+                                                </Button>
+                                                <Button onClick={() => handleDelete(rate.currency_code)} variant="danger" size="sm">
                                                     Delete
-                                                </button>
+                                                </Button>
                                             </div>
                                         )}
                                     </td>

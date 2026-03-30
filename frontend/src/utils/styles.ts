@@ -20,3 +20,27 @@ export const labelStyle: CSSProperties = {
     fontWeight: 600,
     fontSize: '0.85rem',
 };
+
+export const tableStyle: CSSProperties = {
+    width: '100%',
+    borderCollapse: 'collapse',
+    fontSize: '0.85rem',
+};
+
+export const thStyle: CSSProperties = {
+    textAlign: 'left',
+    padding: '0.5rem',
+    borderBottom: '2px solid #e0e0e0',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    color: '#555',
+};
+
+export const tdStyle: CSSProperties = {
+    padding: '0.4rem 0.5rem',
+    borderBottom: '1px solid #eee',
+};
+
+export const trHoverStyle: CSSProperties = {
+    borderBottom: '1px solid #eee',
+};

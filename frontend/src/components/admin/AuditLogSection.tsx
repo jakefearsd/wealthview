@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAuditLogs } from '../../api/audit';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import type { AuditLogEntry } from '../../types/audit';
 
 const ENTITY_TYPES = ['', 'account', 'transaction', 'holding', 'property', 'user', 'tenant'];
@@ -46,24 +46,24 @@ export default function AuditLogSection() {
                     <div>Loading...</div>
                 ) : (
                     <>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <table style={tableStyle}>
                             <thead>
-                                <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Time</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Action</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Entity Type</th>
-                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Details</th>
+                                <tr>
+                                    <th style={thStyle}>Time</th>
+                                    <th style={thStyle}>Action</th>
+                                    <th style={thStyle}>Entity Type</th>
+                                    <th style={thStyle}>Details</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {entries.map((e) => (
-                                    <tr key={e.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                        <td style={{ padding: '0.5rem', fontSize: '0.85rem' }}>
+                                    <tr key={e.id} style={trHoverStyle}>
+                                        <td style={{ ...tdStyle, fontSize: '0.85rem' }}>
                                             {new Date(e.created_at).toLocaleString()}
                                         </td>
-                                        <td style={{ padding: '0.5rem' }}>{e.action}</td>
-                                        <td style={{ padding: '0.5rem' }}>{e.entity_type}</td>
-                                        <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                        <td style={tdStyle}>{e.action}</td>
+                                        <td style={tdStyle}>{e.entity_type}</td>
+                                        <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                             {e.details ? JSON.stringify(e.details) : '-'}
                                         </td>
                                     </tr>

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { register } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
 
 export default function RegisterPage() {
     const [email, setEmail] = useState('');
@@ -49,10 +50,9 @@ export default function RegisterPage() {
                     <input id="inviteCode" type="text" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} required
                         style={{ width: '100%', padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                 </div>
-                <button type="submit" disabled={loading}
-                    style={{ width: '100%', padding: '0.75rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
+                <Button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem' }}>
                     {loading ? 'Creating account...' : 'Register'}
-                </button>
+                </Button>
                 <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
                     Already have an account? <Link to="/login">Sign In</Link>
                 </p>

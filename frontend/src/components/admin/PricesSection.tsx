@@ -9,9 +9,10 @@ import {
 } from '../../api/adminPrices';
 import type { PriceSyncStatus, PriceEntry } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
 import PriceBrowserTab from './PriceBrowserTab';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 type TabId = 'finnhub' | 'yahoo' | 'csv' | 'browse';
@@ -88,21 +89,9 @@ function FinnhubTab() {
         <div>
             <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            background: '#1976d2',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: syncing ? 'not-allowed' : 'pointer',
-                            opacity: syncing ? 0.7 : 1,
-                        }}
-                    >
+                    <Button onClick={handleSync} disabled={syncing}>
                         {syncing ? 'Syncing...' : 'Sync All Holdings'}
-                    </button>
+                    </Button>
                     {syncing && <span style={{ color: '#666', fontSize: '0.9rem' }}>Fetching latest prices from Finnhub...</span>}
                 </div>
             </div>
@@ -112,22 +101,22 @@ function FinnhubTab() {
                 {loading ? (
                     <div style={{ color: '#666' }}>Loading...</div>
                 ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Symbol</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Latest Date</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Source</th>
-                                <th style={{ textAlign: 'center', padding: '0.5rem' }}>Status</th>
+                            <tr>
+                                <th style={thStyle}>Symbol</th>
+                                <th style={thStyle}>Latest Date</th>
+                                <th style={thStyle}>Source</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {statuses?.map((s: PriceSyncStatus) => (
-                                <tr key={s.symbol} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem', fontWeight: 600 }}>{s.symbol}</td>
-                                    <td style={{ padding: '0.5rem', color: '#555' }}>{s.latest_date ?? '—'}</td>
-                                    <td style={{ padding: '0.5rem', color: '#555' }}>{s.source ?? '—'}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                <tr key={s.symbol} style={trHoverStyle}>
+                                    <td style={{ ...tdStyle, fontWeight: 600 }}>{s.symbol}</td>
+                                    <td style={{ ...tdStyle, color: '#555' }}>{s.latest_date ?? '—'}</td>
+                                    <td style={{ ...tdStyle, color: '#555' }}>{s.source ?? '—'}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <span style={{
                                             padding: '0.2rem 0.6rem',
                                             borderRadius: '4px',
@@ -231,21 +220,9 @@ function YahooTab() {
 
             <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Sync All Holdings from Yahoo</h3>
-                <button
-                    onClick={handleSyncAll}
-                    disabled={syncingAll}
-                    style={{
-                        padding: '0.5rem 1rem',
-                        background: '#1976d2',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: syncingAll ? 'not-allowed' : 'pointer',
-                        opacity: syncingAll ? 0.7 : 1,
-                    }}
-                >
+                <Button onClick={handleSyncAll} disabled={syncingAll}>
                     {syncingAll ? 'Syncing...' : 'Sync All Holdings from Yahoo'}
-                </button>
+                </Button>
             </div>
 
             <hr style={{ border: 'none', borderTop: '1px solid #e0e0e0', marginBottom: '1.5rem' }} />
@@ -278,10 +255,9 @@ function YahooTab() {
                         </div>
                     </div>
                     <div>
-                        <button onClick={handleFetchPreview} disabled={fetching}
-                            style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: fetching ? 'not-allowed' : 'pointer', opacity: fetching ? 0.7 : 1 }}>
+                        <Button onClick={handleFetchPreview} disabled={fetching}>
                             {fetching ? 'Fetching...' : 'Fetch Preview'}
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
@@ -289,26 +265,26 @@ function YahooTab() {
                     <>
                         <div style={{ marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
                             <span style={{ fontSize: '0.9rem', color: '#555' }}>{preview.length} prices fetched</span>
-                            <button onClick={handleSaveAll} disabled={saving}
-                                style={{ padding: '0.4rem 0.9rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, fontSize: '0.9rem' }}>
+                            <Button onClick={handleSaveAll} disabled={saving} size="sm"
+                                style={{ background: '#2e7d32', padding: '0.4rem 0.9rem', fontSize: '0.9rem' }}>
                                 {saving ? 'Saving...' : 'Save All'}
-                            </button>
+                            </Button>
                         </div>
                         <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                            <table style={tableStyle}>
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem' }}>Symbol</th>
-                                        <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem' }}>Date</th>
-                                        <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem' }}>Close Price</th>
+                                    <tr>
+                                        <th style={thStyle}>Symbol</th>
+                                        <th style={thStyle}>Date</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Close Price</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {preview.map((p, i) => (
-                                        <tr key={`${p.symbol}-${p.date}-${i}`} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '0.4rem 0.5rem', fontWeight: 600 }}>{p.symbol}</td>
-                                            <td style={{ padding: '0.4rem 0.5rem', color: '#555' }}>{p.date}</td>
-                                            <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
+                                        <tr key={`${p.symbol}-${p.date}-${i}`} style={trHoverStyle}>
+                                            <td style={{ ...tdStyle, fontWeight: 600 }}>{p.symbol}</td>
+                                            <td style={{ ...tdStyle, color: '#555' }}>{p.date}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

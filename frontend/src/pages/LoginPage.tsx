@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router';
 import { login } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import Button from '../components/Button';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -51,10 +52,9 @@ export default function LoginPage() {
                         </button>
                     </div>
                 </div>
-                <button type="submit" disabled={loading}
-                    style={{ width: '100%', padding: '0.75rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}>
+                <Button type="submit" disabled={loading} style={{ width: '100%', padding: '0.75rem' }}>
                     {loading ? 'Signing in...' : 'Sign In'}
-                </button>
+                </Button>
                 <p style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.9rem' }}>
                     Don't have an account? <Link to="/register">Register</Link>
                 </p>
