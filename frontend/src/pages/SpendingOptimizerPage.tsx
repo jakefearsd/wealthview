@@ -585,6 +585,7 @@ export default function SpendingOptimizerPage() {
                     fmt={fmt}
                     fmtShort={fmtShort}
                     pct={pct}
+                    retirementDate={scenario.retirement_date}
                 />
             )}
         </div>
