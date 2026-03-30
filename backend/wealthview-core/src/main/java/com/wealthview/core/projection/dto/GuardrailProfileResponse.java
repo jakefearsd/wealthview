@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -95,7 +96,7 @@ public record GuardrailProfileResponse(
                 entity.getFailureRate(),
                 entity.getPercentile10Final(),
                 entity.getPercentile55Final(),
-                entity.isStale(),
+                entity.isStale() || isOlderThan24Hours(entity),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
                 entity.getPortfolioFloor(),
@@ -106,5 +107,10 @@ public record GuardrailProfileResponse(
                 entity.getCashReturnRate(),
                 conversionSchedule
         );
+    }
+
+    static boolean isOlderThan24Hours(GuardrailSpendingProfileEntity entity) {
+        var updated = entity.getUpdatedAt();
+        return updated != null && Duration.between(updated, OffsetDateTime.now()).toHours() >= 24;
     }
 }

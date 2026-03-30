@@ -6,6 +6,7 @@ import java.util.UUID;
 public record ProjectionAccountResponse(
         UUID id,
         UUID linkedAccountId,
+        String name,
         BigDecimal initialBalance,
         BigDecimal annualContribution,
         BigDecimal expectedReturn,

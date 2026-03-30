@@ -1,6 +1,7 @@
 export interface ProjectionAccount {
     id: string;
     linked_account_id: string | null;
+    name: string;
     initial_balance: number;
     annual_contribution: number;
     expected_return: number;

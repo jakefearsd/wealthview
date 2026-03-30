@@ -232,9 +232,12 @@ public class ProjectionService {
                     var balance = acct.getLinkedAccount() != null
                             ? accountService.computeBalance(acct.getLinkedAccount(), tenantId)
                             : acct.getInitialBalance();
+                    var name = acct.getLinkedAccount() != null
+                            ? acct.getLinkedAccount().getName() : acct.getAccountType();
                     return new ProjectionAccountResponse(
                             acct.getId(),
                             acct.getLinkedAccount() != null ? acct.getLinkedAccount().getId() : null,
+                            name,
                             balance,
                             acct.getAnnualContribution(),
                             acct.getExpectedReturn(),
