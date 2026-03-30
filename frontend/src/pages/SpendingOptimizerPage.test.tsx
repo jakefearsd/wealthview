@@ -38,7 +38,7 @@ const mockScenario: Scenario = {
     end_age: 90,
     inflation_rate: 0.03,
     params_json: '{"birth_year":1968}',
-    accounts: [{ id: 'a1', linked_account_id: null, initial_balance: 500000, annual_contribution: 0, expected_return: 0.07, account_type: 'taxable' }],
+    accounts: [{ id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 500000, annual_contribution: 0, expected_return: 0.07, account_type: 'taxable' }],
     spending_profile: null,
     guardrail_profile: null,
     income_sources: [],

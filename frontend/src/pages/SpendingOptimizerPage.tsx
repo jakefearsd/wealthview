@@ -345,23 +345,28 @@ export default function SpendingOptimizerPage() {
                     <span><strong style={{ color: '#666' }}>Retirement:</strong> {new Date(scenario.retirement_date).getFullYear()}</span>
                     <span><strong style={{ color: '#666' }}>End Age:</strong> {scenario.end_age}</span>
                 </div>
-                {scenario.accounts.length > 0 && (
-                    <div style={{ color: '#555', marginBottom: '0.35rem' }}>
-                        <strong style={{ color: '#666' }}>Accounts:</strong>{' '}
-                        {Object.entries(
-                            scenario.accounts.reduce<Record<string, number>>((acc, a) => {
-                                const type = a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1);
-                                acc[type] = (acc[type] ?? 0) + a.initial_balance;
-                                return acc;
-                            }, {})
-                        ).map(([type, balance], i, arr) => (
-                            <span key={type}>
-                                {balance.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} {type}
-                                {i < arr.length - 1 ? ' · ' : ''}
-                            </span>
-                        ))}
-                    </div>
-                )}
+                {scenario.accounts.length > 0 && (() => {
+                    const grouped = scenario.accounts.reduce<Record<string, typeof scenario.accounts>>((acc, a) => {
+                        const type = a.account_type.charAt(0).toUpperCase() + a.account_type.slice(1);
+                        (acc[type] ??= []).push(a);
+                        return acc;
+                    }, {});
+                    return (
+                        <div style={{ color: '#555', marginBottom: '0.35rem' }}>
+                            {Object.entries(grouped).map(([type, accounts]) => (
+                                <div key={type} style={{ marginBottom: '0.2rem' }}>
+                                    <strong style={{ color: '#666' }}>{type}:</strong>{' '}
+                                    {accounts.map((a, i) => (
+                                        <span key={a.id}>
+                                            {a.name} ({a.initial_balance.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })})
+                                            {i < accounts.length - 1 ? ', ' : ''}
+                                        </span>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    );
+                })()}
                 {scenario.income_sources.length > 0 && (
                     <div style={{ color: '#555', marginBottom: '0.35rem' }}>
                         <strong style={{ color: '#666' }}>Income:</strong>{' '}

@@ -12,6 +12,7 @@ public record GuardrailProfileSummary(
 ) {
 
     public static GuardrailProfileSummary from(GuardrailSpendingProfileEntity entity, boolean active) {
-        return new GuardrailProfileSummary(entity.getId(), entity.getName(), entity.isStale(), active);
+        boolean stale = entity.isStale() || GuardrailProfileResponse.isOlderThan24Hours(entity);
+        return new GuardrailProfileSummary(entity.getId(), entity.getName(), stale, active);
     }
 }
