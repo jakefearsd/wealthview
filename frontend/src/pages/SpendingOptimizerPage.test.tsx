@@ -178,6 +178,26 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByText('Median Final Balance')).toBeInTheDocument();
     });
 
+    it('renders near-term spending guide section', async () => {
+        const profileWithContingent = {
+            ...mockProfile,
+            yearly_spending: mockProfile.yearly_spending.map((y, i) =>
+                i < 2
+                    ? { ...y, contingent_spending_p25: 55000 + i * 1000, contingent_spending_median: 68000 + i * 1000, contingent_spending_p55: 78000 + i * 1000 }
+                    : y,
+            ),
+        };
+        mockGetProfile.mockResolvedValue(profileWithContingent);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Near-Term Spending Guide')).toBeInTheDocument();
+        });
+
+        // Hero card for Year 1
+        expect(screen.getByTestId('hero-card')).toBeInTheDocument();
+    });
+
     it('renders corridor chart with correct data counts', async () => {
         mockGetProfile.mockResolvedValue(mockProfile);
         renderPage();

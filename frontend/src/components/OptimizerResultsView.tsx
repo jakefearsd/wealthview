@@ -7,6 +7,7 @@ import TaxSavingsSummary from './TaxSavingsSummary';
 import ConversionScheduleTable from './ConversionScheduleTable';
 import TraditionalBalanceChart from './TraditionalBalanceChart';
 import ContingentSpendingTable from './ContingentSpendingTable';
+import NearTermSpendingGuide from './NearTermSpendingGuide';
 
 interface OptimizerResultsViewProps {
     result: GuardrailProfileResponse;
@@ -14,6 +15,7 @@ interface OptimizerResultsViewProps {
     fmt: (n: number | null | undefined) => string;
     fmtShort: (n: number | null | undefined) => string;
     pct: (n: number | null | undefined) => string;
+    retirementDate: string;
 }
 
 export default function OptimizerResultsView({
@@ -22,6 +24,7 @@ export default function OptimizerResultsView({
     fmt,
     fmtShort,
     pct,
+    retirementDate,
 }: OptimizerResultsViewProps) {
     const diagnostics = computePlanDiagnostics(result.phases, result.yearly_spending, result.failure_rate);
     const failureRateColors = { good: '#e8f5e9', caution: '#fff8e1', danger: '#ffebee' };
@@ -253,6 +256,14 @@ export default function OptimizerResultsView({
                         ))}
                     </tbody>
                 </table>
+            </div>
+
+            <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                <h3 style={{ marginBottom: '1rem', marginTop: 0 }}>Near-Term Spending Guide</h3>
+                <NearTermSpendingGuide
+                    yearlySpending={result.yearly_spending}
+                    retirementDate={retirementDate}
+                />
             </div>
 
             <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
