@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import client from '../../api/client';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 interface PriceRecord {
@@ -102,20 +103,9 @@ export default function PriceBrowserTab() {
                             style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
                         />
                     </div>
-                    <button
-                        onClick={handleSearch}
-                        disabled={loading}
-                        style={{
-                            padding: '0.5rem 1rem',
-                            background: '#1976d2',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: loading ? 'not-allowed' : 'pointer',
-                        }}
-                    >
+                    <Button onClick={handleSearch} disabled={loading}>
                         {loading ? 'Loading...' : 'Search'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -142,26 +132,26 @@ export default function PriceBrowserTab() {
                         {prices.length} prices found
                     </div>
                     <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                        <table style={tableStyle}>
                             <thead>
-                                <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem' }}>Date</th>
-                                    <th style={{ textAlign: 'right', padding: '0.4rem 0.5rem' }}>Close Price</th>
-                                    <th style={{ textAlign: 'left', padding: '0.4rem 0.5rem' }}>Source</th>
-                                    <th style={{ textAlign: 'center', padding: '0.4rem 0.5rem' }}></th>
+                                <tr>
+                                    <th style={thStyle}>Date</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Close Price</th>
+                                    <th style={thStyle}>Source</th>
+                                    <th style={{ ...thStyle, textAlign: 'center' }}></th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {prices.map((p) => (
-                                    <tr key={p.date} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                        <td style={{ padding: '0.4rem 0.5rem' }}>{p.date}</td>
-                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>
+                                    <tr key={p.date} style={trHoverStyle}>
+                                        <td style={tdStyle}>{p.date}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>
                                             {formatCurrency(p.close_price)}
                                         </td>
-                                        <td style={{ padding: '0.4rem 0.5rem', color: '#666' }}>
+                                        <td style={{ ...tdStyle, color: '#666' }}>
                                             {p.source ?? '-'}
                                         </td>
-                                        <td style={{ padding: '0.4rem 0.5rem', textAlign: 'center' }}>
+                                        <td style={{ ...tdStyle, textAlign: 'center' }}>
                                             <button
                                                 onClick={() => handleDelete(p.date)}
                                                 style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}

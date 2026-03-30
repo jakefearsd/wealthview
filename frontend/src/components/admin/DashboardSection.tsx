@@ -4,7 +4,7 @@ import { syncFinnhub, syncYahoo } from '../../api/adminPrices';
 import type { SystemStats, LoginActivity } from '../../api/adminSystem';
 import type { YahooSyncResult } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import toast from 'react-hot-toast';
 
 const statCardStyle = {
@@ -119,26 +119,26 @@ export default function DashboardSection() {
                 {activityLoading ? (
                     <div>Loading...</div>
                 ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Email</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Time</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>IP Address</th>
-                                <th style={{ textAlign: 'center', padding: '0.5rem' }}>Status</th>
+                            <tr>
+                                <th style={thStyle}>Email</th>
+                                <th style={thStyle}>Time</th>
+                                <th style={thStyle}>IP Address</th>
+                                <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
                             </tr>
                         </thead>
                         <tbody>
                             {activity?.map((a, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{a.user_email}</td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem' }}>
+                                <tr key={i} style={trHoverStyle}>
+                                    <td style={tdStyle}>{a.user_email}</td>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem' }}>
                                         {new Date(a.created_at).toLocaleString()}
                                     </td>
-                                    <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                    <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                         {a.ip_address ?? '-'}
                                     </td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                    <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <span style={{
                                             padding: '0.15rem 0.4rem',
                                             borderRadius: '4px',

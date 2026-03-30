@@ -6,6 +6,10 @@ import { useAuth } from '../context/AuthContext';
 import type { Account, AccountRequest } from '../types/account';
 import { cardStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
+import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import Button from '../components/Button';
 import toast from 'react-hot-toast';
 
 export default function AccountsListPage() {
@@ -70,14 +74,14 @@ export default function AccountsListPage() {
         }
     }
 
-    if (loading) return <div>Loading accounts...</div>;
-    if (error) return <div style={{ color: '#d32f2f' }}>Error: {error}</div>;
+    if (loading) return <LoadingState message="Loading accounts..." />;
+    if (error) return <ErrorState message={error} onRetry={refetch} />;
 
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>Accounts</h2>
-                {canWrite && <button onClick={() => setShowForm(true)} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>New Account</button>}
+                {canWrite && <Button onClick={() => setShowForm(true)}>New Account</Button>}
             </div>
 
             {showForm && (
@@ -102,8 +106,8 @@ export default function AccountsListPage() {
                         />
                     </div>
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
-                        <button onClick={handleSave} style={{ padding: '0.5rem 1rem', background: '#2e7d32', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editingId ? 'Save' : 'Create'}</button>
-                        <button onClick={resetForm} style={{ padding: '0.5rem 1rem', background: '#eee', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Cancel</button>
+                        <Button onClick={handleSave} style={{ background: '#2e7d32' }}>{editingId ? 'Save' : 'Create'}</Button>
+                        <Button onClick={resetForm} variant="secondary" style={{ background: '#eee', color: '#333', border: 'none' }}>Cancel</Button>
                     </div>
                 </div>
             )}
@@ -152,13 +156,18 @@ export default function AccountsListPage() {
                         </Link>
                         {canWrite && (
                             <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid #eee', display: 'flex', gap: '0.5rem' }}>
-                                <button onClick={() => startEdit(account)} style={{ padding: '0.3rem 0.6rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Edit</button>
-                                <button onClick={() => handleDelete(account.id)} style={{ padding: '0.3rem 0.6rem', background: '#d32f2f', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}>Delete</button>
+                                <Button onClick={() => startEdit(account)} size="sm">Edit</Button>
+                                <Button onClick={() => handleDelete(account.id)} variant="danger" size="sm">Delete</Button>
                             </div>
                         )}
                     </div>
                 ))}
-                {data?.data.length === 0 && <div style={{ color: '#999' }}>No accounts yet. Create one to get started.</div>}
+                {data?.data.length === 0 && (
+                    <EmptyState
+                        title="No accounts"
+                        message="Create one to get started."
+                    />
+                )}
             </div>
         </div>
     );

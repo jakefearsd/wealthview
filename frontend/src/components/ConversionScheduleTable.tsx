@@ -1,4 +1,5 @@
 import type { ConversionYearDetail } from '../types/projection';
+import { tableStyle, thStyle as baseThStyle, tdStyle as baseTdStyle, trHoverStyle } from '../utils/styles';
 
 interface Props {
     years: ConversionYearDetail[];
@@ -15,14 +16,14 @@ const fmtShort = (n: number) => {
     return `${sign}$${Math.round(abs)}`;
 };
 
-const thStyle: React.CSSProperties = {
+const localThStyle: React.CSSProperties = {
+    ...baseThStyle,
     textAlign: 'right',
-    padding: '0.5rem',
     whiteSpace: 'nowrap',
 };
 
-const tdStyle: React.CSSProperties = {
-    padding: '0.4rem 0.5rem',
+const localTdStyle: React.CSSProperties = {
+    ...baseTdStyle,
     textAlign: 'right',
 };
 
@@ -33,49 +34,49 @@ export default function ConversionScheduleTable({ years }: Props) {
 
     return (
         <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <table style={tableStyle}>
                 <thead>
                     <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                        <th style={{ ...thStyle, textAlign: 'left' }}>Age</th>
-                        <th style={{ ...thStyle, textAlign: 'left' }}>Year</th>
-                        <th style={thStyle}>Conversion</th>
-                        <th style={thStyle}>Est. Tax</th>
-                        <th style={thStyle}>Traditional</th>
-                        <th style={thStyle}>Roth</th>
-                        <th style={thStyle}>RMD</th>
-                        <th style={thStyle}>Other Income</th>
-                        <th style={thStyle}>Taxable Income</th>
-                        <th style={{ ...thStyle, textAlign: 'left' }}>Bracket</th>
+                        <th style={{ ...localThStyle, textAlign: 'left' }}>Age</th>
+                        <th style={{ ...localThStyle, textAlign: 'left' }}>Year</th>
+                        <th style={localThStyle}>Conversion</th>
+                        <th style={localThStyle}>Est. Tax</th>
+                        <th style={localThStyle}>Traditional</th>
+                        <th style={localThStyle}>Roth</th>
+                        <th style={localThStyle}>RMD</th>
+                        <th style={localThStyle}>Other Income</th>
+                        <th style={localThStyle}>Taxable Income</th>
+                        <th style={{ ...localThStyle, textAlign: 'left' }}>Bracket</th>
                     </tr>
                 </thead>
                 <tbody>
                     {years.map(y => (
                         <tr key={y.calendar_year} style={{
-                            borderBottom: '1px solid #eee',
+                            ...trHoverStyle,
                             background: y.conversion_amount > 0 ? '#f3f8ff' : undefined,
                         }}>
-                            <td style={{ ...tdStyle, textAlign: 'left' }}>{y.age}</td>
-                            <td style={{ ...tdStyle, textAlign: 'left', color: '#666' }}>{y.calendar_year}</td>
+                            <td style={{ ...localTdStyle, textAlign: 'left' }}>{y.age}</td>
+                            <td style={{ ...localTdStyle, textAlign: 'left', color: '#666' }}>{y.calendar_year}</td>
                             <td style={{
-                                ...tdStyle,
+                                ...localTdStyle,
                                 fontWeight: y.conversion_amount > 0 ? 600 : 400,
                                 color: y.conversion_amount > 0 ? '#1976d2' : '#888',
                             }}>
                                 {y.conversion_amount > 0 ? fmt(y.conversion_amount) : '--'}
                             </td>
-                            <td style={{ ...tdStyle, color: y.estimated_tax > 0 ? '#d32f2f' : '#888' }}>
+                            <td style={{ ...localTdStyle, color: y.estimated_tax > 0 ? '#d32f2f' : '#888' }}>
                                 {y.estimated_tax > 0 ? fmt(y.estimated_tax) : '--'}
                             </td>
-                            <td style={tdStyle}>{fmtShort(y.traditional_balance_after)}</td>
-                            <td style={tdStyle}>{fmtShort(y.roth_balance_after)}</td>
-                            <td style={{ ...tdStyle, color: '#888' }}>
+                            <td style={localTdStyle}>{fmtShort(y.traditional_balance_after)}</td>
+                            <td style={localTdStyle}>{fmtShort(y.roth_balance_after)}</td>
+                            <td style={{ ...localTdStyle, color: '#888' }}>
                                 {y.projected_rmd > 0 ? fmt(y.projected_rmd) : '--'}
                             </td>
-                            <td style={{ ...tdStyle, color: '#888' }}>
+                            <td style={{ ...localTdStyle, color: '#888' }}>
                                 {y.other_income > 0 ? fmt(y.other_income) : '--'}
                             </td>
-                            <td style={tdStyle}>{fmt(y.total_taxable_income)}</td>
-                            <td style={{ ...tdStyle, textAlign: 'left', color: '#666' }}>{y.bracket_used}</td>
+                            <td style={localTdStyle}>{fmt(y.total_taxable_income)}</td>
+                            <td style={{ ...localTdStyle, textAlign: 'left', color: '#666' }}>{y.bracket_used}</td>
                         </tr>
                     ))}
                 </tbody>

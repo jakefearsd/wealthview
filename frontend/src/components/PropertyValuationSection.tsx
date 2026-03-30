@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { formatCurrency } from '../utils/format';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import Button from './Button';
 import type { PropertyValuation, ZillowSearchResult } from '../types/property';
 
 interface PropertyValuationSectionProps {
@@ -49,13 +50,14 @@ export default function PropertyValuationSection({
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                         <h3>Valuation History</h3>
                         {canWrite && (
-                            <button
+                            <Button
                                 onClick={onRefreshValuation}
                                 disabled={refreshing}
-                                style={{ padding: '0.4rem 0.8rem', background: refreshing ? '#ccc' : '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: refreshing ? 'default' : 'pointer', fontSize: '0.85rem' }}
+                                size="sm"
+                                style={{ background: refreshing ? '#ccc' : undefined }}
                             >
                                 {refreshing ? 'Refreshing...' : 'Refresh Valuation'}
-                            </button>
+                            </Button>
                         )}
                     </div>
                     <ResponsiveContainer width="100%" height={250}>
@@ -67,20 +69,20 @@ export default function PropertyValuationSection({
                             <Line type="monotone" dataKey="value" name="Value" stroke="#1976d2" strokeWidth={2} dot={{ r: 4 }} />
                         </LineChart>
                     </ResponsiveContainer>
-                    <table style={{ width: '100%', marginTop: '1rem', fontSize: '0.85rem', borderCollapse: 'collapse' }}>
+                    <table style={{ ...tableStyle, marginTop: '1rem' }}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #eee', textAlign: 'left' }}>
-                                <th style={{ padding: '0.5rem' }}>Date</th>
-                                <th style={{ padding: '0.5rem' }}>Value</th>
-                                <th style={{ padding: '0.5rem' }}>Source</th>
+                            <tr>
+                                <th style={thStyle}>Date</th>
+                                <th style={thStyle}>Value</th>
+                                <th style={thStyle}>Source</th>
                             </tr>
                         </thead>
                         <tbody>
                             {valuations?.map((v) => (
-                                <tr key={v.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{v.valuation_date}</td>
-                                    <td style={{ padding: '0.5rem' }}>{formatCurrency(v.value)}</td>
-                                    <td style={{ padding: '0.5rem' }}>
+                                <tr key={v.id} style={trHoverStyle}>
+                                    <td style={tdStyle}>{v.valuation_date}</td>
+                                    <td style={tdStyle}>{formatCurrency(v.value)}</td>
+                                    <td style={tdStyle}>
                                         <span style={badgeStyle(
                                             v.source === 'zillow' ? '#e65100' : v.source === 'appraisal' ? '#1b5e20' : '#444',
                                             v.source === 'zillow' ? '#fff3e0' : v.source === 'appraisal' ? '#e8f5e9' : '#f5f5f5'
@@ -96,13 +98,14 @@ export default function PropertyValuationSection({
             {valuationChartData.length === 0 && canWrite && (
                 <div style={{ ...cardStyle, marginBottom: '2rem', textAlign: 'center', color: '#999' }}>
                     <p>No valuation history yet.</p>
-                    <button
+                    <Button
                         onClick={onRefreshValuation}
                         disabled={refreshing}
-                        style={{ marginTop: '0.5rem', padding: '0.4rem 0.8rem', background: refreshing ? '#ccc' : '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: refreshing ? 'default' : 'pointer', fontSize: '0.85rem' }}
+                        size="sm"
+                        style={{ marginTop: '0.5rem', background: refreshing ? '#ccc' : undefined }}
                     >
                         {refreshing ? 'Refreshing...' : 'Refresh Valuation'}
-                    </button>
+                    </Button>
                 </div>
             )}
 

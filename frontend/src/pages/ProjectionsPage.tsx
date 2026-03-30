@@ -3,10 +3,13 @@ import { Link } from 'react-router';
 import { listScenarios, createScenario, deleteScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { cardStyle } from '../utils/styles';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import type { CreateScenarioRequest } from '../types/projection';
 import ScenarioForm from '../components/ScenarioForm';
+import Button from '../components/Button';
 
 export default function ProjectionsPage() {
     const { data: scenarios, loading, refetch } = useApiQuery(listScenarios);
@@ -33,7 +36,7 @@ export default function ProjectionsPage() {
         }
     }
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <LoadingState message="Loading scenarios..." />;
 
     return (
         <div>
@@ -46,12 +49,9 @@ export default function ProjectionsPage() {
                     >
                         Compare Scenarios
                     </Link>
-                    <button
-                        onClick={() => setShowForm(!showForm)}
-                        style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >
+                    <Button onClick={() => setShowForm(!showForm)}>
                         {showForm ? 'Cancel' : 'New Scenario'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -63,9 +63,10 @@ export default function ProjectionsPage() {
             )}
 
             {scenarios?.length === 0 ? (
-                <div style={{ ...cardStyle, textAlign: 'center', padding: '3rem' }}>
-                    <div style={{ color: '#999', fontSize: '1.1rem' }}>No scenarios yet. Create one to get started.</div>
-                </div>
+                <EmptyState
+                    title="No scenarios"
+                    message="Create one to get started."
+                />
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '1rem' }}>
                     {scenarios?.map(s => (

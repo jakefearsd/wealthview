@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import Button from './Button';
 
 interface Props {
     children: ReactNode;
@@ -56,20 +57,13 @@ export default class ErrorBoundary extends Component<Props, State> {
                             </pre>
                         )}
                         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-                            <button
+                            <Button
                                 onClick={() => window.location.reload()}
-                                style={{
-                                    background: '#d32f2f',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '0.5rem 1.5rem',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '1rem',
-                                }}
+                                variant="danger"
+                                style={{ padding: '0.5rem 1.5rem', fontSize: '1rem' }}
                             >
                                 Reload Page
-                            </button>
+                            </Button>
                             <a
                                 href="/"
                                 style={{

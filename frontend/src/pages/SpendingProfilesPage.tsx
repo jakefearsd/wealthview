@@ -6,9 +6,12 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
 import toast from 'react-hot-toast';
+import Button from '../components/Button';
 import type { SpendingProfile, CreateSpendingProfileRequest, SpendingTier, GuardrailProfileResponse } from '../types/projection';
 
 function defaultSpendingTier(): SpendingTier {
@@ -116,7 +119,7 @@ export default function SpendingProfilesPage() {
         }));
     }
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <LoadingState message="Loading spending profiles..." />;
 
     const { name, essential_expenses: essentialExpenses, discretionary_expenses: discretionaryExpenses, spending_tiers: spendingTiers } = formData;
 
@@ -129,12 +132,9 @@ export default function SpendingProfilesPage() {
                         Spending profiles define your retirement cost of living. Attach one to a projection scenario to see whether your portfolio can sustain your planned lifestyle.
                     </div>
                 </div>
-                <button
-                    onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
-                    style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
+                <Button onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
                     {showForm ? 'Cancel' : 'New Profile'}
-                </button>
+                </Button>
             </div>
 
             {showForm && (
@@ -205,20 +205,21 @@ export default function SpendingProfilesPage() {
                         </div>
                     ))}
 
-                    <button
+                    <Button
                         onClick={handleSave}
                         disabled={saving}
-                        style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', marginTop: '0.5rem' }}
+                        style={{ marginTop: '0.5rem' }}
                     >
                         {saving ? 'Saving...' : (editingId ? 'Update Profile' : 'Create Profile')}
-                    </button>
+                    </Button>
                 </div>
             )}
 
             {profiles?.length === 0 ? (
-                <div style={{ ...cardStyle, textAlign: 'center', padding: '3rem' }}>
-                    <div style={{ color: '#999', fontSize: '1.1rem' }}>No spending profiles yet. Create one to attach to your retirement scenarios.</div>
-                </div>
+                <EmptyState
+                    title="No spending profiles"
+                    message="Create one to attach to your retirement scenarios."
+                />
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))', gap: '1rem' }}>
                     {profiles?.map(p => {

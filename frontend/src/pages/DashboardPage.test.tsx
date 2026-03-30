@@ -31,6 +31,10 @@ vi.mock('../utils/format', () => ({
 
 vi.mock('../utils/styles', () => ({
     cardStyle: {},
+    tableStyle: {},
+    thStyle: {},
+    tdStyle: {},
+    trHoverStyle: {},
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
@@ -69,7 +73,8 @@ describe('DashboardPage', () => {
         mockUseApiQuery.mockReturnValue({ data: null, loading: false, error: 'Network error', refetch: vi.fn() });
         renderWithRouter(<DashboardPage />);
 
-        expect(screen.getByText('Error: Network error')).toBeInTheDocument();
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+        expect(screen.getByText('Network error')).toBeInTheDocument();
     });
 
     it('returns null when data is null and not loading', () => {

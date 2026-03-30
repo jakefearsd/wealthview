@@ -3,6 +3,11 @@ import { createPrice, listLatestPrices } from '../api/prices';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
+import LoadingState from '../components/LoadingState';
+import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import { tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import Button from '../components/Button';
 import toast from 'react-hot-toast';
 import type { Price } from '../types/price';
 
@@ -16,15 +21,16 @@ export default function PricesPage() {
     const [recentPrices, setRecentPrices] = useState<Array<{ symbol: string; date: string; close_price: number }>>([]);
     const [latestPrices, setLatestPrices] = useState<Price[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     async function fetchLatestPrices() {
         setLoading(true);
+        setError(null);
         try {
             const data = await listLatestPrices();
             setLatestPrices(data);
-        } catch (err) {
-            console.error('Failed to load latest prices', err);
-            toast.error('Failed to load prices');
+        } catch {
+            setError('Failed to load prices. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -47,8 +53,7 @@ export default function PricesPage() {
             setDate('');
             setPrice('');
             await fetchLatestPrices();
-        } catch (err) {
-            console.error('Failed to save price', err);
+        } catch {
             toast.error('Failed to save price');
         }
     }
@@ -73,7 +78,7 @@ export default function PricesPage() {
                             <label style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>Price</label>
                             <CurrencyInput value={price} onChange={setPrice} placeholder="185.50" style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
                         </div>
-                        <button onClick={handleAddPrice} style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>Save</button>
+                        <Button onClick={handleAddPrice}>Save</Button>
                     </div>
                 </div>
             )}
@@ -90,26 +95,28 @@ export default function PricesPage() {
                     </button>
                 </div>
                 {loading ? (
-                    <p style={{ color: '#888', margin: 0 }}>Loading…</p>
+                    <LoadingState message="Loading prices..." />
+                ) : error ? (
+                    <ErrorState message={error} onRetry={fetchLatestPrices} />
                 ) : latestPrices.length === 0 ? (
-                    <p style={{ color: '#888', margin: 0 }}>No prices on record.</p>
+                    <EmptyState title="No prices on record" />
                 ) : (
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Symbol</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Latest Date</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Close Price</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Source</th>
+                            <tr>
+                                <th style={thStyle}>Symbol</th>
+                                <th style={thStyle}>Latest Date</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Close Price</th>
+                                <th style={thStyle}>Source</th>
                             </tr>
                         </thead>
                         <tbody>
                             {latestPrices.map((p) => (
-                                <tr key={p.symbol} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem', fontWeight: 500 }}>{p.symbol}</td>
-                                    <td style={{ padding: '0.5rem' }}>{p.date}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
-                                    <td style={{ padding: '0.5rem', color: '#666', fontSize: '0.85rem' }}>{p.source}</td>
+                                <tr key={p.symbol} style={trHoverStyle}>
+                                    <td style={{ ...tdStyle, fontWeight: 500 }}>{p.symbol}</td>
+                                    <td style={tdStyle}>{p.date}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
+                                    <td style={{ ...tdStyle, color: '#666', fontSize: '0.85rem' }}>{p.source}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -120,20 +127,20 @@ export default function PricesPage() {
             {recentPrices.length > 0 && (
                 <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Recently Added</h3>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Symbol</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Date</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Price</th>
+                            <tr>
+                                <th style={thStyle}>Symbol</th>
+                                <th style={thStyle}>Date</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
                             </tr>
                         </thead>
                         <tbody>
                             {recentPrices.map((p, i) => (
-                                <tr key={i} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                    <td style={{ padding: '0.5rem' }}>{p.symbol}</td>
-                                    <td style={{ padding: '0.5rem' }}>{p.date}</td>
-                                    <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
+                                <tr key={i} style={trHoverStyle}>
+                                    <td style={tdStyle}>{p.symbol}</td>
+                                    <td style={tdStyle}>{p.date}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.close_price)}</td>
                                 </tr>
                             ))}
                         </tbody>

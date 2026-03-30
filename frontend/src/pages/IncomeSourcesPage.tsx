@@ -5,10 +5,13 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency, toPercent } from '../utils/format';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
 import InfoSection from '../components/InfoSection';
 import PropertyIncomeChart from '../components/PropertyIncomeChart';
+import Button from '../components/Button';
 import type { IncomeSource, CreateIncomeSourceRequest } from '../types/projection';
 
 const INCOME_TYPES = [
@@ -189,7 +192,7 @@ export default function IncomeSourcesPage() {
         });
     }
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return <LoadingState message="Loading income sources..." />;
 
     const linkableProperties = properties ?? [];
     const grouped = (sources ?? []).reduce<Record<string, IncomeSource[]>>((acc, s) => {
@@ -209,12 +212,9 @@ export default function IncomeSourcesPage() {
                         Define non-portfolio income (Social Security, pensions, rental income, part-time work) that reduces how much you withdraw from investments in retirement.
                     </div>
                 </div>
-                <button
-                    onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
-                    style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                >
+                <Button onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}>
                     {showForm ? 'Cancel' : 'New Income Source'}
-                </button>
+                </Button>
             </div>
 
             <InfoSection prompt="How do income sources work in projections?">
@@ -326,20 +326,17 @@ export default function IncomeSourcesPage() {
                         )}
                     </div>
 
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >
+                    <Button onClick={handleSave} disabled={saving}>
                         {saving ? 'Saving...' : (editingId ? 'Update Income Source' : 'Create Income Source')}
-                    </button>
+                    </Button>
                 </div>
             )}
 
             {(sources ?? []).length === 0 ? (
-                <div style={{ ...cardStyle, textAlign: 'center', padding: '3rem' }}>
-                    <div style={{ color: '#999', fontSize: '1.1rem' }}>No income sources yet. Create one to attach to your retirement scenarios.</div>
-                </div>
+                <EmptyState
+                    title="No income sources"
+                    message="Create one to attach to your retirement scenarios."
+                />
             ) : (
                 Object.entries(grouped).map(([type, items]) => (
                     <div key={type} style={{ marginBottom: '1.5rem' }}>

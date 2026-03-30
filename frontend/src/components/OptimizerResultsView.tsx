@@ -1,6 +1,6 @@
 import type { GuardrailProfileResponse } from '../types/projection';
 import { computePlanDiagnostics } from '../pages/SpendingOptimizerPage';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import SpendingCorridorChart from './SpendingCorridorChart';
 import PortfolioFanChart from './PortfolioFanChart';
 import TaxSavingsSummary from './TaxSavingsSummary';
@@ -132,14 +132,14 @@ export default function OptimizerResultsView({
             {diagnostics.phases.length > 0 && (
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>Phase Achievement</h3>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                    <table style={tableStyle}>
                         <thead>
-                            <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Phase</th>
-                                <th style={{ textAlign: 'left', padding: '0.5rem' }}>Ages</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Target</th>
-                                <th style={{ textAlign: 'right', padding: '0.5rem' }}>Avg Recommended</th>
-                                <th style={{ padding: '0.5rem', width: '35%' }}>Achievement</th>
+                            <tr>
+                                <th style={thStyle}>Phase</th>
+                                <th style={thStyle}>Ages</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Target</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Avg Recommended</th>
+                                <th style={{ ...thStyle, width: '35%' }}>Achievement</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -151,12 +151,12 @@ export default function OptimizerResultsView({
                                     ? `${phase.start_age}\u2013${phase.end_age ?? '\u221E'}`
                                     : '';
                                 return (
-                                    <tr key={p.phaseName} style={{ borderBottom: '1px solid #eee' }}>
-                                        <td style={{ padding: '0.5rem' }}>{p.phaseName}</td>
-                                        <td style={{ padding: '0.5rem', color: '#888' }}>{ageRange}</td>
-                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
-                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
-                                        <td style={{ padding: '0.5rem' }}>
+                                    <tr key={p.phaseName} style={trHoverStyle}>
+                                        <td style={tdStyle}>{p.phaseName}</td>
+                                        <td style={{ ...tdStyle, color: '#888' }}>{ageRange}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.targetSpending)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(p.avgRecommended)}</td>
+                                        <td style={tdStyle}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <div data-testid={`progress-bar-${p.phaseName}`} style={{
                                                     flex: 1, height: '0.75rem', background: '#eee',
@@ -203,52 +203,52 @@ export default function OptimizerResultsView({
 
             <div style={{ ...cardStyle, marginBottom: '1.5rem', overflowX: 'auto' }}>
                 <h3 style={{ marginBottom: '1rem' }}>Year-by-Year Breakdown</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                <table style={tableStyle}>
                     <thead>
                         <tr style={{ borderBottom: '1px solid #e0e0e0' }}>
-                            <th rowSpan={2} style={{ textAlign: 'left', padding: '0.5rem', verticalAlign: 'bottom' }}>Age</th>
-                            <th rowSpan={2} style={{ textAlign: 'left', padding: '0.5rem', verticalAlign: 'bottom' }}>Phase</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Recommended</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Floor</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Discretionary</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Income</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Portfolio Draw</th>
-                            <th colSpan={4} style={{ textAlign: 'center', padding: '0.5rem', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
-                            <th rowSpan={2} style={{ textAlign: 'right', padding: '0.5rem', verticalAlign: 'bottom' }}>Corridor</th>
+                            <th rowSpan={2} style={{ ...thStyle, verticalAlign: 'bottom' }}>Age</th>
+                            <th rowSpan={2} style={{ ...thStyle, verticalAlign: 'bottom' }}>Phase</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Recommended</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Floor</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Discretionary</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Income</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Portfolio Draw</th>
+                            <th colSpan={4} style={{ ...thStyle, textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
+                            <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Corridor</th>
                         </tr>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
-                            <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
-                            <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
-                            <th style={{ textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p55</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
+                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p55</th>
                         </tr>
                     </thead>
                     <tbody>
                         {result.yearly_spending.map(y => (
-                            <tr key={y.year} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '0.4rem 0.5rem' }}>{y.age}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', color: '#666' }}>{y.phase_name}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', fontWeight: 600 }}>{fmt(y.recommended)}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.essential_floor)}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.discretionary)}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.income_offset)}</td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right' }}>{fmt(y.portfolio_withdrawal)}</td>
+                            <tr key={y.year} style={trHoverStyle}>
+                                <td style={tdStyle}>{y.age}</td>
+                                <td style={{ ...tdStyle, color: '#666' }}>{y.phase_name}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>{fmt(y.recommended)}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.essential_floor)}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.discretionary)}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.income_offset)}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{fmt(y.portfolio_withdrawal)}</td>
                                 <td style={{
-                                    padding: '0.4rem 0.5rem', textAlign: 'right',
+                                    ...tdStyle, textAlign: 'right',
                                     color: y.portfolio_balance_p10 != null && y.portfolio_balance_p10 <= 0 ? '#ef5350' : '#888',
                                 }}>
                                     {fmtShort(y.portfolio_balance_p10)}
                                 </td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmtShort(y.portfolio_balance_p25)}
                                 </td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmtShort(y.portfolio_balance_median)}
                                 </td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmtShort(y.portfolio_balance_p55)}
                                 </td>
-                                <td style={{ padding: '0.4rem 0.5rem', textAlign: 'right', color: '#888' }}>
+                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}
                                 </td>
                             </tr>

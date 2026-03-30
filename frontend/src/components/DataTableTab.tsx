@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { formatCurrency } from '../utils/format';
+import { tableStyle } from '../utils/styles';
+import Button from './Button';
 import type { ProjectionYear } from '../types/projection';
 
 interface DataTableTabProps {
@@ -48,23 +50,12 @@ export default function DataTableTab({
                         {showPoolDetails ? 'Hide' : 'Show'} Pool Details
                     </button>
                 )}
-                <button
-                    onClick={onDownloadCsv}
-                    style={{
-                        padding: '0.4rem 1rem',
-                        background: '#1976d2',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                    }}
-                >
+                <Button onClick={onDownloadCsv} size="sm" style={{ padding: '0.4rem 1rem' }}>
                     Download CSV
-                </button>
+                </Button>
             </div>
             <div style={{ maxHeight: '70vh', overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={tableStyle}>
                     <thead>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                             <th style={{ textAlign: 'left', padding: '0.5rem', position: 'sticky', top: 0, background: '#fff' }}>Year</th>

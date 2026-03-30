@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getConfig, setConfig } from '../../api/adminSystem';
 import type { SystemConfig } from '../../api/adminSystem';
 import { cardStyle } from '../../utils/styles';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 const SENSITIVE_KEYS = ['finnhub.api-key'];
@@ -161,19 +162,13 @@ export default function SystemConfigSection() {
                                                     style={{ padding: '0.4rem', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
                                                     autoFocus
                                                 />
-                                                <button
-                                                    onClick={handleSave}
-                                                    disabled={saving}
-                                                    style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                                                >
+                                                <Button onClick={handleSave} disabled={saving} size="sm">
                                                     {saving ? '...' : 'Save'}
-                                                </button>
-                                                <button
-                                                    onClick={() => setEditingKey(null)}
-                                                    style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                                                >
+                                                </Button>
+                                                <Button onClick={() => setEditingKey(null)} variant="secondary" size="sm"
+                                                        style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}>
                                                     Cancel
-                                                </button>
+                                                </Button>
                                             </div>
                                         ) : (
                                             <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -227,14 +222,13 @@ export default function SystemConfigSection() {
                                                         style={{ padding: '0.4rem', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
                                                         autoFocus
                                                     />
-                                                    <button onClick={handleSave} disabled={saving}
-                                                        style={{ padding: '0.4rem 0.8rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                    <Button onClick={handleSave} disabled={saving} size="sm">
                                                         {saving ? '...' : 'Save'}
-                                                    </button>
-                                                    <button onClick={() => setEditingKey(null)}
-                                                        style={{ padding: '0.4rem 0.8rem', background: '#fff', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}>
+                                                    </Button>
+                                                    <Button onClick={() => setEditingKey(null)} variant="secondary" size="sm"
+                                                        style={{ background: '#fff', color: '#333', border: '1px solid #ccc' }}>
                                                         Cancel
-                                                    </button>
+                                                    </Button>
                                                 </div>
                                             ) : (
                                                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>

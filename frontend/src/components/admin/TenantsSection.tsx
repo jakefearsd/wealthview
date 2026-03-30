@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { listTenantDetails, createTenant, setTenantActive } from '../../api/admin';
 import { useApiQuery } from '../../hooks/useApiQuery';
-import { cardStyle } from '../../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
+import Button from '../Button';
 import toast from 'react-hot-toast';
 
 export default function TenantsSection() {
@@ -50,36 +51,32 @@ export default function TenantsSection() {
                         placeholder="Tenant name"
                         style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px', flex: 1 }}
                     />
-                    <button
-                        onClick={handleCreate}
-                        disabled={creating}
-                        style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
-                    >
+                    <Button onClick={handleCreate} disabled={creating}>
                         {creating ? 'Creating...' : 'Create'}
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             <div style={cardStyle}>
                 <h3 style={{ marginBottom: '1rem' }}>Tenants</h3>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <table style={tableStyle}>
                     <thead>
-                        <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>Users</th>
-                            <th style={{ textAlign: 'right', padding: '0.5rem' }}>Accounts</th>
-                            <th style={{ textAlign: 'center', padding: '0.5rem' }}>Status</th>
-                            <th style={{ textAlign: 'left', padding: '0.5rem' }}>Created</th>
-                            <th style={{ padding: '0.5rem' }}></th>
+                        <tr>
+                            <th style={thStyle}>Name</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Users</th>
+                            <th style={{ ...thStyle, textAlign: 'right' }}>Accounts</th>
+                            <th style={{ ...thStyle, textAlign: 'center' }}>Status</th>
+                            <th style={thStyle}>Created</th>
+                            <th style={thStyle}></th>
                         </tr>
                     </thead>
                     <tbody>
                         {tenants?.map((t) => (
-                            <tr key={t.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                <td style={{ padding: '0.5rem' }}>{t.name}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{t.user_count}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'right' }}>{t.account_count}</td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                            <tr key={t.id} style={trHoverStyle}>
+                                <td style={tdStyle}>{t.name}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{t.user_count}</td>
+                                <td style={{ ...tdStyle, textAlign: 'right' }}>{t.account_count}</td>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <span style={{
                                         padding: '0.2rem 0.5rem',
                                         borderRadius: '4px',
@@ -90,10 +87,10 @@ export default function TenantsSection() {
                                         {t.is_active ? 'Active' : 'Disabled'}
                                     </span>
                                 </td>
-                                <td style={{ padding: '0.5rem', fontSize: '0.85rem', color: '#666' }}>
+                                <td style={{ ...tdStyle, fontSize: '0.85rem', color: '#666' }}>
                                     {new Date(t.created_at).toLocaleDateString()}
                                 </td>
-                                <td style={{ padding: '0.5rem', textAlign: 'center' }}>
+                                <td style={{ ...tdStyle, textAlign: 'center' }}>
                                     <button
                                         onClick={() => handleToggleActive(t.id, t.is_active)}
                                         style={{

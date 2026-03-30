@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import { buildProjectionCsv } from '../utils/projectionCsv';
 import SummaryCard from '../components/SummaryCard';
@@ -13,11 +13,14 @@ import ScenarioForm from '../components/ScenarioForm';
 import IncomeStreamsChart from '../components/IncomeStreamsChart';
 import DataTableTab from '../components/DataTableTab';
 import IncomeTaxTab from '../components/IncomeTaxTab';
+import LoadingState from '../components/LoadingState';
+import EmptyState from '../components/EmptyState';
 import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
 import type { ProjectionResult, ProjectionYear, CreateScenarioRequest } from '../types/projection';
 import { downloadBlob } from '../api/export';
+import Button from '../components/Button';
 
 type TabId = 'chart' | 'flows' | 'table' | 'spending' | 'income_tax' | 'income_streams' | 'tax_shield';
 
@@ -179,8 +182,8 @@ export default function ProjectionDetailPage() {
         };
     }, [result]);
 
-    if (loading) return <div>Loading...</div>;
-    if (!scenario) return <div>Scenario not found</div>;
+    if (loading) return <LoadingState message="Loading scenario..." />;
+    if (!scenario) return <EmptyState title="Scenario not found" message="This scenario may have been deleted." />;
 
     const retirementYear = scenario.retirement_date ? new Date(scenario.retirement_date).getFullYear() : null;
     const hasPoolData = result?.yearly_data.some(y => y.traditional_balance !== null) ?? false;
@@ -242,27 +245,26 @@ export default function ProjectionDetailPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>{scenario.name}</h2>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
+                    <Button
                         onClick={() => setEditing(!editing)}
-                        style={{ padding: '0.5rem 1rem', background: editing ? '#757575' : '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                        style={{ background: editing ? '#757575' : '#ff9800' }}
                     >
                         {editing ? 'Cancel Edit' : 'Edit'}
-                    </button>
+                    </Button>
                     {!editing && (
                         <>
-                            <button
+                            <Button
                                 onClick={() => navigate(`/projections/${id}/optimize`)}
-                                style={{ padding: '0.5rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                                style={{ background: '#7c3aed' }}
                             >
                                 Optimize Spending
-                            </button>
-                            <button
+                            </Button>
+                            <Button
                                 onClick={handleRun}
                                 disabled={running}
-                                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
                             >
                                 {running ? 'Running...' : 'Run Projection'}
-                            </button>
+                            </Button>
                         </>
                     )}
                 </div>
@@ -292,35 +294,35 @@ export default function ProjectionDetailPage() {
                     {scenario.income_sources && scenario.income_sources.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Income Sources</h3>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <table style={tableStyle}>
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Name</th>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Start Age</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>End Age</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Base Amount</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Override</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Effective</th>
+                                    <tr>
+                                        <th style={thStyle}>Name</th>
+                                        <th style={thStyle}>Type</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Start Age</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>End Age</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Base Amount</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Override</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Effective</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {scenario.income_sources.map(is => (
-                                        <tr key={is.income_source_id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '0.5rem' }}>{is.name}</td>
-                                            <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.start_age}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                        <tr key={is.income_source_id} style={trHoverStyle}>
+                                            <td style={tdStyle}>{is.name}</td>
+                                            <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{is.income_type.replace(/_/g, ' ')}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{is.start_age}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{is.end_age != null ? is.end_age : '∞'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 {formatCurrency(is.annual_amount)}
                                                 {is.income_type === 'rental_property' && (
                                                     <span style={{ fontSize: '0.75rem', color: '#999', marginLeft: '0.25rem' }}>(gross)</span>
                                                 )}
                                             </td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#666' }}>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#666' }}>
                                                 {is.override_annual_amount != null ? formatCurrency(is.override_annual_amount) : '—'}
                                             </td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
+                                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 600 }}>
                                                 {is.income_type === 'rental_property' && is.annual_net_cash_flow != null
                                                     ? <>{formatCurrency(is.annual_net_cash_flow)}<span style={{ fontSize: '0.75rem', color: '#999', fontWeight: 400, marginLeft: '0.25rem' }}>(net)</span></>
                                                     : formatCurrency(is.effective_amount)
@@ -336,22 +338,22 @@ export default function ProjectionDetailPage() {
                     {scenario.accounts.length > 0 && (
                         <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                             <h3 style={{ marginBottom: '1rem' }}>Accounts</h3>
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <table style={tableStyle}>
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
-                                        <th style={{ textAlign: 'left', padding: '0.5rem' }}>Type</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Initial Balance</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Annual Contribution</th>
-                                        <th style={{ textAlign: 'right', padding: '0.5rem' }}>Expected Return</th>
+                                    <tr>
+                                        <th style={thStyle}>Type</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Initial Balance</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Annual Contribution</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Expected Return</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {scenario.accounts.map(a => (
-                                        <tr key={a.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '0.5rem', textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
-                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>{(a.expected_return * 100).toFixed(1)}%</td>
+                                        <tr key={a.id} style={trHoverStyle}>
+                                            <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{(a.expected_return * 100).toFixed(1)}%</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -573,20 +575,20 @@ export default function ProjectionDetailPage() {
                                 {taxShieldSummary.perProperty.length > 0 && (
                                     <div style={{ marginTop: '1.5rem' }}>
                                         <h4 style={{ marginBottom: '0.5rem' }}>Per-Property Breakdown</h4>
-                                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <table style={tableStyle}>
                                             <thead>
-                                                <tr style={{ background: '#fafafa', borderBottom: '2px solid #ddd' }}>
-                                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Property</th>
-                                                    <th style={{ textAlign: 'left', padding: '0.5rem' }}>Classification</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total Depreciation</th>
-                                                    <th style={{ textAlign: 'right', padding: '0.5rem' }}>Total Loss Applied</th>
+                                                <tr style={{ background: '#fafafa' }}>
+                                                    <th style={thStyle}>Property</th>
+                                                    <th style={thStyle}>Classification</th>
+                                                    <th style={{ ...thStyle, textAlign: 'right' }}>Total Depreciation</th>
+                                                    <th style={{ ...thStyle, textAlign: 'right' }}>Total Loss Applied</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {taxShieldSummary.perProperty.map((p, i) => (
-                                                    <tr key={i} style={{ borderBottom: '1px solid #eee' }}>
-                                                        <td style={{ padding: '0.5rem' }}>{p.name}</td>
-                                                        <td style={{ padding: '0.5rem' }}>
+                                                    <tr key={i} style={trHoverStyle}>
+                                                        <td style={tdStyle}>{p.name}</td>
+                                                        <td style={tdStyle}>
                                                             <span style={{
                                                                 fontSize: '0.75rem', padding: '2px 6px', borderRadius: 4,
                                                                 background: p.taxTreatment === 'rental_passive' ? '#e0e0e0'
@@ -597,8 +599,8 @@ export default function ProjectionDetailPage() {
                                                                     : p.taxTreatment === 'rental_active_reps' ? 'REPS' : 'STR'}
                                                             </span>
                                                         </td>
-                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.depreciation)}</td>
-                                                        <td style={{ padding: '0.5rem', textAlign: 'right' }}>{formatCurrency(p.lossApplied)}</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.depreciation)}</td>
+                                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(p.lossApplied)}</td>
                                                     </tr>
                                                 ))}
                                             </tbody>
