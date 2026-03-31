@@ -97,7 +97,7 @@ class GuardrailProfileServiceTest {
                         new BigDecimal("45000"), new BigDecimal("12000"),
                         new BigDecimal("63000"), "Early")),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
-                new BigDecimal("100000"), new BigDecimal("500000"),
+                new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
 
@@ -163,7 +163,7 @@ class GuardrailProfileServiceTest {
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
-                new BigDecimal("100000"), new BigDecimal("500000"),
+                new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
@@ -296,7 +296,7 @@ class GuardrailProfileServiceTest {
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
-                new BigDecimal("100000"), new BigDecimal("500000"),
+                new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
@@ -355,7 +355,7 @@ class GuardrailProfileServiceTest {
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
-                new BigDecimal("100000"), new BigDecimal("500000"),
+                new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))

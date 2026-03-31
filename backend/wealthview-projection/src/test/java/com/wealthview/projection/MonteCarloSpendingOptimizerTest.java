@@ -124,7 +124,6 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(firstYear.portfolioBalanceMedian()).isNotNull();
         assertThat(firstYear.portfolioBalanceP10()).isNotNull();
         assertThat(firstYear.portfolioBalanceP25()).isNotNull();
-        assertThat(firstYear.portfolioBalanceP55()).isNotNull();
     }
 
     @Test
@@ -483,9 +482,6 @@ class MonteCarloSpendingOptimizerTest {
         assertThat(result.failureRate()).isNotNull();
         assertThat(result.failureRate()).isBetween(BigDecimal.ZERO, BigDecimal.ONE);
         assertThat(result.percentile10Final()).isNotNull();
-        assertThat(result.percentile55Final()).isNotNull();
-        assertThat(result.percentile55Final())
-                .isGreaterThanOrEqualTo(result.percentile10Final());
     }
 
     @Test
@@ -1303,18 +1299,12 @@ class MonteCarloSpendingOptimizerTest {
             assertThat(year.portfolioBalanceP25())
                     .as("p25 should be non-null for age %d", year.age())
                     .isNotNull();
-            assertThat(year.portfolioBalanceP55())
-                    .as("p55 should be non-null for age %d", year.age())
-                    .isNotNull();
             assertThat(year.portfolioBalanceP10())
                     .as("p10 <= p25 for age %d", year.age())
                     .isLessThanOrEqualTo(year.portfolioBalanceP25());
             assertThat(year.portfolioBalanceP25())
                     .as("p25 <= median for age %d", year.age())
                     .isLessThanOrEqualTo(year.portfolioBalanceMedian());
-            assertThat(year.portfolioBalanceMedian())
-                    .as("median <= p55 for age %d", year.age())
-                    .isLessThanOrEqualTo(year.portfolioBalanceP55());
         }
     }
 

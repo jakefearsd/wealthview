@@ -256,7 +256,6 @@ export interface GuardrailYearlySpending {
     portfolio_balance_median: number | null;
     portfolio_balance_p10: number | null;
     portfolio_balance_p25: number | null;
-    portfolio_balance_p55: number | null;
 }
 
 export interface GuardrailProfileResponse {
@@ -274,7 +273,6 @@ export interface GuardrailProfileResponse {
     median_final_balance: number;
     failure_rate: number;
     percentile10_final: number;
-    percentile55_final: number;
     stale: boolean;
     created_at: string;
     updated_at: string;

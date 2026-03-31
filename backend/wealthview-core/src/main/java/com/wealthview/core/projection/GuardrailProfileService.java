@@ -133,7 +133,6 @@ public class GuardrailProfileService {
         entity.setMedianFinalBalance(optimizerResult.medianFinalBalance());
         entity.setFailureRate(optimizerResult.failureRate());
         entity.setPercentile10Final(optimizerResult.percentile10Final());
-        entity.setPercentile55Final(optimizerResult.percentile55Final());
         entity.setPortfolioFloor(optimizationInput.portfolioFloor() != null
                 ? optimizationInput.portfolioFloor() : BigDecimal.ZERO);
         entity.setMaxAnnualAdjustmentRate(optimizationInput.maxAnnualAdjustmentRate() != null

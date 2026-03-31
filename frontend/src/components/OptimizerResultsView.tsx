@@ -62,7 +62,7 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div data-testid="failure-rate-card" style={{
                     ...cardStyle, textAlign: 'center',
                     background: failureRateColors[diagnostics.failureRateSeverity],
@@ -82,10 +82,6 @@ export default function OptimizerResultsView({
                 <div style={{ ...cardStyle, textAlign: 'center' }}>
                     <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Median Final Balance</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.median_final_balance)}</div>
-                </div>
-                <div data-testid="p55-card" style={{ ...cardStyle, textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>55th Percentile Final</div>
-                    <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{fmt(result.percentile55_final)}</div>
                 </div>
             </div>
 
@@ -107,8 +103,8 @@ export default function OptimizerResultsView({
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Slightly above median (p55)</div>
-                                <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.percentile55_final)}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#1976d2' }}>Median (p50)</div>
+                                <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{fmt(result.median_final_balance)}</div>
                             </div>
                         </div>
                         <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
@@ -186,7 +182,7 @@ export default function OptimizerResultsView({
                 <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '0.75rem', lineHeight: 1.5 }}>
                     Portfolio balance projections across thousands of market simulations. The dark line shows the
                     median outcome. The shaded bands show the range between pessimistic (10th percentile) and
-                    slightly-above-average (55th percentile) scenarios. The red dashed line is the worst-case floor.
+                    median (50th percentile) scenarios. The red dashed line is the worst-case floor.
                 </p>
                 <PortfolioFanChart yearlySpending={result.yearly_spending} />
             </div>
@@ -213,14 +209,13 @@ export default function OptimizerResultsView({
                             <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Discretionary</th>
                             <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Income</th>
                             <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Portfolio Draw</th>
-                            <th colSpan={4} style={{ ...thStyle, textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
+                            <th colSpan={3} style={{ ...thStyle, textAlign: 'center', borderBottom: '1px solid #e0e0e0' }}>Portfolio Balance</th>
                             <th rowSpan={2} style={{ ...thStyle, textAlign: 'right', verticalAlign: 'bottom' }}>Corridor</th>
                         </tr>
                         <tr style={{ borderBottom: '2px solid #e0e0e0' }}>
                             <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p10</th>
                             <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p25</th>
                             <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p50</th>
-                            <th style={{ ...thStyle, textAlign: 'right', padding: '0.25rem 0.5rem', fontSize: '0.75rem', color: '#888' }}>p55</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -244,9 +239,6 @@ export default function OptimizerResultsView({
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmtShort(y.portfolio_balance_median)}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
-                                    {fmtShort(y.portfolio_balance_p55)}
                                 </td>
                                 <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>
                                     {fmt(y.corridor_low)} &ndash; {fmt(y.corridor_high)}

@@ -18,9 +18,8 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
             p10: y.portfolio_balance_p10,
             p25: y.portfolio_balance_p25,
             median: y.portfolio_balance_median,
-            p55: y.portfolio_balance_p55,
             // Bands for Recharts Area: [low, high]
-            outerBand: [y.portfolio_balance_p10, y.portfolio_balance_p55],
+            outerBand: [y.portfolio_balance_p10, y.portfolio_balance_median],
             innerBand: [y.portfolio_balance_p25, y.portfolio_balance_median],
         }));
     }, [yearlySpending]);
@@ -51,9 +50,6 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                             return (
                                 <>
                                     <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Age {d.age}</div>
-                                    <div style={{ color: '#a5b4fc' }}>
-                                        55th Percentile: {formatDollarTooltip(d.p55 ?? 0)}
-                                    </div>
                                     <div style={{ color: '#1e1b4b' }}>
                                         Median (p50): {formatDollarTooltip(d.median ?? 0)}
                                     </div>
@@ -69,13 +65,13 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                     } />
                     <Legend />
 
-                    {/* Outer band: p10 to p55 */}
+                    {/* Outer band: p10 to p50 */}
                     <Area
                         type="monotone"
                         dataKey="outerBand"
                         fill="#c7d2fe"
                         stroke="none"
-                        name="10th-55th Percentile"
+                        name="10th-50th Percentile"
                         fillOpacity={0.5}
                         legendType="rect"
                     />
@@ -89,17 +85,6 @@ export default function PortfolioFanChart({ yearlySpending }: Props) {
                         name="25th-50th Percentile"
                         fillOpacity={0.3}
                         legendType="rect"
-                    />
-
-                    {/* p55 line (upper boundary) */}
-                    <Line
-                        type="monotone"
-                        dataKey="p55"
-                        stroke="#a5b4fc"
-                        strokeWidth={1}
-                        strokeDasharray="3 3"
-                        dot={false}
-                        name="55th Percentile"
                     />
 
                     {/* p25 line */}
