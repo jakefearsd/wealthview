@@ -16,7 +16,6 @@ function makeYear(overrides: Partial<GuardrailYearlySpending> & { year: number; 
         portfolio_balance_median: 2300000,
         portfolio_balance_p10: 1200000,
         portfolio_balance_p25: 1800000,
-        portfolio_balance_p55: 2800000,
         ...overrides,
     };
 }
@@ -81,16 +80,6 @@ describe('NearTermSpendingGuide', () => {
         const spendingSection = screen.getByTestId('spending-by-portfolio');
         expect(spendingSection).toHaveTextContent('$70,000');
         expect(spendingSection).not.toHaveTextContent('4% of portfolio');
-    });
-
-    it('p55 uses 5.5% rule', () => {
-        // portfolio_balance_p55 = $2.8M, 5.5% = $154K
-        render(
-            <NearTermSpendingGuide yearlySpending={fiveYears} retirementDate="2020-01-01" />,
-        );
-        const hero = screen.getByTestId('hero-card');
-        expect(hero).toHaveTextContent('$154,000'); // 2,800,000 * 0.055
-        expect(hero).toHaveTextContent('5.5% of portfolio');
     });
 
     it('shows spending-by-portfolio on all cards', () => {

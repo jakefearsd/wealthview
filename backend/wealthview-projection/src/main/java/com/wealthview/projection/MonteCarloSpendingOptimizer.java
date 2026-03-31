@@ -527,19 +527,16 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] medianBalanceByYear = new double[ctx.sim().years()];
         double[] p10BalanceByYear = new double[ctx.sim().years()];
         double[] p25BalanceByYear = new double[ctx.sim().years()];
-        double[] p55BalanceByYear = new double[ctx.sim().years()];
         for (int y = 0; y < ctx.sim().years(); y++) {
             Arrays.sort(yearBalances[y]);
             p10BalanceByYear[y] = percentile(yearBalances[y], 0.10);
             p25BalanceByYear[y] = percentile(yearBalances[y], 0.25);
             medianBalanceByYear[y] = percentile(yearBalances[y], 0.50);
-            p55BalanceByYear[y] = percentile(yearBalances[y], 0.55);
         }
 
         Arrays.sort(finalBalances);
         double medianFinal = percentile(finalBalances, 0.50);
         double p10Final = percentile(finalBalances, 0.10);
-        double p55Final = percentile(finalBalances, 0.55);
         long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
         double failureRate = (double) failures / ctx.sim().trialCount();
 
@@ -560,8 +557,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     toBD(recommended), toBD(corridors[0][y]), toBD(corridors[1][y]),
                     toBD(floor), toBD(disc), toBD(income), toBD(withdrawal), phaseName,
                     toBD(medianBalanceByYear[y]),
-                    toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y]),
-                    toBD(p55BalanceByYear[y])));
+                    toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y])));
         }
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -611,7 +607,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ctx.sim().trialCount(), input.confidenceLevel(),
                 input.phases(), yearlySpending,
                 toBD(medianFinal), toBD(failureRate),
-                toBD(p10Final), toBD(p55Final),
+                toBD(p10Final),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"),
                 convScheduleResponse);
@@ -1570,7 +1566,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.trialCount(), input.confidenceLevel(),
                 input.phases(), List.of(),
                 BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO,
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
     }

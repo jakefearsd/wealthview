@@ -49,16 +49,14 @@ function PhaseTransitionBadge({ from, to }: { from: string; to: string }) {
 }
 
 function SpendingByPortfolio({ year, recommended }: { year: GuardrailYearlySpending; recommended: number }) {
-    if (year.portfolio_balance_p25 == null && year.portfolio_balance_median == null && year.portfolio_balance_p55 == null) return null;
+    if (year.portfolio_balance_p25 == null && year.portfolio_balance_median == null) return null;
 
     const p25Bal = year.portfolio_balance_p25 ?? 0;
     const medianBal = year.portfolio_balance_median ?? 0;
-    const p55Bal = year.portfolio_balance_p55 ?? 0;
 
     const p50FourPct = medianBal * 0.04;
     const p50Spending = Math.max(recommended, p50FourPct);
     const p50UsesHeuristic = p50FourPct > recommended;
-    const p55Spending = p55Bal * 0.055;
 
     return (
         <div data-testid="spending-by-portfolio" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
@@ -95,37 +93,19 @@ function SpendingByPortfolio({ year, recommended }: { year: GuardrailYearlySpend
                     </div>
                 </div>
             )}
-            {year.portfolio_balance_p55 != null && (
-                <div style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '0.5rem 0.6rem', borderRadius: '6px', background: '#f1faf2',
-                }}>
-                    <div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#555' }}>If markets outperform (p55)</div>
-                        <div style={{ fontSize: '0.7rem', color: '#888' }}>
-                            Portfolio at {fmt(p55Bal)} &middot; 5.5% of portfolio
-                        </div>
-                    </div>
-                    <div style={{ fontSize: '1rem', fontWeight: 700, color: '#2e7d32' }}>
-                        {fmt(p55Spending)}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
 
 function CompactSpendingByPortfolio({ year, recommended }: { year: GuardrailYearlySpending; recommended: number }) {
-    if (year.portfolio_balance_p25 == null && year.portfolio_balance_median == null && year.portfolio_balance_p55 == null) return null;
+    if (year.portfolio_balance_p25 == null && year.portfolio_balance_median == null) return null;
 
     const p25Bal = year.portfolio_balance_p25 ?? 0;
     const medianBal = year.portfolio_balance_median ?? 0;
-    const p55Bal = year.portfolio_balance_p55 ?? 0;
     const p50Spending = Math.max(recommended, medianBal * 0.04);
-    const p55Spending = p55Bal * 0.055;
 
     return (
-        <div data-testid="spending-by-portfolio" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <div data-testid="spending-by-portfolio" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginTop: '0.5rem' }}>
             {year.portfolio_balance_p25 != null && (
                 <div style={{ background: '#fff8f8', borderRadius: '4px', padding: '0.35rem 0.5rem', textAlign: 'center' }}>
                     <div style={{ fontSize: '0.65rem', color: '#888' }}>Recommended (p25)</div>
@@ -138,13 +118,6 @@ function CompactSpendingByPortfolio({ year, recommended }: { year: GuardrailYear
                     <div style={{ fontSize: '0.65rem', color: '#888' }}>Expected (p50)</div>
                     <div style={{ fontSize: '0.7rem', color: '#888' }}>{fmt(medianBal)}</div>
                     <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1565c0' }}>{fmt(p50Spending)}</div>
-                </div>
-            )}
-            {year.portfolio_balance_p55 != null && (
-                <div style={{ background: '#f1faf2', borderRadius: '4px', padding: '0.35rem 0.5rem', textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.65rem', color: '#888' }}>Outperform (p55)</div>
-                    <div style={{ fontSize: '0.7rem', color: '#888' }}>{fmt(p55Bal)}</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2e7d32' }}>{fmt(p55Spending)}</div>
                 </div>
             )}
         </div>

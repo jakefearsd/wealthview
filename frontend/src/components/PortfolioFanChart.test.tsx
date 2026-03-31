@@ -21,7 +21,7 @@ function makeYearlySpending(overrides: Partial<GuardrailYearlySpending> = {}): G
         year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000,
         essential_floor: 30000, discretionary: 45000, income_offset: 0, portfolio_withdrawal: 75000,
         phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000,
-        portfolio_balance_p25: 350000, portfolio_balance_p55: 650000,
+        portfolio_balance_p25: 350000,
         ...overrides,
     };
 }
@@ -35,7 +35,7 @@ describe('PortfolioFanChart', () => {
     it('renders chart with data series', () => {
         render(<PortfolioFanChart yearlySpending={[makeYearlySpending()]} />);
         expect(screen.getByTestId('composed-chart')).toBeInTheDocument();
-        expect(screen.getByTestId('area-10th-55th Percentile')).toBeInTheDocument();
+        expect(screen.getByTestId('area-10th-50th Percentile')).toBeInTheDocument();
         expect(screen.getByTestId('area-25th-50th Percentile')).toBeInTheDocument();
         expect(screen.getByTestId('line-Median (p50)')).toBeInTheDocument();
         expect(screen.getByTestId('line-10th Percentile')).toBeInTheDocument();

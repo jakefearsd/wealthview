@@ -142,7 +142,7 @@ grid winner, binary-searching for the exact sustainable spending amount at each 
 Constructs the `GuardrailProfileResponse` including:
 * Year-by-year spending array (inflation-adjusted)
 * Phase annotations (accumulation / transition / distribution)
-* Spending corridor (P55 upper / floor / ceiling from portfolio guardrails)
+* Spending corridor (floor / ceiling from portfolio guardrails)
 * Adaptive Spending Guide — portfolio-contingent spending targets
 * Roth conversion schedule from the optimal conversion fraction
 
@@ -152,7 +152,7 @@ Constructs the `GuardrailProfileResponse` including:
 |---|---|---|
 | Trial count | Configurable (typically 1000) | Number of MC simulations per evaluation |
 | Block length | 5 years | Bootstrap block size for return sampling |
-| Confidence level | 55th percentile | Portfolio survival threshold (P55 — "more likely than not") |
+| Confidence level | Configurable | Portfolio survival threshold |
 | `MAX_SPENDING_CEILING` | $500,000 / year | Binary search upper bound |
 | `CASH_REPLENISHMENT_RATE` | 10% | Equity → cash bucket transfer rate |
 
