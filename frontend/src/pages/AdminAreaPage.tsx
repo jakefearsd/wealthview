@@ -21,7 +21,7 @@ const sidebarItems: SidebarItem[] = [
     { key: 'dashboard', label: 'Dashboard', superAdminOnly: true },
     { key: 'users', label: 'Users' },
     { key: 'tenants', label: 'Tenants', superAdminOnly: true },
-    { key: 'prices', label: 'Prices', superAdminOnly: true },
+    { key: 'prices', label: 'Prices' },
     { key: 'exchange-rates', label: 'Exchange Rates' },
     { key: 'invite-codes', label: 'Invite Codes' },
     { key: 'system-config', label: 'System Config', superAdminOnly: true },
