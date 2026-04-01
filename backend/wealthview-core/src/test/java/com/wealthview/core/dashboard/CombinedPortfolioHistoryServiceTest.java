@@ -109,6 +109,13 @@ class CombinedPortfolioHistoryServiceTest {
             assertThat(dp.investmentValue()).isEqualByComparingTo(new BigDecimal("2000"));
             assertThat(dp.propertyEquity()).isEqualByComparingTo(BigDecimal.ZERO);
             assertThat(dp.totalValue()).isEqualByComparingTo(dp.investmentValue());
+        }
+
+        // All points except the last should be Fridays; the last should be today
+        var lastPoint = result.dataPoints().get(result.dataPoints().size() - 1);
+        assertThat(lastPoint.date()).isEqualTo(LocalDate.now());
+        var allButLast = result.dataPoints().subList(0, result.dataPoints().size() - 1);
+        for (var dp : allButLast) {
             assertThat(dp.date().getDayOfWeek()).isEqualTo(DayOfWeek.FRIDAY);
         }
     }
@@ -412,6 +419,14 @@ class CombinedPortfolioHistoryServiceTest {
             lenient().when(entity.getClosePrice()).thenReturn(price);
             prices.add(entity);
             friday = friday.plusWeeks(1);
+        }
+        // Also add a price for 'end' (today) so the final data point can find a price
+        if (prices.isEmpty() || !prices.get(prices.size() - 1).getDate().equals(end)) {
+            var entity = mock(PriceEntity.class);
+            lenient().when(entity.getSymbol()).thenReturn(symbol);
+            lenient().when(entity.getDate()).thenReturn(end);
+            lenient().when(entity.getClosePrice()).thenReturn(price);
+            prices.add(entity);
         }
         return prices;
     }
