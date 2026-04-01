@@ -2,7 +2,9 @@ package com.wealthview.core.pricefeed;
 
 import com.wealthview.core.pricefeed.dto.CandleResponse;
 import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
+import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.pricefeed.dto.QuoteResponse;
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -55,13 +57,17 @@ class PriceSyncServiceTest {
     void syncDailyPrices_multipleSymbols_fetchesAndSavesEach() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("AAPL", "GOOG"));
         when(priceFeedClient.getQuote("AAPL")).thenReturn(
-                Optional.of(new QuoteResponse("AAPL", new BigDecimal("150.00"))));
+                new QuoteResult.Success(new QuoteResponse("AAPL", new BigDecimal("150.00"))));
         when(priceFeedClient.getQuote("GOOG")).thenReturn(
-                Optional.of(new QuoteResponse("GOOG", new BigDecimal("2800.00"))));
+                new QuoteResult.Success(new QuoteResponse("GOOG", new BigDecimal("2800.00"))));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.syncDailyPrices();
+        var result = service.syncDailyPrices();
+
+        assertThat(result.succeeded()).isEqualTo(2);
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.failures()).isEmpty();
 
         var captor = ArgumentCaptor.forClass(PriceEntity.class);
         verify(priceRepository, org.mockito.Mockito.times(2)).save(captor.capture());
@@ -79,7 +85,7 @@ class PriceSyncServiceTest {
     void syncDailyPrices_existingPrice_updatesClosePriceAndSource() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("AAPL"));
         when(priceFeedClient.getQuote("AAPL")).thenReturn(
-                Optional.of(new QuoteResponse("AAPL", new BigDecimal("155.00"))));
+                new QuoteResult.Success(new QuoteResponse("AAPL", new BigDecimal("155.00"))));
 
         var existing = new PriceEntity("AAPL", LocalDate.now(), new BigDecimal("150.00"), "manual");
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.of(existing));
@@ -94,15 +100,22 @@ class PriceSyncServiceTest {
     }
 
     @Test
-    void syncDailyPrices_apiFailureForOne_continuesWithOthers() {
+    void syncDailyPrices_apiFailureForOne_continuesWithOthersAndReportsReason() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("AAPL", "GOOG"));
-        when(priceFeedClient.getQuote("AAPL")).thenReturn(Optional.empty());
+        when(priceFeedClient.getQuote("AAPL")).thenReturn(
+                new QuoteResult.Failure("no quote data — symbol may not be covered by Finnhub"));
         when(priceFeedClient.getQuote("GOOG")).thenReturn(
-                Optional.of(new QuoteResponse("GOOG", new BigDecimal("2800.00"))));
+                new QuoteResult.Success(new QuoteResponse("GOOG", new BigDecimal("2800.00"))));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        service.syncDailyPrices();
+        var result = service.syncDailyPrices();
+
+        assertThat(result.succeeded()).isEqualTo(1);
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.failures()).hasSize(1);
+        assertThat(result.failures().get(0).symbol()).isEqualTo("AAPL");
+        assertThat(result.failures().get(0).reason()).contains("no quote data");
 
         var captor = ArgumentCaptor.forClass(PriceEntity.class);
         verify(priceRepository).save(captor.capture());
@@ -110,11 +123,14 @@ class PriceSyncServiceTest {
     }
 
     @Test
-    void syncDailyPrices_noSymbols_doesNothing() {
+    void syncDailyPrices_noSymbols_returnsEmptyResult() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of());
 
-        service.syncDailyPrices();
+        var result = service.syncDailyPrices();
 
+        assertThat(result.succeeded()).isEqualTo(0);
+        assertThat(result.total()).isEqualTo(0);
+        assertThat(result.failures()).isEmpty();
         verify(priceFeedClient, never()).getQuote(any());
         verify(priceRepository, never()).save(any());
     }
@@ -172,7 +188,7 @@ class PriceSyncServiceTest {
 
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("AAPL"));
         when(priceFeedClient.getQuote("AAPL")).thenReturn(
-                Optional.of(new QuoteResponse("AAPL", new BigDecimal("150.00"))));
+                new QuoteResult.Success(new QuoteResponse("AAPL", new BigDecimal("150.00"))));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -182,12 +198,16 @@ class PriceSyncServiceTest {
     }
 
     @Test
-    void syncDailyPrices_exceptionDuringQuote_countsAsFailure() {
+    void syncDailyPrices_exceptionDuringQuote_countsAsFailureWithMessage() {
         when(holdingRepository.findDistinctSymbols()).thenReturn(List.of("BAD"));
         when(priceFeedClient.getQuote("BAD")).thenThrow(new RuntimeException("API error"));
 
-        service.syncDailyPrices();
+        var result = service.syncDailyPrices();
 
+        assertThat(result.succeeded()).isEqualTo(0);
+        assertThat(result.failures()).hasSize(1);
+        assertThat(result.failures().get(0).symbol()).isEqualTo("BAD");
+        assertThat(result.failures().get(0).reason()).isEqualTo("API error");
         verify(priceRepository, never()).save(any());
     }
 

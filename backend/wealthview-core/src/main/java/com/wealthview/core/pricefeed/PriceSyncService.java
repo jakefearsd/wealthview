@@ -1,5 +1,7 @@
 package com.wealthview.core.pricefeed;
 
+import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -20,6 +22,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Service
@@ -51,7 +54,7 @@ public class PriceSyncService {
     @Timed("wealthview.pricefeed.sync")
     @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
-    public void syncDailyPrices() {
+    public FinnhubSyncResult syncDailyPrices() {
         MDC.put("operation", "priceSync");
         MDC.put("requestId", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         try {
@@ -61,30 +64,32 @@ public class PriceSyncService {
             log.info("Starting daily price sync for {} symbols", symbols.size());
 
             int successCount = 0;
-            int failCount = 0;
+            var failures = new ArrayList<FinnhubSyncResult.SymbolError>();
             for (var symbol : symbols) {
                 try {
-                    var quoteOpt = priceFeedClient.getQuote(symbol);
-                    if (quoteOpt.isEmpty()) {
-                        log.warn("No quote returned for symbol {}", symbol);
-                        failCount++;
-                        continue;
+                    var quoteResult = priceFeedClient.getQuote(symbol);
+                    switch (quoteResult) {
+                        case QuoteResult.Success s -> {
+                            upsertPrice(symbol, LocalDate.now(), s.quote().currentPrice(), SOURCE_FINNHUB);
+                            successCount++;
+                        }
+                        case QuoteResult.Failure f -> {
+                            log.warn("No quote returned for symbol {}: {}", symbol, f.reason());
+                            failures.add(new FinnhubSyncResult.SymbolError(symbol, f.reason()));
+                        }
                     }
-
-                    var quote = quoteOpt.orElseThrow();
-                    upsertPrice(symbol, LocalDate.now(), quote.currentPrice(), SOURCE_FINNHUB);
-                    successCount++;
                     sleepForRateLimit();
                 } catch (Exception e) {
                     log.warn("Failed to sync price for symbol {}", symbol, e);
-                    failCount++;
+                    failures.add(new FinnhubSyncResult.SymbolError(symbol, e.getMessage()));
                 }
             }
 
             meterRegistry.counter("wealthview.pricefeed.symbols", "status", "success").increment(successCount);
-            meterRegistry.counter("wealthview.pricefeed.symbols", "status", "failure").increment(failCount);
+            meterRegistry.counter("wealthview.pricefeed.symbols", "status", "failure").increment(failures.size());
             log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
-                    successCount, failCount, System.currentTimeMillis() - startTime);
+                    successCount, failures.size(), System.currentTimeMillis() - startTime);
+            return new FinnhubSyncResult(successCount, symbols.size(), failures);
         } finally {
             MDC.remove("operation");
             MDC.remove("requestId");

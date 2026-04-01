@@ -238,7 +238,7 @@ class SuperAdminControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.inserted").value(2))
                 .andExpect(jsonPath("$.updated").value(0))
-                .andExpect(jsonPath("$.failed").isEmpty());
+                .andExpect(jsonPath("$.failures").isEmpty());
     }
 
     @Test

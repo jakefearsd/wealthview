@@ -4,8 +4,11 @@ import com.wealthview.core.pricefeed.PriceFeedClient;
 import com.wealthview.core.pricefeed.dto.CandleResponse;
 import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
 import com.wealthview.core.pricefeed.dto.QuoteResponse;
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -31,7 +34,7 @@ public class FinnhubClient implements PriceFeedClient {
     }
 
     @Override
-    public Optional<QuoteResponse> getQuote(String symbol) {
+    public QuoteResult getQuote(String symbol) {
         try {
             var dto = restClient.get()
                     .uri("/api/v1/quote?symbol={symbol}&token={token}", symbol, apiKey)
@@ -40,13 +43,22 @@ public class FinnhubClient implements PriceFeedClient {
 
             if (dto == null || dto.c() == null || dto.c().compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("No valid quote data for symbol {}", symbol);
-                return Optional.empty();
+                return new QuoteResult.Failure(
+                        "no quote data — symbol may not be covered by Finnhub");
             }
 
-            return Optional.of(new QuoteResponse(symbol, dto.c()));
+            return new QuoteResult.Success(new QuoteResponse(symbol, dto.c()));
+        } catch (HttpClientErrorException e) {
+            log.warn("HTTP {} fetching quote for symbol {}", e.getStatusCode().value(), symbol, e);
+            return new QuoteResult.Failure(
+                    "HTTP %d from Finnhub — check API key permissions".formatted(e.getStatusCode().value()));
+        } catch (HttpServerErrorException e) {
+            log.warn("HTTP {} fetching quote for symbol {}", e.getStatusCode().value(), symbol, e);
+            return new QuoteResult.Failure(
+                    "Finnhub returned HTTP %d".formatted(e.getStatusCode().value()));
         } catch (RestClientException e) {
             log.warn("Failed to fetch quote for symbol {}", symbol, e);
-            return Optional.empty();
+            return new QuoteResult.Failure("network error: " + e.getMessage());
         }
     }
 

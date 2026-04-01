@@ -1,5 +1,6 @@
 package com.wealthview.importmodule.finnhub;
 
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
@@ -40,9 +41,10 @@ class FinnhubClientLiveTest {
         for (var symbol : symbols) {
             var result = client.getQuote(symbol);
 
-            assertThat(result).as("Quote for %s", symbol).isPresent();
-            assertThat(result.get().symbol()).isEqualTo(symbol);
-            assertThat(result.get().currentPrice()).isPositive();
+            assertThat(result).as("Quote for %s", symbol).isInstanceOf(QuoteResult.Success.class);
+            var success = (QuoteResult.Success) result;
+            assertThat(success.quote().symbol()).isEqualTo(symbol);
+            assertThat(success.quote().currentPrice()).isPositive();
 
             Thread.sleep(1100);
         }
@@ -57,9 +59,10 @@ class FinnhubClientLiveTest {
         for (var symbol : symbols) {
             var result = client.getQuote(symbol);
 
-            assertThat(result).as("Quote for %s", symbol).isPresent();
-            assertThat(result.get().symbol()).isEqualTo(symbol);
-            assertThat(result.get().currentPrice()).isPositive();
+            assertThat(result).as("Quote for %s", symbol).isInstanceOf(QuoteResult.Success.class);
+            var success = (QuoteResult.Success) result;
+            assertThat(success.quote().symbol()).isEqualTo(symbol);
+            assertThat(success.quote().currentPrice()).isPositive();
 
             Thread.sleep(1100);
         }

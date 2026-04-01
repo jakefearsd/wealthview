@@ -52,9 +52,10 @@ class YahooFinanceClientTest {
         var result = client.fetchHistory("AAPL",
                 LocalDate.of(2024, 1, 2), LocalDate.of(2024, 1, 3));
 
-        assertThat(result).hasSize(2);
-        assertThat(result.get(0).closePrice()).isEqualByComparingTo("185.50");
-        assertThat(result.get(1).closePrice()).isEqualByComparingTo("186.25");
+        assertThat(result.failed()).isFalse();
+        assertThat(result.points()).hasSize(2);
+        assertThat(result.points().get(0).closePrice()).isEqualByComparingTo("185.50");
+        assertThat(result.points().get(1).closePrice()).isEqualByComparingTo("186.25");
         mockServer.verify();
     }
 
@@ -82,8 +83,8 @@ class YahooFinanceClientTest {
         var result = client.fetchHistory("AAPL",
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).date()).isEqualTo(LocalDate.of(2024, 1, 2));
+        assertThat(result.points()).hasSize(1);
+        assertThat(result.points().get(0).date()).isEqualTo(LocalDate.of(2024, 1, 2));
         mockServer.verify();
     }
 
@@ -109,13 +110,13 @@ class YahooFinanceClientTest {
         var result = client.fetchHistory("AAPL",
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
 
-        assertThat(result).hasSize(1);
-        assertThat(result.get(0).closePrice()).isEqualByComparingTo("185.50");
+        assertThat(result.points()).hasSize(1);
+        assertThat(result.points().get(0).closePrice()).isEqualByComparingTo("185.50");
         mockServer.verify();
     }
 
     @Test
-    void fetchHistory_emptyResult_returnsEmptyList() {
+    void fetchHistory_emptyResult_returnsFailureWithReason() {
         mockServer.expect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {
@@ -129,24 +130,28 @@ class YahooFinanceClientTest {
         var result = client.fetchHistory("INVALID",
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
 
-        assertThat(result).isEmpty();
+        assertThat(result.failed()).isTrue();
+        assertThat(result.points()).isEmpty();
+        assertThat(result.errorReason()).contains("no price data");
         mockServer.verify();
     }
 
     @Test
-    void fetchHistory_serverError_returnsEmptyList() {
+    void fetchHistory_serverError_returnsFailureWithReason() {
         mockServer.expect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
         var result = client.fetchHistory("AAPL",
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
 
-        assertThat(result).isEmpty();
+        assertThat(result.failed()).isTrue();
+        assertThat(result.points()).isEmpty();
+        assertThat(result.errorReason()).contains("HTTP");
         mockServer.verify();
     }
 
     @Test
-    void fetchHistory_chartError_returnsEmptyList() {
+    void fetchHistory_chartError_returnsFailureWithReason() {
         mockServer.expect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
                         {
@@ -163,7 +168,9 @@ class YahooFinanceClientTest {
         var result = client.fetchHistory("INVALID",
                 LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
 
-        assertThat(result).isEmpty();
+        assertThat(result.failed()).isTrue();
+        assertThat(result.points()).isEmpty();
+        assertThat(result.errorReason()).contains("no price data");
         mockServer.verify();
     }
 

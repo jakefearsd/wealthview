@@ -101,23 +101,32 @@ public class PriceService {
     public YahooSyncResult syncFromYahoo(List<String> symbols) {
         if (yahooPriceClient == null) {
             log.warn("Yahoo Finance client not configured; marking all symbols as failed");
-            return new YahooSyncResult(0, 0, new ArrayList<>(symbols));
+            var failures = symbols.stream()
+                    .map(s -> new YahooSyncResult.SymbolError(s, "Yahoo Finance client is not configured"))
+                    .toList();
+            return new YahooSyncResult(0, 0, new ArrayList<>(failures));
         }
 
         var today = LocalDate.now();
         var from = today.minusDays(5);
         int inserted = 0;
         int updated = 0;
-        var failed = new ArrayList<String>();
+        var failures = new ArrayList<YahooSyncResult.SymbolError>();
 
         for (var symbol : symbols) {
-            var points = yahooPriceClient.fetchHistory(symbol, from, today);
-            if (points.isEmpty()) {
-                failed.add(symbol);
+            var fetchResult = yahooPriceClient.fetchHistory(symbol, from, today);
+            if (fetchResult.failed()) {
+                failures.add(new YahooSyncResult.SymbolError(symbol, fetchResult.errorReason()));
                 continue;
             }
 
-            for (var point : points) {
+            if (fetchResult.points().isEmpty()) {
+                failures.add(new YahooSyncResult.SymbolError(symbol,
+                        "no price data returned from Yahoo Finance"));
+                continue;
+            }
+
+            for (var point : fetchResult.points()) {
                 var upsertResult = upsertPrice(symbol, point.date(), point.closePrice(), SOURCE_YAHOO);
                 if (upsertResult) {
                     updated++;
@@ -127,21 +136,20 @@ public class PriceService {
             }
         }
 
-        log.info("Yahoo sync complete: {} inserted, {} updated, {} failed", inserted, updated, failed.size());
-        return new YahooSyncResult(inserted, updated, failed);
+        log.info("Yahoo sync complete: {} inserted, {} updated, {} failed", inserted, updated, failures.size());
+        return new YahooSyncResult(inserted, updated, failures);
     }
 
     @Transactional(readOnly = true)
     public List<PriceResponse> fetchFromYahoo(YahooFetchRequest request) {
         if (yahooPriceClient == null) {
-            log.warn("Yahoo Finance client not configured");
-            return List.of();
+            throw new IllegalStateException("Yahoo Finance client is not configured");
         }
 
         var responses = new ArrayList<PriceResponse>();
         for (var symbol : request.symbols()) {
-            var points = yahooPriceClient.fetchHistory(symbol, request.fromDate(), request.toDate());
-            for (var point : points) {
+            var fetchResult = yahooPriceClient.fetchHistory(symbol, request.fromDate(), request.toDate());
+            for (var point : fetchResult.points()) {
                 responses.add(new PriceResponse(symbol, point.date(), point.closePrice(), SOURCE_YAHOO));
             }
         }

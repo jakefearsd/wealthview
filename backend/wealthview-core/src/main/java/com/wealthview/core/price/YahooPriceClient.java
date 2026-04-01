@@ -14,7 +14,22 @@ public interface YahooPriceClient {
     record PricePoint(LocalDate date, BigDecimal closePrice) {
     }
 
-    List<PricePoint> fetchHistory(String symbol, LocalDate from, LocalDate to);
+    record FetchResult(List<PricePoint> points, String errorReason) {
+
+        public static FetchResult success(List<PricePoint> points) {
+            return new FetchResult(points, null);
+        }
+
+        public static FetchResult failure(String reason) {
+            return new FetchResult(List.of(), reason);
+        }
+
+        public boolean failed() {
+            return errorReason != null;
+        }
+    }
+
+    FetchResult fetchHistory(String symbol, LocalDate from, LocalDate to);
 
     Optional<BigDecimal> fetchCurrentPrice(String symbol);
 }

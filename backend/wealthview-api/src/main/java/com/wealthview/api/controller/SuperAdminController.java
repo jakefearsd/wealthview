@@ -6,6 +6,7 @@ import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.config.SystemStatsService;
 import com.wealthview.core.config.dto.SystemConfigResponse;
 import com.wealthview.core.config.dto.SystemStatsResponse;
+import com.wealthview.api.dto.ErrorResponse;
 import com.wealthview.core.price.PriceService;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.CsvImportResult;
@@ -14,6 +15,7 @@ import com.wealthview.core.price.dto.PriceSyncStatus;
 import com.wealthview.core.price.dto.YahooFetchRequest;
 import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.core.pricefeed.PriceSyncService;
+import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.UserManagementService;
 import com.wealthview.core.tenant.dto.AdminUserResponse;
@@ -108,12 +110,15 @@ public class SuperAdminController {
     // --- Price endpoints ---
 
     @PostMapping("/prices/sync")
-    public ResponseEntity<Void> triggerPriceSync() {
+    public ResponseEntity<?> triggerPriceSync() {
         if (priceSyncService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ErrorResponse("SERVICE_UNAVAILABLE",
+                            "Finnhub API key is not configured. Set app.finnhub.api-key in your environment.",
+                            503));
         }
-        priceSyncService.syncDailyPrices();
-        return ResponseEntity.noContent().build();
+        var result = priceSyncService.syncDailyPrices();
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping("/prices/status")

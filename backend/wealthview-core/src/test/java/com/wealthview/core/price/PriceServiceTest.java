@@ -4,6 +4,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.PriceRequest;
 import com.wealthview.core.price.dto.YahooFetchRequest;
+import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PriceId;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -136,9 +137,9 @@ class PriceServiceTest {
     void syncFromYahoo_successfulFetch_upsertsAndReturnsResult() {
         var today = LocalDate.now();
         when(yahooPriceClient.fetchHistory("AAPL", today.minusDays(5), today))
-                .thenReturn(List.of(
+                .thenReturn(YahooPriceClient.FetchResult.success(List.of(
                         new YahooPriceClient.PricePoint(today.minusDays(1), new BigDecimal("185.50")),
-                        new YahooPriceClient.PricePoint(today, new BigDecimal("186.00"))));
+                        new YahooPriceClient.PricePoint(today, new BigDecimal("186.00")))));
         when(priceRepository.findById(any(PriceId.class))).thenReturn(Optional.empty());
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -146,7 +147,7 @@ class PriceServiceTest {
 
         assertThat(result.inserted()).isEqualTo(2);
         assertThat(result.updated()).isEqualTo(0);
-        assertThat(result.failed()).isEmpty();
+        assertThat(result.failures()).isEmpty();
         verify(priceRepository, times(2)).save(any(PriceEntity.class));
     }
 
@@ -155,8 +156,8 @@ class PriceServiceTest {
         var today = LocalDate.now();
         var existingPrice = new PriceEntity("AAPL", today, new BigDecimal("184.00"), "finnhub");
         when(yahooPriceClient.fetchHistory("AAPL", today.minusDays(5), today))
-                .thenReturn(List.of(
-                        new YahooPriceClient.PricePoint(today, new BigDecimal("186.00"))));
+                .thenReturn(YahooPriceClient.FetchResult.success(List.of(
+                        new YahooPriceClient.PricePoint(today, new BigDecimal("186.00")))));
         when(priceRepository.findById(new PriceId("AAPL", today)))
                 .thenReturn(Optional.of(existingPrice));
         when(priceRepository.save(any(PriceEntity.class))).thenAnswer(inv -> inv.getArgument(0));
@@ -165,29 +166,35 @@ class PriceServiceTest {
 
         assertThat(result.inserted()).isEqualTo(0);
         assertThat(result.updated()).isEqualTo(1);
-        assertThat(result.failed()).isEmpty();
+        assertThat(result.failures()).isEmpty();
     }
 
     @Test
-    void syncFromYahoo_failedSymbol_addedToFailedList() {
+    void syncFromYahoo_failedSymbol_addedToFailuresWithReason() {
         var today = LocalDate.now();
         when(yahooPriceClient.fetchHistory("BAD", today.minusDays(5), today))
-                .thenReturn(List.of());
+                .thenReturn(YahooPriceClient.FetchResult.failure(
+                        "no price data — symbol may not be listed on Yahoo Finance"));
 
         var result = priceService.syncFromYahoo(List.of("BAD"));
 
         assertThat(result.inserted()).isEqualTo(0);
         assertThat(result.updated()).isEqualTo(0);
-        assertThat(result.failed()).containsExactly("BAD");
+        assertThat(result.failures()).hasSize(1);
+        assertThat(result.failures().get(0).symbol()).isEqualTo("BAD");
+        assertThat(result.failures().get(0).reason()).contains("no price data");
     }
 
     @Test
-    void syncFromYahoo_nullClient_allSymbolsFail() {
+    void syncFromYahoo_nullClient_allSymbolsFailWithConfigReason() {
         var service = new PriceService(priceRepository, holdingRepository, null);
 
         var result = service.syncFromYahoo(List.of("AAPL", "MSFT"));
 
-        assertThat(result.failed()).containsExactly("AAPL", "MSFT");
+        assertThat(result.failures()).hasSize(2);
+        assertThat(result.failures().get(0).symbol()).isEqualTo("AAPL");
+        assertThat(result.failures().get(0).reason()).contains("not configured");
+        assertThat(result.failures().get(1).symbol()).isEqualTo("MSFT");
         verify(priceRepository, never()).save(any());
     }
 
@@ -198,9 +205,9 @@ class PriceServiceTest {
                 LocalDate.of(2024, 1, 1),
                 LocalDate.of(2024, 1, 5));
         when(yahooPriceClient.fetchHistory("AAPL", request.fromDate(), request.toDate()))
-                .thenReturn(List.of(
+                .thenReturn(YahooPriceClient.FetchResult.success(List.of(
                         new YahooPriceClient.PricePoint(
-                                LocalDate.of(2024, 1, 2), new BigDecimal("185.50"))));
+                                LocalDate.of(2024, 1, 2), new BigDecimal("185.50")))));
 
         var result = priceService.fetchFromYahoo(request);
 
@@ -208,6 +215,19 @@ class PriceServiceTest {
         assertThat(result.get(0).symbol()).isEqualTo("AAPL");
         assertThat(result.get(0).closePrice()).isEqualByComparingTo("185.50");
         assertThat(result.get(0).source()).isEqualTo("yahoo");
+    }
+
+    @Test
+    void fetchFromYahoo_nullClient_throwsIllegalState() {
+        var service = new PriceService(priceRepository, holdingRepository, null);
+        var request = new YahooFetchRequest(
+                List.of("AAPL"),
+                LocalDate.of(2024, 1, 1),
+                LocalDate.of(2024, 1, 5));
+
+        assertThatThrownBy(() -> service.fetchFromYahoo(request))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("not configured");
     }
 
     @Test
