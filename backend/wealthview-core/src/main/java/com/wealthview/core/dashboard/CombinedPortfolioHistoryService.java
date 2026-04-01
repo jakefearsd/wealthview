@@ -91,8 +91,12 @@ public class CombinedPortfolioHistoryService {
             return new CombinedPortfolioHistoryResponse(List.of(), 0, 0, 0);
         }
 
-        var fridays = generateFridays(startDate, endDate);
-        if (fridays.isEmpty()) {
+        var dataPointDates = generateFridays(startDate, endDate);
+        // Always include today so the chart extends to the current date
+        if (dataPointDates.isEmpty() || !dataPointDates.get(dataPointDates.size() - 1).equals(endDate)) {
+            dataPointDates.add(endDate);
+        }
+        if (dataPointDates.isEmpty()) {
             return new CombinedPortfolioHistoryResponse(List.of(), 0,
                     investmentAccounts.size(), properties.size());
         }
@@ -149,9 +153,9 @@ public class CombinedPortfolioHistoryService {
         var valuationsByProperty = allValuations.stream()
                 .collect(Collectors.groupingBy(PropertyValuationEntity::getPropertyId));
 
-        // Compute weekly data points
+        // Compute data points (weekly Fridays + today)
         var dataPoints = new ArrayList<CombinedPortfolioDataPointDto>();
-        for (var friday : fridays) {
+        for (var friday : dataPointDates) {
             var investmentValue = BigDecimal.ZERO;
 
             for (var entry : holdingsByCurrency.entrySet()) {
