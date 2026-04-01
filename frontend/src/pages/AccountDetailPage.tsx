@@ -82,29 +82,35 @@ export default function AccountDetailPage() {
                             <tr>
                                 <th style={thStyle}>Symbol</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Qty</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Price</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Cost Basis</th>
-                                <th style={{ ...thStyle, textAlign: 'center' }}>Override</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Market Value</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Gain/Loss</th>
                                 {canWrite && <th style={thStyle}></th>}
                             </tr>
                         </thead>
                         <tbody>
-                            {holdings?.map((h) => (
+                            {holdings?.map((h) => {
+                                const glColor = h.gain_loss != null ? (h.gain_loss >= 0 ? '#2e7d32' : '#c62828') : '#888';
+                                return (
                                 <tr key={h.id} style={trHoverStyle}>
                                     <td style={tdStyle}>
                                         <Link to={`/holdings/${h.id}`} style={{ color: '#1976d2', textDecoration: 'none' }}>
                                             {h.symbol}
                                         </Link>
-                                        {h.is_money_market && <span style={{ color: '#999', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(Money Market)</span>}
+                                        {h.is_money_market && <span style={{ color: '#999', fontSize: '0.8rem', marginLeft: '0.25rem' }}>(MM)</span>}
                                     </td>
                                     {editingHoldingId === h.id ? (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} style={{ width: '80px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? `$${h.current_price.toFixed(2)}` : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>
                                                 <CurrencyInput value={editCostBasis} onChange={setEditCostBasis} style={{ width: '100px', padding: '0.25rem', textAlign: 'right' }} />
                                             </td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.market_value != null ? formatCurrency(h.market_value) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? formatCurrency(h.gain_loss) : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                 <button onClick={() => handleSaveHolding(h.id, h.symbol)} style={{ background: 'none', border: 'none', color: '#2e7d32', cursor: 'pointer', marginRight: '0.25rem' }}>Save</button>
                                                 <button onClick={() => setEditingHoldingId(null)} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer' }}>Cancel</button>
@@ -113,8 +119,10 @@ export default function AccountDetailPage() {
                                     ) : (
                                         <>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{h.quantity}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: '#888' }}>{h.current_price != null ? `$${h.current_price.toFixed(2)}` : '—'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(h.cost_basis)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'center' }}>{h.is_manual_override ? 'Yes' : 'No'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{h.market_value != null ? formatCurrency(h.market_value) : '—'}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{h.gain_loss != null ? formatCurrency(h.gain_loss) : '—'}</td>
                                             {canWrite && (
                                                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                                                     <button onClick={() => startEditHolding(h)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer' }}>Edit</button>
@@ -123,8 +131,26 @@ export default function AccountDetailPage() {
                                         </>
                                     )}
                                 </tr>
-                            ))}
-                            {holdings?.length === 0 && <tr><td colSpan={canWrite ? 5 : 4}><EmptyState title="No holdings" /></td></tr>}
+                                );
+                            })}
+                            {holdings && holdings.length > 0 && (() => {
+                                const totalCost = holdings.reduce((sum, h) => sum + (h.cost_basis ?? 0), 0);
+                                const totalValue = holdings.reduce((sum, h) => sum + (h.market_value ?? h.cost_basis ?? 0), 0);
+                                const totalGL = totalValue - totalCost;
+                                const glColor = totalGL >= 0 ? '#2e7d32' : '#c62828';
+                                return (
+                                    <tr style={{ borderTop: '2px solid #ccc', fontWeight: 600 }}>
+                                        <td style={tdStyle}>Total</td>
+                                        <td style={tdStyle}></td>
+                                        <td style={tdStyle}></td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(totalCost)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(totalValue)}</td>
+                                        <td style={{ ...tdStyle, textAlign: 'right', color: glColor }}>{formatCurrency(totalGL)}</td>
+                                        {canWrite && <td style={tdStyle}></td>}
+                                    </tr>
+                                );
+                            })()}
+                            {holdings?.length === 0 && <tr><td colSpan={canWrite ? 7 : 6}><EmptyState title="No holdings" /></td></tr>}
                         </tbody>
                     </table>
                 </div>

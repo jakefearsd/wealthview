@@ -15,19 +15,41 @@ public record HoldingResponse(
         boolean isManualOverride,
         boolean isMoneyMarket,
         BigDecimal moneyMarketRate,
-        LocalDate asOfDate
+        LocalDate asOfDate,
+        BigDecimal currentPrice,
+        BigDecimal marketValue,
+        BigDecimal gainLoss
 ) {
     public static HoldingResponse from(HoldingEntity entity) {
+        return from(entity, null);
+    }
+
+    public static HoldingResponse from(HoldingEntity entity, BigDecimal latestPrice) {
+        var qty = entity.getQuantity();
+        var cost = entity.getCostBasis();
+        BigDecimal mktValue = null;
+        BigDecimal gl = null;
+
+        if (latestPrice != null && qty != null) {
+            mktValue = qty.multiply(latestPrice).setScale(4, java.math.RoundingMode.HALF_UP);
+            if (cost != null) {
+                gl = mktValue.subtract(cost);
+            }
+        }
+
         return new HoldingResponse(
                 entity.getId(),
                 entity.getAccountId(),
                 entity.getSymbol(),
-                entity.getQuantity(),
-                entity.getCostBasis(),
+                qty,
+                cost,
                 entity.isManualOverride(),
                 entity.isMoneyMarket(),
                 entity.getMoneyMarketRate(),
-                entity.getAsOfDate()
+                entity.getAsOfDate(),
+                latestPrice,
+                mktValue,
+                gl
         );
     }
 }
