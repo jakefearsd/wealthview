@@ -7,6 +7,7 @@ import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
+import com.wealthview.persistence.repository.PriceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,9 @@ class HoldingServiceTest {
 
     @Mock
     private AccountRepository accountRepository;
+
+    @Mock
+    private PriceRepository priceRepository;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;

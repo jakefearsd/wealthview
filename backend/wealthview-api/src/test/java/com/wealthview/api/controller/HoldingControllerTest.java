@@ -55,7 +55,8 @@ class HoldingControllerTest {
 
     private HoldingResponse sampleResponse() {
         return new HoldingResponse(HOLDING_ID, ACCOUNT_ID, "AAPL",
-                new BigDecimal("10"), new BigDecimal("1500.00"), false, false, null, LocalDate.now());
+                new BigDecimal("10"), new BigDecimal("1500.00"), false, false, null, LocalDate.now(),
+                new BigDecimal("175.00"), new BigDecimal("1750.00"), new BigDecimal("250.00"));
     }
 
     @Test

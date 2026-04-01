@@ -8,6 +8,9 @@ export interface Holding {
     is_money_market: boolean;
     money_market_rate: number | null;
     as_of_date: string;
+    current_price: number | null;
+    market_value: number | null;
+    gain_loss: number | null;
 }
 
 export interface HoldingRequest {

@@ -5,19 +5,23 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.dto.HoldingRequest;
 import com.wealthview.core.holding.dto.HoldingResponse;
 import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
+import com.wealthview.persistence.repository.PriceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class HoldingService {
@@ -26,19 +30,30 @@ public class HoldingService {
 
     private final HoldingRepository holdingRepository;
     private final AccountRepository accountRepository;
+    private final PriceRepository priceRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public HoldingService(HoldingRepository holdingRepository, AccountRepository accountRepository,
-                          ApplicationEventPublisher eventPublisher) {
+                          PriceRepository priceRepository, ApplicationEventPublisher eventPublisher) {
         this.holdingRepository = holdingRepository;
         this.accountRepository = accountRepository;
+        this.priceRepository = priceRepository;
         this.eventPublisher = eventPublisher;
     }
 
     @Transactional(readOnly = true)
     public List<HoldingResponse> listByAccount(UUID tenantId, UUID accountId) {
-        return holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId).stream()
-                .map(HoldingResponse::from)
+        var holdings = holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId);
+        if (holdings.isEmpty()) {
+            return List.of();
+        }
+
+        var symbols = holdings.stream().map(HoldingEntity::getSymbol).distinct().toList();
+        Map<String, BigDecimal> prices = priceRepository.findLatestBySymbolIn(symbols).stream()
+                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+
+        return holdings.stream()
+                .map(h -> HoldingResponse.from(h, prices.get(h.getSymbol())))
                 .toList();
     }
 
