@@ -7,10 +7,21 @@ export interface PriceSyncStatus {
     stale: boolean;
 }
 
+export interface SymbolError {
+    symbol: string;
+    reason: string;
+}
+
+export interface FinnhubSyncResult {
+    succeeded: number;
+    total: number;
+    failures: SymbolError[];
+}
+
 export interface YahooSyncResult {
     inserted: number;
     updated: number;
-    failed: string[];
+    failures: SymbolError[];
 }
 
 export interface YahooFetchRequest {
@@ -35,8 +46,9 @@ export async function getPriceStatus(): Promise<PriceSyncStatus[]> {
     return data;
 }
 
-export async function syncFinnhub(): Promise<void> {
-    await client.post('/admin/prices/sync');
+export async function syncFinnhub(): Promise<FinnhubSyncResult> {
+    const { data } = await client.post<FinnhubSyncResult>('/admin/prices/sync');
+    return data;
 }
 
 export async function syncYahoo(): Promise<YahooSyncResult> {

@@ -1,8 +1,10 @@
 package com.wealthview.importmodule.finnhub;
 
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
@@ -11,10 +13,12 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestToUriTemplate;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class FinnhubClientTest {
@@ -30,7 +34,7 @@ class FinnhubClientTest {
     }
 
     @Test
-    void getQuote_successfulResponse_returnsQuote() {
+    void getQuote_successfulResponse_returnsSuccess() {
         mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
@@ -39,26 +43,43 @@ class FinnhubClientTest {
 
         var result = client.getQuote("AAPL");
 
-        assertThat(result).isPresent();
-        assertThat(result.get().symbol()).isEqualTo("AAPL");
-        assertThat(result.get().currentPrice()).isEqualByComparingTo("150.25");
+        assertThat(result).isInstanceOf(QuoteResult.Success.class);
+        var success = (QuoteResult.Success) result;
+        assertThat(success.quote().symbol()).isEqualTo("AAPL");
+        assertThat(success.quote().currentPrice()).isEqualByComparingTo("150.25");
         mockServer.verify();
     }
 
     @Test
-    void getQuote_apiError_returnsEmpty() {
+    void getQuote_serverError_returnsFailureWithStatusCode() {
         mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withServerError());
 
         var result = client.getQuote("AAPL");
 
-        assertThat(result).isEmpty();
+        assertThat(result).isInstanceOf(QuoteResult.Failure.class);
+        var failure = (QuoteResult.Failure) result;
+        assertThat(failure.reason()).contains("500");
         mockServer.verify();
     }
 
     @Test
-    void getQuote_zeroPriceResponse_returnsEmpty() {
+    void getQuote_forbidden_returnsFailureWithStatusCode() {
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withStatus(HttpStatus.FORBIDDEN));
+
+        var result = client.getQuote("AAPL");
+
+        assertThat(result).isInstanceOf(QuoteResult.Failure.class);
+        var failure = (QuoteResult.Failure) result;
+        assertThat(failure.reason()).contains("403");
+        mockServer.verify();
+    }
+
+    @Test
+    void getQuote_zeroPriceResponse_returnsFailureWithReason() {
         mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=INVALID&token=test-api-key"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess("""
@@ -67,7 +88,9 @@ class FinnhubClientTest {
 
         var result = client.getQuote("INVALID");
 
-        assertThat(result).isEmpty();
+        assertThat(result).isInstanceOf(QuoteResult.Failure.class);
+        var failure = (QuoteResult.Failure) result;
+        assertThat(failure.reason()).contains("no quote data");
         mockServer.verify();
     }
 

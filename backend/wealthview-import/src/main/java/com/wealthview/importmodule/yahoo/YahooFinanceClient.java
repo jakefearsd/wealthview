@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.wealthview.core.price.YahooPriceClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -31,7 +33,7 @@ public class YahooFinanceClient implements YahooPriceClient {
 
     @Override
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    public List<PricePoint> fetchHistory(String symbol, LocalDate from, LocalDate to) {
+    public FetchResult fetchHistory(String symbol, LocalDate from, LocalDate to) {
         try {
             long period1 = from.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
             long period2 = to.atTime(23, 59, 59).toEpochSecond(ZoneOffset.UTC);
@@ -45,13 +47,26 @@ public class YahooFinanceClient implements YahooPriceClient {
 
             var points = parseChartResponse(response);
             sleepForRateLimit();
-            return points;
+            if (points.isEmpty()) {
+                return FetchResult.failure(
+                        "no price data — symbol may not be listed on Yahoo Finance");
+            }
+            return FetchResult.success(points);
+        } catch (HttpClientErrorException e) {
+            log.warn("HTTP {} fetching Yahoo history for symbol {}", e.getStatusCode().value(), symbol, e);
+            return FetchResult.failure(
+                    "HTTP %d from Yahoo Finance".formatted(e.getStatusCode().value()));
+        } catch (HttpServerErrorException e) {
+            log.warn("HTTP {} fetching Yahoo history for symbol {}", e.getStatusCode().value(), symbol, e);
+            return FetchResult.failure(
+                    "Yahoo Finance returned HTTP %d".formatted(e.getStatusCode().value()));
         } catch (RestClientException e) {
             log.warn("Failed to fetch Yahoo history for symbol {}", symbol, e);
-            return Collections.emptyList();
+            return FetchResult.failure("network error: " + e.getMessage());
         } catch (Exception e) {
             log.warn("Error parsing Yahoo response for symbol {}", symbol, e);
-            return Collections.emptyList();
+            return FetchResult.failure(
+                    "unexpected response format from Yahoo Finance");
         }
     }
 

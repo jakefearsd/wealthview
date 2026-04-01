@@ -11,6 +11,7 @@ import type { PriceSyncStatus, PriceEntry } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
+import { extractErrorMessage } from '../../utils/errorMessage';
 import PriceBrowserTab from './PriceBrowserTab';
 import Button from '../Button';
 import toast from 'react-hot-toast';
@@ -75,11 +76,21 @@ function FinnhubTab() {
     async function handleSync() {
         setSyncing(true);
         try {
-            await syncFinnhub();
-            toast.success('Finnhub sync complete');
+            const result = await syncFinnhub();
+            if (result.failures.length === 0) {
+                toast.success(`Finnhub sync complete: ${result.succeeded} of ${result.total} symbols updated`);
+            } else {
+                const failDetails = result.failures
+                    .map((f) => `${f.symbol} (${f.reason})`)
+                    .join(', ');
+                toast.error(
+                    `Synced ${result.succeeded} of ${result.total}. Failed: ${failDetails}`,
+                    { duration: 10000 },
+                );
+            }
             refetch();
-        } catch {
-            toast.error('Finnhub sync failed');
+        } catch (err) {
+            toast.error(extractErrorMessage(err), { duration: 8000 });
         } finally {
             setSyncing(false);
         }
@@ -157,10 +168,19 @@ function YahooTab() {
         setSyncingAll(true);
         try {
             const result = await syncYahoo();
-            const failedMsg = result.failed.length > 0 ? ` Failed: ${result.failed.join(', ')}.` : '';
-            toast.success(`Inserted ${result.inserted}, updated ${result.updated}.${failedMsg}`);
-        } catch {
-            toast.error('Yahoo sync failed');
+            if (result.failures.length === 0) {
+                toast.success(`Inserted ${result.inserted}, updated ${result.updated}.`);
+            } else {
+                const failDetails = result.failures
+                    .map((f) => `${f.symbol} (${f.reason})`)
+                    .join(', ');
+                toast.error(
+                    `Inserted ${result.inserted}, updated ${result.updated}. Failed: ${failDetails}`,
+                    { duration: 10000 },
+                );
+            }
+        } catch (err) {
+            toast.error(extractErrorMessage(err), { duration: 8000 });
         } finally {
             setSyncingAll(false);
         }
@@ -183,8 +203,8 @@ function YahooTab() {
             const prices = await fetchYahoo({ symbols, from_date: fromDate, to_date: toDate });
             setPreview(prices);
             if (prices.length === 0) toast('No prices returned for those symbols and dates');
-        } catch {
-            toast.error('Fetch failed');
+        } catch (err) {
+            toast.error(extractErrorMessage(err), { duration: 8000 });
         } finally {
             setFetching(false);
         }
@@ -197,8 +217,8 @@ function YahooTab() {
             await saveYahooPrices(preview);
             toast.success(`Saved ${preview.length} price entries`);
             setPreview(null);
-        } catch {
-            toast.error('Save failed');
+        } catch (err) {
+            toast.error(extractErrorMessage(err), { duration: 8000 });
         } finally {
             setSaving(false);
         }
@@ -321,8 +341,8 @@ function CsvTab() {
             } else {
                 toast(`Imported ${result.imported} prices with ${result.errors.length} error(s)`);
             }
-        } catch {
-            toast.error('CSV upload failed');
+        } catch (err) {
+            toast.error(extractErrorMessage(err), { duration: 8000 });
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
