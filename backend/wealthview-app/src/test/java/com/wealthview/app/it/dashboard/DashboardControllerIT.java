@@ -91,7 +91,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     @Order(3)
-    void getPortfolioHistory_allDatesAreFridays() {
+    void getPortfolioHistory_allDatesAreFridaysExceptTodayAtEnd() {
         var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
 
@@ -99,10 +99,17 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         var dataPoints = (List<Map<String, Object>>) response.getBody().get("data_points");
         assertThat(dataPoints).isNotEmpty();
 
-        for (var dp : dataPoints) {
-            var date = LocalDate.parse((String) dp.get("date"));
-            assertThat(date.getDayOfWeek()).isEqualTo(DayOfWeek.FRIDAY);
+        var dates = dataPoints.stream()
+                .map(dp -> LocalDate.parse((String) dp.get("date")))
+                .toList();
+
+        // All dates except the last must be Fridays
+        for (int i = 0; i < dates.size() - 1; i++) {
+            assertThat(dates.get(i).getDayOfWeek()).isEqualTo(DayOfWeek.FRIDAY);
         }
+
+        // The last date is today (chart extends to current date)
+        assertThat(dates.get(dates.size() - 1)).isEqualTo(LocalDate.now());
     }
 
     @Test

@@ -220,10 +220,12 @@ class SuperAdminControllerTest {
     }
 
     @Test
-    void getPriceStatus_nonSuperAdmin_returns403() throws Exception {
+    void getPriceStatus_admin_returns200() throws Exception {
+        when(priceService.getSyncStatus()).thenReturn(List.of());
+
         mockMvc.perform(get("/api/v1/admin/prices/status")
                         .with(authenticatedAdmin()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -296,14 +298,16 @@ class SuperAdminControllerTest {
     }
 
     @Test
-    void importCsv_nonSuperAdmin_returns403() throws Exception {
+    void importCsv_admin_returns200() throws Exception {
+        when(priceService.importCsv(any())).thenReturn(new CsvImportResult(0, List.of()));
+
         var file = new MockMultipartFile("file", "prices.csv", "text/csv",
                 "symbol,date,close_price\nAAPL,2024-01-02,185.50".getBytes());
 
         mockMvc.perform(multipart("/api/v1/admin/prices/csv")
                         .file(file)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isOk());
     }
 
     // --- New: price browse and delete ---
