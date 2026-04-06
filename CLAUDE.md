@@ -202,8 +202,7 @@ UUID primary key, foreign key to accounts.
 - **Never commit commented-out code, TODOs without issue references, or `System.out.println` debugging.**
 
 ### Pushing to GitHub
-- **Do NOT push after every commit.** Accumulate commits locally until a feature or logical unit of work is complete and all tests pass.
-- **Always confirm with the user before running `git push`.** Never push without explicit approval.
+- **NEVER run `git push` unless the user explicitly tells you to push.** Do not push proactively, do not push as part of a workflow, and do not push even if a feature is complete and all tests pass. Wait for a direct instruction like "push" or "push to remote".
 
 ---
 
@@ -362,6 +361,15 @@ mvn -pl wealthview-core test                       # Run tests for one module
 mvn test -Dtest=AccountServiceTest                 # Run a single test class
 mvn test -Dtest="AccountServiceTest#methodName"    # Run a single test method
 ```
+
+### Code Coverage (JaCoCo)
+```bash
+cd backend
+mvn clean test && mvn jacoco:report -pl wealthview-core,wealthview-api,wealthview-projection,wealthview-import
+```
+- HTML reports: `<module>/target/site/jacoco/index.html`
+- CSV data: `<module>/target/site/jacoco/jacoco.csv`
+- Coverage targets: core 90%+, projection 90%+, api 80%+, import 80%+
 
 ### Frontend (development only)
 ```bash
