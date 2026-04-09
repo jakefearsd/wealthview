@@ -34,7 +34,7 @@ export default function PropertyCashFlowSection({
                         <BarChart data={cashFlow}>
                             <XAxis dataKey="month" />
                             <YAxis />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                             <Legend />
                             <Bar dataKey="total_expenses" name="Expenses" fill="#d32f2f" />
                         </BarChart>

@@ -113,7 +113,7 @@ export default function PropertyAnalyticsSection({
                             <LineChart data={analytics.equity_growth}>
                                 <XAxis dataKey="month" />
                                 <YAxis />
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                                 <Legend />
                                 <Line type="monotone" dataKey="equity" name="Equity" stroke="#2e7d32" strokeWidth={2} dot={false} />
                                 <Line type="monotone" dataKey="property_value" name="Property Value" stroke="#1976d2" strokeWidth={1} strokeDasharray="5 5" dot={false} />

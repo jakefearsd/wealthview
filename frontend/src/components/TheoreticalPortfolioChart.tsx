@@ -137,8 +137,8 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
                                 width={60}
                             />
                             <Tooltip
-                                formatter={(value: number) => [formatCurrency(value), 'Value']}
-                                labelFormatter={(label: string) => new Date(label + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                formatter={(value) => [formatCurrency(Number(value)), 'Value']}
+                                labelFormatter={(label) => new Date(String(label) + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                             />
                             <Area
                                 type="monotone"

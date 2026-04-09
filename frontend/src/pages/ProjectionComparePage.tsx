@@ -108,10 +108,10 @@ export default function ProjectionComparePage() {
                                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                                 <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 12 }} width={70} />
                                 <Tooltip
-                                    formatter={(value: number, name: string) => {
-                                        const idx = parseInt(name.replace('scenario_', ''));
+                                    formatter={(value, name) => {
+                                        const idx = parseInt(String(name).replace('scenario_', ''));
                                         const scenarioName = scenarios?.find(s => s.id === selectedIds.filter(id => id !== '')[idx])?.name || `Scenario ${idx + 1}`;
-                                        return [formatCurrency(value), scenarioName];
+                                        return [formatCurrency(Number(value)), scenarioName];
                                     }}
                                 />
                                 <Legend formatter={(value: string) => {

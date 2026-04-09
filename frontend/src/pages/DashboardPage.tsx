@@ -61,12 +61,15 @@ export default function DashboardPage() {
                     {data.allocation.length > 0 ? (
                         <ResponsiveContainer width="100%" height={250}>
                             <PieChart>
-                                <Pie data={data.allocation} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={90} label={({ category, percentage }) => `${category} ${percentage}%`}>
+                                <Pie data={data.allocation} dataKey="value" nameKey="category" cx="50%" cy="50%" outerRadius={90} label={(props) => {
+                                    const entry = (props as { payload?: { category: string; percentage: number } }).payload;
+                                    return entry ? `${entry.category} ${entry.percentage}%` : '';
+                                }}>
                                     {data.allocation.map((_, index) => (
                                         <Cell key={index} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (

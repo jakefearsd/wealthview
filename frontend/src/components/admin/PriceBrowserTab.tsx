@@ -119,7 +119,7 @@ export default function PriceBrowserTab() {
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="date" fontSize={12} />
                             <YAxis domain={['auto', 'auto']} fontSize={12} tickFormatter={(v) => `$${v}`} />
-                            <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                            <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                             <Line type="monotone" dataKey="price" stroke="#1976d2" dot={false} strokeWidth={2} />
                         </LineChart>
                     </ResponsiveContainer>

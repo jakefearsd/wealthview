@@ -40,7 +40,7 @@ export default function TraditionalBalanceChart({ years, exhaustionAge }: Props)
                         domain={[0, 'auto']}
                     />
                     <Tooltip
-                        formatter={(value: number, name: string) => [formatDollarTooltip(value), name]}
+                        formatter={(value, name) => [formatDollarTooltip(Number(value)), String(name)]}
                         labelFormatter={(age) => `Age ${age}`}
                     />
                     <Legend />
