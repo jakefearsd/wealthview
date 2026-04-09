@@ -83,7 +83,7 @@ class SnapshotProjectionServiceTest {
                         new PortfolioDataPointDto(endDate, new BigDecimal("16105.10"))
                 ),
                 List.of("VTI"), 260, false, null);
-        when(theoreticalPortfolioService.computeHistory(TENANT_ID, accountId, 10))
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, accountId, 120))
                 .thenReturn(history);
 
         var result = service.computeProjection(TENANT_ID, 10, 10);
@@ -137,7 +137,7 @@ class SnapshotProjectionServiceTest {
 
         // Empty history response
         var history = new PortfolioHistoryResponse(accountId, List.of(), List.of(), 0, false, null);
-        when(theoreticalPortfolioService.computeHistory(TENANT_ID, accountId, 10))
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, accountId, 120))
                 .thenReturn(history);
 
         var result = service.computeProjection(TENANT_ID, 5, 10);
@@ -263,7 +263,7 @@ class SnapshotProjectionServiceTest {
                         new PortfolioDataPointDto(now, new BigDecimal("50000"))
                 ),
                 List.of("VTI"), 52, false, null);
-        when(theoreticalPortfolioService.computeHistory(TENANT_ID, brokerageAccount.getId(), 10))
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, brokerageAccount.getId(), 120))
                 .thenReturn(history);
 
         // Bank: $10,000 balance

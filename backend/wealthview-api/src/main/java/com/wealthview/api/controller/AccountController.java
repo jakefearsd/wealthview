@@ -83,8 +83,8 @@ public class AccountController {
     public ResponseEntity<PortfolioHistoryResponse> getTheoreticalHistory(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id,
-            @RequestParam(defaultValue = "2") int years) {
-        var response = theoreticalPortfolioService.computeHistory(principal.tenantId(), id, years);
+            @RequestParam(defaultValue = "24") int months) {
+        var response = theoreticalPortfolioService.computeHistory(principal.tenantId(), id, months);
         return ResponseEntity.ok(response);
     }
 }

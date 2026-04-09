@@ -190,7 +190,7 @@ class AccountControllerTest {
                 new PortfolioDataPointDto(LocalDate.of(2025, 1, 10), new BigDecimal("1550.0000"))
         );
         var response = new PortfolioHistoryResponse(ACCOUNT_ID, dataPoints, List.of("AAPL"), 2, false, null);
-        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID, 2))
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID, 24))
                 .thenReturn(response);
 
         mockMvc.perform(get("/api/v1/accounts/{id}/theoretical-history", ACCOUNT_ID)
@@ -205,7 +205,7 @@ class AccountControllerTest {
 
     @Test
     void getTheoreticalHistory_notFound_returns404() throws Exception {
-        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID, 2))
+        when(theoreticalPortfolioService.computeHistory(TENANT_ID, ACCOUNT_ID, 24))
                 .thenThrow(new EntityNotFoundException("Account not found"));
 
         mockMvc.perform(get("/api/v1/accounts/{id}/theoretical-history", ACCOUNT_ID)
