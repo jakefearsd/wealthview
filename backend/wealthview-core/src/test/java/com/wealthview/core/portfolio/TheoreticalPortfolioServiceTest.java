@@ -72,7 +72,7 @@ class TheoreticalPortfolioServiceTest {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.computeHistory(tenantId, accountId, 2))
+        assertThatThrownBy(() -> service.computeHistory(tenantId, accountId, 24))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
@@ -81,7 +81,7 @@ class TheoreticalPortfolioServiceTest {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(bankAccount));
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         assertThat(result.dataPoints()).isEmpty();
         assertThat(result.accountId()).isEqualTo(accountId);
@@ -94,14 +94,14 @@ class TheoreticalPortfolioServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
                 .thenReturn(List.of());
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         assertThat(result.dataPoints()).isEmpty();
         assertThat(result.symbols()).isEmpty();
     }
 
     @Test
-    void computeHistory_customYears_passesCorrectDateRange() {
+    void computeHistory_customMonths_passesCorrectDateRange() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(brokerageAccount));
 
@@ -114,7 +114,7 @@ class TheoreticalPortfolioServiceTest {
                 eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(List.of());
 
-        service.computeHistory(tenantId, accountId, 5);
+        service.computeHistory(tenantId, accountId, 60);
 
         var captor = org.mockito.ArgumentCaptor.forClass(LocalDate.class);
         org.mockito.Mockito.verify(priceRepository).findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
@@ -123,12 +123,64 @@ class TheoreticalPortfolioServiceTest {
         var startDate = captor.getAllValues().get(0);
         var endDate = captor.getAllValues().get(1);
 
-        // 5-year horizon: start date should be ~5 years before end date
-        assertThat(startDate).isEqualTo(endDate.minusYears(5));
+        // 60-month horizon: start date should be 60 months before end date
+        assertThat(startDate).isEqualTo(endDate.minusMonths(60));
     }
 
     @Test
-    void computeHistory_yearsClamped_to1through10() {
+    void computeHistory_sixMonths_passesCorrectDateRange() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding));
+
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        service.computeHistory(tenantId, accountId, 6);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(LocalDate.class);
+        org.mockito.Mockito.verify(priceRepository).findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), captor.capture(), captor.capture());
+
+        var startDate = captor.getAllValues().get(0);
+        var endDate = captor.getAllValues().get(1);
+
+        assertThat(startDate).isEqualTo(endDate.minusMonths(6));
+    }
+
+    @Test
+    void computeHistory_twentyYears_passesCorrectDateRange() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var holding = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(holding));
+
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of());
+
+        service.computeHistory(tenantId, accountId, 240);
+
+        var captor = org.mockito.ArgumentCaptor.forClass(LocalDate.class);
+        org.mockito.Mockito.verify(priceRepository).findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), captor.capture(), captor.capture());
+
+        var startDate = captor.getAllValues().get(0);
+        var endDate = captor.getAllValues().get(1);
+
+        assertThat(startDate).isEqualTo(endDate.minusMonths(240));
+    }
+
+    @Test
+    void computeHistory_monthsClamped_to6through240() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(brokerageAccount));
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
@@ -136,10 +188,34 @@ class TheoreticalPortfolioServiceTest {
 
         // Should not throw for edge values — just clamp
         var result0 = service.computeHistory(tenantId, accountId, 0);
-        var result15 = service.computeHistory(tenantId, accountId, 15);
+        var result300 = service.computeHistory(tenantId, accountId, 300);
 
         assertThat(result0).isNotNull();
-        assertThat(result15).isNotNull();
+        assertThat(result300).isNotNull();
+    }
+
+    @Test
+    void computeHistory_lastDataPointIsToday() {
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var spaxx = new HoldingEntity(brokerageAccount, tenant, "SPAXX",
+                new BigDecimal("10000"), BigDecimal.ZERO);
+        spaxx.setMoneyMarket(true);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(spaxx));
+
+        var result = service.computeHistory(tenantId, accountId, 12);
+
+        assertThat(result.dataPoints()).isNotEmpty();
+        var lastPoint = result.dataPoints().get(result.dataPoints().size() - 1);
+        assertThat(lastPoint.date()).isEqualTo(LocalDate.now());
+
+        // All data points except the last should be Fridays
+        var allButLast = result.dataPoints().subList(0, result.dataPoints().size() - 1);
+        for (var dp : allButLast) {
+            assertThat(dp.date().getDayOfWeek()).isEqualTo(DayOfWeek.FRIDAY);
+        }
     }
 
     @Test
@@ -163,7 +239,7 @@ class TheoreticalPortfolioServiceTest {
                 eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(prices);
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         assertThat(result.symbols()).containsExactly("AAPL");
         assertThat(result.dataPoints()).isNotEmpty();
@@ -204,7 +280,7 @@ class TheoreticalPortfolioServiceTest {
                 any(), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(prices);
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         assertThat(result.symbols()).containsExactlyInAnyOrder("AAPL", "GOOG");
 
@@ -236,7 +312,7 @@ class TheoreticalPortfolioServiceTest {
                 any(), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(prices);
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         // Should still return data points using AAPL only
         assertThat(result.symbols()).containsExactly("AAPL");
@@ -259,7 +335,7 @@ class TheoreticalPortfolioServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
                 .thenReturn(List.of(spaxx));
 
-        var result = service.computeHistory(tenantId, accountId, 1);
+        var result = service.computeHistory(tenantId, accountId, 12);
 
         assertThat(result.symbols()).containsExactly("SPAXX");
         assertThat(result.dataPoints()).isNotEmpty();
@@ -293,7 +369,7 @@ class TheoreticalPortfolioServiceTest {
                 any(), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(prices);
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         assertThat(result.symbols()).containsExactlyInAnyOrder("AAPL", "SPAXX");
         assertThat(result.hasMoneyMarketHoldings()).isTrue();
@@ -326,7 +402,7 @@ class TheoreticalPortfolioServiceTest {
                 eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
                 .thenReturn(prices);
 
-        var result = service.computeHistory(tenantId, accountId, 2);
+        var result = service.computeHistory(tenantId, accountId, 24);
 
         // Friday data point should use Thursday's price via floorEntry
         var point = result.dataPoints().stream()

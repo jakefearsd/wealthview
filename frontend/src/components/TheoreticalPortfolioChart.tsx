@@ -11,11 +11,13 @@ interface Props {
 }
 
 const TIME_HORIZONS = [
-    { value: 1, label: '1 Year' },
-    { value: 2, label: '2 Years' },
-    { value: 3, label: '3 Years' },
-    { value: 5, label: '5 Years' },
-    { value: 10, label: '10 Years' },
+    { value: 6, label: '6 Months' },
+    { value: 12, label: '1 Year' },
+    { value: 24, label: '2 Years' },
+    { value: 36, label: '3 Years' },
+    { value: 60, label: '5 Years' },
+    { value: 120, label: '10 Years' },
+    { value: 240, label: '20 Years' },
 ];
 
 function formatDate(dateStr: string): string {
@@ -34,7 +36,7 @@ const selectStyle = {
 };
 
 export default function TheoreticalPortfolioChart({ accountId, accountType }: Props) {
-    const [years, setYears] = useState(2);
+    const [months, setMonths] = useState(24);
     const [data, setData] = useState<PortfolioHistory | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -43,11 +45,11 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
         let cancelled = false;
         setLoading(true);
         setError(false);
-        getTheoreticalHistory(accountId, years)
+        getTheoreticalHistory(accountId, months)
             .then((result) => { if (!cancelled) { setData(result); setLoading(false); } })
             .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
         return () => { cancelled = true; };
-    }, [accountId, years]);
+    }, [accountId, months]);
 
     const chartData = useMemo(() => {
         if (!data?.data_points) return [];
@@ -69,7 +71,7 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
     }
 
     const tickInterval = Math.max(1, Math.floor(chartData.length / 10));
-    const selectedLabel = TIME_HORIZONS.find(h => h.value === years)?.label ?? `${years} years`;
+    const selectedLabel = TIME_HORIZONS.find(h => h.value === months)?.label ?? `${months} months`;
 
     const growthStats = useMemo(() => {
         if (chartData.length < 2) return null;
@@ -78,17 +80,18 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
         if (startValue === 0) return null;
         const totalGrowth = endValue - startValue;
         const totalReturn = totalGrowth / startValue;
+        const years = months / 12;
         const annualizedRate = Math.pow(1 + totalReturn, 1 / years) - 1;
         return { totalGrowth, annualizedRate };
-    }, [chartData, years]);
+    }, [chartData, months]);
 
     return (
         <div style={chartCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                 <h3>Theoretical Portfolio History</h3>
                 <select
-                    value={years}
-                    onChange={(e) => setYears(Number(e.target.value))}
+                    value={months}
+                    onChange={(e) => setMonths(Number(e.target.value))}
                     style={selectStyle}
                     aria-label="Time horizon"
                 >

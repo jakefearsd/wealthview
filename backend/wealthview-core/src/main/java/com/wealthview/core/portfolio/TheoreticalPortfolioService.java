@@ -32,8 +32,8 @@ import java.util.stream.Collectors;
 public class TheoreticalPortfolioService {
 
     private static final Logger log = LoggerFactory.getLogger(TheoreticalPortfolioService.class);
-    private static final int MIN_YEARS = 1;
-    private static final int MAX_YEARS = 10;
+    private static final int MIN_MONTHS = 6;
+    private static final int MAX_MONTHS = 240;
 
     private final AccountRepository accountRepository;
     private final ExchangeRateService exchangeRateService;
@@ -51,8 +51,8 @@ public class TheoreticalPortfolioService {
     }
 
     @Transactional(readOnly = true)
-    public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId, int years) {
-        var clampedYears = Math.max(MIN_YEARS, Math.min(MAX_YEARS, years));
+    public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId, int months) {
+        var clampedMonths = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, months));
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
@@ -83,7 +83,7 @@ public class TheoreticalPortfolioService {
                 .collect(Collectors.toMap(HoldingEntity::getSymbol, HoldingEntity::getQuantity));
 
         var endDate = LocalDate.now();
-        var startDate = endDate.minusYears(clampedYears);
+        var startDate = endDate.minusMonths(clampedMonths);
 
         var resolved = resolvePricedSymbols(regularSymbols, startDate, endDate, accountId);
         var priceMap = resolved.priceMap();
@@ -94,10 +94,14 @@ public class TheoreticalPortfolioService {
             return emptyResponse(accountId);
         }
 
-        var fridays = generateFridays(startDate, endDate);
+        var dataPointDates = generateFridays(startDate, endDate);
+        // Always include today so the chart extends to the current date
+        if (dataPointDates.isEmpty() || !dataPointDates.get(dataPointDates.size() - 1).equals(endDate)) {
+            dataPointDates.add(endDate);
+        }
         var hasMoneyMarket = !moneyMarketHoldings.isEmpty();
         var dataPoints = computeWeeklyValuesWithMoneyMarket(
-                fridays, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
+                dataPointDates, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
 
         var currency = account.getCurrency();
         if (!"USD".equals(currency)) {
@@ -170,17 +174,17 @@ public class TheoreticalPortfolioService {
     }
 
     private List<PortfolioDataPointDto> computeWeeklyValuesWithMoneyMarket(
-            List<LocalDate> fridays,
+            List<LocalDate> dates,
             List<String> pricedSymbols,
             Map<String, BigDecimal> quantityBySymbol,
             Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap,
             BigDecimal moneyMarketTotal) {
         var dataPoints = new ArrayList<PortfolioDataPointDto>();
-        for (var friday : fridays) {
-            var pricedValue = lookupTotalValue(friday, pricedSymbols, quantityBySymbol, priceMap);
+        for (var date : dates) {
+            var pricedValue = lookupTotalValue(date, pricedSymbols, quantityBySymbol, priceMap);
             if (pricedValue.isPresent() || moneyMarketTotal.compareTo(BigDecimal.ZERO) > 0) {
                 var total = pricedValue.orElse(BigDecimal.ZERO).add(moneyMarketTotal);
-                dataPoints.add(new PortfolioDataPointDto(friday, total));
+                dataPoints.add(new PortfolioDataPointDto(date, total));
             }
         }
         return dataPoints;

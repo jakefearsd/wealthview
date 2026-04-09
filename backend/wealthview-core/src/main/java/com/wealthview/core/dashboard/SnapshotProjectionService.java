@@ -114,7 +114,7 @@ public class SnapshotProjectionService {
     }
 
     private AccountProjection computeInvestmentProjection(UUID tenantId, AccountEntity account, int lookbackYears) {
-        var history = theoreticalPortfolioService.computeHistory(tenantId, account.getId(), lookbackYears);
+        var history = theoreticalPortfolioService.computeHistory(tenantId, account.getId(), lookbackYears * 12);
         var dataPoints = history.dataPoints();
 
         if (dataPoints.isEmpty()) {

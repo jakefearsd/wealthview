@@ -94,7 +94,7 @@ class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
 
         // Get theoretical history — SPAXX should appear at constant value
         var historyResponse = restTemplate.exchange(
-                "/api/v1/accounts/" + accountId + "/theoretical-history?years=1",
+                "/api/v1/accounts/" + accountId + "/theoretical-history?months=12",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
 
         assertThat(historyResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
