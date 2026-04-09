@@ -64,7 +64,7 @@ export default function PropertyValuationSection({
                         <LineChart data={valuationChartData}>
                             <XAxis dataKey="date" />
                             <YAxis />
-                            <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                            <Tooltip formatter={(value) => formatCurrency(Number(value))} />
                             <Legend />
                             <Line type="monotone" dataKey="value" name="Value" stroke="#1976d2" strokeWidth={2} dot={{ r: 4 }} />
                         </LineChart>

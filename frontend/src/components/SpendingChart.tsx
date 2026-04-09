@@ -41,18 +41,20 @@ export default function SpendingChart({ data }: SpendingChartProps) {
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
                 <Tooltip
-                    formatter={(value: number, name: string) => {
+                    formatter={(value, name) => {
                         const labels: Record<string, string> = {
                             essential_expenses: 'Essential Expenses',
                             discretionary_after_cuts: 'Discretionary (After Cuts)',
                             withdrawals: 'Withdrawal',
                             income_streams_total: 'Income Streams',
                         };
-                        return [formatCurrency(value), labels[name] ?? name];
+                        const key = String(name);
+                        return [formatCurrency(Number(value)), labels[key] ?? key];
                     }}
-                    labelFormatter={(year: number) => {
-                        const d = data.find(y => y.year === year);
-                        return d ? `${year} (age ${d.age})` : String(year);
+                    labelFormatter={(year) => {
+                        const y = Number(year);
+                        const d = data.find(row => row.year === y);
+                        return d ? `${y} (age ${d.age})` : String(year);
                     }}
                 />
                 <Legend />

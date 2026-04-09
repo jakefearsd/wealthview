@@ -110,14 +110,15 @@ export default function CombinedPortfolioChart() {
                                 width={60}
                             />
                             <Tooltip
-                                formatter={(value: number, name: string) => [
-                                    formatCurrency(value),
-                                    name,
+                                formatter={(value, name) => [
+                                    formatCurrency(Number(value)),
+                                    String(name),
                                 ]}
-                                labelFormatter={(label: string) => {
-                                    const date = new Date(label + 'T00:00:00');
+                                labelFormatter={(label) => {
+                                    const dateStr = String(label);
+                                    const date = new Date(dateStr + 'T00:00:00');
                                     const formatted = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-                                    const dp = chartData.find(d => d.date === label);
+                                    const dp = chartData.find(d => d.date === dateStr);
                                     const total = dp ? dp.investmentValue + dp.propertyEquity : 0;
                                     return `${formatted} — Total: ${formatCurrency(total)}`;
                                 }}
