@@ -149,4 +149,31 @@ class DataExportServiceTest {
 
         assertThat(csv).isEqualTo("id,name,type,institution,created_at\n");
     }
+
+    @Test
+    void exportAccountsCsv_formulaInjection_prefixesWithSingleQuote() {
+        var evil = new AccountEntity(tenant, "=cmd|'/C calc'!A0", "taxable", "@SUM(1+1)");
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(evil));
+
+        String csv = dataExportService.exportAccountsCsv(tenantId);
+
+        assertThat(csv).doesNotContain(",=cmd");
+        assertThat(csv).doesNotContain(",@SUM");
+        assertThat(csv).contains("\"'=cmd|'/C calc'!A0\"");
+        assertThat(csv).contains("\"'@SUM(1+1)\"");
+    }
+
+    @Test
+    void exportPropertiesCsv_leadingDashAndPlus_prefixesWithSingleQuote() {
+        var property = new PropertyEntity(tenant, "-2+3",
+                new BigDecimal("500000"), LocalDate.of(2019, 3, 15),
+                new BigDecimal("600000"), new BigDecimal("350000"));
+        property.setPropertyType("+1");
+        when(propertyRepository.findByTenant_Id(tenantId)).thenReturn(List.of(property));
+
+        String csv = dataExportService.exportPropertiesCsv(tenantId);
+
+        assertThat(csv).contains("\"'-2+3\"");
+        assertThat(csv).contains("\"'+1\"");
+    }
 }
