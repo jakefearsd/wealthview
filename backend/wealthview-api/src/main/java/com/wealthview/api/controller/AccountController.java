@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.api.common.PageRequests;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.account.dto.AccountRequest;
@@ -50,7 +51,8 @@ public class AccountController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        var response = accountService.list(principal.tenantId(), PageRequest.of(page, size));
+        var response = accountService.list(
+                principal.tenantId(), PageRequest.of(page, PageRequests.clampSize(size)));
         return ResponseEntity.ok(response);
     }
 

@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.api.common.PageRequests;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.transaction.TransactionService;
@@ -48,7 +49,7 @@ public class TransactionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String symbol) {
-        var pageable = PageRequest.of(page, size);
+        var pageable = PageRequest.of(page, PageRequests.clampSize(size));
         var response = symbol != null
                 ? transactionService.listByAccountAndSymbol(principal.tenantId(), accountId, symbol, pageable)
                 : transactionService.listByAccount(principal.tenantId(), accountId, pageable);

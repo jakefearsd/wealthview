@@ -15,10 +15,12 @@ import com.wealthview.core.portfolio.TheoreticalPortfolioService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -105,6 +107,21 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].name").value("Brokerage"))
                 .andExpect(jsonPath("$.total").value(1));
+    }
+
+    @Test
+    void list_withOversizedPageSize_clampsToMax() throws Exception {
+        var page = new PageResponse<>(List.of(sampleResponse()), 0, 200, 1L);
+        when(accountService.list(eq(TENANT_ID), any())).thenReturn(page);
+
+        mockMvc.perform(get("/api/v1/accounts")
+                        .param("size", "100000")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk());
+
+        var captor = ArgumentCaptor.forClass(Pageable.class);
+        org.mockito.Mockito.verify(accountService).list(eq(TENANT_ID), captor.capture());
+        org.assertj.core.api.Assertions.assertThat(captor.getValue().getPageSize()).isEqualTo(200);
     }
 
     @Test

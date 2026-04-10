@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.api.common.PageRequests;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.audit.AuditLogService;
 import com.wealthview.core.audit.dto.AuditLogResponse;
@@ -29,7 +30,7 @@ public class AuditLogController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(name = "entity_type", required = false) String entityType) {
         var response = auditLogService.getAuditLogs(
-                principal.tenantId(), entityType, PageRequest.of(page, size));
+                principal.tenantId(), entityType, PageRequest.of(page, PageRequests.clampSize(size)));
         return ResponseEntity.ok(response);
     }
 }
