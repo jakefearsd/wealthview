@@ -1,5 +1,6 @@
 package com.wealthview.core.tenant;
 
+import com.wealthview.core.auth.CommonPasswordChecker;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.UserRepository;
@@ -22,10 +23,14 @@ public class UserManagementService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CommonPasswordChecker commonPasswordChecker;
 
-    public UserManagementService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserManagementService(UserRepository userRepository,
+                                 PasswordEncoder passwordEncoder,
+                                 CommonPasswordChecker commonPasswordChecker) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.commonPasswordChecker = commonPasswordChecker;
     }
 
     @Transactional(readOnly = true)
@@ -63,6 +68,9 @@ public class UserManagementService {
 
     @Transactional
     public void resetPassword(UUID tenantId, UUID userId, String newPassword) {
+        if (commonPasswordChecker.isCommon(newPassword)) {
+            throw new IllegalArgumentException("Password is too common — choose a stronger one");
+        }
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
@@ -90,6 +98,9 @@ public class UserManagementService {
 
     @Transactional
     public void resetPasswordByUserId(UUID userId, String newPassword) {
+        if (commonPasswordChecker.isCommon(newPassword)) {
+            throw new IllegalArgumentException("Password is too common — choose a stronger one");
+        }
         var user = userRepository.findById(userId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 

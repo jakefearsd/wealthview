@@ -19,6 +19,7 @@ import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.UserManagementService;
 import com.wealthview.core.tenant.dto.AdminUserResponse;
+import com.wealthview.core.tenant.dto.PasswordResetRequest;
 import com.wealthview.core.tenant.dto.SetActiveRequest;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.core.tenant.dto.TenantRequest;
@@ -192,9 +193,8 @@ public class SuperAdminController {
 
     @PutMapping("/users/{userId}/password")
     public ResponseEntity<Void> resetPassword(@PathVariable UUID userId,
-            @RequestBody Map<String, String> body) {
-        var newPassword = body.get("newPassword");
-        userManagementService.resetPasswordByUserId(userId, newPassword);
+            @Valid @RequestBody PasswordResetRequest request) {
+        userManagementService.resetPasswordByUserId(userId, request.newPassword());
         return ResponseEntity.noContent().build();
     }
 
