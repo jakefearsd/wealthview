@@ -28,6 +28,12 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
+    // BCrypt hash of "dummy-password-for-timing-equalization" used only to make
+    // the unknown-email path spend the same ~250 ms BCrypt budget as the
+    // known-email path. Prevents user enumeration via login response timing.
+    private static final String DUMMY_PASSWORD_HASH =
+            "$2a$10$7EqJtq98hPqEX7fNZaFWoO.TfL4QhV0Q.mGvKfpcEsE3NZ4Q1UE9.";
+
     private final UserRepository userRepository;
     private final InviteCodeRepository inviteCodeRepository;
     private final PasswordEncoder passwordEncoder;
@@ -65,14 +71,18 @@ public class AuthService {
             throw new BadCredentialsException("Account temporarily locked due to too many failed attempts");
         }
 
-        var user = userRepository.findByEmail(request.email())
-                .orElseThrow(() -> {
-                    log.warn("Login failed: unknown email");
-                    loginActivityService.record(request.email(), null, false, ipAddress);
-                    meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "unknown_email").increment();
-                    loginAttemptService.recordFailure(request.email());
-                    return new BadCredentialsException("Invalid email or password");
-                });
+        var userOpt = userRepository.findByEmail(request.email());
+        if (userOpt.isEmpty()) {
+            // Burn the same BCrypt budget as a real check so response timing
+            // does not reveal whether the email exists.
+            passwordEncoder.matches(request.password(), DUMMY_PASSWORD_HASH);
+            log.warn("Login failed: unknown email");
+            loginActivityService.record(request.email(), null, false, ipAddress);
+            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "unknown_email").increment();
+            loginAttemptService.recordFailure(request.email());
+            throw new BadCredentialsException("Invalid email or password");
+        }
+        var user = userOpt.get();
 
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("Login failed: wrong password for user {}", user.getId());

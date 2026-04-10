@@ -110,6 +110,35 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_unknownEmail_runsPasswordCheckToPreventTimingEnumeration() {
+        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("nobody@example.com", "pass"), TEST_IP))
+                .isInstanceOf(BadCredentialsException.class);
+
+        // A BCrypt comparison must run even when the email is unknown, otherwise
+        // an attacker can enumerate registered users by measuring response time.
+        verify(passwordEncoder).matches(eq("pass"), anyString());
+    }
+
+    @Test
+    void login_unknownEmail_errorMessageMatchesBadPassword() {
+        when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
+
+        var unknownEmailError = org.assertj.core.api.Assertions.catchThrowable(
+                () -> authService.login(new LoginRequest("nobody@example.com", "wrong"), TEST_IP));
+        var badPasswordError = org.assertj.core.api.Assertions.catchThrowable(
+                () -> authService.login(new LoginRequest("test@example.com", "wrong"), TEST_IP));
+
+        assertThat(unknownEmailError).isInstanceOf(BadCredentialsException.class);
+        assertThat(badPasswordError).isInstanceOf(BadCredentialsException.class);
+        assertThat(unknownEmailError.getMessage()).isEqualTo(badPasswordError.getMessage());
+    }
+
+    @Test
     void login_disabledUser_throwsBadCredentials() {
         user.setActive(false);
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
