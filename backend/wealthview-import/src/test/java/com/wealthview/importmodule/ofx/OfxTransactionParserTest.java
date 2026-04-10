@@ -316,6 +316,100 @@ class OfxTransactionParserTest {
         assertThat(result.errors()).isNotEmpty();
     }
 
+    @Test
+    void parse_xxePayload_doesNotLeakFileContent() throws IOException {
+        // OFX 2.x is XML-based. A malicious client could supply a DOCTYPE with
+        // an external entity that reads /etc/passwd or exfiltrates to a URL.
+        // The parser must not resolve external entities.
+        var xxePayload = """
+                OFXHEADER:100
+                DATA:OFXSGML
+                VERSION:200
+                SECURITY:NONE
+                ENCODING:UTF-8
+                CHARSET:NONE
+                COMPRESSION:NONE
+                OLDFILEUID:NONE
+                NEWFILEUID:NONE
+
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE OFX [
+                  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+                ]>
+                <OFX>
+                  <SIGNONMSGSRSV1>
+                    <SONRS>
+                      <STATUS><CODE>0</CODE><SEVERITY>INFO</SEVERITY><MESSAGE>&xxe;</MESSAGE></STATUS>
+                      <DTSERVER>20250115</DTSERVER>
+                      <LANGUAGE>ENG</LANGUAGE>
+                    </SONRS>
+                  </SIGNONMSGSRSV1>
+                </OFX>
+                """;
+
+        var result = parser.parse(toStream(xxePayload));
+
+        var combinedOutput = new StringBuilder();
+        result.transactions().forEach(t -> combinedOutput.append(t.toString()));
+        result.errors().forEach(e -> combinedOutput.append(e.toString()));
+
+        assertThat(combinedOutput.toString())
+                .as("external entity must not be resolved — /etc/passwd content must not appear in parser output")
+                .doesNotContain("root:")
+                .doesNotContain("/bin/bash")
+                .doesNotContain("daemon:");
+    }
+
+    @Test
+    void parse_externalDtd_doesNotFetchRemote() throws IOException {
+        // If the parser honors external DTDs, a crafted file can force an HTTP
+        // callback (SSRF) or hang on a slow endpoint. We point at a reserved
+        // TEST-NET-1 address (RFC 5737) which should never resolve.
+        var dtdPayload = """
+                OFXHEADER:100
+                DATA:OFXSGML
+                VERSION:200
+                SECURITY:NONE
+                ENCODING:UTF-8
+                CHARSET:NONE
+                COMPRESSION:NONE
+                OLDFILEUID:NONE
+                NEWFILEUID:NONE
+
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE OFX SYSTEM "http://192.0.2.1/evil.dtd">
+                <OFX>
+                  <SIGNONMSGSRSV1>
+                    <SONRS>
+                      <STATUS><CODE>0</CODE><SEVERITY>INFO</SEVERITY></STATUS>
+                      <DTSERVER>20250115</DTSERVER>
+                      <LANGUAGE>ENG</LANGUAGE>
+                    </SONRS>
+                  </SIGNONMSGSRSV1>
+                </OFX>
+                """;
+
+        // Must complete quickly — if the parser tried to fetch the DTD it would
+        // hang until the test timeout. Wrap in a thread-based timeout.
+        var thread = new Thread(() -> {
+            try {
+                parser.parse(toStream(dtdPayload));
+            } catch (IOException ignored) {
+                // parse errors are fine; network hangs are not
+            }
+        });
+        thread.setDaemon(true);
+        thread.start();
+        try {
+            thread.join(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        assertThat(thread.isAlive())
+                .as("parser must not attempt to fetch external DTD — otherwise it hangs waiting for 192.0.2.1")
+                .isFalse();
+    }
+
     private static ByteArrayInputStream toStream(String content) {
         return new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
     }
