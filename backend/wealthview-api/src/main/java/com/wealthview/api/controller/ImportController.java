@@ -50,7 +50,7 @@ public class ImportController {
             @RequestParam(required = false) String format) throws IOException {
         validateFileType(file);
         log.info("CSV import requested for account {} file='{}' size={}B format={}",
-                accountId, file.getOriginalFilename(), file.getSize(), format);
+                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize(), sanitizeForLog(format));
         var result = (format != null && !format.isBlank())
                 ? importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format)
                 : importService.importCsv(principal.tenantId(), accountId, file.getInputStream());
@@ -65,8 +65,8 @@ public class ImportController {
             @RequestParam(required = false) String format) throws IOException {
         validateFileType(file);
         log.info("Positions import requested for account {} file='{}' size={}B format={}",
-                accountId, file.getOriginalFilename(), file.getSize(),
-                format != null ? format : "fidelityPositions");
+                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize(),
+                sanitizeForLog(format != null ? format : "fidelityPositions"));
         var result = positionImportService.importPositions(
                 principal.tenantId(), accountId, file.getInputStream(),
                 format != null ? format : "fidelityPositions");
@@ -80,9 +80,16 @@ public class ImportController {
             @RequestParam("file") MultipartFile file) throws IOException {
         validateFileType(file);
         log.info("OFX import requested for account {} file='{}' size={}B",
-                accountId, file.getOriginalFilename(), file.getSize());
+                accountId, sanitizeForLog(file.getOriginalFilename()), file.getSize());
         var result = importService.importOfx(principal.tenantId(), accountId, file.getInputStream());
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    static String sanitizeForLog(String value) {
+        if (value == null) {
+            return null;
+        }
+        return value.replaceAll("[\\r\\n]", "_");
     }
 
     @GetMapping("/jobs")
