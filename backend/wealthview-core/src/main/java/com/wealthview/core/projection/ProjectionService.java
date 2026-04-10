@@ -48,6 +48,9 @@ public class ProjectionService {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionService.class);
 
+    private static final int MIN_END_AGE = 50;
+    private static final int MAX_END_AGE = 120;
+
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantRepository tenantRepository;
     private final AccountRepository accountRepository;
@@ -85,6 +88,7 @@ public class ProjectionService {
 
     @Transactional
     public ScenarioResponse createScenario(UUID tenantId, CreateScenarioRequest request) {
+        validateEndAge(request.endAge());
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
@@ -134,6 +138,7 @@ public class ProjectionService {
 
     @Transactional
     public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, UpdateScenarioRequest request) {
+        validateEndAge(request.endAge());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
 
@@ -302,6 +307,16 @@ public class ProjectionService {
                     acctReq.expectedReturn(),
                     acctReq.accountType());
             scenario.addAccount(projAcct);
+        }
+    }
+
+    private static void validateEndAge(Integer endAge) {
+        if (endAge == null) {
+            return;
+        }
+        if (endAge < MIN_END_AGE || endAge > MAX_END_AGE) {
+            throw new IllegalArgumentException(
+                    "end_age must be between " + MIN_END_AGE + " and " + MAX_END_AGE);
         }
     }
 
