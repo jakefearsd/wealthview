@@ -201,7 +201,8 @@ public class ZillowScraperClient implements PropertyValuationClient {
         return results.stream().anyMatch(r -> r.zpid().equals(zpid));
     }
 
-    private String formatAddressForUrl(String address) {
-        return address.replace(" ", "-").replace(",", "");
+    String formatAddressForUrl(String address) {
+        var sanitized = address.replaceAll("[^A-Za-z0-9 \\-]", "");
+        return sanitized.trim().replaceAll("\\s+", "-");
     }
 }

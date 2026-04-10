@@ -125,6 +125,30 @@ class ZillowScraperClientTest {
         assertThat(results).isEmpty();
     }
 
+    @Test
+    void formatAddressForUrl_basicAddress_replacesSpacesWithDashes() {
+        assertThat(client.formatAddressForUrl("123 Main St, Seattle, WA"))
+                .isEqualTo("123-Main-St-Seattle-WA");
+    }
+
+    @Test
+    void formatAddressForUrl_stripsPathTraversalAndQueryChars() {
+        // A crafted address must not escape the URL path or inject a query/fragment.
+        assertThat(client.formatAddressForUrl("../admin?x=1#frag"))
+                .doesNotContain("..")
+                .doesNotContain("/")
+                .doesNotContain("?")
+                .doesNotContain("#");
+    }
+
+    @Test
+    void formatAddressForUrl_stripsUrlMetaChars() {
+        var result = client.formatAddressForUrl("123 Main/St&evil=yes");
+        assertThat(result).doesNotContain("/");
+        assertThat(result).doesNotContain("&");
+        assertThat(result).doesNotContain("=");
+    }
+
     private String loadFixture(String path) throws IOException {
         try (var stream = getClass().getClassLoader().getResourceAsStream(path)) {
             if (stream == null) {
