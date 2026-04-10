@@ -17,3 +17,10 @@ export interface AuthResponse {
     email: string;
     role: string;
 }
+
+export interface CurrentUserResponse {
+    user_id: string;
+    tenant_id: string;
+    email: string;
+    role: string;
+}
