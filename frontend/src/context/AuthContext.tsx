@@ -1,5 +1,6 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
 import { getAccessToken, setTokens, clearTokens } from '../utils/storage';
+import { getCurrentUser } from '../api/auth';
 import type { AuthResponse } from '../types/auth';
 
 interface AuthState {
@@ -59,26 +60,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const token = getAccessToken();
-        if (token) {
-            try {
-                const payload = JSON.parse(atob(token.split('.')[1]));
+        if (!token) {
+            dispatch({ type: 'INITIALIZED', payload: {} });
+            return;
+        }
+        getCurrentUser()
+            .then((user) => {
                 dispatch({
                     type: 'INITIALIZED',
                     payload: {
                         isAuthenticated: true,
-                        userId: payload.userId,
-                        tenantId: payload.tenantId,
-                        email: payload.email,
-                        role: payload.role,
+                        userId: user.user_id,
+                        tenantId: user.tenant_id,
+                        email: user.email,
+                        role: user.role,
                     },
                 });
-            } catch {
+            })
+            .catch(() => {
                 clearTokens();
                 dispatch({ type: 'INITIALIZED', payload: {} });
-            }
-        } else {
-            dispatch({ type: 'INITIALIZED', payload: {} });
-        }
+            });
     }, []);
 
     function loginSuccess(response: AuthResponse) {

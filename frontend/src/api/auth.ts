@@ -1,5 +1,6 @@
 import axios from 'axios';
-import type { AuthResponse, LoginRequest, RegisterRequest } from '../types/auth';
+import client from './client';
+import type { AuthResponse, CurrentUserResponse, LoginRequest, RegisterRequest } from '../types/auth';
 
 const authClient = axios.create({
     baseURL: '/api/v1/auth',
@@ -20,5 +21,10 @@ export async function refresh(refreshToken: string): Promise<AuthResponse> {
     const { data } = await authClient.post<AuthResponse>('/refresh', {
         refresh_token: refreshToken,
     });
+    return data;
+}
+
+export async function getCurrentUser(): Promise<CurrentUserResponse> {
+    const { data } = await client.get<CurrentUserResponse>('/auth/me');
     return data;
 }

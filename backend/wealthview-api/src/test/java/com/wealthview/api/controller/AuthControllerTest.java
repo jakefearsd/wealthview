@@ -21,9 +21,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.UUID;
 
+import static com.wealthview.api.testutil.ControllerTestUtils.EMAIL;
+import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
+import static com.wealthview.api.testutil.ControllerTestUtils.USER_ID;
+import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -113,5 +118,22 @@ class AuthControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.access_token").value("new-access"));
+    }
+
+    @Test
+    void me_authenticated_returnsCurrentUser() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user_id").value(USER_ID.toString()))
+                .andExpect(jsonPath("$.tenant_id").value(TENANT_ID.toString()))
+                .andExpect(jsonPath("$.email").value(EMAIL))
+                .andExpect(jsonPath("$.role").value("admin"));
+    }
+
+    @Test
+    void me_unauthenticated_returns401() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/me"))
+                .andExpect(status().isUnauthorized());
     }
 }
