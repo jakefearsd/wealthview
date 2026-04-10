@@ -425,9 +425,50 @@ class SuperAdminControllerTest {
                         .with(authenticatedSuperAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"newPassword": "newSecret123"}
+                                {"new_password": "newSecret123"}
                                 """))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void resetPassword_shortPassword_returns400() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(put("/api/v1/admin/users/{userId}/password", userId)
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"new_password": "short"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resetPassword_blankPassword_returns400() throws Exception {
+        var userId = UUID.randomUUID();
+
+        mockMvc.perform(put("/api/v1/admin/users/{userId}/password", userId)
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"new_password": ""}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void resetPassword_commonPassword_returns400() throws Exception {
+        var userId = UUID.randomUUID();
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Password is too common"))
+                .when(userManagementService).resetPasswordByUserId(eq(userId), eq("password1234"));
+
+        mockMvc.perform(put("/api/v1/admin/users/{userId}/password", userId)
+                        .with(authenticatedSuperAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"new_password": "password1234"}
+                                """))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -438,7 +479,7 @@ class SuperAdminControllerTest {
                         .with(authenticatedAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"newPassword": "newSecret123"}
+                                {"new_password": "newSecret123"}
                                 """))
                 .andExpect(status().isForbidden());
     }

@@ -16,7 +16,7 @@ export async function getAllUsers(): Promise<AdminUser[]> {
 }
 
 export async function resetPassword(userId: string, newPassword: string): Promise<void> {
-    await client.put(`/admin/users/${userId}/password`, { newPassword });
+    await client.put(`/admin/users/${userId}/password`, { new_password: newPassword });
 }
 
 export async function setUserActive(userId: string, active: boolean): Promise<void> {

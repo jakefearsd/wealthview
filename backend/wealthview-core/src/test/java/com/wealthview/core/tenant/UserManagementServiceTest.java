@@ -1,5 +1,6 @@
 package com.wealthview.core.tenant;
 
+import com.wealthview.core.auth.CommonPasswordChecker;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
@@ -37,7 +38,7 @@ class UserManagementServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new UserManagementService(userRepository, passwordEncoder);
+        service = new UserManagementService(userRepository, passwordEncoder, new CommonPasswordChecker());
         tenant = new TenantEntity("Test");
         tenantId = UUID.randomUUID();
     }
