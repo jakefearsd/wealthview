@@ -30,7 +30,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Component
-@Profile({"dev", "docker", "prod"})
+@Profile({"dev", "docker"})
 @Order(2)
 public class SampleDataInitializer implements ApplicationRunner {
 
