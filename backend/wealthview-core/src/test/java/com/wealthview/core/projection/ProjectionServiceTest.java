@@ -465,6 +465,51 @@ class ProjectionServiceTest {
     }
 
     @Test
+    void createScenario_endAgeOver120_throwsIllegalArgument() {
+        var request = new CreateScenarioRequest(
+                "Bad Plan",
+                LocalDate.of(2055, 1, 1),
+                150,
+                new BigDecimal("0.03"),
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null, List.of(), null, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("end_age");
+    }
+
+    @Test
+    void createScenario_endAgeBelow50_throwsIllegalArgument() {
+        var request = new CreateScenarioRequest(
+                "Bad Plan",
+                LocalDate.of(2055, 1, 1),
+                30,
+                new BigDecimal("0.03"),
+                null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null, List.of(), null, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("end_age");
+    }
+
+    @Test
+    void updateScenario_endAgeOver120_throwsIllegalArgument() {
+        var request = new UpdateScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 200,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null, List.of(), null, null, null);
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("end_age");
+    }
+
+    @Test
     void updateScenario_notFound_throwsEntityNotFoundException() {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.empty());
