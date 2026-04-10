@@ -139,4 +139,46 @@ class JwtTokenProviderTest {
 
         assertThat(tokenProvider.extractGeneration(token)).isEqualTo(0);
     }
+
+    @Test
+    void validateToken_tokenIssuedByDifferentIssuer_returnsFalse() {
+        var otherProvider = new JwtTokenProvider(
+                "test-secret-key-that-is-at-least-32-characters-long",
+                3600000, 86400000, "other-issuer", "wealthview-web");
+        var foreignToken = otherProvider.generateAccessToken(userId, tenantId, "admin", "x@y.z");
+
+        assertThat(tokenProvider.validateToken(foreignToken)).isFalse();
+    }
+
+    @Test
+    void validateToken_tokenForDifferentAudience_returnsFalse() {
+        var otherProvider = new JwtTokenProvider(
+                "test-secret-key-that-is-at-least-32-characters-long",
+                3600000, 86400000, "wealthview-api", "some-other-service");
+        var foreignToken = otherProvider.generateAccessToken(userId, tenantId, "admin", "x@y.z");
+
+        assertThat(tokenProvider.validateToken(foreignToken)).isFalse();
+    }
+
+    @Test
+    void validateToken_tokenExpiredWithinClockSkew_returnsTrue() {
+        // Token with expiry 30 seconds in the past should still validate because
+        // clock skew tolerance is 60 seconds.
+        var shortLivedProvider = new JwtTokenProvider(
+                "test-secret-key-that-is-at-least-32-characters-long",
+                -30_000, 86400000);
+        var alreadyExpired = shortLivedProvider.generateAccessToken(userId, tenantId, "admin", "x@y.z");
+
+        assertThat(shortLivedProvider.validateToken(alreadyExpired)).isTrue();
+    }
+
+    @Test
+    void validateToken_tokenExpiredBeyondClockSkew_returnsFalse() {
+        var longStaleProvider = new JwtTokenProvider(
+                "test-secret-key-that-is-at-least-32-characters-long",
+                -120_000, 86400000);
+        var staleToken = longStaleProvider.generateAccessToken(userId, tenantId, "admin", "x@y.z");
+
+        assertThat(longStaleProvider.validateToken(staleToken)).isFalse();
+    }
 }

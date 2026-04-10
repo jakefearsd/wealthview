@@ -20,17 +20,29 @@ public final class JwtTokenProvider {
 
     private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
 
+    private static final long CLOCK_SKEW_SECONDS = 60;
+
     private final SecretKey key;
     private final long accessTokenExpiration;
     private final long refreshTokenExpiration;
+    private final String issuer;
+    private final String audience;
 
     public JwtTokenProvider(
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.access-token-expiration}") long accessTokenExpiration,
-            @Value("${app.jwt.refresh-token-expiration}") long refreshTokenExpiration) {
+            @Value("${app.jwt.refresh-token-expiration}") long refreshTokenExpiration,
+            @Value("${app.jwt.issuer:wealthview-api}") String issuer,
+            @Value("${app.jwt.audience:wealthview-web}") String audience) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.accessTokenExpiration = accessTokenExpiration;
         this.refreshTokenExpiration = refreshTokenExpiration;
+        this.issuer = issuer;
+        this.audience = audience;
+    }
+
+    public JwtTokenProvider(String secret, long accessTokenExpiration, long refreshTokenExpiration) {
+        this(secret, accessTokenExpiration, refreshTokenExpiration, "wealthview-api", "wealthview-web");
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String role, String email) {
@@ -38,6 +50,8 @@ public final class JwtTokenProvider {
         var expiry = new Date(now.getTime() + accessTokenExpiration);
 
         return Jwts.builder()
+                .issuer(issuer)
+                .audience().add(audience).and()
                 .subject(userId.toString())
                 .claim("type", "access")
                 .claim("tenant_id", tenantId.toString())
@@ -54,6 +68,8 @@ public final class JwtTokenProvider {
         var expiry = new Date(now.getTime() + refreshTokenExpiration);
 
         return Jwts.builder()
+                .issuer(issuer)
+                .audience().add(audience).and()
                 .subject(userId.toString())
                 .claim("type", "refresh")
                 .claim("generation", generation)
@@ -123,6 +139,9 @@ public final class JwtTokenProvider {
     private Claims getClaims(String token) {
         return Jwts.parser()
                 .verifyWith(key)
+                .requireIssuer(issuer)
+                .requireAudience(audience)
+                .clockSkewSeconds(CLOCK_SKEW_SECONDS)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
