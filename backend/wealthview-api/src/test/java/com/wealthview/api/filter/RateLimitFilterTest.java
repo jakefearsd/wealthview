@@ -29,7 +29,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        filter = new RateLimitFilter(meterRegistry);
+        filter = new RateLimitFilter(meterRegistry, List.of());
         filterChain = mock(FilterChain.class);
     }
 
@@ -137,14 +137,76 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void getClientIp_withXForwardedFor_usesFirstIp() throws ServletException, IOException {
-        var request = new MockHttpServletRequest("GET", "/api/v1/accounts");
-        request.addHeader("X-Forwarded-For", "203.0.113.50, 70.41.3.18, 150.172.238.178");
-        var response = new MockHttpServletResponse();
+    void untrustedProxy_xForwardedForIsIgnored_cannotBypassRateLimit() throws ServletException, IOException {
+        // Attacker rotates X-Forwarded-For on every request while all requests
+        // actually arrive from the same remote address. Because no trusted
+        // proxy is configured, X-Forwarded-For must be ignored and the limit
+        // must be enforced against the real remote address.
+        for (int i = 0; i <= 60; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("198.51.100.7");
+            request.addHeader("X-Forwarded-For", "203.0.113." + i);
+            var response = new MockHttpServletResponse();
+            filter.doFilterInternal(request, response, filterChain);
+        }
 
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setRemoteAddr("198.51.100.7");
+        request.addHeader("X-Forwarded-For", "203.0.113.999");
+        var response = new MockHttpServletResponse();
         filter.doFilterInternal(request, response, filterChain);
 
-        verify(filterChain).doFilter(request, response);
+        assertThat(response.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void trustedProxy_xForwardedForIsHonored() throws ServletException, IOException {
+        var trustingFilter = new RateLimitFilter(meterRegistry, List.of("10.0.0.100"));
+
+        // 61 requests with the same client IP behind a trusted proxy should exceed
+        // the 60-per-IP auth limit even though remoteAddr is the proxy.
+        for (int i = 0; i <= 60; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("10.0.0.100");
+            request.addHeader("X-Forwarded-For", "203.0.113.50");
+            var response = new MockHttpServletResponse();
+            trustingFilter.doFilterInternal(request, response, filterChain);
+        }
+
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setRemoteAddr("10.0.0.100");
+        request.addHeader("X-Forwarded-For", "203.0.113.50");
+        var response = new MockHttpServletResponse();
+        trustingFilter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+    }
+
+    @Test
+    void trustedProxy_differentClientIpsNotLimitedTogether() throws ServletException, IOException {
+        var trustingFilter = new RateLimitFilter(meterRegistry, List.of("10.0.0.100"));
+
+        // Two distinct clients behind the same trusted proxy should each get their own budget.
+        for (int i = 0; i < 30; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("10.0.0.100");
+            request.addHeader("X-Forwarded-For", "203.0.113.50");
+            trustingFilter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+        }
+        for (int i = 0; i < 30; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("10.0.0.100");
+            request.addHeader("X-Forwarded-For", "198.51.100.22");
+            trustingFilter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+        }
+
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setRemoteAddr("10.0.0.100");
+        request.addHeader("X-Forwarded-For", "198.51.100.22");
+        var response = new MockHttpServletResponse();
+        trustingFilter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(200);
     }
 
     @Test

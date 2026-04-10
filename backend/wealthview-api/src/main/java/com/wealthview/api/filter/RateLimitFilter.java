@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,10 +32,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private static final long WINDOW_MS = 60_000;
 
     private final MeterRegistry meterRegistry;
+    private final Set<String> trustedProxies;
     private final ConcurrentMap<String, RateWindow> windows = new ConcurrentHashMap<>();
 
-    public RateLimitFilter(MeterRegistry meterRegistry) {
+    public RateLimitFilter(
+            MeterRegistry meterRegistry,
+            @Value("${app.rate-limit.trusted-proxies:}") List<String> trustedProxies) {
         this.meterRegistry = meterRegistry;
+        this.trustedProxies = Set.copyOf(trustedProxies);
     }
 
     @Override
@@ -87,11 +94,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        var forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isEmpty()) {
-            return forwarded.split(",")[0].trim();
+        var remoteAddr = request.getRemoteAddr();
+        if (trustedProxies.contains(remoteAddr)) {
+            var forwarded = request.getHeader("X-Forwarded-For");
+            if (forwarded != null && !forwarded.isEmpty()) {
+                return forwarded.split(",")[0].trim();
+            }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
     }
 
     private record RateWindow(long startTime, AtomicInteger count) {}
