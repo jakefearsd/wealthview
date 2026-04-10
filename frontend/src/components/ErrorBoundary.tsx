@@ -43,7 +43,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                         textAlign: 'center',
                     }}>
                         <h2 style={{ color: '#d32f2f', marginTop: 0 }}>Something went wrong</h2>
-                        {this.state.error && (
+                        {this.state.error && import.meta.env.DEV && (
                             <pre style={{
                                 background: '#f5f5f5',
                                 padding: '1rem',
@@ -55,6 +55,11 @@ export default class ErrorBoundary extends Component<Props, State> {
                             }}>
                                 {this.state.error.message}
                             </pre>
+                        )}
+                        {this.state.error && !import.meta.env.DEV && (
+                            <p style={{ color: '#555', fontSize: '0.95rem' }}>
+                                An unexpected error occurred. Please reload the page.
+                            </p>
                         )}
                         <div style={{ marginTop: '1.5rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
                             <Button
