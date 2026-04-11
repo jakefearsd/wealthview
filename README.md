@@ -4,14 +4,14 @@ A self-hosted, multi-tenant personal finance application for tracking investment
 
 ## Key Features
 
-- **Investment Portfolio Tracking** -- Accounts, holdings, transactions with automatic cost basis computation, portfolio history charts, and money market fund support
-- **Rental Property Management** -- Income/expense tracking, cash flow reports, loan amortization, Zillow valuation scraping, investment analytics, and depreciation modeling
-- **Retirement Projections** -- Year-by-year projection engine with three withdrawal strategies, Roth conversion modeling, tax-aware income sources, and spending viability analysis
+- **Investment Portfolio Tracking** -- Accounts, holdings, transactions with automatic cost basis computation, portfolio history charts, live price and market value columns, multi-currency support with tenant-managed exchange rates, and money market fund support
+- **Rental Property Management** -- Income/expense tracking, cash flow reports, loan amortization, Zillow valuation scraping, hold-vs-sell ROI analysis, and cost-segregation depreciation with schedule transparency
+- **Retirement Projections** -- Deterministic year-by-year projection engine plus a Monte Carlo guardrail spending optimizer with block-bootstrap returns, Roth conversion modeling, per-pool withdrawal transparency, rental property integration, and scenario comparison
 - **Multi-Format Import** -- Fidelity, Vanguard, and Schwab CSV parsers plus OFX/QFX import with content-hash deduplication
-- **Live Price Feeds** -- Finnhub API integration with historical backfill and scheduled daily sync
+- **Live Price Feeds** -- Finnhub API integration with historical backfill, scheduled daily sync, and on-demand admin sync
 - **Dashboard** -- Net worth summary combining investments, cash, and property equity with asset allocation breakdown
 - **Multi-Tenant** -- JWT-based auth with tenant isolation, invite code registration, and role-based access (admin/member/viewer)
-- **Administrative Tooling** -- Super-admin tenant management, audit log, data export (JSON + CSV), and notification preferences
+- **Administrative Tooling** -- Super-admin tenant management, audit log, data export (JSON + CSV with formula-injection neutralization), and notification preferences
 - **Self-Hosted** -- Single Docker Compose command to deploy; no third-party SaaS dependencies
 
 ## Quick Start
@@ -89,9 +89,10 @@ docker compose down -v                    # Stop and delete database
 
 | Layer     | Technology                                                |
 |-----------|-----------------------------------------------------------|
-| Frontend  | React 18, TypeScript, Vite, React Router, Recharts, Axios |
-| Backend   | Java 21, Spring Boot 3.3, Spring Security, JPA/Hibernate  |
+| Frontend  | React 19, TypeScript, Vite, React Router, Recharts, Axios |
+| Backend   | Java 21, Spring Boot 3.5, Spring Security, JPA/Hibernate  |
 | Database  | PostgreSQL 16 with Flyway migrations                      |
+| Caching   | Caffeine (balances, holdings, projections)                |
 | Build     | Maven multi-module (backend), npm (frontend)              |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest         |
 | Deploy    | Docker Compose (multi-stage build)                        |
