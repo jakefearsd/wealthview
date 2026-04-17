@@ -237,16 +237,7 @@ public class ProjectionService {
                     var balance = acct.getLinkedAccount() != null
                             ? accountService.computeBalance(acct.getLinkedAccount(), tenantId)
                             : acct.getInitialBalance();
-                    var name = acct.getLinkedAccount() != null
-                            ? acct.getLinkedAccount().getName() : acct.getAccountType();
-                    return new ProjectionAccountResponse(
-                            acct.getId(),
-                            acct.getLinkedAccount() != null ? acct.getLinkedAccount().getId() : null,
-                            name,
-                            balance,
-                            acct.getAnnualContribution(),
-                            acct.getExpectedReturn(),
-                            acct.getAccountType());
+                    return ProjectionAccountResponse.from(acct, balance);
                 })
                 .toList();
     }
@@ -266,12 +257,7 @@ public class ProjectionService {
                             ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
                     var netCashFlow = computeRentalNetCashFlow(src.getIncomeType(),
                             src.getProperty(), effective);
-                    return new ScenarioIncomeSourceResponse(
-                            src.getId(), src.getName(), src.getIncomeType(),
-                            src.getAnnualAmount(), link.getOverrideAnnualAmount(), effective,
-                            netCashFlow,
-                            src.getStartAge(), src.getEndAge(),
-                            src.getInflationRate(), src.isOneTime());
+                    return ScenarioIncomeSourceResponse.from(link, effective, netCashFlow);
                 })
                 .toList();
     }
