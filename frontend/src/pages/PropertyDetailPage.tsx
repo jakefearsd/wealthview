@@ -12,43 +12,11 @@ import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
 import PropertyValuationSection from '../components/PropertyValuationSection';
 import PropertyCashFlowSection from '../components/PropertyCashFlowSection';
 import PropertyRoiCard from '../components/PropertyRoiCard';
-import PropertyForm from '../components/PropertyForm';
+import PropertyForm, { type PropertyFormValues, type CostSegAllocations } from '../components/PropertyForm';
 import toast from 'react-hot-toast';
 
-interface CostSegAllocationsState {
-    fiveYr: string;
-    sevenYr: string;
-    fifteenYr: string;
-    twentySevenYr: string;
-}
-
-interface PropertyFormData {
-    address: string;
-    purchasePrice: string;
-    purchaseDate: string;
-    currentValue: string;
-    mortgageBalance: string;
-    showLoanDetails: boolean;
-    loanAmount: string;
-    annualInterestRate: string;
-    loanTermMonths: string;
-    loanStartDate: string;
-    useComputedBalance: boolean;
-    propertyType: string;
-    showFinancialAssumptions: boolean;
-    annualAppreciationRate: string;
-    annualPropertyTax: string;
-    annualInsuranceCost: string;
-    annualMaintenanceCost: string;
-    showDepreciation: boolean;
-    depreciationMethod: string;
-    inServiceDate: string;
-    landValue: string;
-    usefulLifeYears: string;
-    costSegAllocations: CostSegAllocationsState;
-    bonusDepreciationRate: string;
-    costSegStudyYear: string;
-}
+type CostSegAllocationsState = CostSegAllocations;
+type PropertyFormData = PropertyFormValues;
 
 const initialFormData: PropertyFormData = {
     address: '',
@@ -338,31 +306,8 @@ export default function PropertyDetailPage() {
                 <PropertyForm
                     heading="Edit Property"
                     submitLabel="Save"
-                    address={formData.address} onAddressChange={v => setFormData(prev => ({ ...prev, address: v }))}
-                    purchasePrice={formData.purchasePrice} onPurchasePriceChange={v => setFormData(prev => ({ ...prev, purchasePrice: v }))}
-                    purchaseDate={formData.purchaseDate} onPurchaseDateChange={v => setFormData(prev => ({ ...prev, purchaseDate: v }))}
-                    currentValue={formData.currentValue} onCurrentValueChange={v => setFormData(prev => ({ ...prev, currentValue: v }))}
-                    mortgageBalance={formData.mortgageBalance} onMortgageBalanceChange={v => setFormData(prev => ({ ...prev, mortgageBalance: v }))}
-                    propertyType={formData.propertyType} onPropertyTypeChange={v => setFormData(prev => ({ ...prev, propertyType: v }))}
-                    showLoanDetails={formData.showLoanDetails} onShowLoanDetailsChange={v => setFormData(prev => ({ ...prev, showLoanDetails: v }))}
-                    loanAmount={formData.loanAmount} onLoanAmountChange={v => setFormData(prev => ({ ...prev, loanAmount: v }))}
-                    annualInterestRate={formData.annualInterestRate} onAnnualInterestRateChange={v => setFormData(prev => ({ ...prev, annualInterestRate: v }))}
-                    loanTermMonths={formData.loanTermMonths} onLoanTermMonthsChange={v => setFormData(prev => ({ ...prev, loanTermMonths: v }))}
-                    loanStartDate={formData.loanStartDate} onLoanStartDateChange={v => setFormData(prev => ({ ...prev, loanStartDate: v }))}
-                    useComputedBalance={formData.useComputedBalance} onUseComputedBalanceChange={v => setFormData(prev => ({ ...prev, useComputedBalance: v }))}
-                    showFinancialAssumptions={formData.showFinancialAssumptions} onShowFinancialAssumptionsChange={v => setFormData(prev => ({ ...prev, showFinancialAssumptions: v }))}
-                    annualAppreciationRate={formData.annualAppreciationRate} onAnnualAppreciationRateChange={v => setFormData(prev => ({ ...prev, annualAppreciationRate: v }))}
-                    annualPropertyTax={formData.annualPropertyTax} onAnnualPropertyTaxChange={v => setFormData(prev => ({ ...prev, annualPropertyTax: v }))}
-                    annualInsuranceCost={formData.annualInsuranceCost} onAnnualInsuranceCostChange={v => setFormData(prev => ({ ...prev, annualInsuranceCost: v }))}
-                    annualMaintenanceCost={formData.annualMaintenanceCost} onAnnualMaintenanceCostChange={v => setFormData(prev => ({ ...prev, annualMaintenanceCost: v }))}
-                    showDepreciation={formData.showDepreciation} onShowDepreciationChange={v => setFormData(prev => ({ ...prev, showDepreciation: v }))}
-                    depreciationMethod={formData.depreciationMethod} onDepreciationMethodChange={v => setFormData(prev => ({ ...prev, depreciationMethod: v }))}
-                    inServiceDate={formData.inServiceDate} onInServiceDateChange={v => setFormData(prev => ({ ...prev, inServiceDate: v }))}
-                    landValue={formData.landValue} onLandValueChange={v => setFormData(prev => ({ ...prev, landValue: v }))}
-                    usefulLifeYears={formData.usefulLifeYears} onUsefulLifeYearsChange={v => setFormData(prev => ({ ...prev, usefulLifeYears: v }))}
-                    costSegAllocations={formData.costSegAllocations} onCostSegAllocationsChange={v => setFormData(prev => ({ ...prev, costSegAllocations: v }))}
-                    bonusDepreciationRate={formData.bonusDepreciationRate} onBonusDepreciationRateChange={v => setFormData(prev => ({ ...prev, bonusDepreciationRate: v }))}
-                    costSegStudyYear={formData.costSegStudyYear} onCostSegStudyYearChange={v => setFormData(prev => ({ ...prev, costSegStudyYear: v }))}
+                    values={formData}
+                    onChange={(patch) => setFormData(prev => ({ ...prev, ...patch }))}
                     purchasePriceNum={parseFloat(formData.purchasePrice) || 0}
                     onSubmit={handleSave}
                     onCancel={handleCancelEdit}
