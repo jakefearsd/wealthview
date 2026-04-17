@@ -4,7 +4,7 @@ import { listAccounts, createAccount, updateAccount, deleteAccount } from '../ap
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import type { Account, AccountRequest } from '../types/account';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, inputFieldStyle, selectStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
 import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
@@ -88,21 +88,21 @@ export default function AccountsListPage() {
                 <div style={{ ...cardStyle, marginBottom: '1.5rem' }}>
                     <h3 style={{ marginBottom: '1rem' }}>{editingId ? 'Edit Account' : 'Create Account'}</h3>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
-                        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
-                        <select value={type} onChange={(e) => setType(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}>
+                        <input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} style={inputFieldStyle} />
+                        <select value={type} onChange={(e) => setType(e.target.value)} style={selectStyle}>
                             <option value="brokerage">Brokerage</option>
                             <option value="ira">IRA</option>
                             <option value="401k">401(k)</option>
                             <option value="roth">Roth IRA</option>
                             <option value="bank">Bank</option>
                         </select>
-                        <input placeholder="Institution" value={institution} onChange={(e) => setInstitution(e.target.value)} style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }} />
+                        <input placeholder="Institution" value={institution} onChange={(e) => setInstitution(e.target.value)} style={inputFieldStyle} />
                         <input
                             placeholder="Currency (e.g. USD, EUR)"
                             value={currency}
                             onChange={(e) => setCurrency(e.target.value.toUpperCase())}
                             maxLength={3}
-                            style={{ padding: '0.5rem', border: '1px solid #ccc', borderRadius: '4px' }}
+                            style={inputFieldStyle}
                         />
                     </div>
                     <div style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>

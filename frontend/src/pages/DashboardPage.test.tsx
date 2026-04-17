@@ -35,6 +35,7 @@ vi.mock('../utils/styles', () => ({
     thStyle: {},
     tdStyle: {},
     trHoverStyle: {},
+    selectStyle: {},
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';

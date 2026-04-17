@@ -4,7 +4,9 @@ import {
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
 import { formatDollarAxis } from '../utils/chartFormatters';
+import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear } from '../types/projection';
+import type { RechartsTooltipProps } from '../types/recharts';
 
 interface FlowsChartProps {
     data: ProjectionYear[];
@@ -13,7 +15,7 @@ interface FlowsChartProps {
 
 export default function FlowsChart({ data, retirementYear }: FlowsChartProps) {
 
-    const FlowsTooltipContent = ({ active, payload, label }: any) => {
+    const FlowsTooltipContent = ({ active, payload, label }: RechartsTooltipProps<ProjectionYear>) => {
         if (!active || !payload?.length) return null;
         const d = data.find(y => y.year === label);
         const labels: Record<string, string> = {
@@ -27,13 +29,13 @@ export default function FlowsChart({ data, retirementYear }: FlowsChartProps) {
         const totalCashFlow = withdrawals + incomeTotal;
         const showTotal = d != null && (withdrawals !== 0 || incomeTotal !== 0);
         return (
-            <div style={{ background: '#fff', border: '1px solid #ccc', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
+            <div style={tooltipStyle}>
                 <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
                     {d ? `${label} (age ${d.age})` : label}
                 </div>
-                {payload.map((p: any) => (
+                {payload.map((p) => (
                     <div key={p.name} style={{ color: p.color }}>
-                        {labels[p.dataKey] ?? p.name}: {formatCurrency(p.value)}
+                        {labels[String(p.dataKey)] ?? p.name}: {formatCurrency(Number(p.value ?? 0))}
                     </div>
                 ))}
                 {showTotal && (

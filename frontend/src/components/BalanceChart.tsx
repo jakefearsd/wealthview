@@ -7,7 +7,9 @@ import { formatCurrency } from '../utils/format';
 import { formatDollarAxis } from '../utils/chartFormatters';
 import { findDepletionYear, findCrossoverYear } from '../utils/projectionCalcs';
 import { interpolateMonthly } from '../utils/monthlyInterpolation';
+import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear } from '../types/projection';
+import type { RechartsTooltipProps } from '../types/recharts';
 
 interface BalanceChartProps {
     data: ProjectionYear[];
@@ -120,20 +122,20 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-    const BalanceTooltipContent = ({ active, payload, label }: any) => {
+    const BalanceTooltipContent = ({ active, payload, label }: RechartsTooltipProps) => {
         if (!active || !payload?.length) return null;
         const pt = monthlyData.find(d => d.label === label);
         if (!pt) return null;
         const monthName = monthNames[pt.month - 1];
         const annualRow = filteredData.find(d => d.year === pt.year);
         return (
-            <div style={{ background: '#fff', border: '1px solid #ccc', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
+            <div style={tooltipStyle}>
                 <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
                     {monthName} {pt.year} (age {pt.age})
                 </div>
-                {payload.map((p: any) => (
+                {payload.map((p) => (
                     <div key={p.name} style={{ color: p.color }}>
-                        {p.name}: {formatCurrency(p.value)}
+                        {p.name}: {formatCurrency(Number(p.value ?? 0))}
                     </div>
                 ))}
                 {annualRow?.retired && annualRow.essential_expenses != null && pt.month === 12 && (
