@@ -25,6 +25,7 @@ import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -84,8 +85,9 @@ public class GuardrailProfileService {
         var projectionInput = projectionInputBuilder.build(scenario, tenantId);
 
         int birthYear = parseBirthYear(scenario.getParamsJson());
-        String filingStatus = parseFilingStatus(scenario.getParamsJson());
-        String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order");
+        String filingStatus = parseFilingStatus(scenario.getParamsJson()).orElse(null);
+        String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order")
+                .orElse("taxable_first");
 
         BigDecimal confidence = resolveConfidence(request);
 
@@ -283,7 +285,7 @@ public class GuardrailProfileService {
                 request.cashReturnRate() != null
                         ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE,
                 filingStatus,
-                withdrawalOrder != null ? withdrawalOrder : "taxable_first",
+                withdrawalOrder,
                 request.optimizeConversions() != null && request.optimizeConversions(),
                 request.conversionBracketRate(),
                 request.rmdTargetBracketRate(),
@@ -295,23 +297,23 @@ public class GuardrailProfileService {
         );
     }
 
-    private String parseFilingStatus(String paramsJson) {
+    private Optional<String> parseFilingStatus(String paramsJson) {
         return parseStringParam(paramsJson, "filing_status");
     }
 
-    private String parseStringParam(String paramsJson, String field) {
+    private Optional<String> parseStringParam(String paramsJson, String field) {
         if (paramsJson == null || paramsJson.isBlank()) {
-            return null;
+            return Optional.empty();
         }
         try {
             var node = MAPPER.readTree(paramsJson);
             if (node.has(field)) {
-                return node.get(field).asText();
+                return Optional.of(node.get(field).asText());
             }
         } catch (JsonProcessingException e) {
             log.warn("Failed to parse {} from paramsJson", field, e);
         }
-        return null;
+        return Optional.empty();
     }
 
     private BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
