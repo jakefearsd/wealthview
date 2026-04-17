@@ -2,7 +2,8 @@ import { useMemo, useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getSnapshotProjection } from '../api/dashboard';
 import { formatCurrency } from '../utils/format';
-import { cardStyle } from '../utils/styles';
+import { cardStyle, selectStyle } from '../utils/styles';
+import { extractErrorMessage } from '../utils/errorMessage';
 import type { SnapshotProjection } from '../types/dashboard';
 
 const PROJECTION_HORIZONS = [
@@ -13,28 +14,21 @@ const PROJECTION_HORIZONS = [
 ];
 
 const chartCardStyle = { ...cardStyle, marginBottom: '2rem' };
-const selectStyle = {
-    padding: '0.3rem 0.5rem',
-    border: '1px solid #ccc',
-    borderRadius: '4px',
-    fontSize: '0.85rem',
-    background: '#fff',
-    cursor: 'pointer',
-};
+const horizonSelectStyle = { ...selectStyle, padding: '0.3rem 0.5rem', fontSize: '0.85rem' };
 
 export default function SnapshotProjectionChart() {
     const [years, setYears] = useState(10);
     const [data, setData] = useState<SnapshotProjection | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        setError(false);
+        setError(null);
         getSnapshotProjection(years)
             .then((result) => { if (!cancelled) { setData(result); setLoading(false); } })
-            .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+            .catch((err) => { if (!cancelled) { setError(extractErrorMessage(err)); setLoading(false); } });
         return () => { cancelled = true; };
     }, [years]);
 
@@ -62,7 +56,7 @@ export default function SnapshotProjectionChart() {
                 <select
                     value={years}
                     onChange={(e) => setYears(Number(e.target.value))}
-                    style={selectStyle}
+                    style={horizonSelectStyle}
                     aria-label="Projection horizon"
                 >
                     {PROJECTION_HORIZONS.map(h => (
@@ -73,7 +67,11 @@ export default function SnapshotProjectionChart() {
 
             {loading ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>Loading...</div>
-            ) : error || !data || data.data_points.length === 0 ? (
+            ) : error ? (
+                <div style={{ color: '#c62828', textAlign: 'center', padding: '2rem 0' }}>
+                    Failed to load projection: {error}
+                </div>
+            ) : !data || data.data_points.length === 0 ? (
                 <div style={{ color: '#999', textAlign: 'center', padding: '2rem 0' }}>
                     No projection data available.
                 </div>

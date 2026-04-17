@@ -3,7 +3,9 @@ import {
     Legend, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
+import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear, ScenarioIncomeSourceResponse } from '../types/projection';
+import type { RechartsTooltipProps } from '../types/recharts';
 
 const COLORS = [
     '#1976d2', '#2e7d32', '#e65100', '#6a1b9a', '#c62828',
@@ -42,19 +44,19 @@ export default function IncomeStreamsChart({ data, incomeSources, retirementYear
         sourceNames[s.income_source_id] = s.name;
     }
 
-    const IncomeTooltipContent = ({ active, payload, label }: any) => {
+    const IncomeTooltipContent = ({ active, payload, label }: RechartsTooltipProps) => {
         if (!active || !payload?.length) return null;
         const d = retiredYears.find(y => y.year === label);
-        const visibleItems = payload.filter((p: any) => p.value > 0);
-        const total = visibleItems.reduce((sum: number, p: any) => sum + (p.value as number), 0);
+        const visibleItems = payload.filter((p) => (p.value ?? 0) > 0);
+        const total = visibleItems.reduce((sum, p) => sum + (p.value ?? 0), 0);
         return (
-            <div style={{ background: '#fff', border: '1px solid #ccc', padding: '0.75rem', borderRadius: 4, fontSize: '0.85rem' }}>
+            <div style={tooltipStyle}>
                 <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
                     {d ? `${label} (age ${d.age})` : label}
                 </div>
-                {visibleItems.map((p: any) => (
-                    <div key={p.dataKey} style={{ color: p.color }}>
-                        {sourceNames[p.dataKey] ?? p.name}: {formatCurrency(p.value)}
+                {visibleItems.map((p) => (
+                    <div key={String(p.dataKey)} style={{ color: p.color }}>
+                        {sourceNames[String(p.dataKey)] ?? p.name}: {formatCurrency(Number(p.value ?? 0))}
                     </div>
                 ))}
                 {visibleItems.length > 1 && (

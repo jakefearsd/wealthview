@@ -14,6 +14,21 @@ export const inputStyle: CSSProperties = {
     width: '100%',
 };
 
+/** Sibling of inputStyle without the 100% width — for flex rows and inline inputs. */
+export const inputFieldStyle: CSSProperties = {
+    padding: '0.5rem',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+};
+
+export const selectStyle: CSSProperties = {
+    padding: '0.5rem',
+    border: '1px solid #ccc',
+    borderRadius: '4px',
+    background: '#fff',
+    cursor: 'pointer',
+};
+
 export const labelStyle: CSSProperties = {
     display: 'block',
     marginBottom: '0.25rem',
@@ -43,4 +58,12 @@ export const tdStyle: CSSProperties = {
 
 export const trHoverStyle: CSSProperties = {
     borderBottom: '1px solid #eee',
+};
+
+export const tooltipStyle: CSSProperties = {
+    background: '#fff',
+    border: '1px solid #ccc',
+    padding: '0.75rem',
+    borderRadius: 4,
+    fontSize: '0.85rem',
 };

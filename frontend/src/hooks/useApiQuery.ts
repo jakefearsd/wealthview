@@ -35,6 +35,8 @@ export function useApiQuery<T>(fetchFn: () => Promise<T>): UseApiQueryResult<T> 
         return () => {
             cancelled = true;
         };
+        // fetchFn is intentionally omitted: callers typically pass an inline closure
+        // that would change every render. refetch() is the controlled way to re-run.
     }, [trigger]); // eslint-disable-line react-hooks/exhaustive-deps
 
     return { data, loading, error, refetch };

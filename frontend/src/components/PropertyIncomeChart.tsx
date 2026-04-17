@@ -7,6 +7,7 @@ import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
+import type { RechartsTooltipProps } from '../types/recharts';
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
     mortgage: { label: 'Mortgage', color: '#1976d2' },
@@ -151,13 +152,13 @@ function buildForwardData(
 
 // --- Tooltips ---
 
-function TrailingTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+function TrailingTooltip({ active, payload, label }: RechartsTooltipProps) {
     if (!active || !payload) return null;
 
     const income = payload.find(p => p.name === 'Rent Estimate');
     const netEntry = payload.find(p => p.name === 'Net Cash Flow');
     const expenses = payload.filter(p => p.name !== 'Rent Estimate' && p.name !== 'Net Cash Flow');
-    const totalExpenses = expenses.reduce((sum, p) => sum + Math.abs(p.value), 0);
+    const totalExpenses = expenses.reduce((sum, p) => sum + Math.abs(p.value ?? 0), 0);
     const net = netEntry?.value ?? ((income?.value ?? 0) - totalExpenses);
 
     return (
@@ -165,12 +166,12 @@ function TrailingTooltip({ active, payload, label }: { active?: boolean; payload
             <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{label}</div>
             {income && (
                 <div style={{ color: '#2e7d32', marginBottom: '0.25rem' }}>
-                    Rent Estimate: {formatCurrency(income.value)}
+                    Rent Estimate: {formatCurrency(income.value ?? 0)}
                 </div>
             )}
             {expenses.map(p => (
                 <div key={p.name} style={{ color: p.color, marginBottom: '0.15rem' }}>
-                    {p.name}: {formatCurrency(Math.abs(p.value))}
+                    {p.name}: {formatCurrency(Math.abs(p.value ?? 0))}
                 </div>
             ))}
             {expenses.length > 0 && (
@@ -187,11 +188,10 @@ function TrailingTooltip({ active, payload, label }: { active?: boolean; payload
     );
 }
 
-function ForwardTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; color: string }>; label?: string }) {
+function ForwardTooltip({ active, payload, label }: RechartsTooltipProps<ForwardRow>) {
     if (!active || !payload) return null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const row = (payload[0] as any)?.payload as ForwardRow | undefined;
+    const row = payload[0]?.payload;
     if (!row) return null;
 
     return (
