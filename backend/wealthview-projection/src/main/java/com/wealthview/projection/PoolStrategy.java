@@ -715,27 +715,6 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             }
         }
 
-        private BigDecimal[] executeOrderedWithdrawals(BigDecimal totalNeed) {
-            BigDecimal remaining = totalNeed;
-            BigDecimal[] pools = switch (withdrawalOrder) {
-                case TRADITIONAL_FIRST -> new BigDecimal[]{traditional, taxable, roth};
-                case ROTH_FIRST -> new BigDecimal[]{roth, taxable, traditional};
-                default -> new BigDecimal[]{taxable, traditional, roth};
-            };
-
-            BigDecimal[] drawn = new BigDecimal[3];
-            for (int i = 0; i < 3; i++) {
-                drawn[i] = remaining.min(pools[i]);
-                remaining = remaining.subtract(drawn[i]);
-            }
-
-            return switch (withdrawalOrder) {
-                case TRADITIONAL_FIRST -> new BigDecimal[]{drawn[1], drawn[0], drawn[2]};
-                case ROTH_FIRST -> new BigDecimal[]{drawn[1], drawn[2], drawn[0]};
-                default -> new BigDecimal[]{drawn[0], drawn[1], drawn[2]};
-            };
-        }
-
         private TaxSourceResult deductFromPools(BigDecimal amount) {
             if (amount.compareTo(BigDecimal.ZERO) <= 0) {
                 return TaxSourceResult.ZERO;
