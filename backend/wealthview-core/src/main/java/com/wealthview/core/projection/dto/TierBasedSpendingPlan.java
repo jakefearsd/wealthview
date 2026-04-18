@@ -54,14 +54,6 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         return new ResolvedYearSpending(portfolioNeed, spendingNeed, essential, discretionary);
     }
 
-    BigDecimal computeSpendingNeed(int age, int yearsInRetirement, BigDecimal inflationRate) {
-        var resolved = resolveSpending(age);
-        BigDecimal inflationFactor = computeInflationFactor(age, yearsInRetirement, inflationRate);
-        BigDecimal essential = resolved.essential().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        BigDecimal discretionary = resolved.discretionary().multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        return essential.add(discretionary);
-    }
-
     public record ResolvedSpending(BigDecimal essential, BigDecimal discretionary) {}
 
     public ResolvedSpending resolveSpending(int age) {

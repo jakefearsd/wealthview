@@ -19,6 +19,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -169,5 +170,112 @@ class UserManagementServiceTest {
         assertThatThrownBy(() -> service.updateUserRole(tenantId, userId, "member"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Cannot modify super admin role");
+    }
+
+    @Test
+    void deleteUser_nonExistent_throwsNotFound() {
+        var userId = UUID.randomUUID();
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.deleteUser(tenantId, userId))
+                .isInstanceOf(EntityNotFoundException.class);
+
+        verify(userRepository, never()).delete(any(UserEntity.class));
+    }
+
+    @Test
+    void resetPassword_commonPassword_throwsAndDoesNotLookupUser() {
+        assertThatThrownBy(() -> service.resetPassword(tenantId, UUID.randomUUID(), "password"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too common");
+
+        verify(userRepository, never()).findByTenant_IdAndId(any(), any());
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void getAllUsers_returnsAllUsersFromRepository() {
+        var u1 = new UserEntity(tenant, "a@test.com", "hash", "admin");
+        var u2 = new UserEntity(tenant, "b@test.com", "hash", "member");
+        when(userRepository.findAllWithTenant()).thenReturn(List.of(u1, u2));
+
+        var result = service.getAllUsers();
+
+        assertThat(result).containsExactly(u1, u2);
+    }
+
+    @Test
+    void resetPasswordByUserId_validUser_updatesPasswordHash() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "old-hash", "member");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newpass123")).thenReturn("fresh-hash");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.resetPasswordByUserId(userId, "newpass123");
+
+        assertThat(user.getPasswordHash()).isEqualTo("fresh-hash");
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPasswordByUserId_commonPassword_throwsAndDoesNotLookupUser() {
+        var userId = UUID.randomUUID();
+
+        assertThatThrownBy(() -> service.resetPasswordByUserId(userId, "password"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("too common");
+
+        verify(userRepository, never()).findById(any(UUID.class));
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void resetPasswordByUserId_nonExistent_throwsNotFound() {
+        var userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.resetPasswordByUserId(userId, "newpass123"))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(userId.toString());
+
+        verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void setUserActiveById_deactivatesUser() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "hash", "member");
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setUserActiveById(userId, false);
+
+        assertThat(user.isActive()).isFalse();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void setUserActiveById_activatesUser() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "hash", "member");
+        user.setActive(false);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setUserActiveById(userId, true);
+
+        assertThat(user.isActive()).isTrue();
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void setUserActiveById_nonExistent_throwsNotFound() {
+        var userId = UUID.randomUUID();
+        when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.setUserActiveById(userId, true))
+                .isInstanceOf(EntityNotFoundException.class)
+                .hasMessageContaining(userId.toString());
     }
 }
