@@ -2,6 +2,7 @@ package com.wealthview.app.it.actuator;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
@@ -11,8 +12,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PrometheusEndpointIT extends AbstractApiIntegrationTest {
 
+    private static final String SUPER_ADMIN_EMAIL = "it-super-admin@wealthview.test";
+    private static final String SUPER_ADMIN_PASSWORD = "testpass123";
+
     @Autowired
     private MeterRegistry meterRegistry;
+
+    private String superAdminToken;
+
+    @BeforeEach
+    void setUpSuperAdmin() {
+        authHelper.createSuperAdminDirectly(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD);
+        superAdminToken = authHelper.loginAs(restTemplate, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD);
+    }
 
     @Test
     void meterRegistry_isPrometheusType() {
@@ -20,9 +32,25 @@ class PrometheusEndpointIT extends AbstractApiIntegrationTest {
     }
 
     @Test
-    void prometheusEndpoint_noAuth_returns200WithMetrics() {
+    void prometheusEndpoint_noAuth_returns401() {
         var response = restTemplate.exchange("/actuator/prometheus",
                 HttpMethod.GET, null, String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void prometheusEndpoint_nonSuperAdmin_returns403() {
+        var response = restTemplate.exchange("/actuator/prometheus",
+                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+    }
+
+    @Test
+    void prometheusEndpoint_superAdmin_returns200WithMetrics() {
+        var response = restTemplate.exchange("/actuator/prometheus",
+                HttpMethod.GET, authHelper.authEntity(superAdminToken), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
@@ -34,7 +62,7 @@ class PrometheusEndpointIT extends AbstractApiIntegrationTest {
     @Test
     void prometheusEndpoint_containsApplicationTag() {
         var response = restTemplate.exchange("/actuator/prometheus",
-                HttpMethod.GET, null, String.class);
+                HttpMethod.GET, authHelper.authEntity(superAdminToken), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("application=\"wealthview\"");
@@ -43,7 +71,7 @@ class PrometheusEndpointIT extends AbstractApiIntegrationTest {
     @Test
     void prometheusEndpoint_containsHikariMetrics() {
         var response = restTemplate.exchange("/actuator/prometheus",
-                HttpMethod.GET, null, String.class);
+                HttpMethod.GET, authHelper.authEntity(superAdminToken), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).contains("hikaricp_connections");

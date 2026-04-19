@@ -109,6 +109,19 @@ public class AuthHelper {
         return user.getId();
     }
 
+    @Transactional
+    public UUID createSuperAdminDirectly(String email, String password) {
+        var tenant = tenantRepository.findById(cachedTenantId).orElseThrow();
+        var user = new UserEntity(tenant, email, passwordEncoder.encode(password), "admin");
+        user.setSuperAdmin(true);
+        user = userRepository.save(user);
+        return user.getId();
+    }
+
+    public String loginAs(TestRestTemplate restTemplate, String email, String password) {
+        return login(restTemplate, email, password);
+    }
+
     public String registerAndGetToken(TestRestTemplate restTemplate,
                                       String email, String password, String inviteCode) {
         var body = Map.of(

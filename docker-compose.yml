@@ -23,6 +23,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (32+ chars)}
       SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD must be set in .env}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
+      APP_ZILLOW_ENABLED: ${ZILLOW_ENABLED:-false}
     depends_on:
       db:
         condition: service_healthy

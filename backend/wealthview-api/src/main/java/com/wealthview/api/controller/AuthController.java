@@ -1,5 +1,6 @@
 package com.wealthview.api.controller;
 
+import com.wealthview.api.common.ClientIpResolver;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.dto.AuthResponse;
@@ -23,15 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final ClientIpResolver clientIpResolver;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, ClientIpResolver clientIpResolver) {
         this.authService = authService;
+        this.clientIpResolver = clientIpResolver;
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
                                               HttpServletRequest httpRequest) {
-        var ipAddress = httpRequest.getRemoteAddr();
+        var ipAddress = clientIpResolver.resolve(httpRequest);
         return ResponseEntity.ok(authService.login(request, ipAddress));
     }
 

@@ -29,7 +29,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        filter = new RateLimitFilter(meterRegistry, List.of());
+        filter = new RateLimitFilter(meterRegistry, new com.wealthview.api.common.ClientIpResolver(List.of()));
         filterChain = mock(FilterChain.class);
     }
 
@@ -161,7 +161,7 @@ class RateLimitFilterTest {
 
     @Test
     void trustedProxy_xForwardedForIsHonored() throws ServletException, IOException {
-        var trustingFilter = new RateLimitFilter(meterRegistry, List.of("10.0.0.100"));
+        var trustingFilter = new RateLimitFilter(meterRegistry, new com.wealthview.api.common.ClientIpResolver(List.of("10.0.0.100")));
 
         // 61 requests with the same client IP behind a trusted proxy should exceed
         // the 60-per-IP auth limit even though remoteAddr is the proxy.
@@ -184,7 +184,7 @@ class RateLimitFilterTest {
 
     @Test
     void trustedProxy_differentClientIpsNotLimitedTogether() throws ServletException, IOException {
-        var trustingFilter = new RateLimitFilter(meterRegistry, List.of("10.0.0.100"));
+        var trustingFilter = new RateLimitFilter(meterRegistry, new com.wealthview.api.common.ClientIpResolver(List.of("10.0.0.100")));
 
         // Two distinct clients behind the same trusted proxy should each get their own budget.
         for (int i = 0; i < 30; i++) {
