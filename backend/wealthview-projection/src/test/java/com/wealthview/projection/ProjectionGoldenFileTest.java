@@ -16,6 +16,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.skyscreamer.jsonassert.JSONAssert;
 import org.skyscreamer.jsonassert.JSONCompareMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -29,6 +31,8 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static org.mockito.Mockito.mock;
 
 class ProjectionGoldenFileTest {
+
+    private static final Logger log = LoggerFactory.getLogger(ProjectionGoldenFileTest.class);
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
@@ -57,7 +61,7 @@ class ProjectionGoldenFileTest {
         if (Boolean.getBoolean("update.golden") || !Files.exists(goldenPath)) {
             Files.createDirectories(goldenPath.getParent());
             Files.writeString(goldenPath, actualJson);
-            System.out.println("Updated golden file: " + goldenPath);
+            log.info("Updated golden file: {}", goldenPath);
             return;
         }
 

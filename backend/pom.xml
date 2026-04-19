@@ -19,7 +19,7 @@
     <description>
         Self-hosted, multi-tenant personal finance platform covering investment portfolio monitoring,
         rental property tracking, and tax-aware retirement projection modeling.
-        Built on Java 21 / Spring Boot 3.3 / PostgreSQL 16.
+        Built on Java 21 / Spring Boot 3.5 / PostgreSQL 16.
     </description>
     <url>https://github.com/jakefearsd/wealthview</url>
     <inceptionYear>2024</inceptionYear>
