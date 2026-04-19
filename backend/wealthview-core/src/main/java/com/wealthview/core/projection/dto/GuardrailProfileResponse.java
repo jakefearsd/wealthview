@@ -17,7 +17,6 @@ public record GuardrailProfileResponse(
         BigDecimal essentialFloor,
         BigDecimal terminalBalanceTarget,
         BigDecimal returnMean,
-        BigDecimal returnStddev,
         int trialCount,
         BigDecimal confidenceLevel,
         List<GuardrailPhaseInput> phases,
@@ -41,7 +40,7 @@ public record GuardrailProfileResponse(
 
     public GuardrailProfileResponse(UUID id, UUID scenarioId, String name,
                                      BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
-                                     BigDecimal returnMean, BigDecimal returnStddev,
+                                     BigDecimal returnMean,
                                      int trialCount, BigDecimal confidenceLevel,
                                      List<GuardrailPhaseInput> phases,
                                      List<GuardrailYearlySpending> yearlySpending,
@@ -49,7 +48,7 @@ public record GuardrailProfileResponse(
                                      BigDecimal percentile10Final,
                                      boolean stale, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
         this(id, scenarioId, name, essentialFloor, terminalBalanceTarget,
-                returnMean, returnStddev, trialCount, confidenceLevel,
+                returnMean, trialCount, confidenceLevel,
                 phases, yearlySpending, medianFinalBalance, failureRate,
                 percentile10Final, stale, createdAt, updatedAt,
                 BigDecimal.ZERO, null, 0, null,
@@ -86,7 +85,6 @@ public record GuardrailProfileResponse(
                 entity.getEssentialFloor(),
                 entity.getTerminalBalanceTarget(),
                 entity.getReturnMean(),
-                entity.getReturnStddev(),
                 entity.getTrialCount(),
                 entity.getConfidenceLevel(),
                 phases,

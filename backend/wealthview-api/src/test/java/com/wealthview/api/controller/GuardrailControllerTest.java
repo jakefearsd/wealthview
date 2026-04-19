@@ -60,7 +60,7 @@ class GuardrailControllerTest {
         return new GuardrailProfileResponse(
                 UUID.randomUUID(), SCENARIO_ID, "Optimized Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 List.of(new GuardrailYearlySpending(
@@ -82,7 +82,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Optimized Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, null,
+                BigDecimal.ZERO, null, null, null,
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 null, null, null, null,
                 null, null,
@@ -106,7 +106,7 @@ class GuardrailControllerTest {
 
         var request = new GuardrailOptimizationRequest(
                 SCENARIO_ID, "Plan", new BigDecimal("30000"),
-                BigDecimal.ZERO, null, null, null, null, List.of(),
+                BigDecimal.ZERO, null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
