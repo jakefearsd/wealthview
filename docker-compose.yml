@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: wealthview
       POSTGRES_USER: wv_app
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-wv_dev_pass}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -18,10 +18,10 @@ services:
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wealthview
       SPRING_DATASOURCE_USERNAME: wv_app
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-wv_dev_pass}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
       SPRING_PROFILES_ACTIVE: docker
-      JWT_SECRET: ${JWT_SECRET:-production-secret-key-must-be-at-least-32-characters}
-      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:-admin123}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env (32+ chars)}
+      SUPER_ADMIN_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD must be set in .env}
       FINNHUB_API_KEY: ${FINNHUB_API_KEY:-}
     depends_on:
       db:

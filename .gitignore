@@ -63,5 +63,5 @@ backups/
 # Test artifacts
 frontend/test-results/
 
-# Infrastructure (local)
-infra/
+# Infrastructure (local-only overrides; infra/backup/ is committed)
+infra/local/
