@@ -35,7 +35,6 @@ public class GuardrailProfileService {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private static final BigDecimal DEFAULT_RETURN_MEAN = new BigDecimal("0.10");
-    private static final BigDecimal DEFAULT_RETURN_STDDEV = new BigDecimal("0.15");
     private static final int DEFAULT_TRIAL_COUNT = 5000;
     private static final BigDecimal DEFAULT_CONFIDENCE = new BigDecimal("0.95");
     private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
@@ -106,7 +105,6 @@ public class GuardrailProfileService {
                 scenario.getTenant(), scenario, request.name(), request.essentialFloor());
         entity.setTerminalBalanceTarget(optimizationInput.terminalBalanceTarget());
         entity.setReturnMean(optimizationInput.returnMean());
-        entity.setReturnStddev(optimizationInput.returnStddev());
         entity.setTrialCount(optimizationInput.trialCount());
         entity.setConfidenceLevel(optimizationInput.confidenceLevel());
         entity.setScenarioHash(computeScenarioHash(scenario));
@@ -199,7 +197,6 @@ public class GuardrailProfileService {
                 existing.getEssentialFloor(),
                 existing.getTerminalBalanceTarget(),
                 existing.getReturnMean(),
-                existing.getReturnStddev(),
                 existing.getTrialCount(),
                 existing.getConfidenceLevel(),
                 phases,
@@ -270,7 +267,6 @@ public class GuardrailProfileService {
                 request.essentialFloor(),
                 request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
                 request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
-                request.returnStddev() != null ? request.returnStddev() : DEFAULT_RETURN_STDDEV,
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
                 confidence,
                 request.phases() != null ? request.phases() : List.of(),

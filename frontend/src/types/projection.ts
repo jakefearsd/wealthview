@@ -265,7 +265,6 @@ export interface GuardrailProfileResponse {
     essential_floor: number;
     terminal_balance_target: number;
     return_mean: number;
-    return_stddev: number;
     trial_count: number;
     confidence_level: number;
     phases: GuardrailPhase[];
@@ -335,7 +334,6 @@ export interface GuardrailOptimizationRequest {
     essential_floor: number;
     terminal_balance_target: number;
     return_mean?: number;
-    return_stddev?: number;
     trial_count?: number;
     confidence_level?: number;
     phases: GuardrailPhase[];

@@ -36,7 +36,6 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
     essential_floor: 30000,
     terminal_balance_target: 0,
     return_mean: 0.10,
-    return_stddev: 0.15,
     trial_count: 5000,
     confidence_level: 0.80,
     phases: [

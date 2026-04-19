@@ -14,7 +14,6 @@ public record GuardrailOptimizationInput(
         BigDecimal essentialFloor,
         BigDecimal terminalBalanceTarget,
         BigDecimal returnMean,
-        BigDecimal returnStddev,
         int trialCount,
         BigDecimal confidenceLevel,
         List<GuardrailPhaseInput> phases,

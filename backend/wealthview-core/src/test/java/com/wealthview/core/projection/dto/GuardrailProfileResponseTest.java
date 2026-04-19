@@ -26,7 +26,6 @@ class GuardrailProfileResponseTest {
         when(entity.getEssentialFloor()).thenReturn(new BigDecimal("50000"));
         when(entity.getTerminalBalanceTarget()).thenReturn(BigDecimal.ZERO);
         when(entity.getReturnMean()).thenReturn(new BigDecimal("0.07"));
-        when(entity.getReturnStddev()).thenReturn(new BigDecimal("0.15"));
         when(entity.getTrialCount()).thenReturn(500);
         when(entity.getConfidenceLevel()).thenReturn(new BigDecimal("0.85"));
         when(entity.getMedianFinalBalance()).thenReturn(new BigDecimal("1000000"));
@@ -45,7 +44,7 @@ class GuardrailProfileResponseTest {
     }
 
     @Test
-    void legacySeventeenArgConstructor_defaultsNewFieldsToSensibleZeros() {
+    void legacyShortConstructor_defaultsNewFieldsToSensibleZeros() {
         // The shorter constructor exists for older code paths that don't yet supply
         // portfolio-floor / phase-blend / cash-reserve fields.
         var id = UUID.randomUUID();
@@ -55,7 +54,7 @@ class GuardrailProfileResponseTest {
         var response = new GuardrailProfileResponse(
                 id, scenarioId, "Legacy",
                 new BigDecimal("50000"), BigDecimal.ZERO,
-                new BigDecimal("0.07"), new BigDecimal("0.15"),
+                new BigDecimal("0.07"),
                 500, new BigDecimal("0.85"),
                 List.of(), List.of(),
                 new BigDecimal("1000000"), new BigDecimal("0.05"),

@@ -44,9 +44,6 @@ public class GuardrailSpendingProfileEntity {
     @Column(name = "return_mean", nullable = false, precision = 7, scale = 4)
     private BigDecimal returnMean = new BigDecimal("0.10");
 
-    @Column(name = "return_stddev", nullable = false, precision = 7, scale = 4)
-    private BigDecimal returnStddev = new BigDecimal("0.15");
-
     @Column(name = "trial_count", nullable = false)
     private int trialCount = 5000;
 
@@ -69,12 +66,6 @@ public class GuardrailSpendingProfileEntity {
 
     @Column(name = "percentile_10_final", precision = 19, scale = 4)
     private BigDecimal percentile10Final;
-
-    @Column(name = "percentile_90_final", precision = 19, scale = 4)
-    private BigDecimal percentile90Final;
-
-    @Column(name = "percentile_55_final", precision = 19, scale = 4)
-    private BigDecimal percentile55Final;
 
     @Column(name = "scenario_hash", nullable = false)
     private String scenarioHash;
@@ -144,8 +135,6 @@ public class GuardrailSpendingProfileEntity {
     public void setTerminalBalanceTarget(BigDecimal terminalBalanceTarget) { this.terminalBalanceTarget = terminalBalanceTarget; }
     public BigDecimal getReturnMean() { return returnMean; }
     public void setReturnMean(BigDecimal returnMean) { this.returnMean = returnMean; }
-    public BigDecimal getReturnStddev() { return returnStddev; }
-    public void setReturnStddev(BigDecimal returnStddev) { this.returnStddev = returnStddev; }
     public int getTrialCount() { return trialCount; }
     public void setTrialCount(int trialCount) { this.trialCount = trialCount; }
     public BigDecimal getConfidenceLevel() { return confidenceLevel; }
@@ -160,10 +149,6 @@ public class GuardrailSpendingProfileEntity {
     public void setFailureRate(BigDecimal failureRate) { this.failureRate = failureRate; }
     public BigDecimal getPercentile10Final() { return percentile10Final; }
     public void setPercentile10Final(BigDecimal percentile10Final) { this.percentile10Final = percentile10Final; }
-    public BigDecimal getPercentile90Final() { return percentile90Final; }
-    public void setPercentile90Final(BigDecimal percentile90Final) { this.percentile90Final = percentile90Final; }
-    public BigDecimal getPercentile55Final() { return percentile55Final; }
-    public void setPercentile55Final(BigDecimal percentile55Final) { this.percentile55Final = percentile55Final; }
     public String getScenarioHash() { return scenarioHash; }
     public void setScenarioHash(String scenarioHash) { this.scenarioHash = scenarioHash; }
     public BigDecimal getPortfolioFloor() { return portfolioFloor; }

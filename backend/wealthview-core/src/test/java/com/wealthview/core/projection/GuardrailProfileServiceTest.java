@@ -88,7 +88,7 @@ class GuardrailProfileServiceTest {
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "Optimized Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 phases,
                 List.of(new GuardrailYearlySpending(
@@ -109,7 +109,7 @@ class GuardrailProfileServiceTest {
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Optimized Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"), phases,
                 null, null, null, null,
                 null, null,
@@ -129,7 +129,7 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of(),
+                null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -159,7 +159,7 @@ class GuardrailProfileServiceTest {
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "New Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
@@ -173,7 +173,7 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "New Plan", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of(),
+                null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -292,7 +292,7 @@ class GuardrailProfileServiceTest {
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "Guardrail",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
@@ -306,7 +306,7 @@ class GuardrailProfileServiceTest {
 
         var request = new GuardrailOptimizationRequest(
                 scenarioId, "Guardrail", new BigDecimal("30000"), BigDecimal.ZERO,
-                null, null, null, null, List.of(),
+                null, null, null, List.of(),
                 null, null, null, null,
                 null, null,
                 null, null, null, null, null, null);
@@ -327,7 +327,6 @@ class GuardrailProfileServiceTest {
         entity.setYearlySpending("[]");
         entity.setScenarioHash("old-hash");
         entity.setReturnMean(new BigDecimal("0.10"));
-        entity.setReturnStddev(new BigDecimal("0.15"));
         entity.setTrialCount(5000);
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
@@ -350,7 +349,7 @@ class GuardrailProfileServiceTest {
         var optimizerResponse = new GuardrailProfileResponse(
                 null, scenarioId, "Existing Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 List.of(),
@@ -461,14 +460,13 @@ class GuardrailProfileServiceTest {
     @Test
     void optimize_nullOptionalFields_fillDefaults() {
         var input = captureOptimizationInput(buildRequest(req -> req
-                .withReturnMean(null).withReturnStddev(null).withTrialCount(null)
+                .withReturnMean(null).withTrialCount(null)
                 .withPortfolioFloor(null).withMaxAnnualAdjustmentRate(null)
                 .withPhaseBlendYears(null).withCashReserveYears(null)
                 .withCashReturnRate(null).withTerminalBalanceTarget(null)
                 .withPhases(null)));
 
         assertThat(input.returnMean()).isEqualByComparingTo("0.10");
-        assertThat(input.returnStddev()).isEqualByComparingTo("0.15");
         assertThat(input.trialCount()).isEqualTo(5000);
         assertThat(input.portfolioFloor()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("0.05");
@@ -571,7 +569,6 @@ class GuardrailProfileServiceTest {
         entity.setPhases("{not-json");
         entity.setYearlySpending("[]");
         entity.setReturnMean(new BigDecimal("0.10"));
-        entity.setReturnStddev(new BigDecimal("0.15"));
         entity.setTrialCount(5000);
         entity.setConfidenceLevel(new BigDecimal("0.95"));
         entity.setTerminalBalanceTarget(BigDecimal.ZERO);
@@ -670,7 +667,7 @@ class GuardrailProfileServiceTest {
         return new GuardrailProfileResponse(
                 null, scenarioId, "Plan",
                 new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), new BigDecimal("0.15"),
+                new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
                 new BigDecimal("250000"), new BigDecimal("0.05"),
@@ -683,7 +680,7 @@ class GuardrailProfileServiceTest {
             com.wealthview.core.projection.dto.RothConversionScheduleResponse schedule) {
         return new GuardrailProfileResponse(
                 base.id(), base.scenarioId(), base.name(), base.essentialFloor(),
-                base.terminalBalanceTarget(), base.returnMean(), base.returnStddev(),
+                base.terminalBalanceTarget(), base.returnMean(),
                 base.trialCount(), base.confidenceLevel(), base.phases(), base.yearlySpending(),
                 base.medianFinalBalance(), base.failureRate(), base.percentile10Final(),
                 base.stale(), base.createdAt(), base.updatedAt(),
@@ -702,7 +699,6 @@ class GuardrailProfileServiceTest {
         private BigDecimal essentialFloor = new BigDecimal("30000");
         private BigDecimal terminalBalanceTarget = BigDecimal.ZERO;
         private BigDecimal returnMean = new BigDecimal("0.10");
-        private BigDecimal returnStddev = new BigDecimal("0.15");
         private Integer trialCount = 5000;
         private BigDecimal confidence = new BigDecimal("0.95");
         private List<GuardrailPhaseInput> phases = List.of();
@@ -723,7 +719,6 @@ class GuardrailProfileServiceTest {
         RequestBuilder withConfidence(BigDecimal v) { this.confidence = v; return this; }
         RequestBuilder withRiskTolerance(String v) { this.riskTolerance = v; return this; }
         RequestBuilder withReturnMean(BigDecimal v) { this.returnMean = v; return this; }
-        RequestBuilder withReturnStddev(BigDecimal v) { this.returnStddev = v; return this; }
         RequestBuilder withTrialCount(Integer v) { this.trialCount = v; return this; }
         RequestBuilder withPortfolioFloor(BigDecimal v) { this.portfolioFloor = v; return this; }
         RequestBuilder withMaxAnnualAdjustmentRate(BigDecimal v) { this.maxAnnualAdjustmentRate = v; return this; }
@@ -739,7 +734,7 @@ class GuardrailProfileServiceTest {
 
         GuardrailOptimizationRequest build() {
             return new GuardrailOptimizationRequest(scenarioId, name, essentialFloor,
-                    terminalBalanceTarget, returnMean, returnStddev, trialCount, confidence, phases,
+                    terminalBalanceTarget, returnMean, trialCount, confidence, phases,
                     portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance,
                     cashReserveYears, cashReturnRate, optimizeConversions,
                     conversionBracketRate, rmdTargetBracketRate, buffer,
