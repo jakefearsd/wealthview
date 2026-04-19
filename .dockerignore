@@ -1,0 +1,40 @@
+# Secrets
+.env
+.env.*
+!.env.example
+.keys/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Build outputs
+backend/**/target/
+frontend/dist/
+frontend/node_modules/
+frontend/playwright-report/
+frontend/test-results/
+
+# IDE / tooling
+.idea/
+.vscode/
+*.iml
+.claude/
+.worktrees/
+
+# Local infra and backups
+backups/
+infra/local/
+
+# Docs and dev scripts (image doesn't need them)
+docs/
+*.md
+!backend/**/*.md
+dev-backup.sh
+dev-restore.sh
+
+# Logs and OS noise
+*.log
+.DS_Store
+Thumbs.db
