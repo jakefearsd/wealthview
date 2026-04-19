@@ -18,9 +18,41 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    void validate_dockerComposeFallbackJwtSecret_throws() {
+        // The docker-compose.yml file used to ship with a fallback equal to this string.
+        // Make sure the validator rejects it even though it is not the historical default.
+        var validator = new ProductionConfigValidator(
+                "production-secret-key-must-be-at-least-32-characters", "StrongPass123!");
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
+    void validate_jwtSecretShorterThan32Chars_throws() {
+        var validator = new ProductionConfigValidator(
+                "tooShort", "StrongPass123!");
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
+
+    @Test
     void validate_blankSuperAdminPassword_throws() {
         var validator = new ProductionConfigValidator(
                 "unique-production-secret-at-least-32-chars", "");
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("SUPER_ADMIN_PASSWORD");
+    }
+
+    @Test
+    void validate_demoSuperAdminPassword_throws() {
+        var validator = new ProductionConfigValidator(
+                "unique-production-secret-at-least-32-chars", "admin123");
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
