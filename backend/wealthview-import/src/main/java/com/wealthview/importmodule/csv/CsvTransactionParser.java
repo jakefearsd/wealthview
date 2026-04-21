@@ -1,7 +1,7 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.CsvParser;
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import org.apache.commons.csv.CSVFormat;
@@ -22,17 +22,17 @@ import java.util.Set;
 
 @Component
 @org.springframework.context.annotation.Primary
-public class CsvTransactionParser implements CsvParser {
+public class CsvTransactionParser implements ImportParser {
 
     private static final Set<String> VALID_TYPES = Set.of(
             "buy", "sell", "dividend", "deposit", "withdrawal");
 
     @Override
-    public CsvParseResult parse(InputStream inputStream) throws IOException {
+    public ImportParseResult parse(InputStream inputStream) throws IOException {
         return parse(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
     }
 
-    public CsvParseResult parse(Reader reader) throws IOException {
+    public ImportParseResult parse(Reader reader) throws IOException {
         var transactions = new ArrayList<ParsedTransaction>();
         var errors = new ArrayList<CsvRowError>();
 
@@ -98,6 +98,6 @@ public class CsvTransactionParser implements CsvParser {
             }
         }
 
-        return new CsvParseResult(transactions, errors);
+        return new ImportParseResult(transactions, errors);
     }
 }

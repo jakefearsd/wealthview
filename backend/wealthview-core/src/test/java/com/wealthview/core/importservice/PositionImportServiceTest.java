@@ -1,6 +1,6 @@
 package com.wealthview.core.importservice;
 
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -74,7 +74,7 @@ class PositionImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2026, 3, 5), "opening_balance", "AMZN",
                         new BigDecimal("1100"), new BigDecimal("112324.74")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
         when(importService.resolveParser("generic")).thenReturn(is -> parseResult);
 
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "positions", "completed",
@@ -99,7 +99,7 @@ class PositionImportServiceTest {
                         new BigDecimal("1100"), new BigDecimal("112324.74")),
                 new ParsedTransaction(LocalDate.of(2026, 3, 5), "deposit", null,
                         null, new BigDecimal("704.82")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
         when(importService.resolveParser("fidelityPositions")).thenReturn(is -> parseResult);
 
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "positions", "completed",

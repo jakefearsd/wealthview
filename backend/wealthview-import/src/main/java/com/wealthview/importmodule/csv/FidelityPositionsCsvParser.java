@@ -1,7 +1,7 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.CsvParser;
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import org.apache.commons.csv.CSVFormat;
@@ -27,7 +27,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 @Component("fidelityPositionsCsvParser")
-public class FidelityPositionsCsvParser implements CsvParser {
+public class FidelityPositionsCsvParser implements ImportParser {
 
     private static final Logger log = LoggerFactory.getLogger(FidelityPositionsCsvParser.class);
     private static final String HEADER_MARKER = "Account Number";
@@ -35,18 +35,18 @@ public class FidelityPositionsCsvParser implements CsvParser {
     private static final DateTimeFormatter FOOTER_DATE_FORMAT = DateTimeFormatter.ofPattern("MMM-dd-yyyy", Locale.US);
 
     @Override
-    public CsvParseResult parse(InputStream inputStream) throws IOException {
+    public ImportParseResult parse(InputStream inputStream) throws IOException {
         return parse(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    public CsvParseResult parse(Reader reader) throws IOException {
+    public ImportParseResult parse(Reader reader) throws IOException {
         var buffered = new BufferedReader(reader);
         var lines = readAllLines(buffered);
 
         var csvContent = extractCsvContent(lines);
         if (csvContent.isEmpty()) {
-            return new CsvParseResult(new ArrayList<>(), new ArrayList<>());
+            return new ImportParseResult(new ArrayList<>(), new ArrayList<>());
         }
 
         var snapshotDate = extractDateFromFooter(lines);
@@ -106,7 +106,7 @@ public class FidelityPositionsCsvParser implements CsvParser {
             }
         }
 
-        return new CsvParseResult(transactions, errors);
+        return new ImportParseResult(transactions, errors);
     }
 
     private List<String> readAllLines(BufferedReader reader) throws IOException {

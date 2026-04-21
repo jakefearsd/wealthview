@@ -1,7 +1,7 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.CsvParser;
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import org.apache.commons.csv.CSVFormat;
@@ -26,15 +26,15 @@ import java.util.List;
  * Handles the common parse loop: preamble skipping, CSV parsing, row iteration with error collection.
  * Subclasses define column names, header detection, date format, and per-row extraction logic.
  */
-public abstract class AbstractBrokerCsvParser implements CsvParser {
+public abstract class AbstractBrokerCsvParser implements ImportParser {
 
     @Override
-    public CsvParseResult parse(InputStream inputStream) throws IOException {
+    public ImportParseResult parse(InputStream inputStream) throws IOException {
         return parse(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
     }
 
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    public CsvParseResult parse(Reader reader) throws IOException {
+    public ImportParseResult parse(Reader reader) throws IOException {
         var buffered = new BufferedReader(reader);
         var csvContent = skipPreamble(buffered);
 
@@ -42,7 +42,7 @@ public abstract class AbstractBrokerCsvParser implements CsvParser {
         var errors = new ArrayList<CsvRowError>();
 
         if (csvContent.isBlank()) {
-            return new CsvParseResult(transactions, errors);
+            return new ImportParseResult(transactions, errors);
         }
 
         var format = CSVFormat.DEFAULT.builder()
@@ -64,7 +64,7 @@ public abstract class AbstractBrokerCsvParser implements CsvParser {
             }
         }
 
-        return new CsvParseResult(transactions, errors);
+        return new ImportParseResult(transactions, errors);
     }
 
     /**

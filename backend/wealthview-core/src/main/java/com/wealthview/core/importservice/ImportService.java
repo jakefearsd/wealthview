@@ -2,8 +2,8 @@ package com.wealthview.core.importservice;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
-import com.wealthview.core.importservice.dto.CsvParseResult;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ImportResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.core.transaction.TransactionService;
@@ -44,8 +44,8 @@ public class ImportService {
     private final TransactionRepository transactionRepository;
     private final TransactionService transactionService;
     private final HoldingsComputationService holdingsComputationService;
-    private final CsvParser csvParser;
-    private final Map<String, CsvParser> namedParsers;
+    private final ImportParser csvParser;
+    private final Map<String, ImportParser> namedParsers;
     private final MeterRegistry meterRegistry;
     private final CacheManager cacheManager;
 
@@ -54,8 +54,8 @@ public class ImportService {
                          TransactionRepository transactionRepository,
                          TransactionService transactionService,
                          HoldingsComputationService holdingsComputationService,
-                         CsvParser csvParser,
-                         Map<String, CsvParser> namedParsers,
+                         ImportParser csvParser,
+                         Map<String, ImportParser> namedParsers,
                          MeterRegistry meterRegistry,
                          CacheManager cacheManager) {
         this.importJobRepository = importJobRepository;
@@ -82,7 +82,7 @@ public class ImportService {
         return processCsvImport(tenantId, accountId, parseResult);
     }
 
-    CsvParser resolveParser(String format) {
+    ImportParser resolveParser(String format) {
         if (format == null || format.isBlank() || "generic".equals(format)) {
             return csvParser;
         }
@@ -105,14 +105,14 @@ public class ImportService {
     }
 
     @Transactional
-    public ImportJobResponse processCsvImport(UUID tenantId, UUID accountId, CsvParseResult parseResult) {
+    public ImportJobResponse processCsvImport(UUID tenantId, UUID accountId, ImportParseResult parseResult) {
         return processImport(tenantId, accountId, parseResult, "csv");
     }
 
     @Timed("wealthview.import.process")
     @Transactional
     public ImportJobResponse processImport(UUID tenantId, UUID accountId,
-                                            CsvParseResult parseResult, String source) {
+                                            ImportParseResult parseResult, String source) {
         MDC.put("operation", "import");
         MDC.put("importFormat", source);
         try {
