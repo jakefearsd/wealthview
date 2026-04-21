@@ -19,7 +19,8 @@ public final class HistoricalReturns {
                 "/historical-returns/sp500-real-annual-returns.csv");
              var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
 
-            String line = reader.readLine(); // skip header
+            reader.readLine(); // skip header
+            String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 if (line.isEmpty()) {
