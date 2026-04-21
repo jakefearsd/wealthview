@@ -11,7 +11,7 @@ class IncomeContributionCalculator {
 
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
-    private static final BigDecimal TWO = new BigDecimal("2");
+    private static final BigDecimal TWO = BigDecimal.valueOf(2);
 
     BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement) {
         if (sources == null || sources.isEmpty()) {

@@ -229,8 +229,8 @@ public class GuardrailProfileService {
                 if (node.has("birth_year")) {
                     sb.append('|').append(node.get("birth_year").asInt());
                 }
-            } catch (JsonProcessingException e) {
-                // ignore parse errors — missing birth_year just means it won't affect the hash
+            } catch (JsonProcessingException ignored) {
+                // missing birth_year just means it won't affect the hash
             }
         }
 

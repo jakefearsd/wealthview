@@ -47,7 +47,8 @@ public class PropertyController {
     private final PropertyValuationService valuationService;
     private final PropertyAnalyticsService analyticsService;
     private final PropertyRoiService roiService;
-    private final @Nullable PropertyValuationSyncService syncService;
+    @Nullable
+    private final PropertyValuationSyncService syncService;
 
     public PropertyController(PropertyService propertyService,
                               PropertyValuationService valuationService,

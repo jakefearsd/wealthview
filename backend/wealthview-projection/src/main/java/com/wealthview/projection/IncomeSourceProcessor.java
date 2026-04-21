@@ -118,7 +118,7 @@ class IncomeSourceProcessor {
             String sourceKey = source.id().toString();
             var result = switch (source.incomeType()) {
                 case RENTAL_PROPERTY -> processRentalIncome(source, nominal, taxYear, magi, suspendedLoss, multiplier);
-                case SOCIAL_SECURITY -> processSocialSecurityIncome(source, nominal, nonSSIncome, magi, filingStatus);
+                case SOCIAL_SECURITY -> processSocialSecurityIncome(nominal, nonSSIncome, magi, filingStatus);
                 case PART_TIME_WORK  -> processEmploymentIncome(source, nominal, taxYear);
                 default              -> processDefaultIncome(source, nominal);
             };
@@ -226,7 +226,7 @@ class IncomeSourceProcessor {
     }
 
     private SocialSecurityResult processSocialSecurityIncome(
-            ProjectionIncomeSourceInput source, BigDecimal nominal,
+            BigDecimal nominal,
             BigDecimal nonSSIncome, BigDecimal magi, String filingStatus) {
 
         var taxableAmount = ssTaxCalculator.computeTaxableAmount(
