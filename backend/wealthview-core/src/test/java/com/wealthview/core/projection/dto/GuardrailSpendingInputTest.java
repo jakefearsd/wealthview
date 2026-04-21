@@ -11,18 +11,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 class GuardrailSpendingInputTest {
 
     @Test
-    void conversionByYear_viaSpendingPlanReference_exposesSchedule() {
+    void conversionSchedule_viaSpendingPlanReference_exposesSchedule() {
         Map<Integer, BigDecimal> schedule = Map.of(2030, new BigDecimal("25000"));
         SpendingPlan plan = new GuardrailSpendingInput(List.of(), schedule);
 
-        assertThat(plan.conversionByYear()).containsEntry(2030, new BigDecimal("25000"));
+        assertThat(plan.conversionSchedule())
+                .hasValueSatisfying(s -> assertThat(s).containsEntry(2030, new BigDecimal("25000")));
     }
 
     @Test
-    void conversionByYear_viaSpendingPlanReference_nullWhenUnset() {
+    void conversionSchedule_viaSpendingPlanReference_emptyWhenUnset() {
         SpendingPlan plan = new GuardrailSpendingInput(List.of());
 
-        assertThat(plan.conversionByYear()).isNull();
+        assertThat(plan.conversionSchedule()).isEmpty();
     }
 
 

@@ -11,11 +11,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TierBasedSpendingPlanTest {
 
     @Test
-    void conversionByYear_onTierBasedPlan_returnsNull() {
+    void conversionSchedule_onTierBasedPlan_returnsEmpty() {
         SpendingPlan plan = TierBasedSpendingPlan.of(
                 new BigDecimal("40000"), new BigDecimal("20000"), List.of());
 
-        assertThat(plan.conversionByYear()).isNull();
+        assertThat(plan.conversionSchedule()).isEmpty();
     }
 
 

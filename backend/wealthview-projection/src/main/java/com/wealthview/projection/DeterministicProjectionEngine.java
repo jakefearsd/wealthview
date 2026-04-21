@@ -303,11 +303,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         if (spendingPlan == null) {
             return null;
         }
-        var schedule = spendingPlan.conversionByYear();
-        if (schedule != null) {
-            return schedule.getOrDefault(year, BigDecimal.ZERO);
-        }
-        return null;
+        return spendingPlan.conversionSchedule()
+                .map(schedule -> schedule.getOrDefault(year, BigDecimal.ZERO))
+                .orElse(null);
     }
 
     /**
@@ -660,7 +658,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // If this is an optimizer-validated plan with a conversion schedule,
         // the MC optimizer already validated sustainability at the user's confidence level.
         // Re-validating with deterministic assumptions would produce contradictory results.
-        if (spendingPlan.conversionByYear() != null) {
+        if (spendingPlan.conversionSchedule().isPresent()) {
             return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 

@@ -2,6 +2,7 @@ package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.Optional;
 
 public sealed interface SpendingPlan
         permits TierBasedSpendingPlan, GuardrailSpendingInput {
@@ -10,12 +11,10 @@ public sealed interface SpendingPlan
                                       BigDecimal inflationRate, BigDecimal activeIncome);
 
     /**
-     * Optional pre-computed Roth conversion schedule produced by the Monte Carlo optimizer.
-     * Returns null when the plan has no conversion schedule (e.g., tier-based plans, or
-     * guardrail plans constructed without one). The GuardrailSpendingInput record component
-     * accessor satisfies this automatically.
+     * Pre-computed Roth conversion schedule produced by the Monte Carlo optimizer.
+     * Tier-based plans never carry a schedule; guardrail plans may or may not.
      */
-    default Map<Integer, BigDecimal> conversionByYear() {
-        return null;
+    default Optional<Map<Integer, BigDecimal>> conversionSchedule() {
+        return Optional.empty();
     }
 }

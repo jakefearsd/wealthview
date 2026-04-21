@@ -9,6 +9,7 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
 
     private static final int SCALE = 4;
     private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
+    private static final BigDecimal TWO = BigDecimal.valueOf(2);
 
     private final BigDecimal essentialExpenses;
     private final BigDecimal discretionaryExpenses;
@@ -118,7 +119,6 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         }
 
         if (prev != null && next != null) {
-            var TWO = new BigDecimal("2");
             var essential = prev.essentialExpenses().add(next.essentialExpenses())
                     .divide(TWO, SCALE, ROUNDING);
             var discretionary = prev.discretionaryExpenses().add(next.discretionaryExpenses())
