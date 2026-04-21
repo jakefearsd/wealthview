@@ -15,8 +15,8 @@ import com.webcohesion.ofx4j.domain.data.seclist.BaseSecurityInfo;
 import com.webcohesion.ofx4j.domain.data.seclist.SecurityList;
 import com.webcohesion.ofx4j.domain.data.seclist.SecurityListResponseMessageSet;
 import com.webcohesion.ofx4j.io.AggregateUnmarshaller;
-import com.wealthview.core.importservice.CsvParser;
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import org.slf4j.Logger;
@@ -31,10 +31,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Adapter from OFX4J's {@link ResponseEnvelope} format to the app's {@link CsvParseResult}.
+ * Adapter from OFX4J's {@link ResponseEnvelope} format to the app's {@link ImportParseResult}.
  *
- * <p>This class implements {@link CsvParser} — a functional interface whose single method accepts
- * an {@link InputStream} and returns a {@link CsvParseResult}. OFX/QFX files are not CSVs, but the
+ * <p>Implements {@link ImportParser} — a functional interface whose single method accepts an
+ * {@link InputStream} and returns an {@link ImportParseResult}. OFX/QFX is not CSV, but the parse
  * contract is identical, so this Adapter fits without any interface changes.
  *
  * <p>Per-type mapping is delegated to {@link OfxBankTransactionMapper} and
@@ -44,12 +44,12 @@ import java.util.Map;
  * <p>Bean name {@code "ofxParser"} is resolved by {@code ImportService} for OFX/QFX uploads.
  */
 @Component("ofxParser")
-public class OfxTransactionParser implements CsvParser {
+public class OfxTransactionParser implements ImportParser {
 
     private static final Logger log = LoggerFactory.getLogger(OfxTransactionParser.class);
 
     @Override
-    public CsvParseResult parse(InputStream inputStream) throws IOException {
+    public ImportParseResult parse(InputStream inputStream) throws IOException {
         var transactions = new ArrayList<ParsedTransaction>();
         var errors = new ArrayList<CsvRowError>();
 
@@ -60,7 +60,7 @@ public class OfxTransactionParser implements CsvParser {
         } catch (IOException | com.webcohesion.ofx4j.io.OFXParseException e) {
             log.warn("Failed to parse OFX file", e);
             errors.add(new CsvRowError(0, "Failed to parse OFX file: " + e.getMessage()));
-            return new CsvParseResult(transactions, errors);
+            return new ImportParseResult(transactions, errors);
         }
 
         var tickerMap = buildTickerMap(envelope);
@@ -68,7 +68,7 @@ public class OfxTransactionParser implements CsvParser {
         extractInvestmentTransactions(envelope, tickerMap, transactions, errors);
         extractBankTransactions(envelope, transactions, errors);
 
-        return new CsvParseResult(transactions, errors);
+        return new ImportParseResult(transactions, errors);
     }
 
     private Map<String, String> buildTickerMap(ResponseEnvelope envelope) {

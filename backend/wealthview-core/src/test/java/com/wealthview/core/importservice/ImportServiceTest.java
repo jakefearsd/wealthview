@@ -1,7 +1,7 @@
 package com.wealthview.core.importservice;
 
 import com.wealthview.core.holding.HoldingsComputationService;
-import com.wealthview.core.importservice.dto.CsvParseResult;
+import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.core.transaction.TransactionService;
@@ -59,7 +59,7 @@ class ImportServiceTest {
     @Mock
     private HoldingsComputationService holdingsComputationService;
     @Mock
-    private CsvParser csvParser;
+    private ImportParser csvParser;
     @Mock
     private CacheManager cacheManager;
     @Mock
@@ -101,7 +101,7 @@ class ImportServiceTest {
                         new BigDecimal("10"), new BigDecimal("1500")),
                 new ParsedTransaction(LocalDate.of(2024, 1, 16), "sell", "GOOG",
                         new BigDecimal("5"), new BigDecimal("750")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
@@ -124,7 +124,7 @@ class ImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
@@ -153,7 +153,7 @@ class ImportServiceTest {
                         new BigDecimal("10"), new BigDecimal("1500")),
                 new ParsedTransaction(LocalDate.of(2024, 1, 16), "sell", "GOOG",
                         new BigDecimal("5"), new BigDecimal("750")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
@@ -172,7 +172,7 @@ class ImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
 
         importService.processCsvImport(tenantId, accountId, parseResult);
 
@@ -199,7 +199,7 @@ class ImportServiceTest {
                         new BigDecimal("5"), new BigDecimal("750")),
                 new ParsedTransaction(LocalDate.of(2024, 1, 17), "sell", "GOOG",
                         new BigDecimal("3"), new BigDecimal("450")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
 
         importService.processCsvImport(tenantId, accountId, parseResult);
 
@@ -230,7 +230,7 @@ class ImportServiceTest {
 
     @Test
     void resolveParser_namedFormat_returnsNamedParser() {
-        var fidelityParser = mock(CsvParser.class);
+        var fidelityParser = mock(ImportParser.class);
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
@@ -254,7 +254,7 @@ class ImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
         when(csvParser.parse(any())).thenReturn(parseResult);
         when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
                 .thenReturn(Set.of());
@@ -269,7 +269,7 @@ class ImportServiceTest {
     @Test
     void importCsv_withFormat_usesNamedParser() throws IOException {
         setupAccountAndJobMocks();
-        var fidelityParser = mock(CsvParser.class);
+        var fidelityParser = mock(ImportParser.class);
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
@@ -279,7 +279,7 @@ class ImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
         when(fidelityParser.parse(any())).thenReturn(parseResult);
         when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
                 .thenReturn(Set.of());
@@ -294,7 +294,7 @@ class ImportServiceTest {
     @Test
     void importOfx_delegatesToOfxParser() throws IOException {
         setupAccountAndJobMocks();
-        var ofxParser = mock(CsvParser.class);
+        var ofxParser = mock(ImportParser.class);
         var serviceWithParsers = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser,
@@ -304,7 +304,7 @@ class ImportServiceTest {
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
-        var parseResult = new CsvParseResult(transactions, List.of());
+        var parseResult = new ImportParseResult(transactions, List.of());
         when(ofxParser.parse(any())).thenReturn(parseResult);
         when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
                 .thenReturn(Set.of());
@@ -355,7 +355,7 @@ class ImportServiceTest {
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseErrors = List.of(new CsvRowError(2, "invalid date"), new CsvRowError(5, "missing symbol"));
-        var parseResult = new CsvParseResult(transactions, parseErrors);
+        var parseResult = new ImportParseResult(transactions, parseErrors);
 
         var result = importService.processCsvImport(tenantId, accountId, parseResult);
 
