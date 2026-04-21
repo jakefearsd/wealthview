@@ -4,10 +4,27 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class GuardrailSpendingInputTest {
+
+    @Test
+    void conversionByYear_viaSpendingPlanReference_exposesSchedule() {
+        Map<Integer, BigDecimal> schedule = Map.of(2030, new BigDecimal("25000"));
+        SpendingPlan plan = new GuardrailSpendingInput(List.of(), schedule);
+
+        assertThat(plan.conversionByYear()).containsEntry(2030, new BigDecimal("25000"));
+    }
+
+    @Test
+    void conversionByYear_viaSpendingPlanReference_nullWhenUnset() {
+        SpendingPlan plan = new GuardrailSpendingInput(List.of());
+
+        assertThat(plan.conversionByYear()).isNull();
+    }
+
 
     @Test
     void byYear_returnsMapKeyedByYear() {

@@ -3,7 +3,6 @@ package com.wealthview.projection;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.ProjectionEngine;
-import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -301,8 +300,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private BigDecimal resolveConversionOverride(SpendingPlan spendingPlan, int year) {
-        if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
-            return gsi.conversionByYear().getOrDefault(year, BigDecimal.ZERO);
+        if (spendingPlan == null) {
+            return null;
+        }
+        var schedule = spendingPlan.conversionByYear();
+        if (schedule != null) {
+            return schedule.getOrDefault(year, BigDecimal.ZERO);
         }
         return null;
     }
@@ -657,7 +660,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // If this is an optimizer-validated plan with a conversion schedule,
         // the MC optimizer already validated sustainability at the user's confidence level.
         // Re-validating with deterministic assumptions would produce contradictory results.
-        if (spendingPlan instanceof GuardrailSpendingInput gsi && gsi.conversionByYear() != null) {
+        if (spendingPlan.conversionByYear() != null) {
             return new SpendingFeasibilitySummary(true, null, null, BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
