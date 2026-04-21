@@ -63,7 +63,6 @@ public class ProjectionService {
     private final GuardrailSpendingProfileRepository guardrailProfileRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @SuppressWarnings("PMD.ExcessiveParameterList")
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
                              TenantRepository tenantRepository,
                              AccountRepository accountRepository,

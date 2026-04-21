@@ -4,8 +4,6 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
-import com.wealthview.core.property.dto.CostSegAllocation;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;

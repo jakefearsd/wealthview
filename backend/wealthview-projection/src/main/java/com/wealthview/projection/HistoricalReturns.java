@@ -31,7 +31,9 @@ public final class HistoricalReturns {
                 returnsList.add(Double.parseDouble(parts[1]));
             }
         } catch (IOException e) {
-            throw new ExceptionInInitializerError("Failed to load historical returns CSV: " + e.getMessage());
+            var error = new ExceptionInInitializerError("Failed to load historical returns CSV: " + e.getMessage());
+            error.initCause(e);
+            throw error;
         }
 
         if (yearsList.size() < 100) {

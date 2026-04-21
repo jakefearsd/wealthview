@@ -73,7 +73,7 @@ public record GuardrailProfileResponse(
             try {
                 conversionSchedule = MAPPER.readValue(entity.getConversionSchedule(),
                         RothConversionScheduleResponse.class);
-            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
                 // leave null — entity predates conversion optimizer
             }
         }

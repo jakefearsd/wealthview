@@ -1,13 +1,10 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 
 public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
     private static final BigDecimal SALT_CAP = new BigDecimal("10000");
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final FederalTaxCalculator federal;
     private final StateTaxCalculator state;

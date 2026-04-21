@@ -15,7 +15,6 @@ import com.wealthview.core.price.dto.PriceSyncStatus;
 import com.wealthview.core.price.dto.YahooFetchRequest;
 import com.wealthview.core.price.dto.YahooSyncResult;
 import com.wealthview.core.pricefeed.PriceSyncService;
-import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.UserManagementService;
 import com.wealthview.core.tenant.dto.AdminUserResponse;

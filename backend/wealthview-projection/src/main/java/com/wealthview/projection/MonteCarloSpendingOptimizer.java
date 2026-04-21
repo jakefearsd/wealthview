@@ -178,7 +178,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         // Compute deterministic income for each year
         IncomeYearData[] incomeData = computeDeterministicIncome(
-                input.incomeSources(), retirementAge, years, input.birthYear());
+                input.incomeSources(), retirementAge, years);
         FilingStatus filingStatus = input.filingStatus() != null
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
@@ -190,7 +190,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         // estimates reflect actual bracket positions.
         double[] rentalAwareTaxableIncome = computeRentalAwareTaxableIncome(
                 incomeArrays.taxableIncomeByYear(), input.incomeSources(),
-                incomeData, retirementAge, input.birthYear(), years);
+                retirementAge, input.birthYear(), years);
 
         // Verify essential floor feasibility (inflation-adjusted)
         double[] adjustedFloors = verifyEssentialFloor(
@@ -638,7 +638,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private record IncomeYearData(double totalIncome, double taxableIncome) {}
 
     private IncomeYearData[] computeDeterministicIncome(List<ProjectionIncomeSourceInput> sources,
-                                                         int retirementAge, int years, int birthYear) {
+                                                         int retirementAge, int years) {
         IncomeYearData[] result = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
             result[y] = new IncomeYearData(0, 0);
@@ -1481,7 +1481,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     private double[] computeRentalAwareTaxableIncome(double[] baseTaxableIncome,
                                                       List<ProjectionIncomeSourceInput> sources,
-                                                      IncomeYearData[] incomeData,
                                                       int retirementAge, int birthYear, int years) {
         double[] result = Arrays.copyOf(baseTaxableIncome, years);
         if (sources == null || sources.isEmpty()) {
