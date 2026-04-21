@@ -10,6 +10,15 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class TierBasedSpendingPlanTest {
 
+    @Test
+    void conversionByYear_onTierBasedPlan_returnsNull() {
+        SpendingPlan plan = TierBasedSpendingPlan.of(
+                new BigDecimal("40000"), new BigDecimal("20000"), List.of());
+
+        assertThat(plan.conversionByYear()).isNull();
+    }
+
+
     private static final BigDecimal INFLATION = new BigDecimal("0.03");
     private static final int SCALE = 4;
 
