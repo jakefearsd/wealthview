@@ -11,6 +11,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 
 public class PriceCsvParser {
 
@@ -57,7 +58,7 @@ public class PriceCsvParser {
             return;
         }
 
-        var symbol = parts[0].trim().toUpperCase();
+        var symbol = parts[0].trim().toUpperCase(Locale.ROOT);
         if (symbol.isEmpty()) {
             errors.add("Line " + lineNumber + ": missing symbol");
             return;

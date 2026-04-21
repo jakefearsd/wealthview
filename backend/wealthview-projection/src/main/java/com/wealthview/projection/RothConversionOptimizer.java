@@ -764,7 +764,6 @@ class RothConversionOptimizer {
         if (remaining > 0 && roth > 0) {
             double draw = Math.min(remaining, roth);
             roth -= draw;
-            remaining -= draw;
         }
         return new double[]{taxable, traditional, roth};
     }
