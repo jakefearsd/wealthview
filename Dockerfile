@@ -23,7 +23,11 @@ RUN cd backend && mvn clean package -DskipTests -q
 # Stage 3: Runtime
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
-COPY --from=build /app/backend/wealthview-app/target/*.jar app.jar
-COPY --from=frontend-build /app/frontend/dist /app/static
+RUN addgroup -S wv && adduser -S wv -G wv
+COPY --from=build --chown=wv:wv /app/backend/wealthview-app/target/*.jar app.jar
+COPY --from=frontend-build --chown=wv:wv /app/frontend/dist /app/static
+USER wv
 EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
+    CMD wget -q -O- http://localhost:8080/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "app.jar"]
