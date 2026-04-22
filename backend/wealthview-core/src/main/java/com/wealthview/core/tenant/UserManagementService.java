@@ -75,9 +75,10 @@ public class UserManagementService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
-        log.info("Password reset for user {} in tenant {}", userId, tenantId);
+        log.info("Password reset for user {} in tenant {} (token generation bumped)", userId, tenantId);
     }
 
     @Transactional
@@ -105,9 +106,10 @@ public class UserManagementService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
-        log.info("Password reset for user {} by super_admin", userId);
+        log.info("Password reset for user {} by super_admin (token generation bumped)", userId);
     }
 
     @Transactional

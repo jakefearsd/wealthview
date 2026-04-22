@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.transaction.TransactionService;
@@ -54,6 +55,9 @@ class TransactionControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID TXN_ID = UUID.randomUUID();

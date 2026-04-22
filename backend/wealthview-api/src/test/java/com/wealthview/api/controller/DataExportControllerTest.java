@@ -6,6 +6,7 @@ import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.export.DataExportService;
 import com.wealthview.core.export.dto.TenantExportDto;
 import com.wealthview.core.holding.dto.HoldingResponse;
@@ -41,6 +42,9 @@ class DataExportControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @MockBean
     private DataExportService dataExportService;

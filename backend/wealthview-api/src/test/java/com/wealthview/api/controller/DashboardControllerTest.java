@@ -5,6 +5,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.dashboard.CombinedPortfolioHistoryService;
 import com.wealthview.core.dashboard.DashboardService;
 import com.wealthview.core.dashboard.SnapshotProjectionService;
@@ -49,6 +50,9 @@ class DashboardControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @Test
     void getSummary_authenticated_returns200() throws Exception {

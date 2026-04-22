@@ -88,6 +88,20 @@ class AuthServiceTest {
     }
 
     @Test
+    void login_accessTokenEmbedsUsersCurrentTokenGeneration() {
+        // The access token's generation claim is what lets the auth filter
+        // detect revoked sessions. If the token is minted with generation=0
+        // while the user sits at generation=5, every request will be rejected.
+        user.setTokenGeneration(5);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        var response = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
+
+        assertThat(jwtTokenProvider.extractGeneration(response.accessToken())).isEqualTo(5);
+    }
+
+    @Test
     void login_badPassword_throwsBadCredentialsAndRecordsFailure() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);

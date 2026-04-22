@@ -1,6 +1,7 @@
 package com.wealthview.api.security;
 
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,9 +19,12 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final SessionStateValidator sessionStateValidator;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   SessionStateValidator sessionStateValidator) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.sessionStateValidator = sessionStateValidator;
     }
 
     @Override
@@ -38,17 +42,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if (token != null && jwtTokenProvider.validateAccessToken(token)) {
                 var userId = jwtTokenProvider.extractUserId(token);
-                var tenantId = jwtTokenProvider.extractTenantId(token);
-                var role = jwtTokenProvider.extractRole(token);
-                var email = jwtTokenProvider.extractEmail(token);
+                var generation = jwtTokenProvider.extractGeneration(token);
 
-                MDC.put("userId", userId.toString());
-                MDC.put("tenantId", tenantId.toString());
+                if (sessionStateValidator.isSessionValid(userId, generation)) {
+                    var tenantId = jwtTokenProvider.extractTenantId(token);
+                    var role = jwtTokenProvider.extractRole(token);
+                    var email = jwtTokenProvider.extractEmail(token);
 
-                var principal = new TenantUserPrincipal(userId, tenantId, email, role);
-                var auth = new UsernamePasswordAuthenticationToken(
-                        principal, null, principal.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                    MDC.put("userId", userId.toString());
+                    MDC.put("tenantId", tenantId.toString());
+
+                    var principal = new TenantUserPrincipal(userId, tenantId, email, role);
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            principal, null, principal.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             }
 
             filterChain.doFilter(request, response);
