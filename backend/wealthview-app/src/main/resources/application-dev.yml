@@ -1,4 +1,6 @@
 spring:
+  datasource:
+    password: ${DB_PASSWORD:LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV}
   jpa:
     show-sql: true
     properties:
