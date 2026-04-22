@@ -24,6 +24,7 @@ public class FinnhubClient implements PriceFeedClient {
 
     private static final Logger log = LoggerFactory.getLogger(FinnhubClient.class);
     private static final ZoneId NY_ZONE = ZoneId.of("America/New_York");
+    private static final String TOKEN_HEADER = "X-Finnhub-Token";
 
     private final RestClient restClient;
     private final String apiKey;
@@ -37,7 +38,8 @@ public class FinnhubClient implements PriceFeedClient {
     public QuoteResult getQuote(String symbol) {
         try {
             var dto = restClient.get()
-                    .uri("/api/v1/quote?symbol={symbol}&token={token}", symbol, apiKey)
+                    .uri("/api/v1/quote?symbol={symbol}", symbol)
+                    .header(TOKEN_HEADER, apiKey)
                     .retrieve()
                     .body(FinnhubQuoteDto.class);
 
@@ -69,8 +71,9 @@ public class FinnhubClient implements PriceFeedClient {
             long toUnix = to.atTime(23, 59, 59).atZone(NY_ZONE).toEpochSecond();
 
             var dto = restClient.get()
-                    .uri("/api/v1/stock/candle?symbol={symbol}&resolution=D&from={from}&to={to}&token={token}",
-                            symbol, fromUnix, toUnix, apiKey)
+                    .uri("/api/v1/stock/candle?symbol={symbol}&resolution=D&from={from}&to={to}",
+                            symbol, fromUnix, toUnix)
+                    .header(TOKEN_HEADER, apiKey)
                     .retrieve()
                     .body(FinnhubCandleDto.class);
 
