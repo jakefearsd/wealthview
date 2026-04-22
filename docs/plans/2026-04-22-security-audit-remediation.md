@@ -35,7 +35,7 @@ Ship as four separate conventional commits on `main`. TDD throughout (the iron l
 - **Tests**: `FinnhubClientTest` — verify header is set, query param is absent. Use `MockRestServiceServer`.
 - **Commit**: `fix(import): transmit Finnhub API token via header instead of query string`
 
-### [ ] 1.4 External HTTP clients missing timeouts
+### [x] 1.4 External HTTP clients missing timeouts
 - **Where**: `wealthview-app/src/main/java/com/wealthview/app/config/FinnhubConfig.java`, `YahooConfig.java`, any other `RestClient.builder()` under `wealthview-app/config/`.
 - **Problem**: No connect/read timeout → a hung upstream pins a servlet thread indefinitely.
 - **Fix**: Configure a shared `ClientHttpRequestFactory` (Apache HttpClient5 or JDK with timeouts) and attach it to each `RestClient.builder().requestFactory(...)`. Suggested: connect 5s, read 15s (tune per upstream SLA).
