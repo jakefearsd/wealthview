@@ -53,7 +53,7 @@ Ship as four separate conventional commits on `main`. TDD throughout (the iron l
 
 Six independent tasks. Group as individual commits.
 
-### [ ] 2.1 Dockerfile non-root + HEALTHCHECK
+### [x] 2.1 Dockerfile non-root + HEALTHCHECK
 - **Where**: `/home/jakefear/source/wealthview/Dockerfile`
 - **Fix**: Add a non-root user (`addgroup -S wv && adduser -S wv -G wv`) and `USER wv`; add `HEALTHCHECK --interval=30s --timeout=3s CMD wget -q -O- http://localhost:8080/actuator/health || exit 1`. Ensure the user has read access to the app jar and any writable dir Spring needs.
 - **Tests**: manual — `docker compose up --build -d && docker compose exec app id` should not return uid=0; `docker inspect` shows Health status transitioning to healthy.
