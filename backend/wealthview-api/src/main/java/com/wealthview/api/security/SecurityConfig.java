@@ -14,6 +14,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -87,6 +88,8 @@ public class SecurityConfig {
                                 .policyDirectives("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
                                         + "img-src 'self' data:; font-src 'self'; connect-src 'self'; "
                                         + "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"))
+                        .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy",
+                                "geolocation=(), microphone=(), camera=(), payment=()"))
                 )
                 .addFilterBefore(jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class);
