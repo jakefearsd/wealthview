@@ -1,5 +1,9 @@
 package com.wealthview.api.exception;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
@@ -7,8 +11,10 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.exception.TenantAccessDeniedException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
@@ -30,6 +36,8 @@ class GlobalExceptionHandlerTest {
     private SimpleMeterRegistry meterRegistry;
     private GlobalExceptionHandler handler;
     private HttpServletRequest request;
+    private ListAppender<ILoggingEvent> appender;
+    private Logger handlerLogger;
 
     @BeforeEach
     void setUp() {
@@ -38,6 +46,17 @@ class GlobalExceptionHandlerTest {
         request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/api/v1/test");
+
+        appender = new ListAppender<>();
+        appender.start();
+        handlerLogger = (Logger) LoggerFactory.getLogger(GlobalExceptionHandler.class);
+        handlerLogger.addAppender(appender);
+        handlerLogger.setLevel(Level.WARN);
+    }
+
+    @AfterEach
+    void tearDown() {
+        handlerLogger.detachAppender(appender);
     }
 
     @Test
@@ -200,6 +219,51 @@ class GlobalExceptionHandlerTest {
         handler.handleNotFound(new EntityNotFoundException("c"), request);
 
         assertCounter("EntityNotFoundException", "404", 3);
+    }
+
+    @Test
+    void handleNotFound_stripsCrlfFromLoggedExceptionMessage() {
+        // Entity-not-found messages often interpolate user-controlled strings
+        // (account names, symbols, filenames). A malicious name containing CRLF
+        // would inject a forged log line if we logged the message as-is.
+        var ex = new EntityNotFoundException("Symbol not found: AAPL\r\n2026-04-22 IMPERSONATED LOG");
+
+        handler.handleNotFound(ex, request);
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .doesNotContain("\r")
+                .doesNotContain("\n");
+    }
+
+    @Test
+    void handleValidation_stripsCrlfFromFieldName() {
+        // Field names are derived from the @Valid target — usually constant,
+        // but a nested object with a user-controlled key could surface CRLF.
+        var bindingResult = new BeanPropertyBindingResult(new Object(), "request");
+        bindingResult.addError(new FieldError("request", "email\r\nINJECTED", "must not be blank"));
+        var ex = new MethodArgumentNotValidException(null, bindingResult);
+
+        handler.handleValidation(ex, request);
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .doesNotContain("\r")
+                .doesNotContain("\n");
+    }
+
+    @Test
+    void handleNotFound_stripsCrlfFromRequestUri() {
+        // The URI can contain path segments supplied by the client.
+        when(request.getRequestURI()).thenReturn("/api/v1/accounts/\r\n2026-04-22 FAKE");
+        var ex = new EntityNotFoundException("nope");
+
+        handler.handleNotFound(ex, request);
+
+        assertThat(appender.list).hasSize(1);
+        assertThat(appender.list.get(0).getFormattedMessage())
+                .doesNotContain("\r")
+                .doesNotContain("\n");
     }
 
     private void assertCounter(String exception, String status, double expected) {

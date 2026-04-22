@@ -1,6 +1,7 @@
 package com.wealthview.api.exception;
 
 import com.wealthview.api.dto.ErrorResponse;
+import com.wealthview.api.logging.LogSanitizer;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+
+import static com.wealthview.api.logging.LogSanitizer.sanitize;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -38,7 +41,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(EntityNotFoundException ex, HttpServletRequest request) {
-        log.warn("{} {} - Entity not found: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Entity not found: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.NOT_FOUND);
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse("NOT_FOUND", ex.getMessage(), 404));
@@ -46,7 +49,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidSessionException.class)
     public ResponseEntity<ErrorResponse> handleInvalidSession(InvalidSessionException ex, HttpServletRequest request) {
-        log.warn("{} {} - Invalid session: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Invalid session: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.UNAUTHORIZED);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("UNAUTHORIZED", ex.getMessage(), 401));
@@ -54,7 +57,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DuplicateEntityException.class)
     public ResponseEntity<ErrorResponse> handleDuplicate(DuplicateEntityException ex, HttpServletRequest request) {
-        log.warn("{} {} - Duplicate entity: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Duplicate entity: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.CONFLICT);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("CONFLICT", ex.getMessage(), 409));
@@ -62,7 +65,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InvalidInviteCodeException.class)
     public ResponseEntity<ErrorResponse> handleInvalidInvite(InvalidInviteCodeException ex, HttpServletRequest request) {
-        log.warn("{} {} - Invalid invite code: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Invalid invite code: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST", ex.getMessage(), 400));
@@ -70,7 +73,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleBadCredentials(BadCredentialsException ex, HttpServletRequest request) {
-        log.warn("{} {} - Bad credentials: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Bad credentials: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.UNAUTHORIZED);
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ErrorResponse("UNAUTHORIZED", ex.getMessage(), 401));
@@ -78,7 +81,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex, HttpServletRequest request) {
-        log.warn("{} {} - Access denied: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Access denied: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.FORBIDDEN);
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ErrorResponse("FORBIDDEN", "Access denied", 403));
@@ -86,7 +89,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(TenantAccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleTenantAccessDenied(TenantAccessDeniedException ex, HttpServletRequest request) {
-        log.warn("{} {} - Tenant access denied: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Tenant access denied: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.FORBIDDEN);
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ErrorResponse("FORBIDDEN", ex.getMessage(), 403));
@@ -94,7 +97,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ErrorResponse> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
-        log.warn("{} {} - Illegal state: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Illegal state: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.CONFLICT);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ErrorResponse("CONFLICT", ex.getMessage(), 409));
@@ -102,7 +105,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex, HttpServletRequest request) {
-        log.warn("{} {} - Illegal argument: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - Illegal argument: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST", ex.getMessage(), 400));
@@ -115,7 +118,8 @@ public class GlobalExceptionHandler {
                 .reduce((a, b) -> a + "; " + b)
                 .orElse("Validation failed");
 
-        log.warn("{} {} - Validation failed: {}", request.getMethod(), request.getRequestURI(), message);
+        log.warn("{} {} - Validation failed: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(message));
         recordError(ex, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST", message, 400));
@@ -124,7 +128,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadable(
             org.springframework.http.converter.HttpMessageNotReadableException ex, HttpServletRequest request) {
-        log.warn("{} {} - Request body not readable: {}", request.getMethod(), request.getRequestURI(), ex.getMostSpecificCause().getMessage());
+        log.warn("{} {} - Request body not readable: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()),
+                sanitize(ex.getMostSpecificCause().getMessage()));
         recordError(ex, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST",
@@ -133,7 +139,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUpload(MaxUploadSizeExceededException ex, HttpServletRequest request) {
-        log.warn("{} {} - File too large: {}", request.getMethod(), request.getRequestURI(), ex.getMessage());
+        log.warn("{} {} - File too large: {}", sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(ex.getMessage()));
         recordError(ex, HttpStatus.PAYLOAD_TOO_LARGE);
         return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
                 .body(new ErrorResponse("PAYLOAD_TOO_LARGE", "File size exceeds the 10MB limit", 413));
@@ -141,7 +147,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneral(Exception ex, HttpServletRequest request) {
-        log.error("{} {} - Unhandled exception", request.getMethod(), request.getRequestURI(), ex);
+        log.error("{} {} - Unhandled exception", sanitize(request.getMethod()), sanitize(request.getRequestURI()), ex);
         recordError(ex, HttpStatus.INTERNAL_SERVER_ERROR);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ErrorResponse("INTERNAL_SERVER_ERROR", "An unexpected error occurred", 500));
