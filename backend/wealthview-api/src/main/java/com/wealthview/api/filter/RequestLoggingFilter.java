@@ -1,5 +1,6 @@
 package com.wealthview.api.filter;
 
+import com.wealthview.api.logging.LogSanitizer;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,8 +28,10 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 
         long duration = System.currentTimeMillis() - startTime;
         log.info("{} {} → {} ({}ms) [tenant={} user={}]",
-                request.getMethod(), request.getRequestURI(),
+                LogSanitizer.sanitize(request.getMethod()),
+                LogSanitizer.sanitize(request.getRequestURI()),
                 response.getStatus(), duration,
-                MDC.get("tenantId"), MDC.get("userId"));
+                LogSanitizer.sanitize(MDC.get("tenantId")),
+                LogSanitizer.sanitize(MDC.get("userId")));
     }
 }
