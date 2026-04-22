@@ -7,6 +7,7 @@ import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.auth.dto.AuthResponse;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
@@ -48,6 +49,9 @@ class AuthControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @Test
     void login_validCredentials_returns200() throws Exception {

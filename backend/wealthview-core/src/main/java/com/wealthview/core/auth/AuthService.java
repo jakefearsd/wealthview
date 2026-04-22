@@ -210,7 +210,7 @@ public class AuthService {
     private AuthResponse buildAuthResponse(UserEntity user) {
         var role = user.isSuperAdmin() ? "super_admin" : user.getRole();
         var accessToken = jwtTokenProvider.generateAccessToken(
-                user.getId(), user.getTenantId(), role, user.getEmail());
+                user.getId(), user.getTenantId(), role, user.getEmail(), user.getTokenGeneration());
         var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getTokenGeneration());
 
         return new AuthResponse(

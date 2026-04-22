@@ -5,6 +5,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
@@ -59,6 +60,9 @@ class PropertyControllerAnalyticsTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();
 

@@ -103,6 +103,20 @@ class UserManagementServiceTest {
     }
 
     @Test
+    void resetPassword_bumpsTokenGenerationToRevokeExistingSessions() {
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "old-hash", "member");
+        user.setTokenGeneration(7);
+        when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newpass123")).thenReturn("new-encoded-hash");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.resetPassword(tenantId, userId, "newpass123");
+
+        assertThat(user.getTokenGeneration()).isEqualTo(8);
+    }
+
+    @Test
     void resetPassword_nonExistent_throwsNotFound() {
         var userId = UUID.randomUUID();
         when(userRepository.findByTenant_IdAndId(tenantId, userId)).thenReturn(Optional.empty());
@@ -216,6 +230,23 @@ class UserManagementServiceTest {
 
         assertThat(user.getPasswordHash()).isEqualTo("fresh-hash");
         verify(userRepository).save(user);
+    }
+
+    @Test
+    void resetPasswordByUserId_bumpsTokenGenerationToRevokeExistingSessions() {
+        // A password reset must invalidate every outstanding access and
+        // refresh token for this user — otherwise an attacker who knew the
+        // old password (or still holds a stolen token) retains access.
+        var userId = UUID.randomUUID();
+        var user = new UserEntity(tenant, "user@test.com", "old-hash", "member");
+        user.setTokenGeneration(3);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(passwordEncoder.encode("newpass123")).thenReturn("fresh-hash");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.resetPasswordByUserId(userId, "newpass123");
+
+        assertThat(user.getTokenGeneration()).isEqualTo(4);
     }
 
     @Test

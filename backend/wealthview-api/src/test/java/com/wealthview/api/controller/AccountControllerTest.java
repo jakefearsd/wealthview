@@ -9,6 +9,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.account.dto.AccountResponse;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
@@ -63,6 +64,9 @@ class AccountControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 

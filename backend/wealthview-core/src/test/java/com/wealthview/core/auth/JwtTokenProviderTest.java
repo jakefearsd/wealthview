@@ -134,10 +134,31 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    void extractGeneration_accessToken_returnsZero() {
+    void extractGeneration_accessTokenWithoutExplicitGeneration_returnsZero() {
         var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
 
         assertThat(tokenProvider.extractGeneration(token)).isEqualTo(0);
+    }
+
+    @Test
+    void generateAccessToken_withGeneration_embedsGenerationClaim() {
+        // Access tokens must carry a generation claim so the auth filter can
+        // reject tokens issued before a password reset or explicit logout.
+        // Without this, a leaked access token is usable until it expires (15m).
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com", 7);
+
+        assertThat(tokenProvider.extractGeneration(token)).isEqualTo(7);
+    }
+
+    @Test
+    void generateAccessToken_withGeneration_preservesOtherClaims() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com", 3);
+
+        assertThat(tokenProvider.extractUserId(token)).isEqualTo(userId);
+        assertThat(tokenProvider.extractTenantId(token)).isEqualTo(tenantId);
+        assertThat(tokenProvider.extractRole(token)).isEqualTo("admin");
+        assertThat(tokenProvider.extractEmail(token)).isEqualTo("test@example.com");
+        assertThat(tokenProvider.extractTokenType(token)).isEqualTo("access");
     }
 
     @Test

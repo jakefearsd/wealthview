@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.income.IncomeSourceService;
 import com.wealthview.core.income.dto.CreateIncomeSourceRequest;
@@ -53,6 +54,9 @@ class IncomeSourceControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     private static final UUID SOURCE_ID = UUID.randomUUID();
 

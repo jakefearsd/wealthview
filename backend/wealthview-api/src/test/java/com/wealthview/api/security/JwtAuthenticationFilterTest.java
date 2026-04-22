@@ -1,6 +1,7 @@
 package com.wealthview.api.security;
 
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
@@ -21,8 +22,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -33,6 +36,9 @@ class JwtAuthenticationFilterTest {
 
     @Mock
     private JwtTokenProvider jwtTokenProvider;
+
+    @Mock
+    private SessionStateValidator sessionStateValidator;
 
     @InjectMocks
     private JwtAuthenticationFilter filter;
@@ -48,6 +54,11 @@ class JwtAuthenticationFilterTest {
         chain = org.mockito.Mockito.mock(FilterChain.class);
         SecurityContextHolder.clearContext();
         MDC.clear();
+        // Default: session validator approves. Tests that care about rejection
+        // override this with a specific expectation.
+        lenient().when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt()))
+                .thenReturn(true);
+        lenient().when(jwtTokenProvider.extractGeneration(anyString())).thenReturn(0);
     }
 
     @AfterEach
@@ -252,6 +263,45 @@ class JwtAuthenticationFilterTest {
         filter.doFilterInternal(request, response, chain);
 
         assertThat(captured[0]).hasSize(32).isEqualTo("a".repeat(32));
+    }
+
+    @Test
+    void doFilterInternal_cryptographicallyValidButSessionRejected_leavesContextEmpty()
+            throws ServletException, IOException {
+        // Even when JWT signature, issuer, audience, and expiry are all valid,
+        // the filter must consult SessionStateValidator — this is what lets
+        // logout, password reset, and user/tenant disablement revoke tokens
+        // before their 15-minute expiry.
+        request.addHeader("Authorization", "Bearer revoked.jwt.token");
+        when(jwtTokenProvider.validateAccessToken("revoked.jwt.token")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("revoked.jwt.token")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractGeneration("revoked.jwt.token")).thenReturn(3);
+        when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt())).thenReturn(false);
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(chain).doFilter(request, response);
+    }
+
+    @Test
+    void doFilterInternal_sessionValid_passesTokenGenerationToValidator()
+            throws ServletException, IOException {
+        // The filter must forward the token's generation claim to the validator
+        // so staleness is detectable. If it defaults to 0 or discards the claim,
+        // every refresh breaks the revocation check.
+        var userId = UUID.randomUUID();
+        request.addHeader("Authorization", "Bearer t");
+        when(jwtTokenProvider.validateAccessToken("t")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("t")).thenReturn(userId);
+        when(jwtTokenProvider.extractTenantId("t")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractRole("t")).thenReturn("member");
+        when(jwtTokenProvider.extractEmail("t")).thenReturn("u@e.com");
+        when(jwtTokenProvider.extractGeneration("t")).thenReturn(11);
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(sessionStateValidator).isSessionValid(userId, 11);
     }
 
     @Test

@@ -49,6 +49,10 @@ public final class JwtTokenProvider {
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String role, String email) {
+        return generateAccessToken(userId, tenantId, role, email, 0);
+    }
+
+    public String generateAccessToken(UUID userId, UUID tenantId, String role, String email, int generation) {
         var now = new Date();
         var expiry = new Date(now.getTime() + accessTokenExpiration);
 
@@ -60,6 +64,7 @@ public final class JwtTokenProvider {
                 .claim("tenant_id", tenantId.toString())
                 .claim("role", role)
                 .claim("email", email)
+                .claim("generation", generation)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)

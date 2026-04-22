@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.exchangerate.dto.ExchangeRateRequest;
 import com.wealthview.core.exchangerate.dto.ExchangeRateResponse;
@@ -49,6 +50,9 @@ class ExchangeRateControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     private ExchangeRateResponse eurResponse() {
         return new ExchangeRateResponse("EUR", new BigDecimal("1.0850"), OffsetDateTime.now());

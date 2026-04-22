@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.auth.LoginActivityService;
 import com.wealthview.core.auth.dto.LoginActivityResponse;
 import com.wealthview.core.config.SystemConfigService;
@@ -73,6 +74,9 @@ class SuperAdminControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @MockBean
     private PriceService priceService;

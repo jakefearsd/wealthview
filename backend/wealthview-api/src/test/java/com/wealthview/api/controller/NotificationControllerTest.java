@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.notification.NotificationPreferenceService;
 import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
 import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
@@ -42,6 +43,9 @@ class NotificationControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @MockBean
     private NotificationPreferenceService preferenceService;
