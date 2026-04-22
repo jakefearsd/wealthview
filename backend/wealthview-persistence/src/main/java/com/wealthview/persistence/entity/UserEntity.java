@@ -9,6 +9,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -42,6 +43,10 @@ public class UserEntity {
 
     @Column(name = "token_generation", nullable = false)
     private int tokenGeneration = 0;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private long version;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt = OffsetDateTime.now();
@@ -129,5 +134,9 @@ public class UserEntity {
 
     public void setTokenGeneration(int tokenGeneration) {
         this.tokenGeneration = tokenGeneration;
+    }
+
+    public long getVersion() {
+        return version;
     }
 }

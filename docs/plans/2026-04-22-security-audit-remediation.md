@@ -65,7 +65,7 @@ Six independent tasks. Group as individual commits.
 - **Tests**: migration runs cleanly in the Testcontainers IT suite (existing AbstractApiIntegrationTest will exercise it).
 - **Commit**: `db(persistence): add composite index for tenant-scoped login activity queries`
 
-### [ ] 2.3 Optimistic locking on `UserEntity.tokenGeneration`
+### [x] 2.3 Optimistic locking on `UserEntity.tokenGeneration`
 - **Where**: `wealthview-persistence/src/main/java/com/wealthview/persistence/entity/UserEntity.java`; migration to add `version bigint NOT NULL DEFAULT 0`.
 - **Fix**: Add `@Version private long version;` field. Add migration `V056__add_version_to_users.sql`. Confirm no service code assumes the field is absent.
 - **Tests**: `UserRepositoryIT` — concurrent refresh simulation (two threads each bump generation) — one wins, the other surfaces `OptimisticLockingFailureException`. Wrap in `AuthService.refresh` to translate into `BadCredentialsException`.
