@@ -25,6 +25,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -733,12 +734,13 @@ class PropertyServiceTest {
         var expenseId = UUID.randomUUID();
         var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        ReflectionTestUtils.setField(property, "id", propertyId);
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
                 .thenReturn(Optional.of(property));
 
         var expense = new PropertyExpenseEntity(property, tenant,
                 LocalDate.of(2025, 3, 1), new BigDecimal("500"), "maintenance", "Plumbing fix");
-        when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(expense));
+        when(expenseRepository.findByTenant_IdAndId(tenantId, expenseId)).thenReturn(Optional.of(expense));
 
         propertyService.deleteExpense(tenantId, propertyId, expenseId);
 
@@ -753,10 +755,34 @@ class PropertyServiceTest {
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
                 .thenReturn(Optional.of(property));
-        when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
+        when(expenseRepository.findByTenant_IdAndId(tenantId, expenseId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> propertyService.deleteExpense(tenantId, propertyId, expenseId))
                 .isInstanceOf(EntityNotFoundException.class);
+    }
+
+    @Test
+    void deleteExpense_expenseBelongsToDifferentProperty_throwsNotFound() {
+        var propertyId = UUID.randomUUID();
+        var otherPropertyId = UUID.randomUUID();
+        var expenseId = UUID.randomUUID();
+        var property = new PropertyEntity(tenant, "123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"));
+        ReflectionTestUtils.setField(property, "id", propertyId);
+        var otherProperty = new PropertyEntity(tenant, "456 Oak Ave", new BigDecimal("400000"),
+                LocalDate.of(2021, 1, 1), new BigDecimal("450000"), new BigDecimal("300000"));
+        ReflectionTestUtils.setField(otherProperty, "id", otherPropertyId);
+        when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
+                .thenReturn(Optional.of(property));
+
+        var expenseOnOtherProperty = new PropertyExpenseEntity(otherProperty, tenant,
+                LocalDate.of(2025, 3, 1), new BigDecimal("500"), "maintenance", "Plumbing fix");
+        when(expenseRepository.findByTenant_IdAndId(tenantId, expenseId))
+                .thenReturn(Optional.of(expenseOnOtherProperty));
+
+        assertThatThrownBy(() -> propertyService.deleteExpense(tenantId, propertyId, expenseId))
+                .isInstanceOf(EntityNotFoundException.class);
+        verify(expenseRepository, org.mockito.Mockito.never()).delete(expenseOnOtherProperty);
     }
 
     @Test

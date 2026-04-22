@@ -7,9 +7,12 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface PropertyExpenseRepository extends JpaRepository<PropertyExpenseEntity, UUID> {
+
+    Optional<PropertyExpenseEntity> findByTenant_IdAndId(UUID tenantId, UUID id);
 
     List<PropertyExpenseEntity> findByTenant_IdAndProperty_Id(UUID tenantId, UUID propertyId);
 
