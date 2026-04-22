@@ -10,7 +10,7 @@ Each task is independently executable. Check the box when done, commit, and the 
 
 Ship as four separate conventional commits on `main`. TDD throughout (the iron law). Do **not** push until the user asks.
 
-### [ ] 1.1 Registration email-enumeration leak
+### [x] 1.1 Registration email-enumeration leak
 - **Where**: `wealthview-core/src/main/java/com/wealthview/core/auth/AuthService.java:126-144`
 - **Problem**: `existsByEmail` short-circuits before invite-code validation — distinct exception class + distinct response time lets an attacker enumerate registered emails by spraying invite codes.
 - **Fix**: Validate the invite code FIRST (same lookup + state checks as today), then check email uniqueness. Keep messages distinct to the operator via logs, but collapse the client-facing contract so timing + status code don't differentiate "email known" from "invite invalid."

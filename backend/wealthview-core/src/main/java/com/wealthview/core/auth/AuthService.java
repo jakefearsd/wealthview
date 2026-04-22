@@ -123,12 +123,10 @@ public class AuthService {
             throw new IllegalArgumentException("This password is too common and easily guessed. Please choose a different password.");
         }
 
-        if (userRepository.existsByEmail(request.email())) {
-            log.warn("Registration failed: duplicate email");
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "duplicate_email").increment();
-            throw new DuplicateEntityException("Email already registered");
-        }
-
+        // Invite validation must run before the email-existence check: otherwise
+        // an attacker can enumerate registered emails by spraying arbitrary
+        // invite codes and distinguishing DuplicateEntityException (email known)
+        // from InvalidInviteCodeException (email unknown) via status or timing.
         var inviteCode = inviteCodeRepository.findByCode(request.inviteCode())
                 .orElseThrow(() -> {
                     log.warn("Registration failed: invalid invite code");
@@ -141,6 +139,12 @@ public class AuthService {
                     inviteCode.isConsumed(), inviteCode.isRevoked(), inviteCode.isExpired());
             meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
             throw new InvalidInviteCodeException("Invalid or expired invite code");
+        }
+
+        if (userRepository.existsByEmail(request.email())) {
+            log.warn("Registration failed: duplicate email");
+            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "duplicate_email").increment();
+            throw new DuplicateEntityException("Email already registered");
         }
 
         var user = new UserEntity(

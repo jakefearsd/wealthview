@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -203,6 +204,9 @@ class AuthServiceTest {
 
     @Test
     void register_duplicateEmail_throwsDuplicateEntity() {
+        var invite = new InviteCodeEntity(tenant, "CODE", user,
+                OffsetDateTime.now().plusDays(7));
+        when(inviteCodeRepository.findByCode("CODE")).thenReturn(Optional.of(invite));
         when(userRepository.existsByEmail("exists@example.com")).thenReturn(true);
 
         assertThatThrownBy(() -> authService.register(
@@ -211,11 +215,24 @@ class AuthServiceTest {
     }
 
     @Test
+    void register_invalidInviteCode_throwsBeforeEmailCheck() {
+        // Invite validation must happen before the email-existence lookup so a
+        // caller cannot enumerate registered emails by spraying arbitrary invite
+        // codes and watching for DuplicateEntity vs InvalidInviteCode responses.
+        when(inviteCodeRepository.findByCode("BOGUS")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("any@example.com", "mytestpass", "BOGUS")))
+                .isInstanceOf(InvalidInviteCodeException.class);
+
+        verify(userRepository, never()).existsByEmail(anyString());
+    }
+
+    @Test
     void register_expiredInvite_throwsInvalidInviteCode() {
         var expired = new InviteCodeEntity(tenant, "EXPIRED", user,
                 OffsetDateTime.now().minusDays(1));
 
-        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(inviteCodeRepository.findByCode("EXPIRED")).thenReturn(Optional.of(expired));
 
         assertThatThrownBy(() -> authService.register(
@@ -231,7 +248,6 @@ class AuthServiceTest {
         consumed.setConsumedBy(user);
         consumed.setConsumedAt(OffsetDateTime.now());
 
-        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(inviteCodeRepository.findByCode("USED")).thenReturn(Optional.of(consumed));
 
         assertThatThrownBy(() -> authService.register(
@@ -246,7 +262,6 @@ class AuthServiceTest {
                 OffsetDateTime.now().plusDays(7));
         revoked.setRevoked(true);
 
-        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
         when(inviteCodeRepository.findByCode("REVOKED")).thenReturn(Optional.of(revoked));
 
         assertThatThrownBy(() -> authService.register(
