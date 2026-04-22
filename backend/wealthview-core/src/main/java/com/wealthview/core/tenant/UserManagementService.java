@@ -52,8 +52,9 @@ public class UserManagementService {
         }
 
         user.setRole(newRole);
+        user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
-        log.info("Updated role for user {} to {}", userId, newRole);
+        log.info("Updated role for user {} to {} (token generation bumped)", userId, newRole);
         return userRepository.save(user);
     }
 
