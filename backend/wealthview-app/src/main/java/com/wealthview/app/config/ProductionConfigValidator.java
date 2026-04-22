@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 import java.util.Set;
 
 @Component
-@Profile("prod")
+@Profile({"prod", "docker"})
 public class ProductionConfigValidator {
 
     private static final Logger log = LoggerFactory.getLogger(ProductionConfigValidator.class);
@@ -25,15 +25,21 @@ public class ProductionConfigValidator {
             "demo123",
             "DevPass123!"
     );
+    private static final Set<String> KNOWN_DEFAULT_DB_PASSWORDS = Set.of(
+            "wv_dev_pass"
+    );
 
     private final String jwtSecret;
     private final String superAdminPassword;
+    private final String dbPassword;
 
     public ProductionConfigValidator(
             @Value("${app.jwt.secret}") String jwtSecret,
-            @Value("${app.super-admin.password:}") String superAdminPassword) {
+            @Value("${app.super-admin.password:}") String superAdminPassword,
+            @Value("${spring.datasource.password:}") String dbPassword) {
         this.jwtSecret = jwtSecret;
         this.superAdminPassword = superAdminPassword;
+        this.dbPassword = dbPassword;
     }
 
     @EventListener(ApplicationReadyEvent.class)
@@ -49,6 +55,12 @@ public class ProductionConfigValidator {
                 || KNOWN_DEFAULT_SUPER_ADMIN_PASSWORDS.contains(superAdminPassword)) {
             throw new IllegalStateException(
                     "SECURITY: SUPER_ADMIN_PASSWORD must be set to a unique value in production. "
+                            + "Do not use any of the development defaults.");
+        }
+        if (dbPassword == null || dbPassword.isBlank()
+                || KNOWN_DEFAULT_DB_PASSWORDS.contains(dbPassword)) {
+            throw new IllegalStateException(
+                    "SECURITY: DB_PASSWORD must be set to a unique value in production. "
                             + "Do not use any of the development defaults.");
         }
         log.info("Production security configuration validated successfully");

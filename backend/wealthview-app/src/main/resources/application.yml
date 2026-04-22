@@ -2,7 +2,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/wealthview
     username: wv_app
-    password: ${DB_PASSWORD:wv_dev_pass}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -52,7 +52,7 @@ server:
 
 app:
   jwt:
-    secret: ${JWT_SECRET:default-secret-key-must-be-at-least-32-characters-long}
+    secret: ${JWT_SECRET}
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
   finnhub:

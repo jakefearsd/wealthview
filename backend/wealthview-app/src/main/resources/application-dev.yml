@@ -1,4 +1,6 @@
 spring:
+  datasource:
+    password: ${DB_PASSWORD:wv_dev_pass}
   jpa:
     show-sql: true
     properties:
