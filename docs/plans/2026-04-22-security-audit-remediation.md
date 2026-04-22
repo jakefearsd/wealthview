@@ -59,8 +59,8 @@ Six independent tasks. Group as individual commits.
 - **Tests**: manual — `docker compose up --build -d && docker compose exec app id` should not return uid=0; `docker inspect` shows Health status transitioning to healthy.
 - **Commit**: `chore(docker): run as non-root user and add healthcheck`
 
-### [ ] 2.2 Composite index on `login_activity(tenant_id, created_at)`
-- **Where**: new Flyway migration `V055__index_login_activity_tenant.sql` under `wealthview-persistence/src/main/resources/db/migration/`.
+### [x] 2.2 Composite index on `login_activity(tenant_id, created_at)`
+- **Where**: new Flyway migration `V056__index_login_activity_tenant.sql` under `wealthview-persistence/src/main/resources/db/migration/` (V055 already taken).
 - **Fix**: `CREATE INDEX IF NOT EXISTS idx_login_activity_tenant_created_at ON login_activity (tenant_id, created_at DESC);`
 - **Tests**: migration runs cleanly in the Testcontainers IT suite (existing AbstractApiIntegrationTest will exercise it).
 - **Commit**: `db(persistence): add composite index for tenant-scoped login activity queries`
