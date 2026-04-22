@@ -71,7 +71,7 @@ Six independent tasks. Group as individual commits.
 - **Tests**: `UserRepositoryIT` — concurrent refresh simulation (two threads each bump generation) — one wins, the other surfaces `OptimisticLockingFailureException`. Wrap in `AuthService.refresh` to translate into `BadCredentialsException`.
 - **Commit**: `fix(auth): add optimistic locking to user token generation to resolve refresh races`
 
-### [ ] 2.4 Audit events for super-admin mutations
+### [x] 2.4 Audit events for super-admin mutations
 - **Where**: `wealthview-core/src/main/java/com/wealthview/core/tenant/UserManagementService.java`
 - **Fix**: Inject `ApplicationEventPublisher`; publish `AuditEvent` on `updateUserRole`, `deleteUser`, `setUserActive*`, `resetPassword*`. Include tenant, actor, target user, action name, relevant before/after fields. Make sure the audit entity's details Map is small and well-typed (see 2.5).
 - **Tests**: extend `UserManagementServiceTest` to verify each mutation publishes exactly one event with the expected payload.
