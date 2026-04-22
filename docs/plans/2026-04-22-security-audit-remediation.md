@@ -77,7 +77,7 @@ Six independent tasks. Group as individual commits.
 - **Tests**: extend `UserManagementServiceTest` to verify each mutation publishes exactly one event with the expected payload.
 - **Commit**: `feat(core): emit audit events for user management mutations`
 
-### [ ] 2.5 Cap audit `details` JSON depth and size
+### [x] 2.5 Cap audit `details` JSON depth and size
 - **Where**: wherever `AuditLogEntity.details` is persisted — likely `AuditEventListener` or a dedicated service.
 - **Fix**: Before persistence, reject or truncate details whose serialized JSON exceeds a threshold (suggest 8 KB) or whose map depth exceeds 3 levels. Write as utility method `AuditDetailsValidator.validate(Map<String,Object>)`.
 - **Tests**: unit tests covering oversize, overdeep, and the happy path.
