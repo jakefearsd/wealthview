@@ -170,7 +170,8 @@ public class PropertyService {
     public void deleteExpense(UUID tenantId, UUID propertyId, UUID expenseId) {
         propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
                 .orElseThrow(() -> new EntityNotFoundException("Property not found"));
-        var expense = expenseRepository.findById(expenseId)
+        var expense = expenseRepository.findByTenant_IdAndId(tenantId, expenseId)
+                .filter(e -> e.getProperty() != null && propertyId.equals(e.getProperty().getId()))
                 .orElseThrow(() -> new EntityNotFoundException("Expense not found"));
         expenseRepository.delete(expense);
     }
