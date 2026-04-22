@@ -23,12 +23,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Adapter from OFX4J's {@link ResponseEnvelope} format to the app's {@link ImportParseResult}.
@@ -47,16 +50,26 @@ import java.util.Map;
 public class OfxTransactionParser implements ImportParser {
 
     private static final Logger log = LoggerFactory.getLogger(OfxTransactionParser.class);
+    // Match a DOCTYPE declaration anywhere in the document — case-insensitive,
+    // tolerant of whitespace. Any match is rejected as a potential XXE vector.
+    private static final Pattern DOCTYPE_PATTERN = Pattern.compile("<!\\s*DOCTYPE", Pattern.CASE_INSENSITIVE);
 
     @Override
     public ImportParseResult parse(InputStream inputStream) throws IOException {
         var transactions = new ArrayList<ParsedTransaction>();
         var errors = new ArrayList<CsvRowError>();
 
+        var bytes = inputStream.readAllBytes();
+        if (DOCTYPE_PATTERN.matcher(new String(bytes, StandardCharsets.UTF_8)).find()) {
+            log.warn("Rejected OFX upload containing DOCTYPE declaration (XXE defense)");
+            errors.add(new CsvRowError(0, "Failed to parse OFX file: DOCTYPE declarations are not permitted"));
+            return new ImportParseResult(transactions, errors);
+        }
+
         ResponseEnvelope envelope;
         try {
             var unmarshaller = new AggregateUnmarshaller<>(ResponseEnvelope.class);
-            envelope = unmarshaller.unmarshal(inputStream);
+            envelope = unmarshaller.unmarshal(new ByteArrayInputStream(bytes));
         } catch (IOException | com.webcohesion.ofx4j.io.OFXParseException e) {
             log.warn("Failed to parse OFX file", e);
             errors.add(new CsvRowError(0, "Failed to parse OFX file: " + e.getMessage()));

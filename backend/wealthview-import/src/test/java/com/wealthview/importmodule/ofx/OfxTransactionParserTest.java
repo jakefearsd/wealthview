@@ -318,21 +318,14 @@ class OfxTransactionParserTest {
 
     @Test
     void parse_xxePayload_doesNotLeakFileContent() throws IOException {
-        // OFX 2.x is XML-based. A malicious client could supply a DOCTYPE with
-        // an external entity that reads /etc/passwd or exfiltrates to a URL.
-        // The parser must not resolve external entities.
+        // OFX 2.x is XML-based — ofx4j dispatches on the <?OFX OFXHEADER="200"?>
+        // processing instruction and pipes the body through SAX. A malicious
+        // client can supply a DOCTYPE with an external entity that reads
+        // /etc/passwd (or exfiltrates to a URL via out-of-band techniques).
+        // The parser must refuse to resolve external entities.
         var xxePayload = """
-                OFXHEADER:100
-                DATA:OFXSGML
-                VERSION:200
-                SECURITY:NONE
-                ENCODING:UTF-8
-                CHARSET:NONE
-                COMPRESSION:NONE
-                OLDFILEUID:NONE
-                NEWFILEUID:NONE
-
                 <?xml version="1.0" encoding="UTF-8"?>
+                <?OFX OFXHEADER="200" VERSION="200" SECURITY="NONE" OLDFILEUID="NONE" NEWFILEUID="NONE"?>
                 <!DOCTYPE OFX [
                   <!ENTITY xxe SYSTEM "file:///etc/passwd">
                 ]>
@@ -361,22 +354,44 @@ class OfxTransactionParserTest {
     }
 
     @Test
+    void parse_doctypeDeclaration_rejectedBeforeXmlParse() throws IOException {
+        // Defence-in-depth: ofx4j's v2 SAX path relies on JDK defaults to block
+        // XXE, but JDK defaults can shift across versions or be overridden by
+        // system properties. We reject any file containing a DOCTYPE declaration
+        // before handing bytes to ofx4j so the defense doesn't depend on anything
+        // outside this module.
+        var payloadWithDoctype = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <?OFX OFXHEADER="200" VERSION="200" SECURITY="NONE" OLDFILEUID="NONE" NEWFILEUID="NONE"?>
+                <!DOCTYPE OFX>
+                <OFX>
+                  <SIGNONMSGSRSV1>
+                    <SONRS>
+                      <STATUS><CODE>0</CODE><SEVERITY>INFO</SEVERITY></STATUS>
+                      <DTSERVER>20250115</DTSERVER>
+                      <LANGUAGE>ENG</LANGUAGE>
+                    </SONRS>
+                  </SIGNONMSGSRSV1>
+                </OFX>
+                """;
+
+        var result = parser.parse(toStream(payloadWithDoctype));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors())
+                .as("DOCTYPE declarations must be refused by our own code, "
+                        + "not silently accepted and forwarded to the XML parser")
+                .anyMatch(err -> err.message().toLowerCase().contains("doctype"));
+    }
+
+    @Test
     void parse_externalDtd_doesNotFetchRemote() throws IOException {
         // If the parser honors external DTDs, a crafted file can force an HTTP
         // callback (SSRF) or hang on a slow endpoint. We point at a reserved
         // TEST-NET-1 address (RFC 5737) which should never resolve.
         var dtdPayload = """
-                OFXHEADER:100
-                DATA:OFXSGML
-                VERSION:200
-                SECURITY:NONE
-                ENCODING:UTF-8
-                CHARSET:NONE
-                COMPRESSION:NONE
-                OLDFILEUID:NONE
-                NEWFILEUID:NONE
-
                 <?xml version="1.0" encoding="UTF-8"?>
+                <?OFX OFXHEADER="200" VERSION="200" SECURITY="NONE" OLDFILEUID="NONE" NEWFILEUID="NONE"?>
                 <!DOCTYPE OFX SYSTEM "http://192.0.2.1/evil.dtd">
                 <OFX>
                   <SIGNONMSGSRSV1>
