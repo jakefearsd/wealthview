@@ -14,6 +14,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -196,7 +197,12 @@ public class AuthService {
 
         user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
-        userRepository.save(user);
+        try {
+            userRepository.save(user);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("Token refresh lost race for user {}: {}", userId, e.getMessage());
+            throw new BadCredentialsException("Refresh token has been revoked");
+        }
 
         return buildAuthResponse(user);
     }

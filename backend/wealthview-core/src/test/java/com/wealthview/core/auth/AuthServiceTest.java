@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -324,6 +325,21 @@ class AuthServiceTest {
         var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
         user.setTokenGeneration(1);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("revoked");
+    }
+
+    @Test
+    void refresh_concurrentRefreshRacesToSave_losingCallerThrowsBadCredentials() {
+        // Two requests with the same valid refresh token can race on the generation bump.
+        // The first to save wins; the second must surface as a revoked-session error rather
+        // than bubble up a raw OptimisticLockingFailureException to the HTTP layer.
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class)))
+                .thenThrow(new ObjectOptimisticLockingFailureException(UserEntity.class, user.getId()));
 
         assertThatThrownBy(() -> authService.refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
