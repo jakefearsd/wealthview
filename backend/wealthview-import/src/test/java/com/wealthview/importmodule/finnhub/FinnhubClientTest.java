@@ -14,9 +14,10 @@ import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.queryParam;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestToUriTemplate;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
@@ -35,8 +36,9 @@ class FinnhubClientTest {
 
     @Test
     void getQuote_successfulResponse_returnsSuccess() {
-        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL"))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
                 .andRespond(withSuccess("""
                         {"c": 150.25, "d": -1.5, "dp": -0.99, "h": 152.0, "l": 149.5, "o": 151.0, "pc": 151.75}
                         """, MediaType.APPLICATION_JSON));
@@ -51,9 +53,27 @@ class FinnhubClientTest {
     }
 
     @Test
-    void getQuote_serverError_returnsFailureWithStatusCode() {
-        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
+    void getQuote_doesNotSendTokenAsQueryParam() {
+        // The API key must travel via the X-Finnhub-Token header so it never lands
+        // in access logs, proxy caches, or error-reporting URLs.
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL"))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
+                .andExpect(queryParam("symbol", "AAPL"))
+                .andRespond(withSuccess("""
+                        {"c": 150.25}
+                        """, MediaType.APPLICATION_JSON));
+
+        client.getQuote("AAPL");
+
+        mockServer.verify();
+    }
+
+    @Test
+    void getQuote_serverError_returnsFailureWithStatusCode() {
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
                 .andRespond(withServerError());
 
         var result = client.getQuote("AAPL");
@@ -66,8 +86,9 @@ class FinnhubClientTest {
 
     @Test
     void getQuote_forbidden_returnsFailureWithStatusCode() {
-        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL&token=test-api-key"))
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=AAPL"))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
                 .andRespond(withStatus(HttpStatus.FORBIDDEN));
 
         var result = client.getQuote("AAPL");
@@ -80,8 +101,9 @@ class FinnhubClientTest {
 
     @Test
     void getQuote_zeroPriceResponse_returnsFailureWithReason() {
-        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=INVALID&token=test-api-key"))
+        mockServer.expect(requestTo("https://finnhub.io/api/v1/quote?symbol=INVALID"))
                 .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
                 .andRespond(withSuccess("""
                         {"c": 0, "d": null, "dp": null, "h": 0, "l": 0, "o": 0, "pc": 0}
                         """, MediaType.APPLICATION_JSON));
@@ -95,9 +117,25 @@ class FinnhubClientTest {
     }
 
     @Test
+    void getCandles_sendsTokenAsHeaderNotQueryParam() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
+                .andExpect(queryParam("symbol", "AAPL"))
+                .andExpect(queryParam("resolution", "D"))
+                .andRespond(withSuccess("""
+                        {"s": "no_data"}
+                        """, MediaType.APPLICATION_JSON));
+
+        client.getCandles("AAPL", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 5));
+
+        mockServer.verify();
+    }
+
+    @Test
     void getCandles_successfulResponse_returnsCandleEntries() {
         // Unix timestamps: 2024-01-02 and 2024-01-03 in America/New_York
         mockServer.expect(method(HttpMethod.GET))
+                .andExpect(header("X-Finnhub-Token", "test-api-key"))
                 .andRespond(withSuccess("""
                         {
                             "c": [185.50, 186.25],

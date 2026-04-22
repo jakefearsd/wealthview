@@ -28,7 +28,7 @@ Ship as four separate conventional commits on `main`. TDD throughout (the iron l
 - **Tests**: extend `ProductionConfigValidatorTest` with `prodProfile_emptyCorsOrigin_fails` and `prodProfile_nonHttpsOrigin_fails`.
 - **Commit**: `fix(app): require non-empty https CORS origin in production profile`
 
-### [ ] 1.3 Finnhub API key in query string
+### [x] 1.3 Finnhub API key in query string
 - **Where**: `wealthview-import/src/main/java/com/wealthview/importmodule/finnhub/FinnhubClient.java:40,72`
 - **Problem**: `?token=...` query param gets into access logs / proxies / error reports.
 - **Fix**: Drop `token` from the URI template; configure `FinnhubConfig` to inject an `X-Finnhub-Token` header on every request via a `ClientHttpRequestInterceptor` (or move the header into each `FinnhubClient` call).
