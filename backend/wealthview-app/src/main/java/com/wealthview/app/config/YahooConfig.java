@@ -7,14 +7,20 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
+
 @Configuration
 public class YahooConfig {
+
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(15);
 
     @Bean
     public RestClient yahooRestClient(
             @Value("${app.yahoo.base-url:https://query1.finance.yahoo.com}") String baseUrl) {
         return RestClient.builder()
                 .baseUrl(baseUrl)
+                .requestFactory(HttpClientFactory.withTimeouts(CONNECT_TIMEOUT, READ_TIMEOUT))
                 .build();
     }
 
