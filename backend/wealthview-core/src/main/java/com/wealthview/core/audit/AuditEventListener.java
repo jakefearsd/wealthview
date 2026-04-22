@@ -23,9 +23,15 @@ public class AuditEventListener {
     @TransactionalEventListener(fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleAuditEvent(AuditEvent event) {
+        var safeDetails = AuditDetailsValidator.validate(event.details());
+        if (safeDetails != event.details()) {
+            log.warn("Audit details for action {} on {} {} truncated (reason={})",
+                    event.action(), event.entityType(), event.entityId(),
+                    safeDetails.get("_reason"));
+        }
         var entity = new AuditLogEntity(
                 event.tenantId(), event.userId(), event.action(),
-                event.entityType(), event.entityId(), event.details());
+                event.entityType(), event.entityId(), safeDetails);
         auditLogRepository.save(entity);
         log.debug("Audit log: {} {} {} by user {}",
                 event.action(), event.entityType(), event.entityId(), event.userId());
