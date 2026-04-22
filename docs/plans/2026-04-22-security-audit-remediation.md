@@ -21,7 +21,7 @@ Ship as four separate conventional commits on `main`. TDD throughout (the iron l
   - `register_validInviteDuplicateEmail_stillThrowsDuplicate` — behavior preserved for the happy path.
 - **Commit**: `fix(auth): validate invite code before email uniqueness to close enumeration channel`
 
-### [ ] 1.2 CORS production default is empty
+### [x] 1.2 CORS production default is empty
 - **Where**: `wealthview-app/src/main/resources/application-prod.yml:3` (`${CORS_ORIGIN:}`) and `wealthview-app/src/main/java/com/wealthview/app/config/ProductionConfigValidator.java`
 - **Problem**: Operator who forgets to set `CORS_ORIGIN` in prod ships with empty allowed-origins — fragile and silently misconfigurable.
 - **Fix**: Remove the `:` default from `application-prod.yml` (so absence fails fast) AND add a validator check: on `ApplicationReadyEvent` under prod/docker profile, assert `app.cors.allowed-origins` is non-empty and each entry is an `https://...` URL (except for explicitly allowed localhost in docker profile).
