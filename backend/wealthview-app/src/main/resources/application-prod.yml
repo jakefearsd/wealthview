@@ -1,6 +1,6 @@
 app:
   cors:
-    allowed-origins: ${CORS_ORIGIN:}
+    allowed-origins: ${CORS_ORIGIN}
   super-admin:
     email: admin@wealthview.local
     password: ${SUPER_ADMIN_PASSWORD}
