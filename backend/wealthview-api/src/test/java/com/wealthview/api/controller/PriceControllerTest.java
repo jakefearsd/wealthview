@@ -6,6 +6,7 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.price.PriceService;
 import com.wealthview.core.price.dto.PriceRequest;
@@ -22,6 +23,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
+import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedMember;
+import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedViewer;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -46,6 +49,9 @@ class PriceControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private SessionStateValidator sessionStateValidator;
 
     @Test
     void listLatestPrices_returns200WithPriceList() throws Exception {
@@ -109,5 +115,52 @@ class PriceControllerTest {
                                 {"date": "2025-01-15", "close_price": 185.50}
                                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void create_memberRole_returns403() throws Exception {
+        // Prices are global/shared across tenants — allowing any authenticated
+        // MEMBER to overwrite them lets one tenant influence every tenant's
+        // holding valuations. Mutations must be restricted to ADMIN+.
+        mockMvc.perform(post("/api/v1/prices")
+                        .with(authenticatedMember())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"symbol": "AAPL", "date": "2025-01-15", "close_price": 0.01}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void create_viewerRole_returns403() throws Exception {
+        mockMvc.perform(post("/api/v1/prices")
+                        .with(authenticatedViewer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"symbol": "AAPL", "date": "2025-01-15", "close_price": 0.01}
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void listLatestPrices_memberRole_returns200() throws Exception {
+        // Reads of global prices remain open to all authenticated roles —
+        // only writes are privileged.
+        when(priceService.listLatestPrices()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/prices")
+                        .with(authenticatedMember()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void getLatest_memberRole_returns200() throws Exception {
+        var response = new PriceResponse("AAPL", LocalDate.of(2025, 1, 15),
+                new BigDecimal("185.50"), "manual");
+        when(priceService.getLatestPrice("AAPL")).thenReturn(response);
+
+        mockMvc.perform(get("/api/v1/prices/AAPL/latest")
+                        .with(authenticatedMember()))
+                .andExpect(status().isOk());
     }
 }
