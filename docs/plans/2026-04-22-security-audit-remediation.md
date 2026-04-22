@@ -83,7 +83,7 @@ Six independent tasks. Group as individual commits.
 - **Tests**: unit tests covering oversize, overdeep, and the happy path.
 - **Commit**: `fix(core): bound audit event details to prevent storage-amplification payloads`
 
-### [ ] 2.6 `Permissions-Policy` header
+### [x] 2.6 `Permissions-Policy` header
 - **Where**: `wealthview-api/src/main/java/com/wealthview/api/security/SecurityConfig.java` header block (`~line 80`).
 - **Fix**: Add `.addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=()"))` (or equivalent Spring Security 6 fluent call).
 - **Tests**: extend an existing `SecurityConfigIntegrationTest` (or add one) to GET a public endpoint and assert the header value.
