@@ -18,9 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -84,7 +86,72 @@ class TenantServiceTest {
         var result = tenantService.generateInviteCode(tenantId, userId);
 
         assertThat(result.getCode()).isNotBlank();
-        assertThat(result.getCode()).hasSize(8);
+    }
+
+    @Test
+    void generateInviteCode_codeHasAtLeast120BitsEntropy() {
+        // 120 bits of entropy is the minimum that makes online brute-force
+        // infeasible. The old 8-char uppercase-hex substring was ~32 bits —
+        // trivially bruteforceable with the register endpoint's rate limit.
+        // 24 chars from a 32-symbol alphabet = exactly 120 bits.
+        var tenant = new TenantEntity("Test");
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var tenantId = UUID.randomUUID();
+        var userId = UUID.randomUUID();
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var result = tenantService.generateInviteCode(tenantId, userId);
+
+        assertThat(result.getCode().length()).isGreaterThanOrEqualTo(24);
+    }
+
+    @Test
+    void generateInviteCode_codeUsesHumanFriendlyAlphabet() {
+        // Codes should be typable: uppercase alphanumerics only. No lowercase
+        // (ambiguous with I/1), no symbols (copy-paste hostile). Crockford-ish
+        // alphabet — drops I, L, O, U to avoid visual confusion.
+        var tenant = new TenantEntity("Test");
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var tenantId = UUID.randomUUID();
+        var userId = UUID.randomUUID();
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var allowedAlphabet = Pattern.compile("^[A-Z0-9]+$");
+        for (int i = 0; i < 50; i++) {
+            var result = tenantService.generateInviteCode(tenantId, userId);
+            assertThat(result.getCode()).matches(allowedAlphabet);
+        }
+    }
+
+    @Test
+    void generateInviteCode_noCollisionsAcrossManyGenerations() {
+        // A CSPRNG with ≥120 bits has negligible collision probability.
+        // If two codes collide in 10k trials, entropy is wrong or the PRNG
+        // is Math.random() masquerading as secure.
+        var tenant = new TenantEntity("Test");
+        var user = new UserEntity(tenant, "admin@test.com", "hash", "admin");
+        var tenantId = UUID.randomUUID();
+        var userId = UUID.randomUUID();
+
+        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var seen = new HashSet<String>();
+        for (int i = 0; i < 10_000; i++) {
+            var code = tenantService.generateInviteCode(tenantId, userId).getCode();
+            assertThat(seen).doesNotContain(code);
+            seen.add(code);
+        }
     }
 
     @Test

@@ -16,9 +16,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,6 +26,12 @@ import java.util.UUID;
 public class TenantService {
 
     private static final Logger log = LoggerFactory.getLogger(TenantService.class);
+
+    // Crockford-ish Base32 alphabet (no I, L, O, U). 32 symbols * 24 chars = 120 bits.
+    private static final char[] INVITE_CODE_ALPHABET =
+            "0123456789ABCDEFGHJKMNPQRSTVWXYZ".toCharArray();
+    private static final int INVITE_CODE_LENGTH = 24;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final TenantRepository tenantRepository;
     private final InviteCodeRepository inviteCodeRepository;
@@ -105,13 +111,21 @@ public class TenantService {
         var creator = userRepository.findById(createdByUserId)
                 .orElseThrow(() -> new EntityNotFoundException("User not found: " + createdByUserId));
 
-        var code = UUID.randomUUID().toString().substring(0, 8).toUpperCase(Locale.US);
+        var code = generateSecureInviteCode();
         var invite = new InviteCodeEntity(tenant, code, creator,
                 OffsetDateTime.now().plusDays(expiryDays));
         invite = inviteCodeRepository.save(invite);
 
-        log.info("Invite code generated for tenant {} with {} day expiry: {}", tenantId, expiryDays, code);
+        log.info("Invite code generated for tenant {} with {} day expiry", tenantId, expiryDays);
         return invite;
+    }
+
+    private static String generateSecureInviteCode() {
+        var chars = new char[INVITE_CODE_LENGTH];
+        for (int i = 0; i < INVITE_CODE_LENGTH; i++) {
+            chars[i] = INVITE_CODE_ALPHABET[SECURE_RANDOM.nextInt(INVITE_CODE_ALPHABET.length)];
+        }
+        return new String(chars);
     }
 
     @Transactional(readOnly = true)
