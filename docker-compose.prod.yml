@@ -15,6 +15,7 @@ services:
     restart: unless-stopped
 
   app:
+    image: wealthview:${WEALTHVIEW_VERSION:-latest}
     build: .
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wealthview
