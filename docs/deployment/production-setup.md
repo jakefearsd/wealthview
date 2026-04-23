@@ -2,337 +2,442 @@
 
 # Production Setup
 
-This guide walks through deploying WealthView on a VPS with TLS, automated backups,
-and a reverse proxy. By the end you will have a fully production-ready instance.
+This is the end-to-end guide for putting WealthView on a real machine that you
+intend to use every day. It assumes only basic Docker knowledge (you have run
+`docker compose up` once before) and walks through every step.
 
-## Architecture Overview
+At the end you will have:
 
-The production stack runs five containers:
+- WealthView running in Docker on a Linux host.
+- A PostgreSQL database with nightly automatic backups.
+- An edge proxy providing TLS (HTTPS) — you pick one of two options.
+
+For a 5-minute local trial, see [quickstart.md](quickstart.md) instead.
+
+---
+
+## What you are about to deploy
+
+WealthView ships with **two** Compose files at the repo root:
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Local evaluation. Two services (`db`, `app`) with the `docker` Spring profile, which seeds a demo tenant. Not for production. |
+| `docker-compose.prod.yml` | Production. Three services: `db`, `app`, `backup`. Runs the `prod` Spring profile with strict config validation and no seed data. |
+
+The production compose file contains **only the WealthView containers**. It
+deliberately does not include nginx, certbot, or any other edge proxy, because
+the right choice depends on how you are exposing the server to the internet.
+You will add a proxy (or a Cloudflare Tunnel) in a separate, later step.
+
+### The three production containers
 
 ```
-                  +----------+
-    Internet ---->|  nginx   |----> app:8080 (Spring Boot)
-     :80/:443    +----------+         |
-                      |               v
-                  +----------+   +----------+
-                  | certbot  |   |    db    |
-                  +----------+   | (Pg 16) |
-                                 +----------+
-                                      |
-                                 +----------+
-                                 |  backup  |
-                                 +----------+
+                                     +-------------------+
+   [edge proxy: nginx-on-host        |                   |
+    OR cloudflared OR similar]       |                   |
+                  |                  |                   |
+                  v                  |                   |
+         localhost:APP_PORT    -->   |  app (Spring Boot)|
+                                     |                   |
+                                     +---------+---------+
+                                               |
+                                               v (internal Docker network)
+                                     +-------------------+         +-------------------+
+                                     |  db (PostgreSQL)  | <-----  |      backup       |
+                                     +-------------------+         | (nightly pg_dump) |
+                                                                   +-------------------+
 ```
 
 | Container | Role |
 |-----------|------|
-| **db** | PostgreSQL 16. Stores all application data. Data persisted in a Docker volume. |
-| **app** | Spring Boot application. Serves the API and React frontend. Runs Flyway migrations on startup. Not directly accessible from outside -- nginx proxies to it. |
-| **nginx** | Reverse proxy and TLS termination. Serves HTTPS with security headers. Redirects HTTP to HTTPS. |
-| **certbot** | Automated Let's Encrypt certificate provisioning and renewal. Runs a renewal check every 12 hours. |
-| **backup** | Runs `pg_dump` daily at 3 AM UTC. Cleans up old backups based on retention policy. |
+| **db** | PostgreSQL 16. Data lives in the named Docker volume `pgdata`. No host port published. |
+| **app** | Spring Boot application serving the API and the React SPA at `/`. Publishes `${APP_PORT:-80}:8080` on the host — this is what your edge proxy or Cloudflare Tunnel points at. Runs as a non-root user (`wv`) with a container-level HEALTHCHECK against `/actuator/health`. |
+| **backup** | Alpine container running `cron` + `pg_dump`. Writes timestamped dumps into `./backups/` on the host every night. |
 
-## VPS Requirements
+Nothing listens on the public internet directly — you only expose the edge
+proxy, never the container port. See [Step 6](#step-6-choose-and-configure-an-edge-proxy-tls).
+
+---
+
+## VPS / host requirements
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
-| OS | Ubuntu 22.04/24.04 or Debian 12 | Ubuntu 24.04 LTS |
-| CPU | 1 core | 2+ cores |
-| RAM | 1 GB | 2+ GB |
-| Disk | 1 GB | 10+ GB |
-| Network | Port 80 and 443 open | Static IP |
+| OS | Any Linux (x86-64 or ARM64) with a recent kernel | Ubuntu 24.04 LTS, Debian 12 |
+| CPU | 1 vCPU | 2+ vCPU |
+| RAM | 1 GB | 2 GB |
+| Disk | 10 GB | 20+ GB (room for backups + Docker images) |
+| Network | Outbound HTTPS for Maven/npm builds; inbound depends on edge proxy choice | Static IPv4 address if exposing directly |
 
-You also need a **domain name** with a DNS A record pointing to your server's IP address.
+For a home-lab install (no public IP), a Raspberry Pi 4 with 4 GB RAM behind a
+Cloudflare Tunnel is a perfectly good target. See
+[cloudflared.md](cloudflared.md).
+
+---
 
 ## Step 1: Install Docker
 
-Follow the [official Docker installation guide](https://docs.docker.com/engine/install/)
-for your distribution. Make sure the Compose plugin is included:
+If Docker is not already installed, follow the
+[official Docker Engine install guide](https://docs.docker.com/engine/install/)
+for your distribution. On Debian/Ubuntu, the short version is:
 
 ```bash
-docker --version
-docker compose version
+# Install prerequisites
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl
+
+# Add Docker's official GPG key and repo
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+  https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Install Docker Engine + Compose plugin
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-Add your user to the `docker` group so you don't need `sudo` for every command:
+Verify both `docker` and `docker compose` (Compose v2, one word, not
+`docker-compose`) are available:
+
+```bash
+docker --version            # Docker version 24.x or newer
+docker compose version      # Docker Compose version v2.x
+```
+
+Add your user to the `docker` group so you don't need `sudo` for every
+command. **You must log out and back in for this to take effect.**
 
 ```bash
 sudo usermod -aG docker $USER
-# Log out and back in for the group change to take effect
+# Now log out, log back in, and re-run:
+docker ps
+# If you see an empty table (no error), you're good.
 ```
 
-## Step 2: Clone the Repository
+---
+
+## Step 2: Clone the repository
+
+Pick where the app will live. `/opt/wealthview` is a common choice on Linux
+servers; anywhere writable by your user works.
 
 ```bash
-git clone https://github.com/your-org/wealthview.git
-cd wealthview
+sudo mkdir -p /opt/wealthview
+sudo chown $USER /opt/wealthview
+cd /opt/wealthview
+
+git clone https://github.com/<your-org>/wealthview.git .
 ```
 
-## Step 3: Create the `.env` File
+Replace `<your-org>` with the GitHub user or organization hosting the fork you
+are deploying.
 
-Create a `.env` file in the project root with all configuration variables:
+---
+
+## Step 3: Create the `.env` file
+
+All runtime secrets live in `.env` at the repo root. A template is provided:
 
 ```bash
-cat > .env << 'EOF'
-# --- Required ---
-DB_PASSWORD=<generated>              # Database password
-JWT_SECRET=<generated>               # JWT signing key (32+ chars, HMAC-SHA256)
-SUPER_ADMIN_PASSWORD=<generated>     # Super-admin account password
-
-# --- Optional ---
-FINNHUB_API_KEY=                     # Finnhub API key for live stock prices
-ZILLOW_ENABLED=false                 # Enable Zillow property valuations
-BACKUP_RETENTION_DAYS=14             # Days to keep backup files
-EOF
+cp .env.example .env
 ```
 
-Generate strong values for each required secret:
+Edit `.env` and fill in **every** value that currently reads `CHANGE_ME`:
+
+```dotenv
+# Database password for the wv_app PostgreSQL role.
+DB_PASSWORD=<generate with: openssl rand -base64 24>
+
+# HMAC-SHA256 signing key for JWT access/refresh tokens. Must be 32+ chars.
+JWT_SECRET=<generate with: openssl rand -base64 48>
+
+# Initial password for admin@wealthview.local. Change immediately after first login.
+SUPER_ADMIN_PASSWORD=<generate with: openssl rand -base64 18>
+
+# Finnhub API key for live stock prices. Optional — leave blank to use seeded prices only.
+FINNHUB_API_KEY=
+
+# Enable the weekly Zillow property valuation sync. Optional, default false.
+ZILLOW_ENABLED=false
+
+# Keep this many days of nightly pg_dump files under ./backups/. Optional, default 14.
+BACKUP_RETENTION_DAYS=14
+
+# Allowed origin for /api/* requests. REQUIRED in production — the app refuses to
+# start with an empty or non-https value on the prod profile. Set to your public URL.
+CORS_ORIGIN=https://wealthview.example.com
+
+# Host port the container listens on. Leave as 80 when the app is behind a local
+# edge proxy on the same machine, or set to a non-privileged port (e.g. 8080) when
+# behind Cloudflare Tunnel or another loopback-only proxy.
+APP_PORT=80
+```
+
+Three things are mandatory in production:
+
+1. `DB_PASSWORD`, `JWT_SECRET`, `SUPER_ADMIN_PASSWORD` cannot be the dev
+   defaults — `ProductionConfigValidator` aborts startup with a clear error
+   message if they are.
+2. `JWT_SECRET` must be at least 32 characters.
+3. `CORS_ORIGIN` must be a non-empty `https://...` URL on the `prod` profile
+   (again, the validator enforces this). The only exception is the `docker`
+   profile, which also allows `http://localhost` for local evaluation.
+
+Generate strong values on any Linux box:
 
 ```bash
-# Database password
-openssl rand -base64 24
-
-# JWT signing key (must be 32+ characters for HMAC-SHA256)
-openssl rand -base64 48
-
-# Super-admin password
-openssl rand -base64 18
+openssl rand -base64 24    # DB_PASSWORD
+openssl rand -base64 48    # JWT_SECRET
+openssl rand -base64 18    # SUPER_ADMIN_PASSWORD
 ```
 
-Copy each generated value into the `.env` file, replacing the `<generated>` placeholders.
-
-Lock down file permissions:
+Lock down the file so only your user can read it:
 
 ```bash
 chmod 600 .env
+ls -la .env                # should show: -rw------- 1 you you ...
 ```
 
-## Step 4: Set Up DNS
-
-Create a DNS A record pointing your domain to the server's IP:
-
-| Type | Name | Value | TTL |
-|------|------|-------|-----|
-| A | wealthview.example.com | 203.0.113.50 | 300 |
-
-Verify DNS propagation:
+**Never commit `.env`** to git. It is already in `.gitignore`; verify:
 
 ```bash
-dig +short wealthview.example.com
-# Should return your server's IP
+grep -E '^\.env$' .gitignore
 ```
 
-## Step 5: Provision the Initial TLS Certificate
+---
 
-The nginx container expects TLS certificates to exist before it starts. You need to
-provision the first certificate manually using certbot in standalone mode.
-
-Make sure port 80 is open and not in use:
-
-```bash
-sudo lsof -i :80
-```
-
-Run certbot to obtain the initial certificate:
-
-```bash
-docker run --rm -p 80:80 \
-  -v $(pwd)/certbot-certs:/etc/letsencrypt \
-  certbot/certbot certonly \
-  --standalone \
-  -d wealthview.example.com \
-  --agree-tos \
-  --email you@example.com \
-  --non-interactive
-```
-
-Replace `wealthview.example.com` with your actual domain and `you@example.com` with
-your email address.
-
-Verify the certificate was created:
-
-```bash
-ls certbot-certs/live/wealthview.example.com/
-# Should contain: cert.pem  chain.pem  fullchain.pem  privkey.pem
-```
-
-## Step 6: Update Nginx Configuration
-
-Edit `nginx-prod.conf` to set your domain name:
-
-```bash
-# Replace the server_name placeholder with your domain
-sed -i 's/server_name _;/server_name wealthview.example.com;/' nginx-prod.conf
-```
-
-If your domain differs from `wealthview`, also update the SSL certificate paths
-in the same file to match the directory name under `/etc/letsencrypt/live/`.
-
-## Step 7: Start the Production Stack
+## Step 4: Start the stack
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
-This builds the application image, starts all five containers, runs database
-migrations, and begins serving traffic.
+What this command does, line by line:
 
-## Step 8: Verify the Deployment
+- `docker compose` — invoke the Compose plugin.
+- `-f docker-compose.prod.yml` — use the production compose file (not the
+  default `docker-compose.yml`).
+- `up` — create and start every service defined in the file.
+- `--build` — build the `app` and `backup` container images from source before
+  starting. The first build takes 2–5 minutes (downloads Maven + npm
+  dependencies). Subsequent builds reuse Docker's layer cache and take under a
+  minute.
+- `-d` — detach; run in the background.
 
-Check that all containers are running:
+Watch the logs until the app finishes starting up:
+
+```bash
+docker compose -f docker-compose.prod.yml logs -f app
+```
+
+You should see:
+
+- `Successfully applied N migrations to schema "public"` (Flyway)
+- `Started WealthviewApplication in <seconds>` (Spring Boot is up)
+- `SuperAdminInitializer` creating the `admin@wealthview.local` account
+
+Press `Ctrl-C` to stop tailing (the containers keep running).
+
+---
+
+## Step 5: Verify the app is healthy
+
+Check all three containers are running:
 
 ```bash
 docker compose -f docker-compose.prod.yml ps
 ```
 
-All five services should show as running or healthy.
+Expected output: three rows (`db`, `app`, `backup`) all showing `running` (the
+`app` row also shows `(healthy)` once the container-level HEALTHCHECK passes,
+which can take 30–60 seconds after startup).
 
-Check the health endpoint:
+Hit the public health endpoint directly on the container port:
+
+```bash
+curl -s http://localhost/actuator/health
+# {"status":"UP"}
+```
+
+Load the UI in a browser at `http://<server-ip>/` — you should see the
+WealthView login page. Don't log in yet; first put TLS in front of the app.
+
+---
+
+## Step 6: Choose and configure an edge proxy (TLS)
+
+The container is serving plain HTTP. You must not let unauthenticated traffic
+reach it over the public internet. Pick one of the three options below.
+
+### Option A — Cloudflare Tunnel (recommended for home labs / self-hosters)
+
+Best when: your server is behind NAT, has no public IP, or you don't want to
+manage certificates yourself. Cloudflare terminates TLS at their edge and
+pushes traffic to your server through an outbound tunnel; you never open any
+inbound ports.
+
+Follow [cloudflared.md](cloudflared.md) for the step-by-step.
+
+### Option B — nginx + Let's Encrypt on the same host
+
+Best when: you have a public IP and want to stay off third-party infrastructure.
+nginx handles TLS termination, certbot renews certificates automatically.
+
+Follow [tls-and-nginx.md](tls-and-nginx.md).
+
+### Option C — Existing reverse proxy (Caddy, Traefik, etc.)
+
+If you already run a reverse proxy, point it at `http://localhost:${APP_PORT}`
+(usually `http://localhost:80`). You need to:
+
+1. Terminate TLS at the proxy.
+2. Forward `Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` headers.
+3. Set `APP_RATE_LIMIT_TRUSTED_PROXIES` in `.env` to the proxy's peer IP (see
+   [Trusted proxy configuration](#trusted-proxy-configuration) below).
+
+### After the edge proxy is up
+
+Regardless of which option you chose, verify HTTPS works end-to-end:
 
 ```bash
 curl -s https://wealthview.example.com/actuator/health
+# {"status":"UP"}
+
+curl -sI https://wealthview.example.com/ | grep -Ei "strict-transport|permissions-policy|x-frame-options"
+# Should show: HSTS, Permissions-Policy, X-Frame-Options headers
 ```
 
-Expected response:
+---
 
-```json
-{"status":"UP"}
-```
+## Step 7: First login
 
-Check application logs for migration and startup status:
+Open `https://wealthview.example.com/` in a browser.
 
-```bash
-docker compose -f docker-compose.prod.yml logs app | head -50
-```
-
-Look for:
-- `Successfully applied N migrations` (Flyway)
-- `Started WealthviewApplication` (Spring Boot startup complete)
-
-## Step 9: First Login
-
-Open `https://wealthview.example.com` in your browser.
-
-Log in with the super-admin account:
+Log in as super admin:
 
 - **Email:** `admin@wealthview.local`
-- **Password:** the `SUPER_ADMIN_PASSWORD` value from your `.env` file
+- **Password:** the `SUPER_ADMIN_PASSWORD` you set in `.env`
 
-The super-admin account is created automatically on first startup.
+From the admin console you can:
 
----
+1. Create your first tenant (**Admin → Tenants → New**).
+2. Issue an invite code for that tenant — copy the code.
+3. Open `/register` in a private browser window and sign up a regular user
+   account against that invite code. That user becomes the first non-admin
+   member of the tenant.
 
-## Service Details
-
-### db (PostgreSQL 16)
-
-- Data stored in the `pgdata` Docker volume
-- Health check: `pg_isready -U wv_app -d wealthview`
-- Not exposed to the host network (no published ports)
-- Connected to the app and backup containers via the internal Docker network
-
-### app (Spring Boot)
-
-- Runs Flyway migrations automatically on startup
-- Listens on port 8080 internally (not published to host)
-- Uses `expose: 8080` so nginx can reach it within the Docker network
-- Health check: `GET /actuator/health`
-- Spring profile: `docker` (set via `SPRING_PROFILES_ACTIVE`)
-
-### nginx (Reverse Proxy)
-
-- Publishes ports 80 and 443 to the host
-- Port 80: serves Let's Encrypt ACME challenges, redirects all other traffic to HTTPS
-- Port 443: TLS termination with security headers, proxies to `app:8080`
-- Security headers: HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy
-- Configuration file: `nginx-prod.conf`
-
-### certbot (Certificate Renewal)
-
-- Runs in a loop: attempts renewal every 12 hours
-- Certificates are valid for 90 days; renewal happens automatically at 60 days
-- Uses the webroot challenge method (writes to a shared volume that nginx serves)
-- No manual intervention needed after initial provisioning
-
-### backup (Database Backups)
-
-- Runs `pg_dump -Fc` daily at 3 AM UTC
-- Backup files stored in `./backups/` on the host
-- Filename format: `wealthview_YYYY-MM-DD_HH-MM.dump`
-- Automatically deletes backups older than `BACKUP_RETENTION_DAYS` (default: 14)
-- Restore script: `./infra/backup/restore.sh`
-- Built from `infra/backup/` (Alpine + postgresql16-client + crond)
+Full lifecycle for tenants, invite codes, and the audit log:
+[`docs/administration/tenant-and-user-management.md`](../administration/tenant-and-user-management.md).
 
 ---
 
-## Resource Monitoring
+## Trusted proxy configuration
 
-Monitor container resource usage:
+The app reads the client IP from `X-Forwarded-For` for rate limiting and login
+audit logging — but **only** when the request arrives from a peer listed in
+`APP_RATE_LIMIT_TRUSTED_PROXIES`. Otherwise the IP is read straight from the
+TCP connection (which will be the proxy's own IP, not the end user's).
 
-```bash
-docker stats --no-stream
+Set this to a comma-separated list of proxy IPs in `.env`:
+
+```dotenv
+# If nginx runs on the same host:
+APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1
+
+# If behind Cloudflare Tunnel:
+APP_RATE_LIMIT_TRUSTED_PROXIES=<cloudflared container IP or 127.0.0.1>
 ```
 
-Check disk usage by Docker:
-
-```bash
-docker system df
-```
-
-Check backup directory size:
-
-```bash
-du -sh backups/
-```
-
-Monitor application logs:
-
-```bash
-# All containers
-docker compose -f docker-compose.prod.yml logs -f
-
-# Specific container
-docker compose -f docker-compose.prod.yml logs -f app
-docker compose -f docker-compose.prod.yml logs -f nginx
-```
+Leave this **empty** if nothing is in front of the app. See the troubleshooting
+table in [`docs/DeploymentGuide.md`](../DeploymentGuide.md#7-troubleshooting)
+if all your login activity rows show the same internal IP.
 
 ---
 
-## Optional: Finnhub Price Feed
+## Step 8: Turn on optional integrations
 
-WealthView can fetch live stock prices from [Finnhub](https://finnhub.io/).
+### Finnhub live stock prices
 
-1. Sign up for a free account at [finnhub.io](https://finnhub.io/)
-2. Copy your API key from the dashboard
-3. Add it to your `.env` file:
-   ```
+1. Sign up at [finnhub.io](https://finnhub.io/) for a free API key.
+2. Add it to `.env`:
+   ```dotenv
    FINNHUB_API_KEY=your_api_key_here
    ```
-4. Restart the app container:
+3. Restart the app so Spring picks up the new env var:
    ```bash
    docker compose -f docker-compose.prod.yml up -d app
    ```
 
-The free tier supports up to 60 API calls per minute, which is sufficient for
-typical personal use.
+The sync runs weekdays at 16:30 America/New_York. The free tier allows 60
+API calls per minute — enough for any personal portfolio.
 
-## Optional: Zillow Property Valuations
+### Zillow property valuations
 
-To enable Zillow property valuations:
-
-1. Set `ZILLOW_ENABLED=true` in your `.env` file
-2. Restart the app container:
+1. Set `ZILLOW_ENABLED=true` in `.env`.
+2. Restart the app:
    ```bash
    docker compose -f docker-compose.prod.yml up -d app
    ```
-3. In the WealthView UI, configure the Zillow ZPID for each property in the
-   property settings page
+3. In the UI, configure a Zillow ZPID for each property.
+
+The sync runs Sundays at 06:00 UTC.
 
 ---
 
-## Related Guides
+## Day-2 operations
 
-- [Quick Start](quickstart.md) -- simplified local setup for evaluation
-- [TLS and Nginx](tls-and-nginx.md) -- detailed TLS configuration walkthrough
-- [Security Hardening](security-hardening.md) -- additional security measures
-- [Upgrading](upgrading.md) -- how to update your deployment
+The following topics each have their own guide. Read them once your instance
+is up and running:
+
+| Task | Guide |
+|------|-------|
+| Verify backups, test restore, set up offsite copies | [`docs/administration/backups.md`](../administration/backups.md) |
+| Monitor logs, set up Prometheus scraping, alerting | [`docs/administration/monitoring-and-logging.md`](../administration/monitoring-and-logging.md) |
+| Tune Postgres, JVM heap, disk capacity | [`docs/administration/maintenance.md`](../administration/maintenance.md) |
+| Upgrade to a new WealthView version | [`upgrading.md`](upgrading.md) |
+| Harden the host OS and container runtime | [`security-hardening.md`](security-hardening.md) |
+| Diagnose problems | [`docs/administration/troubleshooting.md`](../administration/troubleshooting.md) |
+
+---
+
+## Quick command reference
+
+```bash
+# Start / stop / restart
+docker compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml down                    # stop; preserve data
+docker compose -f docker-compose.prod.yml restart app             # restart one service
+
+# Status + logs
+docker compose -f docker-compose.prod.yml ps
+docker compose -f docker-compose.prod.yml logs -f app
+docker compose -f docker-compose.prod.yml logs --tail=200 db
+
+# Rebuild after a git pull
+git pull
+docker compose -f docker-compose.prod.yml up --build -d
+
+# Manual backup
+docker compose -f docker-compose.prod.yml exec backup /backup.sh
+
+# Restore a specific dump
+./infra/backup/restore.sh backups/wealthview_2026-04-22_03-00.dump
+
+# DANGER — deletes the database volume (everything is gone)
+docker compose -f docker-compose.prod.yml down -v
+```
+
+---
+
+## Related guides
+
+- [Quick Start](quickstart.md) — 5-minute local evaluation.
+- [Cloudflared Deployment](cloudflared.md) — step-by-step Cloudflare Tunnel setup.
+- [TLS and Nginx](tls-and-nginx.md) — nginx + Let's Encrypt on the host.
+- [Security Hardening](security-hardening.md) — firewall, SSH, secrets, app-level security.
+- [Upgrading](upgrading.md) — keep your instance up to date.

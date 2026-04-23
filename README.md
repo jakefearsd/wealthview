@@ -52,9 +52,10 @@ docker compose down -v                    # Stop and delete database
 | Guide | Description |
 |-------|-------------|
 | [Quick Start Deployment](docs/deployment/quickstart.md) | Get running in 5 minutes with Docker |
-| [Production Setup](docs/deployment/production-setup.md) | Full VPS deployment with nginx and TLS |
-| [TLS & Nginx](docs/deployment/tls-and-nginx.md) | Let's Encrypt certificates, nginx configuration |
-| [Security Hardening](docs/deployment/security-hardening.md) | Firewall, SSH, secrets management |
+| [Production Setup](docs/deployment/production-setup.md) | Full production deployment — db, app, backup, edge proxy choice |
+| [Cloudflare Tunnel](docs/deployment/cloudflared.md) | Self-hosted deployment via `cloudflared` (no open ports) |
+| [TLS & Nginx](docs/deployment/tls-and-nginx.md) | Host-managed TLS with nginx + Let's Encrypt |
+| [Security Hardening](docs/deployment/security-hardening.md) | Firewall, SSH, secrets, app-level security |
 | [Upgrading](docs/deployment/upgrading.md) | Upgrades, rollback, Flyway migrations |
 
 ### System Administration

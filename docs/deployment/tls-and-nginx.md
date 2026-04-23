@@ -1,316 +1,478 @@
 [<- Back to README](../../README.md)
 
-# TLS and Nginx Configuration
+# TLS with Nginx and Let's Encrypt
 
-This guide explains how the nginx reverse proxy and certbot automatic certificate
-renewal work in the WealthView production stack, and how to set up TLS from scratch.
+This guide walks through putting nginx (with an automatically-renewing Let's
+Encrypt certificate) in front of the WealthView app container. It is written
+for someone who has run `docker compose up` before but has never configured
+nginx or certbot.
 
-## Prerequisites
+**Use this guide when:** you have a public IPv4 address and you want to
+manage TLS yourself, without depending on Cloudflare or another CDN.
 
-- A domain name (e.g., `wealthview.example.com`)
-- A DNS A record pointing that domain to your server's IP address
-- Ports 80 and 443 open on the server (firewall and cloud provider)
+**Use [cloudflared.md](cloudflared.md) instead when:** your server is behind
+NAT / CG-NAT, you can't forward ports 80/443, or you prefer to let Cloudflare
+handle certificates.
 
-## How It Works
+Before you start, complete [production-setup.md](production-setup.md) Steps
+1–5. Running `curl http://localhost/actuator/health` on the server should
+return `{"status":"UP"}`.
 
-The production Compose file runs two containers that work together for TLS:
-
-1. **nginx** -- reverse proxy that terminates TLS and forwards requests to the app
-2. **certbot** -- obtains and renews Let's Encrypt certificates automatically
-
-They share two volumes:
-- `certbot-webroot` -- certbot writes ACME challenge files here; nginx serves them
-- `certbot-certs` -- certbot stores certificates here; nginx reads them
+**A note on where nginx runs:** this guide installs nginx directly on the
+host (as a native system package), not as a Docker container. Some older
+versions of our docs implied nginx lived in `docker-compose.prod.yml` — it
+does not. Running nginx on the host is simpler for certificate renewals and
+keeps the app's Docker environment focused on WealthView itself.
 
 ---
 
-## Nginx Configuration Walkthrough
+## Prerequisites
 
-The configuration file is `nginx-prod.conf`. Here is what each section does.
+- A domain name (e.g. `wealthview.example.com`) whose DNS you control.
+- A public IPv4 address on your server.
+- Inbound TCP ports 80 and 443 reachable from the internet (Let's Encrypt's
+  HTTP-01 challenge needs port 80).
+- WealthView already running — the container should be answering on
+  `http://localhost:${APP_PORT}` (default `APP_PORT=80`).
 
-### Port 80 -- HTTP Server
+---
+
+## Step 1: Change the app's port to not conflict with nginx
+
+nginx will take port 80 and 443 on the public interface. WealthView's `app`
+container currently also publishes `80:8080`. Move the container to a
+non-conflicting loopback port.
+
+Edit `.env`:
+
+```dotenv
+APP_PORT=8080
+```
+
+Edit `docker-compose.prod.yml` so the port mapping binds to loopback only
+(not the public interface):
+
+```yaml
+services:
+  app:
+    # ...
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+```
+
+The `127.0.0.1:` prefix is important — it ensures the app is only reachable
+from the host itself, never directly from the internet. nginx (running on the
+host) can still proxy to it.
+
+Restart the app:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+Verify from the host:
+
+```bash
+curl -s http://127.0.0.1:8080/actuator/health
+# {"status":"UP"}
+```
+
+From anywhere else on the internet, `http://<server-ip>:8080` should now
+**fail** to connect. That is correct.
+
+---
+
+## Step 2: Point DNS at the server
+
+Create a DNS `A` record for your domain pointing at the server's public IPv4:
+
+| Type | Name | Value | TTL |
+|------|------|-------|-----|
+| A | wealthview | 203.0.113.50 | 300 |
+
+Confirm propagation:
+
+```bash
+dig +short wealthview.example.com
+# Should print your server's public IP.
+```
+
+If you get nothing, wait (usually minutes for TTL-300 records) and try again.
+
+---
+
+## Step 3: Open ports 80 and 443 in the firewall
+
+If you're using `ufw`:
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw status verbose
+```
+
+If you're on a cloud VPS, you may also need to open these ports in the
+provider's security group / network ACL.
+
+---
+
+## Step 4: Install nginx and certbot on the host
+
+On Debian / Ubuntu:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y nginx certbot python3-certbot-nginx
+```
+
+`python3-certbot-nginx` is the certbot plugin that edits your nginx config
+for you — it makes the initial cert provisioning a single command.
+
+Verify:
+
+```bash
+sudo nginx -v           # nginx version: nginx/1.2x
+certbot --version       # certbot 2.x.x
+systemctl status nginx  # active (running)
+```
+
+---
+
+## Step 5: Write the initial nginx server block
+
+Create `/etc/nginx/sites-available/wealthview`:
+
+```bash
+sudo tee /etc/nginx/sites-available/wealthview > /dev/null <<'EOF'
+server {
+    listen 80;
+    listen [::]:80;
+    server_name wealthview.example.com;
+
+    # Temporary — certbot will rewrite this block to also listen on 443
+    # and add the ssl_certificate directives.
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Upload size: CSV/OFX imports can be a few MB.
+        client_max_body_size 10m;
+
+        # Long-running requests (projection recompute can take ~30s).
+        proxy_read_timeout 60s;
+    }
+}
+EOF
+```
+
+Replace `wealthview.example.com` with your real domain. Match the port in
+`proxy_pass` to the `APP_PORT` you set in `.env` (Step 1).
+
+Enable the site:
+
+```bash
+sudo ln -sf /etc/nginx/sites-available/wealthview /etc/nginx/sites-enabled/wealthview
+
+# Disable the default "welcome to nginx" site so it doesn't shadow ours.
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# Validate the config before reloading.
+sudo nginx -t
+
+# Reload — zero downtime.
+sudo systemctl reload nginx
+```
+
+Test:
+
+```bash
+curl -s http://wealthview.example.com/actuator/health
+# {"status":"UP"}
+```
+
+HTTP (not HTTPS) works now. HTTPS is next.
+
+---
+
+## Step 6: Obtain the initial TLS certificate
+
+certbot talks to Let's Encrypt, proves you control the domain (HTTP-01
+challenge), writes `/etc/letsencrypt/live/wealthview.example.com/fullchain.pem`
++ `privkey.pem`, and edits your nginx config to use them.
+
+```bash
+sudo certbot --nginx \
+  -d wealthview.example.com \
+  --agree-tos \
+  --email you@example.com \
+  --redirect \
+  --non-interactive
+```
+
+Flag-by-flag:
+
+- `--nginx` — use the nginx plugin (automatically edit your nginx site file).
+- `-d wealthview.example.com` — the domain to certify.
+- `--agree-tos` — accept the Let's Encrypt subscriber agreement.
+- `--email you@example.com` — used for renewal failure notifications.
+- `--redirect` — add a 301 redirect from HTTP → HTTPS.
+- `--non-interactive` — don't prompt; fail with a clear error if something's
+  missing.
+
+On success, certbot prints:
+
+```
+Successfully received certificate.
+Certificate is saved at: /etc/letsencrypt/live/wealthview.example.com/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/wealthview.example.com/privkey.pem
+```
+
+Test HTTPS:
+
+```bash
+curl -s https://wealthview.example.com/actuator/health
+# {"status":"UP"}
+
+curl -sI http://wealthview.example.com/
+# Should show: HTTP/1.1 301 Moved Permanently, Location: https://...
+```
+
+---
+
+## Step 7: Add HTTPS-only security headers
+
+certbot's default config is minimal. Open the now-modified file and add
+security headers to the HTTPS server block:
+
+```bash
+sudo nano /etc/nginx/sites-enabled/wealthview
+```
+
+Inside the `server { listen 443 ssl; ... }` block, add:
+
+```nginx
+    # Force HTTPS for one year. Browsers that see this will refuse plain
+    # HTTP even if someone types http:// explicitly.
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Prevent the browser from MIME-sniffing responses.
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # The application already sets X-Frame-Options: DENY and
+    # Content-Security-Policy: frame-ancestors 'none', so the frame block
+    # is defence in depth.
+    add_header X-Frame-Options "DENY" always;
+
+    # Trim referrer to just the origin for cross-site requests.
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+```
+
+Note: WealthView's Spring Boot layer already emits
+`Content-Security-Policy`, `Permissions-Policy`, and `X-Content-Type-Options`
+headers on every response. The headers above are **duplicates at the nginx
+layer** and act as belt-and-suspenders for any request path that bypasses
+Spring (e.g. nginx-served error pages). It is safe to have both.
+
+Reload:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+Verify the full security header set is present:
+
+```bash
+curl -sI https://wealthview.example.com/ | grep -Ei \
+  "strict-transport|x-content-type|x-frame|referrer-policy|content-security|permissions-policy"
+```
+
+You should see all six.
+
+---
+
+## Step 8: Update WealthView's `.env`
+
+```dotenv
+# The public HTTPS URL is now the allowed origin for /api/* requests.
+CORS_ORIGIN=https://wealthview.example.com
+
+# nginx is the immediate peer — trust its forwarded client IP.
+APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1
+```
+
+Restart the app so Spring picks up the new env vars:
+
+```bash
+docker compose -f docker-compose.prod.yml up -d app
+```
+
+Without `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1`, login audit and rate
+limit records will log the loopback IP instead of the real client IP
+(because every request technically arrives from nginx, which runs on
+localhost).
+
+---
+
+## Step 9: Confirm automatic certificate renewal
+
+The `certbot` package installs a systemd timer that renews certificates
+automatically (Let's Encrypt certs expire every 90 days; certbot renews them
+at around 60 days).
+
+```bash
+systemctl list-timers | grep certbot
+# Expected: certbot.timer  <next run time>  ...
+
+# Dry-run a renewal (does not actually call Let's Encrypt, but validates
+# that renewal would work).
+sudo certbot renew --dry-run
+# Expected output includes: "Congratulations, all simulated renewals succeeded"
+```
+
+No further action needed. The timer fires twice daily, notices when a cert
+is within 30 days of expiry, renews it, and reloads nginx.
+
+---
+
+## Complete final nginx config (reference)
+
+After all the steps above, your `/etc/nginx/sites-enabled/wealthview` should
+look something like this:
 
 ```nginx
 server {
     listen 80;
-    server_name _;
+    listen [::]:80;
+    server_name wealthview.example.com;
 
+    # Certbot's HTTP-01 challenge files go here; everything else redirects.
     location /.well-known/acme-challenge/ {
-        root /var/www/certbot;
+        root /var/www/html;
     }
 
     location / {
         return 301 https://$host$request_uri;
     }
 }
-```
 
-This server handles two things:
-
-- **ACME challenges:** Certbot places challenge files in `/var/www/certbot/.well-known/acme-challenge/`. Nginx serves them so Let's Encrypt can verify domain ownership.
-- **HTTPS redirect:** All other HTTP requests get a 301 redirect to the HTTPS version of the same URL.
-
-### Port 443 -- HTTPS Server
-
-```nginx
 server {
-    listen 443 ssl;
-    server_name _;
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name wealthview.example.com;
 
-    ssl_certificate     /etc/letsencrypt/live/wealthview/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/wealthview/privkey.pem;
-```
+    ssl_certificate     /etc/letsencrypt/live/wealthview.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/wealthview.example.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
 
-The SSL certificate and private key are loaded from the certbot-certs volume. Update
-the path if your domain directory name differs from `wealthview`.
-
-### TLS Protocol and Cipher Configuration
-
-```nginx
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 10m;
-```
-
-- **TLS 1.2 and 1.3 only** -- older protocols (SSLv3, TLS 1.0, TLS 1.1) are disabled
-- **Session cache** -- 10 MB shared cache reduces TLS handshake overhead for returning clients
-- **Session timeout** -- cached sessions expire after 10 minutes
-
-### Security Headers
-
-```nginx
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "DENY" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-```
-
-| Header | Value | Purpose |
-|--------|-------|---------|
-| Strict-Transport-Security | max-age=31536000 (1 year) | Browsers remember to always use HTTPS |
-| X-Content-Type-Options | nosniff | Prevents MIME type sniffing attacks |
-| X-Frame-Options | DENY | Prevents clickjacking by blocking iframe embedding |
-| Referrer-Policy | strict-origin-when-cross-origin | Limits referrer information sent to other origins |
-
-### Proxy Locations
-
-```nginx
-    location /api/ {
-        proxy_pass http://app:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
 
     location / {
-        proxy_pass http://app:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        client_max_body_size 10m;
+        proxy_read_timeout 60s;
     }
+}
 ```
 
-Both `/api/` and `/` are proxied to the Spring Boot application at `app:8080`. The
-`app` hostname resolves within the Docker network. The forwarding headers ensure the
-application knows the original client IP and protocol.
+(`options-ssl-nginx.conf` and `ssl-dhparams.pem` are dropped in automatically
+by `python3-certbot-nginx` the first time it runs.)
 
 ---
 
-## Initial Certificate Provisioning
+## About `nginx-prod.conf` in the repo
 
-The nginx HTTPS server requires certificates to exist before it can start. You need
-to provision the first certificate before launching the full production stack.
+The repo contains a file called `nginx-prod.conf` at its root. This is a
+reference config for people who prefer to run nginx **inside** a Docker
+container alongside WealthView (rather than on the host). It is not wired
+into `docker-compose.prod.yml` by default and you can ignore it if you
+followed this guide.
 
-### Step 1: Verify DNS Propagation
-
-```bash
-dig +short wealthview.example.com
-```
-
-This must return your server's IP address. If it returns nothing or the wrong IP,
-wait for DNS propagation (can take up to 48 hours, usually minutes).
-
-### Step 2: Ensure Port 80 Is Open
-
-```bash
-# Check if anything is listening on port 80
-sudo lsof -i :80
-
-# If using ufw, ensure port 80 is allowed
-sudo ufw allow 80/tcp
-```
-
-### Step 3: Run Certbot Standalone
-
-With no other service using port 80, run certbot in standalone mode:
-
-```bash
-docker run --rm -p 80:80 \
-  -v $(pwd)/certbot-certs:/etc/letsencrypt \
-  certbot/certbot certonly \
-  --standalone \
-  -d wealthview.example.com \
-  --agree-tos \
-  --email you@example.com \
-  --non-interactive
-```
-
-Replace `wealthview.example.com` and `you@example.com` with your actual values.
-
-### Step 4: Verify the Certificate
-
-```bash
-ls certbot-certs/live/wealthview.example.com/
-```
-
-You should see: `cert.pem`, `chain.pem`, `fullchain.pem`, `privkey.pem`.
-
-### Step 5: Update nginx-prod.conf
-
-Make sure the certificate path in `nginx-prod.conf` matches the directory name
-under `/etc/letsencrypt/live/`:
-
-```nginx
-ssl_certificate     /etc/letsencrypt/live/wealthview.example.com/fullchain.pem;
-ssl_certificate_key /etc/letsencrypt/live/wealthview.example.com/privkey.pem;
-```
-
-### Step 6: Start the Production Stack
-
-```bash
-docker compose -f docker-compose.prod.yml up --build -d
-```
-
----
-
-## Certificate Renewal
-
-Once the production stack is running, certificate renewal is fully automatic.
-
-The certbot container runs in a loop:
-1. Sleeps for 12 hours
-2. Runs `certbot renew`
-3. Repeats
-
-Let's Encrypt certificates are valid for 90 days. Certbot renews them when they
-have 30 days or less remaining (around day 60). No manual intervention is needed.
-
-You can verify the renewal process is working:
-
-```bash
-docker compose -f docker-compose.prod.yml logs certbot
-```
-
-To manually trigger a renewal check:
-
-```bash
-docker compose -f docker-compose.prod.yml exec certbot certbot renew --dry-run
-```
-
----
-
-## Custom Domain Configuration
-
-To use your own domain:
-
-1. Update the `server_name` directive in `nginx-prod.conf`:
-   ```nginx
-   server_name wealthview.example.com;
-   ```
-   Change this in both the port 80 and port 443 server blocks (or leave as `_` to
-   accept any hostname).
-
-2. Update the SSL certificate paths to match your certbot directory name.
-
-3. Restart nginx:
-   ```bash
-   docker compose -f docker-compose.prod.yml restart nginx
-   ```
-
----
-
-## Testing TLS
-
-Verify that TLS is working correctly:
-
-```bash
-curl -v https://wealthview.example.com/actuator/health 2>&1 | head -30
-```
-
-Look for:
-- `SSL connection using TLSv1.3`
-- `subject: CN=wealthview.example.com`
-- `issuer: C=US; O=Let's Encrypt`
-
-Check security headers:
-
-```bash
-curl -sI https://wealthview.example.com | grep -E "(Strict-Transport|X-Content|X-Frame|Referrer)"
-```
-
-Expected output:
-
-```
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: strict-origin-when-cross-origin
-```
+If you do want to run nginx in Docker, copy `nginx-prod.conf` into a bind
+mount and add a service in a Compose override. The certificate lifecycle
+is tricker in that setup (you need a `certbot` container too and a shared
+volume). Most home-lab / small-team deployments are better served by
+nginx-on-host as described above or by [Cloudflare Tunnel](cloudflared.md).
 
 ---
 
 ## Troubleshooting
 
-### DNS Not Propagated
+### certbot: "The server was busy in responding to challenge requests"
 
-**Symptom:** `dig +short wealthview.example.com` returns nothing or the wrong IP.
+Usually a sign that another process has port 80. Stop anything using it
+(Apache? old nginx? containerized proxy?) before running certbot.
 
-**Fix:** Wait for propagation. Check with multiple DNS resolvers:
 ```bash
-dig @8.8.8.8 +short wealthview.example.com
-dig @1.1.1.1 +short wealthview.example.com
+sudo ss -tlnp | grep :80
 ```
 
-### Port 80 Blocked by Firewall
+### Mixed-content warnings in the browser
 
-**Symptom:** Certbot standalone fails with "Could not bind TCP port 80."
+All static assets come from the same origin, so this shouldn't happen — but
+if it does, check that `CORS_ORIGIN` in `.env` starts with `https://`, not
+`http://`, and that you restarted the app after editing.
 
-**Fix:** Open the port in your firewall and cloud provider's security group:
+### HTTPS returns 502 Bad Gateway
+
+nginx is running but can't reach the app.
+
 ```bash
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
+# Is the app container up?
+docker compose -f docker-compose.prod.yml ps
+
+# Does the app answer directly on the host?
+curl -s http://127.0.0.1:8080/actuator/health
+
+# nginx error log
+sudo tail -50 /var/log/nginx/error.log
 ```
 
-### Certificate Expired
+Common cause: `proxy_pass` in the nginx config points at a different port
+than the one in the `app` service's `ports:` mapping. They must match.
 
-**Symptom:** Browser shows certificate error; `curl` reports expired cert.
+### Login audit rows show `127.0.0.1` instead of the real user IP
 
-**Fix:** Run a manual renewal:
+Set `APP_RATE_LIMIT_TRUSTED_PROXIES=127.0.0.1` in `.env` and restart the
+app. See [Step 8](#step-8-update-wealthviews-env).
+
+### Certificate renewal fails
+
 ```bash
-docker compose -f docker-compose.prod.yml exec certbot certbot renew --force-renewal
-docker compose -f docker-compose.prod.yml restart nginx
+sudo certbot renew --dry-run
+sudo journalctl -u certbot.timer --since "7 days ago"
 ```
 
-### Nginx Won't Start -- Certificate Not Found
+Most common causes:
+- Port 80 is no longer reachable from the public internet (firewall change).
+- DNS A record was removed or changed.
+- nginx is stopped.
 
-**Symptom:** Nginx exits immediately with "cannot load certificate" error.
+Fix the underlying issue, then trigger a renewal manually:
 
-**Fix:** The initial certificate has not been provisioned. Follow the "Initial
-Certificate Provisioning" steps above before starting the full stack.
-
-### Mixed Content Warnings in Browser
-
-**Symptom:** Browser console shows "Mixed Content" errors; some resources loaded via HTTP.
-
-**Fix:** Ensure all API calls in the frontend use relative URLs (e.g., `/api/accounts`
-instead of `http://server/api/accounts`). The React app is configured to do this
-by default.
+```bash
+sudo certbot renew
+sudo systemctl reload nginx
+```
 
 ---
 
-## Related Guides
+## Related guides
 
-- [Production Setup](production-setup.md) -- full deployment walkthrough
-- [Security Hardening](security-hardening.md) -- additional security measures
+- [Production Setup](production-setup.md) — overall deployment walkthrough.
+- [Cloudflared Deployment](cloudflared.md) — alternative: no open ports.
+- [Security Hardening](security-hardening.md) — host + app-level security.
