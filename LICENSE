@@ -1,0 +1,32 @@
+WealthView — Proprietary License
+
+Copyright (c) 2024–2026 Jake Fear. All rights reserved.
+
+This software and its accompanying source code, documentation, data, and
+configuration ("the Software") are the proprietary work of the copyright
+holder. The Software is made available for the author's personal and family
+use only.
+
+No license, express or implied, is granted to any third party. In particular,
+without prior written permission from the copyright holder you may NOT:
+
+  * copy, reproduce, redistribute, publish, or host the Software;
+  * modify, adapt, translate, or prepare derivative works based on the
+    Software;
+  * reverse engineer, decompile, or disassemble any compiled artifact;
+  * use the Software or any portion of it in a commercial product or
+    service;
+  * sublicense, sell, lease, rent, or otherwise transfer the Software to
+    any other party.
+
+Any contributions submitted to this repository are assumed to be offered
+under the same terms and assigned to the copyright holder unless a
+separate written agreement states otherwise.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL
+THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT
+OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
