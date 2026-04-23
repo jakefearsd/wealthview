@@ -76,6 +76,7 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
         <jsoup.version>1.22.2</jsoup.version>
+        <caffeine.version>3.2.3</caffeine.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
@@ -161,7 +162,7 @@
             <dependency>
                 <groupId>com.github.ben-manes.caffeine</groupId>
                 <artifactId>caffeine</artifactId>
-                <version>3.2.3</version>
+                <version>${caffeine.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
