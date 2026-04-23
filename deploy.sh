@@ -16,10 +16,21 @@ if [[ -z "${DEPLOY_HOST:-}" ]]; then
 fi
 
 DEPLOY_DIR="${DEPLOY_DIR:-/opt/wealthview}"
-IMAGE_NAME="wealthview:latest"
+
+# Resolve an explicit version tag for the image instead of pushing :latest,
+# which would silently pick up whatever is in the remote cache on the next
+# compose pull. Priority: WEALTHVIEW_VERSION env var > git describe > short SHA.
+if [[ -n "${WEALTHVIEW_VERSION:-}" ]]; then
+    VERSION="$WEALTHVIEW_VERSION"
+elif VERSION="$(git describe --tags --always --dirty 2>/dev/null)"; then
+    :
+else
+    VERSION="$(git rev-parse --short HEAD 2>/dev/null || date -u +%Y%m%d%H%M%S)"
+fi
+IMAGE_NAME="wealthview:${VERSION}"
 TARBALL="/tmp/wealthview-image.tar.gz"
 
-echo "==> Building Docker image locally..."
+echo "==> Building Docker image ${IMAGE_NAME} locally..."
 docker build -t "$IMAGE_NAME" .
 
 echo "==> Saving image to tarball..."
@@ -56,20 +67,21 @@ echo "==> Transferring image tarball..."
 scp "$TARBALL" "$DEPLOY_HOST:/tmp/wealthview-image.tar.gz"
 
 echo "==> Loading image and restarting services on remote..."
-ssh "$DEPLOY_HOST" bash -s "$DEPLOY_DIR" <<'REMOTE'
+ssh "$DEPLOY_HOST" bash -s "$DEPLOY_DIR" "$VERSION" <<'REMOTE'
 set -euo pipefail
 DEPLOY_DIR="$1"
+VERSION="$2"
 echo "  Loading Docker image..."
 docker load < /tmp/wealthview-image.tar.gz
 rm -f /tmp/wealthview-image.tar.gz
 cd "$DEPLOY_DIR"
 echo "  Stopping existing services..."
-docker compose down
-echo "  Starting services..."
-docker compose up -d
+WEALTHVIEW_VERSION="$VERSION" docker compose down
+echo "  Starting services (wealthview:${VERSION})..."
+WEALTHVIEW_VERSION="$VERSION" docker compose up -d
 echo "  Waiting for health check..."
 sleep 5
-docker compose ps
+WEALTHVIEW_VERSION="$VERSION" docker compose ps
 REMOTE
 
 rm -f "$TARBALL"
