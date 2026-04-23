@@ -185,18 +185,26 @@ curl http://localhost/actuator/health        # {"status":"UP"...}
 curl -I http://localhost/                    # 200 OK, serves index.html
 ```
 
-### 4.4 TLS (Let's Encrypt + nginx)
+### 4.4 TLS (edge proxy)
 
-The production compose does not include nginx by default. The most
-reliable pattern is to run nginx + certbot on the host (or in a separate
-compose file) and reverse-proxy to the WealthView container on
-`localhost:${APP_PORT}`. The full walkthrough — including a complete
-nginx config, certbot renewal loop, and HTTP→HTTPS redirect — lives in
-[`docs/deployment/tls-and-nginx.md`](deployment/tls-and-nginx.md).
+The production compose does not include nginx by default. Pick the
+approach that matches how your server is exposed to the internet:
 
-If you are using Cloudflare Tunnel or another edge proxy that
-terminates TLS for you, leave `CORS_ORIGIN` set to the public URL and
-skip this section entirely.
+- **Cloudflare Tunnel (`cloudflared`)** — recommended for home labs,
+  Raspberry Pi deployments, or any host behind NAT/CG-NAT. No open ports
+  required; Cloudflare terminates TLS. Full walkthrough:
+  [`docs/deployment/cloudflared.md`](deployment/cloudflared.md).
+- **Nginx + Let's Encrypt on the host** — best when the server has a
+  public IP and you want to manage certificates yourself. Full
+  walkthrough: [`docs/deployment/tls-and-nginx.md`](deployment/tls-and-nginx.md).
+- **Existing reverse proxy (Caddy, Traefik, HAProxy, etc.)** — point it
+  at `http://localhost:${APP_PORT}`, forward the standard
+  `X-Forwarded-*` headers, and set `APP_RATE_LIMIT_TRUSTED_PROXIES` to
+  the proxy's peer IP.
+
+Whichever you choose, make sure `CORS_ORIGIN` in `.env` is set to the
+public HTTPS URL — the `prod` profile aborts startup on an empty or
+non-HTTPS value.
 
 ### 4.5 First login
 
@@ -388,7 +396,8 @@ in [`docs/administration/troubleshooting.md`](administration/troubleshooting.md)
 
 | Need | Read |
 |---|---|
-| TLS certificate provisioning end-to-end | [`docs/deployment/tls-and-nginx.md`](deployment/tls-and-nginx.md) |
+| Cloudflare Tunnel self-hosting (no open ports) | [`docs/deployment/cloudflared.md`](deployment/cloudflared.md) |
+| TLS certificate provisioning end-to-end (nginx on host) | [`docs/deployment/tls-and-nginx.md`](deployment/tls-and-nginx.md) |
 | Hardening checklist (firewall, SSH, container isolation) | [`docs/deployment/security-hardening.md`](deployment/security-hardening.md) |
 | Backup verification and offsite replication | [`docs/administration/backups.md`](administration/backups.md) |
 | Tenant lifecycle, invite codes, audit log | [`docs/administration/tenant-and-user-management.md`](administration/tenant-and-user-management.md) |

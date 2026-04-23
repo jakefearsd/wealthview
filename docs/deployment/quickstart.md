@@ -2,15 +2,19 @@
 
 # Quick Start Guide
 
-Get WealthView running locally in 5 minutes. This uses the development Docker Compose
-setup, which is ideal for trying the app out. For production deployment, see
+Get WealthView running locally in about 5 minutes. This uses the development
+Docker Compose setup, which is ideal for trying the app out. For a real
+deployment (public URL, TLS, backups), see
 [production-setup.md](production-setup.md).
+
+---
 
 ## Prerequisites
 
-- **Docker** with the Compose plugin (`docker compose` -- not the legacy `docker-compose`)
-- **1 GB RAM** minimum (2 GB recommended)
-- **Port 80** available on the host
+- **Docker** with the Compose plugin (`docker compose` as two words — not the
+  legacy `docker-compose`).
+- **1 GB RAM** minimum (2 GB recommended).
+- **Port 80** available on the host.
 
 Verify Docker is installed:
 
@@ -19,39 +23,51 @@ docker --version
 docker compose version
 ```
 
-## Step 1: Clone the Repository
+If either of those fails, follow the official [Docker install
+guide](https://docs.docker.com/engine/install/) for your platform.
+
+> **Permissions note (Linux):** if you see "permission denied while trying to
+> connect to the Docker daemon socket," add your user to the `docker` group
+> and log out and back in: `sudo usermod -aG docker $USER`.
+
+---
+
+## Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/your-org/wealthview.git
+git clone https://github.com/<your-org>/wealthview.git
 cd wealthview
 ```
 
-## Step 2: Create the `.env` File
+---
 
-Create a `.env` file in the project root with three secrets:
+## Step 2: Create the `.env` file
 
-```bash
-cat > .env << 'EOF'
-DB_PASSWORD=<generated>
-JWT_SECRET=<generated>
-SUPER_ADMIN_PASSWORD=<generated>
-EOF
-```
-
-Generate strong values for each:
+`.env` holds the secrets the app needs at runtime. Copy the template:
 
 ```bash
-# Database password
-openssl rand -base64 24
-
-# JWT signing key (must be 32+ characters)
-openssl rand -base64 48
-
-# Super-admin password
-openssl rand -base64 18
+cp .env.example .env
 ```
 
-Copy each output into the corresponding `.env` line.
+Open `.env` in an editor and replace every `CHANGE_ME` with a random value.
+You can generate values directly on the command line:
+
+```bash
+openssl rand -base64 24   # DB_PASSWORD
+openssl rand -base64 48   # JWT_SECRET (must be 32+ chars)
+openssl rand -base64 18   # SUPER_ADMIN_PASSWORD
+```
+
+For a local trial you can leave `FINNHUB_API_KEY`, `ZILLOW_ENABLED`,
+`CORS_ORIGIN`, and `APP_PORT` at their defaults.
+
+Lock down file permissions:
+
+```bash
+chmod 600 .env
+```
+
+---
 
 ## Step 3: Start WealthView
 
@@ -59,58 +75,105 @@ Copy each output into the corresponding `.env` line.
 docker compose up --build -d
 ```
 
-This builds the application image (frontend + backend), starts PostgreSQL, runs
-database migrations, and seeds demo data. First build takes 2-5 minutes.
+Line-by-line:
+
+- `docker compose up` — create and start every service in the default
+  `docker-compose.yml` file.
+- `--build` — build the application Docker image from source before starting.
+  First build takes 2–5 minutes (it pulls Maven + npm dependencies). Later
+  builds reuse Docker's layer cache and are much faster.
+- `-d` — detach; run in the background.
+
+Watch the startup logs until you see `Started WealthviewApplication`:
+
+```bash
+docker compose logs -f app
+```
+
+Press `Ctrl-C` to stop tailing. The containers keep running.
+
+---
 
 ## Step 4: Verify
 
-Check that the health endpoint responds:
-
-```bash
-curl http://localhost/actuator/health
-```
-
-Expected response:
-
-```json
-{"status":"UP"}
-```
-
-Check container status:
+Check that both containers are healthy:
 
 ```bash
 docker compose ps
 ```
 
-Both `app` and `db` should show as healthy/running.
+You should see two services (`app` and `db`) both marked `running`. The
+`app` row also shows `(healthy)` once the container-level HEALTHCHECK passes
+(30–60 seconds after startup).
 
-## Step 5: Log In
+Hit the health endpoint:
+
+```bash
+curl -s http://localhost/actuator/health
+# {"status":"UP"}
+```
+
+---
+
+## Step 5: Log in
 
 Open [http://localhost](http://localhost) in your browser.
 
 Log in with the super-admin account:
 
 - **Email:** `admin@wealthview.local`
-- **Password:** the `SUPER_ADMIN_PASSWORD` value you set in `.env`
+- **Password:** the `SUPER_ADMIN_PASSWORD` value you put in `.env`
 
-A demo account is also available (seeded automatically with the `docker` profile):
+A demo tenant is seeded automatically with the `docker` profile. You can
+also log in with:
 
 - **Email:** `demo@wealthview.local`
 - **Password:** `demo123`
 
-## What's Included
+The demo account has sample accounts, holdings, transactions, and a rental
+property so you can click around without importing your own data.
 
-The development Compose setup runs two containers:
+---
 
-- **db** -- PostgreSQL 16 with persistent storage
-- **app** -- Spring Boot application serving both the API and the React frontend
+## What's included
 
-This is suitable for local evaluation and development. It does **not** include TLS,
-automated backups, or a reverse proxy.
+The default Compose setup runs two containers:
 
-## Next Steps
+| Container | Role |
+|-----------|------|
+| **db** | PostgreSQL 16 with persistent storage in a named Docker volume (`pgdata`). |
+| **app** | Spring Boot application serving both the API and the React frontend at port 80. |
 
-- [Production Setup](production-setup.md) -- deploy on a VPS with TLS, backups, and nginx
-- [TLS and Nginx](tls-and-nginx.md) -- understand the HTTPS configuration
-- [Security Hardening](security-hardening.md) -- lock down your deployment
-- [Upgrading](upgrading.md) -- keep your instance up to date
+The `docker` Spring profile is active — this enables seeded demo data and
+allows `http://localhost` as a valid CORS origin. It is **not** suitable for
+internet-facing deployments.
+
+---
+
+## Stopping / restarting
+
+```bash
+# Stop everything, preserve data.
+docker compose down
+
+# Stop and DELETE the database volume. Everything is gone after this.
+docker compose down -v
+
+# Restart after a code change.
+docker compose up --build -d
+
+# Tail combined logs.
+docker compose logs -f
+```
+
+---
+
+## Next steps
+
+- [Production Setup](production-setup.md) — deploy on a real host with TLS,
+  backups, and an edge proxy.
+- [Cloudflare Tunnel](cloudflared.md) — expose a self-hosted server to the
+  internet without opening any ports.
+- [TLS and Nginx](tls-and-nginx.md) — host-managed TLS via Let's Encrypt.
+- [Security Hardening](security-hardening.md) — lock down your deployment.
+- [Upgrading](upgrading.md) — keep your instance current.

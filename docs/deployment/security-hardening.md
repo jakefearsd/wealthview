@@ -2,156 +2,190 @@
 
 # Security Hardening
 
-This guide covers security best practices for a WealthView production deployment.
-Many of these measures are already in place in the default configuration; this
-document explains them and adds recommendations for the host operating system.
+This guide covers security practices for a WealthView production deployment.
+Much of what is described below is already in place in the default
+configuration — this document explains what the defaults are and what you
+should add at the host-operating-system level on top of them.
 
-## Secrets Management
+It is organized by layer: secrets, host OS, Docker, the database, the
+application itself, and the edge proxy. A final [checklist](#security-checklist)
+summarizes everything.
 
-### Generate Strong Secrets
+---
 
-Every secret in the `.env` file should be cryptographically random. Never use
+## Secrets management
+
+### Generate strong secrets
+
+Every secret in `.env` should be cryptographically random. Never use
 dictionary words, reuse secrets across environments, or commit secrets to git.
 
 ```bash
-# Database password
-openssl rand -base64 24
-
-# JWT signing key (must be 32+ characters for HMAC-SHA256)
-openssl rand -base64 48
-
-# Super-admin password
-openssl rand -base64 18
+openssl rand -base64 24    # DB_PASSWORD
+openssl rand -base64 48    # JWT_SECRET (must be 32+ chars for HMAC-SHA256)
+openssl rand -base64 18    # SUPER_ADMIN_PASSWORD
 ```
 
-### Protect the `.env` File
+The `prod` Spring profile runs `ProductionConfigValidator` at startup and
+**aborts** the application if it detects any of the following:
 
-The `.env` file contains all deployment secrets. Restrict access:
+- `JWT_SECRET` shorter than 32 characters, unset, or matching a known dev
+  default (`default-secret-key-...`, `production-secret-key-...`).
+- `SUPER_ADMIN_PASSWORD` matching `admin123`, `demo123`, or `DevPass123!`.
+- `CORS_ORIGIN` empty, or not a comma-separated list of `https://...` URLs
+  (the one exception is the `docker` profile, which also allows
+  `http://localhost` for local evaluation).
+
+This is intentional. If you see the app fail to start with a
+`ProductionConfigValidator` error, fix the `.env` value rather than
+bypassing the check.
+
+### Protect the `.env` file
 
 ```bash
 chmod 600 .env
+ls -la .env      # -rw------- 1 you you ...
 ```
 
-This ensures only the file owner can read or write it.
-
-Verify that `.env` is listed in `.gitignore`:
+`.env` is in `.gitignore`. Verify before your first commit:
 
 ```bash
-grep '\.env' .gitignore
+grep -E '^\.env$' .gitignore
 ```
 
-If it is not listed, add it:
+If secrets ever land in git history, **rotate them** — deleting the file
+from history is not enough. Generate new values and redeploy.
 
-```bash
-echo '.env' >> .gitignore
-```
+### Separate secrets per environment
 
-Never commit `.env` to version control. If secrets are accidentally committed, rotate
-them immediately -- deleting the file from git history is not enough.
-
-### Separate Secrets Per Environment
-
-If you run multiple instances (staging, production), use different secrets for each.
-Never share `JWT_SECRET` or `DB_PASSWORD` between environments.
+Never share `JWT_SECRET` or `DB_PASSWORD` between staging, production, and
+backup environments. A leak in one then compromises all.
 
 ---
 
-## Firewall Configuration (ufw)
+## Host operating system
 
-Lock down the server to only accept traffic on necessary ports:
+### Firewall (ufw)
+
+Lock down the server to only the ports you actually use.
+
+If you are running the app behind **nginx on the host** (Let's Encrypt for
+TLS):
 
 ```bash
-# Set default policies
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-
-# Allow SSH
-sudo ufw allow 22/tcp
-
-# Allow HTTP (needed for certbot ACME challenges and HTTPS redirect)
-sudo ufw allow 80/tcp
-
-# Allow HTTPS
-sudo ufw allow 443/tcp
-
-# Enable the firewall
+sudo ufw allow 22/tcp      # SSH (or your custom SSH port)
+sudo ufw allow 80/tcp      # HTTP (certbot challenges + HTTPS redirect)
+sudo ufw allow 443/tcp     # HTTPS
 sudo ufw enable
-
-# Verify rules
 sudo ufw status verbose
 ```
 
-If you changed the SSH port (see below), replace `22/tcp` with your custom port.
+If you are running the app behind **Cloudflare Tunnel**:
 
----
+```bash
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow 22/tcp      # SSH only
+sudo ufw enable
+```
 
-## SSH Hardening
+`cloudflared` connects *outbound* to Cloudflare, so you don't need any
+inbound rule for HTTP/HTTPS at all.
 
-### Use SSH Keys Only
+### SSH
 
-Disable password authentication to prevent brute-force attacks:
+Disable password authentication (keys only):
 
 ```bash
 sudo nano /etc/ssh/sshd_config
 ```
 
-Set these directives:
-
 ```
 PasswordAuthentication no
 PubkeyAuthentication yes
-```
-
-Ensure your public key is in `~/.ssh/authorized_keys` before disabling passwords.
-
-### Disable Root Login
-
-```
 PermitRootLogin no
 ```
 
-### Optional: Change the SSH Port
+Make sure your public key is already in `~/.ssh/authorized_keys` before
+disabling passwords — otherwise you will lock yourself out.
 
-Using a non-standard port reduces automated scanning noise (this is not a substitute
-for proper authentication):
-
-```
-Port 2222
-```
-
-If you change the port, update your firewall rules:
-
-```bash
-sudo ufw delete allow 22/tcp
-sudo ufw allow 2222/tcp
-```
-
-### Apply Changes
+Apply changes:
 
 ```bash
 sudo systemctl restart sshd
 ```
 
-Test SSH access in a new terminal before closing your current session.
+**Test from a new terminal before closing your current session.**
+
+Changing the SSH port (e.g. to 2222) adds a small amount of log hygiene but
+is not a substitute for key-only auth.
+
+### Automatic security updates
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt-get install -y unattended-upgrades
+sudo dpkg-reconfigure --priority=low unattended-upgrades
+```
+
+This keeps the kernel, OpenSSH, and other host packages patched without
+manual intervention.
 
 ---
 
-## Docker Security
+## Docker
 
-### Network Isolation in Production
+### The app runs as a non-root user
 
-The production Compose file is configured with security in mind:
+The `app` container image runs as an unprivileged user (`wv`, added by the
+Dockerfile with `RUN addgroup -S wv && adduser -S wv -G wv`). If an attacker
+ever achieves code execution inside the container, they cannot immediately
+touch the host kernel or any file not owned by `wv`.
 
-- **App container** uses `expose: 8080` (not `ports`). It is accessible only within
-  the Docker network -- not from the host or the internet. Nginx is the only entry point.
-- **Database container** has no published ports. It is only accessible from the app
-  and backup containers within the Docker network.
-- **Nginx** is the only container that publishes ports (80 and 443) to the host.
+Verify after a rebuild:
 
-### Resource Limits
+```bash
+docker compose -f docker-compose.prod.yml exec app id
+# uid=101(wv) gid=101(wv) groups=101(wv)
+```
 
-Prevent runaway containers from consuming all host resources by adding resource
-limits to your Compose file:
+### Container-level HEALTHCHECK
+
+The Dockerfile declares:
+
+```dockerfile
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s \
+    CMD wget -q -O- http://localhost:8080/actuator/health || exit 1
+```
+
+Docker reports the container as `(healthy)` / `(unhealthy)` in
+`docker compose ps`, and downstream tools (systemd, watchtower, container
+orchestrators) can restart an unhealthy container automatically.
+
+### No unnecessary port publishing
+
+`docker-compose.prod.yml` publishes exactly one port to the host — the
+`app` container's `8080` is mapped to `${APP_PORT}`. The `db` and `backup`
+containers do not publish any ports; they are only reachable from other
+containers on the Compose-managed internal network.
+
+If your server has a public IP, either keep the firewall rule on port
+`${APP_PORT}` closed (so only nginx or cloudflared can reach it) or bind
+the app's published port to loopback only by editing the Compose file:
+
+```yaml
+services:
+  app:
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+```
+
+### Resource limits (optional)
+
+Prevent a runaway container from consuming all host memory:
 
 ```yaml
 services:
@@ -169,158 +203,214 @@ services:
           cpus: '0.5'
 ```
 
-### Keep Docker Updated
-
-Regularly update Docker to get security patches:
+### Keep Docker updated
 
 ```bash
-sudo apt update && sudo apt upgrade docker-ce docker-ce-cli containerd.io
+sudo apt-get update && sudo apt-get upgrade -y docker-ce docker-ce-cli containerd.io
 ```
 
----
-
-## Database Security
-
-### No External Access
-
-In the production Compose file, the database has no published ports. It is only
-reachable from other containers on the internal Docker network. This eliminates
-the risk of external brute-force attacks against PostgreSQL.
-
-### Strong Password
-
-Use a cryptographically random password for `DB_PASSWORD` (see above). Avoid short
-or guessable passwords.
-
-### Connection Limits
-
-For high-traffic scenarios, consider setting PostgreSQL connection limits in
-a custom `postgresql.conf`:
-
-```
-max_connections = 100
-```
-
-For deployments with many concurrent users, consider adding pgbouncer as a
-connection pooler.
-
----
-
-## Application Security
-
-### JWT Configuration
-
-The `JWT_SECRET` is used for HMAC-SHA256 signing of authentication tokens. It must
-be at least 32 characters long. A weak or short secret makes token forgery possible.
-
-```bash
-# Generate a strong JWT secret
-openssl rand -base64 48
-```
-
-### Change the Default Super-Admin Password
-
-The super-admin account (`admin@wealthview.local`) is created automatically on
-startup. If `SUPER_ADMIN_PASSWORD` is not set, it defaults to `admin123`. Always
-set a strong password in production:
-
-```bash
-# Generate and set in .env
-openssl rand -base64 18
-```
-
-### CORS Configuration
-
-CORS settings are controlled by the Spring profile:
-
-- The `docker` profile restricts origins to localhost
-- Review and adjust CORS configuration in the application properties if you need
-  to allow additional origins
-
-### Tenant Isolation
-
-WealthView enforces tenant isolation at the data access layer. Every database query
-filters by `tenant_id`, which is extracted from the authenticated user's JWT token.
-The tenant ID never comes from request parameters or user input.
-
----
-
-## Security Headers
-
-The nginx configuration (`nginx-prod.conf`) includes security headers on all
-HTTPS responses:
-
-| Header | Value | Protection |
-|--------|-------|------------|
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` | Forces browsers to use HTTPS for 1 year. Prevents SSL stripping attacks. |
-| `X-Content-Type-Options` | `nosniff` | Prevents browsers from MIME-sniffing responses. Mitigates drive-by download attacks. |
-| `X-Frame-Options` | `DENY` | Prevents the page from being embedded in iframes. Mitigates clickjacking attacks. |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Limits referrer information sent to external sites. Protects URL-based sensitive data. |
-
-These headers are applied by nginx, so they cover all responses (API and frontend).
-
----
-
-## Regular Updates
-
-### Rebuild with Latest Base Images
-
-Periodically rebuild your containers to pull in security updates for the base OS
-images and system packages:
+Rebuild periodically so you pull the latest base-image security updates:
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build --pull always -d
 ```
 
-The `--pull always` flag forces Docker to pull the latest versions of base images
-(OpenJDK, PostgreSQL, nginx, Alpine) before building.
+`--pull always` forces Docker to check for newer versions of the parent
+images (Temurin JRE, Alpine, PostgreSQL, etc.) before building.
 
-### Monitor Dependencies
+---
 
-Keep an eye on security advisories for:
-- Spring Boot and Spring Security
+## Database
+
+- **No published ports** in production. The `db` container is reachable only
+  from `app` and `backup` on the internal Docker network.
+- **Strong password.** `DB_PASSWORD` must be cryptographically random; the
+  `prod` profile doesn't validate it explicitly, but exposing a weak one
+  defeats the point of network isolation.
+- **Backups encrypted at rest (optional but recommended).** The nightly
+  `pg_dump` under `./backups/` is plain `.dump`. For anything sensitive,
+  encrypt before offsite copy:
+  ```bash
+  age -r <your-public-key> backups/wealthview_2026-04-22_03-00.dump \
+    > backups/wealthview_2026-04-22_03-00.dump.age
+  ```
+  or use cloud-side encryption if you're syncing to S3/Backblaze/etc.
+
+---
+
+## Application-level security
+
+The items below are all already implemented; they are listed here so you
+know what is actually protecting your deployment.
+
+### Authentication
+
+- Short-lived access tokens (15 minute default) + refresh tokens stored
+  per-user. Tokens are HMAC-SHA256 signed; every token carries `iss` and
+  `aud` claims that are checked on every request.
+- Refresh tokens are bound to a per-user `tokenGeneration` counter. Logging
+  out or triggering a password reset bumps the counter and invalidates every
+  previously-issued refresh token. The counter field uses JPA `@Version`
+  optimistic locking so concurrent refresh calls can't double-issue tokens.
+- Password reset flows always hash the password with BCrypt (cost 12).
+- The `/api/v1/auth/register` endpoint validates the invite code **before**
+  it queries for email uniqueness. This eliminates a timing / response-code
+  difference that could otherwise have been used to enumerate registered
+  emails.
+- Login attempts are rate-limited per client IP. The client IP is only
+  trusted from `X-Forwarded-For` when the request arrives from a peer in
+  `APP_RATE_LIMIT_TRUSTED_PROXIES` — set this to your nginx / cloudflared
+  host IP.
+
+### Tenant isolation
+
+Every service method that reads or writes business data filters by
+`tenant_id`. The `tenant_id` is taken from the authenticated user's JWT
+via `SecurityContextHolder` — **never** from a request parameter, path
+variable, or body field. A cross-tenant read would require forging a JWT
+for another tenant, which the signing key prevents.
+
+### Audit logging
+
+User- and admin-facing mutations (tenant lifecycle, invite codes, user role
+changes, user deletes, password resets, data exports, etc.) publish
+`AuditEvent` domain events. An async listener persists them into the
+`audit_log` table. The details payload of each audit record is bounded by
+`AuditDetailsValidator`: anything larger than 8 KB or deeper than 3 nested
+levels gets replaced with a marker object, so a malicious caller cannot
+amplify one request into gigabytes of audit storage.
+
+### HTTP security headers
+
+Every response from the Spring Boot layer carries:
+
+| Header | Value |
+|--------|-------|
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'` |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=(), payment=()` |
+
+`Permissions-Policy` is new as of the 2026-04-22 security pass. It tells the
+browser to refuse every script on the page (ours or injected) access to
+geolocation, microphone, camera, and payment APIs — features the app does
+not use at all.
+
+If you also add these at the nginx layer (see [tls-and-nginx.md](tls-and-nginx.md)),
+that's fine — duplicates are harmless.
+
+### Outbound HTTP timeouts
+
+Every outbound HTTP client (Finnhub, Zillow, etc.) has connect and read
+timeouts configured (5s connect, 15s read). A hung upstream can no longer
+pin a servlet thread indefinitely.
+
+### API key transmission
+
+The Finnhub API key is sent as an `X-Finnhub-Token` HTTP header, never as a
+query string. This keeps the key out of access logs, proxy logs, and
+error-reporting breadcrumbs.
+
+### CSV injection
+
+Exported CSV files (audit log export, holdings export, etc.) are neutralized
+against formula-injection attacks — any cell value beginning with `=`, `+`,
+`-`, `@`, `\t`, or `\r` is prefixed with a single quote so Excel / Numbers /
+LibreOffice Calc don't execute it as a formula.
+
+---
+
+## Edge proxy
+
+Whether you use nginx-on-host or Cloudflare Tunnel, the edge proxy is the
+only thing facing the public internet. Keep it simple and keep it current.
+
+- **TLS 1.2 and 1.3 only.** Disable older protocols. `python3-certbot-nginx`
+  does this automatically via `options-ssl-nginx.conf`. Cloudflare terminates
+  TLS with modern ciphers by default.
+- **HTTP → HTTPS redirect.** Certbot's `--redirect` flag adds this for
+  nginx. Cloudflare offers "Always Use HTTPS" in **SSL/TLS → Edge
+  Certificates**.
+- **Forwarded-header hygiene.** The app honors `X-Forwarded-For` only from
+  peers in `APP_RATE_LIMIT_TRUSTED_PROXIES`. Set this correctly or audit
+  records lose their value.
+
+For Cloudflare-specific hardening options (Access, WAF, rate limiting at the
+edge), see [cloudflared.md](cloudflared.md#security-notes-specific-to-cloudflare-tunnel).
+
+---
+
+## Regular maintenance
+
+### Dependency updates
+
+```bash
+# Maven dependencies (backend)
+cd backend && mvn versions:display-dependency-updates
+
+# npm dependencies (frontend)
+cd frontend && npm audit
+```
+
+Watch security advisories for:
+
+- Spring Boot / Spring Security
 - PostgreSQL
 - nginx
-- Let's Encrypt / certbot
-- Node.js and npm packages (frontend)
+- Let's Encrypt / certbot (the renewal timer email is your friend)
+- cloudflared (auto-updates on Debian/Ubuntu if you use the apt repo)
 
-Run `mvn dependency:tree` and `npm audit` periodically to check for known
-vulnerabilities in dependencies.
+### Review the audit log
 
----
+The super-admin UI has an Audit Log page (`/admin/audit-log`) showing every
+tenant / user / export mutation. Skim it periodically for entries that
+don't match legitimate activity.
 
-## Audit Trail
+### Rotate credentials periodically
 
-WealthView logs user actions in the `audit_log` database table. This provides a
-record of who did what and when.
+- Rotate `JWT_SECRET` at least annually. All users will be forced to log in
+  again after the rotation.
+- Rotate `DB_PASSWORD` when team membership changes.
+- Rotate `SUPER_ADMIN_PASSWORD` whenever someone with access leaves.
 
-Review the audit log periodically by querying the database or accessing the
-audit log view in the application at `/audit-log`.
+To rotate:
 
----
-
-## Security Checklist
-
-Use this checklist to verify your deployment:
-
-- [ ] `.env` file has `chmod 600` permissions
-- [ ] `.env` is in `.gitignore`
-- [ ] `DB_PASSWORD` is randomly generated (24+ characters)
-- [ ] `JWT_SECRET` is randomly generated (32+ characters)
-- [ ] `SUPER_ADMIN_PASSWORD` is set (not using default `admin123`)
-- [ ] Firewall allows only ports 22, 80, and 443
-- [ ] SSH password authentication is disabled
-- [ ] SSH root login is disabled
-- [ ] Database has no published ports in production Compose
-- [ ] App has no published ports in production Compose (nginx proxies)
-- [ ] TLS is working (check with `curl -v https://yourdomain.com`)
-- [ ] Security headers are present (check with `curl -sI`)
-- [ ] Backups are running (check `ls -la backups/`)
+1. Edit `.env`.
+2. `docker compose -f docker-compose.prod.yml up -d app` (for app-level
+   secrets) or `docker compose -f docker-compose.prod.yml up -d` (for DB
+   password — requires recreating both `app` and `db` with the new value).
 
 ---
 
-## Related Guides
+## Security checklist
 
-- [Production Setup](production-setup.md) -- full deployment walkthrough
-- [TLS and Nginx](tls-and-nginx.md) -- detailed TLS configuration
-- [Upgrading](upgrading.md) -- keeping your deployment up to date
+Use this to verify your deployment:
+
+- [ ] `.env` has `chmod 600` permissions
+- [ ] `.env` is listed in `.gitignore`
+- [ ] `DB_PASSWORD`, `JWT_SECRET`, `SUPER_ADMIN_PASSWORD` all randomly generated
+- [ ] `JWT_SECRET` is 32+ characters
+- [ ] `CORS_ORIGIN` is set to `https://your-domain`
+- [ ] `APP_RATE_LIMIT_TRUSTED_PROXIES` set to the edge proxy's peer IP
+- [ ] App starts cleanly on the `prod` profile (no `ProductionConfigValidator` errors)
+- [ ] Firewall allows only the ports you need (22, optionally 80 + 443)
+- [ ] SSH password auth is disabled; root login disabled
+- [ ] Automatic host-OS security updates enabled (`unattended-upgrades`)
+- [ ] `db` container has no published ports in production
+- [ ] `app` container published port is bound to loopback or firewalled
+- [ ] Container runs as `wv` (non-root) — verified via `docker exec ... id`
+- [ ] HEALTHCHECK shows `(healthy)` in `docker compose ps`
+- [ ] TLS end-to-end: `curl -s https://your-domain/actuator/health` returns `{"status":"UP"}`
+- [ ] Security headers present: `curl -sI https://your-domain | grep -Ei 'strict-transport|permissions-policy|x-frame-options|x-content-type'`
+- [ ] Nightly backups running: `ls -la backups/` shows recent dumps
+- [ ] You have tested a restore at least once in a non-prod environment
+
+---
+
+## Related guides
+
+- [Production Setup](production-setup.md) — full deployment walkthrough.
+- [TLS and Nginx](tls-and-nginx.md) — host-managed TLS.
+- [Cloudflared Deployment](cloudflared.md) — Cloudflare Tunnel TLS.
+- [Upgrading](upgrading.md) — keep the app up to date.

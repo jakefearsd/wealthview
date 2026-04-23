@@ -233,4 +233,6 @@ check the logs for database connection errors or migration issues.
 ## Related Guides
 
 - [Production Setup](production-setup.md) -- initial deployment
+- [Cloudflare Tunnel](cloudflared.md) -- self-hosted deployment via cloudflared
+- [TLS and Nginx](tls-and-nginx.md) -- host-managed TLS
 - [Security Hardening](security-hardening.md) -- securing your deployment
