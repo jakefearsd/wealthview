@@ -200,103 +200,102 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         return new FederalOnlyTaxStrategy(taxCalculator);
     }
 
+    /** Carry-forward state threaded between successive year iterations. */
+    private record YearAccumulator(int yearsInRetirement, BigDecimal previousWithdrawal, BigDecimal suspendedLoss) {
+        static final YearAccumulator INITIAL = new YearAccumulator(0, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    private record YearStepResult(ProjectionYearDto yearDto, YearAccumulator nextAccumulator) {}
+
     private ProjectionResultResponse runProjection(ProjectionRunContext ctx) {
-        var input = ctx.input();
-        var pool = ctx.pool();
-        var strategy = ctx.strategy();
-        int currentYear = ctx.currentYear();
-        int birthYear = ctx.birthYear();
-        int retirementYear = ctx.retirementYear();
-        int endYear = ctx.endYear();
-        var inflationRate = ctx.inflationRate();
-        var spendingPlan = ctx.spendingPlan();
-        var incomeSources = ctx.incomeSources();
-        var properties = ctx.properties();
-        var taxStrategy = ctx.taxStrategy();
-
         var yearlyData = new ArrayList<ProjectionYearDto>();
-        int yearsInRetirement = 0;
-        BigDecimal previousWithdrawal = BigDecimal.ZERO;
-        BigDecimal suspendedLoss = BigDecimal.ZERO;
+        var acc = YearAccumulator.INITIAL;
 
-        for (int year = currentYear; year < endYear; year++) {
-            int age = year - birthYear;
-            boolean retired = year >= retirementYear;
-            BigDecimal startBalance = pool.getTotal();
-
-            BigDecimal contributions = BigDecimal.ZERO;
-            BigDecimal withdrawals = BigDecimal.ZERO;
-
-            if (retired) {
-                yearsInRetirement++;
-            } else {
-                contributions = pool.applyContributions();
-            }
-
-            var growthResult = pool.applyGrowth();
-            BigDecimal totalGrowth = growthResult.total();
-
-            var incomeResult = processIncomeAndConversions(
-                    pool, incomeSources, age, yearsInRetirement, year, suspendedLoss,
-                    resolveConversionOverride(spendingPlan, year));
-            suspendedLoss = incomeResult.suspendedLoss();
-            BigDecimal conversionAmount = incomeResult.conversionAmount();
-            BigDecimal taxLiability = incomeResult.taxLiability();
-
-            BigDecimal surplusReinvested = null;
-            BigDecimal wdFromTaxable = BigDecimal.ZERO;
-            BigDecimal wdFromTraditional = BigDecimal.ZERO;
-            BigDecimal wdFromRoth = BigDecimal.ZERO;
-            PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
-            if (retired) {
-                var rwCtx = new RetirementWithdrawalContext(
-                        pool, strategy, spendingPlan, age, yearsInRetirement, year,
-                        inflationRate, incomeResult.totalActiveIncome(), startBalance,
-                        previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                        incomeResult.isResult(), taxStrategy);
-                var retirementResult = processRetirementWithdrawals(rwCtx);
-                withdrawals = retirementResult.withdrawals();
-                taxLiability = taxLiability.add(retirementResult.taxLiability());
-                previousWithdrawal = retirementResult.previousWithdrawal();
-                surplusReinvested = retirementResult.surplusReinvested();
-                wdFromTaxable = retirementResult.withdrawalFromTaxable();
-                wdFromTraditional = retirementResult.withdrawalFromTraditional();
-                wdFromRoth = retirementResult.withdrawalFromRoth();
-                withdrawalTaxSource = retirementResult.withdrawalTaxSource();
-            }
-
-            var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
-
-            pool.floorAtZero();
-
-            int yearsElapsed = year - currentYear;
-            BigDecimal propertyEquity = computePropertyEquity(properties, yearsElapsed);
-
-            var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
-                    totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
-                    growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
-            yearDto = applyPropertyEquity(yearDto, propertyEquity);
-            yearDto = applyViability(yearDto, spendingPlan, year, age, yearsInRetirement, inflationRate,
-                    incomeResult.totalActiveIncome());
-            yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
-            yearDto = yearDto.withSurplusReinvested(surplusReinvested);
-            yearDto = applyRetirementTaxAnnotations(yearDto, retired, age, year,
-                    wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
-                    taxLiability, pool, taxStrategy);
-            yearlyData.add(yearDto);
+        for (int year = ctx.currentYear(); year < ctx.endYear(); year++) {
+            var step = processYear(ctx, year, acc);
+            yearlyData.add(step.yearDto());
+            acc = step.nextAccumulator();
         }
 
         BigDecimal finalBalance = yearlyData.isEmpty()
-                ? pool.getTotal()
+                ? ctx.pool().getTotal()
                 : yearlyData.getLast().endBalance();
 
         log.info("{} for scenario '{}': {} years, final balance {}",
-                pool.logTag(), input.scenarioName(), yearlyData.size(), finalBalance);
+                ctx.pool().logTag(), ctx.input().scenarioName(), yearlyData.size(), finalBalance);
 
-        var feasibility = computeFeasibility(yearlyData, spendingPlan, inflationRate);
+        var feasibility = computeFeasibility(yearlyData, ctx.spendingPlan(), ctx.inflationRate());
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
-        return new ProjectionResultResponse(input.scenarioId(), yearlyData, finalBalance,
-                yearsInRetirement, feasibility, finalNetWorth);
+        return new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
+                acc.yearsInRetirement(), feasibility, finalNetWorth);
+    }
+
+    private YearStepResult processYear(ProjectionRunContext ctx, int year, YearAccumulator acc) {
+        var pool = ctx.pool();
+        int age = year - ctx.birthYear();
+        boolean retired = year >= ctx.retirementYear();
+        BigDecimal startBalance = pool.getTotal();
+
+        BigDecimal contributions = BigDecimal.ZERO;
+        BigDecimal withdrawals = BigDecimal.ZERO;
+        int yearsInRetirement = retired ? acc.yearsInRetirement() + 1 : acc.yearsInRetirement();
+        if (!retired) {
+            contributions = pool.applyContributions();
+        }
+
+        var growthResult = pool.applyGrowth();
+        BigDecimal totalGrowth = growthResult.total();
+
+        var incomeResult = processIncomeAndConversions(
+                pool, ctx.incomeSources(), age, yearsInRetirement, year, acc.suspendedLoss(),
+                resolveConversionOverride(ctx.spendingPlan(), year));
+        BigDecimal suspendedLoss = incomeResult.suspendedLoss();
+        BigDecimal conversionAmount = incomeResult.conversionAmount();
+        BigDecimal taxLiability = incomeResult.taxLiability();
+
+        BigDecimal surplusReinvested = null;
+        BigDecimal wdFromTaxable = BigDecimal.ZERO;
+        BigDecimal wdFromTraditional = BigDecimal.ZERO;
+        BigDecimal wdFromRoth = BigDecimal.ZERO;
+        BigDecimal previousWithdrawal = acc.previousWithdrawal();
+        PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
+        if (retired) {
+            var rwCtx = new RetirementWithdrawalContext(
+                    pool, ctx.strategy(), ctx.spendingPlan(), age, yearsInRetirement, year,
+                    ctx.inflationRate(), incomeResult.totalActiveIncome(), startBalance,
+                    previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
+                    incomeResult.isResult(), ctx.taxStrategy());
+            var retirementResult = processRetirementWithdrawals(rwCtx);
+            withdrawals = retirementResult.withdrawals();
+            taxLiability = taxLiability.add(retirementResult.taxLiability());
+            previousWithdrawal = retirementResult.previousWithdrawal();
+            surplusReinvested = retirementResult.surplusReinvested();
+            wdFromTaxable = retirementResult.withdrawalFromTaxable();
+            wdFromTraditional = retirementResult.withdrawalFromTraditional();
+            wdFromRoth = retirementResult.withdrawalFromRoth();
+            withdrawalTaxSource = retirementResult.withdrawalTaxSource();
+        }
+
+        var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
+
+        pool.floorAtZero();
+
+        int yearsElapsed = year - ctx.currentYear();
+        BigDecimal propertyEquity = computePropertyEquity(ctx.properties(), yearsElapsed);
+
+        var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
+                totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
+                growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
+        yearDto = applyPropertyEquity(yearDto, propertyEquity);
+        yearDto = applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement, ctx.inflationRate(),
+                incomeResult.totalActiveIncome());
+        yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
+        yearDto = yearDto.withSurplusReinvested(surplusReinvested);
+        yearDto = applyRetirementTaxAnnotations(yearDto, retired, age, year,
+                wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
+                taxLiability, pool, ctx.taxStrategy());
+
+        return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss));
     }
 
     private BigDecimal resolveConversionOverride(SpendingPlan spendingPlan, int year) {
