@@ -5,6 +5,7 @@ import com.wealthview.persistence.entity.HoldingEntity;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 public record HoldingResponse(
         UUID id,
@@ -31,7 +32,7 @@ public record HoldingResponse(
         BigDecimal gl = null;
 
         if (latestPrice != null && qty != null) {
-            mktValue = qty.multiply(latestPrice).setScale(4, java.math.RoundingMode.HALF_UP);
+            mktValue = qty.multiply(latestPrice).setScale(Money.SCALE, Money.ROUNDING);
             if (cost != null) {
                 gl = mktValue.subtract(cost);
             }

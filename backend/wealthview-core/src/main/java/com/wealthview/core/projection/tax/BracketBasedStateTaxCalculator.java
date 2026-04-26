@@ -6,18 +6,16 @@ import com.wealthview.persistence.entity.StateTaxSurchargeEntity;
 import com.wealthview.persistence.repository.StateStandardDeductionRepository;
 import com.wealthview.persistence.repository.StateTaxBracketRepository;
 import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public class BracketBasedStateTaxCalculator implements StateTaxCalculator {
-
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final String stateCode;
     private final boolean capitalGainsAsOrdinary;

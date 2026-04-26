@@ -3,7 +3,8 @@ package com.wealthview.core.projection.tax;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 /**
  * Computes self-employment tax: 15.3% on 92.35% of net earnings.
@@ -12,9 +13,6 @@ import java.math.RoundingMode;
  */
 @Component
 public class SelfEmploymentTaxCalculator {
-
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private static final BigDecimal NET_EARNINGS_FACTOR = new BigDecimal("0.9235");
     private static final BigDecimal SS_RATE = new BigDecimal("0.124");

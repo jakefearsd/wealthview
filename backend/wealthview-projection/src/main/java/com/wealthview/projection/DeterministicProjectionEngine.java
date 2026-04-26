@@ -37,10 +37,11 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 @Component
 @SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
@@ -50,8 +51,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
     private static final BigDecimal SHORTFALL_TOLERANCE = new BigDecimal("-10");
     private static final BigDecimal IRMAA_BRACKET_RATE = new BigDecimal("0.22");
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final FederalTaxCalculator taxCalculator;
@@ -498,7 +497,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 withdrawalResult.fromRoth(), withdrawalResult.taxSource());
     }
 
-
     private WithdrawalStrategy resolveStrategy(ScenarioParams params, BigDecimal withdrawalRate) {
         if (params.withdrawalStrategy == null || params.withdrawalStrategy.isBlank()) {
             return new FixedPercentageWithdrawal(withdrawalRate);
@@ -515,7 +513,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             default -> new FixedPercentageWithdrawal(withdrawalRate);
         };
     }
-
 
     private ScenarioParams parseParams(String paramsJson) {
         if (paramsJson == null || paramsJson.isBlank()) {
@@ -584,7 +581,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             BigDecimal primaryResidenceMortgageInterest,
             BigDecimal dynamicSequencingBracketRate) {
     }
-
 
     private BigDecimal getDecimal(JsonNode item, String camelCase, String snakeCase, BigDecimal fallback) {
         if (item.has(camelCase) && !item.get(camelCase).isNull()) {

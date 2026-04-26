@@ -6,9 +6,10 @@ import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,9 +21,6 @@ import java.util.UUID;
  * for a single projection year, computing cash inflows, taxable income, and related fields.
  */
 class IncomeSourceProcessor {
-
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final RentalLossCalculator rentalLossCalculator;
     private final SocialSecurityTaxCalculator ssTaxCalculator;

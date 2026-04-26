@@ -21,6 +21,7 @@ import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 @Service
 public class ExchangeRateService {
@@ -114,6 +115,6 @@ public class ExchangeRateService {
                         "No exchange rate found for " + currency
                                 + " — add one in Settings before using this currency"));
 
-        return amount.multiply(entity.getRateToUsd()).setScale(4, RoundingMode.HALF_UP);
+        return amount.multiply(entity.getRateToUsd()).setScale(Money.SCALE, Money.ROUNDING);
     }
 }

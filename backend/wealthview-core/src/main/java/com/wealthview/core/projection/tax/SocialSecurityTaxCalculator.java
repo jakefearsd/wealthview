@@ -3,7 +3,8 @@ package com.wealthview.core.projection.tax;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 /**
  * Computes the taxable portion of Social Security benefits using the IRS two-tier formula.
@@ -13,8 +14,6 @@ import java.math.RoundingMode;
 @Component
 public class SocialSecurityTaxCalculator {
 
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final BigDecimal HALF = new BigDecimal("0.5");
     private static final BigDecimal EIGHTY_FIVE_PERCENT = new BigDecimal("0.85");
 

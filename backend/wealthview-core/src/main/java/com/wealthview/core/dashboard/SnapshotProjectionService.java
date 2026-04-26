@@ -21,6 +21,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 @Service
 public class SnapshotProjectionService {
@@ -100,9 +101,9 @@ public class SnapshotProjectionService {
 
             var totalValue = investmentValue.add(propertyEquity);
             dataPoints.add(new SnapshotProjectionDataPointDto(
-                    year, date, totalValue.setScale(4, RoundingMode.HALF_UP),
-                    investmentValue.setScale(4, RoundingMode.HALF_UP),
-                    propertyEquity.setScale(4, RoundingMode.HALF_UP)));
+                    year, date, totalValue.setScale(Money.SCALE, Money.ROUNDING),
+                    investmentValue.setScale(Money.SCALE, Money.ROUNDING),
+                    propertyEquity.setScale(Money.SCALE, Money.ROUNDING)));
         }
 
         log.info("Computed snapshot projection for tenant {}: {} years, {} accounts, {} properties",

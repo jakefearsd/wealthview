@@ -7,16 +7,14 @@ import com.wealthview.persistence.repository.TaxBracketRepository;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 @Component
 public class FederalTaxCalculator {
-
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final TaxBracketRepository taxBracketRepository;
     private final StandardDeductionRepository standardDeductionRepository;

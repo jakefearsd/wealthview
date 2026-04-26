@@ -19,9 +19,10 @@ import org.springframework.stereotype.Component;
 
 import com.wealthview.core.projection.dto.ConversionYearDetail;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,8 +34,6 @@ import java.util.Random;
 public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private static final Logger log = LoggerFactory.getLogger(MonteCarloSpendingOptimizer.class);
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final double DEFAULT_BLOCK_LENGTH = 5.0;
     private static final int JOINT_GRID_SIZE = 20;
     private static final double JOINT_REFINE_HALF_WIDTH = 0.1;
@@ -696,7 +695,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
         return result;
     }
-
 
     private double[] verifyEssentialFloor(double[][] paths, double[] income,
                                            double essentialFloor,

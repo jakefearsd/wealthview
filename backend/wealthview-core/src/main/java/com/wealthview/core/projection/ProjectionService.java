@@ -41,6 +41,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 @Service
 @SuppressWarnings("PMD.CouplingBetweenObjects")
@@ -370,7 +371,7 @@ public class ProjectionService {
                     property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
             if (remaining.compareTo(BigDecimal.ZERO) > 0) {
                 var interest = remaining.multiply(property.getAnnualInterestRate())
-                        .setScale(4, RoundingMode.HALF_UP);
+                        .setScale(Money.SCALE, Money.ROUNDING);
                 var annualPayment = AmortizationCalculator.monthlyPayment(
                         property.getLoanAmount(), property.getAnnualInterestRate(),
                         property.getLoanTermMonths()).multiply(new BigDecimal("12"));
