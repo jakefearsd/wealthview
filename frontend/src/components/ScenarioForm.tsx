@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
@@ -25,6 +25,30 @@ interface ScenarioFormProps {
     submitLabel: string;
 }
 
+interface ScenarioFormFields {
+    name: string;
+    retirementDate: string;
+    endAge: number;
+    inflationRate: number;
+    birthYear: number;
+    withdrawalRate: number;
+    withdrawalStrategy: string;
+    dynamicCeiling: number;
+    dynamicFloor: number;
+    filingStatus: string;
+    otherIncome: number;
+    annualRothConversion: number;
+    rothConversionStrategy: string;
+    targetBracketRate: number;
+    rothConversionStartYear: number | null;
+    withdrawalOrder: string;
+    dynamicSequencingBracketRate: number;
+    state: string;
+    primaryResidencePropertyTax: number;
+    primaryResidenceMortgageInterest: number;
+    spendingPlanSelection: string;
+}
+
 function defaultAccount(): ScenarioAccountInput {
     return {
         linked_account_id: null,
@@ -43,39 +67,48 @@ function mapAccountType(realType: string): string {
     }
 }
 
+function buildInitialFields(initialValues: Scenario | null | undefined): ScenarioFormFields {
+    const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
+    const spendingPlanSelection = initialValues?.guardrail_profile?.active
+        ? 'guardrail'
+        : (initialValues?.spending_profile?.id ?? '');
+
+    return {
+        name: initialValues?.name ?? '',
+        retirementDate: initialValues?.retirement_date ?? '',
+        endAge: initialValues?.end_age ?? 90,
+        inflationRate: toPercent(initialValues?.inflation_rate ?? 0.03),
+        birthYear: parsedParams.birth_year ?? 1990,
+        withdrawalRate: toPercent(parsedParams.withdrawal_rate ?? 0.04),
+        withdrawalStrategy: parsedParams.withdrawal_strategy ?? 'fixed_percentage',
+        dynamicCeiling: toPercent(parsedParams.dynamic_ceiling ?? 0.05),
+        dynamicFloor: toPercent(parsedParams.dynamic_floor ?? -0.025),
+        filingStatus: parsedParams.filing_status ?? 'single',
+        otherIncome: parsedParams.other_income ?? 0,
+        annualRothConversion: parsedParams.annual_roth_conversion ?? 0,
+        rothConversionStrategy: parsedParams.roth_conversion_strategy ?? 'fixed_amount',
+        targetBracketRate: toPercent(parsedParams.target_bracket_rate ?? 0.12),
+        rothConversionStartYear: parsedParams.roth_conversion_start_year ?? null,
+        withdrawalOrder: parsedParams.withdrawal_order ?? 'taxable_first',
+        dynamicSequencingBracketRate: parsedParams.dynamic_sequencing_bracket_rate ?? 0.12,
+        state: parsedParams.state ?? '',
+        primaryResidencePropertyTax: parsedParams.primary_residence_property_tax ?? 0,
+        primaryResidenceMortgageInterest: parsedParams.primary_residence_mortgage_interest ?? 0,
+        spendingPlanSelection,
+    };
+}
+
 export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: ScenarioFormProps) {
     const { data: profiles } = useApiQuery(listSpendingProfiles);
     const { data: accountsPage } = useApiQuery(() => listAccounts(0, 100));
     const { data: availableIncomeSources } = useApiQuery(listIncomeSources);
     const existingAccounts: Account[] = accountsPage?.data ?? [];
 
-    const parsedParams = initialValues?.params_json ? JSON.parse(initialValues.params_json) : {};
+    const [fields, setFields] = useState<ScenarioFormFields>(() => buildInitialFields(initialValues));
+    const setField = useCallback(<K extends keyof ScenarioFormFields>(key: K, value: ScenarioFormFields[K]) => {
+        setFields(prev => ({ ...prev, [key]: value }));
+    }, []);
 
-    const [name, setName] = useState(initialValues?.name ?? '');
-    const [retirementDate, setRetirementDate] = useState(initialValues?.retirement_date ?? '');
-    const [endAge, setEndAge] = useState(initialValues?.end_age ?? 90);
-    const [inflationRate, setInflationRate] = useState(toPercent(initialValues?.inflation_rate ?? 0.03));
-    const [birthYear, setBirthYear] = useState<number>(parsedParams.birth_year ?? 1990);
-    const [withdrawalRate, setWithdrawalRate] = useState<number>(toPercent(parsedParams.withdrawal_rate ?? 0.04));
-    const [withdrawalStrategy, setWithdrawalStrategy] = useState(parsedParams.withdrawal_strategy ?? 'fixed_percentage');
-    const [dynamicCeiling, setDynamicCeiling] = useState<number>(toPercent(parsedParams.dynamic_ceiling ?? 0.05));
-    const [dynamicFloor, setDynamicFloor] = useState<number>(toPercent(parsedParams.dynamic_floor ?? -0.025));
-    const [filingStatus, setFilingStatus] = useState(parsedParams.filing_status ?? 'single');
-    const [otherIncome, setOtherIncome] = useState<number>(parsedParams.other_income ?? 0);
-    const [annualRothConversion, setAnnualRothConversion] = useState<number>(parsedParams.annual_roth_conversion ?? 0);
-    const [rothConversionStrategy, setRothConversionStrategy] = useState(parsedParams.roth_conversion_strategy ?? 'fixed_amount');
-    const [targetBracketRate, setTargetBracketRate] = useState<number>(toPercent(parsedParams.target_bracket_rate ?? 0.12));
-    const [rothConversionStartYear, setRothConversionStartYear] = useState<number | null>(parsedParams.roth_conversion_start_year ?? null);
-    const [withdrawalOrder, setWithdrawalOrder] = useState(parsedParams.withdrawal_order ?? 'taxable_first');
-    const [dynamicSequencingBracketRate, setDynamicSequencingBracketRate] = useState(
-        parsedParams.dynamic_sequencing_bracket_rate ?? 0.12
-    );
-    const [state, setState] = useState<string>(parsedParams.state ?? '');
-    const [primaryResidencePropertyTax, setPrimaryResidencePropertyTax] = useState<number>(parsedParams.primary_residence_property_tax ?? 0);
-    const [primaryResidenceMortgageInterest, setPrimaryResidenceMortgageInterest] = useState<number>(parsedParams.primary_residence_mortgage_interest ?? 0);
-    const deriveSpendingPlan = () =>
-        initialValues?.guardrail_profile?.active ? 'guardrail' : (initialValues?.spending_profile?.id ?? '');
-    const [spendingPlanSelection, setSpendingPlanSelection] = useState<string>(deriveSpendingPlan);
     const [accounts, setAccounts] = useState<ScenarioAccountInput[]>(
         initialValues?.accounts?.map(a => ({
             linked_account_id: a.linked_account_id,
@@ -92,6 +125,15 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         })) ?? []
     );
     const [saving, setSaving] = useState(false);
+
+    const {
+        name, retirementDate, endAge, inflationRate, birthYear, withdrawalRate,
+        withdrawalStrategy, dynamicCeiling, dynamicFloor, filingStatus, otherIncome,
+        annualRothConversion, rothConversionStrategy, targetBracketRate,
+        rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
+        state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
+        spendingPlanSelection,
+    } = fields;
 
     function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null) {
         setAccounts(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
@@ -162,28 +204,28 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         <div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
                 <FormField label="Name">
-                    <input style={inputStyle} value={name} onChange={e => setName(e.target.value)} placeholder="Retirement Plan" />
+                    <input style={inputStyle} value={name} onChange={e => setField('name', e.target.value)} placeholder="Retirement Plan" />
                 </FormField>
                 <FormField label="Retirement Date">
-                    <input style={inputStyle} type="date" value={retirementDate} onChange={e => setRetirementDate(e.target.value)} />
+                    <input style={inputStyle} type="date" value={retirementDate} onChange={e => setField('retirementDate', e.target.value)} />
                 </FormField>
                 <FormField label="Birth Year" helpText="Used to calculate your age at each projection year.">
-                    <input style={inputStyle} type="number" value={birthYear} onChange={e => setBirthYear(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" value={birthYear} onChange={e => setField('birthYear', Number(e.target.value))} />
                 </FormField>
                 <FormField label="End Age" helpText="Age at which the projection ends. Plan beyond your expected lifespan for safety.">
-                    <input style={inputStyle} type="number" value={endAge} onChange={e => setEndAge(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" value={endAge} onChange={e => setField('endAge', Number(e.target.value))} />
                 </FormField>
                 <FormField label="Inflation Rate (%)" helpText="Annual rate of price increases. 3 = 3%, the historical U.S. average.">
-                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setInflationRate(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setField('inflationRate', Number(e.target.value))} />
                 </FormField>
                 <FormField label="Withdrawal Rate (%)" helpText="Percentage of portfolio to withdraw annually in retirement. 4 = 4%.">
-                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate || ''} onChange={e => setWithdrawalRate(Number(e.target.value))} />
+                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate || ''} onChange={e => setField('withdrawalRate', Number(e.target.value))} />
                 </FormField>
                 <FormField
                     label="Spending Plan"
                     helpText="Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income."
                 >
-                    <select style={inputStyle} value={spendingPlanSelection} onChange={e => setSpendingPlanSelection(e.target.value)}>
+                    <select style={inputStyle} value={spendingPlanSelection} onChange={e => setField('spendingPlanSelection', e.target.value)}>
                         <option value="">None (use withdrawal rate)</option>
                         {profiles?.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -255,37 +297,37 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
             <WithdrawalStrategySection
                 withdrawalStrategy={withdrawalStrategy}
-                onWithdrawalStrategyChange={setWithdrawalStrategy}
+                onWithdrawalStrategyChange={v => setField('withdrawalStrategy', v)}
                 dynamicCeiling={dynamicCeiling}
-                onDynamicCeilingChange={setDynamicCeiling}
+                onDynamicCeilingChange={v => setField('dynamicCeiling', v)}
                 dynamicFloor={dynamicFloor}
-                onDynamicFloorChange={setDynamicFloor}
+                onDynamicFloorChange={v => setField('dynamicFloor', v)}
                 withdrawalOrder={withdrawalOrder}
-                onWithdrawalOrderChange={setWithdrawalOrder}
+                onWithdrawalOrderChange={v => setField('withdrawalOrder', v)}
                 dynamicSequencingBracketRate={dynamicSequencingBracketRate}
-                onDynamicSequencingBracketRateChange={setDynamicSequencingBracketRate}
+                onDynamicSequencingBracketRateChange={v => setField('dynamicSequencingBracketRate', v)}
             />
 
             <RothConversionSection
                 rothConversionStrategy={rothConversionStrategy}
-                onRothConversionStrategyChange={setRothConversionStrategy}
+                onRothConversionStrategyChange={v => setField('rothConversionStrategy', v)}
                 annualRothConversion={annualRothConversion}
-                onAnnualRothConversionChange={setAnnualRothConversion}
+                onAnnualRothConversionChange={v => setField('annualRothConversion', v)}
                 targetBracketRate={targetBracketRate}
-                onTargetBracketRateChange={setTargetBracketRate}
+                onTargetBracketRateChange={v => setField('targetBracketRate', v)}
                 rothConversionStartYear={rothConversionStartYear}
-                onRothConversionStartYearChange={setRothConversionStartYear}
+                onRothConversionStartYearChange={v => setField('rothConversionStartYear', v)}
                 filingStatus={filingStatus}
-                onFilingStatusChange={setFilingStatus}
+                onFilingStatusChange={v => setField('filingStatus', v)}
                 otherIncome={otherIncome}
-                onOtherIncomeChange={setOtherIncome}
+                onOtherIncomeChange={v => setField('otherIncome', v)}
             />
 
             <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
                 <h4 style={{ marginBottom: '0.75rem' }}>Tax Configuration</h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
                     <FormField label="State" helpText="State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.">
-                        <select style={inputStyle} value={state} onChange={e => setState(e.target.value)}>
+                        <select style={inputStyle} value={state} onChange={e => setField('state', e.target.value)}>
                             <option value="">None (federal only)</option>
                             <option value="AZ">AZ - Arizona</option>
                             <option value="CA">CA - California</option>
@@ -300,14 +342,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 <CurrencyInput
                                     style={inputStyle}
                                     value={primaryResidencePropertyTax || ''}
-                                    onChange={v => setPrimaryResidencePropertyTax(Number(v) || 0)}
+                                    onChange={v => setField('primaryResidencePropertyTax', Number(v) || 0)}
                                 />
                             </FormField>
                             <FormField label="Primary Residence Mortgage Interest" helpText="Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.">
                                 <CurrencyInput
                                     style={inputStyle}
                                     value={primaryResidenceMortgageInterest || ''}
-                                    onChange={v => setPrimaryResidenceMortgageInterest(Number(v) || 0)}
+                                    onChange={v => setField('primaryResidenceMortgageInterest', Number(v) || 0)}
                                 />
                             </FormField>
                         </>
