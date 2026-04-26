@@ -1,6 +1,6 @@
 package com.wealthview.core.notification;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
 import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
 import com.wealthview.persistence.entity.NotificationPreferenceEntity;
@@ -46,7 +46,7 @@ public class NotificationPreferenceService {
     @Transactional
     public void updatePreferences(UUID userId, NotificationPreferenceRequest request) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         for (var item : request.preferences()) {
             var existing = preferenceRepository.findByUser_IdAndNotificationType(userId, item.notificationType());

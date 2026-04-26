@@ -1,6 +1,6 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.ValuationRefreshResponse;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
@@ -86,7 +86,7 @@ public class PropertyValuationSyncService {
     @Transactional
     public ValuationRefreshResponse refreshProperty(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         if (property.getZillowZpid() != null) {
             return fetchByZpid(tenantId, propertyId, property.getZillowZpid());
@@ -113,7 +113,7 @@ public class PropertyValuationSyncService {
     @Transactional
     public ValuationRefreshResponse selectZpid(UUID tenantId, UUID propertyId, String zpid) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         storeZpid(property, zpid);
         return fetchByZpid(tenantId, propertyId, zpid);

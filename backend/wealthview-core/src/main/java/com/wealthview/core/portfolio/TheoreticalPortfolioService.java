@@ -1,6 +1,6 @@
 package com.wealthview.core.portfolio;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
@@ -54,7 +54,7 @@ public class TheoreticalPortfolioService {
     public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId, int months) {
         var clampedMonths = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, months));
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         if ("bank".equals(account.getType())) {
             return emptyResponse(accountId);

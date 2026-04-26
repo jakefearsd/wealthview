@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
@@ -109,14 +109,14 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public PropertyResponse get(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
         return buildResponse(property);
     }
 
     @Transactional
     public PropertyResponse update(UUID tenantId, UUID propertyId, PropertyRequest request) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         validateLoanDetails(request);
 
@@ -139,7 +139,7 @@ public class PropertyService {
     @Transactional
     public void delete(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var linkedSources = incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId);
         if (!linkedSources.isEmpty()) {
@@ -160,7 +160,7 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public List<PropertyExpenseResponse> listExpenses(UUID tenantId, UUID propertyId) {
         propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
         return expenseRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId).stream()
                 .map(PropertyExpenseResponse::from)
                 .toList();
@@ -169,17 +169,17 @@ public class PropertyService {
     @Transactional
     public void deleteExpense(UUID tenantId, UUID propertyId, UUID expenseId) {
         propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
         var expense = expenseRepository.findByTenant_IdAndId(tenantId, expenseId)
                 .filter(e -> e.getProperty() != null && propertyId.equals(e.getProperty().getId()))
-                .orElseThrow(() -> new EntityNotFoundException("Expense not found"));
+                .orElseThrow(Entities.notFound("Expense"));
         expenseRepository.delete(expense);
     }
 
     @Transactional(readOnly = true)
     public DepreciationScheduleResult getDepreciationSchedule(UUID tenantId, UUID propertyId) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found: " + propertyId));
+                .orElseThrow(Entities.notFound("Property", propertyId));
 
         var method = property.getDepreciationMethod();
         if (method == null || "none".equals(method)) {
@@ -286,7 +286,7 @@ public class PropertyService {
     @Transactional
     public void addExpense(UUID tenantId, UUID propertyId, PropertyExpenseRequest request) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var frequency = request.frequency() != null ? request.frequency() : "monthly";
         var expense = new PropertyExpenseEntity(property, property.getTenant(),
@@ -297,7 +297,7 @@ public class PropertyService {
     @Transactional
     public void addIncome(UUID tenantId, UUID propertyId, PropertyIncomeRequest request) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var frequency = request.frequency() != null ? request.frequency() : "monthly";
         var income = new PropertyIncomeEntity(property, property.getTenant(),
@@ -363,7 +363,7 @@ public class PropertyService {
 
     private CashFlowContext loadCashFlowContext(UUID tenantId, UUID propertyId, YearMonth from, YearMonth to) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var fromDate = from.atDay(1);
         var toDate = to.atEndOfMonth();

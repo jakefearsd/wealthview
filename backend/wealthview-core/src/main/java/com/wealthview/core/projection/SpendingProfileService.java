@@ -2,7 +2,7 @@ package com.wealthview.core.projection;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
@@ -59,7 +59,7 @@ public class SpendingProfileService {
     @Transactional
     public SpendingProfileResponse updateProfile(UUID tenantId, UUID profileId, UpdateSpendingProfileRequest request) {
         var entity = profileRepository.findByTenant_IdAndId(tenantId, profileId)
-                .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
+                .orElseThrow(Entities.notFound("Spending profile"));
 
         entity.setName(request.name());
         entity.setEssentialExpenses(request.essentialExpenses());
@@ -82,14 +82,14 @@ public class SpendingProfileService {
     @Transactional(readOnly = true)
     public SpendingProfileResponse getProfile(UUID tenantId, UUID profileId) {
         var entity = profileRepository.findByTenant_IdAndId(tenantId, profileId)
-                .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
+                .orElseThrow(Entities.notFound("Spending profile"));
         return SpendingProfileResponse.from(entity);
     }
 
     @Transactional
     public void deleteProfile(UUID tenantId, UUID profileId) {
         var entity = profileRepository.findByTenant_IdAndId(tenantId, profileId)
-                .orElseThrow(() -> new EntityNotFoundException("Spending profile not found"));
+                .orElseThrow(Entities.notFound("Spending profile"));
 
         var referencingScenarios = scenarioRepository.findBySpendingProfile(entity);
         if (!referencingScenarios.isEmpty()) {

@@ -1,6 +1,6 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.HoldScenarioResult;
 import com.wealthview.core.property.dto.RoiAnalysisResponse;
 import com.wealthview.core.property.dto.SellScenarioResult;
@@ -47,10 +47,10 @@ public class PropertyRoiService {
                                                     BigDecimal rentGrowth,
                                                     BigDecimal expenseInflation) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var incomeSource = incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId)
-                .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
+                .orElseThrow(Entities.notFound("Income source"));
 
         var sell = computeSellScenario(property, investmentReturn, years);
 

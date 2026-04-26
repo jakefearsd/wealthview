@@ -1,6 +1,6 @@
 package com.wealthview.core.income;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.income.dto.CreateIncomeSourceRequest;
 import com.wealthview.core.income.dto.IncomeSourceResponse;
@@ -64,7 +64,7 @@ public class IncomeSourceService {
 
         if (request.propertyId() != null) {
             var property = propertyRepository.findByTenant_IdAndId(tenantId, request.propertyId())
-                    .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                    .orElseThrow(Entities.notFound("Property"));
             entity.setProperty(property);
         }
 
@@ -83,14 +83,14 @@ public class IncomeSourceService {
     @Transactional(readOnly = true)
     public IncomeSourceResponse get(UUID tenantId, UUID sourceId) {
         var entity = incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId)
-                .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
+                .orElseThrow(Entities.notFound("Income source"));
         return IncomeSourceResponse.from(entity);
     }
 
     @Transactional
     public IncomeSourceResponse update(UUID tenantId, UUID sourceId, UpdateIncomeSourceRequest request) {
         var entity = incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId)
-                .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
+                .orElseThrow(Entities.notFound("Income source"));
 
         if (request.incomeType() != null) {
             validateIncomeType(request.incomeType());
@@ -108,7 +108,7 @@ public class IncomeSourceService {
 
         if (request.propertyId() != null) {
             var property = propertyRepository.findByTenant_IdAndId(tenantId, request.propertyId())
-                    .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                    .orElseThrow(Entities.notFound("Property"));
             entity.setProperty(property);
         } else {
             entity.setProperty(null);
@@ -123,7 +123,7 @@ public class IncomeSourceService {
     @Transactional
     public void delete(UUID tenantId, UUID sourceId) {
         var entity = incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId)
-                .orElseThrow(() -> new EntityNotFoundException("Income source not found"));
+                .orElseThrow(Entities.notFound("Income source"));
         incomeSourceRepository.delete(entity);
         log.info("Income source '{}' deleted for tenant {}", entity.getName(), tenantId);
     }

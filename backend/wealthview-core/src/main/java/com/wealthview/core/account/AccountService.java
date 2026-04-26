@@ -4,7 +4,7 @@ import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.account.dto.AccountResponse;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -77,14 +77,14 @@ public class AccountService {
     @Transactional(readOnly = true)
     public AccountResponse get(UUID tenantId, UUID accountId) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
         return AccountResponse.from(account, computeBalance(account, tenantId));
     }
 
     @Transactional
     public AccountResponse update(UUID tenantId, UUID accountId, AccountRequest request) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         account.setName(request.name());
         account.setType(request.type());
@@ -99,7 +99,7 @@ public class AccountService {
     @Transactional
     public void delete(UUID tenantId, UUID accountId) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
         accountRepository.delete(account);
         log.info("Account {} deleted for tenant {}", accountId, tenantId);
         eventPublisher.publishEvent(new AuditEvent(tenantId, null, "DELETE", "account",
