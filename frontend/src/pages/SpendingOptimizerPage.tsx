@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router';
 import toast from 'react-hot-toast';
 import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '../api/projections';
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle, inputStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import CurrencyInput from '../components/CurrencyInput';
@@ -237,54 +238,64 @@ export default function SpendingOptimizerPage() {
         });
     }, [id]);
 
+    const optimize = useApiMutation(
+        (input: GuardrailOptimizationRequest) => optimizeSpending(id!, input),
+        {
+            successMessage: 'Optimization complete',
+            errorMessage: 'Optimization failed',
+            onSuccess: (profile) => {
+                setResult(profile);
+                setState('results');
+            },
+            onError: () => setState('configure'),
+        },
+    );
+
+    const reoptimizeMutation = useApiMutation(
+        () => reoptimize(id!),
+        {
+            successMessage: 'Re-optimization complete',
+            errorMessage: 'Re-optimization failed',
+            onSuccess: (profile) => {
+                setResult(profile);
+                setState('results');
+            },
+            onError: () => setState('results'),
+        },
+    );
+
     const handleOptimize = async () => {
         if (!id) return;
         setState('running');
-        try {
-            const request: GuardrailOptimizationRequest = {
-                scenario_id: id,
-                name,
-                essential_floor: essentialFloor,
-                terminal_balance_target: terminalTarget,
-                trial_count: trialCount,
-                cash_reserve_years: cashReserveYears,
-                cash_return_rate: cashReturnRate / 100,
-                phases,
-                portfolio_floor: portfolioFloor,
-                max_annual_adjustment_rate: spendingFlexibility / 100,
-                phase_blend_years: phaseBlendYears,
-                risk_tolerance: riskTolerance,
-                ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
-                ...(optimizeConversions ? {
-                    optimize_conversions: true,
-                    conversion_bracket_rate: conversionBracketRate,
-                    rmd_target_bracket_rate: rmdTargetBracketRate,
-                    traditional_exhaustion_buffer: exhaustionBuffer,
-                    rmd_bracket_headroom: rmdBracketHeadroom / 100,
-                } : {}),
-            };
-            const profile = await optimizeSpending(id, request);
-            setResult(profile);
-            setState('results');
-            toast.success('Optimization complete');
-        } catch {
-            setState('configure');
-            toast.error('Optimization failed');
-        }
+        const request: GuardrailOptimizationRequest = {
+            scenario_id: id,
+            name,
+            essential_floor: essentialFloor,
+            terminal_balance_target: terminalTarget,
+            trial_count: trialCount,
+            cash_reserve_years: cashReserveYears,
+            cash_return_rate: cashReturnRate / 100,
+            phases,
+            portfolio_floor: portfolioFloor,
+            max_annual_adjustment_rate: spendingFlexibility / 100,
+            phase_blend_years: phaseBlendYears,
+            risk_tolerance: riskTolerance,
+            ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
+            ...(optimizeConversions ? {
+                optimize_conversions: true,
+                conversion_bracket_rate: conversionBracketRate,
+                rmd_target_bracket_rate: rmdTargetBracketRate,
+                traditional_exhaustion_buffer: exhaustionBuffer,
+                rmd_bracket_headroom: rmdBracketHeadroom / 100,
+            } : {}),
+        };
+        await optimize.mutate(request);
     };
 
     const handleReoptimize = async () => {
         if (!id) return;
         setState('running');
-        try {
-            const profile = await reoptimize(id);
-            setResult(profile);
-            setState('results');
-            toast.success('Re-optimization complete');
-        } catch {
-            setState('results');
-            toast.error('Re-optimization failed');
-        }
+        await reoptimizeMutation.mutate(undefined);
     };
 
     const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '--';
