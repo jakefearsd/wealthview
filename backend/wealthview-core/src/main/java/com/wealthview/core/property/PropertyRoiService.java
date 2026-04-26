@@ -1,5 +1,6 @@
 package com.wealthview.core.property;
 
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.HoldScenarioResult;
 import com.wealthview.core.property.dto.RoiAnalysisResponse;
@@ -199,7 +200,6 @@ public class PropertyRoiService {
     }
 
     private BigDecimal compound(BigDecimal principal, BigDecimal annualRate, int years) {
-        var factor = BigDecimal.ONE.add(annualRate).pow(years);
-        return principal.multiply(factor).setScale(SCALE, ROUNDING);
+        return CompoundGrowth.inflate(principal, annualRate, years).setScale(SCALE, ROUNDING);
     }
 }

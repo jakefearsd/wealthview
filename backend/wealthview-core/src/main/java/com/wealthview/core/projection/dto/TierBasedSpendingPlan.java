@@ -1,5 +1,7 @@
 package com.wealthview.core.projection.dto;
 
+import com.wealthview.core.common.CompoundGrowth;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,11 +154,11 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         int yearsInTier = computeYearsInTier(age, yearsInRetirement);
         if (yearsInTier >= 0) {
             return yearsInTier > 0
-                    ? BigDecimal.ONE.add(inflationRate).pow(yearsInTier)
+                    ? CompoundGrowth.factor(inflationRate, yearsInTier)
                     : BigDecimal.ONE;
         }
         return yearsInRetirement > 1
-                ? BigDecimal.ONE.add(inflationRate).pow(yearsInRetirement - 1)
+                ? CompoundGrowth.factor(inflationRate, yearsInRetirement - 1)
                 : BigDecimal.ONE;
     }
 }

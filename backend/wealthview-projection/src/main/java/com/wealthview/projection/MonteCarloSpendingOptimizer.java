@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.SpendingOptimizer;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
@@ -659,7 +660,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
                 if (source.inflationRate() != null
                         && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearsInRetirement - 1);
+                    gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), yearsInRetirement - 1);
                 }
 
                 double amount = gross;
@@ -708,7 +709,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         double[] inflatedFloors = new double[years];
         double[] floorWithdrawals = new double[years];
         for (int y = 0; y < years; y++) {
-            inflatedFloors[y] = essentialFloor * Math.pow(1 + inflationRate, y);
+            inflatedFloors[y] = CompoundGrowth.inflate(essentialFloor, inflationRate, y);
             floorWithdrawals[y] = Math.max(0, inflatedFloors[y] - income[y]);
         }
 
@@ -852,7 +853,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 double nominalTarget = phase.targetSpending().doubleValue();
                 for (int y = phaseStart; y <= phaseEnd; y++) {
                     avgFloor += floors[y];
-                    avgInflatedTarget += nominalTarget * Math.pow(1 + inflationRate, y);
+                    avgInflatedTarget += CompoundGrowth.inflate(nominalTarget, inflationRate, y);
                     count++;
                 }
                 avgFloor = count > 0 ? avgFloor / count : 0;
