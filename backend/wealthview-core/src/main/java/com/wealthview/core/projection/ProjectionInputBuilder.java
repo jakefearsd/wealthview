@@ -36,6 +36,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 @Service
 public class ProjectionInputBuilder {
@@ -207,7 +208,7 @@ public class ProjectionInputBuilder {
                         property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
                 if (remainingBalance.compareTo(BigDecimal.ZERO) > 0) {
                     annualMortgageInterest = remainingBalance.multiply(property.getAnnualInterestRate())
-                            .setScale(4, RoundingMode.HALF_UP);
+                            .setScale(Money.SCALE, Money.ROUNDING);
                     BigDecimal annualPayment = AmortizationCalculator.monthlyPayment(
                             property.getLoanAmount(), property.getAnnualInterestRate(),
                             property.getLoanTermMonths())

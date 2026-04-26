@@ -42,6 +42,7 @@ import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Set;
 import java.util.UUID;
+import com.wealthview.core.common.Money;
 
 @Service
 public class PropertyService {
@@ -256,7 +257,7 @@ public class PropertyService {
             };
             boolean isBonusEligible = Set.of("5yr", "7yr", "15yr").contains(alloc.assetClass());
             var bonusAmount = isBonusEligible
-                    ? alloc.allocation().multiply(bonusRate).setScale(4, java.math.RoundingMode.HALF_UP)
+                    ? alloc.allocation().multiply(bonusRate).setScale(Money.SCALE, Money.ROUNDING)
                     : BigDecimal.ZERO;
             var remainder = alloc.allocation().subtract(bonusAmount);
             var annualSL = remainder.compareTo(BigDecimal.ZERO) > 0

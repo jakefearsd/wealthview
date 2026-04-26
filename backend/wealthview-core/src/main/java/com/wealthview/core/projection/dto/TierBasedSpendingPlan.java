@@ -1,14 +1,13 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 public final class TierBasedSpendingPlan implements SpendingPlan {
 
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final BigDecimal TWO = BigDecimal.valueOf(2);
 
     private final BigDecimal essentialExpenses;

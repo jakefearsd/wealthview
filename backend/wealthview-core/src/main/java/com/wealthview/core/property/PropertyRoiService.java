@@ -13,9 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.UUID;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 @Service
 public class PropertyRoiService {
@@ -25,8 +26,6 @@ public class PropertyRoiService {
     private static final BigDecimal SELLING_COST_RATE = new BigDecimal("0.06");
     private static final BigDecimal CAPITAL_GAINS_RATE = new BigDecimal("0.15");
     private static final BigDecimal DEPRECIATION_RECAPTURE_RATE = new BigDecimal("0.25");
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
     private final PropertyRepository propertyRepository;
     private final IncomeSourceRepository incomeSourceRepository;

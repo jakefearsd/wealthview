@@ -36,6 +36,7 @@ import java.util.NavigableMap;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.wealthview.core.common.Money;
 
 @Service
 public class CombinedPortfolioHistoryService {
@@ -262,7 +263,7 @@ public class CombinedPortfolioHistoryService {
                 .divide(new BigDecimal(totalDays), MathContext.DECIMAL128);
         var diff = ceiling.getValue().subtract(floor.getValue());
         return floor.getValue().add(diff.multiply(ratio))
-                .setScale(4, RoundingMode.HALF_UP);
+                .setScale(Money.SCALE, Money.ROUNDING);
     }
 
     private BigDecimal computeMortgageBalance(LocalDate date, PropertyEntity property) {

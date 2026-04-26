@@ -3,7 +3,8 @@ package com.wealthview.core.projection.tax;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 /**
  * Applies IRS passive activity loss rules to rental income.
@@ -13,8 +14,6 @@ import java.math.RoundingMode;
 @Component
 public class RentalLossCalculator {
 
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final BigDecimal EXCEPTION_AMOUNT = new BigDecimal("25000");
     private static final BigDecimal PHASEOUT_START = new BigDecimal("100000");
     private static final BigDecimal PHASEOUT_END = new BigDecimal("150000");

@@ -5,6 +5,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import com.wealthview.core.common.Money;
 
 public final class AmortizationCalculator {
 
@@ -58,7 +59,7 @@ public final class AmortizationCalculator {
 
         return loanAmount.multiply(numerator, MC)
                 .divide(denominator, MC)
-                .setScale(4, RoundingMode.HALF_UP)
+                .setScale(Money.SCALE, Money.ROUNDING)
                 .max(BigDecimal.ZERO);
     }
 
@@ -90,7 +91,7 @@ public final class AmortizationCalculator {
 
         return loanAmount.multiply(numerator, MC)
                 .divide(denominator, MC)
-                .setScale(4, RoundingMode.HALF_UP);
+                .setScale(Money.SCALE, Money.ROUNDING);
     }
 
     private static BigDecimal pow(BigDecimal base, int exponent) {

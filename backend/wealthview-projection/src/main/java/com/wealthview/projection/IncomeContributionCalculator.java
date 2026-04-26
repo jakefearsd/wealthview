@@ -2,15 +2,14 @@ package com.wealthview.projection;
 
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 class IncomeContributionCalculator {
 
-    private static final int SCALE = 4;
-    private static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
     private static final BigDecimal TWO = BigDecimal.valueOf(2);
 
     BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement) {

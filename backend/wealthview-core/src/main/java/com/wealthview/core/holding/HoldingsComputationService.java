@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import com.wealthview.core.common.Money;
 
 @Service
 public class HoldingsComputationService {
@@ -77,7 +78,7 @@ public class HoldingsComputationService {
                     if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
                         var avgCost = totalCost.divide(netQuantity, 4, RoundingMode.HALF_UP);
                         netQuantity = netQuantity.subtract(txn.getQuantity());
-                        totalCost = netQuantity.multiply(avgCost).setScale(4, RoundingMode.HALF_UP);
+                        totalCost = netQuantity.multiply(avgCost).setScale(Money.SCALE, Money.ROUNDING);
                     }
                 }
                 default -> {

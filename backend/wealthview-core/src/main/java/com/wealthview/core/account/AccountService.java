@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.wealthview.core.common.Money;
 
 @Service
 public class AccountService {
@@ -157,7 +158,7 @@ public class AccountService {
                     var price = latestPrices.get(holding.getSymbol());
                     if (price != null) {
                         value = value.add(holding.getQuantity().multiply(price)
-                                .setScale(4, RoundingMode.HALF_UP));
+                                .setScale(Money.SCALE, Money.ROUNDING));
                     } else {
                         value = value.add(holding.getCostBasis());
                     }
@@ -198,7 +199,7 @@ public class AccountService {
             var price = latestPrices.get(holding.getSymbol());
             if (price != null) {
                 value = value.add(holding.getQuantity().multiply(price)
-                        .setScale(4, RoundingMode.HALF_UP));
+                        .setScale(Money.SCALE, Money.ROUNDING));
             } else {
                 value = value.add(holding.getCostBasis());
             }
