@@ -9,6 +9,7 @@ import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.ProjectionService;
+import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
@@ -53,6 +54,9 @@ class ProjectionControllerTest {
     private ObjectMapper objectMapper;
 
     @MockBean
+    private ScenarioCrudService scenarioCrudService;
+
+    @MockBean
     private ProjectionService projectionService;
 
     @MockBean
@@ -73,7 +77,7 @@ class ProjectionControllerTest {
 
     @Test
     void create_validInput_returns201() throws Exception {
-        when(projectionService.createScenario(eq(TENANT_ID), any()))
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any()))
                 .thenReturn(sampleScenario());
 
         mockMvc.perform(post("/api/v1/projections")
@@ -100,7 +104,7 @@ class ProjectionControllerTest {
 
     @Test
     void list_authenticated_returns200() throws Exception {
-        when(projectionService.listScenarios(TENANT_ID))
+        when(scenarioCrudService.listScenarios(TENANT_ID))
                 .thenReturn(List.of(sampleScenario()));
 
         mockMvc.perform(get("/api/v1/projections")
@@ -111,7 +115,7 @@ class ProjectionControllerTest {
 
     @Test
     void get_existingScenario_returns200() throws Exception {
-        when(projectionService.getScenario(TENANT_ID, SCENARIO_ID))
+        when(scenarioCrudService.getScenario(TENANT_ID, SCENARIO_ID))
                 .thenReturn(sampleScenario());
 
         mockMvc.perform(get("/api/v1/projections/{id}", SCENARIO_ID)
@@ -122,7 +126,7 @@ class ProjectionControllerTest {
 
     @Test
     void get_notFound_returns404() throws Exception {
-        when(projectionService.getScenario(TENANT_ID, SCENARIO_ID))
+        when(scenarioCrudService.getScenario(TENANT_ID, SCENARIO_ID))
                 .thenThrow(new EntityNotFoundException("Scenario not found"));
 
         mockMvc.perform(get("/api/v1/projections/{id}", SCENARIO_ID)
@@ -132,7 +136,7 @@ class ProjectionControllerTest {
 
     @Test
     void delete_existingScenario_returns204() throws Exception {
-        doNothing().when(projectionService).deleteScenario(TENANT_ID, SCENARIO_ID);
+        doNothing().when(scenarioCrudService).deleteScenario(TENANT_ID, SCENARIO_ID);
 
         mockMvc.perform(delete("/api/v1/projections/{id}", SCENARIO_ID)
                         .with(authenticatedAdmin()))
@@ -162,7 +166,7 @@ class ProjectionControllerTest {
 
     @Test
     void update_validInput_returns200() throws Exception {
-        when(projectionService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
+        when(scenarioCrudService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
                 .thenReturn(sampleScenario());
 
         mockMvc.perform(put("/api/v1/projections/{id}", SCENARIO_ID)
@@ -188,7 +192,7 @@ class ProjectionControllerTest {
 
     @Test
     void update_notFound_returns404() throws Exception {
-        when(projectionService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
+        when(scenarioCrudService.updateScenario(eq(TENANT_ID), eq(SCENARIO_ID), any()))
                 .thenThrow(new EntityNotFoundException("Scenario not found"));
 
         mockMvc.perform(put("/api/v1/projections/{id}", SCENARIO_ID)
