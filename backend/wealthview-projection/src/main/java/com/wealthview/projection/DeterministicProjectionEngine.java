@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
@@ -694,7 +695,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
 
             BigDecimal expenseInflationFactor = retiredYearIndex > 1
-                    ? BigDecimal.ONE.add(inflationRate).pow(retiredYearIndex - 1)
+                    ? CompoundGrowth.factor(inflationRate, retiredYearIndex - 1)
                     : BigDecimal.ONE;
 
             BigDecimal realAvailable = expenseInflationFactor.compareTo(BigDecimal.ZERO) > 0

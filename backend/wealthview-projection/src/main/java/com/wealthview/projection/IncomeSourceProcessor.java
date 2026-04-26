@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
@@ -274,7 +275,7 @@ class IncomeSourceProcessor {
                 || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
             return source.annualAmount();
         }
-        BigDecimal factor = BigDecimal.ONE.add(source.inflationRate()).pow(yearsInRetirement - 1);
-        return source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
+        return CompoundGrowth.inflate(source.annualAmount(), source.inflationRate(), yearsInRetirement - 1)
+                .setScale(SCALE, ROUNDING);
     }
 }

@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -599,7 +600,7 @@ class RothConversionOptimizer {
             double effectiveOtherIncome, double rmdAmount, double conversionAmount,
             int calendarYear) {
 
-        double inflatedSpending = essentialFloor * Math.pow(1 + inflationRate, yearIndex);
+        double inflatedSpending = CompoundGrowth.inflate(essentialFloor, inflationRate, yearIndex);
         double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
 
         if (netSpendingNeed <= 0) {
@@ -625,8 +626,7 @@ class RothConversionOptimizer {
         }
         double tentativeTax = computeIncrementalTax(
                 maxConversion, effectiveIncome, calendarYear);
-        double inflatedSpending = essentialFloor
-                * Math.pow(1 + inflationRate, yearIndex);
+        double inflatedSpending = CompoundGrowth.inflate(essentialFloor, inflationRate, yearIndex);
         double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
         double available = taxable - netSpendingNeed;
         if (available <= 0) {
@@ -684,7 +684,7 @@ class RothConversionOptimizer {
             double yearsToRmd = rmdStartAge - age;
             if (yearsToRmd > 0 && targetTraditionalBalance > 0) {
                 double traditionalNeededNow = targetTraditionalBalance
-                        / Math.pow(1 + returnMean, yearsToRmd);
+                        / CompoundGrowth.factor(returnMean, (int) yearsToRmd);
                 double excessTraditional = Math.max(0, traditional - traditionalNeededNow);
                 maxConversion = Math.min(maxConversion, excessTraditional);
             }

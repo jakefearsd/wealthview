@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 
@@ -26,7 +27,7 @@ final class RentalIncomeHelper {
         double gross = source.annualAmount().doubleValue();
         if (source.inflationRate() != null
                 && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-            gross *= Math.pow(1 + source.inflationRate().doubleValue(), yearIndex);
+            gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), yearIndex);
         }
 
         double expenses = nullSafe(source.annualOperatingExpenses())
