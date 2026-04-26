@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.projection.ProjectionService;
+import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
@@ -32,9 +33,12 @@ public class ProjectionController {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionController.class);
 
+    private final ScenarioCrudService scenarioCrudService;
     private final ProjectionService projectionService;
 
-    public ProjectionController(ProjectionService projectionService) {
+    public ProjectionController(ScenarioCrudService scenarioCrudService,
+                                ProjectionService projectionService) {
+        this.scenarioCrudService = scenarioCrudService;
         this.projectionService = projectionService;
     }
 
@@ -44,14 +48,14 @@ public class ProjectionController {
             @RequestBody CreateScenarioRequest request) {
         log.info("Creating projection scenario '{}' for tenant {} with {} accounts",
                 request.name(), principal.tenantId(), request.accounts() != null ? request.accounts().size() : 0);
-        var result = projectionService.createScenario(principal.tenantId(), request);
+        var result = scenarioCrudService.createScenario(principal.tenantId(), request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
     @GetMapping
     public ResponseEntity<List<ScenarioResponse>> list(
             @AuthenticationPrincipal TenantUserPrincipal principal) {
-        return ResponseEntity.ok(projectionService.listScenarios(principal.tenantId()));
+        return ResponseEntity.ok(scenarioCrudService.listScenarios(principal.tenantId()));
     }
 
     @PostMapping("/compare")
@@ -65,7 +69,7 @@ public class ProjectionController {
     public ResponseEntity<ScenarioResponse> get(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(projectionService.getScenario(principal.tenantId(), id));
+        return ResponseEntity.ok(scenarioCrudService.getScenario(principal.tenantId(), id));
     }
 
     @PutMapping("/{id}")
@@ -73,14 +77,14 @@ public class ProjectionController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id,
             @RequestBody UpdateScenarioRequest request) {
-        return ResponseEntity.ok(projectionService.updateScenario(principal.tenantId(), id, request));
+        return ResponseEntity.ok(scenarioCrudService.updateScenario(principal.tenantId(), id, request));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
-        projectionService.deleteScenario(principal.tenantId(), id);
+        scenarioCrudService.deleteScenario(principal.tenantId(), id);
         return ResponseEntity.noContent().build();
     }
 
