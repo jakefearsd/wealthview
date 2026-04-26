@@ -1,6 +1,6 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.EquityGrowthPoint;
 import com.wealthview.core.property.dto.MortgageProgress;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
@@ -49,7 +49,7 @@ public class PropertyAnalyticsService {
     @Transactional(readOnly = true)
     public PropertyAnalyticsResponse getAnalytics(UUID tenantId, UUID propertyId, Integer year) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var totalAppreciation = property.getCurrentValue().subtract(property.getPurchasePrice());
         var appreciationPercent = percentageOf(totalAppreciation, property.getPurchasePrice());

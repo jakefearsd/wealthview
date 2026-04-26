@@ -3,7 +3,7 @@ package com.wealthview.core.projection;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.account.AccountService;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.projection.dto.CompareRequest;
@@ -124,7 +124,7 @@ public class ProjectionService {
     @Transactional(readOnly = true)
     public ScenarioResponse getScenario(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+                .orElseThrow(Entities.notFound("Scenario"));
         return toScenarioResponse(scenario, tenantId);
     }
 
@@ -139,7 +139,7 @@ public class ProjectionService {
     public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, UpdateScenarioRequest request) {
         validateEndAge(request.endAge());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+                .orElseThrow(Entities.notFound("Scenario"));
 
         scenario.setName(request.name());
         scenario.setRetirementDate(request.retirementDate());
@@ -192,7 +192,7 @@ public class ProjectionService {
     @Transactional
     public void deleteScenario(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+                .orElseThrow(Entities.notFound("Scenario"));
         scenarioRepository.delete(scenario);
         log.info("Scenario {} deleted for tenant {}", scenarioId, tenantId);
     }
@@ -203,7 +203,7 @@ public class ProjectionService {
         var results = new java.util.ArrayList<ProjectionResultResponse>();
         for (var scenarioId : request.scenarioIds()) {
             var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                    .orElseThrow(() -> new EntityNotFoundException("Scenario not found: " + scenarioId));
+                    .orElseThrow(Entities.notFound("Scenario", scenarioId));
             results.add(projectionEngine.run(projectionInputBuilder.build(scenario, tenantId)));
         }
         return new CompareResponse(results);
@@ -213,7 +213,7 @@ public class ProjectionService {
     public ProjectionResultResponse runProjection(UUID tenantId, UUID scenarioId) {
         log.info("Running projection for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+                .orElseThrow(Entities.notFound("Scenario"));
         return projectionEngine.run(projectionInputBuilder.build(scenario, tenantId));
     }
 
@@ -268,8 +268,7 @@ public class ProjectionService {
         }
         for (var isReq : incomeSources) {
             var incomeSource = incomeSourceRepository.findByTenant_IdAndId(tenantId, isReq.incomeSourceId())
-                    .orElseThrow(() -> new EntityNotFoundException(
-                            "Income source not found: " + isReq.incomeSourceId()));
+                    .orElseThrow(Entities.notFound("Income source", isReq.incomeSourceId()));
             scenarioIncomeSourceRepository.save(
                     new ScenarioIncomeSourceEntity(scenario, incomeSource, isReq.overrideAnnualAmount()));
         }

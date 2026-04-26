@@ -1,6 +1,6 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.PropertyValuationResponse;
 import com.wealthview.persistence.entity.PropertyValuationEntity;
 import com.wealthview.persistence.repository.PropertyRepository;
@@ -34,7 +34,7 @@ public class PropertyValuationService {
     public PropertyValuationResponse recordValuation(UUID tenantId, UUID propertyId,
                                                       LocalDate date, BigDecimal value, String source) {
         var property = propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         var existing = valuationRepository.findByProperty_IdAndSourceAndValuationDate(
                 propertyId, source, date);
@@ -61,7 +61,7 @@ public class PropertyValuationService {
     @Transactional(readOnly = true)
     public List<PropertyValuationResponse> getHistory(UUID tenantId, UUID propertyId) {
         propertyRepository.findByTenant_IdAndId(tenantId, propertyId)
-                .orElseThrow(() -> new EntityNotFoundException("Property not found"));
+                .orElseThrow(Entities.notFound("Property"));
 
         return valuationRepository.findByProperty_IdAndTenant_IdOrderByValuationDateDesc(propertyId, tenantId)
                 .stream()

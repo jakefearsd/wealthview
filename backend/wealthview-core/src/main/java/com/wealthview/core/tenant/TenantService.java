@@ -1,6 +1,7 @@
 package com.wealthview.core.tenant;
 
 import com.wealthview.core.audit.AuditEvent;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
@@ -75,14 +76,14 @@ public class TenantService {
     @Transactional(readOnly = true)
     public TenantDetailResponse getTenantDetail(UUID tenantId) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(Entities.notFound("Tenant"));
         return toDetailResponse(tenant);
     }
 
     @Transactional
     public void setTenantActive(UUID tenantId, boolean active) {
         var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Tenant not found"));
+                .orElseThrow(Entities.notFound("Tenant"));
         tenant.setActive(active);
         tenantRepository.save(tenant);
         log.info("Tenant {} set active={}", tenantId, active);
@@ -109,7 +110,7 @@ public class TenantService {
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
         var creator = userRepository.findById(createdByUserId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found: " + createdByUserId));
+                .orElseThrow(Entities.notFound("User", createdByUserId));
 
         var code = generateSecureInviteCode();
         var invite = new InviteCodeEntity(tenant, code, creator,
@@ -136,7 +137,7 @@ public class TenantService {
     @Transactional
     public void revokeInviteCode(UUID tenantId, UUID codeId) {
         var invite = inviteCodeRepository.findById(codeId)
-                .orElseThrow(() -> new EntityNotFoundException("Invite code not found"));
+                .orElseThrow(Entities.notFound("Invite code"));
 
         if (!invite.getTenant().getId().equals(tenantId)) {
             throw new EntityNotFoundException("Invite code not found");

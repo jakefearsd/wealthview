@@ -1,6 +1,6 @@
 package com.wealthview.core.importservice;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
@@ -45,7 +45,7 @@ public class PositionImportService {
         var parseResult = parser.parse(inputStream);
 
         accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         transactionRepository.deleteByAccount_IdAndTenant_Id(accountId, tenantId);
         holdingRepository.deleteByAccount_IdAndTenant_Id(accountId, tenantId);

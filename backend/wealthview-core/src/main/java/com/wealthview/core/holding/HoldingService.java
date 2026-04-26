@@ -1,7 +1,7 @@
 package com.wealthview.core.holding;
 
 import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.holding.dto.HoldingRequest;
 import com.wealthview.core.holding.dto.HoldingResponse;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -61,7 +61,7 @@ public class HoldingService {
     public HoldingResponse getById(UUID tenantId, UUID holdingId) {
         return holdingRepository.findByIdAndTenant_Id(holdingId, tenantId)
                 .map(HoldingResponse::from)
-                .orElseThrow(() -> new EntityNotFoundException("Holding not found"));
+                .orElseThrow(Entities.notFound("Holding"));
     }
 
     @Transactional(readOnly = true)
@@ -74,7 +74,7 @@ public class HoldingService {
     @Transactional
     public HoldingResponse createManual(UUID tenantId, HoldingRequest request) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, request.accountId())
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         var holding = new HoldingEntity(account, account.getTenant(),
                 request.symbol(), request.quantity(), request.costBasis());
@@ -91,7 +91,7 @@ public class HoldingService {
     @Transactional
     public HoldingResponse update(UUID tenantId, UUID holdingId, HoldingRequest request) {
         var holding = holdingRepository.findByIdAndTenant_Id(holdingId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Holding not found"));
+                .orElseThrow(Entities.notFound("Holding"));
 
         holding.setQuantity(request.quantity());
         holding.setCostBasis(request.costBasis());

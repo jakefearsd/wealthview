@@ -2,7 +2,7 @@ package com.wealthview.core.transaction;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.PageResponse;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.transaction.dto.TransactionRequest;
 import com.wealthview.core.transaction.dto.TransactionResponse;
@@ -45,7 +45,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse create(UUID tenantId, UUID accountId, TransactionRequest request) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
                 request.type(), request.symbol(), request.quantity(), request.amount());
@@ -64,7 +64,7 @@ public class TransactionService {
     public TransactionResponse createWithHash(UUID tenantId, UUID accountId,
                                               TransactionRequest request, String importHash) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
                 request.type(), request.symbol(), request.quantity(), request.amount());
@@ -82,7 +82,7 @@ public class TransactionService {
     public TransactionResponse createWithHashNoRecompute(UUID tenantId, UUID accountId,
                                                           TransactionRequest request, String importHash) {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                .orElseThrow(Entities.notFound("Account"));
 
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
                 request.type(), request.symbol(), request.quantity(), request.amount());
@@ -110,7 +110,7 @@ public class TransactionService {
     @Transactional
     public TransactionResponse update(UUID tenantId, UUID transactionId, TransactionRequest request) {
         var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Transaction not found"));
+                .orElseThrow(Entities.notFound("Transaction"));
 
         var oldSymbol = txn.getSymbol();
         txn.setDate(request.date());
@@ -138,7 +138,7 @@ public class TransactionService {
     @Transactional
     public void delete(UUID tenantId, UUID transactionId) {
         var txn = transactionRepository.findByIdAndTenant_Id(transactionId, tenantId)
-                .orElseThrow(() -> new EntityNotFoundException("Transaction not found"));
+                .orElseThrow(Entities.notFound("Transaction"));
 
         var account = txn.getAccount();
         var tenant = txn.getTenant();

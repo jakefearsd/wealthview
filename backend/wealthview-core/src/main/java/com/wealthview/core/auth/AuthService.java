@@ -5,7 +5,7 @@ import com.wealthview.core.auth.dto.AuthResponse;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
 import com.wealthview.core.exception.DuplicateEntityException;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.InvalidInviteCodeException;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
@@ -176,7 +176,7 @@ public class AuthService {
 
         var userId = jwtTokenProvider.extractUserId(refreshToken);
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         if (!user.isActive()) {
             log.warn("Token refresh failed: user {} is disabled", userId);
@@ -210,7 +210,7 @@ public class AuthService {
     @Transactional
     public void logout(UUID userId) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);

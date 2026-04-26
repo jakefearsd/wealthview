@@ -3,7 +3,7 @@ package com.wealthview.core.tenant;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.auth.CommonPasswordChecker;
 import com.wealthview.core.auth.TenantContext;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.UserRepository;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public class UserManagementService {
         }
 
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         if (user.isSuperAdmin()) {
             throw new IllegalStateException("Cannot modify super admin role");
@@ -72,7 +72,7 @@ public class UserManagementService {
     @Transactional
     public void deleteUser(UUID tenantId, UUID userId) {
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         var email = user.getEmail();
         var affectedTenant = user.getTenantId();
@@ -87,7 +87,7 @@ public class UserManagementService {
             throw new IllegalArgumentException("Password is too common — choose a stronger one");
         }
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
@@ -101,7 +101,7 @@ public class UserManagementService {
     @Transactional
     public void setUserActive(UUID tenantId, UUID userId, boolean active) {
         var user = userRepository.findByTenant_IdAndId(tenantId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+                .orElseThrow(Entities.notFound("User"));
 
         user.setActive(active);
         user.setUpdatedAt(OffsetDateTime.now());
@@ -121,7 +121,7 @@ public class UserManagementService {
             throw new IllegalArgumentException("Password is too common — choose a stronger one");
         }
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+                .orElseThrow(Entities.notFound("User", userId));
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
@@ -135,7 +135,7 @@ public class UserManagementService {
     @Transactional
     public void setUserActiveById(UUID userId, boolean active) {
         var user = userRepository.findById(userId)
-                .orElseThrow(() -> new EntityNotFoundException("User not found: " + userId));
+                .orElseThrow(Entities.notFound("User", userId));
 
         user.setActive(active);
         user.setUpdatedAt(OffsetDateTime.now());

@@ -1,6 +1,6 @@
 package com.wealthview.core.importservice;
 
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
 import com.wealthview.core.importservice.dto.ImportParseResult;
@@ -120,7 +120,7 @@ public class ImportService {
                     source.toUpperCase(Locale.US), accountId, parseResult.transactions().size(), parseResult.errors().size());
 
             var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
-                    .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+                    .orElseThrow(Entities.notFound("Account"));
 
             var job = new ImportJobEntity(account.getTenant(), account, source);
             job.setStatus("processing");

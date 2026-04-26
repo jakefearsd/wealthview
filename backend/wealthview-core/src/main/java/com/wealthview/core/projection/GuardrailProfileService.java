@@ -2,7 +2,7 @@ package com.wealthview.core.projection;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.common.Entities;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
@@ -79,7 +79,7 @@ public class GuardrailProfileService {
         }
 
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Scenario not found"));
+                .orElseThrow(Entities.notFound("Scenario"));
 
         var projectionInput = projectionInputBuilder.build(scenario, tenantId);
 
@@ -160,14 +160,14 @@ public class GuardrailProfileService {
     @Transactional(readOnly = true)
     public GuardrailProfileResponse getGuardrailProfile(UUID tenantId, UUID scenarioId) {
         var entity = guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Guardrail profile not found"));
+                .orElseThrow(Entities.notFound("Guardrail profile"));
         return GuardrailProfileResponse.from(entity);
     }
 
     @Transactional
     public void deleteGuardrailProfile(UUID tenantId, UUID scenarioId) {
         var entity = guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Guardrail profile not found"));
+                .orElseThrow(Entities.notFound("Guardrail profile"));
 
         scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId).ifPresent(scenario -> {
             scenario.setGuardrailProfile(null);
@@ -181,7 +181,7 @@ public class GuardrailProfileService {
     @Transactional
     public GuardrailProfileResponse reoptimize(UUID tenantId, UUID scenarioId) {
         var existing = guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId)
-                .orElseThrow(() -> new EntityNotFoundException("Guardrail profile not found"));
+                .orElseThrow(Entities.notFound("Guardrail profile"));
 
         List<GuardrailPhaseInput> phases;
         try {
