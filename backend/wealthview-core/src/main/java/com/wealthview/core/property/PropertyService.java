@@ -525,7 +525,20 @@ public class PropertyService {
         var landValue = request.landValue() != null ? request.landValue() : BigDecimal.ZERO;
         var depreciableBasis = request.purchasePrice().subtract(landValue);
 
-        // Validate asset classes
+        validateAssetClasses(allocations);
+        validateAllocationSum(allocations, depreciableBasis);
+
+        try {
+            property.setCostSegAllocations(MAPPER.writeValueAsString(allocations));
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize cost seg allocations", e);
+        }
+        property.setBonusDepreciationRate(
+                request.bonusDepreciationRate() != null ? request.bonusDepreciationRate() : BigDecimal.ONE);
+        property.setCostSegStudyYear(request.costSegStudyYear());
+    }
+
+    private void validateAssetClasses(List<CostSegAllocation> allocations) {
         for (var alloc : allocations) {
             if (!VALID_ASSET_CLASSES.contains(alloc.assetClass())) {
                 throw new IllegalArgumentException(
@@ -537,8 +550,9 @@ public class PropertyService {
                         "Allocation for " + alloc.assetClass() + " must be non-negative");
             }
         }
+    }
 
-        // Validate sum equals depreciable basis
+    private void validateAllocationSum(List<CostSegAllocation> allocations, BigDecimal depreciableBasis) {
         var sum = allocations.stream()
                 .map(CostSegAllocation::allocation)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -547,15 +561,6 @@ public class PropertyService {
                     "Cost segregation allocations (" + sum
                             + ") must equal depreciable basis (" + depreciableBasis + ")");
         }
-
-        try {
-            property.setCostSegAllocations(MAPPER.writeValueAsString(allocations));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize cost seg allocations", e);
-        }
-        property.setBonusDepreciationRate(
-                request.bonusDepreciationRate() != null ? request.bonusDepreciationRate() : BigDecimal.ONE);
-        property.setCostSegStudyYear(request.costSegStudyYear());
     }
 
     private void validateLoanDetails(PropertyRequest request) {
