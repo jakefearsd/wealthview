@@ -1,28 +1,32 @@
 import axios from 'axios';
-import { getAccessToken, getRefreshToken, setTokens, clearTokens } from '../utils/storage';
 
+/**
+ * Axios client for authenticated API calls.
+ *
+ * <p>Auth tokens live in HttpOnly cookies set by the backend on login/refresh —
+ * never in localStorage, never readable by JavaScript. {@code withCredentials}
+ * tells the browser to send those cookies with every request to {@code /api/v1}.
+ *
+ * <p>CSRF protection works automatically: axios reads the {@code XSRF-TOKEN}
+ * cookie (which is NOT HttpOnly) and echoes it as the {@code X-XSRF-TOKEN}
+ * header on every request. The backend's CSRF filter rejects mutations whose
+ * header value doesn't match the cookie — the standard double-submit pattern.
+ */
 const client = axios.create({
     baseURL: '/api/v1',
     headers: { 'Content-Type': 'application/json' },
-});
-
-client.interceptors.request.use((config) => {
-    const token = getAccessToken();
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
+    withCredentials: true,
 });
 
 let isRefreshing = false;
-let failedQueue: Array<{ resolve: (token: string) => void; reject: (err: unknown) => void }> = [];
+let failedQueue: Array<{ resolve: () => void; reject: (err: unknown) => void }> = [];
 
-function processQueue(error: unknown, token: string | null) {
+function processQueue(error: unknown) {
     failedQueue.forEach((prom) => {
         if (error) {
             prom.reject(error);
         } else {
-            prom.resolve(token!);
+            prom.resolve();
         }
     });
     failedQueue = [];
@@ -34,35 +38,23 @@ client.interceptors.response.use(
         const originalRequest = error.config;
         if (error.response?.status === 401 && !originalRequest._retry) {
             if (isRefreshing) {
-                return new Promise((resolve, reject) => {
+                return new Promise<void>((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
-                }).then((token) => {
-                    originalRequest.headers.Authorization = `Bearer ${token}`;
-                    return client(originalRequest);
-                });
+                }).then(() => client(originalRequest));
             }
 
             originalRequest._retry = true;
             isRefreshing = true;
-            const refreshToken = getRefreshToken();
-
-            if (!refreshToken) {
-                clearTokens();
-                window.location.href = '/login';
-                return Promise.reject(error);
-            }
 
             try {
-                const { data } = await axios.post('/api/v1/auth/refresh', {
-                    refresh_token: refreshToken,
-                });
-                setTokens(data.access_token, data.refresh_token);
-                processQueue(null, data.access_token);
-                originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
+                // Refresh token comes from the HttpOnly refresh_token cookie —
+                // we don't pass anything in the body. The response sets new
+                // access_token and refresh_token cookies.
+                await axios.post('/api/v1/auth/refresh', null, { withCredentials: true });
+                processQueue(null);
                 return client(originalRequest);
             } catch (refreshError) {
-                processQueue(refreshError, null);
-                clearTokens();
+                processQueue(refreshError);
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             } finally {

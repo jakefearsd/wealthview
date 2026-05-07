@@ -5,6 +5,7 @@ import type { AuthResponse, CurrentUserResponse, LoginRequest, RegisterRequest }
 const authClient = axios.create({
     baseURL: '/api/v1/auth',
     headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
 });
 
 export async function login(request: LoginRequest): Promise<AuthResponse> {
@@ -17,11 +18,17 @@ export async function register(request: RegisterRequest): Promise<AuthResponse> 
     return data;
 }
 
-export async function refresh(refreshToken: string): Promise<AuthResponse> {
-    const { data } = await authClient.post<AuthResponse>('/refresh', {
-        refresh_token: refreshToken,
-    });
+/**
+ * Refreshes auth cookies. The refresh token is read from the HttpOnly
+ * {@code refresh_token} cookie by the backend; nothing is sent in the body.
+ */
+export async function refresh(): Promise<AuthResponse> {
+    const { data } = await authClient.post<AuthResponse>('/refresh', null);
     return data;
+}
+
+export async function logout(): Promise<void> {
+    await client.post('/auth/logout');
 }
 
 export async function getCurrentUser(): Promise<CurrentUserResponse> {

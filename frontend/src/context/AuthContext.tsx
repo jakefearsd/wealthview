@@ -1,6 +1,5 @@
 import { createContext, useContext, useReducer, useEffect, type ReactNode } from 'react';
-import { getAccessToken, setTokens, clearTokens } from '../utils/storage';
-import { getCurrentUser } from '../api/auth';
+import { getCurrentUser, logout as logoutApi } from '../api/auth';
 import type { AuthResponse } from '../types/auth';
 
 interface AuthState {
@@ -15,7 +14,6 @@ interface AuthState {
 type AuthAction =
     | { type: 'LOGIN_SUCCESS'; payload: AuthResponse }
     | { type: 'LOGOUT' }
-    | { type: 'TOKEN_REFRESHED'; payload: AuthResponse }
     | { type: 'INITIALIZED'; payload: Partial<AuthState> };
 
 const initialState: AuthState = {
@@ -30,7 +28,6 @@ const initialState: AuthState = {
 function authReducer(state: AuthState, action: AuthAction): AuthState {
     switch (action.type) {
         case 'LOGIN_SUCCESS':
-        case 'TOKEN_REFRESHED':
             return {
                 isAuthenticated: true,
                 userId: action.payload.user_id,
@@ -50,7 +47,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
 
 interface AuthContextValue extends AuthState {
     loginSuccess: (response: AuthResponse) => void;
-    logout: () => void;
+    logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -59,11 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(authReducer, initialState);
 
     useEffect(() => {
-        const token = getAccessToken();
-        if (!token) {
-            dispatch({ type: 'INITIALIZED', payload: {} });
-            return;
-        }
+        // Cookies are HttpOnly so we cannot inspect them. On every mount we
+        // ask the server who we are; a 401 just means "logged out".
         getCurrentUser()
             .then((user) => {
                 dispatch({
@@ -78,18 +72,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 });
             })
             .catch(() => {
-                clearTokens();
                 dispatch({ type: 'INITIALIZED', payload: {} });
             });
     }, []);
 
     function loginSuccess(response: AuthResponse) {
-        setTokens(response.access_token, response.refresh_token);
+        // No client-side token storage — cookies are already set by the server.
         dispatch({ type: 'LOGIN_SUCCESS', payload: response });
     }
 
-    function logout() {
-        clearTokens();
+    async function logout() {
+        // Server clears the auth cookies. Even if the call fails (e.g. network
+        // hiccup) we still drop client-side state so the UI doesn't pretend
+        // to be authenticated.
+        try {
+            await logoutApi();
+        } catch {
+            // ignore — cookies may already be invalid
+        }
         dispatch({ type: 'LOGOUT' });
     }
 

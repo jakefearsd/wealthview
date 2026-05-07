@@ -9,9 +9,12 @@ export interface RegisterRequest {
     invite_code: string;
 }
 
+/**
+ * Identity fields returned in the body of login/register/refresh responses.
+ * Tokens are NOT in the body — they are issued as HttpOnly cookies that
+ * JavaScript cannot read.
+ */
 export interface AuthResponse {
-    access_token: string;
-    refresh_token: string;
     user_id: string;
     tenant_id: string;
     email: string;
