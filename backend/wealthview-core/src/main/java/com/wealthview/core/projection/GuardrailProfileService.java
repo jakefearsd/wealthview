@@ -63,20 +63,7 @@ public class GuardrailProfileService {
         MDC.put("operation", "guardrail-optimize");
         MDC.put("scenarioId", scenarioId.toString());
         try {
-        if (Boolean.TRUE.equals(request.optimizeConversions())) {
-            if (request.rmdTargetBracketRate() != null
-                    && request.conversionBracketRate() != null
-                    && request.rmdTargetBracketRate().compareTo(request.conversionBracketRate()) > 0) {
-                throw new IllegalArgumentException(
-                        "RMD target bracket rate must be ≤ conversion bracket rate");
-            }
-            int buffer = request.traditionalExhaustionBuffer() != null
-                    ? request.traditionalExhaustionBuffer() : 5;
-            if (buffer < 1 || buffer > 15) {
-                throw new IllegalArgumentException(
-                        "Traditional exhaustion buffer must be between 1 and 15");
-            }
-        }
+        validateConversionRequest(request);
 
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
@@ -95,31 +82,65 @@ public class GuardrailProfileService {
 
         var optimizerResult = spendingOptimizer.optimize(optimizationInput);
 
+        deleteExistingProfile(scenario, scenarioId);
+
+        var entity = new GuardrailSpendingProfileEntity(
+                scenario.getTenant(), scenario, request.name(), request.essentialFloor());
+        populateGuardrailEntity(entity, scenario, request, optimizationInput, optimizerResult);
+
+        var saved = guardrailRepository.save(entity);
+
+        scenario.setSpendingProfile(null);
+        scenario.setGuardrailProfile(saved);
+        scenario.setUpdatedAt(OffsetDateTime.now());
+        scenarioRepository.save(scenario);
+
+        log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
+        return GuardrailProfileResponse.from(saved);
+        } finally {
+            MDC.remove("operation");
+            MDC.remove("scenarioId");
+        }
+    }
+
+    private void validateConversionRequest(GuardrailOptimizationRequest request) {
+        if (!Boolean.TRUE.equals(request.optimizeConversions())) {
+            return;
+        }
+        if (request.rmdTargetBracketRate() != null
+                && request.conversionBracketRate() != null
+                && request.rmdTargetBracketRate().compareTo(request.conversionBracketRate()) > 0) {
+            throw new IllegalArgumentException(
+                    "RMD target bracket rate must be ≤ conversion bracket rate");
+        }
+        int buffer = request.traditionalExhaustionBuffer() != null
+                ? request.traditionalExhaustionBuffer() : 5;
+        if (buffer < 1 || buffer > 15) {
+            throw new IllegalArgumentException(
+                    "Traditional exhaustion buffer must be between 1 and 15");
+        }
+    }
+
+    private void deleteExistingProfile(ProjectionScenarioEntity scenario, UUID scenarioId) {
         guardrailRepository.findByScenario_Id(scenarioId).ifPresent(existing -> {
             scenario.setGuardrailProfile(null);
             guardrailRepository.delete(existing);
             guardrailRepository.flush();
         });
+    }
 
-        var entity = new GuardrailSpendingProfileEntity(
-                scenario.getTenant(), scenario, request.name(), request.essentialFloor());
+    private void populateGuardrailEntity(GuardrailSpendingProfileEntity entity,
+                                          ProjectionScenarioEntity scenario,
+                                          GuardrailOptimizationRequest request,
+                                          GuardrailOptimizationInput optimizationInput,
+                                          GuardrailProfileResponse optimizerResult) {
         entity.setTerminalBalanceTarget(optimizationInput.terminalBalanceTarget());
         entity.setReturnMean(optimizationInput.returnMean());
         entity.setTrialCount(optimizationInput.trialCount());
         entity.setConfidenceLevel(optimizationInput.confidenceLevel());
         entity.setScenarioHash(computeScenarioHash(scenario));
 
-        try {
-            entity.setPhases(MAPPER.writeValueAsString(
-                    optimizationInput.phases() != null ? optimizationInput.phases() : List.of()));
-            entity.setYearlySpending(MAPPER.writeValueAsString(
-                    optimizerResult.yearlySpending() != null ? optimizerResult.yearlySpending() : List.of()));
-            if (optimizerResult.conversionSchedule() != null) {
-                entity.setConversionSchedule(MAPPER.writeValueAsString(optimizerResult.conversionSchedule()));
-            }
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException("Failed to serialize guardrail data", e);
-        }
+        serializeGuardrailJson(entity, optimizationInput, optimizerResult);
 
         entity.setConversionBracketRate(request.conversionBracketRate());
         entity.setRmdTargetBracketRate(request.rmdTargetBracketRate());
@@ -141,19 +162,21 @@ public class GuardrailProfileService {
         entity.setCashReserveYears(optimizationInput.cashReserveYears());
         entity.setCashReturnRate(optimizationInput.cashReturnRate());
         entity.setRiskTolerance(request.riskTolerance());
+    }
 
-        var saved = guardrailRepository.save(entity);
-
-        scenario.setSpendingProfile(null);
-        scenario.setGuardrailProfile(saved);
-        scenario.setUpdatedAt(OffsetDateTime.now());
-        scenarioRepository.save(scenario);
-
-        log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
-        return GuardrailProfileResponse.from(saved);
-        } finally {
-            MDC.remove("operation");
-            MDC.remove("scenarioId");
+    private void serializeGuardrailJson(GuardrailSpendingProfileEntity entity,
+                                         GuardrailOptimizationInput optimizationInput,
+                                         GuardrailProfileResponse optimizerResult) {
+        try {
+            entity.setPhases(MAPPER.writeValueAsString(
+                    optimizationInput.phases() != null ? optimizationInput.phases() : List.of()));
+            entity.setYearlySpending(MAPPER.writeValueAsString(
+                    optimizerResult.yearlySpending() != null ? optimizerResult.yearlySpending() : List.of()));
+            if (optimizerResult.conversionSchedule() != null) {
+                entity.setConversionSchedule(MAPPER.writeValueAsString(optimizerResult.conversionSchedule()));
+            }
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("Failed to serialize guardrail data", e);
         }
     }
 
