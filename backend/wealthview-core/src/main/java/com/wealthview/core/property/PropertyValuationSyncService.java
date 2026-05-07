@@ -27,6 +27,8 @@ public class PropertyValuationSyncService {
     private final PropertyValuationClient valuationClient;
     private final PropertyValuationService valuationService;
     private final MeterRegistry meterRegistry;
+    private final java.util.concurrent.atomic.AtomicLong lastSuccessEpochSeconds =
+            new java.util.concurrent.atomic.AtomicLong(0L);
 
     public PropertyValuationSyncService(PropertyRepository propertyRepository,
                                          PropertyValuationClient valuationClient,
@@ -36,6 +38,11 @@ public class PropertyValuationSyncService {
         this.valuationClient = valuationClient;
         this.valuationService = valuationService;
         this.meterRegistry = meterRegistry;
+        io.micrometer.core.instrument.Gauge.builder("wealthview.scheduled.last_success_seconds",
+                        lastSuccessEpochSeconds, java.util.concurrent.atomic.AtomicLong::doubleValue)
+                .tag("job", "propertyValuationSync")
+                .description("Unix epoch seconds of the most recent successful run; 0 if never succeeded")
+                .register(meterRegistry);
     }
 
     @Timed("wealthview.property.valuation.sync")
@@ -44,6 +51,7 @@ public class PropertyValuationSyncService {
     public void syncAll() {
         MDC.put("operation", "propertyValuationSync");
         MDC.put("requestId", java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        boolean failed = false;
         try {
             long startTime = System.currentTimeMillis();
             log.info("Starting property valuation sync");
@@ -77,7 +85,15 @@ public class PropertyValuationSyncService {
             meterRegistry.counter("wealthview.property.valuations", "status", "skipped").increment(skipped);
             log.info("Property valuation sync complete: {} updated, {} skipped, {}ms",
                     success, skipped, System.currentTimeMillis() - startTime);
+        } catch (RuntimeException e) {
+            failed = true;
+            throw e;
         } finally {
+            meterRegistry.counter("wealthview.scheduled.runs",
+                    "job", "propertyValuationSync", "status", failed ? "failure" : "success").increment();
+            if (!failed) {
+                lastSuccessEpochSeconds.set(java.time.Instant.now().getEpochSecond());
+            }
             MDC.remove("operation");
             MDC.remove("requestId");
         }

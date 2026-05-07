@@ -232,6 +232,26 @@ class PriceSyncServiceTest {
     }
 
     @Test
+    void syncDailyPrices_recordsScheduledRunMetricsAndAdvancesLastSuccessGauge() {
+        var registry = new SimpleMeterRegistry();
+        var instrumented = new PriceSyncService(priceFeedClient, priceRepository, holdingRepository, 0, registry);
+        when(holdingRepository.findDistinctSymbols()).thenReturn(List.of());
+
+        long before = java.time.Instant.now().getEpochSecond() - 1;
+        instrumented.syncDailyPrices();
+
+        var success = registry.find("wealthview.scheduled.runs")
+                .tag("job", "priceSync").tag("status", "success").counter();
+        assertThat(success).isNotNull();
+        assertThat(success.count()).isEqualTo(1.0);
+
+        var gauge = registry.find("wealthview.scheduled.last_success_seconds")
+                .tag("job", "priceSync").gauge();
+        assertThat(gauge).isNotNull();
+        assertThat(gauge.value()).isGreaterThanOrEqualTo(before);
+    }
+
+    @Test
     void onNewHolding_triggersBackfill() {
         when(priceRepository.existsBySymbol("AAPL")).thenReturn(false);
         when(priceFeedClient.getCandles(eq("AAPL"), any(LocalDate.class), any(LocalDate.class)))

@@ -209,4 +209,25 @@ class PropertyValuationSyncServiceTest {
         // zpid should still be stored even if current fetch fails
         assertThat(property.getZillowZpid()).isEqualTo("55555");
     }
+
+    @Test
+    void syncAll_recordsScheduledRunMetricsAndAdvancesLastSuccessGauge() {
+        var registry = new SimpleMeterRegistry();
+        var instrumented = new PropertyValuationSyncService(
+                propertyRepository, valuationClient, valuationService, registry);
+        when(propertyRepository.findDistinctTenantIds()).thenReturn(List.of());
+
+        long before = java.time.Instant.now().getEpochSecond() - 1;
+        instrumented.syncAll();
+
+        var success = registry.find("wealthview.scheduled.runs")
+                .tag("job", "propertyValuationSync").tag("status", "success").counter();
+        assertThat(success).isNotNull();
+        assertThat(success.count()).isEqualTo(1.0);
+
+        var gauge = registry.find("wealthview.scheduled.last_success_seconds")
+                .tag("job", "propertyValuationSync").gauge();
+        assertThat(gauge).isNotNull();
+        assertThat(gauge.value()).isGreaterThanOrEqualTo(before);
+    }
 }

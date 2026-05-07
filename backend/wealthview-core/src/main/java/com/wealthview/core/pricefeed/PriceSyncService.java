@@ -37,6 +37,8 @@ public class PriceSyncService {
     private final HoldingRepository holdingRepository;
     private final long rateLimitMs;
     private final MeterRegistry meterRegistry;
+    private final java.util.concurrent.atomic.AtomicLong lastSuccessEpochSeconds =
+            new java.util.concurrent.atomic.AtomicLong(0L);
 
     public PriceSyncService(PriceFeedClient priceFeedClient,
                             PriceRepository priceRepository,
@@ -48,6 +50,11 @@ public class PriceSyncService {
         this.holdingRepository = holdingRepository;
         this.rateLimitMs = rateLimitMs;
         this.meterRegistry = meterRegistry;
+        io.micrometer.core.instrument.Gauge.builder("wealthview.scheduled.last_success_seconds",
+                        lastSuccessEpochSeconds, java.util.concurrent.atomic.AtomicLong::doubleValue)
+                .tag("job", "priceSync")
+                .description("Unix epoch seconds of the most recent successful run; 0 if never succeeded")
+                .register(meterRegistry);
     }
 
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
@@ -57,6 +64,7 @@ public class PriceSyncService {
     public FinnhubSyncResult syncDailyPrices() {
         MDC.put("operation", "priceSync");
         MDC.put("requestId", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        boolean failed = false;
         try {
             long startTime = System.currentTimeMillis();
             // Prices are shared reference data — intentionally aggregated across all tenants
@@ -90,7 +98,15 @@ public class PriceSyncService {
             log.info("Daily price sync complete: {} succeeded, {} failed, {}ms",
                     successCount, failures.size(), System.currentTimeMillis() - startTime);
             return new FinnhubSyncResult(successCount, symbols.size(), failures);
+        } catch (RuntimeException e) {
+            failed = true;
+            throw e;
         } finally {
+            meterRegistry.counter("wealthview.scheduled.runs",
+                    "job", "priceSync", "status", failed ? "failure" : "success").increment();
+            if (!failed) {
+                lastSuccessEpochSeconds.set(java.time.Instant.now().getEpochSecond());
+            }
             MDC.remove("operation");
             MDC.remove("requestId");
         }
