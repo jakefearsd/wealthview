@@ -36,7 +36,7 @@ class ImportControllerIT extends AbstractApiIntegrationTest {
 
         var headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBearerAuth(authHelper.adminToken());
+        authHelper.applyAuth(headers, authHelper.adminToken());
 
         var response = restTemplate.exchange("/api/v1/import/csv",
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
@@ -54,7 +54,7 @@ class ImportControllerIT extends AbstractApiIntegrationTest {
 
         var headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBearerAuth(authHelper.adminToken());
+        authHelper.applyAuth(headers, authHelper.adminToken());
 
         // First import
         restTemplate.exchange("/api/v1/import/csv",
@@ -86,7 +86,7 @@ class ImportControllerIT extends AbstractApiIntegrationTest {
 
         var headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBearerAuth(authHelper.adminToken());
+        authHelper.applyAuth(headers, authHelper.adminToken());
 
         var response = restTemplate.exchange("/api/v1/import/csv",
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);

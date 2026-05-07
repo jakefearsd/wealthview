@@ -29,9 +29,14 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(response.getBody()).containsKeys("access_token", "refresh_token", "user_id", "tenant_id");
+        assertThat(response.getBody()).containsKeys("user_id", "tenant_id");
+        assertThat(response.getBody()).doesNotContainKeys("access_token", "refresh_token");
         assertThat(response.getBody().get("email")).isEqualTo("newuser@test.com");
         assertThat(response.getBody().get("role")).isEqualTo("member");
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
+                .anyMatch(c -> c.startsWith("access_token=") && c.contains("HttpOnly"));
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
+                .anyMatch(c -> c.startsWith("refresh_token=") && c.contains("HttpOnly"));
     }
 
     @Test
@@ -84,8 +89,11 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        assertThat(response.getBody()).containsKeys("access_token", "refresh_token");
+        assertThat(response.getBody()).doesNotContainKeys("access_token", "refresh_token");
         assertThat(response.getBody().get("email")).isEqualTo("it-admin@wealthview.test");
+        assertThat(response.getHeaders().get(HttpHeaders.SET_COOKIE))
+                .anyMatch(c -> c.startsWith("access_token=") && c.contains("HttpOnly")
+                        && c.contains("SameSite=Strict"));
     }
 
     @Test

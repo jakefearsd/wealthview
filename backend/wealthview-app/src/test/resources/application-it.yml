@@ -22,6 +22,8 @@ management:
         enabled: true
 
 app:
+  cookie:
+    secure: false
   rate-limit:
     enabled: false
   jwt:

@@ -113,7 +113,7 @@ class ImportPositionsControllerIT extends AbstractApiIntegrationTest {
 
         var headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        headers.setBearerAuth(authHelper.adminToken());
+        authHelper.applyAuth(headers, authHelper.adminToken());
 
         return restTemplate.exchange("/api/v1/import/positions",
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
