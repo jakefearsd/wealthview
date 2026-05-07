@@ -14,6 +14,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -61,6 +62,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         this(taxCalculator, null);
     }
 
+    @Autowired
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         @Nullable MeterRegistry meterRegistry) {
         this.taxCalculator = taxCalculator;

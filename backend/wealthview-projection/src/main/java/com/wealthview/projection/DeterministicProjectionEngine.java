@@ -32,6 +32,7 @@ import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -68,6 +69,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         this(taxCalculator, stateTaxCalculatorFactory, null);
     }
 
+    @Autowired
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
                                           @Nullable MeterRegistry meterRegistry) {
