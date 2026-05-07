@@ -3,6 +3,8 @@ package com.wealthview.app.config;
 import io.micrometer.core.aop.TimedAspect;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.config.MeterFilter;
+import io.micrometer.observation.ObservationRegistry;
+import io.micrometer.observation.aop.ObservedAspect;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryCustomizer;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +23,16 @@ public class MetricsConfig {
     @Bean
     public TimedAspect timedAspect(MeterRegistry registry) {
         return new TimedAspect(registry);
+    }
+
+    /**
+     * Enables {@link io.micrometer.observation.annotation.Observed} on Spring beans.
+     * When tracing is enabled, observed methods become spans automatically; when
+     * tracing is off the aspect is still cheap (a no-op observation).
+     */
+    @Bean
+    public ObservedAspect observedAspect(ObservationRegistry observationRegistry) {
+        return new ObservedAspect(observationRegistry);
     }
 
     @Bean

@@ -110,6 +110,10 @@ public class ImportService {
     }
 
     @Timed("wealthview.import.process")
+    @io.micrometer.observation.annotation.Observed(
+            name = "wealthview.import.process",
+            contextualName = "import-process",
+            lowCardinalityKeyValues = {"component", "import"})
     @Transactional
     public ImportJobResponse processImport(UUID tenantId, UUID accountId,
                                             ImportParseResult parseResult, String source) {

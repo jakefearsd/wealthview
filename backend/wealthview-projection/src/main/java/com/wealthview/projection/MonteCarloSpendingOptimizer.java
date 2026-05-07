@@ -14,6 +14,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -132,6 +133,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     ) {}
 
     @Timed(value = "wealthview.mc.optimize", histogram = true)
+    @Observed(name = "wealthview.mc.optimize",
+              contextualName = "monte-carlo-optimize",
+              lowCardinalityKeyValues = {"component", "projection"})
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
         MDC.put("operation", "mc-optimize");

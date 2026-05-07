@@ -45,6 +45,20 @@ management:
   # Common tags (application, env) are added programmatically by
   # MetricsConfig.CommonTagsCustomizer so they apply uniformly across all
   # registries (including SimpleMeterRegistry used in tests).
+  tracing:
+    # Off by default. Operators turn it on with MANAGEMENT_TRACING_ENABLED=true
+    # plus an OTLP endpoint (OTEL_EXPORTER_OTLP_ENDPOINT). Sampling defaults
+    # to 10%; set MANAGEMENT_TRACING_SAMPLING_PROBABILITY=1.0 to capture every
+    # request when investigating an incident. See docs/OBSERVABILITY.md.
+    enabled: false
+    sampling:
+      probability: 0.1
+  otlp:
+    tracing:
+      # Only used when tracing is enabled. Default points at a typical local
+      # OpenTelemetry Collector / Tempo gRPC port; production deployments
+      # override via OTEL_EXPORTER_OTLP_ENDPOINT.
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
 server:
   port: 8080

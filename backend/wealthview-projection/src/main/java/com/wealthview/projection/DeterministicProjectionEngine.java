@@ -32,6 +32,7 @@ import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +86,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     @Timed("wealthview.projection.run")
+    @Observed(name = "wealthview.projection.run",
+              contextualName = "deterministic-projection",
+              lowCardinalityKeyValues = {"component", "projection"})
     @Override
     public ProjectionResultResponse run(ProjectionInput input) {
         MDC.put("operation", "projection");
