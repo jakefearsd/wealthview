@@ -83,14 +83,7 @@ public class ScenarioCrudService {
         var tenant = tenantRepository.findById(tenantId)
                 .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
 
-        String paramsJson = buildParamsJson(extractParamsFromRequest(
-                request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
-                request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
-                request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
-                request.dynamicSequencingBracketRate(),
-                request.rothConversionStrategy(), request.targetBracketRate(),
-                request.rothConversionStartYear(), request.state(),
-                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest()));
+        String paramsJson = buildParamsJson(extractParamsFromRequest(request));
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -137,14 +130,7 @@ public class ScenarioCrudService {
         scenario.setRetirementDate(request.retirementDate());
         scenario.setEndAge(request.endAge());
         scenario.setInflationRate(request.inflationRate());
-        scenario.setParamsJson(buildParamsJson(extractParamsFromRequest(
-                request.birthYear(), request.withdrawalRate(), request.withdrawalStrategy(),
-                request.dynamicCeiling(), request.dynamicFloor(), request.filingStatus(),
-                request.otherIncome(), request.annualRothConversion(), request.withdrawalOrder(),
-                request.dynamicSequencingBracketRate(),
-                request.rothConversionStrategy(), request.targetBracketRate(),
-                request.rothConversionStartYear(), request.state(),
-                request.primaryResidencePropertyTax(), request.primaryResidenceMortgageInterest())));
+        scenario.setParamsJson(buildParamsJson(extractParamsFromRequest(request)));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -276,8 +262,26 @@ public class ScenarioCrudService {
         }
     }
 
-    @SuppressWarnings("PMD.ExcessiveParameterList") // mirrors request record fields; used at two call sites
-    private Map<String, Object> extractParamsFromRequest(
+    private Map<String, Object> extractParamsFromRequest(CreateScenarioRequest r) {
+        return scenarioParams(r.birthYear(), r.withdrawalRate(), r.withdrawalStrategy(),
+                r.dynamicCeiling(), r.dynamicFloor(), r.filingStatus(),
+                r.otherIncome(), r.annualRothConversion(), r.withdrawalOrder(),
+                r.dynamicSequencingBracketRate(), r.rothConversionStrategy(),
+                r.targetBracketRate(), r.rothConversionStartYear(), r.state(),
+                r.primaryResidencePropertyTax(), r.primaryResidenceMortgageInterest());
+    }
+
+    private Map<String, Object> extractParamsFromRequest(UpdateScenarioRequest r) {
+        return scenarioParams(r.birthYear(), r.withdrawalRate(), r.withdrawalStrategy(),
+                r.dynamicCeiling(), r.dynamicFloor(), r.filingStatus(),
+                r.otherIncome(), r.annualRothConversion(), r.withdrawalOrder(),
+                r.dynamicSequencingBracketRate(), r.rothConversionStrategy(),
+                r.targetBracketRate(), r.rothConversionStartYear(), r.state(),
+                r.primaryResidencePropertyTax(), r.primaryResidenceMortgageInterest());
+    }
+
+    @SuppressWarnings("PMD.ExcessiveParameterList") // mirrors request record fields; used by overloads above
+    private Map<String, Object> scenarioParams(
             Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
             BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
             BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
