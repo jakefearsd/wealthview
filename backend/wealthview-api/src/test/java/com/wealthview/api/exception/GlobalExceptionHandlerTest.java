@@ -209,7 +209,25 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody().status()).isEqualTo(500);
         assertThat(response.getBody().message()).isEqualTo("An unexpected error occurred");
-        assertCounter("RuntimeException", "500", 1);
+        // RuntimeException is intentionally outside the closed whitelist; it
+        // gets bucketed as "other" so the wealthview_errors_total cardinality
+        // stays bounded even when a brand-new exception type lands here.
+        assertCounter("other", "500", 1);
+    }
+
+    @Test
+    void recordError_unknownException_isBucketedAsOther() {
+        class MysteryException extends RuntimeException {
+            MysteryException(String m) { super(m); }
+        }
+        handler.handleGeneral(new MysteryException("strange"), request);
+
+        assertCounter("other", "500", 1);
+        // And the actual class name is NOT used as a tag — that would let an
+        // attacker (or a careless dev) explode cardinality by naming exception
+        // classes after request data.
+        assertThat(meterRegistry.find("wealthview.errors").tag("exception", "MysteryException").counter())
+                .isNull();
     }
 
     @Test

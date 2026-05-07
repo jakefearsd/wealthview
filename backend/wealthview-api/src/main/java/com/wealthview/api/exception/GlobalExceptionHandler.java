@@ -29,13 +29,36 @@ public class GlobalExceptionHandler {
 
     private final MeterRegistry meterRegistry;
 
+    /**
+     * Closed whitelist of exception class names that may appear as a meter tag.
+     * Anything not on this list is bucketed as {@code other} so the
+     * {@code wealthview_errors_total} time series stays bounded even if a new
+     * exception type is thrown without a dedicated handler.
+     */
+    private static final java.util.Set<String> KNOWN_EXCEPTIONS = java.util.Set.of(
+            "EntityNotFoundException",
+            "InvalidSessionException",
+            "DuplicateEntityException",
+            "InvalidInviteCodeException",
+            "BadCredentialsException",
+            "AccessDeniedException",
+            "TenantAccessDeniedException",
+            "IllegalStateException",
+            "IllegalArgumentException",
+            "MethodArgumentNotValidException",
+            "HttpMessageNotReadableException",
+            "MaxUploadSizeExceededException"
+    );
+
     public GlobalExceptionHandler(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
     }
 
     private void recordError(Exception ex, HttpStatus status) {
+        var simpleName = ex.getClass().getSimpleName();
+        var bucketed = KNOWN_EXCEPTIONS.contains(simpleName) ? simpleName : "other";
         meterRegistry.counter("wealthview.errors",
-                "exception", ex.getClass().getSimpleName(),
+                "exception", bucketed,
                 "status", String.valueOf(status.value())).increment();
     }
 
