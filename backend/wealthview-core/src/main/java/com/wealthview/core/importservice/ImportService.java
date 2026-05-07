@@ -115,6 +115,7 @@ public class ImportService {
                                             ImportParseResult parseResult, String source) {
         MDC.put("operation", "import");
         MDC.put("importFormat", source);
+        String importStatus = "failed";
         try {
             log.info("Starting {} import for account {}: {} transactions parsed, {} parse errors",
                     source.toUpperCase(Locale.US), accountId, parseResult.transactions().size(), parseResult.errors().size());
@@ -139,10 +140,15 @@ public class ImportService {
             meterRegistry.counter("wealthview.import.rows", "outcome", "duplicate").increment(result.skippedDuplicates());
             meterRegistry.counter("wealthview.import.rows", "outcome", "error").increment(result.failedCount() + parseResult.errors().size());
 
+            int totalErrors = result.failedCount() + parseResult.errors().size();
+            importStatus = totalErrors == 0 ? "success" : (result.successCount() > 0 ? "partial" : "failed");
             log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
                     source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
             return ImportJobResponse.from(job);
         } finally {
+            // Per-import-job counter (vs. wealthview.import.rows which is per-row).
+            // Prometheus name: wealthview_imports_total{format,status}.
+            meterRegistry.counter("wealthview.imports", "format", source, "status", importStatus).increment();
             MDC.remove("operation");
             MDC.remove("importFormat");
         }

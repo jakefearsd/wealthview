@@ -66,6 +66,7 @@ class ImportServiceTest {
     private Cache accountBalancesCache;
 
     private ImportService importService;
+    private SimpleMeterRegistry meterRegistry;
 
     private final UUID tenantId = UUID.randomUUID();
     private final UUID accountId = UUID.randomUUID();
@@ -73,10 +74,11 @@ class ImportServiceTest {
     @BeforeEach
     void setUp() {
         lenient().when(cacheManager.getCache("accountBalances")).thenReturn(accountBalancesCache);
+        meterRegistry = new SimpleMeterRegistry();
         importService = new ImportService(
                 importJobRepository, accountRepository, transactionRepository,
                 transactionService, holdingsComputationService, csvParser, Map.of(),
-                new SimpleMeterRegistry(), cacheManager);
+                meterRegistry, cacheManager);
     }
 
     private void setupAccountAndJobMocks() {
@@ -361,6 +363,45 @@ class ImportServiceTest {
 
         assertThat(result.failedRows()).isEqualTo(2);
         assertThat(result.errorMessage()).contains("2 rows had parse errors");
+    }
+
+    @Test
+    void processImport_success_incrementsImportsCounterWithFormatAndStatusSuccess() {
+        setupAccountAndJobMocks();
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of());
+
+        var transactions = List.of(
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                        new BigDecimal("10"), new BigDecimal("1500")));
+        var parseResult = new ImportParseResult(transactions, List.of());
+
+        importService.processCsvImport(tenantId, accountId, parseResult);
+
+        var counter = meterRegistry.find("wealthview.imports")
+                .tag("format", "csv").tag("status", "success").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void processImport_withParseErrors_incrementsImportsCounterWithStatusPartial() {
+        setupAccountAndJobMocks();
+        when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
+                .thenReturn(Set.of());
+
+        var transactions = List.of(
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                        new BigDecimal("10"), new BigDecimal("1500")));
+        var parseErrors = List.of(new CsvRowError(2, "invalid date"));
+        var parseResult = new ImportParseResult(transactions, parseErrors);
+
+        importService.processCsvImport(tenantId, accountId, parseResult);
+
+        var counter = meterRegistry.find("wealthview.imports")
+                .tag("format", "csv").tag("status", "partial").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 
     private static void setField(Object target, String fieldName, Object value) {
