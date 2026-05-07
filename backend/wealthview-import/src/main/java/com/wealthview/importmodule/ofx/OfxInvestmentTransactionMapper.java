@@ -22,27 +22,21 @@ final class OfxInvestmentTransactionMapper {
 
     /** Returns a parsed transaction, or null if the investment type is not supported. */
     static ParsedTransaction map(BaseInvestmentTransaction invTxn, Map<String, String> tickerMap) {
-        if (invTxn instanceof BaseBuyInvestmentTransaction buy) {
-            return buildBuyOrSell(buy.getSecurityId(), tickerMap, buy.getTradeDate(),
-                    "buy", buy.getUnits(), buy.getTotal());
-        }
-        if (invTxn instanceof BaseSellInvestmentTransaction sell) {
-            return buildBuyOrSell(sell.getSecurityId(), tickerMap, sell.getTradeDate(),
-                    "sell", sell.getUnits(), sell.getTotal());
-        }
-        if (invTxn instanceof IncomeTransaction income) {
-            return new ParsedTransaction(
+        return switch (invTxn) {
+            case BaseBuyInvestmentTransaction buy -> buildBuyOrSell(buy.getSecurityId(), tickerMap,
+                    buy.getTradeDate(), "buy", buy.getUnits(), buy.getTotal());
+            case BaseSellInvestmentTransaction sell -> buildBuyOrSell(sell.getSecurityId(), tickerMap,
+                    sell.getTradeDate(), "sell", sell.getUnits(), sell.getTotal());
+            case ReinvestIncomeTransaction reinvest -> buildBuyOrSell(reinvest.getSecurityId(), tickerMap,
+                    reinvest.getTradeDate(), "buy", reinvest.getUnits(), reinvest.getTotal());
+            case IncomeTransaction income -> new ParsedTransaction(
                     OfxDateUtils.toLocalDate(income.getTradeDate()),
                     "dividend",
                     resolveSymbol(income.getSecurityId(), tickerMap),
                     null,
                     absOrNull(income.getTotal()));
-        }
-        if (invTxn instanceof ReinvestIncomeTransaction reinvest) {
-            return buildBuyOrSell(reinvest.getSecurityId(), tickerMap, reinvest.getTradeDate(),
-                    "buy", reinvest.getUnits(), reinvest.getTotal());
-        }
-        return null;
+            case null, default -> null;
+        };
     }
 
     private static ParsedTransaction buildBuyOrSell(SecurityId secId, Map<String, String> tickerMap,
