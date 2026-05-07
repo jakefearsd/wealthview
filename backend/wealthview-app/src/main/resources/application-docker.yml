@@ -1,4 +1,6 @@
 app:
+  cookie:
+    secure: false
   cors:
     allowed-origins: http://localhost
   super-admin:

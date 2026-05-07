@@ -13,6 +13,8 @@ logging:
     com.wealthview: DEBUG
 
 app:
+  cookie:
+    secure: false
   cors:
     allowed-origins: http://localhost:5173
   super-admin:

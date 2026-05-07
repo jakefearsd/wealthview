@@ -51,6 +51,11 @@ server:
   port: 8080
 
 app:
+  cookie:
+    # When true, auth cookies and the CSRF cookie carry the Secure flag and
+    # are only sent over HTTPS. Override to false in dev/integration profiles
+    # so local-http development still works.
+    secure: true
   jwt:
     secret: ${JWT_SECRET}
     access-token-expiration: 3600000
