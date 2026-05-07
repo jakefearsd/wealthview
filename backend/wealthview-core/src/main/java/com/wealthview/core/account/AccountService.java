@@ -115,58 +115,62 @@ public class AccountService {
             return Map.of();
         }
 
-        var bankAccountIds = accounts.stream()
-                .filter(a -> "bank".equals(a.getType()))
-                .map(AccountEntity::getId)
-                .toList();
-
-        // Bulk bank balances — 1 query
-        var bankBalances = new HashMap<UUID, BigDecimal>();
-        if (!bankAccountIds.isEmpty()) {
-            for (var row : transactionRepository.computeBalancesByAccountIds(tenantId, bankAccountIds)) {
-                bankBalances.put((UUID) row[0], (BigDecimal) row[1]);
-            }
-        }
-
-        // All holdings for tenant — 1 query
+        var bankBalances = bulkBankBalances(tenantId, accounts);
         var allHoldings = holdingRepository.findByTenant_Id(tenantId);
-
-        // Group holdings by account
         var holdingsByAccount = allHoldings.stream()
                 .collect(Collectors.groupingBy(HoldingEntity::getAccountId));
+        var latestPrices = bulkLatestPrices(allHoldings);
 
-        // All distinct symbols — 1 query for latest prices
-        var allSymbols = allHoldings.stream()
-                .map(HoldingEntity::getSymbol)
-                .distinct()
-                .toList();
-
-        var latestPrices = allSymbols.isEmpty()
-                ? Map.<String, BigDecimal>of()
-                : priceRepository.findLatestBySymbolIn(allSymbols).stream()
-                        .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
-
-        // Compute per-account balances
         var result = new HashMap<UUID, BigDecimal>();
         for (var account : accounts) {
             if ("bank".equals(account.getType())) {
                 result.put(account.getId(), bankBalances.getOrDefault(account.getId(), BigDecimal.ZERO));
             } else {
                 var holdings = holdingsByAccount.getOrDefault(account.getId(), List.of());
-                var value = BigDecimal.ZERO;
-                for (var holding : holdings) {
-                    var price = latestPrices.get(holding.getSymbol());
-                    if (price != null) {
-                        value = value.add(holding.getQuantity().multiply(price)
-                                .setScale(Money.SCALE, Money.ROUNDING));
-                    } else {
-                        value = value.add(holding.getCostBasis());
-                    }
-                }
-                result.put(account.getId(), value);
+                result.put(account.getId(), valueHoldings(holdings, latestPrices));
             }
         }
         return result;
+    }
+
+    private Map<UUID, BigDecimal> bulkBankBalances(UUID tenantId, List<AccountEntity> accounts) {
+        var bankAccountIds = accounts.stream()
+                .filter(a -> "bank".equals(a.getType()))
+                .map(AccountEntity::getId)
+                .toList();
+        var balances = new HashMap<UUID, BigDecimal>();
+        if (!bankAccountIds.isEmpty()) {
+            for (var row : transactionRepository.computeBalancesByAccountIds(tenantId, bankAccountIds)) {
+                balances.put((UUID) row[0], (BigDecimal) row[1]);
+            }
+        }
+        return balances;
+    }
+
+    private Map<String, BigDecimal> bulkLatestPrices(List<HoldingEntity> holdings) {
+        var symbols = holdings.stream()
+                .map(HoldingEntity::getSymbol)
+                .distinct()
+                .toList();
+        if (symbols.isEmpty()) {
+            return Map.of();
+        }
+        return priceRepository.findLatestBySymbolIn(symbols).stream()
+                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+    }
+
+    private BigDecimal valueHoldings(List<HoldingEntity> holdings, Map<String, BigDecimal> latestPrices) {
+        var value = BigDecimal.ZERO;
+        for (var holding : holdings) {
+            var price = latestPrices.get(holding.getSymbol());
+            if (price != null) {
+                value = value.add(holding.getQuantity().multiply(price)
+                        .setScale(Money.SCALE, Money.ROUNDING));
+            } else {
+                value = value.add(holding.getCostBasis());
+            }
+        }
+        return value;
     }
 
     public BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
