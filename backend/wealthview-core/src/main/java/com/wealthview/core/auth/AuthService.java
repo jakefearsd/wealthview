@@ -1,7 +1,7 @@
 package com.wealthview.core.auth;
 
 import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.auth.dto.AuthResponse;
+import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
 import com.wealthview.core.exception.DuplicateEntityException;
@@ -66,7 +66,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResponse login(LoginRequest request, String ipAddress) {
+    public AuthResult login(LoginRequest request, String ipAddress) {
         if (loginAttemptService.isBlocked(request.email())) {
             meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "account_locked").increment();
             throw new BadCredentialsException("Account temporarily locked due to too many failed attempts");
@@ -115,11 +115,11 @@ public class AuthService {
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
                 user.getId(), Map.of("email", user.getEmail())));
-        return buildAuthResponse(user);
+        return buildAuthResult(user);
     }
 
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public AuthResult register(RegisterRequest request) {
         if (commonPasswordChecker.isCommon(request.password())) {
             throw new IllegalArgumentException("This password is too common and easily guessed. Please choose a different password.");
         }
@@ -164,11 +164,11 @@ public class AuthService {
         log.info("User {} registered for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "REGISTER", "user",
                 user.getId(), Map.of("email", request.email())));
-        return buildAuthResponse(user);
+        return buildAuthResult(user);
     }
 
     @Transactional
-    public AuthResponse refresh(String refreshToken) {
+    public AuthResult refresh(String refreshToken) {
         if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
             log.warn("Token refresh failed: invalid or non-refresh token");
             throw new BadCredentialsException("Invalid refresh token");
@@ -204,7 +204,7 @@ public class AuthService {
             throw new BadCredentialsException("Refresh token has been revoked");
         }
 
-        return buildAuthResponse(user);
+        return buildAuthResult(user);
     }
 
     @Transactional
@@ -217,13 +217,13 @@ public class AuthService {
         log.info("User {} logged out (token generation incremented)", userId);
     }
 
-    private AuthResponse buildAuthResponse(UserEntity user) {
+    private AuthResult buildAuthResult(UserEntity user) {
         var role = user.isSuperAdmin() ? "super_admin" : user.getRole();
         var accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(), user.getTenantId(), role, user.getEmail(), user.getTokenGeneration());
         var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), user.getTokenGeneration());
 
-        return new AuthResponse(
+        return new AuthResult(
                 accessToken,
                 refreshToken,
                 user.getId(),

@@ -87,6 +87,14 @@ public final class JwtTokenProvider {
                 .compact();
     }
 
+    public long getAccessTokenExpirationMs() {
+        return accessTokenExpiration;
+    }
+
+    public long getRefreshTokenExpirationMs() {
+        return refreshTokenExpiration;
+    }
+
     public int extractGeneration(String token) {
         var gen = getClaims(token).get("generation", Integer.class);
         return gen != null ? gen : 0;
