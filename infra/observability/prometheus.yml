@@ -1,0 +1,35 @@
+# Prometheus scrape config for WealthView.
+#
+# Scrapes the wealthview app's /actuator/prometheus endpoint every 15s. The
+# endpoint requires SUPER_ADMIN auth (see SecurityConfig); we use the
+# admin's basic-auth credential supplied via env vars.
+#
+# Notes:
+# - Use Prometheus 3.x environment-variable expansion ($${VAR}) so
+#   docker-compose passes the secret in without committing it to disk.
+# - When the app is run outside compose, change `targets` below to the
+#   reachable host:port of the Spring Boot process.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    application: wealthview
+
+scrape_configs:
+  - job_name: wealthview-app
+    metrics_path: /actuator/prometheus
+    scheme: http
+    basic_auth:
+      username: ${WEALTHVIEW_PROMETHEUS_USERNAME}
+      password: ${WEALTHVIEW_PROMETHEUS_PASSWORD}
+    static_configs:
+      - targets:
+          - app:8080
+        labels:
+          service: wealthview-app
+
+  # Self-scrape so Prometheus' own metrics show up in Grafana.
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - localhost:9090

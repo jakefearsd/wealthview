@@ -1,0 +1,54 @@
+# Optional observability stack — Prometheus + Grafana.
+#
+# Use alongside the production compose:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.observability.yml up -d
+#
+# Required env vars:
+#   GRAFANA_ADMIN_PASSWORD  — Grafana admin login (no fallback; Grafana refuses to start without it)
+#   SUPER_ADMIN_PASSWORD    — already required by the prod compose; Prometheus uses it
+#                             with basic auth to scrape /actuator/prometheus
+#
+# Prometheus scrapes the app on the user-defined Docker network. Grafana ships with a
+# pre-provisioned datasource pointing at Prometheus and one dashboard at
+# infra/observability/grafana/dashboards/wealthview.json.
+services:
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    environment:
+      # Plumbed into the basic-auth scrape config via env_file substitution
+      # (Prometheus reads $${VAR} from the YAML; we expand them here).
+      WEALTHVIEW_PROMETHEUS_USERNAME: super-admin@wealthview.local
+      WEALTHVIEW_PROMETHEUS_PASSWORD: ${SUPER_ADMIN_PASSWORD:?SUPER_ADMIN_PASSWORD must be set}
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+volumes:
+  prometheus_data:
+  grafana_data:
