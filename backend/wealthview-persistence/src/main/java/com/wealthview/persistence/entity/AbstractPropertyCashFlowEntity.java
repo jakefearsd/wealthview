@@ -13,8 +13,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @MappedSuperclass
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public abstract class AbstractPropertyCashFlowEntity {
 
     @Id

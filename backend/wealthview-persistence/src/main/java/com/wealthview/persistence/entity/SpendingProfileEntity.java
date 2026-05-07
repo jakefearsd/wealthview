@@ -15,9 +15,11 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "spending_profiles")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class SpendingProfileEntity {
 
     @Id

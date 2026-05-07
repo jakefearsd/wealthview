@@ -13,9 +13,11 @@ import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "property_depreciation_schedule")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PropertyDepreciationScheduleEntity {
 
     @Id

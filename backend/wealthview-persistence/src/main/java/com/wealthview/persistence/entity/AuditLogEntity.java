@@ -12,9 +12,11 @@ import org.hibernate.type.SqlTypes;
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "audit_log")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class AuditLogEntity {
 
     @Id

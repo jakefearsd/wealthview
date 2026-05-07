@@ -13,9 +13,11 @@ import jakarta.persistence.Version;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "users")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class UserEntity {
 
     @Id

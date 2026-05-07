@@ -14,9 +14,11 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "property_valuations")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PropertyValuationEntity {
 
     @Id

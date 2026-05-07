@@ -8,9 +8,11 @@ import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "login_activity")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class LoginActivityEntity {
 
     @Id

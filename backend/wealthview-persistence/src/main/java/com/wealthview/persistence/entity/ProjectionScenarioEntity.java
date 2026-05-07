@@ -20,9 +20,11 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "projection_scenarios")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ProjectionScenarioEntity {
 
     @Id

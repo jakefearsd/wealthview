@@ -12,9 +12,11 @@ import jakarta.persistence.Table;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "import_jobs")
+@Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class ImportJobEntity {
 
     @Id
