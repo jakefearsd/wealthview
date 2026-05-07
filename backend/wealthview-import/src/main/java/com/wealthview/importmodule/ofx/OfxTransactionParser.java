@@ -123,50 +123,21 @@ public class OfxTransactionParser implements ImportParser {
         }
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void processInvestmentTransactionList(List<BaseInvestmentTransaction> invTxns,
                                                    Map<String, String> tickerMap,
                                                    List<ParsedTransaction> transactions,
                                                    List<CsvRowError> errors) {
-        if (invTxns == null) {
-            return;
-        }
-        int rowNum = 0;
-        for (BaseInvestmentTransaction invTxn : invTxns) {
-            rowNum++;
-            try {
-                var parsed = OfxInvestmentTransactionMapper.map(invTxn, tickerMap);
-                if (parsed != null) {
-                    transactions.add(parsed);
-                }
-            } catch (Exception e) {
-                errors.add(new CsvRowError(rowNum, "Error parsing investment transaction: " + e.getMessage()));
-            }
-        }
+        mapEach(invTxns, txn -> OfxInvestmentTransactionMapper.map(txn, tickerMap),
+                "Error parsing investment transaction: ", transactions, errors);
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void processBankTransactionsInStatement(List<InvestmentBankTransaction> bankTxns,
                                                      List<ParsedTransaction> transactions,
                                                      List<CsvRowError> errors) {
-        if (bankTxns == null) {
-            return;
-        }
-        int rowNum = 0;
-        for (InvestmentBankTransaction bankTxn : bankTxns) {
-            rowNum++;
-            try {
-                var parsed = OfxBankTransactionMapper.map(bankTxn.getTransaction());
-                if (parsed != null) {
-                    transactions.add(parsed);
-                }
-            } catch (Exception e) {
-                errors.add(new CsvRowError(rowNum, "Error parsing bank transaction in investment statement: " + e.getMessage()));
-            }
-        }
+        mapEach(bankTxns, bankTxn -> OfxBankTransactionMapper.map(bankTxn.getTransaction()),
+                "Error parsing bank transaction in investment statement: ", transactions, errors);
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void extractBankTransactions(ResponseEnvelope envelope,
                                           List<ParsedTransaction> transactions,
                                           List<CsvRowError> errors) {
@@ -180,18 +151,30 @@ public class OfxTransactionParser implements ImportParser {
             if (stmt == null || stmt.getTransactionList() == null) {
                 continue;
             }
+            mapEach(stmt.getTransactionList().getTransactions(), OfxBankTransactionMapper::map,
+                    "Error parsing bank transaction: ", transactions, errors);
+        }
+    }
 
-            int rowNum = 0;
-            for (Transaction txn : stmt.getTransactionList().getTransactions()) {
-                rowNum++;
-                try {
-                    var parsed = OfxBankTransactionMapper.map(txn);
-                    if (parsed != null) {
-                        transactions.add(parsed);
-                    }
-                } catch (Exception e) {
-                    errors.add(new CsvRowError(rowNum, "Error parsing bank transaction: " + e.getMessage()));
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private static <T> void mapEach(List<T> items,
+                                    java.util.function.Function<T, ParsedTransaction> mapper,
+                                    String errorPrefix,
+                                    List<ParsedTransaction> transactions,
+                                    List<CsvRowError> errors) {
+        if (items == null) {
+            return;
+        }
+        int rowNum = 0;
+        for (T item : items) {
+            rowNum++;
+            try {
+                var parsed = mapper.apply(item);
+                if (parsed != null) {
+                    transactions.add(parsed);
                 }
+            } catch (Exception e) {
+                errors.add(new CsvRowError(rowNum, errorPrefix + e.getMessage()));
             }
         }
     }
