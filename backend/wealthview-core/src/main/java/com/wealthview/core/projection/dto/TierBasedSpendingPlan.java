@@ -130,22 +130,18 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
     }
 
     public int computeYearsInTier(int age, int yearsInRetirement) {
-        if (!spendingTiers.isEmpty()) {
-            var matches = new ArrayList<SpendingTierData>();
-            for (var tier : spendingTiers) {
-                if (age >= tier.startAge() && (tier.endAge() == null || age <= tier.endAge())) {
-                    matches.add(tier);
-                }
-            }
-            if (matches.size() >= 2) {
-                return 0;
-            }
-            if (matches.size() == 1) {
-                var tier = matches.getFirst();
-                int retirementStartAge = age - yearsInRetirement + 1;
-                int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
-                return age - effectiveTierStart;
-            }
+        if (spendingTiers.isEmpty()) {
+            return -1;
+        }
+        var matches = findMatchingTiers(age);
+        if (matches.size() >= 2) {
+            return 0;
+        }
+        if (matches.size() == 1) {
+            var tier = matches.getFirst();
+            int retirementStartAge = age - yearsInRetirement + 1;
+            int effectiveTierStart = Math.max(tier.startAge(), retirementStartAge);
+            return age - effectiveTierStart;
         }
         return -1;
     }
