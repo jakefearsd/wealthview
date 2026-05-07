@@ -42,10 +42,9 @@ management:
     metrics:
       export:
         enabled: true
-  metrics:
-    tags:
-      application: wealthview
-      environment: ${spring.profiles.active:unknown}
+  # Common tags (application, env) are added programmatically by
+  # MetricsConfig.CommonTagsCustomizer so they apply uniformly across all
+  # registries (including SimpleMeterRegistry used in tests).
 
 server:
   port: 8080

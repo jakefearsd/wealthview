@@ -111,7 +111,10 @@ public class AuthService {
 
         loginAttemptService.recordSuccess(request.email());
         loginActivityService.record(request.email(), user.getTenantId(), true, ipAddress);
-        meterRegistry.counter("wealthview.auth.login", "result", "success").increment();
+        // Always include a "reason" tag so the success and failure variants share the
+        // same tag-key set; mismatched key sets on the same meter name emit a
+        // "duplicate meter registration" warning from Micrometer.
+        meterRegistry.counter("wealthview.auth.login", "result", "success", "reason", "ok").increment();
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
                 user.getId(), Map.of("email", user.getEmail())));
