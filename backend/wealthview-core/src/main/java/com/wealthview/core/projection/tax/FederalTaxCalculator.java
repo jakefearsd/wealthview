@@ -73,33 +73,36 @@ public class FederalTaxCalculator {
             Integer maxYear = taxBracketRepository.findMaxTaxYear();
             if (maxYear != null) {
                 brackets = loadBrackets(maxYear, status);
-                if (bracketInflationRate != null
-                        && bracketInflationRate.compareTo(BigDecimal.ZERO) > 0
-                        && taxYear > maxYear) {
-                    inflationFactor = BigDecimal.ONE.add(bracketInflationRate)
-                            .pow(taxYear - maxYear);
-                }
+                inflationFactor = bracketInflationFactor(bracketInflationRate, taxYear, maxYear);
             }
         }
 
-        BigDecimal deduction = loadStandardDeduction(taxYear, status);
-        if (inflationFactor.compareTo(BigDecimal.ONE) > 0) {
-            deduction = deduction.multiply(inflationFactor).setScale(SCALE, ROUNDING);
-        }
+        BigDecimal deduction = inflate(loadStandardDeduction(taxYear, status), inflationFactor);
 
         for (var bracket : brackets) {
-            if (bracket.getRate().compareTo(targetRate) == 0) {
-                if (bracket.getBracketCeiling() != null) {
-                    BigDecimal ceiling = bracket.getBracketCeiling();
-                    if (inflationFactor.compareTo(BigDecimal.ONE) > 0) {
-                        ceiling = ceiling.multiply(inflationFactor).setScale(SCALE, ROUNDING);
-                    }
-                    return ceiling.add(deduction);
-                }
+            if (bracket.getRate().compareTo(targetRate) != 0) {
+                continue;
+            }
+            if (bracket.getBracketCeiling() == null) {
                 return BigDecimal.ZERO;
             }
+            return inflate(bracket.getBracketCeiling(), inflationFactor).add(deduction);
         }
         return BigDecimal.ZERO;
+    }
+
+    private static BigDecimal bracketInflationFactor(BigDecimal rate, int taxYear, int maxYear) {
+        if (rate == null || rate.compareTo(BigDecimal.ZERO) <= 0 || taxYear <= maxYear) {
+            return BigDecimal.ONE;
+        }
+        return BigDecimal.ONE.add(rate).pow(taxYear - maxYear);
+    }
+
+    private static BigDecimal inflate(BigDecimal value, BigDecimal factor) {
+        if (factor.compareTo(BigDecimal.ONE) <= 0) {
+            return value;
+        }
+        return value.multiply(factor).setScale(SCALE, ROUNDING);
     }
 
     /**
