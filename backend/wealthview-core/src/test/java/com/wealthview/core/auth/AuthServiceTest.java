@@ -56,6 +56,7 @@ class AuthServiceTest {
 
     private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
+    private SimpleMeterRegistry meterRegistry;
 
     private TenantEntity tenant;
     private UserEntity user;
@@ -67,9 +68,10 @@ class AuthServiceTest {
         jwtTokenProvider = new JwtTokenProvider(
                 "test-secret-key-that-is-at-least-32-characters-long",
                 3600000, 86400000);
+        meterRegistry = new SimpleMeterRegistry();
         authService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry(), new LoginAttemptService(), new CommonPasswordChecker());
+                meterRegistry, new LoginAttemptService(), new CommonPasswordChecker());
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
@@ -410,5 +412,42 @@ class AuthServiceTest {
                 new RegisterRequest("new@example.com", "myuniquephrase", "VALID"));
 
         assertThat(response.accessToken()).isNotBlank();
+    }
+
+    @Test
+    void refresh_validToken_recordsSuccessMetric() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.refresh(refreshToken);
+
+        var counter = meterRegistry.find("wealthview.auth.refresh")
+                .tag("result", "success").tag("reason", "ok").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void refresh_invalidToken_recordsFailureMetric() {
+        assertThatThrownBy(() -> authService.refresh("invalid.token"))
+                .isInstanceOf(BadCredentialsException.class);
+
+        var counter = meterRegistry.find("wealthview.auth.refresh")
+                .tag("result", "failure").tag("reason", "invalid_token").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void logout_recordsCounter() {
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.logout(user.getId());
+
+        var counter = meterRegistry.find("wealthview.auth.logout").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 }

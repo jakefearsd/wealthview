@@ -174,20 +174,26 @@ public class AuthService {
     public AuthResult refresh(String refreshToken) {
         if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
             log.warn("Token refresh failed: invalid or non-refresh token");
+            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "invalid_token").increment();
             throw new BadCredentialsException("Invalid refresh token");
         }
 
         var userId = jwtTokenProvider.extractUserId(refreshToken);
         var user = userRepository.findById(userId)
-                .orElseThrow(Entities.notFound("User"));
+                .orElseThrow(() -> {
+                    meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "unknown_user").increment();
+                    return Entities.notFound("User").get();
+                });
 
         if (!user.isActive()) {
             log.warn("Token refresh failed: user {} is disabled", userId);
+            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "disabled_user").increment();
             throw new BadCredentialsException("Account is disabled");
         }
 
         if (!user.getTenant().isActive()) {
             log.warn("Token refresh failed: tenant {} is disabled for user {}", user.getTenantId(), userId);
+            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "disabled_tenant").increment();
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
 
@@ -195,6 +201,7 @@ public class AuthService {
         if (tokenGeneration != user.getTokenGeneration()) {
             log.warn("Token refresh failed: stale generation for user {} (token={}, current={})",
                     userId, tokenGeneration, user.getTokenGeneration());
+            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "stale_generation").increment();
             throw new BadCredentialsException("Refresh token has been revoked");
         }
 
@@ -204,9 +211,11 @@ public class AuthService {
             userRepository.save(user);
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Token refresh lost race for user {}: {}", userId, e.getMessage());
+            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "race_lost").increment();
             throw new BadCredentialsException("Refresh token has been revoked");
         }
 
+        meterRegistry.counter("wealthview.auth.refresh", "result", "success", "reason", "ok").increment();
         return buildAuthResult(user);
     }
 
@@ -217,6 +226,7 @@ public class AuthService {
         user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
+        meterRegistry.counter("wealthview.auth.logout").increment();
         log.info("User {} logged out (token generation incremented)", userId);
     }
 
