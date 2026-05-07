@@ -57,7 +57,12 @@ public final class ControllerTestUtils {
             SecurityContext context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(auth);
             SecurityContextHolder.setContext(context);
-            return SecurityMockMvcRequestPostProcessors.securityContext(context).postProcessRequest(request);
+            // Authenticated requests in our cookie/CSRF model always carry a valid
+            // CSRF token, so test fixtures attach one alongside the security context.
+            // GET requests are unaffected (CSRF check only fires on mutations).
+            request = (org.springframework.mock.web.MockHttpServletRequest)
+                    SecurityMockMvcRequestPostProcessors.securityContext(context).postProcessRequest(request);
+            return SecurityMockMvcRequestPostProcessors.csrf().postProcessRequest(request);
         };
     }
 }

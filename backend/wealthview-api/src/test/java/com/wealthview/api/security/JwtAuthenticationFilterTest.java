@@ -4,6 +4,7 @@ import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.SessionStateValidator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,8 +55,6 @@ class JwtAuthenticationFilterTest {
         chain = org.mockito.Mockito.mock(FilterChain.class);
         SecurityContextHolder.clearContext();
         MDC.clear();
-        // Default: session validator approves. Tests that care about rejection
-        // override this with a specific expectation.
         lenient().when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt()))
                 .thenReturn(true);
         lenient().when(jwtTokenProvider.extractGeneration(anyString())).thenReturn(0);
@@ -68,10 +67,10 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilterInternal_validBearerToken_populatesSecurityContext() throws ServletException, IOException {
+    void doFilterInternal_validAccessTokenCookie_populatesSecurityContext() throws ServletException, IOException {
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
-        request.addHeader("Authorization", "Bearer valid.jwt.token");
+        request.setCookies(new Cookie("access_token", "valid.jwt.token"));
         when(jwtTokenProvider.validateAccessToken("valid.jwt.token")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("valid.jwt.token")).thenReturn(userId);
         when(jwtTokenProvider.extractTenantId("valid.jwt.token")).thenReturn(tenantId);
@@ -96,7 +95,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilterInternal_adminRole_setsRoleAdminAuthority() throws ServletException, IOException {
-        request.addHeader("Authorization", "Bearer admin.token");
+        request.setCookies(new Cookie("access_token", "admin.token"));
         when(jwtTokenProvider.validateAccessToken("admin.token")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("admin.token")).thenReturn(UUID.randomUUID());
         when(jwtTokenProvider.extractTenantId("admin.token")).thenReturn(UUID.randomUUID());
@@ -112,7 +111,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilterInternal_invalidToken_leavesSecurityContextEmpty() throws ServletException, IOException {
-        request.addHeader("Authorization", "Bearer bad.token");
+        request.setCookies(new Cookie("access_token", "bad.token"));
         when(jwtTokenProvider.validateAccessToken("bad.token")).thenReturn(false);
 
         filter.doFilterInternal(request, response, chain);
@@ -123,7 +122,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilterInternal_noAuthorizationHeader_skipsAuthentication() throws ServletException, IOException {
+    void doFilterInternal_noCookies_skipsAuthentication() throws ServletException, IOException {
         filter.doFilterInternal(request, response, chain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
@@ -132,19 +131,9 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilterInternal_nonBearerAuthorizationHeader_skipsAuthentication() throws ServletException, IOException {
-        request.addHeader("Authorization", "Basic dXNlcjpwYXNz");
-
-        filter.doFilterInternal(request, response, chain);
-
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(chain).doFilter(request, response);
-        verifyNoInteractions(jwtTokenProvider);
-    }
-
-    @Test
-    void doFilterInternal_bearerWithNoSpace_treatedAsNonBearer() throws ServletException, IOException {
-        request.addHeader("Authorization", "Bearerfoo");
+    void doFilterInternal_authorizationHeaderIgnored_noCookieMeansNoAuth() throws ServletException, IOException {
+        // Cookie is the only accepted token source; legacy Authorization headers must NOT authenticate.
+        request.addHeader("Authorization", "Bearer some.token");
 
         filter.doFilterInternal(request, response, chain);
 
@@ -154,8 +143,20 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilterInternal_bearerWithEmptyToken_passesEmptyStringToValidator() throws ServletException, IOException {
-        request.addHeader("Authorization", "Bearer ");
+    void doFilterInternal_otherCookiesPresent_butNoAccessTokenCookie_skipsAuthentication()
+            throws ServletException, IOException {
+        request.setCookies(new Cookie("XSRF-TOKEN", "csrf-value"),
+                new Cookie("session", "abc"));
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verifyNoInteractions(jwtTokenProvider);
+    }
+
+    @Test
+    void doFilterInternal_emptyAccessTokenCookie_passesEmptyStringToValidator() throws ServletException, IOException {
+        request.setCookies(new Cookie("access_token", ""));
         when(jwtTokenProvider.validateAccessToken("")).thenReturn(false);
 
         filter.doFilterInternal(request, response, chain);
@@ -167,7 +168,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doFilterInternal_clearsMdcAfterRequest() throws ServletException, IOException {
-        request.addHeader("Authorization", "Bearer valid.token");
+        request.setCookies(new Cookie("access_token", "valid.token"));
         when(jwtTokenProvider.validateAccessToken("valid.token")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("valid.token")).thenReturn(UUID.randomUUID());
         when(jwtTokenProvider.extractTenantId("valid.token")).thenReturn(UUID.randomUUID());
@@ -185,7 +186,7 @@ class JwtAuthenticationFilterTest {
     void doFilterInternal_populatesMdcDuringChainInvocation() throws ServletException, IOException {
         var userId = UUID.randomUUID();
         var tenantId = UUID.randomUUID();
-        request.addHeader("Authorization", "Bearer t");
+        request.setCookies(new Cookie("access_token", "t"));
         when(jwtTokenProvider.validateAccessToken("t")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("t")).thenReturn(userId);
         when(jwtTokenProvider.extractTenantId("t")).thenReturn(tenantId);
@@ -268,11 +269,7 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilterInternal_cryptographicallyValidButSessionRejected_leavesContextEmpty()
             throws ServletException, IOException {
-        // Even when JWT signature, issuer, audience, and expiry are all valid,
-        // the filter must consult SessionStateValidator — this is what lets
-        // logout, password reset, and user/tenant disablement revoke tokens
-        // before their 15-minute expiry.
-        request.addHeader("Authorization", "Bearer revoked.jwt.token");
+        request.setCookies(new Cookie("access_token", "revoked.jwt.token"));
         when(jwtTokenProvider.validateAccessToken("revoked.jwt.token")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("revoked.jwt.token")).thenReturn(UUID.randomUUID());
         when(jwtTokenProvider.extractGeneration("revoked.jwt.token")).thenReturn(3);
@@ -287,11 +284,8 @@ class JwtAuthenticationFilterTest {
     @Test
     void doFilterInternal_sessionValid_passesTokenGenerationToValidator()
             throws ServletException, IOException {
-        // The filter must forward the token's generation claim to the validator
-        // so staleness is detectable. If it defaults to 0 or discards the claim,
-        // every refresh breaks the revocation check.
         var userId = UUID.randomUUID();
-        request.addHeader("Authorization", "Bearer t");
+        request.setCookies(new Cookie("access_token", "t"));
         when(jwtTokenProvider.validateAccessToken("t")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("t")).thenReturn(userId);
         when(jwtTokenProvider.extractTenantId("t")).thenReturn(UUID.randomUUID());
