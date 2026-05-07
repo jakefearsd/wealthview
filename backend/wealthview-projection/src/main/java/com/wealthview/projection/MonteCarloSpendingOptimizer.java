@@ -561,7 +561,35 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
         double failureRate = (double) failures / ctx.sim().trialCount();
 
-        // Build yearly spending records
+        var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
+                medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
+
+        log.info("MC optimization complete: {} trials, {} years, median final balance {}",
+                ctx.sim().trialCount(), ctx.sim().years(), toBD(medianFinal));
+
+        RothConversionScheduleResponse convScheduleResponse =
+                buildConvScheduleResponse(ctx, input, convSchedule, mcExhaustionPct);
+
+        return new GuardrailProfileResponse(
+                null, null, "Optimized",
+                input.essentialFloor(), input.terminalBalanceTarget(),
+                input.returnMean(),
+                ctx.sim().trialCount(), input.confidenceLevel(),
+                input.phases(), yearlySpending,
+                toBD(medianFinal), toBD(failureRate),
+                toBD(p10Final),
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"),
+                convScheduleResponse);
+    }
+
+    private List<GuardrailYearlySpending> buildYearlySpending(OptimizationSetup ctx,
+                                                                GuardrailOptimizationInput input,
+                                                                double[] discretionaryByYear,
+                                                                double[][] corridors,
+                                                                double[] medianBalanceByYear,
+                                                                double[] p10BalanceByYear,
+                                                                double[] p25BalanceByYear) {
         var yearlySpending = new ArrayList<GuardrailYearlySpending>();
         for (int y = 0; y < ctx.sim().years(); y++) {
             int age = ctx.sim().retirementAge() + y;
@@ -580,58 +608,49 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     toBD(medianBalanceByYear[y]),
                     toBD(p10BalanceByYear[y]), toBD(p25BalanceByYear[y])));
         }
+        return yearlySpending;
+    }
 
-        log.info("MC optimization complete: {} trials, {} years, median final balance {}",
-                ctx.sim().trialCount(), ctx.sim().years(), toBD(medianFinal));
-
-        // Build conversion schedule response if conversions were optimized
-        RothConversionScheduleResponse convScheduleResponse = null;
-        if (convSchedule != null) {
-            var convYears = new ArrayList<ConversionYearDetail>();
-            for (int y = 0; y < ctx.sim().years(); y++) {
-                int age = ctx.sim().retirementAge() + y;
-                int calendarYear = ctx.sim().retirementYear() + y;
-                if (convSchedule.conversionByYear()[y] > 0) {
-                    convYears.add(new ConversionYearDetail(
-                            calendarYear, age,
-                            toBD(convSchedule.conversionByYear()[y]),
-                            toBD(convSchedule.conversionTaxByYear()[y]),
-                            toBD(convSchedule.traditionalBalance()[y]),
-                            toBD(convSchedule.rothBalance()[y]),
-                            toBD(convSchedule.projectedRmd()[y]),
-                            toBD(ctx.taxIncome().incomeByYear()[y]),
-                            toBD(ctx.taxIncome().taxableIncomeByYear()[y]
-                                    + convSchedule.conversionByYear()[y]),
-                            null));
-                }
-            }
-            convScheduleResponse = new RothConversionScheduleResponse(
-                    toBD(convSchedule.lifetimeTaxWith()),
-                    toBD(convSchedule.lifetimeTaxWithout()),
-                    toBD(convSchedule.lifetimeTaxWithout() - convSchedule.lifetimeTaxWith()),
-                    convSchedule.exhaustionAge(),
-                    convSchedule.exhaustionTargetMet(),
-                    input.conversionBracketRate(),
-                    input.rmdTargetBracketRate(),
-                    input.traditionalExhaustionBuffer(),
-                    toBD(mcExhaustionPct),
-                    toBD(convSchedule.targetTraditionalBalance()),
-                    input.rmdBracketHeadroom() != null
-                            ? input.rmdBracketHeadroom() : new BigDecimal("0.10"),
-                    convYears);
+    @Nullable
+    private RothConversionScheduleResponse buildConvScheduleResponse(OptimizationSetup ctx,
+                                                                       GuardrailOptimizationInput input,
+                                                                       RothConversionOptimizer.RothConversionSchedule convSchedule,
+                                                                       double mcExhaustionPct) {
+        if (convSchedule == null) {
+            return null;
         }
-
-        return new GuardrailProfileResponse(
-                null, null, "Optimized",
-                input.essentialFloor(), input.terminalBalanceTarget(),
-                input.returnMean(),
-                ctx.sim().trialCount(), input.confidenceLevel(),
-                input.phases(), yearlySpending,
-                toBD(medianFinal), toBD(failureRate),
-                toBD(p10Final),
-                false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"),
-                convScheduleResponse);
+        var convYears = new ArrayList<ConversionYearDetail>();
+        for (int y = 0; y < ctx.sim().years(); y++) {
+            int age = ctx.sim().retirementAge() + y;
+            int calendarYear = ctx.sim().retirementYear() + y;
+            if (convSchedule.conversionByYear()[y] > 0) {
+                convYears.add(new ConversionYearDetail(
+                        calendarYear, age,
+                        toBD(convSchedule.conversionByYear()[y]),
+                        toBD(convSchedule.conversionTaxByYear()[y]),
+                        toBD(convSchedule.traditionalBalance()[y]),
+                        toBD(convSchedule.rothBalance()[y]),
+                        toBD(convSchedule.projectedRmd()[y]),
+                        toBD(ctx.taxIncome().incomeByYear()[y]),
+                        toBD(ctx.taxIncome().taxableIncomeByYear()[y]
+                                + convSchedule.conversionByYear()[y]),
+                        null));
+            }
+        }
+        return new RothConversionScheduleResponse(
+                toBD(convSchedule.lifetimeTaxWith()),
+                toBD(convSchedule.lifetimeTaxWithout()),
+                toBD(convSchedule.lifetimeTaxWithout() - convSchedule.lifetimeTaxWith()),
+                convSchedule.exhaustionAge(),
+                convSchedule.exhaustionTargetMet(),
+                input.conversionBracketRate(),
+                input.rmdTargetBracketRate(),
+                input.traditionalExhaustionBuffer(),
+                toBD(mcExhaustionPct),
+                toBD(convSchedule.targetTraditionalBalance()),
+                input.rmdBracketHeadroom() != null
+                        ? input.rmdBracketHeadroom() : new BigDecimal("0.10"),
+                convYears);
     }
 
     private double[][] runMonteCarloTrials(int trialCount, int years,
