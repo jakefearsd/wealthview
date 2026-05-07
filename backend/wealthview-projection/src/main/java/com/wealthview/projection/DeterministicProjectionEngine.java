@@ -31,6 +31,7 @@ import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -58,11 +59,21 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final StateTaxCalculatorFactory stateTaxCalculatorFactory;
     private final IncomeSourceProcessor incomeSourceProcessor;
     private final IncomeContributionCalculator incomeContributionCalculator;
+    @Nullable
+    private final MeterRegistry meterRegistry;
 
+    /** Test-friendly constructor that omits the optional meter registry. */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory) {
+        this(taxCalculator, stateTaxCalculatorFactory, null);
+    }
+
+    public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
+                                          @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable MeterRegistry meterRegistry) {
         this.taxCalculator = taxCalculator;
         this.stateTaxCalculatorFactory = stateTaxCalculatorFactory;
+        this.meterRegistry = meterRegistry;
         var rentalLossCalculator = new RentalLossCalculator();
         var ssTaxCalculator = new SocialSecurityTaxCalculator();
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
@@ -77,7 +88,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         MDC.put("operation", "projection");
         MDC.put("scenarioName", input.scenarioName() != null ? input.scenarioName() : "unnamed");
         try {
-            return runInternal(input);
+            var result = runInternal(input);
+            if (meterRegistry != null) {
+                meterRegistry.counter("wealthview.projection.runs", "type", "deterministic").increment();
+            }
+            return result;
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioName");

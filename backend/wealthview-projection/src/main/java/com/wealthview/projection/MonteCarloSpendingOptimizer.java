@@ -12,6 +12,8 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -51,9 +53,18 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final int EARLY_WITHDRAWAL_AGE = 60;
 
     private final FederalTaxCalculator taxCalculator;
+    @Nullable
+    private final MeterRegistry meterRegistry;
 
+    /** Test-friendly constructor that omits the optional meter registry. */
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator) {
+        this(taxCalculator, null);
+    }
+
+    public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
+                                        @Nullable MeterRegistry meterRegistry) {
         this.taxCalculator = taxCalculator;
+        this.meterRegistry = meterRegistry;
     }
 
     /** Portfolio configuration and pool balances passed into the optimizer. */
@@ -118,9 +129,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             boolean trackYearBalances
     ) {}
 
+    @Timed(value = "wealthview.mc.optimize", histogram = true)
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
         MDC.put("operation", "mc-optimize");
+        if (meterRegistry != null) {
+            meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
+        }
         try {
             var ctx = prepareContext(input);
             if (ctx.sim().years() <= 0) {
