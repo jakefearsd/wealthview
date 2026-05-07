@@ -1,5 +1,7 @@
 # Stage 1: Build frontend
-FROM node:20-alpine AS frontend-build
+# Pinned by digest (node:20-alpine, NODE_VERSION=20.20.2 at time of pin).
+# To upgrade: `docker pull node:<tag>` then `docker inspect --format='{{index .RepoDigests 0}}' node:<tag>`.
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
@@ -7,7 +9,8 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build backend
-FROM maven:3.9-eclipse-temurin-21 AS build
+# Pinned by digest (maven:3.9-eclipse-temurin-21, JDK 21.0.10+7 at time of pin).
+FROM maven:3.9-eclipse-temurin-21@sha256:8e7dc4215c70f922e798c9f8aafa0a3734ca386342427b3dbb17cecc4a429c8e AS build
 WORKDIR /app
 COPY backend/pom.xml backend/pom.xml
 COPY backend/wealthview-persistence/pom.xml backend/wealthview-persistence/pom.xml
@@ -21,7 +24,8 @@ COPY backend backend
 RUN cd backend && mvn clean package -DskipTests -q
 
 # Stage 3: Runtime
-FROM eclipse-temurin:21-jre-alpine
+# Pinned by digest (eclipse-temurin:21-jre-alpine, JDK 21.0.10+7 at time of pin).
+FROM eclipse-temurin:21-jre-alpine@sha256:ad0cdd9782db550ca7dde6939a16fd850d04e683d37d3cff79d84a5848ba6a5a
 WORKDIR /app
 RUN addgroup -S wv && adduser -S wv -G wv
 COPY --from=build --chown=wv:wv /app/backend/wealthview-app/target/*.jar app.jar

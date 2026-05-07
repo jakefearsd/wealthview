@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:16
+    # Pinned by digest (postgres:16, server version 16.13 at time of pin).
+    image: postgres:16@sha256:71e27bf60b70bded003791b5573f8b808365613f341df20ffcf0c1ed7bc13ddf
     environment:
       POSTGRES_DB: wealthview
       POSTGRES_USER: wv_app
@@ -15,7 +16,7 @@ services:
     restart: unless-stopped
 
   app:
-    image: wealthview:${WEALTHVIEW_VERSION:-latest}
+    image: wealthview:${WEALTHVIEW_VERSION:?WEALTHVIEW_VERSION must be set in .env (use a version like 1.0.0 or a digest like sha256-... — never deploy :latest)}
     build: .
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/wealthview
