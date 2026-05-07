@@ -319,15 +319,12 @@ public class ScenarioCrudService {
     }
 
     private boolean putIfNotNull(ObjectNode node, String key, Object value) {
-        if (value == null) {
-            return false;
-        }
-        if (value instanceof Integer i) {
-            node.put(key, i);
-        } else if (value instanceof BigDecimal bd) {
-            node.put(key, bd);
-        } else if (value instanceof String s) {
-            node.put(key, s);
+        switch (value) {
+            case null -> { return false; }
+            case Integer i -> node.put(key, i);
+            case BigDecimal bd -> node.put(key, bd);
+            case String s -> node.put(key, s);
+            default -> { }
         }
         return true;
     }
