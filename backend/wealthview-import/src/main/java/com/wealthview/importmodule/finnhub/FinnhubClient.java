@@ -5,6 +5,7 @@ import com.wealthview.core.pricefeed.dto.CandleResponse;
 import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
 import com.wealthview.core.pricefeed.dto.QuoteResponse;
 import com.wealthview.core.pricefeed.dto.QuoteResult;
+import io.micrometer.core.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.HttpClientErrorException;
@@ -34,6 +35,7 @@ public class FinnhubClient implements PriceFeedClient {
         this.apiKey = apiKey;
     }
 
+    @Timed(value = "wealthview.finnhub.quote", histogram = true)
     @Override
     public QuoteResult getQuote(String symbol) {
         try {
@@ -64,6 +66,7 @@ public class FinnhubClient implements PriceFeedClient {
         }
     }
 
+    @Timed(value = "wealthview.finnhub.candles", histogram = true)
     @Override
     public Optional<CandleResponse> getCandles(String symbol, LocalDate from, LocalDate to) {
         try {
