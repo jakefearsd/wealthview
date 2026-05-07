@@ -13,6 +13,12 @@ import java.util.concurrent.TimeUnit;
 
 @Configuration
 @EnableCaching
+@org.springframework.transaction.annotation.EnableTransactionManagement(
+        // Lower the transaction interceptor's order so our TenantFilterAspect
+        // (LOWEST_PRECEDENCE) runs inside the active transaction. Hibernate
+        // filters are enabled on the session bound to the current tx, so the
+        // aspect must execute after @Transactional has opened it.
+        order = org.springframework.core.Ordered.LOWEST_PRECEDENCE - 100)
 public class CacheConfig {
 
     @Bean
