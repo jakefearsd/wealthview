@@ -41,6 +41,12 @@ would explode Prometheus' index and leak PII through scrape output.
 | Meter (Micrometer name)       | Type      | Tags                       | Emitted by                           |
 | ----------------------------- | --------- | -------------------------- | ------------------------------------ |
 | `wealthview.auth.login`       | Counter   | `result`, `reason`         | `AuthService.login`                  |
+| `wealthview.auth.refresh`     | Counter   | `result`, `reason`         | `AuthService.refresh`                |
+| `wealthview.auth.logout`      | Counter   | (none)                     | `AuthService.logout`                 |
+| `wealthview.auth.registration`| Counter   | `result`, `reason`         | `AuthService.register`               |
+| `wealthview.scenarios`        | Counter   | `action` (create/update/delete) | `ScenarioCrudService`           |
+| `wealthview.scheduled.runs`   | Counter   | `job`, `status` (success/failure) | scheduled jobs (price, valuation) |
+| `wealthview.scheduled.last_success_seconds` | Gauge | `job` (priceSync, propertyValuationSync) | scheduled jobs |
 | `wealthview.import.process`   | Timer     | (auto from `@Timed`)       | `ImportService.processImport`        |
 | `wealthview.import.rows`      | Counter   | `outcome`                  | `ImportService.processImport`        |
 | `wealthview.imports`          | Counter   | `format`, `status`         | `ImportService.processImport`        |
@@ -54,7 +60,8 @@ would explode Prometheus' index and leak PII through scrape output.
 | `wealthview.finnhub.quote`    | Timer + histogram | (auto)             | `FinnhubClient.getQuote`             |
 | `wealthview.finnhub.candles`  | Timer + histogram | (auto)             | `FinnhubClient.getCandles`           |
 | `wealthview.ratelimit.exceeded` | Counter | `type` (ip / user)         | `RateLimitFilter`                    |
-| `wealthview.errors`           | Counter   | (varies)                   | `GlobalExceptionHandler`             |
+| `wealthview.errors`           | Counter   | `exception`, `status`      | `GlobalExceptionHandler` (whitelist; unknowns bucket as `other`) |
+| `cache.gets` / `cache.puts` / `cache.evictions` / `cache.size` | Caffeine | `cache`, `result` (hit/miss for gets) | `CacheConfig` (5 caches) |
 
 In Prometheus output the dots become underscores and timers/histograms expand
 into `_seconds_count` / `_seconds_sum` / `_seconds_bucket` sibling series.
@@ -74,6 +81,12 @@ Spring Boot also ships rich built-ins: `http_server_requests_seconds_*`,
   key sets emit a "duplicate meter registration" warning.
 - Never tag with `tenantId`, `userId`, request bodies, account IDs,
   symbols, or anything else with cardinality above ~20.
+- For tags derived from class names or other potentially-open inputs, use a
+  closed whitelist and bucket unknowns as `other` (see
+  `GlobalExceptionHandler.KNOWN_EXCEPTIONS`).
+- For scheduled jobs, emit both a per-run counter (`wealthview.scheduled.runs{job, status}`)
+  and a "last success" gauge (`wealthview.scheduled.last_success_seconds{job}`).
+  Alert with `time() - wealthview_scheduled_last_success_seconds{job=...} > <threshold>`.
 
 ---
 
