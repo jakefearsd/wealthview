@@ -6,6 +6,8 @@ import { AuthProvider } from '../context/AuthContext';
 
 vi.mock('../api/auth', () => ({
     register: vi.fn(),
+    getCurrentUser: vi.fn().mockRejectedValue(new Error('401')),
+    logout: vi.fn().mockResolvedValue(undefined),
 }));
 
 function renderRegisterPage() {
