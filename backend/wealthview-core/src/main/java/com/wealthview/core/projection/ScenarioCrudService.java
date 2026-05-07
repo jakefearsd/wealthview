@@ -27,6 +27,7 @@ import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,7 @@ public class ScenarioCrudService {
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final IncomeSourceRepository incomeSourceRepository;
     private final GuardrailSpendingProfileRepository guardrailProfileRepository;
+    private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ScenarioCrudService(ProjectionScenarioRepository scenarioRepository,
@@ -66,7 +68,8 @@ public class ScenarioCrudService {
                                AccountService accountService,
                                ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                IncomeSourceRepository incomeSourceRepository,
-                               GuardrailSpendingProfileRepository guardrailProfileRepository) {
+                               GuardrailSpendingProfileRepository guardrailProfileRepository,
+                               MeterRegistry meterRegistry) {
         this.scenarioRepository = scenarioRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
@@ -75,6 +78,7 @@ public class ScenarioCrudService {
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.incomeSourceRepository = incomeSourceRepository;
         this.guardrailProfileRepository = guardrailProfileRepository;
+        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -101,6 +105,7 @@ public class ScenarioCrudService {
 
         saveIncomeSourceLinks(saved, tenantId, request.incomeSources());
 
+        meterRegistry.counter("wealthview.scenarios", "action", "create").increment();
         log.info("Scenario '{}' created with {} accounts for tenant {}",
                 request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
         return toScenarioResponse(saved, tenantId);
@@ -163,6 +168,7 @@ public class ScenarioCrudService {
             }
         });
 
+        meterRegistry.counter("wealthview.scenarios", "action", "update").increment();
         log.info("Scenario {} updated for tenant {}", scenarioId, tenantId);
         return toScenarioResponse(saved, tenantId);
     }
@@ -172,6 +178,7 @@ public class ScenarioCrudService {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
         scenarioRepository.delete(scenario);
+        meterRegistry.counter("wealthview.scenarios", "action", "delete").increment();
         log.info("Scenario {} deleted for tenant {}", scenarioId, tenantId);
     }
 

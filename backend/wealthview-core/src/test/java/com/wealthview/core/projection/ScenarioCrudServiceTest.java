@@ -22,11 +22,11 @@ import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -73,8 +73,8 @@ class ScenarioCrudServiceTest {
     @Mock
     private GuardrailSpendingProfileRepository guardrailProfileRepository;
 
-    @InjectMocks
     private ScenarioCrudService service;
+    private SimpleMeterRegistry meterRegistry;
 
     private UUID tenantId;
     private UUID scenarioId;
@@ -85,6 +85,10 @@ class ScenarioCrudServiceTest {
         tenantId = UUID.randomUUID();
         scenarioId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
+        meterRegistry = new SimpleMeterRegistry();
+        service = new ScenarioCrudService(scenarioRepository, tenantRepository, accountRepository,
+                spendingProfileRepository, accountService, scenarioIncomeSourceRepository,
+                incomeSourceRepository, guardrailProfileRepository, meterRegistry);
     }
 
     @Test
@@ -941,5 +945,19 @@ class ScenarioCrudServiceTest {
         var result = service.getScenario(tenantId, scenarioId);
 
         assertThat(result.incomeSources().getFirst().annualNetCashFlow()).isNull();
+    }
+
+    @Test
+    void deleteScenario_incrementsScenariosCounterWithDeleteAction() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        service.deleteScenario(tenantId, scenarioId);
+
+        var counter = meterRegistry.find("wealthview.scenarios").tag("action", "delete").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
     }
 }
