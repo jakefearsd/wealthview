@@ -1,6 +1,8 @@
 package com.wealthview.core.config;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
@@ -22,23 +24,26 @@ import java.util.concurrent.TimeUnit;
 public class CacheConfig {
 
     @Bean
-    public CacheManager cacheManager() {
+    public CacheManager cacheManager(MeterRegistry meterRegistry) {
         var manager = new SimpleCacheManager();
         manager.setCaches(List.of(
-                buildCache("accountBalances", 5, TimeUnit.MINUTES, 200),
-                buildCache("latestPrices", 10, TimeUnit.MINUTES, 500),
-                buildCache("exchangeRates", 30, TimeUnit.MINUTES, 200),
-                buildCache("taxBrackets", 24, TimeUnit.HOURS, 10),
-                buildCache("standardDeductions", 24, TimeUnit.HOURS, 10)
+                buildCache("accountBalances", 5, TimeUnit.MINUTES, 200, meterRegistry),
+                buildCache("latestPrices", 10, TimeUnit.MINUTES, 500, meterRegistry),
+                buildCache("exchangeRates", 30, TimeUnit.MINUTES, 200, meterRegistry),
+                buildCache("taxBrackets", 24, TimeUnit.HOURS, 10, meterRegistry),
+                buildCache("standardDeductions", 24, TimeUnit.HOURS, 10, meterRegistry)
         ));
         return manager;
     }
 
-    private CaffeineCache buildCache(String name, long duration, TimeUnit unit, int maxSize) {
-        return new CaffeineCache(name, Caffeine.newBuilder()
+    private CaffeineCache buildCache(String name, long duration, TimeUnit unit, int maxSize,
+                                      MeterRegistry meterRegistry) {
+        var caffeine = Caffeine.newBuilder()
                 .expireAfterWrite(duration, unit)
                 .maximumSize(maxSize)
                 .recordStats()
-                .build());
+                .build();
+        CaffeineCacheMetrics.monitor(meterRegistry, caffeine, name);
+        return new CaffeineCache(name, caffeine);
     }
 }
