@@ -19,6 +19,7 @@ A self-hosted, multi-tenant personal finance application for tracking investment
 **Prerequisites:** Docker with the Compose plugin (`docker compose`), port 80 available.
 
 ```bash
+cp .env.example .env                      # Fill in DB_PASSWORD, JWT_SECRET, SUPER_ADMIN_PASSWORD
 docker compose up --build -d              # Build and start
 ```
 
@@ -30,6 +31,15 @@ docker compose up --build -d              # Build and start
 docker compose down                       # Stop (preserve data)
 docker compose down -v                    # Stop and delete database
 ```
+
+### Developer setup (one-time)
+
+```bash
+./scripts/install-hooks.sh                # gitleaks pre-commit hook
+direnv allow                              # auto-load .env on cd (install direnv first)
+```
+
+`.env` is gitignored. Real secrets live there and only there. See [Secrets & Configuration](#secrets--configuration) below.
 
 ## Documentation
 
@@ -97,6 +107,27 @@ docker compose down -v                    # Stop and delete database
 | Build     | Maven multi-module (backend), npm (frontend)              |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest         |
 | Deploy    | Docker Compose (multi-stage build)                        |
+
+## Secrets & Configuration
+
+WealthView reads every credential from environment variables. There are no real secrets in any committed file.
+
+| File | Purpose | Tracked? |
+|------|---------|----------|
+| `.env.example` | Schema and `CHANGE_ME` placeholders | ✅ committed |
+| `.env` | Your actual secrets | ❌ gitignored |
+| `.envrc` | direnv hook to auto-load `.env` | ✅ committed |
+| `application-dev.yml` / `application-it.yml` | Sentinel fallbacks (`LOCAL_DEV_*`, `INTEGRATION_TEST_*`) so `mvn test` works without env | ✅ committed |
+| `application.yml` / `application-prod.yml` / `application-docker.yml` | `${VAR}` references with no fallbacks; fail-loud at startup | ✅ committed |
+
+**Layered guardrails against re-introducing secrets:**
+
+1. **Pre-commit hook** (`scripts/install-hooks.sh`) — gitleaks scans the staged diff and blocks commits containing secret-shaped values.
+2. **CI job** (`.github/workflows/secret-scan.yml`) — gitleaks scans full history on every push and PR; failure blocks the build.
+3. **Allowlist** (`.gitleaks.toml`) — explicitly permits the documented sentinel values; everything else is suspect.
+4. **Production startup validator** (`ProductionConfigValidator`) — refuses to boot the prod profile if any sentinel default leaked into a real deployment.
+
+**The rule:** never put a real or real-looking value into any committed file. Always reference `${VAR}` and add the variable to `.env.example`.
 
 ## License
 

@@ -39,6 +39,7 @@ Thumbs.db
 *.pem
 *.key
 .keys
+.direnv/
 
 # Docker
 docker-compose.override.yml

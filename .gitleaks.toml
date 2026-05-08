@@ -33,11 +33,14 @@ regexes = [
 ]
 
 paths = [
-    # Documentation always cites example values
+    # Documentation always cites example values and historical context
     '''(?i)\.env\.example$''',
     '''(?i)readme[^/]*$''',
     '''docs/.*\.md$''',
     '''CHANGELOG\.md$''',
+    '''CLAUDE\.md$''',
+    '''AGENTS\.md$''',
+    '''GEMINI\.md$''',
     '''.*\.example\..*''',
 
     # Test fixtures

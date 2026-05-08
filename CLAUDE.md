@@ -404,6 +404,46 @@ Before committing, verify:
 
 ---
 
+## Secrets & Pseudo-Secrets
+
+**Never put a real or real-looking value into any committed file.** This rule is binding for every commit, every PR, every refactor. The pre-commit hook (`gitleaks`) and CI scan are the safety net; this rule is the design.
+
+### Where credentials live
+
+| Layer | File | Tracked? |
+|---|---|---|
+| Schema + placeholders | `.env.example` | ✅ committed, contains `CHANGE_ME` only |
+| Real local values | `.env` | ❌ gitignored |
+| Auto-load on `cd` | `.envrc` (direnv) | ✅ committed (one line: `dotenv_if_exists .env`) |
+| Dev/IT fallbacks (so `mvn test` works without env) | `application-dev.yml`, `application-it.yml` | ✅ committed, but only `LOCAL_DEV_*` / `INTEGRATION_TEST_*` sentinels |
+| Prod / docker config | `application.yml`, `application-prod.yml`, `application-docker.yml` | ✅ committed, `${VAR}` references with NO fallbacks (fail-loud) |
+
+### The rule, operationally
+
+When you add a new configurable value:
+1. Reference it in YAML as `${MY_VAR}` (prod) or `${MY_VAR:OBVIOUSLY_FAKE_SENTINEL}` (dev/IT only).
+2. Add `MY_VAR=CHANGE_ME` (or appropriate placeholder) to `.env.example`.
+3. If it's a denylist of bad values (like `ProductionConfigValidator`'s known-default JWT secrets), add the file to the allowlist in `.gitleaks.toml` — don't refactor the literals away.
+4. Never `git add -f` to bypass `.gitignore`. If you think you need to, you don't.
+
+### Sentinel naming
+
+Dev / IT fallback strings must be obviously non-secret by inspection:
+- Prefix `LOCAL_DEV_` for dev profile fallbacks.
+- Prefix `INTEGRATION_TEST_` for IT-only fixtures.
+- Length must satisfy the consumer (HS256 keys ≥ 32 chars).
+- Never use values that look plausible as a real password or API key.
+
+### Pseudo-secrets (config that's not secret but shouldn't leak)
+
+Things like a personal Finnhub API key on the free tier, or a Zillow scraper hint. Same rule applies: env-driven, gitignored `.env`, never in YAML.
+
+### What the scanner enforces
+
+`.gitleaks.toml` extends the v8 default ruleset and adds a hard-block rule for the four historical strings scrubbed from history (`wv_dev_pass`, `DevPass123!`, `dev-secret-key-min-32-chars-long-for-hs256`, `integration-test-secret-key-must-be-at-least-32-characters-long`). Reintroducing any of those will fail both the local hook and CI.
+
+---
+
 ## Common Pitfalls — Do NOT Do These
 
 1. **Do not use H2 for tests.** Always use Testcontainers with PostgreSQL.
@@ -416,3 +456,4 @@ Before committing, verify:
 8. **Do not use `@Autowired` on fields.** Use constructor injection only.
 9. **Do not push to GitHub without explicit user confirmation.**
 10. **Do not assume test failures are pre-existing.** When you encounter a failing test — unit, integration, or end-to-end — investigate and fix it immediately. Never skip a failing test with the rationale that "it was already broken." Every red test is your responsibility to resolve before moving on.
+11. **Do not put a real or real-looking secret in any committed file.** Reference `${VAR}` in YAML and add to `.env.example`. Dev/IT fallbacks must be `LOCAL_DEV_*` or `INTEGRATION_TEST_*` sentinels. See the "Secrets & Pseudo-Secrets" section above.
