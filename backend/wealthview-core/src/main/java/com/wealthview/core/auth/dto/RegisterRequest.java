@@ -11,4 +11,13 @@ public record RegisterRequest(
         String password,
         @NotBlank String inviteCode
 ) {
+    /**
+     * Override the record's auto-generated toString so an accidental
+     * {@code log.info("{}", request)} cannot dump the plaintext password
+     * or the single-use invite code.
+     */
+    @Override
+    public String toString() {
+        return "RegisterRequest[email=" + email + ", password=***, inviteCode=***]";
+    }
 }
