@@ -1,6 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
 
+    <!--
+        Logback configuration for WealthView.
+
+        Profiles:
+          - dev / default       human-readable pattern, includes MDC fields, INFO root
+          - it                  minimal WARN logging for the integration-test runner
+          - docker / prod       single-line JSON via LogstashEncoder, async wrapper
+
+        The dev pattern shows the request-scoped MDC keys populated by
+        JwtAuthenticationFilter (requestId, tenantId, userId) plus the
+        per-job operation key set by scheduled jobs. JSON output for
+        prod / docker is intended to be consumed by a log shipper
+        (Promtail, Vector, Filebeat, Datadog Agent, etc.) — every line is
+        a complete JSON object with @timestamp / level / message /
+        logger_name / thread_name / mdc / stack_trace.
+    -->
+
     <!-- Dev profile: human-readable with MDC fields -->
     <springProfile name="dev | default">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -13,16 +30,44 @@
         </root>
     </springProfile>
 
-    <!-- Docker profile: structured JSON for production -->
-    <springProfile name="docker">
+    <!--
+        Docker / prod profile: structured JSON via LogstashEncoder. Wrapped in
+        an AsyncAppender so application threads never block on the encoder
+        under load. queueSize is bounded; once full, neverBlock=false (the
+        default) drops TRACE/DEBUG/INFO before WARN/ERROR so signal survives.
+    -->
+    <springProfile name="docker | prod">
         <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
-            <encoder class="ch.qos.logback.classic.encoder.JsonEncoder"/>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!--
+                    Promote MDC fields into top-level JSON keys. Without this
+                    they would all be nested under "mdc": {} which is awkward
+                    to query in most log search backends.
+                -->
+                <includeMdcKeyName>requestId</includeMdcKeyName>
+                <includeMdcKeyName>tenantId</includeMdcKeyName>
+                <includeMdcKeyName>userId</includeMdcKeyName>
+                <includeMdcKeyName>operation</includeMdcKeyName>
+                <includeMdcKeyName>traceId</includeMdcKeyName>
+                <includeMdcKeyName>spanId</includeMdcKeyName>
+                <customFields>{"application":"wealthview"}</customFields>
+            </encoder>
+        </appender>
+        <appender name="ASYNC_JSON" class="ch.qos.logback.classic.AsyncAppender">
+            <appender-ref ref="JSON"/>
+            <queueSize>2048</queueSize>
+            <discardingThreshold>0</discardingThreshold>
+            <includeCallerData>false</includeCallerData>
         </appender>
         <root level="INFO">
-            <appender-ref ref="JSON"/>
+            <appender-ref ref="ASYNC_JSON"/>
         </root>
+        <!-- Prod and docker should NOT emit Spring debug noise. Tighten frameworks: -->
+        <logger name="org.springframework" level="WARN"/>
+        <logger name="org.hibernate" level="WARN"/>
     </springProfile>
 
+    <!-- Slow-query warnings come from the Hibernate session-events log. -->
     <logger name="org.hibernate.SQL_SLOW" level="WARN"/>
 
     <!-- IT profile: minimal logging at WARN -->

@@ -1,4 +1,9 @@
 spring:
+  lifecycle:
+    # Cap how long graceful shutdown waits for the SmartLifecycle phase that
+    # drains the web server before forcing termination. Matches the default
+    # 30s SIGTERM grace period most orchestrators allow.
+    timeout-per-shutdown-phase: 25s
   datasource:
     url: jdbc:postgresql://localhost:5433/wealthview
     username: wv_app
@@ -62,6 +67,11 @@ management:
 
 server:
   port: 8080
+  # Graceful shutdown: in-flight requests are allowed to complete before the
+  # JVM exits. Spring Boot's lifecycle then drains the Hikari pool and
+  # ThreadPoolTaskScheduler. Containers should send SIGTERM (Docker / k8s do
+  # this by default) rather than SIGKILL to honor this.
+  shutdown: graceful
 
 app:
   cookie:
