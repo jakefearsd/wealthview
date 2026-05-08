@@ -45,6 +45,13 @@ class PrometheusEndpointIT extends AbstractApiIntegrationTest {
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        // 403 must surface through the standard error envelope. Without a
+        // custom AccessDeniedHandler in SecurityConfig, Spring Security
+        // returns an empty body here, which clients can't parse.
+        assertThat(response.getBody())
+                .as("403 from the security filter chain should serialize the standard error envelope")
+                .contains("\"error\":\"FORBIDDEN\"")
+                .contains("\"status\":403");
     }
 
     @Test

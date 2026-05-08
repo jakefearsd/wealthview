@@ -97,6 +97,19 @@ public class SecurityConfig {
                             response.getWriter().write("""
                                     {"error":"UNAUTHORIZED","message":"Authentication required","status":401}""");
                         })
+                        // Without an explicit handler, Spring Security's default
+                        // 403 path returns an empty body (or framework HTML),
+                        // which breaks the {error,message,status} envelope used
+                        // by every other endpoint. AccessDeniedException raised
+                        // by the filter chain (e.g. role-mismatch on hasRole(...))
+                        // never reaches @RestControllerAdvice, so we have to
+                        // serialize the envelope here.
+                        .accessDeniedHandler((request, response, deniedException) -> {
+                            response.setStatus(403);
+                            response.setContentType("application/json");
+                            response.getWriter().write("""
+                                    {"error":"FORBIDDEN","message":"Access denied","status":403}""");
+                        })
                 )
                 .headers(headers -> headers
                         .contentTypeOptions(Customizer.withDefaults())
