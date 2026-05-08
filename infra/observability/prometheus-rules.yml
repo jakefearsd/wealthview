@@ -1,0 +1,206 @@
+# WealthView Prometheus alert rules.
+#
+# These are recommended defaults — Prometheus does not load them by itself.
+# Wire them into your prometheus.yml when you set up Alertmanager:
+#
+#     rule_files:
+#       - /etc/prometheus/wealthview-rules.yml
+#
+# and mount this file into the prometheus container (for example by adding
+# a volume in docker-compose.observability.yml):
+#
+#     volumes:
+#       - ./infra/observability/prometheus-rules.yml:/etc/prometheus/wealthview-rules.yml:ro
+#
+# Severities follow Grafana / Alertmanager convention:
+#   - critical: page on-call. Service is down or losing data.
+#   - warning:  notify the team channel. Investigate during business hours.
+#
+# Tune the thresholds to your traffic profile. The defaults below assume a
+# small self-hosted single-tenant deployment; production multi-tenant
+# operators will likely want lower latency thresholds and tighter error
+# budgets.
+
+groups:
+  # ─── Liveness ────────────────────────────────────────────────────────
+  - name: wealthview-liveness
+    interval: 30s
+    rules:
+      - alert: WealthViewAppDown
+        expr: up{job="wealthview-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "WealthView app is unreachable"
+          description: |
+            Prometheus has not been able to scrape /actuator/prometheus on
+            {{ $labels.instance }} for 2 minutes. The app is either down,
+            in a crash loop, or unreachable from Prometheus.
+
+  # ─── HTTP error & latency budgets ────────────────────────────────────
+  - name: wealthview-http
+    interval: 30s
+    rules:
+      - alert: WealthViewHighHttpErrorRate
+        # 5xx-share over 5 minutes. Excludes 4xx (those are user errors).
+        expr: |
+          (sum(rate(http_server_requests_seconds_count{status=~"5..", application="wealthview"}[5m]))
+           /
+           sum(rate(http_server_requests_seconds_count{application="wealthview"}[5m])))
+          > 0.01
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WealthView 5xx error rate above 1% for 10 minutes"
+          description: |
+            More than 1% of HTTP responses have been 5xx for 10 minutes.
+            Check the wealthview_errors_total counter and recent ERROR
+            logs. The GlobalExceptionHandler whitelist tags the exception
+            class name; unknowns bucket as "other".
+
+      - alert: WealthViewHttpP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum by (le, uri) (rate(http_server_requests_seconds_bucket{application="wealthview"}[5m]))
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WealthView HTTP p99 latency above 5s for 10m on {{ $labels.uri }}"
+          description: |
+            p99 latency on {{ $labels.uri }} has been above 5s for 10m.
+            Check projection / Monte Carlo timers; large MC runs can push
+            the dashboard summary endpoint past this without a real
+            regression.
+
+  # ─── JVM ─────────────────────────────────────────────────────────────
+  - name: wealthview-jvm
+    interval: 1m
+    rules:
+      - alert: WealthViewHeapPressureSustained
+        # Only the heap memory pools — avoid alerting on metaspace/CCS.
+        expr: |
+          max by (instance) (
+            jvm_memory_used_bytes{area="heap", application="wealthview"}
+            /
+            jvm_memory_max_bytes{area="heap", application="wealthview"}
+          ) > 0.85
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WealthView heap above 85% for 15m on {{ $labels.instance }}"
+          description: |
+            Heap utilisation has stayed above 85% for 15 minutes. The JVM
+            is likely close to OutOfMemoryError or a stop-the-world GC
+            spiral. Inspect jvm_gc_pause_seconds_*; consider increasing
+            -Xmx or investigating a leak via a heap dump.
+
+  # ─── Datasource ──────────────────────────────────────────────────────
+  - name: wealthview-datasource
+    interval: 30s
+    rules:
+      - alert: WealthViewHikariSaturated
+        # active / max consistently above 90% — pool starvation imminent.
+        expr: |
+          (
+            hikaricp_connections_active{application="wealthview"}
+            /
+            hikaricp_connections_max{application="wealthview"}
+          ) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Hikari pool above 90% utilisation for 5m"
+          description: |
+            The DB connection pool has been near-saturated for 5 minutes.
+            Slow queries are queueing or a long transaction is leaking.
+            Look at session.events.log.LOG_QUERIES_SLOWER_THAN_MS output
+            and hikaricp_connections_pending.
+
+      - alert: WealthViewHikariConnectionsExhausted
+        expr: hikaricp_connections_pending{application="wealthview"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Hikari has pending connection requests for 5m"
+          description: |
+            Threads are waiting for a DB connection. Either the pool is
+            sized too small, queries are hanging, or a transactional
+            boundary is leaking connections.
+
+  # ─── Scheduled jobs ──────────────────────────────────────────────────
+  - name: wealthview-scheduled
+    interval: 1m
+    rules:
+      - alert: WealthViewPriceSyncStale
+        # priceSync runs MON–FRI at 16:30 ET; if it hasn't succeeded in
+        # 96h something is broken (3-day weekend tolerance).
+        expr: |
+          time() - max by (job) (wealthview_scheduled_last_success_seconds{job="priceSync"})
+          > 96 * 3600
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Price sync hasn't succeeded in 96h"
+          description: |
+            wealthview_scheduled_last_success_seconds{job="priceSync"} is
+            stale. Check Finnhub API key / rate limits and inspect the
+            most recent wealthview_scheduled_runs{job="priceSync",status="failure"}
+            increment.
+
+      - alert: WealthViewPropertyValuationSyncStale
+        # propertyValuationSync is weekly (Sun 06:00). 14 days = two
+        # missed runs.
+        expr: |
+          time() - max by (job) (wealthview_scheduled_last_success_seconds{job="propertyValuationSync"})
+          > 14 * 86400
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Property valuation sync hasn't succeeded in 14 days"
+          description: |
+            wealthview_scheduled_last_success_seconds{job="propertyValuationSync"}
+            is stale. Zillow may be blocking, or the cron may not be firing.
+
+  # ─── Auth / abuse ────────────────────────────────────────────────────
+  - name: wealthview-auth
+    interval: 30s
+    rules:
+      - alert: WealthViewLoginFailureSpike
+        # 10x baseline of failed logins is suspicious — credential stuffing
+        # or a broken integration. The rate-limit filter caps it but the
+        # signal still warrants an alert.
+        expr: |
+          sum(rate(wealthview_auth_login_total{result="failure", application="wealthview"}[5m]))
+          > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Login failure rate above 5/sec for 5m"
+          description: |
+            Sustained failed-login rate suggests credential-stuffing or
+            an integration outage. Cross-reference wealthview_ratelimit_exceeded
+            and recent JwtAuthenticationFilter / AuthService warnings.
+
+      - alert: WealthViewRateLimitSustained
+        expr: |
+          sum(rate(wealthview_ratelimit_exceeded_total{application="wealthview"}[5m]))
+          > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate-limit rejections sustained above 1/sec for 10m"
+          description: |
+            More than 60 rate-limit rejections per minute for 10 minutes
+            running. Either a misbehaving client / integration or an
+            attempted abuse. Inspect ip / user labels in the source logs.

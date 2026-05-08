@@ -196,6 +196,16 @@ docker compose -f docker-compose.prod.yml \
 Use `docker compose ... down -v` to also drop the `prometheus_data` and
 `grafana_data` volumes if you want a clean slate.
 
+### Alerting rules
+
+`infra/observability/prometheus-rules.yml` ships a recommended starter set
+of alerts (app-down, 5xx-rate, p99-latency, heap-pressure, Hikari
+saturation, scheduled-job staleness, login-failure spike, sustained
+rate-limit rejections). They are not loaded by Prometheus by default —
+mount the file into the prometheus container and add it under
+`rule_files:` in `prometheus.yml` once you wire up Alertmanager. The
+file's preamble has the exact mount-and-include incantation.
+
 ### Production deployment notes
 
 - The stack as shipped exposes Prometheus and Grafana on the host network.
