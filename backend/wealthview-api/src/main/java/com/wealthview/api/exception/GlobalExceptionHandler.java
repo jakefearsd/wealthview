@@ -51,7 +51,8 @@ public class GlobalExceptionHandler {
             "HttpMessageNotReadableException",
             "MaxUploadSizeExceededException",
             "DataIntegrityViolationException",
-            "UncheckedIOException"
+            "UncheckedIOException",
+            "DateTimeParseException"
     );
 
     public GlobalExceptionHandler(MeterRegistry meterRegistry) {
@@ -203,6 +204,25 @@ public class GlobalExceptionHandler {
      * 500. ImportBoundaryFuzzIT relies on this to keep random-byte / random-row
      * uploads in the 4xx band.
      */
+    /**
+     * Surfaces {@link java.time.format.DateTimeParseException} as 400.
+     * Endpoints that take date / YearMonth / OffsetDateTime as a query
+     * parameter parse it via {@code YearMonth.parse(...)} (etc.) inside the
+     * controller method. A bad input like {@code ?from=2024-00} or
+     * {@code ?from=abc} otherwise reaches the catch-all 500. Surfaced by
+     * DateValidationFuzzIT.
+     */
+    @ExceptionHandler(java.time.format.DateTimeParseException.class)
+    public ResponseEntity<ErrorResponse> handleDateTimeParse(
+            java.time.format.DateTimeParseException ex, HttpServletRequest request) {
+        var msg = "Invalid date or time format: " + ex.getParsedString();
+        log.warn("{} {} - Date/time parse failure: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(msg));
+        recordError(ex, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST", msg, 400));
+    }
+
     @ExceptionHandler(java.io.UncheckedIOException.class)
     public ResponseEntity<ErrorResponse> handleUncheckedIo(
             java.io.UncheckedIOException ex, HttpServletRequest request) {
