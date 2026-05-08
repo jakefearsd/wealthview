@@ -53,7 +53,9 @@ would explode Prometheus' index and leak PII through scrape output.
 | `wealthview.dashboard.summary`| Timer     | (auto from `@Timed`)       | `DashboardService`                   |
 | `wealthview.dashboard.portfolio.history` | Timer | (auto)                | `CombinedPortfolioHistoryService`    |
 | `wealthview.pricefeed.sync`   | Timer     | (auto)                     | `PriceSyncService`                   |
+| `wealthview.pricefeed.symbols`| Counter   | `status` (success/failure) | `PriceSyncService` (per-symbol outcome) |
 | `wealthview.property.valuation.sync` | Timer | (auto)                  | `PropertyValuationSyncService`       |
+| `wealthview.property.valuations` | Counter | `status` (success/skipped) | `PropertyValuationSyncService` (per-property outcome) |
 | `wealthview.projection.run`   | Timer     | (auto)                     | `DeterministicProjectionEngine.run`  |
 | `wealthview.projection.runs`  | Counter   | `type` (deterministic / monte_carlo) | both projection paths     |
 | `wealthview.mc.optimize`      | Timer + histogram | (auto)             | `MonteCarloSpendingOptimizer.optimize` |
