@@ -56,6 +56,17 @@
             <artifactId>httpclient5</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            jqwik — property-based test framework, used by *FuzzIT classes for
+            HTTP-boundary security/robustness coverage. Spring Boot's BOM does
+            not manage jqwik, so the version is pinned here directly.
+        -->
+        <dependency>
+            <groupId>net.jqwik</groupId>
+            <artifactId>jqwik</artifactId>
+            <version>1.9.3</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
