@@ -1,7 +1,6 @@
 package com.wealthview.api.exception;
 
 import com.wealthview.api.dto.ErrorResponse;
-import com.wealthview.api.logging.LogSanitizer;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;

@@ -5,7 +5,6 @@ import com.webcohesion.ofx4j.domain.data.ResponseEnvelope;
 import com.webcohesion.ofx4j.domain.data.banking.BankStatementResponse;
 import com.webcohesion.ofx4j.domain.data.banking.BankStatementResponseTransaction;
 import com.webcohesion.ofx4j.domain.data.banking.BankingResponseMessageSet;
-import com.webcohesion.ofx4j.domain.data.common.Transaction;
 import com.webcohesion.ofx4j.domain.data.investment.statements.InvestmentStatementResponse;
 import com.webcohesion.ofx4j.domain.data.investment.statements.InvestmentStatementResponseMessageSet;
 import com.webcohesion.ofx4j.domain.data.investment.statements.InvestmentStatementResponseTransaction;
