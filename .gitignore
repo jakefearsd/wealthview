@@ -63,6 +63,7 @@ backups/
 
 # Test artifacts
 frontend/test-results/
+.jqwik-database
 
 # Infrastructure (local-only overrides; infra/backup/ is committed)
 infra/local/
