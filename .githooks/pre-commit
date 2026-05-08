@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Pre-commit guardrail: scan the staged diff for secrets before allowing the commit.
+# Activate via:  git config core.hooksPath .githooks
+# Or run once:   ./scripts/install-hooks.sh
+
+set -euo pipefail
+
+if ! command -v gitleaks >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+ERROR: gitleaks is not installed.
+
+WealthView's pre-commit hook scans the staged diff for secrets before
+allowing the commit. Install gitleaks before committing:
+
+  Linux/macOS:
+    curl -fsSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_$(uname | tr A-Z a-z)_x64.tar.gz \
+      | tar -xz -C /tmp gitleaks && sudo install -m755 /tmp/gitleaks /usr/local/bin/
+
+  Homebrew:
+    brew install gitleaks
+
+  Then re-run your commit.
+EOF
+    exit 1
+fi
+
+gitleaks protect \
+    --staged \
+    --redact \
+    --config "$(git rev-parse --show-toplevel)/.gitleaks.toml" \
+    --no-banner \
+    || {
+        cat >&2 <<'EOF'
+
+❌ Commit BLOCKED by gitleaks: a value matching a secret pattern was
+   found in your staged changes (redacted above).
+
+   If this is a false positive (e.g. a new test sentinel value), add it
+   to the allowlist in .gitleaks.toml and re-stage.
+
+   If this is a REAL secret, remove it from the file. Do NOT commit.
+   Move it to a gitignored .env / .env.local file and reference it via
+   ${ENV_VAR} in YAML.
+
+   To run the same scan manually:
+     gitleaks protect --staged --redact --config .gitleaks.toml
+
+EOF
+        exit 1
+    }

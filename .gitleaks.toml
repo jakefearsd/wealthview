@@ -1,0 +1,69 @@
+title = "WealthView gitleaks config"
+
+# Inherit gitleaks v8 default ruleset so we get all upstream detectors
+# (AWS keys, GitHub PATs, generic high-entropy strings, etc.).
+[extend]
+useDefault = true
+
+# Single global allowlist. v8.21 has merge quirks with `[[allowlists]]`
+# (plural) when combined with `extend.useDefault`; `[allowlist]` (singular)
+# is the documented form and reliably allowlists across both default and
+# custom rules.
+[allowlist]
+description = "WealthView allowlist: dev sentinels, framework class names, denylist file, docs, test fixtures"
+
+regexes = [
+    # Dev / IT sentinel fallback values introduced post-rotation
+    '''LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV''',
+    '''LOCAL_DEV_HS256_SIGNING_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_DEVELOPMENT''',
+    '''INTEGRATION_TEST_HS256_SIGNING_KEY_FIXED_VALUE_FOR_TEST_DETERMINISM_ONLY''',
+
+    # Spring Security framework class names; not credentials
+    '''UsernamePasswordAuthenticationToken''',
+    '''BCryptPasswordEncoder''',
+    '''\bPasswordEncoder\b''',
+
+    # ProductionConfigValidator's denylist sentinel literals — the file's
+    # whole job is to reject these strings in prod, not to use them.
+    '''default-secret-key-must-be-at-least-32-characters-long''',
+    '''production-secret-key-must-be-at-least-32-characters''',
+
+    # Synthetic test emails / role strings used in unit fixtures
+    '''@(?:example|test|x)\.(?:com|org)''',
+]
+
+paths = [
+    # Documentation always cites example values
+    '''(?i)\.env\.example$''',
+    '''(?i)readme[^/]*$''',
+    '''docs/.*\.md$''',
+    '''CHANGELOG\.md$''',
+    '''.*\.example\..*''',
+
+    # Test fixtures
+    '''.*src/test/.*''',
+    '''.*Test\.java$''',
+    '''.*IT\.java$''',
+    '''.*\.test\.[tj]sx?$''',
+
+    # ProductionConfigValidator denylist file
+    '''ProductionConfigValidator\.java''',
+    '''ProductionConfigValidatorTest\.java''',
+
+    # Local-only directories that must never be scanned
+    '''^\.worktrees/''',
+    '''^\.claude/''',
+    '''^node_modules/''',
+    '''^backend/.*/target/''',
+    '''^frontend/dist/''',
+    '''^backups/''',
+]
+
+# Hard-block reintroduction of the four scrubbed historical strings.
+# This rule has its own narrow allowlist so docs/readme/changelog can
+# discuss the cleanup (those paths are matched in the global allowlist).
+[[rules]]
+id = "wv-banned-historical-strings"
+description = "Hard-block reintroduction of the four scrubbed historical strings"
+regex = '''(wv_dev_pass|DevPass123!|dev-secret-key-min-32-chars-long-for-hs256|integration-test-secret-key-must-be-at-least-32-characters-long)'''
+tags = ["wealthview", "historical-leak"]
