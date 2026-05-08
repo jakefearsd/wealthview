@@ -52,7 +52,8 @@ public class AccountController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
         var response = accountService.list(
-                principal.tenantId(), PageRequest.of(page, PageRequests.clampSize(size)));
+                principal.tenantId(),
+                PageRequest.of(PageRequests.clampPage(page), PageRequests.clampSize(size)));
         return ResponseEntity.ok(response);
     }
 

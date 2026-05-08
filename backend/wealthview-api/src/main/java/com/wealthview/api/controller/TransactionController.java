@@ -49,7 +49,8 @@ public class TransactionController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
             @RequestParam(required = false) String symbol) {
-        var pageable = PageRequest.of(page, PageRequests.clampSize(size));
+        var pageable = PageRequest.of(
+                PageRequests.clampPage(page), PageRequests.clampSize(size));
         var response = symbol != null
                 ? transactionService.listByAccountAndSymbol(principal.tenantId(), accountId, symbol, pageable)
                 : transactionService.listByAccount(principal.tenantId(), accountId, pageable);

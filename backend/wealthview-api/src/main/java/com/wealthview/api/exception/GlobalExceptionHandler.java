@@ -17,6 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import static com.wealthview.api.logging.LogSanitizer.sanitize;
@@ -45,6 +46,7 @@ public class GlobalExceptionHandler {
             "IllegalStateException",
             "IllegalArgumentException",
             "MethodArgumentNotValidException",
+            "MethodArgumentTypeMismatchException",
             "HttpMessageNotReadableException",
             "MaxUploadSizeExceededException"
     );
@@ -141,6 +143,29 @@ public class GlobalExceptionHandler {
                 .orElse("Validation failed");
 
         log.warn("{} {} - Validation failed: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(message));
+        recordError(ex, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST", message, 400));
+    }
+
+    /**
+     * Triggered when a query parameter cannot be coerced into the controller
+     * argument type — e.g. {@code ?size=abc} bound to {@code int size}, or
+     * {@code ?id=not-a-uuid} bound to {@code UUID id}. Without this handler,
+     * Spring's default behavior is to surface the conversion failure as a
+     * 500 (since {@code MethodArgumentTypeMismatchException} is not a built-in
+     * 4xx) — see fuzz coverage in PaginationFuzzIT and the matching commit
+     * that introduced this handler.
+     */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ErrorResponse> handleTypeMismatch(
+            MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        var paramName = ex.getName();
+        var requiredType = ex.getRequiredType();
+        var typeName = requiredType != null ? requiredType.getSimpleName() : "value";
+        var message = "Parameter '" + paramName + "' must be a valid " + typeName;
+        log.warn("{} {} - Type mismatch: {}",
                 sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(message));
         recordError(ex, HttpStatus.BAD_REQUEST);
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

@@ -30,7 +30,8 @@ public class AuditLogController {
             @RequestParam(defaultValue = "50") int size,
             @RequestParam(name = "entity_type", required = false) String entityType) {
         var response = auditLogService.getAuditLogs(
-                principal.tenantId(), entityType, PageRequest.of(page, PageRequests.clampSize(size)));
+                principal.tenantId(), entityType,
+                PageRequest.of(PageRequests.clampPage(page), PageRequests.clampSize(size)));
         return ResponseEntity.ok(response);
     }
 }
