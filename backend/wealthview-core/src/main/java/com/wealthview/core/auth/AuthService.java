@@ -212,7 +212,7 @@ public class AuthService {
         } catch (ObjectOptimisticLockingFailureException e) {
             log.warn("Token refresh lost race for user {}: {}", userId, e.getMessage());
             meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "race_lost").increment();
-            throw new BadCredentialsException("Refresh token has been revoked");
+            throw new BadCredentialsException("Refresh token has been revoked", e);
         }
 
         meterRegistry.counter("wealthview.auth.refresh", "result", "success", "reason", "ok").increment();
