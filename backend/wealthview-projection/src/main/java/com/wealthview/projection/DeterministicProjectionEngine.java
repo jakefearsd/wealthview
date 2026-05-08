@@ -819,7 +819,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             if (prop.loanAmount() != null && prop.annualInterestRate() != null
                     && prop.loanTermMonths() > 0 && prop.loanStartDate() != null) {
                 // Amortize from the start of the projection to projection year
-                java.time.LocalDate asOf = prop.loanStartDate()
+                LocalDate asOf = prop.loanStartDate()
                         .plusYears(yearsElapsed)
                         .withDayOfYear(1);
                 mortgageBalance = com.wealthview.core.property.AmortizationCalculator

@@ -50,7 +50,7 @@ public class PropertyValuationSyncService {
     @Scheduled(cron = "${app.zillow.sync-cron:0 0 6 * * SUN}")
     public void syncAll() {
         MDC.put("operation", "propertyValuationSync");
-        MDC.put("requestId", java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        MDC.put("requestId", UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         boolean failed = false;
         try {
             long startTime = System.currentTimeMillis();

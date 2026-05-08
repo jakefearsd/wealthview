@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class PriceCsvParser {
 
@@ -50,7 +51,7 @@ public class PriceCsvParser {
         return new PriceCsvParseResult(new ArrayList<>(rowsByKey.values()), errors);
     }
 
-    private void parseLine(String line, int lineNumber, LinkedHashMap<String, PriceRow> rowsByKey,
+    private void parseLine(String line, int lineNumber, Map<String, PriceRow> rowsByKey,
                            List<String> errors) {
         var parts = line.split(",", -1);
         if (parts.length < 3) {

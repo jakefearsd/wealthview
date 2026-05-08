@@ -261,7 +261,7 @@ public class PropertyService {
                     : BigDecimal.ZERO;
             var remainder = alloc.allocation().subtract(bonusAmount);
             var annualSL = remainder.compareTo(BigDecimal.ZERO) > 0
-                    ? remainder.divide(lifeYears, 4, java.math.RoundingMode.HALF_UP)
+                    ? remainder.divide(lifeYears, 4, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
             int slYears = remainder.compareTo(BigDecimal.ZERO) > 0
                     ? lifeYears.intValue() + 1 // includes partial first/last year

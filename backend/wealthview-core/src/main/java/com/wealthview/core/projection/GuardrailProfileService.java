@@ -241,9 +241,9 @@ public class GuardrailProfileService {
 
     public static String computeScenarioHash(ProjectionScenarioEntity scenario) {
         var sb = new StringBuilder();
-        sb.append(scenario.getRetirementDate());
-        sb.append('|').append(scenario.getEndAge());
-        sb.append('|').append(scenario.getInflationRate());
+        sb.append(scenario.getRetirementDate())
+                .append('|').append(scenario.getEndAge())
+                .append('|').append(scenario.getInflationRate());
 
         // Only birth_year from paramsJson affects guardrail optimization
         if (scenario.getParamsJson() != null) {
@@ -258,10 +258,10 @@ public class GuardrailProfileService {
         }
 
         for (var acct : scenario.getAccounts()) {
-            sb.append('|').append(acct.getAccountType());
-            sb.append(':').append(acct.getInitialBalance());
-            sb.append(':').append(acct.getAnnualContribution());
-            sb.append(':').append(acct.getExpectedReturn());
+            sb.append('|').append(acct.getAccountType())
+                    .append(':').append(acct.getInitialBalance())
+                    .append(':').append(acct.getAnnualContribution())
+                    .append(':').append(acct.getExpectedReturn());
         }
 
         try {
