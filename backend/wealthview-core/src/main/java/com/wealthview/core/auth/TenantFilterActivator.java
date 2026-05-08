@@ -99,7 +99,7 @@ public class TenantFilterActivator {
             session.enableFilter(FILTER_NAME).setParameter(PARAM_NAME, tenantId);
             return true;
         } catch (RuntimeException ex) {
-            log.warn("Could not enable tenantFilter for tenant {}: {}", tenantId, ex.toString());
+            log.warn("Could not enable tenantFilter for tenant {}", tenantId, ex);
             return false;
         }
     }

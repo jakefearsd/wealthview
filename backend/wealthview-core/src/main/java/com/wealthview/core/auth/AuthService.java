@@ -210,7 +210,12 @@ public class AuthService {
         try {
             userRepository.save(user);
         } catch (ObjectOptimisticLockingFailureException e) {
-            log.warn("Token refresh lost race for user {}: {}", userId, e.getMessage());
+            // Concurrent refresh from the same client: another worker bumped
+            // the token generation first. We treat that as token-revoked and
+            // tell the client to log in again. Log without the stack — this
+            // is a known, recoverable race, not a bug.
+            log.warn("Token refresh lost race for user {} (concurrent refresh): {}",
+                    userId, e.getMessage());
             meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "race_lost").increment();
             throw new BadCredentialsException("Refresh token has been revoked", e);
         }

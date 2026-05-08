@@ -109,7 +109,7 @@ public class SpendingProfileService {
         try {
             return objectMapper.writeValueAsString(tiers);
         } catch (JsonProcessingException e) {
-            log.warn("Failed to serialize spending tiers: {}", e.getMessage());
+            log.warn("Failed to serialize spending tiers", e);
             return "[]";
         }
     }

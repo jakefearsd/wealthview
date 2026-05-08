@@ -32,7 +32,7 @@ public record SpendingProfileResponse(
                         new TypeReference<>() {});
             }
         } catch (JsonProcessingException e) {
-            log.warn("Failed to parse spending tiers JSON: {}", e.getMessage());
+            log.warn("Failed to parse spending tiers JSON for profile {}", entity.getId(), e);
         }
 
         return new SpendingProfileResponse(

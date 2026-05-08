@@ -128,7 +128,11 @@ public final class JwtTokenProvider {
             log.warn("JWT token expired");
             return false;
         } catch (JwtException | IllegalArgumentException e) {
-            log.warn("JWT token invalid: {}", e.getMessage());
+            // Don't log the stack trace here — these are routine "user sent
+            // a bad/expired/garbage cookie" cases, but include the cause
+            // class so unusual JWT library failures (e.g. SignatureException
+            // vs MalformedJwtException) are still distinguishable.
+            log.warn("JWT token invalid: {} ({})", e.getMessage(), e.getClass().getSimpleName());
             return false;
         }
     }
