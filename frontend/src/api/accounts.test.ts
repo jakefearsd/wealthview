@@ -34,16 +34,16 @@ const ACCOUNT: Account = {
     type: 'taxable',
     institution: 'Vanguard',
     currency: 'USD',
-    cash_balance: 1000,
-    holdings: [],
-} as unknown as Account;
+    balance: 1000,
+    created_at: '2024-01-01T00:00:00Z',
+};
 
 const REQUEST: AccountRequest = {
     name: 'Brokerage',
     type: 'taxable',
     institution: 'Vanguard',
     currency: 'USD',
-} as unknown as AccountRequest;
+};
 
 describe('api/accounts', () => {
     beforeEach(() => {
@@ -58,9 +58,8 @@ describe('api/accounts', () => {
             data: [ACCOUNT],
             page: 1,
             size: 50,
-            total_elements: 1,
-            total_pages: 1,
-        } as unknown as PageResponse<Account>;
+            total: 1,
+        };
         mocks.get.mockResolvedValue({ data: page });
 
         const result = await listAccounts(1, 50);
@@ -71,7 +70,7 @@ describe('api/accounts', () => {
 
     it('listAccounts uses the documented defaults when page/size are omitted', async () => {
         mocks.get.mockResolvedValue({
-            data: { data: [], page: 0, size: 25, total_elements: 0, total_pages: 0 },
+            data: { data: [], page: 0, size: 25, total: 0 },
         });
 
         await listAccounts();
@@ -115,7 +114,14 @@ describe('api/accounts', () => {
     });
 
     it('getTheoreticalHistory passes the months query param (default 24)', async () => {
-        const history = { points: [] } as unknown as PortfolioHistory;
+        const history: PortfolioHistory = {
+            account_id: 'a1',
+            data_points: [],
+            symbols: [],
+            weeks: 0,
+            has_money_market_holdings: false,
+            money_market_total: null,
+        };
         mocks.get.mockResolvedValue({ data: history });
 
         const result = await getTheoreticalHistory('a1');
@@ -127,7 +133,7 @@ describe('api/accounts', () => {
     });
 
     it('getTheoreticalHistory honors a custom months value', async () => {
-        mocks.get.mockResolvedValue({ data: { points: [] } });
+        mocks.get.mockResolvedValue({ data: { account_id: 'a1', data_points: [] } });
 
         await getTheoreticalHistory('a1', 60);
 

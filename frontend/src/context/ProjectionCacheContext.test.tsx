@@ -7,10 +7,12 @@ const STORAGE_KEY = 'projection_cache';
 
 function makeResult(id: string): ProjectionResult {
     return {
-        scenario: { id, name: `Scenario ${id}` },
-        years: [],
-        summary: {},
-    } as unknown as ProjectionResult;
+        scenario_id: id,
+        yearly_data: [],
+        final_balance: 1_000_000,
+        years_in_retirement: 0,
+        spending_feasibility: null,
+    };
 }
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -56,7 +58,7 @@ describe('ProjectionCacheProvider', () => {
         const { result } = renderHook(() => useProjectionCache(), { wrapper });
 
         expect(result.current.get('existing')).not.toBeNull();
-        expect(result.current.get('existing')?.scenario.id).toBe('existing');
+        expect(result.current.get('existing')?.scenario_id).toBe('existing');
     });
 
     it('falls back to an empty cache when sessionStorage is corrupt JSON', () => {
