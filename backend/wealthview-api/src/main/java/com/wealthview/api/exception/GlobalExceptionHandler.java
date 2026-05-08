@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -48,7 +49,8 @@ public class GlobalExceptionHandler {
             "MethodArgumentNotValidException",
             "MethodArgumentTypeMismatchException",
             "HttpMessageNotReadableException",
-            "MaxUploadSizeExceededException"
+            "MaxUploadSizeExceededException",
+            "DataIntegrityViolationException"
     );
 
     public GlobalExceptionHandler(MeterRegistry meterRegistry) {
@@ -182,6 +184,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("BAD_REQUEST",
                         "Invalid request body: " + ex.getMostSpecificCause().getMessage(), 400));
+    }
+
+    /**
+     * Surfaces persistence-layer rejections (column-length, numeric-precision,
+     * UTF-8-encoding, and unique-key violations) as {@code 400 BAD_REQUEST}.
+     * Without this handler PostgreSQL errors like "invalid byte sequence for
+     * encoding UTF8" (null byte in a {@code text} column) or "numeric field
+     * overflow" reach the catch-all and return 500. The original cause
+     * message is sanitized but otherwise passed through so the client knows
+     * which field was rejected. Surfaced by NumericAndStringInjectionFuzzIT.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(
+            DataIntegrityViolationException ex, HttpServletRequest request) {
+        var cause = ex.getMostSpecificCause().getMessage();
+        log.warn("{} {} - Data integrity violation: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(cause));
+        recordError(ex, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST",
+                        "Request violates a database constraint: " + cause, 400));
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
