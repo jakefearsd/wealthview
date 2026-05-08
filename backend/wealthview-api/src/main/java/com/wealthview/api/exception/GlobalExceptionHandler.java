@@ -50,7 +50,8 @@ public class GlobalExceptionHandler {
             "MethodArgumentTypeMismatchException",
             "HttpMessageNotReadableException",
             "MaxUploadSizeExceededException",
-            "DataIntegrityViolationException"
+            "DataIntegrityViolationException",
+            "UncheckedIOException"
     );
 
     public GlobalExceptionHandler(MeterRegistry meterRegistry) {
@@ -195,6 +196,25 @@ public class GlobalExceptionHandler {
      * message is sanitized but otherwise passed through so the client knows
      * which field was rejected. Surfaced by NumericAndStringInjectionFuzzIT.
      */
+    /**
+     * Surfaces commons-csv / I/O parsing failures from file uploads as 400.
+     * Without this handler an {@link java.io.UncheckedIOException} thrown by
+     * Apache Commons CSV when the upload is malformed reaches the catch-all
+     * 500. ImportBoundaryFuzzIT relies on this to keep random-byte / random-row
+     * uploads in the 4xx band.
+     */
+    @ExceptionHandler(java.io.UncheckedIOException.class)
+    public ResponseEntity<ErrorResponse> handleUncheckedIo(
+            java.io.UncheckedIOException ex, HttpServletRequest request) {
+        var msg = ex.getMessage() != null ? ex.getMessage() : "I/O error";
+        log.warn("{} {} - Unchecked I/O: {}",
+                sanitize(request.getMethod()), sanitize(request.getRequestURI()), sanitize(msg));
+        recordError(ex, HttpStatus.BAD_REQUEST);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ErrorResponse("BAD_REQUEST",
+                        "Failed to parse uploaded content: " + msg, 400));
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ErrorResponse> handleDataIntegrity(
             DataIntegrityViolationException ex, HttpServletRequest request) {
