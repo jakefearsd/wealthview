@@ -350,6 +350,14 @@ docker compose exec db psql -U wv_app wealthview   # Connect to database
 - **Credentials:** `demo@wealthview.local` / `demo123`
 - When the user asks to "start the app", "rebuild and relaunch", or "run it for testing", use `docker compose up --build -d`.
 - To stop, use `docker compose down`. Always stop existing instances before starting new ones.
+- **Local backend dev:** Run `docker compose up -d db` first — the DB is exposed on `localhost:5433` (to avoid conflicts with native PostgreSQL) so `mvn spring-boot:run` and IDE run configs connect automatically.
+
+### Dev Database Backup / Restore
+```bash
+./dev-backup.sh                                    # Dump to backups/wealthview_<timestamp>.dump
+./dev-restore.sh backups/<file>.dump                # Restore from a dump file
+./dev-restore.sh                                   # List available backups
+```
 
 ### Backend (development / tests only)
 ```bash

@@ -6,6 +6,8 @@ services:
       POSTGRES_DB: wealthview
       POSTGRES_USER: wv_app
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+    ports:
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:

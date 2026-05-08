@@ -9,16 +9,16 @@ Instructions for setting up a local development environment, building, and runni
 - Java 21+
 - Maven 3.9+
 - Node.js 20+
-- PostgreSQL 16 (local or via Docker)
-- Docker (required for integration tests via Testcontainers)
+- Docker & Docker Compose (for PostgreSQL and integration tests via Testcontainers)
 
 ## Database Setup
 
 ```bash
-docker compose up -d db
+docker compose up -d db                              # Start PostgreSQL (exposed on localhost:5432)
+docker compose exec db psql -U wv_app wealthview     # Direct psql access
 ```
 
-Or use a locally installed PostgreSQL instance with database `wealthview`, user `wv_app`, password `LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV`.
+The Docker Compose DB is exposed on `localhost:5433` (avoiding conflicts with any native PostgreSQL on 5432), so the backend connects to it automatically whether run via Docker Compose or locally (IDE / `mvn spring-boot:run`).
 
 ## Backend
 
@@ -39,6 +39,16 @@ npm run dev                               # Dev server at http://localhost:5173
 ```
 
 The Vite dev server proxies `/api` requests to the backend on port 8080.
+
+## Dev Database Backup & Restore
+
+```bash
+./dev-backup.sh                                      # Dump to backups/wealthview_<timestamp>.dump
+./dev-restore.sh backups/<file>.dump                  # Restore from a dump file
+./dev-restore.sh                                      # List available backups
+```
+
+Backups are stored in `backups/` (gitignored). Use these to save test data before destructive operations or to share a known database state.
 
 ---
 
