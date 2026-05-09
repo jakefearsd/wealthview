@@ -1,45 +1,36 @@
 /**
- * Sample React Native App
- * https://github.com/facebook/react-native
+ * WealthView Mobile (scaffold)
+ *
+ * Single-screen proof that the mobile app consumes the @wealthview/shared
+ * package end-to-end: it imports `formatCurrency` from the shared workspace
+ * and renders the formatted result.
  *
  * @format
  */
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import React from 'react';
+import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { formatCurrency } from '@wealthview/shared';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+const SAMPLE_AMOUNT = 1234567.89;
 
+export default function App(): React.JSX.Element {
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" />
+      <View style={styles.body}>
+        <Text style={styles.heading}>WealthView</Text>
+        <Text style={styles.label}>Sample formatted value</Text>
+        <Text style={styles.amount}>{formatCurrency(SAMPLE_AMOUNT)}</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1, backgroundColor: '#fafafa' },
+  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  heading: { fontSize: 28, fontWeight: '600', marginBottom: 24 },
+  label: { fontSize: 14, color: '#666' },
+  amount: { fontSize: 48, fontWeight: '700', marginTop: 8 },
 });
-
-export default App;
