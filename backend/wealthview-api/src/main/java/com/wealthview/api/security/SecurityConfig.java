@@ -17,6 +17,7 @@ import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -54,12 +55,18 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfRepo)
                         .csrfTokenRequestHandler(csrfHandler)
-                        // Login + register are the only state-changing endpoints
-                        // that legitimately have no prior session/cookie. Every
-                        // other mutating endpoint requires X-XSRF-TOKEN.
+                        // CSRF protects cookie-authenticated requests from cross-site form
+                        // submissions. Bearer tokens must be set explicitly by the app's
+                        // HTTP client; an attacker page in a victim's browser cannot trigger
+                        // that, so Bearer-authenticated requests don't need CSRF.
+                        // Spring's CSRF filter runs before JwtAuthenticationFilter, so we
+                        // re-check the Authorization header directly here rather than
+                        // relying on the filter's request attribute.
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/api/v1/auth/login", "POST"),
-                                new AntPathRequestMatcher("/api/v1/auth/register", "POST")))
+                                new AntPathRequestMatcher("/api/v1/auth/register", "POST"),
+                                new AntPathRequestMatcher("/api/v1/auth/token/**"),
+                                bearerAuthorizationHeaderMatcher()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
@@ -133,6 +140,13 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(12);
+    }
+
+    private static RequestMatcher bearerAuthorizationHeaderMatcher() {
+        return request -> {
+            var header = request.getHeader("Authorization");
+            return header != null && header.startsWith("Bearer ");
+        };
     }
 
     @Bean
