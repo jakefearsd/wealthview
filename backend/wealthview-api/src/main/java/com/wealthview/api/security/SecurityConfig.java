@@ -73,6 +73,15 @@ public class SecurityConfig {
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/v1/auth/me").authenticated()
+                        // Logout endpoints (cookie + Bearer) require an
+                        // authenticated principal: the controller method
+                        // resolves the user id from @AuthenticationPrincipal
+                        // and would NPE if the request reached the controller
+                        // unauthenticated. Without explicit authenticated()
+                        // here, the wildcard permitAll below leaks a 500.
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/auth/logout",
+                                "/api/v1/auth/token/logout").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/prices/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
