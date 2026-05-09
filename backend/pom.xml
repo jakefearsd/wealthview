@@ -77,6 +77,7 @@
         <ofx4j.version>1.39</ofx4j.version>
         <jsoup.version>1.22.2</jsoup.version>
         <caffeine.version>3.2.3</caffeine.version>
+        <samstevens-totp.version>1.7.1</samstevens-totp.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
@@ -163,6 +164,11 @@
                 <groupId>com.github.ben-manes.caffeine</groupId>
                 <artifactId>caffeine</artifactId>
                 <version>${caffeine.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.samstevens.totp</groupId>
+                <artifactId>totp</artifactId>
+                <version>${samstevens-totp.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
