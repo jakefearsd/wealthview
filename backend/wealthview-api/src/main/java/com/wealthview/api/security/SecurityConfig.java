@@ -97,6 +97,11 @@ public class SecurityConfig {
                                 "/api/v1/auth/mfa/regenerate-recovery-codes",
                                 "/api/v1/auth/mfa/status").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Mobile force-update / version-check is anonymous: the
+                        // app may not have credentials yet on launch, and the
+                        // response reveals nothing sensitive (just the public
+                        // version-policy values).
+                        .requestMatchers(HttpMethod.GET, "/api/v1/app/version-check").permitAll()
                         .requestMatchers("/api/v1/admin/prices/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/v1/prices", "/api/v1/prices/**")
