@@ -93,7 +93,7 @@ wv_compose() {
 # --- .env validation. -------------------------------------------------------
 # REQUIRED_ENV_VARS: vars that MUST be set to a non-empty, non-placeholder
 # value before the stack can run. Pre-update / first-up will refuse otherwise.
-WV_REQUIRED_ENV_VARS=(DB_PASSWORD JWT_SECRET SUPER_ADMIN_PASSWORD)
+WV_REQUIRED_ENV_VARS=(DB_PASSWORD JWT_SECRET SUPER_ADMIN_PASSWORD MFA_ENCRYPTION_KEY)
 
 # Placeholder values that should never appear in a deployed .env.
 WV_FORBIDDEN_ENV_VALUES=(CHANGE_ME)
