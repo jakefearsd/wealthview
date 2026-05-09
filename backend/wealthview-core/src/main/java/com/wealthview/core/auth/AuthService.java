@@ -67,8 +67,14 @@ public class AuthService {
 
     @Transactional
     public AuthResult login(LoginRequest request, String ipAddress) {
+        return login(request, ipAddress, "cookie");
+    }
+
+    @Transactional
+    public AuthResult login(LoginRequest request, String ipAddress, String transport) {
         if (loginAttemptService.isBlocked(request.email())) {
-            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "account_locked").increment();
+            meterRegistry.counter("wealthview.auth.login",
+                    "result", "failure", "reason", "account_locked", "transport", transport).increment();
             throw new BadCredentialsException("Account temporarily locked due to too many failed attempts");
         }
 
@@ -79,7 +85,8 @@ public class AuthService {
             passwordEncoder.matches(request.password(), DUMMY_PASSWORD_HASH);
             log.warn("Login failed: unknown email");
             loginActivityService.record(request.email(), null, false, ipAddress);
-            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "unknown_email").increment();
+            meterRegistry.counter("wealthview.auth.login",
+                    "result", "failure", "reason", "unknown_email", "transport", transport).increment();
             loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Invalid email or password");
         }
@@ -88,7 +95,8 @@ public class AuthService {
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             log.warn("Login failed: wrong password for user {}", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
-            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "wrong_password").increment();
+            meterRegistry.counter("wealthview.auth.login",
+                    "result", "failure", "reason", "wrong_password", "transport", transport).increment();
             loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Invalid email or password");
         }
@@ -96,7 +104,8 @@ public class AuthService {
         if (!user.isActive()) {
             log.warn("Login failed: user {} is disabled", user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
-            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_user").increment();
+            meterRegistry.counter("wealthview.auth.login",
+                    "result", "failure", "reason", "disabled_user", "transport", transport).increment();
             loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Account is disabled");
         }
@@ -104,7 +113,8 @@ public class AuthService {
         if (!user.getTenant().isActive()) {
             log.warn("Login failed: tenant {} disabled for user {}", user.getTenantId(), user.getId());
             loginActivityService.record(request.email(), user.getTenantId(), false, ipAddress);
-            meterRegistry.counter("wealthview.auth.login", "result", "failure", "reason", "disabled_tenant").increment();
+            meterRegistry.counter("wealthview.auth.login",
+                    "result", "failure", "reason", "disabled_tenant", "transport", transport).increment();
             loginAttemptService.recordFailure(request.email());
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
@@ -114,7 +124,8 @@ public class AuthService {
         // Always include a "reason" tag so the success and failure variants share the
         // same tag-key set; mismatched key sets on the same meter name emit a
         // "duplicate meter registration" warning from Micrometer.
-        meterRegistry.counter("wealthview.auth.login", "result", "success", "reason", "ok").increment();
+        meterRegistry.counter("wealthview.auth.login",
+                "result", "success", "reason", "ok", "transport", transport).increment();
         log.info("User {} logged in for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "LOGIN", "user",
                 user.getId(), Map.of("email", user.getEmail())));
@@ -123,6 +134,11 @@ public class AuthService {
 
     @Transactional
     public AuthResult register(RegisterRequest request) {
+        return register(request, "cookie");
+    }
+
+    @Transactional
+    public AuthResult register(RegisterRequest request, String transport) {
         if (commonPasswordChecker.isCommon(request.password())) {
             throw new IllegalArgumentException("This password is too common and easily guessed. Please choose a different password.");
         }
@@ -134,20 +150,23 @@ public class AuthService {
         var inviteCode = inviteCodeRepository.findByCode(request.inviteCode())
                 .orElseThrow(() -> {
                     log.warn("Registration failed: invalid invite code");
-                    meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
+                    meterRegistry.counter("wealthview.auth.registration",
+                            "result", "failure", "reason", "invalid_invite", "transport", transport).increment();
                     return new InvalidInviteCodeException("Invalid or expired invite code");
                 });
 
         if (inviteCode.isConsumed() || inviteCode.isRevoked() || inviteCode.isExpired()) {
             log.warn("Registration failed: invite code unusable (consumed={}, revoked={}, expired={})",
                     inviteCode.isConsumed(), inviteCode.isRevoked(), inviteCode.isExpired());
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "invalid_invite").increment();
+            meterRegistry.counter("wealthview.auth.registration",
+                    "result", "failure", "reason", "invalid_invite", "transport", transport).increment();
             throw new InvalidInviteCodeException("Invalid or expired invite code");
         }
 
         if (userRepository.existsByEmail(request.email())) {
             log.warn("Registration failed: duplicate email");
-            meterRegistry.counter("wealthview.auth.registration", "result", "failure", "reason", "duplicate_email").increment();
+            meterRegistry.counter("wealthview.auth.registration",
+                    "result", "failure", "reason", "duplicate_email", "transport", transport).increment();
             throw new DuplicateEntityException("Email already registered");
         }
 
@@ -163,7 +182,8 @@ public class AuthService {
         inviteCode.setConsumedAt(OffsetDateTime.now());
         inviteCodeRepository.save(inviteCode);
 
-        meterRegistry.counter("wealthview.auth.registration", "result", "success").increment();
+        meterRegistry.counter("wealthview.auth.registration",
+                "result", "success", "transport", transport).increment();
         log.info("User {} registered for tenant {}", user.getId(), user.getTenantId());
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "REGISTER", "user",
                 user.getId(), Map.of("email", request.email())));
@@ -172,28 +192,37 @@ public class AuthService {
 
     @Transactional
     public AuthResult refresh(String refreshToken) {
+        return refresh(refreshToken, "cookie");
+    }
+
+    @Transactional
+    public AuthResult refresh(String refreshToken, String transport) {
         if (!jwtTokenProvider.validateRefreshToken(refreshToken)) {
             log.warn("Token refresh failed: invalid or non-refresh token");
-            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "invalid_token").increment();
+            meterRegistry.counter("wealthview.auth.refresh",
+                    "result", "failure", "reason", "invalid_token", "transport", transport).increment();
             throw new BadCredentialsException("Invalid refresh token");
         }
 
         var userId = jwtTokenProvider.extractUserId(refreshToken);
         var user = userRepository.findById(userId)
                 .orElseThrow(() -> {
-                    meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "unknown_user").increment();
+                    meterRegistry.counter("wealthview.auth.refresh",
+                            "result", "failure", "reason", "unknown_user", "transport", transport).increment();
                     return Entities.notFound("User").get();
                 });
 
         if (!user.isActive()) {
             log.warn("Token refresh failed: user {} is disabled", userId);
-            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "disabled_user").increment();
+            meterRegistry.counter("wealthview.auth.refresh",
+                    "result", "failure", "reason", "disabled_user", "transport", transport).increment();
             throw new BadCredentialsException("Account is disabled");
         }
 
         if (!user.getTenant().isActive()) {
             log.warn("Token refresh failed: tenant {} is disabled for user {}", user.getTenantId(), userId);
-            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "disabled_tenant").increment();
+            meterRegistry.counter("wealthview.auth.refresh",
+                    "result", "failure", "reason", "disabled_tenant", "transport", transport).increment();
             throw new BadCredentialsException("Account disabled — contact your administrator");
         }
 
@@ -201,7 +230,8 @@ public class AuthService {
         if (tokenGeneration != user.getTokenGeneration()) {
             log.warn("Token refresh failed: stale generation for user {} (token={}, current={})",
                     userId, tokenGeneration, user.getTokenGeneration());
-            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "stale_generation").increment();
+            meterRegistry.counter("wealthview.auth.refresh",
+                    "result", "failure", "reason", "stale_generation", "transport", transport).increment();
             throw new BadCredentialsException("Refresh token has been revoked");
         }
 
@@ -216,22 +246,29 @@ public class AuthService {
             // is a known, recoverable race, not a bug.
             log.warn("Token refresh lost race for user {} (concurrent refresh): {}",
                     userId, e.getMessage());
-            meterRegistry.counter("wealthview.auth.refresh", "result", "failure", "reason", "race_lost").increment();
+            meterRegistry.counter("wealthview.auth.refresh",
+                    "result", "failure", "reason", "race_lost", "transport", transport).increment();
             throw new BadCredentialsException("Refresh token has been revoked", e);
         }
 
-        meterRegistry.counter("wealthview.auth.refresh", "result", "success", "reason", "ok").increment();
+        meterRegistry.counter("wealthview.auth.refresh",
+                "result", "success", "reason", "ok", "transport", transport).increment();
         return buildAuthResult(user);
     }
 
     @Transactional
     public void logout(UUID userId) {
+        logout(userId, "cookie");
+    }
+
+    @Transactional
+    public void logout(UUID userId, String transport) {
         var user = userRepository.findById(userId)
                 .orElseThrow(Entities.notFound("User"));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
         user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
-        meterRegistry.counter("wealthview.auth.logout").increment();
+        meterRegistry.counter("wealthview.auth.logout", "transport", transport).increment();
         log.info("User {} logged out (token generation incremented)", userId);
     }
 
