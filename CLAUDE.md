@@ -400,6 +400,23 @@ npm run test                                       # Run tests (Vitest)
 npm run lint                                       # ESLint check
 ```
 
+### Monorepo workspaces
+
+The repo is an npm workspaces monorepo: `frontend/` (web SPA), `mobile/` (React Native), and `shared/` (cross-platform utilities consumed by both). Run `npm install` once at the repo root to wire everything up — workspace dependencies (`@wealthview/shared`) resolve to symlinks under `node_modules/@wealthview/`.
+
+Cross-workspace scripts from the repo root:
+```bash
+npm install                                        # Hoist + symlink workspace deps
+npm run test:shared                                # Vitest in shared
+npm run test:frontend                              # Vitest in frontend
+npm run test:mobile                                # Jest in mobile
+npm run test:all                                   # All workspaces with tests
+npm run typecheck:all                              # tsc --noEmit in all workspaces
+npm run build:frontend                             # Vite production build
+```
+
+Mobile native builds (Android Gradle, iOS Xcode) run **locally only** — CI handles typecheck + Jest. See `mobile/README.md`.
+
 ---
 
 ## Pre-Commit Checklist

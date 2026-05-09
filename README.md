@@ -52,7 +52,10 @@ docker compose up --build -d              # Dev stack, raw
 ```bash
 ./scripts/install-hooks.sh                # gitleaks pre-commit hook
 direnv allow                              # auto-load .env on cd (install direnv first)
+npm install                               # hoist workspace deps (frontend, shared, mobile)
 ```
+
+The repo is an npm workspaces monorepo with three packages: `frontend/` (web SPA), `mobile/` (React Native app), and `shared/` (cross-platform utilities consumed by both). Run `npm install` once at the root and the workspaces wire themselves up.
 
 `.env` is gitignored. Real secrets live there and only there. See [Secrets & Configuration](#secrets--configuration) below.
 

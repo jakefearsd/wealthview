@@ -1,97 +1,42 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# @wealthview/mobile
 
-# Getting Started
+WealthView's React Native client. Lives as a workspace package alongside the web frontend and the cross-platform `shared/` package — see the root `README.md` for the monorepo layout.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+The current scaffold is intentionally minimal: a single screen that renders `formatCurrency(1234567.89)` from `@wealthview/shared`, proving the cross-platform consumption pattern end-to-end. Real screens, navigation, and the API client land in subsequent passes.
 
-## Step 1: Start Metro
+## CI vs local builds
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+| Step | Where it runs |
+|---|---|
+| `npm run typecheck --workspace mobile` | CI (`.github/workflows/mobile.yml`) and locally |
+| `npm run test --workspace mobile` | CI and locally |
+| Android Gradle build (`npm run android`) | **Local only** — needs Android SDK |
+| iOS Xcode build (`npm run ios`) | **Local only** — needs a Mac with Xcode |
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Linux CI never builds APKs or runs xcodebuild. Releases are cut from a developer machine.
 
-```sh
-# Using npm
-npm start
+## Local development
 
-# OR using Yarn
-yarn start
+From the repository root:
+
+```bash
+npm install                                # one-time, hoists workspace deps
 ```
 
-## Step 2: Build and run your app
+From `mobile/`:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
+```bash
+npm start                                  # Metro bundler
+npm run android                            # build + launch Android emulator/device
+npm run ios                                # build + launch iOS simulator (Mac only)
+npm test                                   # Jest
+npm run typecheck                          # tsc --noEmit
 ```
 
-### iOS
+Metro is configured to watch `../shared/` and resolve modules from both the local and root-hoisted `node_modules`. See `metro.config.js`. Hierarchical lookup is disabled to prevent duplicate React installations from fighting.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+## Adding cross-platform code
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+Pure utilities, types, and finance-domain helpers belong in `shared/`. The shared package has no React or DOM dependencies — both this app and the web frontend consume its TypeScript source directly. See `shared/README.md`.
 
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Anything platform-specific (`AsyncStorage`, native modules, navigation glue) lives here.
