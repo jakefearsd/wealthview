@@ -221,6 +221,38 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void successfulResponse_carriesRateLimitHeaders() throws ServletException, IOException {
+        var request = new MockHttpServletRequest("GET", "/api/v1/accounts");
+        request.setRemoteAddr("10.0.0.123");
+        var response = new MockHttpServletResponse();
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("300");
+        assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("299");
+        assertThat(response.getHeader("X-RateLimit-Reset")).isNotNull();
+    }
+
+    @Test
+    void rateLimitedResponse_alsoCarriesRateLimitHeaders() throws ServletException, IOException {
+        for (int i = 0; i <= 300; i++) {
+            var req = new MockHttpServletRequest("GET", "/api/v1/test");
+            req.setRemoteAddr("9.9.9.9");
+            filter.doFilterInternal(req, new MockHttpServletResponse(), filterChain);
+        }
+
+        var request = new MockHttpServletRequest("GET", "/api/v1/test");
+        request.setRemoteAddr("9.9.9.9");
+        var response = new MockHttpServletResponse();
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+        assertThat(response.getHeader("X-RateLimit-Limit")).isEqualTo("300");
+        assertThat(response.getHeader("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(response.getHeader("X-RateLimit-Reset")).isNotNull();
+    }
+
+    @Test
     void rateLimitExceeded_responseBodyIsJson() throws ServletException, IOException {
         for (int i = 0; i <= 300; i++) {
             var req = new MockHttpServletRequest("GET", "/api/v1/test");

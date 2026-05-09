@@ -76,8 +76,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return existing;
         });
 
-        if (window.count.get() > limit) {
-            log.warn("Rate limit exceeded: key={} count={} limit={}", key, window.count.get(), limit);
+        long resetEpochSec = (window.startTime + WINDOW_MS) / 1000L;
+        int used = window.count.get();
+        int remaining = Math.max(0, limit - used);
+        response.setHeader("X-RateLimit-Limit", Integer.toString(limit));
+        response.setHeader("X-RateLimit-Remaining", Integer.toString(remaining));
+        response.setHeader("X-RateLimit-Reset", Long.toString(resetEpochSec));
+
+        if (used > limit) {
+            log.warn("Rate limit exceeded: key={} count={} limit={}", key, used, limit);
             meterRegistry.counter("wealthview.ratelimit.exceeded", "type", isAuth ? "ip" : "user").increment();
             response.setStatus(429);
             response.setContentType("application/json");
