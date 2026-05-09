@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# wv — WealthView admin entry point.
+#
+# Single command for all routine operations: bring the stack up, take and
+# verify backups, update to a new image, roll back, migrate between hosts.
+#
+# Each subcommand is implemented in scripts/wv-lib/<name>.sh and invoked here.
+# Run `./wv help` for the full reference.
+
+set -euo pipefail
+
+# --- Locate repo root regardless of how the script is invoked. -------------
+WV_SELF="${BASH_SOURCE[0]}"
+while [[ -L "$WV_SELF" ]]; do
+    WV_LINK_DIR="$(cd -- "$(dirname -- "$WV_SELF")" >/dev/null 2>&1 && pwd)"
+    WV_SELF="$(readlink "$WV_SELF")"
+    [[ "$WV_SELF" != /* ]] && WV_SELF="$WV_LINK_DIR/$WV_SELF"
+done
+WV_ROOT="$(cd -- "$(dirname -- "$WV_SELF")" >/dev/null 2>&1 && pwd)"
+export WV_ROOT
+export WV_LIB_DIR="$WV_ROOT/scripts/wv-lib"
+
+# --- Common helpers shared across subcommands. -----------------------------
+# shellcheck source=scripts/wv-lib/common.sh
+. "$WV_LIB_DIR/common.sh"
+
+# --- Dispatch. -------------------------------------------------------------
+SUBCOMMAND="${1:-help}"
+shift || true
+
+case "$SUBCOMMAND" in
+    -h|--help|help)
+        # shellcheck source=scripts/wv-lib/help.sh
+        . "$WV_LIB_DIR/help.sh"
+        wv_help "$@"
+        ;;
+    up|down|status|logs|psql|backup|backups|restore|verify|update|rollback|\
+    migrate-out|migrate-in|rotate-secret|config-check)
+        SUB_FILE="$WV_LIB_DIR/${SUBCOMMAND}.sh"
+        if [[ ! -f "$SUB_FILE" ]]; then
+            wv_die "Subcommand '$SUBCOMMAND' is registered but $SUB_FILE is missing."
+        fi
+        # shellcheck disable=SC1090
+        . "$SUB_FILE"
+        # The library file defines a function named wv_<subcommand_with_underscores>.
+        FN_NAME="wv_${SUBCOMMAND//-/_}"
+        if ! declare -F "$FN_NAME" >/dev/null; then
+            wv_die "Subcommand library $SUB_FILE did not define $FN_NAME."
+        fi
+        "$FN_NAME" "$@"
+        ;;
+    *)
+        wv_err "Unknown subcommand: $SUBCOMMAND"
+        wv_err "Run './wv help' for the full reference."
+        exit 2
+        ;;
+esac
