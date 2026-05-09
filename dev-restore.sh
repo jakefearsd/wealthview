@@ -1,30 +1,19 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# DEPRECATED: thin shim that delegates to ./wv restore.
+#
+# Kept so existing muscle memory (and any docs that haven't been updated)
+# continues to work. New scripts should call ./wv restore directly. See
+# docs/deployment/operations.md.
+
 set -euo pipefail
 
-if [ $# -eq 0 ]; then
-    echo "Usage: $0 <backup-file>"
-    echo ""
-    echo "Available backups:"
-    ls -lh backups/wealthview_*.dump 2>/dev/null || echo "  No backups found in backups/"
-    exit 1
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+# Old behavior: with no args, list backups. wv restore mirrors that — call
+# wv backups first if no path given so the deprecation doesn't break the
+# ergonomics of `./dev-restore.sh` -> "show me what I have".
+if (( $# == 0 )); then
+    exec "$SCRIPT_DIR/wv" backups
 fi
 
-BACKUP_FILE="$1"
-
-if [ ! -f "${BACKUP_FILE}" ]; then
-    echo "ERROR: File not found: ${BACKUP_FILE}"
-    exit 1
-fi
-
-echo "This will restore from: ${BACKUP_FILE}"
-echo "WARNING: This replaces all data in the wealthview database."
-read -rp "Continue? (y/N) " confirm
-if [ "${confirm}" != "y" ] && [ "${confirm}" != "Y" ]; then
-    echo "Aborted."
-    exit 0
-fi
-
-echo "Restoring database..."
-docker compose exec -T db pg_restore --clean --if-exists -U wv_app -d wealthview < "${BACKUP_FILE}"
-
-echo "Restore complete."
+exec "$SCRIPT_DIR/wv" restore "$@"
