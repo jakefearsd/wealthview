@@ -164,6 +164,116 @@ Examples mobile clients should be ready for:
 | 429    | `RATE_LIMITED`     | Too many requests for this principal/IP |
 | 5xx    | `INTERNAL_ERROR`   | Server fault. Retry with exponential backoff. |
 
+## Per-device sessions
+
+Every successful login creates a row in `user_sessions` and the issued
+access token carries the row id in a `sid` claim. The session list lets
+users see and revoke individual devices without nuking other devices the
+way `token_generation` does.
+
+| Method | Path                                  | Auth                | Notes |
+|--------|---------------------------------------|---------------------|-------|
+| GET    | `/api/v1/auth/sessions`               | Bearer or Cookie    | Returns active sessions, sorted by `last_used_at` desc. The current session is marked `current: true`. |
+| DELETE | `/api/v1/auth/sessions/{id}`          | Bearer or Cookie    | Revokes one session. Returns 404 if the id doesn't belong to the caller (avoids cross-tenant existence oracle). |
+| DELETE | `/api/v1/auth/sessions`               | Bearer or Cookie    | "Log out everywhere else." Revokes every active session except the caller's current one. |
+
+Optional `device_label` field on `POST /api/v1/auth/{token,}/login`
+(max 64 chars) is surfaced in the session list so users can recognize
+their own devices.
+
+## Single-use refresh tokens
+
+Refresh tokens rotate on every use. The server tracks each issued JTI in
+`refresh_tokens`. When a token is consumed it's marked `used_at`; if the
+same JTI shows up a second time we treat it as **compromise** —
+`token_generation` is bumped, every active token (including the
+legitimate replacement) is invalidated, and the caller must log in
+fresh. Mobile clients must never retry a refresh call with the same
+token; if a refresh fails for any reason, drop both tokens and re-auth.
+
+## Rate-limit headers
+
+Every API response carries:
+
+| Header                  | Meaning |
+|-------------------------|---------|
+| `X-RateLimit-Limit`     | The bucket size for this principal/IP. Auth endpoints: 60/min/IP. Authenticated API: 300/min/user. |
+| `X-RateLimit-Remaining` | Requests left in the current 60-second window. |
+| `X-RateLimit-Reset`     | Unix epoch (seconds) when the current window resets. |
+
+Headers travel on 2xx, 4xx, AND the 429 response itself. Clients should
+back off proactively when `X-RateLimit-Remaining` falls below ~10, and
+must wait until `X-RateLimit-Reset` after a 429.
+
+## TOTP MFA
+
+Users can enable TOTP MFA at any time via authenticator apps (Google
+Authenticator, 1Password, Authy, etc.).
+
+### Setup
+
+```
+POST /api/v1/auth/mfa/setup            (Bearer or Cookie, 200)
+  Response: { secret, qr_code_uri, recovery_codes: [...10] }
+            (secret + recovery codes shown ONCE; persist nothing client-side)
+
+POST /api/v1/auth/mfa/verify-setup     (Bearer or Cookie, 204)
+  Body: { totp_code: "123456" }
+  → flips mfa_enabled = true. Until verified, MFA is not active.
+
+GET  /api/v1/auth/mfa/status           (Bearer or Cookie, 200)
+  Response: { enabled, setup_at, recovery_codes_remaining }
+```
+
+### Login challenge
+
+```
+POST /api/v1/auth/{token,}/login
+  Body: { email, password }
+
+If MFA is NOT enabled → returns tokens / cookies as before.
+If MFA IS  enabled  → returns:
+  HTTP 200
+  Body: { mfa_required: true, mfa_token: "<short-lived JWT>" }
+
+POST /api/v1/auth/{token,}/mfa/challenge
+  Body: { mfa_token, totp_code }
+        OR { mfa_token, recovery_code }
+  → returns the same shape as the original login response (tokens or cookies).
+
+The mfa_token is single-use, expires in 5 minutes, and is bound to the
+specific user that just authenticated.
+```
+
+### Disable
+
+```
+POST /api/v1/auth/mfa/disable          (Bearer or Cookie, 204)
+  Body: { totp_code }
+  → requires a current TOTP. Clears all mfa_* state and recovery codes.
+
+POST /api/v1/auth/mfa/regenerate-recovery-codes
+  → invalidates the prior batch and returns 10 fresh codes.
+```
+
+### Sequence diagram (login w/ MFA)
+
+```
+Client                                Server
+  |                                     |
+  |--- POST /token/login -------------->|
+  |    {email, password}                |
+  |                                     |
+  |<- 200 {mfa_required, mfa_token} ----|
+  |                                     |
+  |  user enters TOTP from authenticator|
+  |                                     |
+  |--- POST /token/mfa/challenge ------>|
+  |    {mfa_token, totp_code}           |
+  |                                     |
+  |<- 200 {access_token, refresh_token}-|
+```
+
 ## Out of scope (future work)
 
 Not implemented today; surface here so the mobile developer can plan:
