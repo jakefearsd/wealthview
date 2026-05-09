@@ -1,0 +1,13 @@
+{
+  "name": "wealthview-monorepo",
+  "private": true,
+  "workspaces": ["shared", "frontend", "mobile"],
+  "scripts": {
+    "test:shared": "npm run test --workspace shared",
+    "test:frontend": "npm run test --workspace frontend",
+    "test:mobile": "npm run test --workspace mobile",
+    "test:all": "npm run test --workspaces --if-present",
+    "typecheck:all": "npm run typecheck --workspaces --if-present",
+    "build:frontend": "npm run build --workspace frontend"
+  }
+}
