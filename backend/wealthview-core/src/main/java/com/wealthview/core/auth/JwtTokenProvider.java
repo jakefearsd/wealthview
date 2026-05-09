@@ -49,14 +49,19 @@ public final class JwtTokenProvider {
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String role, String email) {
-        return generateAccessToken(userId, tenantId, role, email, 0);
+        return generateAccessToken(userId, tenantId, role, email, 0, null);
     }
 
     public String generateAccessToken(UUID userId, UUID tenantId, String role, String email, int generation) {
+        return generateAccessToken(userId, tenantId, role, email, generation, null);
+    }
+
+    public String generateAccessToken(UUID userId, UUID tenantId, String role, String email,
+                                      int generation, UUID sessionId) {
         var now = new Date();
         var expiry = new Date(now.getTime() + accessTokenExpiration);
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .issuer(issuer)
                 .audience().add(audience).and()
                 .subject(userId.toString())
@@ -66,12 +71,41 @@ public final class JwtTokenProvider {
                 .claim("email", email)
                 .claim("generation", generation)
                 .issuedAt(now)
+                .expiration(expiry);
+        if (sessionId != null) {
+            builder.claim("sid", sessionId.toString());
+        }
+        return builder.signWith(key).compact();
+    }
+
+    public String generateMfaChallenge(UUID userId, String transport, UUID jti, long ttlMillis) {
+        var now = new Date();
+        var expiry = new Date(now.getTime() + ttlMillis);
+        return Jwts.builder()
+                .issuer(issuer)
+                .audience().add(audience).and()
+                .subject(userId.toString())
+                .id(jti.toString())
+                .claim("type", "mfa_challenge")
+                .claim("transport", transport)
+                .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
                 .compact();
     }
 
+    public boolean validateMfaChallenge(String token) {
+        if (!validateToken(token)) {
+            return false;
+        }
+        return "mfa_challenge".equals(extractTokenType(token));
+    }
+
     public String generateRefreshToken(UUID userId, int generation) {
+        return generateRefreshToken(userId, generation, UUID.randomUUID());
+    }
+
+    public String generateRefreshToken(UUID userId, int generation, UUID jti) {
         var now = new Date();
         var expiry = new Date(now.getTime() + refreshTokenExpiration);
 
@@ -79,6 +113,7 @@ public final class JwtTokenProvider {
                 .issuer(issuer)
                 .audience().add(audience).and()
                 .subject(userId.toString())
+                .id(jti.toString())
                 .claim("type", "refresh")
                 .claim("generation", generation)
                 .issuedAt(now)
@@ -154,6 +189,16 @@ public final class JwtTokenProvider {
 
     public String extractTokenType(String token) {
         return getClaims(token).get("type", String.class);
+    }
+
+    public UUID extractJti(String token) {
+        var raw = getClaims(token).getId();
+        return raw == null ? null : UUID.fromString(raw);
+    }
+
+    public UUID extractSessionId(String token) {
+        var raw = getClaims(token).get("sid", String.class);
+        return raw == null ? null : UUID.fromString(raw);
     }
 
     private Claims getClaims(String token) {

@@ -194,6 +194,53 @@ class JwtTokenProviderTest {
     }
 
     @Test
+    void generateRefreshToken_setsRandomJti_extractableViaExtractJti() {
+        var token = tokenProvider.generateRefreshToken(userId, 0);
+
+        var jti = tokenProvider.extractJti(token);
+        assertThat(jti).isNotNull();
+    }
+
+    @Test
+    void generateRefreshToken_distinctCalls_produceDistinctJtis() {
+        var t1 = tokenProvider.generateRefreshToken(userId, 0);
+        var t2 = tokenProvider.generateRefreshToken(userId, 0);
+
+        assertThat(tokenProvider.extractJti(t1)).isNotEqualTo(tokenProvider.extractJti(t2));
+    }
+
+    @Test
+    void generateRefreshToken_withExplicitJti_embedsThatJti() {
+        var explicit = UUID.randomUUID();
+        var token = tokenProvider.generateRefreshToken(userId, 0, explicit);
+
+        assertThat(tokenProvider.extractJti(token)).isEqualTo(explicit);
+    }
+
+    @Test
+    void generateAccessToken_withSessionId_embedsSidClaim() {
+        var sid = UUID.randomUUID();
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin",
+                "test@example.com", 0, sid);
+
+        assertThat(tokenProvider.extractSessionId(token)).isEqualTo(sid);
+    }
+
+    @Test
+    void extractSessionId_tokenWithoutSid_returnsNull() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.extractSessionId(token)).isNull();
+    }
+
+    @Test
+    void extractJti_accessTokenWithoutJti_returnsNull() {
+        var token = tokenProvider.generateAccessToken(userId, tenantId, "admin", "test@example.com");
+
+        assertThat(tokenProvider.extractJti(token)).isNull();
+    }
+
+    @Test
     void validateToken_tokenExpiredBeyondClockSkew_returnsFalse() {
         var longStaleProvider = new JwtTokenProvider(
                 "test-secret-key-that-is-at-least-32-characters-long",

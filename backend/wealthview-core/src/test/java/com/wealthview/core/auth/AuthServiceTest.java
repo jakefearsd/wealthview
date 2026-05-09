@@ -9,7 +9,10 @@ import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
+import com.wealthview.persistence.repository.MfaChallengeRepository;
+import com.wealthview.persistence.repository.RefreshTokenRepository;
 import com.wealthview.persistence.repository.UserRepository;
+import com.wealthview.persistence.repository.UserSessionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,6 +57,31 @@ class AuthServiceTest {
     @Mock
     private LoginActivityService loginActivityService;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private UserSessionRepository userSessionRepository;
+
+    @Mock
+    private MfaChallengeRepository mfaChallengeRepository;
+
+    @Mock
+    private com.wealthview.core.auth.mfa.MfaService mfaService;
+
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager =
+            new org.springframework.transaction.PlatformTransactionManager() {
+                @Override
+                public org.springframework.transaction.TransactionStatus getTransaction(
+                        org.springframework.transaction.TransactionDefinition def) {
+                    return new org.springframework.transaction.support.SimpleTransactionStatus();
+                }
+                @Override
+                public void commit(org.springframework.transaction.TransactionStatus status) {}
+                @Override
+                public void rollback(org.springframework.transaction.TransactionStatus status) {}
+            };
+
     private JwtTokenProvider jwtTokenProvider;
     private AuthService authService;
     private SimpleMeterRegistry meterRegistry;
@@ -71,7 +99,17 @@ class AuthServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         authService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                meterRegistry, new LoginAttemptService(), new CommonPasswordChecker());
+                meterRegistry, new LoginAttemptService(), new CommonPasswordChecker(),
+                refreshTokenRepository, userSessionRepository, mfaChallengeRepository, mfaService,
+                transactionManager);
+        // Default mocking: when AuthService asks for a new session row, give it
+        // back something with an id set so the access-token sid claim is populated.
+        org.mockito.Mockito.lenient().when(userSessionRepository.save(any(com.wealthview.persistence.entity.UserSessionEntity.class)))
+                .thenAnswer(inv -> {
+                    var s = (com.wealthview.persistence.entity.UserSessionEntity) inv.getArgument(0);
+                    com.wealthview.core.testutil.TestEntityHelper.setId(s, java.util.UUID.randomUUID());
+                    return s;
+                });
 
         tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
@@ -275,7 +313,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_validToken_returnsNewAuthResponse() {
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        var refreshToken = trackedRefreshToken(0);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -283,6 +321,16 @@ class AuthServiceTest {
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.refreshToken()).isNotBlank();
+    }
+
+    private String trackedRefreshToken(int generation) {
+        var jti = UUID.randomUUID();
+        var token = jwtTokenProvider.generateRefreshToken(user.getId(), generation, jti);
+        var stored = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                tenant.getId(), user.getId(), jti,
+                OffsetDateTime.now(), OffsetDateTime.now().plusDays(1));
+        when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+        return token;
     }
 
     @Test
@@ -338,7 +386,7 @@ class AuthServiceTest {
         // Two requests with the same valid refresh token can race on the generation bump.
         // The first to save wins; the second must surface as a revoked-session error rather
         // than bubble up a raw OptimisticLockingFailureException to the HTTP layer.
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        var refreshToken = trackedRefreshToken(0);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class)))
                 .thenThrow(new ObjectOptimisticLockingFailureException(UserEntity.class, user.getId()));
@@ -350,13 +398,105 @@ class AuthServiceTest {
 
     @Test
     void refresh_incrementsGeneration() {
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        var refreshToken = trackedRefreshToken(0);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         authService.refresh(refreshToken);
 
         assertThat(user.getTokenGeneration()).isEqualTo(1);
+    }
+
+    @Test
+    void refresh_unknownJti_throwsBadCredentialsAndCountsUnknownJti() {
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        // Note: trackedRefreshToken NOT called, so findByJti returns Optional.empty()
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("revoked");
+
+        var counter = meterRegistry.find("wealthview.auth.refresh")
+                .tag("reason", "unknown_jti").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void refresh_reusedJti_bumpsGenerationAndCountsReuseDetected() {
+        var jti = UUID.randomUUID();
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0, jti);
+        var alreadyUsed = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                tenant.getId(), user.getId(), jti,
+                OffsetDateTime.now().minusMinutes(10), OffsetDateTime.now().plusDays(1));
+        alreadyUsed.setUsedAt(OffsetDateTime.now().minusMinutes(5));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(alreadyUsed));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class);
+
+        assertThat(user.getTokenGeneration()).isEqualTo(1);
+        var reuseCounter = meterRegistry.find("wealthview.auth.refresh_reuse_detected").counter();
+        assertThat(reuseCounter).isNotNull();
+        assertThat(reuseCounter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void refresh_revokedJti_throwsBadCredentialsAndCountsRevoked() {
+        var jti = UUID.randomUUID();
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0, jti);
+        var revoked = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                tenant.getId(), user.getId(), jti,
+                OffsetDateTime.now().minusMinutes(10), OffsetDateTime.now().plusDays(1));
+        revoked.setRevokedAt(OffsetDateTime.now().minusMinutes(1));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(revoked));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class);
+
+        var counter = meterRegistry.find("wealthview.auth.refresh")
+                .tag("reason", "revoked").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void refresh_dbExpiredJti_throwsBadCredentialsAndCountsExpired() {
+        var jti = UUID.randomUUID();
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0, jti);
+        var dbExpired = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                tenant.getId(), user.getId(), jti,
+                OffsetDateTime.now().minusDays(2), OffsetDateTime.now().minusHours(1));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(dbExpired));
+
+        assertThatThrownBy(() -> authService.refresh(refreshToken))
+                .isInstanceOf(BadCredentialsException.class);
+
+        var counter = meterRegistry.find("wealthview.auth.refresh")
+                .tag("reason", "expired").counter();
+        assertThat(counter).isNotNull();
+        assertThat(counter.count()).isEqualTo(1.0);
+    }
+
+    @Test
+    void refresh_marksOldJtiUsedAndStoresReplacement() {
+        var jti = UUID.randomUUID();
+        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0, jti);
+        var stored = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                tenant.getId(), user.getId(), jti,
+                OffsetDateTime.now(), OffsetDateTime.now().plusDays(1));
+        when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.refresh(refreshToken);
+
+        assertThat(stored.getUsedAt()).isNotNull();
+        assertThat(stored.getReplacedByJti()).isNotNull();
     }
 
     @Test
@@ -378,7 +518,9 @@ class AuthServiceTest {
         }
         var lockedAuthService = new AuthService(userRepository, inviteCodeRepository,
                 passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry(), attemptService, new CommonPasswordChecker());
+                new SimpleMeterRegistry(), attemptService, new CommonPasswordChecker(),
+                refreshTokenRepository, userSessionRepository, mfaChallengeRepository, mfaService,
+                transactionManager);
 
         assertThatThrownBy(() -> lockedAuthService.login(
                 new LoginRequest("test@example.com", "password"), "127.0.0.1"))
@@ -416,7 +558,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_validToken_recordsSuccessMetric() {
-        var refreshToken = jwtTokenProvider.generateRefreshToken(user.getId(), 0);
+        var refreshToken = trackedRefreshToken(0);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
