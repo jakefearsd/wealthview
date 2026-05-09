@@ -23,11 +23,34 @@ out/
 .settings/
 bin/
 
-# Node / Frontend
+# Node / Workspaces (root-hoisted by npm workspaces)
+node_modules/
+.npm/
+.pnpm-debug.log*
+
+# Web frontend
 frontend/node_modules/
 frontend/dist/
 frontend/.env
 frontend/.env.*
+
+# Shared workspace
+shared/node_modules/
+shared/dist/
+
+# Mobile workspace
+mobile/node_modules/
+mobile/.expo/
+mobile/.metro-cache/
+mobile/.bundle/
+mobile/ios/Pods/
+mobile/ios/build/
+mobile/ios/DerivedData/
+mobile/ios/*.xcuserdatad/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/.gradle/
+mobile/android/local.properties
 
 # OS files
 .DS_Store
