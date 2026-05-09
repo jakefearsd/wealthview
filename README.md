@@ -20,16 +20,31 @@ A self-hosted, multi-tenant personal finance application for tracking investment
 
 ```bash
 cp .env.example .env                      # Fill in DB_PASSWORD, JWT_SECRET, SUPER_ADMIN_PASSWORD
-docker compose up --build -d              # Build and start
+./wv up                                   # Build, start, wait for health
+./wv status                               # Verify
 ```
+
+For a **production** deployment, also set `WEALTHVIEW_VERSION` in `.env` —
+that flips `./wv` into prod mode (uses `docker-compose.prod.yml`, with the
+nightly backup container and stricter config validation).
 
 - **URL:** http://localhost
 - **Super admin:** `admin@wealthview.local` / `admin123`
 - **Demo user:** `demo@wealthview.local` / `demo123` (pre-loaded with sample data)
 
 ```bash
-docker compose down                       # Stop (preserve data)
-docker compose down -v                    # Stop and delete database
+./wv down                                 # Stop (preserve data)
+./wv down --with-volumes                  # Stop and delete database (prompts)
+./wv help                                 # Full subcommand reference
+```
+
+For backups, restores, host migrations, secret rotation, and update +
+rollback, see [Operations Handbook](docs/deployment/operations.md).
+
+For raw `docker compose` access (rarely needed once `./wv` is in your hands):
+
+```bash
+docker compose up --build -d              # Dev stack, raw
 ```
 
 ### Developer setup (one-time)
@@ -62,6 +77,7 @@ direnv allow                              # auto-load .env on cd (install direnv
 | Guide | Description |
 |-------|-------------|
 | [Quick Start Deployment](docs/deployment/quickstart.md) | Get running in 5 minutes with Docker |
+| [Operations Handbook](docs/deployment/operations.md) | `./wv` admin command reference for every routine operation |
 | [Production Setup](docs/deployment/production-setup.md) | Full production deployment — db, app, backup, edge proxy choice |
 | [Cloudflare Tunnel](docs/deployment/cloudflared.md) | Self-hosted deployment via `cloudflared` (no open ports) |
 | [TLS & Nginx](docs/deployment/tls-and-nginx.md) | Host-managed TLS with nginx + Let's Encrypt |

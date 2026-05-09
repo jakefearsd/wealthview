@@ -334,30 +334,41 @@ frontend/src/
 
 ## Build & Run Commands
 
-### Running the Application (Docker Compose — default for manual testing)
+### Running the Application — `./wv` admin entry point
 
-This is the **preferred way** to start the app for manual testing. It builds both frontend and backend into a single Docker image, runs Flyway migrations, and seeds demo data automatically.
+`./wv` is the single command surface for both dev and prod stacks. It auto-detects mode (prod when `WEALTHVIEW_VERSION` is set in `.env`, dev otherwise) and dispatches to the right compose file. See `docs/deployment/operations.md` for the full handbook.
 
 ```bash
-docker compose up --build -d                       # Build & start (http://localhost:80)
-docker compose down                                # Stop everything
-docker compose logs -f app                         # Tail application logs
-docker compose exec db psql -U wv_app wealthview   # Connect to database
+./wv up                                            # Build & start; waits for health
+./wv down                                          # Stop (preserve data)
+./wv status                                        # Container status + health probe
+./wv logs app                                      # Tail logs
+./wv psql                                          # Open a psql shell
+./wv help                                          # All subcommands
 ```
 
 - **URL:** http://localhost:80
-- **Profile:** `docker` (seeds demo data via SampleDataInitializer)
+- **Profile:** `docker` (dev) / `prod` (when `WEALTHVIEW_VERSION` is set)
 - **Credentials:** `demo@wealthview.local` / `demo123`
-- When the user asks to "start the app", "rebuild and relaunch", or "run it for testing", use `docker compose up --build -d`.
-- To stop, use `docker compose down`. Always stop existing instances before starting new ones.
+- When the user asks to "start the app", "rebuild and relaunch", or "run it for testing", use `./wv up` (which calls `docker compose up --build -d` underneath, then waits for health).
+- To stop, use `./wv down`. Always stop existing instances before starting new ones.
 - **Local backend dev:** Run `docker compose up -d db` first — the DB is exposed on `localhost:5433` (to avoid conflicts with native PostgreSQL) so `mvn spring-boot:run` and IDE run configs connect automatically.
 
-### Dev Database Backup / Restore
+### Backup / restore / update / migrate
 ```bash
-./dev-backup.sh                                    # Dump to backups/wealthview_<timestamp>.dump
-./dev-restore.sh backups/<file>.dump                # Restore from a dump file
-./dev-restore.sh                                   # List available backups
+./wv backup                                        # On-demand pg_dump
+./wv backup --encrypt                              # age-encrypted (needs BACKUP_ENCRYPTION_RECIPIENT)
+./wv backups                                       # List with size + age
+./wv verify <file>                                 # Round-trip dump through throwaway pg
+./wv restore <file>                                # Confirm + restore + restart + health-check
+./wv update                                        # Pre-update backup -> rebuild -> swap -> auto-rollback on health failure
+./wv rollback                                      # Revert app to image tag saved by last successful update
+./wv migrate-out / migrate-in                      # Encrypted bundle for moving to another host
+./wv rotate-secret JWT_SECRET                      # In-place secret rotation
+./wv config-check                                  # Validate .env, compose files, tools
 ```
+
+The `dev-backup.sh` and `dev-restore.sh` scripts are now thin shims that delegate to `./wv backup` / `./wv restore`; new automation should call `./wv` directly.
 
 ### Backend (development / tests only)
 ```bash
