@@ -14,8 +14,13 @@ public record TenantUserPrincipal(
         UUID userId,
         UUID tenantId,
         String email,
-        String role
+        String role,
+        UUID sessionId
 ) implements UserDetails, TenantContext.AuthenticatedUser {
+
+    public TenantUserPrincipal(UUID userId, UUID tenantId, String email, String role) {
+        this(userId, tenantId, email, role, null);
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

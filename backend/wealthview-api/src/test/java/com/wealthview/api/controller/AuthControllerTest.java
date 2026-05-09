@@ -5,6 +5,7 @@ import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
+import com.wealthview.core.auth.AuthRequestContext;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.SessionStateValidator;
@@ -63,7 +64,8 @@ class AuthControllerTest {
     void login_validCredentials_returns200_setsAuthCookies_omitsTokensFromBody() throws Exception {
         var result = new AuthResult("access-jwt", "refresh-jwt",
                 UUID.randomUUID(), UUID.randomUUID(), "test@example.com", "admin");
-        when(authService.login(any(LoginRequest.class), anyString())).thenReturn(result);
+        when(authService.loginInitiate(any(LoginRequest.class), any(AuthRequestContext.class)))
+                .thenReturn(new com.wealthview.core.auth.dto.LoginOutcome.Tokens(result));
         when(jwtTokenProvider.getAccessTokenExpirationMs()).thenReturn(3_600_000L);
         when(jwtTokenProvider.getRefreshTokenExpirationMs()).thenReturn(86_400_000L);
 
@@ -87,7 +89,7 @@ class AuthControllerTest {
 
     @Test
     void login_invalidCredentials_returns401() throws Exception {
-        when(authService.login(any(LoginRequest.class), anyString()))
+        when(authService.loginInitiate(any(LoginRequest.class), any(AuthRequestContext.class)))
                 .thenThrow(new BadCredentialsException("Invalid email or password"));
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -103,7 +105,7 @@ class AuthControllerTest {
     void register_validInput_returns201_setsAuthCookies() throws Exception {
         var result = new AuthResult("access", "refresh",
                 UUID.randomUUID(), UUID.randomUUID(), "new@example.com", "member");
-        when(authService.register(any(RegisterRequest.class))).thenReturn(result);
+        when(authService.register(any(RegisterRequest.class), any(AuthRequestContext.class))).thenReturn(result);
         when(jwtTokenProvider.getAccessTokenExpirationMs()).thenReturn(3_600_000L);
         when(jwtTokenProvider.getRefreshTokenExpirationMs()).thenReturn(86_400_000L);
 
@@ -133,7 +135,8 @@ class AuthControllerTest {
     void refresh_readsRefreshTokenFromCookie_returnsNewCookies() throws Exception {
         var result = new AuthResult("new-access", "new-refresh",
                 UUID.randomUUID(), UUID.randomUUID(), "test@example.com", "admin");
-        when(authService.refresh("valid-refresh-token")).thenReturn(result);
+        when(authService.refresh(org.mockito.ArgumentMatchers.eq("valid-refresh-token"),
+                any(AuthRequestContext.class))).thenReturn(result);
         when(jwtTokenProvider.getAccessTokenExpirationMs()).thenReturn(3_600_000L);
         when(jwtTokenProvider.getRefreshTokenExpirationMs()).thenReturn(86_400_000L);
 

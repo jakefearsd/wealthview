@@ -2,12 +2,16 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.common.ClientIpResolver;
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.auth.AuthRequestContext;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.dto.AuthResult;
+import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
+import com.wealthview.core.auth.dto.MfaChallengeRequest;
 import com.wealthview.core.auth.dto.MobileAuthResponse;
 import com.wealthview.core.auth.dto.MobileRefreshRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
+import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -61,23 +65,46 @@ public class AuthMobileController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<MobileAuthResponse> login(@Valid @RequestBody LoginRequest request,
-                                                    HttpServletRequest httpRequest) {
-        var ipAddress = clientIpResolver.resolve(httpRequest);
-        var result = authService.login(request, ipAddress, TRANSPORT_TAG);
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+                                   HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, request.deviceLabel());
+        var outcome = authService.loginInitiate(request, ctx);
+        if (outcome instanceof LoginOutcome.MfaRequired m) {
+            return ResponseEntity.ok(Map.of("mfa_required", true, "mfa_token", m.mfaToken()));
+        }
+        var tokens = ((LoginOutcome.Tokens) outcome).result();
+        return ResponseEntity.ok(toResponse(tokens));
+    }
+
+    @PostMapping("/mfa/challenge")
+    public ResponseEntity<MobileAuthResponse> mfaChallenge(@Valid @RequestBody MfaChallengeRequest request,
+                                                           HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, null);
+        var result = authService.completeMfaChallenge(request.mfaToken(),
+                request.totpCode(), request.recoveryCode(), ctx);
         return ResponseEntity.ok(toResponse(result));
     }
 
     @PostMapping("/register")
-    public ResponseEntity<MobileAuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        var result = authService.register(request, TRANSPORT_TAG);
+    public ResponseEntity<MobileAuthResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                       HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, null);
+        var result = authService.register(request, ctx);
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(result));
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<MobileAuthResponse> refresh(@Valid @RequestBody MobileRefreshRequest request) {
-        var result = authService.refresh(request.refreshToken(), TRANSPORT_TAG);
+    public ResponseEntity<MobileAuthResponse> refresh(@Valid @RequestBody MobileRefreshRequest request,
+                                                      HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, null);
+        var result = authService.refresh(request.refreshToken(), ctx);
         return ResponseEntity.ok(toResponse(result));
+    }
+
+    private AuthRequestContext buildContext(HttpServletRequest httpRequest, String deviceLabel) {
+        var ip = clientIpResolver.resolve(httpRequest);
+        var ua = httpRequest.getHeader("User-Agent");
+        return new AuthRequestContext(TRANSPORT_TAG, ip, ua, deviceLabel);
     }
 
     @PostMapping("/logout")

@@ -55,9 +55,10 @@ class JwtAuthenticationFilterTest {
         chain = org.mockito.Mockito.mock(FilterChain.class);
         SecurityContextHolder.clearContext();
         MDC.clear();
-        lenient().when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt()))
+        lenient().when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt(), any()))
                 .thenReturn(true);
         lenient().when(jwtTokenProvider.extractGeneration(anyString())).thenReturn(0);
+        lenient().when(jwtTokenProvider.extractSessionId(anyString())).thenReturn(null);
     }
 
     @AfterEach
@@ -329,7 +330,7 @@ class JwtAuthenticationFilterTest {
         when(jwtTokenProvider.validateAccessToken("revoked.jwt.token")).thenReturn(true);
         when(jwtTokenProvider.extractUserId("revoked.jwt.token")).thenReturn(UUID.randomUUID());
         when(jwtTokenProvider.extractGeneration("revoked.jwt.token")).thenReturn(3);
-        when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt())).thenReturn(false);
+        when(sessionStateValidator.isSessionValid(any(UUID.class), anyInt(), any())).thenReturn(false);
 
         filter.doFilterInternal(request, response, chain);
 
@@ -351,7 +352,7 @@ class JwtAuthenticationFilterTest {
 
         filter.doFilterInternal(request, response, chain);
 
-        verify(sessionStateValidator).isSessionValid(userId, 11);
+        verify(sessionStateValidator).isSessionValid(userId, 11, null);
     }
 
     @Test

@@ -47,8 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (token != null && jwtTokenProvider.validateAccessToken(token)) {
                 var userId = jwtTokenProvider.extractUserId(token);
                 var generation = jwtTokenProvider.extractGeneration(token);
+                var sessionId = jwtTokenProvider.extractSessionId(token);
 
-                if (sessionStateValidator.isSessionValid(userId, generation)) {
+                if (sessionStateValidator.isSessionValid(userId, generation, sessionId)) {
                     var tenantId = jwtTokenProvider.extractTenantId(token);
                     var role = jwtTokenProvider.extractRole(token);
                     var email = jwtTokenProvider.extractEmail(token);
@@ -60,7 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         request.setAttribute(BEARER_AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
                     }
 
-                    var principal = new TenantUserPrincipal(userId, tenantId, email, role);
+                    var principal = new TenantUserPrincipal(userId, tenantId, email, role, sessionId);
                     var auth = new UsernamePasswordAuthenticationToken(
                             principal, null, principal.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(auth);

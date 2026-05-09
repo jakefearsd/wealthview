@@ -65,6 +65,8 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/api/v1/auth/login", "POST"),
                                 new AntPathRequestMatcher("/api/v1/auth/register", "POST"),
+                                new AntPathRequestMatcher("/api/v1/auth/refresh", "POST"),
+                                new AntPathRequestMatcher("/api/v1/auth/mfa/challenge", "POST"),
                                 new AntPathRequestMatcher("/api/v1/auth/token/**"),
                                 bearerAuthorizationHeaderMatcher()))
                 .sessionManagement(session ->
@@ -82,6 +84,18 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/auth/logout",
                                 "/api/v1/auth/token/logout").authenticated()
+                        // Per-device session endpoints (list / revoke) require
+                        // the caller's principal — same reasoning as logout.
+                        .requestMatchers("/api/v1/auth/sessions",
+                                "/api/v1/auth/sessions/**").authenticated()
+                        // MFA management endpoints all operate on the caller's
+                        // own account; they are authenticated even though they
+                        // are technically under /api/v1/auth/.
+                        .requestMatchers("/api/v1/auth/mfa/setup",
+                                "/api/v1/auth/mfa/verify-setup",
+                                "/api/v1/auth/mfa/disable",
+                                "/api/v1/auth/mfa/regenerate-recovery-codes",
+                                "/api/v1/auth/mfa/status").authenticated()
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/admin/prices/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")

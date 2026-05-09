@@ -2,13 +2,17 @@ package com.wealthview.api.controller;
 
 import com.wealthview.api.common.ClientIpResolver;
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.auth.AuthRequestContext;
 import com.wealthview.core.auth.AuthService;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.dto.AuthIdentityResponse;
 import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.CurrentUserResponse;
+import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
+import com.wealthview.core.auth.dto.MfaChallengeRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
+import java.util.Map;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -56,15 +60,31 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<AuthIdentityResponse> login(@Valid @RequestBody LoginRequest request,
-                                                      HttpServletRequest httpRequest) {
-        var ipAddress = clientIpResolver.resolve(httpRequest);
-        return respondWithCookies(authService.login(request, ipAddress), HttpStatus.OK);
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+                                   HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, AuthRequestContext.COOKIE, request.deviceLabel());
+        var outcome = authService.loginInitiate(request, ctx);
+        if (outcome instanceof LoginOutcome.MfaRequired m) {
+            return ResponseEntity.ok(Map.of("mfa_required", true, "mfa_token", m.mfaToken()));
+        }
+        var tokens = ((LoginOutcome.Tokens) outcome).result();
+        return respondWithCookies(tokens, HttpStatus.OK);
+    }
+
+    @PostMapping("/mfa/challenge")
+    public ResponseEntity<AuthIdentityResponse> mfaChallenge(@Valid @RequestBody MfaChallengeRequest request,
+                                                             HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, AuthRequestContext.COOKIE, null);
+        var result = authService.completeMfaChallenge(request.mfaToken(),
+                request.totpCode(), request.recoveryCode(), ctx);
+        return respondWithCookies(result, HttpStatus.OK);
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthIdentityResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return respondWithCookies(authService.register(request), HttpStatus.CREATED);
+    public ResponseEntity<AuthIdentityResponse> register(@Valid @RequestBody RegisterRequest request,
+                                                         HttpServletRequest httpRequest) {
+        var ctx = buildContext(httpRequest, AuthRequestContext.COOKIE, null);
+        return respondWithCookies(authService.register(request, ctx), HttpStatus.CREATED);
     }
 
     @PostMapping("/refresh")
@@ -73,7 +93,15 @@ public class AuthController {
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new BadCredentialsException("Missing refresh token cookie");
         }
-        return respondWithCookies(authService.refresh(refreshToken), HttpStatus.OK);
+        var ctx = buildContext(httpRequest, AuthRequestContext.COOKIE, null);
+        return respondWithCookies(authService.refresh(refreshToken, ctx), HttpStatus.OK);
+    }
+
+    private AuthRequestContext buildContext(HttpServletRequest httpRequest, String transport,
+                                            String deviceLabel) {
+        var ip = clientIpResolver.resolve(httpRequest);
+        var ua = httpRequest.getHeader("User-Agent");
+        return new AuthRequestContext(transport, ip, ua, deviceLabel);
     }
 
     @PostMapping("/logout")
