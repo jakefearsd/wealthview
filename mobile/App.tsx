@@ -1,36 +1,29 @@
 /**
- * WealthView Mobile (scaffold)
+ * WealthView Mobile — root component.
  *
- * Single-screen proof that the mobile app consumes the @wealthview/shared
- * package end-to-end: it imports `formatCurrency` from the shared workspace
- * and renders the formatted result.
+ * Composes the providers (SafeArea, AuthContext, NavigationContainer) and
+ * delegates routing to RootNavigator, which switches on auth status:
+ * BootSplash → ServerConfig → Login → Dashboard.
  *
  * @format
  */
 
 import React from 'react';
-import { SafeAreaView, StatusBar, StyleSheet, Text, View } from 'react-native';
-import { formatCurrency } from '@wealthview/shared';
-
-const SAMPLE_AMOUNT = 1234567.89;
+import { StatusBar } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AuthProvider } from './src/auth/AuthContext';
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 export default function App(): React.JSX.Element {
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaProvider>
       <StatusBar barStyle="dark-content" />
-      <View style={styles.body}>
-        <Text style={styles.heading}>WealthView</Text>
-        <Text style={styles.label}>Sample formatted value</Text>
-        <Text style={styles.amount}>{formatCurrency(SAMPLE_AMOUNT)}</Text>
-      </View>
-    </SafeAreaView>
+      <AuthProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fafafa' },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  heading: { fontSize: 28, fontWeight: '600', marginBottom: 24 },
-  label: { fontSize: 14, color: '#666' },
-  amount: { fontSize: 48, fontWeight: '700', marginTop: 8 },
-});
