@@ -274,11 +274,104 @@ Client                                Server
   |<- 200 {access_token, refresh_token}-|
 ```
 
+## Version check
+
+The mobile client SHOULD call `GET /api/v1/app/version-check` on every
+launch (and ideally on app foreground) to learn whether the running build
+is still acceptable.
+
+| Method | Path                       | Auth | Notes |
+|--------|----------------------------|------|-------|
+| GET    | `/api/v1/app/version-check` | none | Anonymous — the app may not have credentials yet on launch. |
+
+### Request
+
+Two required query parameters:
+
+| Param      | Required | Notes |
+|------------|----------|-------|
+| `platform` | yes      | `android` or `ios` (case-insensitive, normalized to lowercase server-side). |
+| `version`  | yes      | The installed build's version. Semver shape: `\d+\.\d+\.\d+` with optional `-pre.release` suffix. |
+
+Examples:
+
+```
+GET /api/v1/app/version-check?platform=android&version=1.2.3
+GET /api/v1/app/version-check?platform=ios&version=2.0.0-beta.1
+```
+
+### Response (200)
+
+```json
+{
+  "platform": "android",
+  "current_version": "1.2.3",
+  "minimum_supported_version": "1.0.0",
+  "latest_version": "1.5.0",
+  "update_required": false,
+  "update_recommended": true,
+  "store_url": "https://play.google.com/store/apps/details?id=com.wealthview",
+  "message": null
+}
+```
+
+| Field                       | Meaning |
+|-----------------------------|---------|
+| `update_required`           | `current_version < minimum_supported_version` (semver compare). When `true`, the app MUST refuse to operate and show a hard "Update required" screen pointing the user to `store_url`. |
+| `update_recommended`        | `current_version < latest_version && !update_required`. When `true`, show a soft, dismissable "Update available" banner. |
+| `message`                   | Optional admin-set string ("Required for new tax features"); shown alongside the prompt. `null` if not set. |
+| `store_url`                 | Where to send the user to update. Operator-set per platform. |
+
+### Recommended client behaviour
+
+1. Call `version-check` early in the launch flow (before showing the login
+   screen).
+2. If `update_required` is `true`: show a non-dismissable update screen
+   with `message` (if set) and a "Update now" button that opens
+   `store_url`. Do not allow the user to proceed.
+3. If `update_recommended` is `true`: show a dismissable banner. Allow
+   normal use.
+4. If both are `false`: continue normally.
+5. Treat any 4xx/5xx as "skip the check" — do NOT block the user on
+   transient backend issues.
+
+### Errors
+
+| Status | When |
+|--------|------|
+| 400    | Missing `platform` / `version`, unknown platform (anything other than android/ios), or malformed semver. |
+| 5xx    | Server fault. Client should treat as "no policy returned" and proceed. |
+
+### Caching
+
+Server-side, the lookup is cached with a 5-minute TTL per platform.
+Operator updates via the admin endpoint evict the cache immediately, so
+fresh policy values are visible on the next request after a bump. Mobile
+clients SHOULD NOT add their own client-side cache beyond a single launch.
+
+### Admin endpoints (SUPER_ADMIN)
+
+For operators only. Documented here so mobile developers know how the
+backend values get bumped:
+
+```
+GET  /api/v1/admin/mobile-versions
+PUT  /api/v1/admin/mobile-versions/{platform}
+       body: {
+         "minimum_supported_version": "1.5.0",
+         "latest_version": "2.0.0",
+         "store_url": "https://play.google.com/store/apps/details?id=com.wealthview",
+         "message": "Required for new tax features"
+       }
+```
+
+The seeded defaults (`0.0.1` / `0.0.1` and dummy store URLs) MUST be
+updated by the operator before announcing a real mobile build.
+
 ## Out of scope (future work)
 
 Not implemented today; surface here so the mobile developer can plan:
 
-- Force-update endpoint (`GET /api/v1/app/version-check`).
 - Push notifications (no `device_registrations` table yet).
 - Export-as-JSON-body variant of `DataExportController` (currently emits
   `text/csv` with `Content-Disposition: attachment`, which native apps
