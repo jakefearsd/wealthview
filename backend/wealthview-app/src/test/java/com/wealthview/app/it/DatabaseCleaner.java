@@ -33,6 +33,10 @@ public class DatabaseCleaner {
                     exchange_rates,
                     accounts,
                     invite_codes,
+                    refresh_tokens,
+                    user_sessions,
+                    mfa_recovery_codes,
+                    mfa_challenges,
                     users,
                     tenants
                 CASCADE

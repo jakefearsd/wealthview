@@ -83,6 +83,12 @@ app:
     secret: ${JWT_SECRET}
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
+  mfa:
+    # Base64-encoded 32-byte AES-256-GCM key used to encrypt TOTP shared
+    # secrets at rest. Generate with `openssl rand -base64 32`. Required in
+    # production (no fallback); ProductionConfigValidator rejects known dev
+    # defaults. Local dev/it profiles inject a deterministic sentinel.
+    encryption-key: ${MFA_ENCRYPTION_KEY}
   finnhub:
     api-key: ${FINNHUB_API_KEY:}
     base-url: https://finnhub.io

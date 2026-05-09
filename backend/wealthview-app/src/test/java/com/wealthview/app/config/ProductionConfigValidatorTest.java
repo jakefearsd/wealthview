@@ -43,6 +43,8 @@ class ProductionConfigValidatorTest {
     private static final String VALID_JWT_SECRET = "unique-production-secret-at-least-32-chars";
     private static final String VALID_SUPER_ADMIN_PASSWORD = "StrongPass123!";
     private static final String VALID_DB_PASSWORD = "super-secret-db-password";
+    // Valid base64-encoded 32 bytes, distinct from the dev sentinel.
+    private static final String VALID_MFA_KEY = "QkVMSUVWQUJMRS1QUk9EVUNUSU9OLU1GQS1LRVlIRVJF";
     private static final List<String> VALID_CORS_ORIGINS = List.of("https://app.wealthview.example");
 
     @Test
@@ -50,7 +52,7 @@ class ProductionConfigValidatorTest {
         var validator = new ProductionConfigValidator(
                 "default-secret-key-must-be-at-least-32-characters-long",
                 VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -64,7 +66,7 @@ class ProductionConfigValidatorTest {
         var validator = new ProductionConfigValidator(
                 "production-secret-key-must-be-at-least-32-characters",
                 VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -75,7 +77,7 @@ class ProductionConfigValidatorTest {
     void validate_jwtSecretShorterThan32Chars_throws() {
         var validator = new ProductionConfigValidator(
                 "tooShort", VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -86,7 +88,7 @@ class ProductionConfigValidatorTest {
     void validate_blankSuperAdminPassword_throws() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, "", VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -97,7 +99,7 @@ class ProductionConfigValidatorTest {
     void validate_demoSuperAdminPassword_throws() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, "admin123", VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -108,7 +110,7 @@ class ProductionConfigValidatorTest {
     void validate_blankDbPassword_throws() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, "",
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -121,7 +123,7 @@ class ProductionConfigValidatorTest {
         // in prod or docker, even if someone manually sets DB_PASSWORD=LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV.
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, "LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV",
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -129,10 +131,32 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    void validate_devSentinelMfaKey_throws() {
+        var validator = new ProductionConfigValidator(
+                VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                "REVWRUxPUE1FTlQtT05MWS1NRkEtS0VZLTMyLUJZVEU=", VALID_CORS_ORIGINS, prodEnv());
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("MFA_ENCRYPTION_KEY");
+    }
+
+    @Test
+    void validate_blankMfaKey_throws() {
+        var validator = new ProductionConfigValidator(
+                VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                "", VALID_CORS_ORIGINS, prodEnv());
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("MFA_ENCRYPTION_KEY");
+    }
+
+    @Test
     void validate_validConfig_succeeds() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                VALID_CORS_ORIGINS, prodEnv());
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
 
         validator.validate(); // should not throw
 
@@ -146,7 +170,7 @@ class ProductionConfigValidatorTest {
         // Spring update change the implicit "allow-all" behavior unnoticed.
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of(), prodEnv());
+                VALID_MFA_KEY, List.of(), prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -159,7 +183,7 @@ class ProductionConfigValidatorTest {
         // string and Spring splitting it into [""] ) must also fail.
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of(""), prodEnv());
+                VALID_MFA_KEY, List.of(""), prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -170,7 +194,7 @@ class ProductionConfigValidatorTest {
     void prodProfile_nonHttpsOrigin_fails() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of("http://app.wealthview.example"), prodEnv());
+                VALID_MFA_KEY, List.of("http://app.wealthview.example"), prodEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)
@@ -181,7 +205,7 @@ class ProductionConfigValidatorTest {
     void prodProfile_mixedHttpsAndHttpOrigins_fails() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of("https://app.wealthview.example", "http://legacy.example"),
+                VALID_MFA_KEY, List.of("https://app.wealthview.example", "http://legacy.example"),
                 prodEnv());
 
         assertThatThrownBy(validator::validate)
@@ -193,7 +217,7 @@ class ProductionConfigValidatorTest {
     void prodProfile_multipleHttpsOrigins_succeeds() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of("https://app.wealthview.example", "https://admin.wealthview.example"),
+                VALID_MFA_KEY, List.of("https://app.wealthview.example", "https://admin.wealthview.example"),
                 prodEnv());
 
         assertThatCode(validator::validate).doesNotThrowAnyException();
@@ -205,7 +229,7 @@ class ProductionConfigValidatorTest {
         // the prod-only HTTPS rule must not apply under the docker profile.
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of("http://localhost"), dockerEnv());
+                VALID_MFA_KEY, List.of("http://localhost"), dockerEnv());
 
         assertThatCode(validator::validate).doesNotThrowAnyException();
     }
@@ -214,7 +238,7 @@ class ProductionConfigValidatorTest {
     void dockerProfile_emptyCorsOrigin_fails() {
         var validator = new ProductionConfigValidator(
                 VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
-                List.of(), dockerEnv());
+                VALID_MFA_KEY, List.of(), dockerEnv());
 
         assertThatThrownBy(validator::validate)
                 .isInstanceOf(IllegalStateException.class)

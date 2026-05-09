@@ -24,5 +24,10 @@ app:
     secret: ${JWT_SECRET:LOCAL_DEV_HS256_SIGNING_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_DEVELOPMENT}
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
+  mfa:
+    # Dev sentinel: base64 of "DEVELOPMENT-ONLY-MFA-KEY-32-BYTE". Not a
+    # real key. ProductionConfigValidator rejects this exact value when
+    # the prod/docker profile is active, so it can never reach production.
+    encryption-key: ${MFA_ENCRYPTION_KEY:REVWRUxPUE1FTlQtT05MWS1NRkEtS0VZLTMyLUJZVEU=}
   zillow:
     enabled: true

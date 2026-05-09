@@ -31,10 +31,14 @@ public class ProductionConfigValidator {
     private static final Set<String> KNOWN_DEFAULT_DB_PASSWORDS = Set.of(
             "LOCAL_DEV_NOT_A_REAL_PASSWORD_OVERRIDE_VIA_ENV"
     );
+    private static final Set<String> KNOWN_DEFAULT_MFA_KEYS = Set.of(
+            "REVWRUxPUE1FTlQtT05MWS1NRkEtS0VZLTMyLUJZVEU="
+    );
 
     private final String jwtSecret;
     private final String superAdminPassword;
     private final String dbPassword;
+    private final String mfaEncryptionKey;
     private final List<String> allowedCorsOrigins;
     private final Environment environment;
 
@@ -42,11 +46,13 @@ public class ProductionConfigValidator {
             @Value("${app.jwt.secret}") String jwtSecret,
             @Value("${app.super-admin.password:}") String superAdminPassword,
             @Value("${spring.datasource.password:}") String dbPassword,
+            @Value("${app.mfa.encryption-key:}") String mfaEncryptionKey,
             @Value("${app.cors.allowed-origins:}") List<String> allowedCorsOrigins,
             Environment environment) {
         this.jwtSecret = jwtSecret;
         this.superAdminPassword = superAdminPassword;
         this.dbPassword = dbPassword;
+        this.mfaEncryptionKey = mfaEncryptionKey;
         this.allowedCorsOrigins = allowedCorsOrigins;
         this.environment = environment;
     }
@@ -71,6 +77,12 @@ public class ProductionConfigValidator {
             throw new IllegalStateException(
                     "SECURITY: DB_PASSWORD must be set to a unique value in production. "
                             + "Do not use any of the development defaults.");
+        }
+        if (mfaEncryptionKey == null || mfaEncryptionKey.isBlank()
+                || KNOWN_DEFAULT_MFA_KEYS.contains(mfaEncryptionKey)) {
+            throw new IllegalStateException(
+                    "SECURITY: MFA_ENCRYPTION_KEY must be set to a unique base64-encoded "
+                            + "32-byte value in production. Generate via `openssl rand -base64 32`.");
         }
         validateCorsOrigins();
         log.info("Production security configuration validated successfully");

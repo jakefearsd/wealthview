@@ -30,6 +30,8 @@ app:
     secret: INTEGRATION_TEST_HS256_SIGNING_KEY_FIXED_VALUE_FOR_TEST_DETERMINISM_ONLY
     access-token-expiration: 3600000
     refresh-token-expiration: 86400000
+  mfa:
+    encryption-key: REVWRUxPUE1FTlQtT05MWS1NRkEtS0VZLTMyLUJZVEU=
   finnhub:
     api-key: ""
   zillow:
