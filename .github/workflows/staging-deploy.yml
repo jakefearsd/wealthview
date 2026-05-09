@@ -3,6 +3,12 @@ name: Staging Deploy
 on:
   push:
     branches: [main]
+    paths:
+      - 'backend/**'
+      - 'pom.xml'
+      - 'Dockerfile'
+      - 'docker-compose*.yml'
+      - '.github/workflows/staging-deploy.yml'
   workflow_dispatch:
 
 concurrency:
