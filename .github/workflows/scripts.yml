@@ -1,0 +1,77 @@
+name: Admin Scripts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wv'
+      - 'scripts/**'
+      - 'infra/**'
+      - 'dev-backup.sh'
+      - 'dev-restore.sh'
+      - 'deploy.sh'
+      - 'fulltestsuite.sh'
+      - '.github/workflows/scripts.yml'
+  pull_request:
+    paths:
+      - 'wv'
+      - 'scripts/**'
+      - 'infra/**'
+      - 'dev-backup.sh'
+      - 'dev-restore.sh'
+      - 'deploy.sh'
+      - 'fulltestsuite.sh'
+      - '.github/workflows/scripts.yml'
+  workflow_dispatch:
+
+jobs:
+  shellcheck-and-bats:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure shellcheck is on PATH
+        run: |
+          set -euo pipefail
+          if ! command -v shellcheck >/dev/null 2>&1; then
+            SC_VER=0.10.0
+            tmp=$(mktemp -d)
+            curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/v${SC_VER}/shellcheck-v${SC_VER}.linux.x86_64.tar.xz" -o "$tmp/sc.tar.xz"
+            tar -xf "$tmp/sc.tar.xz" -C "$tmp"
+            install -m755 "$tmp/shellcheck-v${SC_VER}/shellcheck" "$HOME/.local/bin/shellcheck"
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          shellcheck --version | head -2
+
+      - name: Ensure bats is on PATH
+        run: |
+          set -euo pipefail
+          if ! command -v bats >/dev/null 2>&1; then
+            BATS_VER=1.11.0
+            tmp=$(mktemp -d)
+            curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/v${BATS_VER}.tar.gz" -o "$tmp/bats.tgz"
+            tar -xf "$tmp/bats.tgz" -C "$tmp"
+            (cd "$tmp/bats-core-${BATS_VER}" && ./install.sh "$HOME/.local")
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          bats --version
+
+      - name: Ensure age is on PATH (for encryption tests)
+        run: |
+          set -euo pipefail
+          if ! command -v age >/dev/null 2>&1; then
+            AGE_VER=1.2.0
+            tmp=$(mktemp -d)
+            curl -fsSL "https://github.com/FiloSottile/age/releases/download/v${AGE_VER}/age-v${AGE_VER}-linux-amd64.tar.gz" -o "$tmp/age.tgz"
+            tar -xf "$tmp/age.tgz" -C "$tmp"
+            install -m755 "$tmp/age/age" "$HOME/.local/bin/age"
+            install -m755 "$tmp/age/age-keygen" "$HOME/.local/bin/age-keygen"
+          fi
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          age --version
+
+      - name: shellcheck
+        run: ./scripts/test-wv.sh shellcheck
+
+      - name: bats
+        run: ./scripts/test-wv.sh bats
