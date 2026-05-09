@@ -46,6 +46,15 @@ public class UserEntity {
     @Column(name = "token_generation", nullable = false)
     private int tokenGeneration = 0;
 
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled = false;
+
+    @Column(name = "mfa_secret_encrypted")
+    private String mfaSecretEncrypted;
+
+    @Column(name = "mfa_setup_at")
+    private OffsetDateTime mfaSetupAt;
+
     @Version
     @Column(name = "version", nullable = false)
     private long version;
@@ -140,5 +149,29 @@ public class UserEntity {
 
     public long getVersion() {
         return version;
+    }
+
+    public boolean isMfaEnabled() {
+        return mfaEnabled;
+    }
+
+    public void setMfaEnabled(boolean mfaEnabled) {
+        this.mfaEnabled = mfaEnabled;
+    }
+
+    public String getMfaSecretEncrypted() {
+        return mfaSecretEncrypted;
+    }
+
+    public void setMfaSecretEncrypted(String mfaSecretEncrypted) {
+        this.mfaSecretEncrypted = mfaSecretEncrypted;
+    }
+
+    public OffsetDateTime getMfaSetupAt() {
+        return mfaSetupAt;
+    }
+
+    public void setMfaSetupAt(OffsetDateTime mfaSetupAt) {
+        this.mfaSetupAt = mfaSetupAt;
     }
 }
