@@ -28,6 +28,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.sessionStateValidator = sessionStateValidator;
     }
 
+    static final String BEARER_AUTHENTICATED_ATTRIBUTE = "BEARER_AUTHENTICATED";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
@@ -39,7 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         MDC.put("requestId", requestId);
 
         try {
-            var token = extractToken(request);
+            var bearerToken = extractBearerToken(request);
+            var token = bearerToken != null ? bearerToken : extractCookieToken(request);
 
             if (token != null && jwtTokenProvider.validateAccessToken(token)) {
                 var userId = jwtTokenProvider.extractUserId(token);
@@ -52,6 +55,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     MDC.put("userId", userId.toString());
                     MDC.put("tenantId", tenantId.toString());
+
+                    if (bearerToken != null) {
+                        request.setAttribute(BEARER_AUTHENTICATED_ATTRIBUTE, Boolean.TRUE);
+                    }
 
                     var principal = new TenantUserPrincipal(userId, tenantId, email, role);
                     var auth = new UsernamePasswordAuthenticationToken(
@@ -66,7 +73,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private String extractToken(HttpServletRequest request) {
+    private String extractBearerToken(HttpServletRequest request) {
+        var header = request.getHeader("Authorization");
+        if (header == null || !header.startsWith("Bearer ")) {
+            return null;
+        }
+        var token = header.substring("Bearer ".length()).trim();
+        return token.isEmpty() ? null : token;
+    }
+
+    private String extractCookieToken(HttpServletRequest request) {
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
             return null;

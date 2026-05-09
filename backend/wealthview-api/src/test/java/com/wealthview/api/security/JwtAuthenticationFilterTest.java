@@ -131,15 +131,71 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilterInternal_authorizationHeaderIgnored_noCookieMeansNoAuth() throws ServletException, IOException {
-        // Cookie is the only accepted token source; legacy Authorization headers must NOT authenticate.
-        request.addHeader("Authorization", "Bearer some.token");
+    void doFilterInternal_validBearerHeader_populatesSecurityContextAndMarksRequest()
+            throws ServletException, IOException {
+        var userId = UUID.randomUUID();
+        var tenantId = UUID.randomUUID();
+        request.addHeader("Authorization", "Bearer mobile.jwt.token");
+        when(jwtTokenProvider.validateAccessToken("mobile.jwt.token")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("mobile.jwt.token")).thenReturn(userId);
+        when(jwtTokenProvider.extractTenantId("mobile.jwt.token")).thenReturn(tenantId);
+        when(jwtTokenProvider.extractRole("mobile.jwt.token")).thenReturn("member");
+        when(jwtTokenProvider.extractEmail("mobile.jwt.token")).thenReturn("mobile@test.com");
 
         filter.doFilterInternal(request, response, chain);
 
-        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        assertThat(auth).isNotNull();
+        assertThat(((TenantUserPrincipal) auth.getPrincipal()).userId()).isEqualTo(userId);
+        assertThat(request.getAttribute("BEARER_AUTHENTICATED")).isEqualTo(Boolean.TRUE);
         verify(chain).doFilter(request, response);
-        verifyNoInteractions(jwtTokenProvider);
+    }
+
+    @Test
+    void doFilterInternal_bearerHeaderTakesPrecedenceOverCookie() throws ServletException, IOException {
+        request.addHeader("Authorization", "Bearer header.token");
+        request.setCookies(new Cookie("access_token", "cookie.token"));
+        when(jwtTokenProvider.validateAccessToken("header.token")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("header.token")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractTenantId("header.token")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractRole("header.token")).thenReturn("member");
+        when(jwtTokenProvider.extractEmail("header.token")).thenReturn("u@e.com");
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(jwtTokenProvider).validateAccessToken("header.token");
+        verify(jwtTokenProvider, never()).validateAccessToken("cookie.token");
+    }
+
+    @Test
+    void doFilterInternal_cookieAuth_doesNotMarkBearerAttribute() throws ServletException, IOException {
+        request.setCookies(new Cookie("access_token", "valid.cookie"));
+        when(jwtTokenProvider.validateAccessToken("valid.cookie")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("valid.cookie")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractTenantId("valid.cookie")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractRole("valid.cookie")).thenReturn("member");
+        when(jwtTokenProvider.extractEmail("valid.cookie")).thenReturn("u@e.com");
+
+        filter.doFilterInternal(request, response, chain);
+
+        assertThat(request.getAttribute("BEARER_AUTHENTICATED")).isNull();
+    }
+
+    @Test
+    void doFilterInternal_authorizationHeaderWithoutBearerPrefix_fallsBackToCookie()
+            throws ServletException, IOException {
+        request.addHeader("Authorization", "Basic dXNlcjpwYXNz");
+        request.setCookies(new Cookie("access_token", "cookie.token"));
+        when(jwtTokenProvider.validateAccessToken("cookie.token")).thenReturn(true);
+        when(jwtTokenProvider.extractUserId("cookie.token")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractTenantId("cookie.token")).thenReturn(UUID.randomUUID());
+        when(jwtTokenProvider.extractRole("cookie.token")).thenReturn("member");
+        when(jwtTokenProvider.extractEmail("cookie.token")).thenReturn("u@e.com");
+
+        filter.doFilterInternal(request, response, chain);
+
+        verify(jwtTokenProvider).validateAccessToken("cookie.token");
+        assertThat(request.getAttribute("BEARER_AUTHENTICATED")).isNull();
     }
 
     @Test
