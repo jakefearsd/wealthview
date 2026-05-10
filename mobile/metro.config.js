@@ -25,10 +25,13 @@ const config = {
       path.resolve(projectRoot, 'node_modules'),
       path.resolve(monorepoRoot, 'node_modules'),
     ],
-    // Honor the package.json `exports` field — required for modern packages
-    // like @babel/runtime that expose subpaths (./helpers/...) only via the
-    // exports map and not via direct file paths.
-    unstable_enablePackageExports: true,
+    // DISABLE package-exports resolution. Metro's default conditions for
+    // RN are ['react-native'], and packages like @babel/runtime declare
+    // their exports map with only ['node','import','default'] conditions.
+    // When Metro can't match a condition AND won't fall back to the plain
+    // file path, even existing files become "unresolvable." With this off,
+    // Metro uses traditional <package>/<subpath>.js lookup which Just Works.
+    unstable_enablePackageExports: false,
   },
 };
 
