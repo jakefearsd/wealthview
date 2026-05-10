@@ -14,4 +14,10 @@ export type {
     MeResponse,
     ErrorResponse,
     PageResponse,
+    AccountResponse,
+    AccountType,
+    AccountsListParams,
+    DashboardSummaryResponse,
+    DashboardAccountSummary,
+    DashboardAllocationEntry,
 } from './api/types';

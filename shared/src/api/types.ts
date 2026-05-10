@@ -74,3 +74,80 @@ export interface PageResponse<T> {
 
 /** Bearer transport delivers tokens in the Authorization header (mobile). */
 export type AuthTransport = 'bearer' | 'cookie';
+
+// ---------------------------------------------------------------------------
+// Account
+// ---------------------------------------------------------------------------
+
+/**
+ * The user-defined category an account belongs to. Mirrors the regex in
+ * AccountRequest on the backend (`brokerage|ira|401k|roth|bank`) plus the
+ * synthetic `property` type the dashboard summary emits for owned real
+ * estate. New types should be added here AND on the backend's regex.
+ */
+export type AccountType = 'brokerage' | 'ira' | '401k' | 'roth' | 'bank' | 'property';
+
+/**
+ * One account row as returned by `GET /api/v1/accounts` and `GET
+ * /api/v1/accounts/{id}`. Field names mirror the backend's
+ * `AccountResponse` record verbatim (snake_case on the wire after Jackson's
+ * naming strategy).
+ *
+ * `balance` is the current balance in the account's NATIVE currency — the
+ * dashboard summary does the USD conversion separately.
+ */
+export interface AccountResponse {
+    id: string;
+    name: string;
+    type: string;
+    institution: string | null;
+    currency: string;
+    balance: string;
+    created_at: string;
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard summary
+// ---------------------------------------------------------------------------
+
+/**
+ * One row in the dashboard summary's flat account list. Note this is NOT
+ * the same shape as {@link AccountResponse} — the summary intentionally
+ * omits id/institution/currency to keep the payload small. The `balance`
+ * here is in USD (the summary normalizes everything before returning).
+ *
+ * Properties also appear in this list with `type === 'property'` and the
+ * property's address as the `name`.
+ */
+export interface DashboardAccountSummary {
+    name: string;
+    type: string;
+    balance: string;
+}
+
+/** One slice of the allocation pie. Percentage is 0–100, NOT 0–1. */
+export interface DashboardAllocationEntry {
+    category: string;
+    value: string;
+    percentage: string;
+}
+
+/**
+ * Response body for `GET /api/v1/dashboard/summary`. All monetary fields
+ * arrive as decimal strings (BigDecimal serialized by Jackson) so callers
+ * preserve precision; convert to Number only at display boundaries.
+ */
+export interface DashboardSummaryResponse {
+    net_worth: string;
+    total_investments: string;
+    total_cash: string;
+    total_property_equity: string;
+    accounts: DashboardAccountSummary[];
+    allocation: DashboardAllocationEntry[];
+}
+
+/** Optional pagination params accepted by `GET /api/v1/accounts`. */
+export interface AccountsListParams {
+    page?: number;
+    size?: number;
+}
