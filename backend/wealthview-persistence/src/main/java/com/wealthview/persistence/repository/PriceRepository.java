@@ -37,4 +37,6 @@ public interface PriceRepository extends JpaRepository<PriceEntity, PriceId> {
     @Transactional
     @Query("DELETE FROM PriceEntity p WHERE p.symbol = :symbol AND p.date = :date")
     void deleteBySymbolAndDate(@Param("symbol") String symbol, @Param("date") LocalDate date);
+
+    List<PriceEntity> findBySymbolAndDateBefore(String symbol, LocalDate date);
 }

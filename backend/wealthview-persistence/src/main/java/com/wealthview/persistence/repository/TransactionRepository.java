@@ -58,4 +58,27 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
                                                @Param("accountIds") List<UUID> accountIds);
 
     void deleteByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
+
+    @Query("SELECT DISTINCT t.symbol FROM TransactionEntity t WHERE t.symbol IS NOT NULL")
+    List<String> findDistinctSymbolsAcrossAllTenants();
+
+    @Query("""
+            SELECT t FROM TransactionEntity t
+            WHERE t.symbol = :symbol
+              AND t.date <= :asOf
+            """)
+    List<TransactionEntity> findBySymbolAndDateOnOrBefore(@Param("symbol") String symbol,
+                                                          @Param("asOf") java.time.LocalDate asOf);
+
+    @Query("""
+            SELECT MIN(t.date) FROM TransactionEntity t
+            WHERE t.symbol = :symbol
+            """)
+    Optional<java.time.LocalDate> findEarliestDateBySymbol(@Param("symbol") String symbol);
+
+    @Query("""
+            SELECT DISTINCT t.tenant.id FROM TransactionEntity t
+            WHERE t.symbol = :symbol
+            """)
+    List<UUID> findDistinctTenantIdsBySymbol(@Param("symbol") String symbol);
 }
