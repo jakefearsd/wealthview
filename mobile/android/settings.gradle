@@ -1,14 +1,22 @@
-// Resolve @react-native/gradle-plugin via Node so this works regardless of
-// whether the package is at mobile/node_modules/ (standalone install) or
-// hoisted to ../node_modules/ (npm/yarn workspaces).
-def gradlePluginDir = new File(
-    ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
-        .execute([], rootDir).text.trim()
-).getParentFile()
-
-pluginManagement { includeBuild(gradlePluginDir) }
+// pluginManagement {} must be the FIRST statement — Gradle does not allow
+// preceding `def` or any other code. So we inline the Node resolve here.
+// See: https://docs.gradle.org/current/userguide/plugins.html#sec:plugin_management
+pluginManagement {
+    includeBuild(new File(
+        ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
+            .execute([], rootDir).text.trim()
+    ).getParentFile())
+}
 plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'MobileApp'
 include ':app'
+
+// Same Node resolve, this time stored in a def for use by the second
+// includeBuild call. Workspace setup means the package is hoisted to the
+// repo-root node_modules/ rather than mobile/node_modules/.
+def gradlePluginDir = new File(
+    ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
+        .execute([], rootDir).text.trim()
+).getParentFile()
 includeBuild(gradlePluginDir)
