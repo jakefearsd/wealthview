@@ -53,6 +53,29 @@ jest.mock('@react-navigation/native-stack', () => {
   return { __esModule: true, createNativeStackNavigator };
 });
 
+// Same approach for bottom-tabs: render only the first tab's component so
+// tests can verify tab presence and the default landing tab.
+jest.mock('@react-navigation/bottom-tabs', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+
+  function createBottomTabNavigator() {
+    const Navigator = ({ children }) => {
+      const screens = React.Children.toArray(children).filter(Boolean);
+      const first = screens[0];
+      if (!first || !first.props?.component) {
+        return React.createElement(View, null);
+      }
+      const Component = first.props.component;
+      return React.createElement(View, null, React.createElement(Component, {}));
+    };
+    const Screen = () => null;
+    return { Navigator, Screen };
+  }
+
+  return { __esModule: true, createBottomTabNavigator };
+});
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const SafeAreaProvider = ({ children }) => React.createElement(React.Fragment, null, children);

@@ -4,14 +4,14 @@ import { useAuth } from '../auth/AuthContext';
 import { BootSplash } from '../screens/BootSplash';
 import { ServerConfigScreen } from '../screens/ServerConfigScreen';
 import { LoginScreen } from '../screens/LoginScreen';
-import { DashboardScreen } from '../screens/DashboardScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { MainTabsNavigator } from './MainTabsNavigator';
 
 export type RootStackParamList = {
     BootSplash: undefined;
     ServerConfig: undefined;
     Login: undefined;
-    Dashboard: undefined;
+    Main: undefined;
     Settings: undefined;
 };
 
@@ -53,19 +53,10 @@ export function RootNavigator(): React.JSX.Element {
         );
     }
 
-    // status === 'authenticated'
+    // status === 'authenticated' — bottom tabs become the main surface.
     return (
-        <Stack.Navigator>
-            <Stack.Screen
-                name="Dashboard"
-                component={DashboardScreen}
-                options={{ title: 'WealthView' }}
-            />
-            <Stack.Screen
-                name="Settings"
-                component={SettingsScreen}
-                options={{ title: 'Settings' }}
-            />
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Main" component={MainTabsNavigator} />
         </Stack.Navigator>
     );
 }

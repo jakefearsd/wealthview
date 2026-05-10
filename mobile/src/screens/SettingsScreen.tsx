@@ -7,7 +7,7 @@ import { useAuth } from '../auth/AuthContext';
 import { isValidServerUrl, normalizeServerUrl } from '../config/serverUrlStorage';
 
 export function SettingsScreen(): React.JSX.Element {
-    const { serverUrl, setServerUrl, logout, status } = useAuth();
+    const { serverUrl, setServerUrl, logout, status, identity } = useAuth();
     const [value, setValue] = useState<string>(serverUrl ?? '');
     const [error, setError] = useState<string | null>(null);
     const [savingUrl, setSavingUrl] = useState(false);
@@ -53,6 +53,16 @@ export function SettingsScreen(): React.JSX.Element {
         <ScrollView contentContainerStyle={styles.container}>
             <Text style={styles.heading}>Settings</Text>
 
+            {isAuthenticated && identity ? (
+                <View style={styles.card}>
+                    <Text style={styles.cardTitle}>Account</Text>
+                    <Field label="Email" value={identity.email} />
+                    <Field label="Role" value={identity.role} />
+                    <Field label="Tenant ID" value={identity.tenant_id} mono />
+                    <Field label="User ID" value={identity.user_id} mono />
+                </View>
+            ) : null}
+
             <View style={styles.card}>
                 <Text style={styles.cardTitle}>Server</Text>
                 <TextInput
@@ -90,6 +100,21 @@ export function SettingsScreen(): React.JSX.Element {
     );
 }
 
+interface FieldProps {
+    label: string;
+    value: string;
+    mono?: boolean;
+}
+
+function Field({ label, value, mono = false }: FieldProps): React.JSX.Element {
+    return (
+        <View style={styles.field}>
+            <Text style={styles.fieldLabel}>{label}</Text>
+            <Text style={mono ? styles.fieldMono : styles.fieldValue}>{value}</Text>
+        </View>
+    );
+}
+
 const styles = StyleSheet.create({
     container: { backgroundColor: colors.bg, padding: spacing.lg, flexGrow: 1 },
     heading: { ...typography.h1, marginBottom: spacing.lg },
@@ -102,4 +127,8 @@ const styles = StyleSheet.create({
         borderColor: colors.border,
     },
     cardTitle: { ...typography.h2, marginBottom: spacing.md },
+    field: { marginBottom: spacing.sm },
+    fieldLabel: { ...typography.caption, marginBottom: 2 },
+    fieldValue: { ...typography.body, fontWeight: '500' },
+    fieldMono: { ...typography.mono },
 });
