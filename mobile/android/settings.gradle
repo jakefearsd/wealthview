@@ -1,6 +1,14 @@
-pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
+// Resolve @react-native/gradle-plugin via Node so this works regardless of
+// whether the package is at mobile/node_modules/ (standalone install) or
+// hoisted to ../node_modules/ (npm/yarn workspaces).
+def gradlePluginDir = new File(
+    ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
+        .execute([], rootDir).text.trim()
+).getParentFile()
+
+pluginManagement { includeBuild(gradlePluginDir) }
 plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'MobileApp'
 include ':app'
-includeBuild('../node_modules/@react-native/gradle-plugin')
+includeBuild(gradlePluginDir)
