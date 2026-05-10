@@ -11,6 +11,7 @@ import type { MeResponse, MobileAuthResponse } from '@wealthview/shared';
 import { tokenStorage } from './tokenStorage';
 import { serverUrlStorage } from '../config/serverUrlStorage';
 import { buildMobileApi, type MobileApiBundle } from './apiClient';
+import { buildDataApis, type DataApis } from '../api/apis';
 
 export type AuthStatus =
     | 'restoring'
@@ -31,6 +32,13 @@ export interface AuthContextValue extends AuthState {
     refreshMe(): Promise<void>;
     setServerUrl(url: string): Promise<void>;
     clearError(): void;
+    /**
+     * Returns the data-API wrappers (dashboard, accounts) backed by the
+     * currently authenticated axios client. Throws if called before the
+     * server URL is configured. Returns null if there's no API bundle yet
+     * (e.g. on the unauthenticated branch where no API has been built).
+     */
+    getDataApis(): DataApis | null;
 }
 
 type Action =
@@ -300,6 +308,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         dispatch({ type: 'clear_error' });
     }, []);
 
+    const getDataApis = useCallback((): DataApis | null => {
+        const api = apiRef.current;
+        if (!api) return null;
+        return buildDataApis(api.client);
+    }, []);
+
     const value = useMemo<AuthContextValue>(
         () => ({
             ...state,
@@ -308,8 +322,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
             refreshMe,
             setServerUrl,
             clearError,
+            getDataApis,
         }),
-        [state, login, logout, refreshMe, setServerUrl, clearError],
+        [state, login, logout, refreshMe, setServerUrl, clearError, getDataApis],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
