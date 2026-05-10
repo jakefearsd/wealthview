@@ -38,3 +38,9 @@ dev-restore.sh
 *.log
 .DS_Store
 Thumbs.db
+
+# Monorepo workspace
+mobile/
+shared/node_modules/
+node_modules/
+shared/dist/

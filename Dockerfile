@@ -2,11 +2,21 @@
 # Pinned by digest (node:20-alpine, NODE_VERSION=20.20.2 at time of pin).
 # To upgrade: `docker pull node:<tag>` then `docker inspect --format='{{index .RepoDigests 0}}' node:<tag>`.
 FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS frontend-build
-WORKDIR /app/frontend
-COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
-COPY frontend/ ./
-RUN npm run build
+WORKDIR /app
+# Workspace manifests — must all be present for `npm ci` to resolve the
+# workspace topology even though we only build frontend in this stage.
+# (mobile/ is intentionally excluded from the install — it pulls in React
+#  Native + native modules that are huge and irrelevant to the web build.)
+COPY package.json package-lock.json ./
+COPY frontend/package.json ./frontend/
+COPY shared/package.json ./shared/
+RUN npm ci --omit=optional --workspace=frontend --workspace=shared --include-workspace-root
+# Source
+COPY shared ./shared
+COPY frontend ./frontend
+# Build
+RUN npm run build --workspace=frontend
+# Result: /app/frontend/dist
 
 # Stage 2: Build backend
 # Pinned by digest (maven:3.9-eclipse-temurin-21, JDK 21.0.10+7 at time of pin).
