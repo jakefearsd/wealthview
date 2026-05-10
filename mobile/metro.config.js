@@ -27,6 +27,10 @@ const config = {
     ],
     // Disable hierarchical lookup so duplicate React installations don't fight.
     disableHierarchicalLookup: true,
+    // Honor the package.json `exports` field — required for modern packages
+    // like @babel/runtime that expose subpaths (./helpers/...) only via the
+    // exports map and not via direct file paths.
+    unstable_enablePackageExports: true,
   },
 };
 
