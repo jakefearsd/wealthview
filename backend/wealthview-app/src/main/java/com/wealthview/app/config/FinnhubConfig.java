@@ -1,6 +1,7 @@
 package com.wealthview.app.config;
 
 import com.wealthview.importmodule.finnhub.FinnhubClient;
+import com.wealthview.importmodule.finnhub.FinnhubSplitClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.context.annotation.Bean;
@@ -28,5 +29,11 @@ public class FinnhubConfig {
     public FinnhubClient finnhubClient(RestClient finnhubRestClient,
                                        @Value("${app.finnhub.api-key}") String apiKey) {
         return new FinnhubClient(finnhubRestClient, apiKey);
+    }
+
+    @Bean
+    public FinnhubSplitClient finnhubSplitClient(RestClient finnhubRestClient,
+                                                 @Value("${app.finnhub.api-key}") String apiKey) {
+        return new FinnhubSplitClient(finnhubRestClient, apiKey);
     }
 }
