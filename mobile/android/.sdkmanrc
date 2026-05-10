@@ -1,0 +1,6 @@
+# Mirrors mobile/.sdkmanrc so SDKMAN activates JDK 17 even when you
+# cd directly into mobile/android/ (e.g., from a fresh terminal). RN's
+# gradle-plugin uses kotlin { jvmToolchain(17) } and silently fails to
+# compile under JDK 25, masquerading as "plugin not found in any
+# included build."
+java=17.0.19-tem
