@@ -3,6 +3,10 @@ export { createApiClient } from './api/client';
 export type { ApiClientConfig } from './api/client';
 export { createAuthApi } from './api/auth';
 export type { AuthApi } from './api/auth';
+export { createDashboardApi } from './api/dashboard';
+export type { DashboardApi } from './api/dashboard';
+export { createAccountsApi } from './api/accounts';
+export type { AccountsApi } from './api/accounts';
 export type {
     AuthTransport,
     LoginRequest,
