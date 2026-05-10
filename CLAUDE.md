@@ -10,6 +10,8 @@ WealthView is a self-hosted, multi-tenant personal finance app (investments, ren
 - `backend/` — Maven multi-module: wealthview-api, wealthview-core, wealthview-persistence, wealthview-import, wealthview-projection, wealthview-app
 - `frontend/` — React + Vite SPA
 
+**Stock splits are auto-detected.** A daily Finnhub sync (`StockSplitSyncService`) plus a one-time backfill (`StockSplitBackfillRunner`) keep transactions, holdings, and historical prices split-adjusted. Manual entry and un-apply live under `/api/v1/admin/stock-splits`. See `docs/operations/stock-splits.md`.
+
 ---
 
 ## Development Workflow — TDD First
