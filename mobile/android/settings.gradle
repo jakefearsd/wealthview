@@ -1,24 +1,6 @@
-// pluginManagement {} MUST be the first statement in settings.gradle —
-// Gradle does not allow preceding `def`/`if`/anything else.
-//
-// React Native's Gradle plugin under npm workspaces is hoisted to the
-// repo-root node_modules/, NOT mobile/node_modules/. From this file
-// (rootDir = mobile/android/), `..` is mobile/, `../..` is the repo root.
-pluginManagement {
-    includeBuild(new File(rootDir, "../../node_modules/@react-native/gradle-plugin").canonicalFile)
-}
+pluginManagement { includeBuild("../../node_modules/@react-native/gradle-plugin") }
 plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'MobileApp'
 include ':app'
-
-// Mirror the include for non-plugin contexts. Existence check + actionable
-// error message lives here, after pluginManagement (where ordering is free).
-def gradlePluginRoot = new File(rootDir, "../../node_modules/@react-native/gradle-plugin").canonicalFile
-if (!gradlePluginRoot.exists()) {
-    throw new GradleException(
-        "React Native gradle-plugin not found at ${gradlePluginRoot}\n" +
-        "Run `npm install` from the monorepo root to populate node_modules/."
-    )
-}
-includeBuild(gradlePluginRoot)
+includeBuild("../../node_modules/@react-native/gradle-plugin")
