@@ -86,6 +86,19 @@ public class TestDataHelper {
                 HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
     }
 
+    public String createBuyTransactionOnDateAndGetId(String accountId, String date, String symbol,
+                                                     int quantity, int amount) {
+        var body = Map.of(
+                "date", date,
+                "type", "buy",
+                "symbol", symbol,
+                "quantity", quantity,
+                "amount", amount);
+        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
+                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        return (String) response.getBody().get("id");
+    }
+
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getTransactions(String accountId) {
         var response = restTemplate.exchange(

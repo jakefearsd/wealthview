@@ -17,6 +17,8 @@ public class DatabaseCleaner {
     public void clean() {
         jdbcTemplate.execute("""
                 TRUNCATE TABLE
+                    stock_split_adjustments,
+                    stock_splits,
                     scenario_income_sources,
                     income_sources,
                     property_depreciation_schedule,
@@ -41,5 +43,7 @@ public class DatabaseCleaner {
                     tenants
                 CASCADE
                 """);
+        // Reset the backfill flag so each split-related test starts fresh.
+        jdbcTemplate.update("DELETE FROM system_config WHERE key LIKE 'stock_splits.%'");
     }
 }
