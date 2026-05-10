@@ -32,11 +32,12 @@ function processQueue(error: unknown) {
     failedQueue = [];
 }
 
-// URLs whose 401 should propagate to the caller as-is, without attempting to
-// refresh or redirect. These are auth-shaped probes — for /auth/me a 401
-// just means "not logged in," and for /auth/refresh and /auth/login a 401
-// means the credentials are bad (no point retrying via refresh).
-const AUTH_PROBE_PATHS = ['/auth/me', '/auth/refresh', '/auth/login', '/auth/register'];
+// URLs whose 401 must NOT trigger a refresh attempt — refreshing them would
+// be circular (refresh-on-refresh loop) or pointless (a failed login won't
+// be saved by retrying with a refresh token). /auth/me is intentionally NOT
+// in this list: a 401 there should fire one refresh attempt to handle the
+// "access token rotated mid-session" case before we conclude "logged out."
+const AUTH_PROBE_PATHS = ['/auth/refresh', '/auth/login', '/auth/register'];
 
 function isAuthProbe(url: string | undefined): boolean {
     if (!url) return false;
