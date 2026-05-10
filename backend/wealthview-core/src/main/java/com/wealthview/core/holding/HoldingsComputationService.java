@@ -39,6 +39,28 @@ public class HoldingsComputationService {
         this.eventPublisher = eventPublisher;
     }
 
+    /**
+     * Recompute holdings for every account belonging to {@code tenantId} that
+     * has at least one transaction in {@code symbol}. Used by the stock-split
+     * apply/unapply flow, where a single split touches every account holding
+     * the symbol within a tenant.
+     */
+    @Transactional
+    public void recomputeAllForTenantAndSymbol(java.util.UUID tenantId, String symbol) {
+        if (symbol == null || symbol.isBlank()) {
+            return;
+        }
+        var txns = transactionRepository.findByTenant_Id(tenantId).stream()
+                .filter(t -> symbol.equals(t.getSymbol()))
+                .toList();
+        var seenAccountIds = new java.util.HashSet<java.util.UUID>();
+        for (var txn : txns) {
+            if (seenAccountIds.add(txn.getAccount().getId())) {
+                recomputeForAccountAndSymbol(txn.getAccount(), txn.getTenant(), symbol);
+            }
+        }
+    }
+
     @CacheEvict(value = "accountBalances", key = "#tenant.id")
     @Transactional
     public void recomputeForAccountAndSymbol(AccountEntity account, TenantEntity tenant, String symbol) {
