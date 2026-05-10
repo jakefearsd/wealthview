@@ -7,6 +7,8 @@ export { createDashboardApi } from './api/dashboard';
 export type { DashboardApi } from './api/dashboard';
 export { createAccountsApi } from './api/accounts';
 export type { AccountsApi } from './api/accounts';
+export { groupAccountsByCategory } from './portfolio/groupAccountsByCategory';
+export type { AccountCategory, AccountGroup } from './portfolio/groupAccountsByCategory';
 export type {
     AuthTransport,
     LoginRequest,
