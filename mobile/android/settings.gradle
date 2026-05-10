@@ -1,22 +1,24 @@
-// pluginManagement {} must be the FIRST statement — Gradle does not allow
-// preceding `def` or any other code. So we inline the Node resolve here.
-// See: https://docs.gradle.org/current/userguide/plugins.html#sec:plugin_management
+// pluginManagement {} MUST be the first statement in settings.gradle —
+// Gradle does not allow preceding `def`/`if`/anything else.
+//
+// React Native's Gradle plugin under npm workspaces is hoisted to the
+// repo-root node_modules/, NOT mobile/node_modules/. From this file
+// (rootDir = mobile/android/), `..` is mobile/, `../..` is the repo root.
 pluginManagement {
-    includeBuild(new File(
-        ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
-            .execute([], rootDir).text.trim()
-    ).getParentFile())
+    includeBuild(new File(rootDir, "../../node_modules/@react-native/gradle-plugin").canonicalFile)
 }
 plugins { id("com.facebook.react.settings") }
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'MobileApp'
 include ':app'
 
-// Same Node resolve, this time stored in a def for use by the second
-// includeBuild call. Workspace setup means the package is hoisted to the
-// repo-root node_modules/ rather than mobile/node_modules/.
-def gradlePluginDir = new File(
-    ['node', '--print', "require.resolve('@react-native/gradle-plugin/package.json')"]
-        .execute([], rootDir).text.trim()
-).getParentFile()
-includeBuild(gradlePluginDir)
+// Mirror the include for non-plugin contexts. Existence check + actionable
+// error message lives here, after pluginManagement (where ordering is free).
+def gradlePluginRoot = new File(rootDir, "../../node_modules/@react-native/gradle-plugin").canonicalFile
+if (!gradlePluginRoot.exists()) {
+    throw new GradleException(
+        "React Native gradle-plugin not found at ${gradlePluginRoot}\n" +
+        "Run `npm install` from the monorepo root to populate node_modules/."
+    )
+}
+includeBuild(gradlePluginRoot)
