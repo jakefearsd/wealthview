@@ -8,11 +8,47 @@ iOS deployment is deferred until first release; that section is a placeholder at
 
 | Tool | Version | Notes |
 |---|---|---|
-| Android Studio | latest stable | Or just the command-line tools + platform-tools, but the bundled SDK manager is by far the easiest way to install the right `compileSdk` / `buildTools` versions. |
-| JDK | 17+ | RN 0.85 needs JDK 17 minimum. `java -version` to check. |
+| Android Studio | Panda Feature Drop (2025.3.4+) | Installed at `~/android-studio/`. Launchable from the apps menu (entry created at `~/.local/share/applications/android-studio.desktop`) or via `studio.sh` once `~/android-studio/bin` is on PATH. |
+| JDK | 17.0.x via SDKMAN | RN 0.85 requires JDK 17. Backend uses JDK 25. SDKMAN auto-switches based on `mobile/.sdkmanrc`. |
 | Node | 22.11+ | Same engine pin as the rest of the monorepo. |
 | Android phone | Android 9+ | Older versions also work but cleartext-HTTP behaviour differs. |
-| `adb` on `PATH` | from platform-tools | `adb devices` should list your phone after USB debugging is enabled. |
+| `adb` on `PATH` | from platform-tools | `adb devices` should list your phone after USB debugging is enabled. Installed alongside the SDK by Studio's first-run wizard. |
+
+### One-time machine setup (already done on the dev workstation)
+
+If setting up a new machine from scratch, replicate:
+
+```bash
+# JDK 17 alongside JDK 25 via SDKMAN with auto-switch
+sdk install java 17.0.19-tem        # may need: sed -i 's/sdkman_auto_env=false/sdkman_auto_env=true/' ~/.sdkman/etc/config
+
+# Android Studio (3.5GB download, 3.3GB on disk after extract)
+curl -L -o /tmp/studio.tgz "$(curl -fsSL https://developer.android.com/studio | grep -oE 'https://[^\"]*android-studio[^\"]*linux[^\"]*\.tar\.gz' | head -1)"
+tar -xzf /tmp/studio.tgz -C ~
+
+# .bashrc additions (after SDK install completes via Studio):
+#   export ANDROID_HOME="$HOME/Android/Sdk"
+#   export ANDROID_SDK_ROOT="$ANDROID_HOME"
+#   export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+#   export PATH="$HOME/android-studio/bin:$PATH"
+```
+
+The `mobile/.sdkmanrc` file in this repo declares `java=17.0.19-tem`. With `sdkman_auto_env=true`, every `cd` into `mobile/` switches the shell's JDK automatically; `cd ..` reverts to JDK 25 for backend work.
+
+### Android Studio first-run wizard (one-time, GUI)
+
+1. Launch Android Studio (apps menu → Android Studio, or `studio.sh` from terminal).
+2. "Do not import settings" → Next.
+3. Welcome → Next.
+4. Install Type: **Standard** (downloads recommended SDK + platform tools + emulator).
+5. UI Theme: pick.
+6. Verify Settings → Next → accept all licenses → Finish.
+7. SDK download starts (~2-3GB; 5-10 minutes on a fast connection). Sit through it once.
+8. After SDK is installed, **open a new terminal** so `ANDROID_HOME` and the `platform-tools` PATH entries take effect, then verify:
+   ```bash
+   adb --version          # should print Android Debug Bridge version 1.0.x
+   echo "$ANDROID_HOME"   # should print /home/jakefear/Android/Sdk
+   ```
 
 On the phone:
 - Settings → About phone → tap "Build number" seven times → Developer options unlocked.
