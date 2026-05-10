@@ -64,6 +64,12 @@ The first launch shows the Server URL screen. To talk to your local backend:
    - **Email:** `demo@wealthview.local`
    - **Password:** `demo123`
 
+### What you should see
+
+After login you'll land on the **Portfolio** tab showing your net worth and accounts grouped by category (Investment Accounts / Cash / Other). Pull down to refresh. Tap any account card to see its details. The **Settings** tab lets you change the server URL or log out.
+
+If the Portfolio screen lands on the empty state ("No accounts yet"), the demo data probably hasn't seeded yet — confirm `SampleDataInitializer` ran in the backend logs (`docker compose logs app | grep -i sample`).
+
 ## 4. HTTP-vs-HTTPS gotcha
 
 Android 9+ blocks plaintext HTTP traffic by default. The RN scaffold sets `usesCleartextTraffic="true"` only for `localhost` and `10.0.2.2` (the emulator gateway). For an arbitrary LAN IP, you need to allowlist your subnet explicitly **for debug builds only**.

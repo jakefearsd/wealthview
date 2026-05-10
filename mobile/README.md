@@ -2,7 +2,7 @@
 
 WealthView's React Native client. Lives as a workspace package alongside the web frontend and the cross-platform `shared/` package — see the root `README.md` for the monorepo layout.
 
-This pass ships an end-to-end auth MVP: server URL configuration, login against the backend's mobile auth endpoints, dashboard with identity + server URL, settings with server URL editing, and logout. Account / transaction / projection screens land in subsequent passes.
+This pass ships the daily-driver Portfolio screen on top of the auth MVP: net-worth headline, category breakdown chips, and accounts grouped by type with tap-through to a per-account detail screen. The authenticated UI is a two-tab bar (Portfolio / Settings) — see "Navigation" below. Holdings, transactions, charts, and account creation land in subsequent passes (web app for now).
 
 ## What ships in this build
 
@@ -11,8 +11,18 @@ This pass ships an end-to-end auth MVP: server URL configuration, login against 
 | BootSplash | Spinner shown while AuthContext reads the keychain and verifies `/auth/me` on cold start. |
 | ServerConfigScreen | First screen on a fresh install. Validates and stores the user's WealthView server URL. |
 | LoginScreen | Email + password against `POST /api/v1/auth/token/login`. Friendly refusal of MFA-enabled accounts (challenge UI is a later pass). |
-| DashboardScreen | Greeting, identity card (role / tenant / user IDs), server URL card, logout button. Re-fetches `/auth/me` on focus. |
-| SettingsScreen | Editable server URL (with confirmation when it would invalidate the current session) and a logout button. Reachable from both Login and Dashboard. |
+| **PortfolioScreen** (default tab) | The screen the user opens every day. Net-worth headline, investment / cash / property breakdown chips, accounts grouped by category with the largest balances on top, pull-to-refresh, tap-through to AccountDetail. Hits `GET /dashboard/summary` and `GET /accounts` in parallel. |
+| AccountDetailScreen | Tap-through landing for any account row. Shows balance, type, institution, currency. Holdings + transactions are a separate pass. |
+| SettingsScreen | Identity card (email / role / tenant / user IDs), editable server URL (with confirmation when it would invalidate the current session), and a logout button. |
+
+## Navigation
+
+Authenticated UI is a `@react-navigation/bottom-tabs` navigator with two tabs:
+
+- **Portfolio** — stack containing `Portfolio` and `AccountDetail`.
+- **Settings** — single-screen stack.
+
+Unauthenticated UI keeps its plain native-stack (`Login` ↔ `Settings` for server-URL editing). The root `RootNavigator` switches between these trees on `auth.status`.
 
 State is held in a single `AuthProvider` (`src/auth/AuthContext.tsx`) using `useReducer`. Tokens persist in `react-native-keychain` (Keystore-backed `EncryptedSharedPreferences` on Android, `kSecClassGenericPassword` on iOS). The HTTP layer comes from `@wealthview/shared` — `createApiClient` and `createAuthApi` — so the same axios factory will eventually serve both the mobile app and the web frontend.
 
@@ -81,7 +91,7 @@ cd mobile/ios && pod install
 cd .. && npm run ios
 ```
 
-The JS / business logic in this build is platform-agnostic — every native dep used (`react-native-keychain`, `react-native-screens`, `react-native-safe-area-context`, `@react-navigation/native-stack`) ships an iOS implementation.
+The JS / business logic in this build is platform-agnostic — every native dep used (`react-native-keychain`, `react-native-screens`, `react-native-safe-area-context`, `@react-navigation/native-stack`, `@react-navigation/bottom-tabs`) ships an iOS implementation.
 
 ## Tests
 
@@ -89,7 +99,7 @@ The JS / business logic in this build is platform-agnostic — every native dep 
 npm run test --workspace mobile           # from repo root
 ```
 
-The suite covers `AuthContext` (cold-start restore, login outcomes including MFA refusal, logout), every screen (input validation, error display, navigation), and a top-level App smoke that mounts the full provider tree. Mocks for `react-native-keychain`, `react-native-screens`, `react-native-safe-area-context`, and `@react-navigation/native-stack` live in `jest.setup.js` so individual tests don't need to repeat them.
+The suite covers `AuthContext` (cold-start restore, login outcomes including MFA refusal, logout), every screen (input validation, error display, navigation, loading/empty/error states for Portfolio), the bottom-tabs root, and a top-level App smoke that mounts the full provider tree. Mocks for `react-native-keychain`, `react-native-screens`, `react-native-safe-area-context`, `@react-navigation/native-stack`, and `@react-navigation/bottom-tabs` live in `jest.setup.js` so individual tests don't need to repeat them.
 
 ## Adding cross-platform code
 
