@@ -44,11 +44,32 @@ The `mobile/.sdkmanrc` file in this repo declares `java=17.0.19-tem`. With `sdkm
 5. UI Theme: pick.
 6. Verify Settings → Next → accept all licenses → Finish.
 7. SDK download starts (~2-3GB; 5-10 minutes on a fast connection). Sit through it once.
-8. After SDK is installed, **open a new terminal** so `ANDROID_HOME` and the `platform-tools` PATH entries take effect, then verify:
-   ```bash
-   adb --version          # should print Android Debug Bridge version 1.0.x
-   echo "$ANDROID_HOME"   # should print /home/jakefear/Android/Sdk
-   ```
+
+### Install the Android API levels RN needs (also one-time, GUI)
+
+The Standard wizard installs the latest SDK platform Studio's release ships with — that's not always the version this repo's `mobile/android/build.gradle` pins (today: `compileSdk = 36`, `buildToolsVersion = 36.0.0` — i.e. Android 16). If they don't match, `npm run android` fails with an unhelpful Gradle error pointing at a missing platform.
+
+From the **Welcome to Android Studio** screen:
+
+1. Click **More Actions** (top-right of the project list) → **SDK Manager**. (The SDK Manager is hidden behind this dropdown when no project is open; once a project is open it lives under Tools → SDK Manager.)
+2. **SDK Platforms** tab — tick at least:
+   - **Android 16 (API 36)** — required, matches the repo's `compileSdk`.
+   - **Android 15 (API 35)** — recommended for compatibility testing one version back.
+3. **SDK Tools** tab — verify these are present (install if missing):
+   - **Android SDK Command-line Tools (latest)** — gives you `sdkmanager` on the CLI.
+   - **Android SDK Build-Tools** at version 36.0.0.
+   - **Android Emulator** (only if you want to use an emulator instead of a physical phone).
+4. Apply → accept licenses → wait for the download (~1-2 GB depending on what was missing).
+
+After this, **open a new terminal** so `ANDROID_HOME` and the `platform-tools` PATH entries take effect, then verify:
+
+```bash
+adb --version             # should print Android Debug Bridge version 1.0.x
+sdkmanager --version      # should print 20.0 (or similar)
+echo "$ANDROID_HOME"      # should print /home/jakefear/Android/Sdk
+sdkmanager --list_installed | grep -E "platforms|build-tools"
+# should show platforms;android-36 and build-tools;36.0.0 at minimum
+```
 
 On the phone:
 - Settings → About phone → tap "Build number" seven times → Developer options unlocked.
