@@ -12,6 +12,9 @@ const mockLogout = jest.fn();
 let mockAuthState: {
     serverUrl: string | null;
     status: string;
+    identity:
+        | { user_id: string; tenant_id: string; email: string; role: string }
+        | null;
 };
 
 jest.mock('../../src/auth/AuthContext', () => ({
@@ -30,6 +33,12 @@ beforeEach(() => {
     mockAuthState = {
         serverUrl: 'https://wealthview.example.com',
         status: 'authenticated',
+        identity: {
+            user_id: '11111111-2222-3333-4444-555555555555',
+            tenant_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
+            email: 'demo@wealthview.local',
+            role: 'admin',
+        },
     };
     mockSetServerUrl.mockResolvedValue(undefined);
     mockLogout.mockResolvedValue(undefined);
@@ -98,5 +107,19 @@ describe('SettingsScreen', () => {
         await waitFor(() => {
             expect(mockLogout).toHaveBeenCalled();
         });
+    });
+
+    it('displays the signed-in identity (email, role, tenant id) when authenticated', () => {
+        const { queryByText } = render(<SettingsScreen />);
+        expect(queryByText('demo@wealthview.local')).toBeTruthy();
+        expect(queryByText(/admin/)).toBeTruthy();
+        expect(queryByText('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')).toBeTruthy();
+    });
+
+    it('omits the Account card when unauthenticated', () => {
+        mockAuthState.status = 'unauthenticated';
+        mockAuthState.identity = null;
+        const { queryByText } = render(<SettingsScreen />);
+        expect(queryByText('demo@wealthview.local')).toBeNull();
     });
 });
