@@ -10,7 +10,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY frontend/package.json ./frontend/
 COPY shared/package.json ./shared/
-RUN npm ci --omit=optional --workspace=frontend --workspace=shared --include-workspace-root
+RUN npm ci --workspace=frontend --workspace=shared --include-workspace-root
 # Source
 COPY shared ./shared
 COPY frontend ./frontend
