@@ -8,6 +8,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import SummaryCard from '../components/SummaryCard';
 import CombinedPortfolioChart from '../components/CombinedPortfolioChart';
 import SnapshotProjectionChart from '../components/SnapshotProjectionChart';
+import RecentStockSplits from '../components/RecentStockSplits';
 
 const COLORS = ['#1976d2', '#2e7d32', '#ed6c02', '#9c27b0', '#d32f2f', '#0097a7'];
 
@@ -76,6 +77,10 @@ export default function DashboardPage() {
                         <div style={{ color: '#999', textAlign: 'center', padding: '3rem' }}>No allocation data</div>
                     )}
                 </div>
+            </div>
+
+            <div style={{ marginTop: '1.5rem' }}>
+                <RecentStockSplits />
             </div>
         </div>
     );

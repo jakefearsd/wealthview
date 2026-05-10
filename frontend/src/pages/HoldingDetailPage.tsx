@@ -10,6 +10,7 @@ import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
+import RecentStockSplits from '../components/RecentStockSplits';
 import type { Transaction } from '../types/transaction';
 import toast from 'react-hot-toast';
 
@@ -112,6 +113,10 @@ export default function HoldingDetailPage() {
                         </tbody>
                     </table>
                 )}
+            </div>
+
+            <div style={{ marginBottom: '2rem' }}>
+                <RecentStockSplits symbol={holding.symbol} title={`Splits affecting ${holding.symbol}`} />
             </div>
 
             <div style={cardStyle}>

@@ -8,8 +8,9 @@ import ExchangeRatesSection from '../components/admin/ExchangeRatesSection';
 import InviteCodesSection from '../components/admin/InviteCodesSection';
 import SystemConfigSection from '../components/admin/SystemConfigSection';
 import AuditLogSection from '../components/admin/AuditLogSection';
+import StockSplitsSection from '../components/admin/StockSplitsSection';
 
-type AdminSection = 'dashboard' | 'users' | 'tenants' | 'prices' | 'exchange-rates' | 'invite-codes' | 'system-config' | 'audit-log';
+type AdminSection = 'dashboard' | 'users' | 'tenants' | 'prices' | 'exchange-rates' | 'invite-codes' | 'system-config' | 'audit-log' | 'stock-splits';
 
 interface SidebarItem {
     key: AdminSection;
@@ -22,6 +23,7 @@ const sidebarItems: SidebarItem[] = [
     { key: 'users', label: 'Users' },
     { key: 'tenants', label: 'Tenants', superAdminOnly: true },
     { key: 'prices', label: 'Prices' },
+    { key: 'stock-splits', label: 'Stock Splits', superAdminOnly: true },
     { key: 'exchange-rates', label: 'Exchange Rates' },
     { key: 'invite-codes', label: 'Invite Codes' },
     { key: 'system-config', label: 'System Config', superAdminOnly: true },
@@ -47,6 +49,7 @@ export default function AdminAreaPage() {
             case 'users': return <UsersSection />;
             case 'tenants': return <TenantsSection />;
             case 'prices': return <PricesSection />;
+            case 'stock-splits': return <StockSplitsSection />;
             case 'exchange-rates': return <ExchangeRatesSection />;
             case 'invite-codes': return <InviteCodesSection />;
             case 'system-config': return <SystemConfigSection />;
