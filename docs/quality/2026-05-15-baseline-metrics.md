@@ -240,3 +240,147 @@ decomposition target.
    Jackson field annotation cleanup will suppress or resolve all 4.
 4. **wealthview-api** — Branch coverage at 60.8% is the most significant coverage gap.
    Adding error-path tests to controller tests should push this above 75%.
+
+---
+
+## 7. PIT Mutation Testing — Core + Projection (added 2026-05-16, Task 12)
+
+The pitest `targetClasses` were broadened from the projection-only set
+(`com.wealthview.core.projection.*`, `com.wealthview.core.projection.tax.*`,
+`com.wealthview.projection.*`) to also cover the high-value core service packages:
+`com.wealthview.core.account.*`, `com.wealthview.core.split.*`,
+`com.wealthview.core.property.*`, `com.wealthview.core.auth.*`. Matching `<targetTests>`
+were added. All four package names exist verbatim under
+`backend/wealthview-core/src/main/java/com/wealthview/core/` — no corrections needed.
+
+Run command:
+```
+cd backend && mvn -q test-compile org.pitest:pitest-maven:mutationCoverage -pl wealthview-core,wealthview-projection
+```
+Result: completes successfully (exit 0). HTML reports under each module's `target/pit-reports/`.
+
+### 7.1 Mutation scores
+
+| Module               | Mutations | Killed | Mutation Score | SURVIVED | Line Cov (mutated classes) | Test Strength |
+|----------------------|-----------|--------|----------------|----------|-----------------------------|---------------|
+| wealthview-core      | 1 288     | 887    | **69%**        | **401**  | 87%                         | 79%           |
+| wealthview-projection | 1 311    | 769    | **59%**        | **542**  | 97%                         | 60%           |
+
+"SURVIVED" above includes both genuinely-survived mutants (covered by a test but not killed)
+and NO_COVERAGE mutants (no test exercises the line). The projection module's high line
+coverage (97%) but low mutation score (59%) shows the projection tests assert end results
+broadly but rarely pin down individual branch boundaries — a classic "coverage without
+strength" gap.
+
+Per-package mutation score (core):
+
+| Package                              | Mutations | Score | Survivors |
+|---------------------------------------|-----------|-------|-----------|
+| com.wealthview.core.auth              | 235       | 59%   | 96 (incl. NO_COVERAGE)|
+| com.wealthview.core.auth.mfa          | 62        | 53%   | 29        |
+| com.wealthview.core.split             | 82        | 29%   | 58        |
+| com.wealthview.core.property          | 290       | 79%   | 62        |
+| com.wealthview.core.account           | 35        | 71%   | 10        |
+| com.wealthview.core.projection (+tax) | 393       | ~70%  | ~66       |
+
+### 7.2 Survivor triage
+
+Triage categories: **(a) missing test** — mutation changes real behaviour, no test catches
+it; **(b) equivalent** — no observable behaviour change; **(c) trivial** — real but not
+worth a dedicated test (metrics/logging side-effects, defensive code).
+
+The 401 core + 542 projection survivors were triaged in aggregate by class, mutation
+operator, and code inspection of representative lines. The breakdown below feeds Task 13.
+
+**Core — 401 survivors**
+
+| Category | Count (approx) | What it is |
+|----------|----------------|------------|
+| (a) missing test | ~205 | Real behaviour gaps — see specific list below |
+| (b) equivalent   | ~10  | e.g. `setUpdatedAt` removal where `updated_at` is also `DEFAULT now()` and never asserted; ordering-neutral lambda swaps |
+| (c) trivial      | ~186 | Micrometer `Counter::increment` removals (21+), `ApplicationEventPublisher::publishEvent` removals (6), `LoginAttemptService.recordFailure/recordSuccess` side-effect calls, `setUpdatedAt` calls, daemon-thread/`setPropagationBehavior` config wiring |
+
+**Projection — 542 survivors**
+
+| Category | Count (approx) | What it is |
+|----------|----------------|------------|
+| (a) missing test | ~470 | `MonteCarloSpendingOptimizer` (356) and `RothConversionOptimizer` (120) dominate — conditional-boundary and return-value mutants on optimization math that tests assert only loosely; `DeterministicProjectionEngine` (48) boundary mutants |
+| (b) equivalent   | ~20  | Boundary mutants on guards where the off-by-one range is unreachable given upstream validation |
+| (c) trivial      | ~52  | Logging/metric side-effects, defensive null-branch returns |
+
+### 7.3 Category (a) — concrete missing-test targets for Task 13
+
+The following are genuine behaviour gaps worth a dedicated test. Each entry is
+`Class:Line — mutation operator — reason`.
+
+**Auth (high priority — security-sensitive, much NO_COVERAGE):**
+- `AuthService:L205-240` — *whole `completeMfaChallenge` method is NO_COVERAGE* (negated
+  conditionals on challenge validity/expiry/used checks, `setUsedAt` removal, null return).
+  No test exercises MFA challenge completion at all.
+- `AuthService:L226,228 / loginInitiate L184-186` — negated conditionals + null return,
+  NO_COVERAGE on the MFA-required login branch.
+- `MfaService:L122-128 verifySetup`, `L135-140 disable`, `L162 regenerateRecoveryCodes`,
+  `L169 status`, `L174-182 verifyTotp` — NO_COVERAGE: TOTP verification, setup confirmation,
+  and disable paths are untested. `verifyTotp` negated-conditional survivors mean an
+  always-true verification would pass the suite.
+- `JwtTokenProvider:L99 validateMfaChallenge` (negated conditional, boolean→true),
+  `L85 generateMfaChallenge` (return→""), `L175 validateAccessToken` (boolean→true) —
+  NO_COVERAGE: token validation could always-return-valid undetected.
+- `SessionService:L31-70` — `listForUser`, `revoke`, `revokeAllOther` entirely NO_COVERAGE.
+- `TenantContext:L13-31` — all four accessors NO_COVERAGE (null/empty return mutants).
+- `CrossTenantAspect:L47-53`, `TenantFilterAspect:L49-53`, `TenantFilterActivator:L100` —
+  NO_COVERAGE on the tenant-filter aspect logic (negated conditionals, `reEnable` removal).
+- `LoginAttemptService:L24,34` — `isBlocked` / `recordFailure` conditional-boundary
+  survivors: the lockout threshold (`>=` vs `>`) is not pinned by a test.
+
+**Split:**
+- `StockSplitService:L240-269` — `restoreTransaction` / `restorePrice` largely NO_COVERAGE
+  (negated conditionals, boolean-return mutants, `setClosePrice` removal).
+- `StockSplitService:L299-309` — `listForTenant` filter predicate + `validateRatio`
+  conditional boundary survive: ratio bounds and the active/applied filter are unasserted.
+- `StockSplitService:L219-221 adjustPrices` — increment and int-return mutants survive:
+  the count of adjusted prices is not asserted.
+- `StockSplitSyncService` (whole `syncAll` + `computeFromDate`) and
+  `StockSplitBackfillRunner.runIfNeeded` — NO_COVERAGE: the daily sync orchestration and
+  one-time backfill gate have no unit test.
+
+**Property:**
+- `PropertyService:L124-136 update` — every field setter (`setAddress`, `setPurchasePrice`,
+  `setPurchaseDate`, `setCurrentValue`, `setMortgageBalance`) survives removal: the update
+  test calls update but does not assert the individual fields changed.
+- `PropertyService:L263-271 buildClassBreakdowns`, `L392 spreadEntryByCategory`,
+  `L509-552 applyDepreciationFields/applyCostSegFields/validateAssetClasses` — negated
+  conditionals and boundary mutants on cost-seg allocation logic survive.
+- `DepreciationCalculator:L59-233` — 13 conditional-boundary survivors across
+  `computeStraightLine`, `computeCostSegregation`, `applyBonusSchedule`,
+  `applyCatchUpSchedule`, `getDepreciationForYear`, `accumulatedThrough`: the last-year
+  remainder loop and 481(a) catch-up year ranges need boundary-case tests.
+- `AmortizationCalculator:L35,41 remainingBalance` — boundary survivors: behaviour at
+  payment 0 and final payment is unpinned.
+- `PropertyRoiService:L66-170` — boundary survivors on hold-vs-sell year comparisons.
+
+**Account:**
+- `AccountService:L92-94 update` — `setInstitution`, `setCurrency`, `setUpdatedAt`,
+  negated conditional survive: update test does not assert mutated fields.
+- `AccountService:L138 bulkBankBalances` lambda, `L190 computeInvestmentValue` —
+  boolean/return mutants survive: filtering and the unpriced-symbol path are unasserted.
+
+**Projection (carryover from prior baseline + amplified):**
+- `MonteCarloSpendingOptimizer` (356 survivors) and `RothConversionOptimizer` (120) —
+  conditional-boundary and return-value mutants on guardrail/optimization math. These are
+  category (a) but most are best addressed by the Phase 3 decomposition (Task plan) so the
+  extracted units become individually testable, rather than by bolting tests onto the
+  current 1 600-line God class. Task 13 should pick the highest-value boundary mutants in
+  `DeterministicProjectionEngine` (48 survivors) where the units are already testable.
+
+### 7.4 Notes for Task 13
+
+- Prioritise the **auth NO_COVERAGE** survivors: `completeMfaChallenge`, `MfaService.verifyTotp`,
+  `JwtTokenProvider.validateMfaChallenge`, and the tenant-filter aspects are security-critical
+  and currently have mutants proving an always-pass implementation would not be caught.
+- The `update`-method setter survivors (Account + Property) are cheap, high-value wins:
+  one assertion per mutated field in the existing update tests.
+- Do **not** chase category (c) metric/event survivors — verifying `Counter.increment` was
+  called adds brittle Mockito `verify()` noise for no behavioural guarantee.
+- Projection optimizer survivors are real but should largely be deferred to the Phase 3
+  decomposition; testing the monolith directly is low-leverage.

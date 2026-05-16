@@ -271,7 +271,20 @@
                             <param>com.wealthview.core.projection.*</param>
                             <param>com.wealthview.core.projection.tax.*</param>
                             <param>com.wealthview.projection.*</param>
+                            <param>com.wealthview.core.account.*</param>
+                            <param>com.wealthview.core.split.*</param>
+                            <param>com.wealthview.core.property.*</param>
+                            <param>com.wealthview.core.auth.*</param>
                         </targetClasses>
+                        <targetTests>
+                            <param>com.wealthview.core.projection.*</param>
+                            <param>com.wealthview.core.projection.tax.*</param>
+                            <param>com.wealthview.projection.*</param>
+                            <param>com.wealthview.core.account.*</param>
+                            <param>com.wealthview.core.split.*</param>
+                            <param>com.wealthview.core.property.*</param>
+                            <param>com.wealthview.core.auth.*</param>
+                        </targetTests>
                     </configuration>
                 </plugin>
                 <plugin>
