@@ -30,6 +30,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -305,6 +306,110 @@ class StockSplitServiceTest {
         var result = service.listForTenant(tenantId, null, null, null);
 
         assertThat(result).isEmpty();
+    }
+
+    @Test
+    void listForTenant_withSymbolFilter_returnsOnlyMatchingSymbolCaseInsensitively() {
+        // The symbol filter predicate must keep only splits whose symbol equals
+        // the requested one (ignoring case) and drop the rest.
+        var t1 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        var t2 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "MSFT",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(t1, t2));
+        var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
+        var msftSplit = new StockSplitEntity("MSFT", LocalDate.of(2021, 2, 1), 2, 1, "finnhub");
+        when(stockSplitRepository.findBySymbolsInAndDateRange(any(), any(), any()))
+                .thenReturn(List.of(aaplSplit, msftSplit));
+
+        var result = service.listForTenant(tenantId, "aapl", null, null);
+
+        assertThat(result).containsExactly(aaplSplit);
+    }
+
+    @Test
+    void listForTenant_blankSymbolFilter_returnsAllSplits() {
+        var t = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500"));
+        when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(t));
+        var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
+        var msftSplit = new StockSplitEntity("MSFT", LocalDate.of(2021, 2, 1), 2, 1, "finnhub");
+        when(stockSplitRepository.findBySymbolsInAndDateRange(any(), any(), any()))
+                .thenReturn(List.of(aaplSplit, msftSplit));
+
+        var result = service.listForTenant(tenantId, "   ", null, null);
+
+        assertThat(result).containsExactly(aaplSplit, msftSplit);
+    }
+
+    @Test
+    void applySplit_zeroNumerator_throwsIllegalArgument() {
+        assertThatThrownBy(() -> service.applySplit("AAPL", LocalDate.of(2020, 8, 31), 0, 1, "manual"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+    }
+
+    @Test
+    void applySplit_negativeDenominator_throwsIllegalArgument() {
+        assertThatThrownBy(() -> service.applySplit("AAPL", LocalDate.of(2020, 8, 31), 1, -1, "manual"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+    }
+
+    @Test
+    void applySplit_ratioOfOneToOne_isAccepted() {
+        // 1:1 is the boundary: numerator and denominator are both exactly 1,
+        // which must pass the >0 check (a <=0 / <0 mutant boundary).
+        when(stockSplitRepository.findBySymbolAndEffectiveDate(any(), any())).thenReturn(Optional.empty());
+        when(stockSplitRepository.save(any(StockSplitEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+        when(transactionRepository.findBySymbolAndDateOnOrBefore(any(), any())).thenReturn(List.of());
+
+        var result = service.applySplit("AAPL", LocalDate.of(2020, 8, 31), 1, 1, "manual");
+
+        assertThat(result).isNotNull();
+    }
+
+    @Test
+    void unapplySplit_transactionRowMissing_doesNotCountAsRestored() {
+        // restoreTransaction must return false (not crash, not count) when the
+        // referenced transaction row no longer exists.
+        var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
+        var splitId = UUID.randomUUID();
+        var missingTxnId = UUID.randomUUID();
+        var adj = new StockSplitAdjustmentEntity(split, tenantId, "transactions", missingTxnId,
+                "quantity", new BigDecimal("100"), new BigDecimal("400"));
+        when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
+        when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj));
+        when(transactionRepository.findById(missingTxnId)).thenReturn(Optional.empty());
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        service.unapplySplit(splitId);
+
+        verify(stockSplitRepository).delete(split);
+    }
+
+    @Test
+    void unapplySplit_restoresPriceRows() {
+        // restorePrice must locate the price row by deterministic UUID and
+        // restore its old close price.
+        var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
+        var splitId = UUID.randomUUID();
+        var priceDate = LocalDate.of(2020, 1, 1);
+        var price = new PriceEntity("AAPL", priceDate, new BigDecimal("100.0000"), "finnhub");
+        var priceRowId = UUID.nameUUIDFromBytes(
+                ("price:AAPL:" + priceDate).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        var adj = new StockSplitAdjustmentEntity(split, tenantId, "prices", priceRowId,
+                "close_price", new BigDecimal("400.00000000"), new BigDecimal("100.00000000"));
+        when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
+        when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj));
+        when(priceRepository.findBySymbolAndDateBefore("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(List.of(price));
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        service.unapplySplit(splitId);
+
+        assertThat(price.getClosePrice()).isEqualByComparingTo("400.0000");
     }
 
     private TransactionEntity txn(UUID id, LocalDate date, String type, String symbol,
