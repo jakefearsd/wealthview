@@ -70,7 +70,7 @@ public class FinnhubSplitClient implements SplitDetectionClient {
                     results.add(new DetectedSplit(symbol,
                             LocalDate.parse(entry.date()), numerator, denominator));
                 } catch (IllegalArgumentException e) {
-                    log.warn("Skipping invalid split for {} on {}: {}", symbol, entry.date, e.getMessage());
+                    log.warn("Skipping invalid split for {} on {}: {}", symbol, entry.date(), e.getMessage());
                 }
             }
             return results;
