@@ -3,6 +3,8 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.util.Optional;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
 
@@ -35,10 +37,11 @@ final class MultiPoolYearDtoBuilder {
     }
 
     /**
-     * Builds the year DTO. {@code taxBreakdown} is the tax breakdown accumulated during the
-     * year's withdrawal + conversion cycle, if any.
+     * Builds the year DTO. {@code yearTaxBreakdown} is the tax breakdown accumulated during the
+     * year's withdrawal + conversion cycle, or {@code null} if no tax was computed this year.
      */
-    static ProjectionYearDto build(YearDtoInputs in, Optional<CombinedTaxResult> taxBreakdown) {
+    static ProjectionYearDto build(YearDtoInputs in, @Nullable CombinedTaxResult yearTaxBreakdown) {
+        Optional<CombinedTaxResult> taxBreakdown = Optional.ofNullable(yearTaxBreakdown);
         BigDecimal fedTax = taxBreakdown.map(CombinedTaxResult::federalTax).orElse(null);
         BigDecimal stTax = taxBreakdown
                 .filter(b -> b.stateTax().compareTo(BigDecimal.ZERO) > 0)

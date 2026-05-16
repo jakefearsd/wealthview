@@ -536,7 +536,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     combinedTaxSource, getTotal(), taxable, traditional, roth);
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
-            Optional<CombinedTaxResult> breakdown = lastTaxBreakdown;
+            CombinedTaxResult breakdown = lastTaxBreakdown.orElse(null);
             lastTaxBreakdown = Optional.empty();
             return MultiPoolYearDtoBuilder.build(inputs, breakdown);
         }
