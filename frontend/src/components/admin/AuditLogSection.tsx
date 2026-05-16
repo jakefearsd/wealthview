@@ -13,7 +13,6 @@ export default function AuditLogSection() {
     const [total, setTotal] = useState(0);
 
     useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- idiomatic loading flag for a data-fetching effect
         setLoading(true);
         getAuditLogs(page, 50, filter || undefined)
             .then((res) => {

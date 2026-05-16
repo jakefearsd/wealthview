@@ -205,7 +205,6 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
                         interval={xTickInterval}
                     />
                     <YAxis tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
-                    {/* eslint-disable-next-line react-hooks/static-components -- recharts custom tooltip rendered via its content render-prop */}
                     <Tooltip content={<BalanceTooltipContent />} />
                     <Legend />
                     {retireLabelVisible && <ReferenceLine x={retireLabel!} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}

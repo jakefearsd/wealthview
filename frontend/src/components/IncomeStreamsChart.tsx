@@ -77,7 +77,6 @@ export default function IncomeStreamsChart({ data, incomeSources, retirementYear
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 12 }} width={70} />
-                {/* eslint-disable-next-line react-hooks/static-components -- recharts custom tooltip rendered via its content render-prop */}
                 <Tooltip content={<IncomeTooltipContent />} />
                 <Legend />
                 {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}

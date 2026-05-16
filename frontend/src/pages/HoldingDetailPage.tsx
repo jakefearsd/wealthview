@@ -29,7 +29,6 @@ export default function HoldingDetailPage() {
 
     useEffect(() => {
         if (!holdingAccountId || !holdingSymbol) return;
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- idiomatic loading flag for a data-fetching effect
         setTxnLoading(true);
         listTransactions(holdingAccountId, 0, 100, holdingSymbol)
             .then((page) => setTransactions(page.data))

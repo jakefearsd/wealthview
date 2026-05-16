@@ -30,6 +30,12 @@ export default tseslint.config(
                 'error',
                 { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
             ],
+            // React Compiler is not enabled in this codebase (no babel-plugin-react-compiler).
+            // These rules from react-hooks v7 only flag code the compiler cannot optimize —
+            // they are advisory for a migration we are not doing, not correctness defects.
+            // rules-of-hooks and exhaustive-deps stay ON: those are compiler-independent.
+            'react-hooks/set-state-in-effect': 'off',
+            'react-hooks/static-components': 'off',
         },
     },
     {

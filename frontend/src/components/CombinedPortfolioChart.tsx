@@ -36,7 +36,6 @@ export default function CombinedPortfolioChart() {
 
     useEffect(() => {
         let cancelled = false;
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- idiomatic loading flag for a data-fetching effect
         setLoading(true);
         setError(false);
         getCombinedPortfolioHistory(years)

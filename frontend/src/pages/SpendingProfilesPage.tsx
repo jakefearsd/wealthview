@@ -56,7 +56,6 @@ export default function SpendingProfilesPage() {
         }
     }, []);
 
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load; loadGuardrails sets an idiomatic loading flag
     useEffect(() => { loadGuardrails(); }, [loadGuardrails]);
 
     async function handleReoptimize(scenarioId: string) {
