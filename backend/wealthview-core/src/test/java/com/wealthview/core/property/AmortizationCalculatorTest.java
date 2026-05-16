@@ -89,6 +89,32 @@ class AmortizationCalculatorTest {
     }
 
     @Test
+    void remainingBalance_oneMonthIn_isBelowLoanAmount() {
+        // Boundary just above zero: after exactly one payment the balance must
+        // have dropped — a mutant flipping monthsBetween<=0 to <0 would return
+        // the full loan amount here instead.
+        var balance = AmortizationCalculator.remainingBalance(
+                new BigDecimal("300000"), new BigDecimal("0.065"),
+                360, LocalDate.of(2024, 1, 1), LocalDate.of(2024, 2, 1));
+
+        assertThat(balance).isLessThan(new BigDecimal("300000"));
+        assertThat(balance).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void remainingBalance_oneMonthBeforeFinalPayment_isPositiveNotZero() {
+        // Boundary just below the term: at term-1 payments the balance must
+        // still be positive — a mutant flipping paymentsMade>=term to > would
+        // be fine, but flipping to >= term-1 (off-by-one) would wrongly zero it.
+        var startDate = LocalDate.of(2024, 1, 1);
+        var balance = AmortizationCalculator.remainingBalance(
+                new BigDecimal("300000"), new BigDecimal("0.065"),
+                360, startDate, startDate.plusMonths(359));
+
+        assertThat(balance).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
     void remainingBalance_beforeStartDate_returnsLoanAmount() {
         var balance = AmortizationCalculator.remainingBalance(
                 new BigDecimal("300000"), new BigDecimal("0.065"),

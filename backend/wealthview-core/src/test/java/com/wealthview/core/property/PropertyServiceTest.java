@@ -1055,6 +1055,51 @@ class PropertyServiceTest {
         assertThat(result.annualMaintenanceCost()).isEqualByComparingTo("3000");
     }
 
+    @Test
+    void update_coreFields_writesEveryRequestedValue() {
+        // Pins each core setter in update() — address, purchasePrice,
+        // purchaseDate, currentValue and mortgageBalance. A mutant dropping any
+        // one setter would otherwise survive.
+        var property = new PropertyEntity(tenant, "Old Address", new BigDecimal("100000"),
+                LocalDate.of(2015, 1, 1), new BigDecimal("110000"), new BigDecimal("90000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("999 New Lane", new BigDecimal("450000"),
+                LocalDate.of(2021, 7, 4), new BigDecimal("500000"), new BigDecimal("310000"),
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, null, null, null, null, null);
+        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+
+        assertThat(result.address()).isEqualTo("999 New Lane");
+        assertThat(result.purchasePrice()).isEqualByComparingTo("450000");
+        assertThat(result.purchaseDate()).isEqualTo(LocalDate.of(2021, 7, 4));
+        assertThat(result.currentValue()).isEqualByComparingTo("500000");
+        assertThat(result.mortgageBalance()).isEqualByComparingTo("310000");
+    }
+
+    @Test
+    void update_nullMortgageBalance_defaultsToZero() {
+        // A null mortgage balance in the request must be coerced to ZERO, not
+        // left as the old value nor stored as null.
+        var property = new PropertyEntity(tenant, "Addr", new BigDecimal("100000"),
+                LocalDate.of(2015, 1, 1), new BigDecimal("110000"), new BigDecimal("90000"));
+        when(propertyRepository.findByTenant_IdAndId(eq(tenantId), any()))
+                .thenReturn(Optional.of(property));
+        when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new PropertyRequest("Addr", new BigDecimal("100000"),
+                LocalDate.of(2015, 1, 1), new BigDecimal("110000"), null,
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, null, null, null, null, null);
+        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+
+        assertThat(result.mortgageBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     // --- Cost Segregation tests ---
 
     @Test

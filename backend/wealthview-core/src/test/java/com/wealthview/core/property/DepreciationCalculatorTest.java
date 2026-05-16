@@ -271,4 +271,70 @@ class DepreciationCalculatorTest {
 
         assertThat(schedule).isEmpty();
     }
+
+    @Test
+    void getDepreciationForYear_exactlyInServiceYear_returnsNonZero() {
+        // Boundary: taxYear == inService year must NOT be treated as "before
+        // in-service". A mutant flipping < to <= would wrongly zero this.
+        var result = calculator.getDepreciationForYear(
+                "straight_line",
+                new BigDecimal("300000"), new BigDecimal("50000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("27.5"),
+                2020, Map.of());
+
+        assertThat(result).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    @Test
+    void getDepreciationForYear_oneYearBeforeInService_returnsZero() {
+        var result = calculator.getDepreciationForYear(
+                "straight_line",
+                new BigDecimal("300000"), new BigDecimal("50000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("27.5"),
+                2019, Map.of());
+
+        assertThat(result).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void accumulatedThrough_isInclusiveOfTheThroughYear() {
+        // The accumulation guard is <= throughYear: the through year's amount
+        // must be included; a mutant flipping <= to < would drop it.
+        var schedule = Map.of(
+                2020, new BigDecimal("1000"),
+                2021, new BigDecimal("2000"),
+                2022, new BigDecimal("4000"));
+
+        var throughInclusive = DepreciationCalculator.accumulatedThrough(schedule, 2021);
+
+        assertThat(throughInclusive).isEqualByComparingTo("3000");
+    }
+
+    @Test
+    void accumulatedThrough_excludesYearsAfterThroughYear() {
+        var schedule = Map.of(
+                2020, new BigDecimal("1000"),
+                2021, new BigDecimal("2000"));
+
+        var total = DepreciationCalculator.accumulatedThrough(schedule, 2020);
+
+        assertThat(total).isEqualByComparingTo("1000");
+    }
+
+    @Test
+    void computeCostSegregation_studyYearEqualToInServiceYear_hasNoCatchUp() {
+        // Boundary: studyYear == in-service year means no 481(a) catch-up — a
+        // mutant flipping > to >= would spuriously trigger the catch-up path.
+        var allocations = List.of(
+                new CostSegAllocation("5yr", new BigDecimal("30000")));
+
+        var withEqualStudyYear = calculator.computeCostSegregation(
+                allocations, BigDecimal.ONE, LocalDate.of(2020, 1, 1), 2020);
+        var withNullStudyYear = calculator.computeCostSegregation(
+                allocations, BigDecimal.ONE, LocalDate.of(2020, 1, 1), null);
+
+        // With no catch-up the schedule must match the plain (null study year)
+        // bonus schedule exactly.
+        assertThat(withEqualStudyYear).isEqualTo(withNullStudyYear);
+    }
 }
