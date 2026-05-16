@@ -459,7 +459,7 @@ public class AuthService {
         // Revoke every active session row too, even though token_generation
         // already invalidates them. Keeping the rows in sync makes the GET
         // /sessions endpoint reflect reality without an additional join.
-        userSessionRepository.revokeAllExcept(userId, java.util.UUID.fromString("00000000-0000-0000-0000-000000000000"), now);
+        userSessionRepository.revokeAllExcept(userId, UUID.fromString("00000000-0000-0000-0000-000000000000"), now);
         meterRegistry.counter("wealthview.auth.logout", "transport", transport).increment();
         log.info("User {} logged out (token generation incremented)", userId);
     }

@@ -56,10 +56,7 @@ public class TenantFilterActivator {
             return false;
         }
         UUID tenantId = user.tenantId();
-        if (tenantId == null) {
-            return false;
-        }
-        return enable(entityManager, tenantId);
+        return tenantId != null && enable(entityManager, tenantId);
     }
 
     /**
@@ -110,7 +107,7 @@ public class TenantFilterActivator {
         }
         for (var ga : auth.getAuthorities()) {
             String a = ga.getAuthority();
-            if (a == null) continue;
+            if (a == null) { continue; }
             String upper = a.toUpperCase(Locale.US);
             if (upper.equals("ROLE_" + SUPER_ADMIN_ROLE) || upper.equals(SUPER_ADMIN_ROLE)) {
                 return true;

@@ -4,6 +4,7 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.StockSplitAdjustmentEntity;
 import com.wealthview.persistence.entity.StockSplitEntity;
+import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.StockSplitAdjustmentRepository;
@@ -287,7 +288,7 @@ public class StockSplitService {
     @Transactional(readOnly = true)
     public List<StockSplitEntity> listForTenant(UUID tenantId, String symbol, LocalDate from, LocalDate to) {
         var symbols = transactionRepository.findByTenant_Id(tenantId).stream()
-                .map(t -> t.getSymbol())
+                .map(TransactionEntity::getSymbol)
                 .filter(s -> s != null && !s.isBlank())
                 .distinct()
                 .toList();

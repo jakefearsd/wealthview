@@ -95,10 +95,7 @@ public final class JwtTokenProvider {
     }
 
     public boolean validateMfaChallenge(String token) {
-        if (!validateToken(token)) {
-            return false;
-        }
-        return "mfa_challenge".equals(extractTokenType(token));
+        return validateToken(token) && "mfa_challenge".equals(extractTokenType(token));
     }
 
     public String generateRefreshToken(UUID userId, int generation) {
@@ -181,10 +178,7 @@ public final class JwtTokenProvider {
     }
 
     public boolean validateRefreshToken(String token) {
-        if (!validateToken(token)) {
-            return false;
-        }
-        return "refresh".equals(extractTokenType(token));
+        return validateToken(token) && "refresh".equals(extractTokenType(token));
     }
 
     public String extractTokenType(String token) {

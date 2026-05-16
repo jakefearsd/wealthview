@@ -52,10 +52,7 @@ final class Semver {
     }
 
     static boolean isValid(String version) {
-        if (version == null) {
-            return false;
-        }
-        return PATTERN.matcher(version).matches();
+        return version != null && PATTERN.matcher(version).matches();
     }
 
     private static Parts parse(String version) {

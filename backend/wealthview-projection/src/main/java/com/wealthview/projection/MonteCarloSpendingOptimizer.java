@@ -501,7 +501,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
         // Simulate with withdrawals to get final balances and per-year median balances
         boolean simPools = conversionByYear != null
-                || (ctx.portfolio().initTraditional() > 0 || ctx.portfolio().initRoth() > 0);
+                || ctx.portfolio().initTraditional() > 0 || ctx.portfolio().initRoth() > 0;
         double initTaxable = simPools
                 ? ctx.portfolio().initTaxable() : ctx.portfolio().initialPortfolio();
         double initTraditional = simPools ? ctx.portfolio().initTraditional() : 0;
@@ -886,7 +886,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double capped;
             if (phase.targetSpending() != null
-                    && phase.targetSpending().compareTo(java.math.BigDecimal.ZERO) > 0) {
+                    && phase.targetSpending().compareTo(BigDecimal.ZERO) > 0) {
                 double avgFloor = 0;
                 double avgInflatedTarget = 0;
                 int count = 0;
@@ -1420,7 +1420,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                            double need, String order, boolean preAge595,
                                            double dsBracketCeiling, double otherIncome,
                                            double conversionAmount, double rmdAmount) {
-        if (need <= 0) return new PoolWithdrawal(0, 0, 0);
+        if (need <= 0) { return new PoolWithdrawal(0, 0, 0); }
         if (preAge595) {
             double drawn = Math.min(need, Math.max(0, taxable));
             return new PoolWithdrawal(drawn, 0, 0);
@@ -1458,7 +1458,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double drawn = Math.min(remaining, Math.max(0, pools[i]));
             amounts[mapping[i]] = drawn;
             remaining -= drawn;
-            if (remaining <= 0) break;
+            if (remaining <= 0) { break; }
         }
         return new PoolWithdrawal(amounts[0], amounts[1], amounts[2]);
     }
@@ -1471,7 +1471,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     private static double estimateWithdrawalTax(double traditionalWithdrawal,
                                                   double marginalRate) {
-        if (traditionalWithdrawal <= 0) return 0;
+        if (traditionalWithdrawal <= 0) { return 0; }
         return traditionalWithdrawal * marginalRate;
     }
 
@@ -1484,7 +1484,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                                int retirementYear, int years,
                                                FilingStatus filingStatus) {
         double[] rates = new double[years];
-        if (taxCalculator == null) return rates;
+        if (taxCalculator == null) { return rates; }
 
         double probeAmount = 50_000;
         for (int y = 0; y < years; y++) {

@@ -107,15 +107,11 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         SpendingTierData prev = null;
         SpendingTierData next = null;
         for (var tier : spendingTiers) {
-            if (tier.endAge() != null && tier.endAge() < age) {
-                if (prev == null || tier.endAge() > prev.endAge()) {
-                    prev = tier;
-                }
+            if (tier.endAge() != null && tier.endAge() < age && (prev == null || tier.endAge() > prev.endAge())) {
+                prev = tier;
             }
-            if (tier.startAge() > age) {
-                if (next == null || tier.startAge() < next.startAge()) {
-                    next = tier;
-                }
+            if (tier.startAge() > age && (next == null || tier.startAge() < next.startAge())) {
+                next = tier;
             }
         }
 

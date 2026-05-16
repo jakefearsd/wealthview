@@ -15,6 +15,7 @@ import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
@@ -145,7 +146,7 @@ public class PropertyService {
         var linkedSources = incomeSourceRepository.findByTenant_IdAndProperty_Id(tenantId, propertyId);
         if (!linkedSources.isEmpty()) {
             var names = linkedSources.stream()
-                    .map(s -> s.getName())
+                    .map(IncomeSourceEntity::getName)
                     .toList();
             throw new IllegalStateException(
                     "Cannot delete property — it is linked to %d income source(s): %s. Delete these income sources first."

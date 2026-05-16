@@ -145,7 +145,7 @@ public class ImportService {
             meterRegistry.counter("wealthview.import.rows", "outcome", "error").increment(result.failedCount() + parseResult.errors().size());
 
             int totalErrors = result.failedCount() + parseResult.errors().size();
-            importStatus = totalErrors == 0 ? "success" : (result.successCount() > 0 ? "partial" : "failed");
+            importStatus = totalErrors == 0 ? "success" : result.successCount() > 0 ? "partial" : "failed";
             log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
                     source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
             return ImportJobResponse.from(job);

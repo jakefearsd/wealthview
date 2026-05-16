@@ -311,8 +311,8 @@ class RothConversionOptimizer {
     }
 
     private boolean isBetterCandidate(double tax, boolean feasible, double bestTax, boolean bestFeasible) {
-        if (feasible && !bestFeasible) return true;
-        if (!feasible && bestFeasible) return false;
+        if (feasible && !bestFeasible) { return true; }
+        if (!feasible && bestFeasible) { return false; }
         return tax < bestTax;
     }
 
@@ -415,7 +415,7 @@ class RothConversionOptimizer {
 
                 if (age < EARLY_WITHDRAWAL_AGE) {
                     taxable -= conversionTax;
-                    if (taxable < 0) taxable = 0;
+                    if (taxable < 0) { taxable = 0; }
                 } else {
                     double[] afterDeduct = deductCascade(conversionTax, taxable,
                             traditional, roth);
@@ -489,7 +489,7 @@ class RothConversionOptimizer {
                                          double rmdAmount, double conversionAmount,
                                          int calendarYear) {
             taxable -= need;
-            if (taxable < 0) taxable = 0;
+            if (taxable < 0) { taxable = 0; }
             return new WithdrawalResult(taxable, traditional, roth, 0);
         }
     }
@@ -555,7 +555,7 @@ class RothConversionOptimizer {
             double withdrawalTax = 0;
 
             for (var pool : pools) {
-                if (remaining <= 0) break;
+                if (remaining <= 0) { break; }
                 switch (pool) {
                     case PoolStrategy.POOL_TAXABLE -> {
                         double draw = Math.min(remaining, taxable);
@@ -808,11 +808,21 @@ class RothConversionOptimizer {
     static Builder builder() { return new Builder(); }
 
     static class Builder {
-        private double traditional, roth, taxable;
-        private double[] otherIncomeByYear, taxableIncomeByYear;
-        private int birthYear, retirementAge, endAge, exhaustionBuffer;
-        private double conversionBracketRate, rmdTargetBracketRate, returnMean;
-        private double essentialFloor, inflationRate, rmdBracketHeadroom;
+        private double traditional;
+        private double roth;
+        private double taxable;
+        private double[] otherIncomeByYear;
+        private double[] taxableIncomeByYear;
+        private int birthYear;
+        private int retirementAge;
+        private int endAge;
+        private int exhaustionBuffer;
+        private double conversionBracketRate;
+        private double rmdTargetBracketRate;
+        private double returnMean;
+        private double essentialFloor;
+        private double inflationRate;
+        private double rmdBracketHeadroom;
         private double dynamicSequencingBracketRate = 0.0;
         private FilingStatus filingStatus;
         private FederalTaxCalculator taxCalculator;
