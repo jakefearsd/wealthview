@@ -158,6 +158,31 @@ class TenantFilterActivatorTest {
         verify(session, never()).disableFilter(TenantFilterActivator.FILTER_NAME);
     }
 
+    @Test
+    void reEnable_withAuthenticatedTenant_re_activatesTheFilter() {
+        // reEnable is used after a @CrossTenant bypass to restore the filter;
+        // it must actually re-enable for the current tenant, not no-op.
+        var tenantId = UUID.randomUUID();
+        authenticate(new TenantUser(UUID.randomUUID(), tenantId, "u@x.com", "MEMBER"), "ROLE_MEMBER");
+        when(session.getEnabledFilter(TenantFilterActivator.FILTER_NAME)).thenReturn(null);
+
+        activator.reEnable(entityManager);
+
+        verify(session).enableFilter(TenantFilterActivator.FILTER_NAME);
+        verify(filter).setParameter(TenantFilterActivator.PARAM_NAME, tenantId);
+    }
+
+    @Test
+    void reEnable_withNoAuthentication_isNoop() {
+        // After logout mid-request there is no authenticated tenant, so reEnable
+        // must not attempt to enable the filter.
+        SecurityContextHolder.clearContext();
+
+        activator.reEnable(entityManager);
+
+        verify(session, never()).enableFilter(TenantFilterActivator.FILTER_NAME);
+    }
+
     private void authenticate(TenantContext.AuthenticatedUser user, String authority) {
         var auth = new UsernamePasswordAuthenticationToken(user, null,
                 List.of(new SimpleGrantedAuthority(authority)));
