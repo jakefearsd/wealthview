@@ -84,10 +84,7 @@ public class SchwabCsvParser extends AbstractBrokerCsvParser {
             return;
         }
 
-        var quantity = parseOptionalAmount(record.get("Quantity"));
-        var absAmount = amount != null ? amount.abs() : null;
-        var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
-        transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, absAmount));
+        addTransaction(date, type, amount, record, transactions);
     }
 
     private boolean isFooterRow(String dateStr) {

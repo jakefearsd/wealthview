@@ -362,14 +362,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double fraction = (double) i / gridSize;
             var schedule = convOptimizer.scheduleForFraction(fraction);
 
-            double spending = evaluateSustainableSpending(
-                    searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
-                    searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                    searchTaxCtx,
-                    schedule.conversionByYear(), schedule.conversionTaxByYear(),
-                    ctx.taxIncome().dsBracketCeilingByYear());
+            double spending = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
+                    schedule.conversionByYear(), schedule.conversionTaxByYear());
 
             if (spending > bestSpending) {
                 bestSpending = spending;
@@ -387,23 +381,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             var s1 = convOptimizer.scheduleForFraction(m1);
             var s2 = convOptimizer.scheduleForFraction(m2);
 
-            double sp1 = evaluateSustainableSpending(
-                    searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
-                    searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                    searchTaxCtx,
-                    s1.conversionByYear(), s1.conversionTaxByYear(),
-                    ctx.taxIncome().dsBracketCeilingByYear());
+            double sp1 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
+                    s1.conversionByYear(), s1.conversionTaxByYear());
 
-            double sp2 = evaluateSustainableSpending(
-                    searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
-                    searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                    searchTaxCtx,
-                    s2.conversionByYear(), s2.conversionTaxByYear(),
-                    ctx.taxIncome().dsBracketCeilingByYear());
+            double sp2 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
+                    s2.conversionByYear(), s2.conversionTaxByYear());
 
             if (sp1 > sp2) {
                 hi = m2;
@@ -426,6 +408,24 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         log.info("Joint optimization: best fraction={}, sustainable spending={}",
                 bestFraction, bestSpending);
         return bestSchedule;
+    }
+
+    /**
+     * Convenience wrapper around {@link #evaluateSustainableSpending} that captures the fixed
+     * search-phase args ({@code searchPaths}, the {@link OptimizationSetup} fields, {@code searchFloors},
+     * {@code searchTrials}, and {@code searchTaxCtx}) so the repeated call sites in
+     * {@link #jointSearchConversions} only vary by {@code conversionByYear} / {@code conversionTaxByYear}.
+     */
+    private double evalSearchSpending(double[][] searchPaths, OptimizationSetup ctx,
+                                       double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
+                                       double[] conversionByYear, double[] conversionTaxByYear) {
+        return evaluateSustainableSpending(
+                searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
+                ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
+                searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
+                searchTaxCtx, conversionByYear, conversionTaxByYear,
+                ctx.taxIncome().dsBracketCeilingByYear());
     }
 
     private double[] allocateAndSmooth(OptimizationSetup ctx, GuardrailOptimizationInput input,
@@ -454,23 +454,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     ctx.sim().years(), input.phases(), ctx.sim().retirementAge());
 
             // Re-verify sustainability of smoothed plan; reduce if broken
-            if (!isSustainable(ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
-                    ctx.taxIncome().adjustedFloors(), discretionaryByYear, ctx.portfolio().terminalTarget(), ctx.sim().years(),
-                    ctx.sim().trialCount(), ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), ctx.taxIncome().taxCtx(),
-                    conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                    ctx.taxIncome().dsBracketCeilingByYear())) {
+            if (!isSustainableCtx(ctx, discretionaryByYear, conversionByYear, conversionTaxByYear)) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < ctx.sim().years(); y++) {
                         discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
                     }
-                    if (isSustainable(ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
-                            ctx.taxIncome().surplusTaxByYear(), ctx.taxIncome().adjustedFloors(), discretionaryByYear,
-                            ctx.portfolio().terminalTarget(), ctx.sim().years(), ctx.sim().trialCount(),
-                            ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(), ctx.portfolio().cashReserveYears(),
-                            ctx.portfolio().cashReturnRate(), ctx.taxIncome().taxCtx(),
-                            conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                            ctx.taxIncome().dsBracketCeilingByYear())) {
+                    if (isSustainableCtx(ctx, discretionaryByYear, conversionByYear, conversionTaxByYear)) {
                         break;
                     }
                 }
@@ -478,6 +467,21 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         }
 
         return discretionaryByYear;
+    }
+
+    /**
+     * Convenience wrapper around {@link #isSustainable} that unpacks the fixed args from
+     * {@code ctx} so call sites in {@link #allocateAndSmooth} aren't repeated verbatim.
+     */
+    private boolean isSustainableCtx(OptimizationSetup ctx, double[] discretionaryByYear,
+                                      double[] conversionByYear, double[] conversionTaxByYear) {
+        return isSustainable(ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
+                ctx.taxIncome().surplusTaxByYear(), ctx.taxIncome().adjustedFloors(), discretionaryByYear,
+                ctx.portfolio().terminalTarget(), ctx.sim().years(), ctx.sim().trialCount(),
+                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
+                ctx.taxIncome().taxCtx(), conversionByYear, conversionTaxByYear,
+                ctx.sim().retirementAge(), ctx.taxIncome().dsBracketCeilingByYear());
     }
 
     private GuardrailProfileResponse buildResponse(OptimizationSetup ctx,

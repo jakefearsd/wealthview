@@ -12,6 +12,7 @@ import com.wealthview.core.projection.dto.GuardrailProfileSummary;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
+import com.wealthview.core.projection.dto.ScenarioParamsSource;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
@@ -269,16 +270,7 @@ public class ScenarioCrudService {
         }
     }
 
-    private Map<String, Object> extractParamsFromRequest(CreateScenarioRequest r) {
-        return scenarioParams(r.birthYear(), r.withdrawalRate(), r.withdrawalStrategy(),
-                r.dynamicCeiling(), r.dynamicFloor(), r.filingStatus(),
-                r.otherIncome(), r.annualRothConversion(), r.withdrawalOrder(),
-                r.dynamicSequencingBracketRate(), r.rothConversionStrategy(),
-                r.targetBracketRate(), r.rothConversionStartYear(), r.state(),
-                r.primaryResidencePropertyTax(), r.primaryResidenceMortgageInterest());
-    }
-
-    private Map<String, Object> extractParamsFromRequest(UpdateScenarioRequest r) {
+    private Map<String, Object> extractParamsFromRequest(ScenarioParamsSource r) {
         return scenarioParams(r.birthYear(), r.withdrawalRate(), r.withdrawalStrategy(),
                 r.dynamicCeiling(), r.dynamicFloor(), r.filingStatus(),
                 r.otherIncome(), r.annualRothConversion(), r.withdrawalOrder(),

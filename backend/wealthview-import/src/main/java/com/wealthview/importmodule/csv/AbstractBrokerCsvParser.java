@@ -135,4 +135,18 @@ public abstract class AbstractBrokerCsvParser implements ImportParser {
     protected LocalDate parseDate(String raw) {
         return LocalDate.parse(raw.trim(), getDateFormat());
     }
+
+    /**
+     * Shared tail of {@code extractRow}: reads Quantity and Symbol from the record,
+     * normalises {@code amount} to its absolute value, then appends a {@link ParsedTransaction}.
+     * Call this after the broker-specific amount and type have been resolved.
+     */
+    protected void addTransaction(LocalDate date, String type, BigDecimal amount,
+                                   CSVRecord record,
+                                   List<ParsedTransaction> transactions) {
+        var quantity = parseOptionalAmount(record.get("Quantity"));
+        var absAmount = amount != null ? amount.abs() : null;
+        var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
+        transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, absAmount));
+    }
 }

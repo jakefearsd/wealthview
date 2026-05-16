@@ -29,5 +29,5 @@ public record UpdateScenarioRequest(
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
-        List<ScenarioIncomeSourceInput> incomeSources) {
+        List<ScenarioIncomeSourceInput> incomeSources) implements ScenarioParamsSource {
 }
