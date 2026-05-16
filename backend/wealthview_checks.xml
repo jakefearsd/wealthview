@@ -10,7 +10,7 @@
       - 120-character line limit (not Google's 100)
       - Import order: java.*, jakarta.*, org.*, com.*, then static (not Google's STATIC first)
       - No mandatory Javadoc (internal project, not a library)
-      - Single-statement compact methods (builder pattern) are permitted
+      - OneStatementPerLine enforced (previously disabled, restored in style fixup)
       - No VariableDeclarationUsageDistance enforcement (too noisy for service methods)
       - No OverloadMethodsDeclarationOrder enforcement (conflicts with logical grouping)
 -->
@@ -122,7 +122,7 @@
             <message key="ws.notPreceded"
                     value="WhitespaceAround: ''{0}'' is not preceded with whitespace."/>
         </module>
-        <!-- OneStatementPerLine disabled: compact single-line builder methods are permitted -->
+        <module name="OneStatementPerLine"/>
         <module name="MultipleVariableDeclarations"/>
         <module name="ArrayTypeStyle"/>
         <module name="MissingSwitchDefault"/>

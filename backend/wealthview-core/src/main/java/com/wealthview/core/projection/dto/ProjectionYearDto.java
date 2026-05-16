@@ -240,183 +240,228 @@ public record ProjectionYearDto(
         }
 
         public Builder year(int year) {
-            this.year = year; return this;
+            this.year = year;
+            return this;
         }
 
         public Builder age(int age) {
-            this.age = age; return this;
+            this.age = age;
+            return this;
         }
 
         public Builder startBalance(BigDecimal startBalance) {
-            this.startBalance = startBalance; return this;
+            this.startBalance = startBalance;
+            return this;
         }
 
         public Builder contributions(BigDecimal contributions) {
-            this.contributions = contributions; return this;
+            this.contributions = contributions;
+            return this;
         }
 
         public Builder growth(BigDecimal growth) {
-            this.growth = growth; return this;
+            this.growth = growth;
+            return this;
         }
 
         public Builder withdrawals(BigDecimal withdrawals) {
-            this.withdrawals = withdrawals; return this;
+            this.withdrawals = withdrawals;
+            return this;
         }
 
         public Builder endBalance(BigDecimal endBalance) {
-            this.endBalance = endBalance; return this;
+            this.endBalance = endBalance;
+            return this;
         }
 
         public Builder retired(boolean retired) {
-            this.retired = retired; return this;
+            this.retired = retired;
+            return this;
         }
 
         public Builder traditionalBalance(BigDecimal traditionalBalance) {
-            this.traditionalBalance = traditionalBalance; return this;
+            this.traditionalBalance = traditionalBalance;
+            return this;
         }
 
         public Builder rothBalance(BigDecimal rothBalance) {
-            this.rothBalance = rothBalance; return this;
+            this.rothBalance = rothBalance;
+            return this;
         }
 
         public Builder taxableBalance(BigDecimal taxableBalance) {
-            this.taxableBalance = taxableBalance; return this;
+            this.taxableBalance = taxableBalance;
+            return this;
         }
 
         public Builder rothConversionAmount(BigDecimal rothConversionAmount) {
-            this.rothConversionAmount = rothConversionAmount; return this;
+            this.rothConversionAmount = rothConversionAmount;
+            return this;
         }
 
         public Builder taxLiability(BigDecimal taxLiability) {
-            this.taxLiability = taxLiability; return this;
+            this.taxLiability = taxLiability;
+            return this;
         }
 
         public Builder essentialExpenses(BigDecimal essentialExpenses) {
-            this.essentialExpenses = essentialExpenses; return this;
+            this.essentialExpenses = essentialExpenses;
+            return this;
         }
 
         public Builder discretionaryExpenses(BigDecimal discretionaryExpenses) {
-            this.discretionaryExpenses = discretionaryExpenses; return this;
+            this.discretionaryExpenses = discretionaryExpenses;
+            return this;
         }
 
         public Builder incomeStreamsTotal(BigDecimal incomeStreamsTotal) {
-            this.incomeStreamsTotal = incomeStreamsTotal; return this;
+            this.incomeStreamsTotal = incomeStreamsTotal;
+            return this;
         }
 
         public Builder netSpendingNeed(BigDecimal netSpendingNeed) {
-            this.netSpendingNeed = netSpendingNeed; return this;
+            this.netSpendingNeed = netSpendingNeed;
+            return this;
         }
 
         public Builder spendingSurplus(BigDecimal spendingSurplus) {
-            this.spendingSurplus = spendingSurplus; return this;
+            this.spendingSurplus = spendingSurplus;
+            return this;
         }
 
         public Builder discretionaryAfterCuts(BigDecimal discretionaryAfterCuts) {
-            this.discretionaryAfterCuts = discretionaryAfterCuts; return this;
+            this.discretionaryAfterCuts = discretionaryAfterCuts;
+            return this;
         }
 
         public Builder rentalIncomeGross(BigDecimal rentalIncomeGross) {
-            this.rentalIncomeGross = rentalIncomeGross; return this;
+            this.rentalIncomeGross = rentalIncomeGross;
+            return this;
         }
 
         public Builder rentalExpensesTotal(BigDecimal rentalExpensesTotal) {
-            this.rentalExpensesTotal = rentalExpensesTotal; return this;
+            this.rentalExpensesTotal = rentalExpensesTotal;
+            return this;
         }
 
         public Builder depreciationTotal(BigDecimal depreciationTotal) {
-            this.depreciationTotal = depreciationTotal; return this;
+            this.depreciationTotal = depreciationTotal;
+            return this;
         }
 
         public Builder rentalLossApplied(BigDecimal rentalLossApplied) {
-            this.rentalLossApplied = rentalLossApplied; return this;
+            this.rentalLossApplied = rentalLossApplied;
+            return this;
         }
 
         public Builder suspendedLossCarryforward(BigDecimal suspendedLossCarryforward) {
-            this.suspendedLossCarryforward = suspendedLossCarryforward; return this;
+            this.suspendedLossCarryforward = suspendedLossCarryforward;
+            return this;
         }
 
         public Builder socialSecurityTaxable(BigDecimal socialSecurityTaxable) {
-            this.socialSecurityTaxable = socialSecurityTaxable; return this;
+            this.socialSecurityTaxable = socialSecurityTaxable;
+            return this;
         }
 
         public Builder selfEmploymentTax(BigDecimal selfEmploymentTax) {
-            this.selfEmploymentTax = selfEmploymentTax; return this;
+            this.selfEmploymentTax = selfEmploymentTax;
+            return this;
         }
 
         public Builder incomeBySource(Map<String, BigDecimal> incomeBySource) {
-            this.incomeBySource = incomeBySource; return this;
+            this.incomeBySource = incomeBySource;
+            return this;
         }
 
         public Builder propertyEquity(BigDecimal propertyEquity) {
-            this.propertyEquity = propertyEquity; return this;
+            this.propertyEquity = propertyEquity;
+            return this;
         }
 
         public Builder totalNetWorth(BigDecimal totalNetWorth) {
-            this.totalNetWorth = totalNetWorth; return this;
+            this.totalNetWorth = totalNetWorth;
+            return this;
         }
 
         public Builder surplusReinvested(BigDecimal surplusReinvested) {
-            this.surplusReinvested = surplusReinvested; return this;
+            this.surplusReinvested = surplusReinvested;
+            return this;
         }
 
         public Builder taxableGrowth(BigDecimal taxableGrowth) {
-            this.taxableGrowth = taxableGrowth; return this;
+            this.taxableGrowth = taxableGrowth;
+            return this;
         }
 
         public Builder traditionalGrowth(BigDecimal traditionalGrowth) {
-            this.traditionalGrowth = traditionalGrowth; return this;
+            this.traditionalGrowth = traditionalGrowth;
+            return this;
         }
 
         public Builder rothGrowth(BigDecimal rothGrowth) {
-            this.rothGrowth = rothGrowth; return this;
+            this.rothGrowth = rothGrowth;
+            return this;
         }
 
         public Builder taxPaidFromTaxable(BigDecimal taxPaidFromTaxable) {
-            this.taxPaidFromTaxable = taxPaidFromTaxable; return this;
+            this.taxPaidFromTaxable = taxPaidFromTaxable;
+            return this;
         }
 
         public Builder taxPaidFromTraditional(BigDecimal taxPaidFromTraditional) {
-            this.taxPaidFromTraditional = taxPaidFromTraditional; return this;
+            this.taxPaidFromTraditional = taxPaidFromTraditional;
+            return this;
         }
 
         public Builder taxPaidFromRoth(BigDecimal taxPaidFromRoth) {
-            this.taxPaidFromRoth = taxPaidFromRoth; return this;
+            this.taxPaidFromRoth = taxPaidFromRoth;
+            return this;
         }
 
         public Builder withdrawalFromTaxable(BigDecimal withdrawalFromTaxable) {
-            this.withdrawalFromTaxable = withdrawalFromTaxable; return this;
+            this.withdrawalFromTaxable = withdrawalFromTaxable;
+            return this;
         }
 
         public Builder withdrawalFromTraditional(BigDecimal withdrawalFromTraditional) {
-            this.withdrawalFromTraditional = withdrawalFromTraditional; return this;
+            this.withdrawalFromTraditional = withdrawalFromTraditional;
+            return this;
         }
 
         public Builder withdrawalFromRoth(BigDecimal withdrawalFromRoth) {
-            this.withdrawalFromRoth = withdrawalFromRoth; return this;
+            this.withdrawalFromRoth = withdrawalFromRoth;
+            return this;
         }
 
         public Builder rentalPropertyDetails(List<RentalPropertyYearDetail> rentalPropertyDetails) {
-            this.rentalPropertyDetails = rentalPropertyDetails; return this;
+            this.rentalPropertyDetails = rentalPropertyDetails;
+            return this;
         }
 
         public Builder federalTax(BigDecimal federalTax) {
-            this.federalTax = federalTax; return this;
+            this.federalTax = federalTax;
+            return this;
         }
 
         public Builder stateTax(BigDecimal stateTax) {
-            this.stateTax = stateTax; return this;
+            this.stateTax = stateTax;
+            return this;
         }
 
         public Builder saltDeduction(BigDecimal saltDeduction) {
-            this.saltDeduction = saltDeduction; return this;
+            this.saltDeduction = saltDeduction;
+            return this;
         }
 
         public Builder usedItemizedDeduction(Boolean usedItemizedDeduction) {
-            this.usedItemizedDeduction = usedItemizedDeduction; return this;
+            this.usedItemizedDeduction = usedItemizedDeduction;
+            return this;
         }
 
         public Builder irmaaWarning(Boolean irmaaWarning) {
-            this.irmaaWarning = irmaaWarning; return this;
+            this.irmaaWarning = irmaaWarning;
+            return this;
         }
 
         public ProjectionYearDto build() {

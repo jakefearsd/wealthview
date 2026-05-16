@@ -1190,7 +1190,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                 * CASH_REPLENISHMENT_RATE);
                 pools[0] -= replenishment;
                 if (pools[0] < 0) {
-                    pools[1] += pools[0]; pools[0] = 0;
+                    pools[1] += pools[0];
+                    pools[0] = 0;
                 }
                 return cashBalance + replenishment;
             }
