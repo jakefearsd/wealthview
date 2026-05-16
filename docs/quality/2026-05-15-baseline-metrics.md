@@ -384,3 +384,49 @@ The following are genuine behaviour gaps worth a dedicated test. Each entry is
   called adds brittle Mockito `verify()` noise for no behavioural guarantee.
 - Projection optimizer survivors are real but should largely be deferred to the Phase 3
   decomposition; testing the monolith directly is low-leverage.
+
+### 7.5 Task 13 result (added 2026-05-16)
+
+Task 13 wrote tests to kill the category-(a) "missing test" survivors identified in
+sections 7.3–7.4. Re-running PIT on `wealthview-core` after the work:
+
+| Metric                       | Before (Task 12) | After (Task 13) |
+|-------------------------------|------------------|-----------------|
+| Core mutation score           | 69%              | **76%**         |
+| Core mutations killed         | 887 / 1 288      | **983 / 1 288** |
+| Core SURVIVED + NO_COVERAGE   | 401              | **305**         |
+| Core test strength            | 79%              | **81%**         |
+| Core unit tests               | ~870             | **1 005**       |
+
+96 additional core mutants are now killed (+7 percentage points). Per-package movement:
+
+| Package                       | Before | After |
+|--------------------------------|--------|-------|
+| com.wealthview.core.auth       | 59%    | 78%   |
+| com.wealthview.core.auth.mfa   | 53%    | 71%   |
+| com.wealthview.core.split      | 29%    | 59%   |
+| com.wealthview.core.account    | 71%    | 83%   |
+| com.wealthview.core.property   | 79%    | 82%   |
+
+**New / extended test classes:** `AuthServiceTest` (MFA login + completeMfaChallenge),
+`MfaServiceTest`, `JwtTokenProviderTest` (MFA-challenge token), `SessionServiceTest` (new),
+`TenantContextTest` (new), `CrossTenantAspectTest` (new), `TenantFilterAspectTest` (new),
+`TenantFilterActivatorTest` (reEnable), `StockSplitServiceTest`, `StockSplitSyncServiceTest`
+(new), `StockSplitBackfillRunnerTest` (new), `AccountServiceTest`, `PropertyServiceTest`,
+`AmortizationCalculatorTest`, `DepreciationCalculatorTest`. In `wealthview-projection`,
+`DeterministicProjectionEngineTest` gained retirement-boundary cases (all 440 projection
+tests still pass).
+
+**Remaining core survivors (305) are out of scope** and break down as:
+- **Category (c) trivial (~190):** Micrometer `Counter.increment` removals, `publishEvent`
+  removals, `setUpdatedAt` removals, and only-logged counters (e.g. `StockSplitService`'s
+  `restoreTransaction`/`restorePrice` boolean returns and `adjustPrices`/`adjustTransactions`
+  int counts feed a log line only — asserting them adds brittle `verify()` noise with no
+  behavioural guarantee, per 7.4).
+- **Category (b) equivalent (~25):** e.g. `MfaService.setupMfa` clearing `setMfaSetupAt(null)`
+  / `setMfaEnabled(false)` on already-default state; `generateRecoveryCodes` loop-count
+  boundary where the produced count (10) is already asserted.
+- **Deferred optimizer survivors:** `MonteCarloSpendingOptimizer` (356) and
+  `RothConversionOptimizer` (120) in `wealthview-projection` remain untouched — they are
+  best addressed by the Phase 3 decomposition rather than by bolting tests onto the God
+  classes. The projection PIT run was therefore not repeated.
