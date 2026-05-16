@@ -92,7 +92,7 @@ class EntityBranchCoverageTest {
 
     @Test
     void inviteCodeEntity_isConsumed_returnsFalse_whenConsumedByIsNull() {
-        // Use no-arg constructor via setConsumedBy = null (default state)
+        // A freshly constructed invite has no consumer yet
         var invite = new InviteCodeEntity(null, "CODE1", null, OffsetDateTime.now().plusDays(7));
 
         assertThat(invite.isConsumed()).isFalse();
