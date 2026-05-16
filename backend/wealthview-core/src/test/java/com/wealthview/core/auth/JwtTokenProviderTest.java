@@ -249,4 +249,76 @@ class JwtTokenProviderTest {
 
         assertThat(longStaleProvider.validateToken(staleToken)).isFalse();
     }
+
+    // --- MFA challenge token --------------------------------------------------
+
+    @Test
+    void generateMfaChallenge_returnsNonEmptyTokenCarryingJtiAndUser() {
+        var jti = UUID.randomUUID();
+
+        var token = tokenProvider.generateMfaChallenge(userId, "cookie", jti, 60_000L);
+
+        assertThat(token).isNotBlank();
+        assertThat(tokenProvider.extractJti(token)).isEqualTo(jti);
+        assertThat(tokenProvider.extractUserId(token)).isEqualTo(userId);
+    }
+
+    @Test
+    void generateMfaChallenge_tokenTypeIsMfaChallenge() {
+        var token = tokenProvider.generateMfaChallenge(userId, "cookie", UUID.randomUUID(), 60_000L);
+
+        assertThat(tokenProvider.extractTokenType(token)).isEqualTo("mfa_challenge");
+    }
+
+    @Test
+    void validateMfaChallenge_withMfaChallengeToken_returnsTrue() {
+        var token = tokenProvider.generateMfaChallenge(userId, "cookie", UUID.randomUUID(), 60_000L);
+
+        assertThat(tokenProvider.validateMfaChallenge(token)).isTrue();
+    }
+
+    @Test
+    void validateMfaChallenge_withAccessToken_returnsFalse() {
+        // An access token must NOT pass MFA-challenge validation, otherwise a
+        // caller could skip the challenge step by replaying their access token.
+        var accessToken = tokenProvider.generateAccessToken(userId, tenantId, "admin", "x@y.z");
+
+        assertThat(tokenProvider.validateMfaChallenge(accessToken)).isFalse();
+    }
+
+    @Test
+    void validateMfaChallenge_withRefreshToken_returnsFalse() {
+        var refreshToken = tokenProvider.generateRefreshToken(userId, 0);
+
+        assertThat(tokenProvider.validateMfaChallenge(refreshToken)).isFalse();
+    }
+
+    @Test
+    void validateMfaChallenge_withGarbageToken_returnsFalse() {
+        assertThat(tokenProvider.validateMfaChallenge("not-a-token")).isFalse();
+    }
+
+    @Test
+    void validateMfaChallenge_withExpiredChallengeToken_returnsFalse() {
+        var staleProvider = new JwtTokenProvider(
+                "test-secret-key-that-is-at-least-32-characters-long", 3600000, 86400000);
+        var expired = staleProvider.generateMfaChallenge(userId, "cookie", UUID.randomUUID(), -120_000L);
+
+        assertThat(staleProvider.validateMfaChallenge(expired)).isFalse();
+    }
+
+    @Test
+    void validateAccessToken_withMfaChallengeToken_returnsTrue() {
+        // validateAccessToken only rejects refresh tokens; an mfa_challenge
+        // token is not a refresh token so it passes the type check. This pins
+        // the exact predicate (reject only "refresh"), not "accept only access".
+        var token = tokenProvider.generateMfaChallenge(userId, "cookie", UUID.randomUUID(), 60_000L);
+
+        assertThat(tokenProvider.validateAccessToken(token)).isTrue();
+    }
+
+    @Test
+    void validateAccessToken_withGarbageToken_returnsFalse() {
+        assertThat(tokenProvider.validateAccessToken("garbage.token")).isFalse();
+    }
 }
