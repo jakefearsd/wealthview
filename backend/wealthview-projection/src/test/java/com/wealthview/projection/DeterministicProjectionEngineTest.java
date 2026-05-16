@@ -113,6 +113,51 @@ class DeterministicProjectionEngineTest {
     }
 
     @Test
+    void run_retirementYearBoundary_yearIsRetiredOnRetirementYearNotBefore() {
+        // Boundary: retired = year >= retirementYear. The year EQUAL to the
+        // retirement year must be retired; the year immediately before must
+        // not be. A mutant flipping >= to > would make the retirement year
+        // itself still "working".
+        int retirementYear = LocalDate.now().getYear() + 5;
+        var input = createInput(
+                LocalDate.of(retirementYear, 1, 1), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 60),
+                List.of(acct("1000000.0000", "10000.0000", "0.0500")));
+
+        var result = engine.run(input);
+
+        var lastWorking = result.yearlyData().stream()
+                .filter(y -> y.year() == retirementYear - 1).findFirst().orElseThrow();
+        var firstRetired = result.yearlyData().stream()
+                .filter(y -> y.year() == retirementYear).findFirst().orElseThrow();
+
+        assertThat(lastWorking.retired()).isFalse();
+        assertThat(firstRetired.retired()).isTrue();
+    }
+
+    @Test
+    void run_preRetirementYear_appliesContributionsButNoWithdrawals() {
+        // Pins the !retired contribution branch: a working year must add
+        // contributions and take zero withdrawals.
+        int retirementYear = LocalDate.now().getYear() + 10;
+        var input = createInput(
+                LocalDate.of(retirementYear, 1, 1), 90, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04}
+                """.formatted(LocalDate.now().getYear() - 55),
+                List.of(acct("500000.0000", "12000.0000", "0.0500")));
+
+        var result = engine.run(input);
+        var workingYear = result.yearlyData().getFirst();
+
+        assertThat(workingYear.retired()).isFalse();
+        assertThat(workingYear.contributions()).isEqualByComparingTo(bd("12000"));
+        assertThat(workingYear.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     void run_withMalformedNumericInParamsJson_usesDefaults() {
         var input = createInput(
                 LocalDate.now().minusYears(1), 90, BigDecimal.ZERO,
