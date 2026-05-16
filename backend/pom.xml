@@ -235,18 +235,10 @@
                     <artifactId>maven-checkstyle-plugin</artifactId>
                     <version>${checkstyle-plugin.version}</version>
                     <configuration>
-                        <configLocation>google_checks.xml</configLocation>
+                        <configLocation>${maven.multiModuleProjectDirectory}/wealthview_checks.xml</configLocation>
                         <consoleOutput>true</consoleOutput>
                         <failOnViolation>false</failOnViolation>
                         <violationSeverity>warning</violationSeverity>
-                        <propertyExpansion>
-                            org.checkstyle.google.checks.indentation.basicOffset=4
-                            org.checkstyle.google.checks.indentation.braceAdjustment=0
-                            org.checkstyle.google.checks.indentation.caseIndent=4
-                            org.checkstyle.google.checks.indentation.throwsIndent=8
-                            org.checkstyle.google.checks.indentation.arrayInitIndent=4
-                            org.checkstyle.google.checks.indentation.lineWrappingIndentation=8
-                        </propertyExpansion>
                     </configuration>
                 </plugin>
                 <plugin>
@@ -442,17 +434,9 @@
                 <artifactId>maven-checkstyle-plugin</artifactId>
                 <version>${checkstyle-plugin.version}</version>
                 <configuration>
-                    <configLocation>google_checks.xml</configLocation>
+                    <configLocation>${maven.multiModuleProjectDirectory}/wealthview_checks.xml</configLocation>
                     <failsOnError>false</failsOnError>
                     <linkXRef>true</linkXRef>
-                    <propertyExpansion>
-                        org.checkstyle.google.checks.indentation.basicOffset=4
-                        org.checkstyle.google.checks.indentation.braceAdjustment=0
-                        org.checkstyle.google.checks.indentation.caseIndent=4
-                        org.checkstyle.google.checks.indentation.throwsIndent=8
-                        org.checkstyle.google.checks.indentation.arrayInitIndent=4
-                        org.checkstyle.google.checks.indentation.lineWrappingIndentation=8
-                    </propertyExpansion>
                 </configuration>
                 <reportSets>
                     <reportSet>

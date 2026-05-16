@@ -1,11 +1,11 @@
 package com.wealthview.core.auth;
 
-import org.springframework.stereotype.Service;
-
 import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.springframework.stereotype.Service;
 
 @Service
 public class LoginAttemptService {

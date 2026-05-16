@@ -1,16 +1,28 @@
 package com.wealthview.core.projection;
 
-import com.wealthview.core.account.AccountService;
-import com.wealthview.core.exchangerate.ExchangeRateService;
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.LinkedAccountInput;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.core.projection.dto.IncomeSourceType;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.core.account.AccountService;
+import com.wealthview.core.common.Money;
+import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.LinkedAccountInput;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
@@ -24,18 +36,6 @@ import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
-import org.springframework.stereotype.Service;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import com.wealthview.core.common.Money;
 
 @Service
 public class ProjectionInputBuilder {

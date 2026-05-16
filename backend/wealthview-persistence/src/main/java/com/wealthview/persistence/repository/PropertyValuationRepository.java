@@ -1,12 +1,13 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.PropertyValuationEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.wealthview.persistence.entity.PropertyValuationEntity;
 
 public interface PropertyValuationRepository extends JpaRepository<PropertyValuationEntity, UUID> {
 

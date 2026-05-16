@@ -1,12 +1,13 @@
 package com.wealthview.app.it.testutil;
 
-import com.wealthview.app.it.AuthHelper;
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 
-import java.util.List;
-import java.util.Map;
+import com.wealthview.app.it.AuthHelper;
 
 /**
  * Shared helper for creating test entities via the REST API in integration tests.

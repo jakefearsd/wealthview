@@ -1,5 +1,12 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,19 +15,12 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 import org.hibernate.annotations.Filter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "projection_scenarios")
@@ -81,27 +81,89 @@ public class ProjectionScenarioEntity {
         this.paramsJson = paramsJson;
     }
 
-    public UUID getId() { return id; }
-    public TenantEntity getTenant() { return tenant; }
-    public UUID getTenantId() { return tenant.getId(); }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public LocalDate getRetirementDate() { return retirementDate; }
-    public void setRetirementDate(LocalDate retirementDate) { this.retirementDate = retirementDate; }
-    public Integer getEndAge() { return endAge; }
-    public void setEndAge(Integer endAge) { this.endAge = endAge; }
-    public BigDecimal getInflationRate() { return inflationRate; }
-    public void setInflationRate(BigDecimal inflationRate) { this.inflationRate = inflationRate; }
-    public String getParamsJson() { return paramsJson; }
-    public void setParamsJson(String paramsJson) { this.paramsJson = paramsJson; }
-    public SpendingProfileEntity getSpendingProfile() { return spendingProfile; }
-    public void setSpendingProfile(SpendingProfileEntity spendingProfile) { this.spendingProfile = spendingProfile; }
-    public GuardrailSpendingProfileEntity getGuardrailProfile() { return guardrailProfile; }
-    public void setGuardrailProfile(GuardrailSpendingProfileEntity guardrailProfile) { this.guardrailProfile = guardrailProfile; }
-    public List<ProjectionAccountEntity> getAccounts() { return accounts; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public TenantEntity getTenant() {
+        return tenant;
+    }
+
+    public UUID getTenantId() {
+        return tenant.getId();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public LocalDate getRetirementDate() {
+        return retirementDate;
+    }
+
+    public void setRetirementDate(LocalDate retirementDate) {
+        this.retirementDate = retirementDate;
+    }
+
+    public Integer getEndAge() {
+        return endAge;
+    }
+
+    public void setEndAge(Integer endAge) {
+        this.endAge = endAge;
+    }
+
+    public BigDecimal getInflationRate() {
+        return inflationRate;
+    }
+
+    public void setInflationRate(BigDecimal inflationRate) {
+        this.inflationRate = inflationRate;
+    }
+
+    public String getParamsJson() {
+        return paramsJson;
+    }
+
+    public void setParamsJson(String paramsJson) {
+        this.paramsJson = paramsJson;
+    }
+
+    public SpendingProfileEntity getSpendingProfile() {
+        return spendingProfile;
+    }
+
+    public void setSpendingProfile(SpendingProfileEntity spendingProfile) {
+        this.spendingProfile = spendingProfile;
+    }
+
+    public GuardrailSpendingProfileEntity getGuardrailProfile() {
+        return guardrailProfile;
+    }
+
+    public void setGuardrailProfile(GuardrailSpendingProfileEntity guardrailProfile) {
+        this.guardrailProfile = guardrailProfile;
+    }
+
+    public List<ProjectionAccountEntity> getAccounts() {
+        return accounts;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 
     public void addAccount(ProjectionAccountEntity account) {
         accounts.add(account);

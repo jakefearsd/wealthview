@@ -1,11 +1,8 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.common.Entities;
-import com.wealthview.core.property.dto.ValuationRefreshResponse;
-import com.wealthview.persistence.entity.PropertyEntity;
-import com.wealthview.persistence.repository.PropertyRepository;
-import io.micrometer.core.annotation.Timed;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -14,8 +11,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import com.wealthview.core.common.Entities;
+import com.wealthview.core.property.dto.ValuationRefreshResponse;
+import com.wealthview.persistence.entity.PropertyEntity;
+import com.wealthview.persistence.repository.PropertyRepository;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Service
 @ConditionalOnBean(PropertyValuationClient.class)

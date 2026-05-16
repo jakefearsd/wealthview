@@ -1,9 +1,9 @@
 package com.wealthview.core.price.dto;
 
-import com.wealthview.persistence.entity.PriceEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
+
+import com.wealthview.persistence.entity.PriceEntity;
 
 public record PriceResponse(
         String symbol,

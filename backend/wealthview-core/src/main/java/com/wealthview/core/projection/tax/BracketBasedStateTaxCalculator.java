@@ -1,19 +1,20 @@
 package com.wealthview.core.projection.tax;
 
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+
 import com.wealthview.persistence.entity.StateStandardDeductionEntity;
 import com.wealthview.persistence.entity.StateTaxBracketEntity;
 import com.wealthview.persistence.entity.StateTaxSurchargeEntity;
 import com.wealthview.persistence.repository.StateStandardDeductionRepository;
 import com.wealthview.persistence.repository.StateTaxBracketRepository;
 import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
+
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
-
-import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
 
 public class BracketBasedStateTaxCalculator implements StateTaxCalculator {
 

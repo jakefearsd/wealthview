@@ -1,10 +1,8 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.api.security.TenantUserPrincipal;
-import com.wealthview.core.projection.SpendingProfileService;
-import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
-import com.wealthview.core.projection.dto.SpendingProfileResponse;
-import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,8 +15,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.projection.SpendingProfileService;
+import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
+import com.wealthview.core.projection.dto.SpendingProfileResponse;
+import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
 
 @RestController
 @RequestMapping("/api/v1/spending-profiles")

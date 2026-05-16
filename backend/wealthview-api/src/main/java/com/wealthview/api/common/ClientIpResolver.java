@@ -1,11 +1,11 @@
 package com.wealthview.api.common;
 
+import java.util.List;
+import java.util.Set;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import java.util.List;
-import java.util.Set;
 
 @Component
 public class ClientIpResolver {

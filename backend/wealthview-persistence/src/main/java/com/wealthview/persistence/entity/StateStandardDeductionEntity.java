@@ -1,15 +1,15 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "state_standard_deductions")
@@ -44,10 +44,27 @@ public class StateStandardDeductionEntity {
         this.amount = amount;
     }
 
-    public UUID getId() { return id; }
-    public String getStateCode() { return stateCode; }
-    public int getTaxYear() { return taxYear; }
-    public String getFilingStatus() { return filingStatus; }
-    public BigDecimal getAmount() { return amount; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public String getStateCode() {
+        return stateCode;
+    }
+
+    public int getTaxYear() {
+        return taxYear;
+    }
+
+    public String getFilingStatus() {
+        return filingStatus;
+    }
+
+    public BigDecimal getAmount() {
+        return amount;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

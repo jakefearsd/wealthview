@@ -1,6 +1,20 @@
 package com.wealthview.core.dashboard;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.account.AccountService;
+import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionDataPointDto;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionResponse;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
@@ -9,19 +23,6 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.MathContext;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-import com.wealthview.core.common.Money;
 
 @Service
 public class SnapshotProjectionService {

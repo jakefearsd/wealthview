@@ -1,10 +1,5 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-import org.apache.commons.csv.CSVRecord;
-import org.junit.jupiter.api.Test;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -13,6 +8,12 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+
+import org.apache.commons.csv.CSVRecord;
+import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.importservice.dto.CsvRowError;
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

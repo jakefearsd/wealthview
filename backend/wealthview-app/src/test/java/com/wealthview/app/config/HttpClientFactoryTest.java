@@ -1,11 +1,11 @@
 package com.wealthview.app.config;
 
+import java.net.ServerSocket;
+import java.time.Duration;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
-
-import java.net.ServerSocket;
-import java.time.Duration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

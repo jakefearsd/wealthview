@@ -1,18 +1,18 @@
 package com.wealthview.app.it.property;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import static java.util.Map.entry;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
+import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PropertyControllerIT extends AbstractApiIntegrationTest {

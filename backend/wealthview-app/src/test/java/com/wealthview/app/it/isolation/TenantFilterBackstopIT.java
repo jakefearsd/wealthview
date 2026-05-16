@@ -1,7 +1,8 @@
 package com.wealthview.app.it.isolation;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.core.auth.TenantContext;
+import java.util.List;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +11,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.core.auth.TenantContext;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

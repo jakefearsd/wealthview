@@ -1,13 +1,5 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.ImportParser;
-import com.wealthview.core.importservice.dto.ImportParseResult;
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.springframework.stereotype.Component;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -19,6 +11,15 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.Set;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.springframework.stereotype.Component;
+
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.CsvRowError;
+import com.wealthview.core.importservice.dto.ImportParseResult;
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 
 @Component
 @org.springframework.context.annotation.Primary

@@ -1,6 +1,7 @@
 package com.wealthview.api.filter;
 
-import com.wealthview.api.logging.LogSanitizer;
+import java.io.IOException;
+
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,7 +12,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-import java.io.IOException;
+import com.wealthview.api.logging.LogSanitizer;
 
 @Component
 public class RequestLoggingFilter extends OncePerRequestFilter {

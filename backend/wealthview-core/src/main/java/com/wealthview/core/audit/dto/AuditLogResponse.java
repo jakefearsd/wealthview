@@ -1,10 +1,10 @@
 package com.wealthview.core.audit.dto;
 
-import com.wealthview.persistence.entity.AuditLogEntity;
-
 import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.AuditLogEntity;
 
 public record AuditLogResponse(
         UUID id,

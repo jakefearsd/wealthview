@@ -1,5 +1,24 @@
 package com.wealthview.core.importservice;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.cache.CacheManager;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.core.importservice.dto.ImportJobResponse;
@@ -15,24 +34,6 @@ import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.cache.CacheManager;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 
 @Service
 public class ImportService {
@@ -76,7 +77,8 @@ public class ImportService {
     }
 
     @Transactional
-    public ImportJobResponse importCsv(UUID tenantId, UUID accountId, InputStream inputStream, String format) throws IOException {
+    public ImportJobResponse importCsv(UUID tenantId, UUID accountId,
+            InputStream inputStream, String format) throws IOException {
         var parser = resolveParser(format);
         var parseResult = parser.parse(inputStream);
         return processCsvImport(tenantId, accountId, parseResult);
@@ -122,7 +124,8 @@ public class ImportService {
         String importStatus = "failed";
         try {
             log.info("Starting {} import for account {}: {} transactions parsed, {} parse errors",
-                    source.toUpperCase(Locale.US), accountId, parseResult.transactions().size(), parseResult.errors().size());
+                    source.toUpperCase(Locale.US), accountId,
+                    parseResult.transactions().size(), parseResult.errors().size());
 
             var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                     .orElseThrow(Entities.notFound("Account"));
@@ -141,13 +144,16 @@ public class ImportService {
 
             finalizeJob(job, result, parseResult.errors().size());
             meterRegistry.counter("wealthview.import.rows", "outcome", "imported").increment(result.successCount());
-            meterRegistry.counter("wealthview.import.rows", "outcome", "duplicate").increment(result.skippedDuplicates());
-            meterRegistry.counter("wealthview.import.rows", "outcome", "error").increment(result.failedCount() + parseResult.errors().size());
+            meterRegistry.counter("wealthview.import.rows", "outcome", "duplicate")
+                    .increment(result.skippedDuplicates());
+            meterRegistry.counter("wealthview.import.rows", "outcome", "error")
+                    .increment(result.failedCount() + parseResult.errors().size());
 
             int totalErrors = result.failedCount() + parseResult.errors().size();
             importStatus = totalErrors == 0 ? "success" : result.successCount() > 0 ? "partial" : "failed";
             log.info("{} import completed for account {}: {} successful, {} duplicates skipped, {} failed",
-                    source.toUpperCase(Locale.US), accountId, result.successCount(), result.skippedDuplicates(), job.getFailedRows());
+                    source.toUpperCase(Locale.US), accountId,
+                    result.successCount(), result.skippedDuplicates(), job.getFailedRows());
             return ImportJobResponse.from(job);
         } finally {
             // Per-import-job counter (vs. wealthview.import.rows which is per-row).
@@ -158,7 +164,8 @@ public class ImportService {
         }
     }
 
-    @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional catch-all so one bad row doesn't abort entire import
+    // intentional catch-all so one bad row doesn't abort entire import
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private ImportResult importTransactions(List<ParsedTransaction> transactions,
                                              UUID tenantId, UUID accountId,
                                              AccountEntity account) {

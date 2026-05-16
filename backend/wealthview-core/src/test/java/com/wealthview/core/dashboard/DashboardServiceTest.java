@@ -1,13 +1,12 @@
 package com.wealthview.core.dashboard;
 
-import com.wealthview.core.account.AccountService;
-import com.wealthview.core.exchangerate.ExchangeRateService;
-import com.wealthview.core.testutil.TestEntityHelper;
-import com.wealthview.persistence.entity.AccountEntity;
-import com.wealthview.persistence.entity.PropertyEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.repository.AccountRepository;
-import com.wealthview.persistence.repository.PropertyRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -17,12 +16,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.core.account.AccountService;
+import com.wealthview.core.exchangerate.ExchangeRateService;
+import com.wealthview.core.testutil.TestEntityHelper;
+import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.PropertyEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.AccountRepository;
+import com.wealthview.persistence.repository.PropertyRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

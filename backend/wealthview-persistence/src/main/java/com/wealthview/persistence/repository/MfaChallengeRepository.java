@@ -1,10 +1,11 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.MfaChallengeEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-
 import java.util.Optional;
 import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.wealthview.persistence.entity.MfaChallengeEntity;
 
 public interface MfaChallengeRepository extends JpaRepository<MfaChallengeEntity, UUID> {
 

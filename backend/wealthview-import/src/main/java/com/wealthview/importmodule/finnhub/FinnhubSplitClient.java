@@ -1,8 +1,9 @@
 package com.wealthview.importmodule.finnhub;
 
-import com.wealthview.core.split.SplitDetectionClient;
-import com.wealthview.core.split.dto.DetectedSplit;
-import io.micrometer.core.annotation.Timed;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.client.HttpClientErrorException;
@@ -10,9 +11,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import com.wealthview.core.split.SplitDetectionClient;
+import com.wealthview.core.split.dto.DetectedSplit;
+import io.micrometer.core.annotation.Timed;
 
 /**
  * Finnhub split-detection adapter. Calls

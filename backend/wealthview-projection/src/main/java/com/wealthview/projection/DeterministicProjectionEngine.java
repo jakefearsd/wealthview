@@ -1,5 +1,17 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.common.CompoundGrowth;
@@ -22,9 +34,9 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.CombinedTaxCalculator;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
-import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
@@ -33,17 +45,7 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
@@ -173,7 +175,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             spendingPlan = parseTierBasedPlan(input.spendingProfile());
         }
 
-        var incomeSources = input.incomeSources() != null ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
+        var incomeSources = input.incomeSources() != null
+                ? input.incomeSources() : List.<ProjectionIncomeSourceInput>of();
         var properties = input.properties() != null ? input.properties() : List.<ProjectionPropertyInput>of();
 
         return new ResolvedParams(currentYear, birthYear, retirementYear, endYear,

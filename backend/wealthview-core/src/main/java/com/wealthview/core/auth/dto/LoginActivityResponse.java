@@ -1,9 +1,9 @@
 package com.wealthview.core.auth.dto;
 
-import com.wealthview.persistence.entity.LoginActivityEntity;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.LoginActivityEntity;
 
 public record LoginActivityResponse(
         String userEmail,

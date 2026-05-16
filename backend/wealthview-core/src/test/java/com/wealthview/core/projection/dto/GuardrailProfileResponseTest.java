@@ -1,13 +1,14 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
-import com.wealthview.persistence.entity.ProjectionScenarioEntity;
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

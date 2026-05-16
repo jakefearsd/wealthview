@@ -1,13 +1,14 @@
 package com.wealthview.core.audit;
 
-import com.wealthview.persistence.entity.AuditLogEntity;
-import com.wealthview.persistence.repository.AuditLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionalEventListener;
+
+import com.wealthview.persistence.entity.AuditLogEntity;
+import com.wealthview.persistence.repository.AuditLogRepository;
 
 @Component
 public class AuditEventListener {

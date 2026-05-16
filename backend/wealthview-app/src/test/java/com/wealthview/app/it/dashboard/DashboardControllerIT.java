@@ -1,7 +1,11 @@
 package com.wealthview.app.it.dashboard;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.app.it.testutil.TestDataHelper;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
@@ -13,11 +17,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.TestDataHelper;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

@@ -1,11 +1,12 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.StateStandardDeductionEntity;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.persistence.entity.StateStandardDeductionEntity;
 
 public interface StateStandardDeductionRepository extends JpaRepository<StateStandardDeductionEntity, UUID> {
 

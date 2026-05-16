@@ -1,8 +1,9 @@
 package com.wealthview.core.projection.tax;
 
+import java.math.BigDecimal;
+
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 

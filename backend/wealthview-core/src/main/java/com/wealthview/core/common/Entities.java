@@ -1,9 +1,9 @@
 package com.wealthview.core.common;
 
-import com.wealthview.core.exception.EntityNotFoundException;
-
 import java.util.Optional;
 import java.util.function.Supplier;
+
+import com.wealthview.core.exception.EntityNotFoundException;
 
 public final class Entities {
 

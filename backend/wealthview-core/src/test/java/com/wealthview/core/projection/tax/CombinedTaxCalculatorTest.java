@@ -1,15 +1,16 @@
 package com.wealthview.core.projection.tax;
 
-import com.wealthview.core.testutil.TaxBracketFixtures;
-import com.wealthview.persistence.repository.StandardDeductionRepository;
-import com.wealthview.persistence.repository.TaxBracketRepository;
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
+import com.wealthview.core.testutil.TaxBracketFixtures;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;

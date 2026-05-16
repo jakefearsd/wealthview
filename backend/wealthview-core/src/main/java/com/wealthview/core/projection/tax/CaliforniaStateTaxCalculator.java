@@ -1,10 +1,10 @@
 package com.wealthview.core.projection.tax;
 
+import java.math.BigDecimal;
+
 import com.wealthview.persistence.repository.StateStandardDeductionRepository;
 import com.wealthview.persistence.repository.StateTaxBracketRepository;
 import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
-
-import java.math.BigDecimal;
 
 public class CaliforniaStateTaxCalculator implements StateTaxCalculator {
 

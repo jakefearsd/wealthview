@@ -1,7 +1,7 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.core.mobile.MobileAppVersionService;
-import com.wealthview.core.mobile.dto.VersionCheckResponse;
+import java.util.List;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.wealthview.core.mobile.MobileAppVersionService;
+import com.wealthview.core.mobile.dto.VersionCheckResponse;
 
 /**
  * SUPER_ADMIN endpoints for managing the mobile-app version-check rows.

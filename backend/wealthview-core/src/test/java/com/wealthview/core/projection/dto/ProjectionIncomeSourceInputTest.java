@@ -1,9 +1,9 @@
 package com.wealthview.core.projection.dto;
 
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

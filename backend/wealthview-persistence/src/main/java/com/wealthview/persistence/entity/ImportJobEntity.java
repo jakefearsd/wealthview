@@ -1,5 +1,8 @@
 package com.wealthview.persistence.entity;
 
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,9 +12,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
 import org.hibernate.annotations.Filter;
 
 @Entity
@@ -65,20 +65,67 @@ public class ImportJobEntity {
         this.status = "pending";
     }
 
-    public UUID getId() { return id; }
-    public TenantEntity getTenant() { return tenant; }
-    public AccountEntity getAccount() { return account; }
-    public String getSource() { return source; }
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-    public int getTotalRows() { return totalRows; }
-    public void setTotalRows(int totalRows) { this.totalRows = totalRows; }
-    public int getSuccessfulRows() { return successfulRows; }
-    public void setSuccessfulRows(int successfulRows) { this.successfulRows = successfulRows; }
-    public int getFailedRows() { return failedRows; }
-    public void setFailedRows(int failedRows) { this.failedRows = failedRows; }
-    public String getErrorMessage() { return errorMessage; }
-    public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public TenantEntity getTenant() {
+        return tenant;
+    }
+
+    public AccountEntity getAccount() {
+        return account;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public int getTotalRows() {
+        return totalRows;
+    }
+
+    public void setTotalRows(int totalRows) {
+        this.totalRows = totalRows;
+    }
+
+    public int getSuccessfulRows() {
+        return successfulRows;
+    }
+
+    public void setSuccessfulRows(int successfulRows) {
+        this.successfulRows = successfulRows;
+    }
+
+    public int getFailedRows() {
+        return failedRows;
+    }
+
+    public void setFailedRows(int failedRows) {
+        this.failedRows = failedRows;
+    }
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

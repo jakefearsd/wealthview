@@ -1,10 +1,10 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
+
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
-
-import java.math.BigDecimal;
 
 /**
  * Shared rental income computation used by both MonteCarloSpendingOptimizer

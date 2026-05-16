@@ -1,9 +1,9 @@
 package com.wealthview.core.split;
 
-import com.wealthview.core.split.dto.DetectedSplit;
-
 import java.time.LocalDate;
 import java.util.List;
+
+import com.wealthview.core.split.dto.DetectedSplit;
 
 /**
  * Source of stock-split events (Finnhub today, potentially Yahoo later).

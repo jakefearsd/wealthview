@@ -1,5 +1,21 @@
 package com.wealthview.core.projection;
 
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.OffsetDateTime;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.common.Entities;
@@ -12,21 +28,6 @@ import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.OffsetDateTime;
-import java.util.HexFormat;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 @Service
 public class GuardrailProfileService {
@@ -63,40 +64,40 @@ public class GuardrailProfileService {
         MDC.put("operation", "guardrail-optimize");
         MDC.put("scenarioId", scenarioId.toString());
         try {
-        validateConversionRequest(request);
+            validateConversionRequest(request);
 
-        var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
-                .orElseThrow(Entities.notFound("Scenario"));
+            var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
+                    .orElseThrow(Entities.notFound("Scenario"));
 
-        var projectionInput = projectionInputBuilder.build(scenario, tenantId);
+            var projectionInput = projectionInputBuilder.build(scenario, tenantId);
 
-        int birthYear = parseBirthYear(scenario.getParamsJson());
-        String filingStatus = parseFilingStatus(scenario.getParamsJson()).orElse(null);
-        String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order")
-                .orElse("taxable_first");
+            int birthYear = parseBirthYear(scenario.getParamsJson());
+            String filingStatus = parseFilingStatus(scenario.getParamsJson()).orElse(null);
+            String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order")
+                    .orElse("taxable_first");
 
-        BigDecimal confidence = resolveConfidence(request);
+            BigDecimal confidence = resolveConfidence(request);
 
-        var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
-                birthYear, confidence, filingStatus, withdrawalOrder);
+            var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
+                    birthYear, confidence, filingStatus, withdrawalOrder);
 
-        var optimizerResult = spendingOptimizer.optimize(optimizationInput);
+            var optimizerResult = spendingOptimizer.optimize(optimizationInput);
 
-        deleteExistingProfile(scenario, scenarioId);
+            deleteExistingProfile(scenario, scenarioId);
 
-        var entity = new GuardrailSpendingProfileEntity(
-                scenario.getTenant(), scenario, request.name(), request.essentialFloor());
-        populateGuardrailEntity(entity, scenario, request, optimizationInput, optimizerResult);
+            var entity = new GuardrailSpendingProfileEntity(
+                    scenario.getTenant(), scenario, request.name(), request.essentialFloor());
+            populateGuardrailEntity(entity, scenario, request, optimizationInput, optimizerResult);
 
-        var saved = guardrailRepository.save(entity);
+            var saved = guardrailRepository.save(entity);
 
-        scenario.setSpendingProfile(null);
-        scenario.setGuardrailProfile(saved);
-        scenario.setUpdatedAt(OffsetDateTime.now());
-        scenarioRepository.save(scenario);
+            scenario.setSpendingProfile(null);
+            scenario.setGuardrailProfile(saved);
+            scenario.setUpdatedAt(OffsetDateTime.now());
+            scenarioRepository.save(scenario);
 
-        log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
-        return GuardrailProfileResponse.from(saved);
+            log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
+            return GuardrailProfileResponse.from(saved);
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioId");

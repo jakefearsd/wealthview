@@ -1,13 +1,5 @@
 package com.wealthview.importmodule.zillow;
 
-import com.wealthview.core.property.PropertyValuationClient;
-import com.wealthview.core.property.dto.PropertyValuationResult;
-import com.wealthview.core.property.dto.ZillowSearchResult;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -16,6 +8,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.wealthview.core.property.PropertyValuationClient;
+import com.wealthview.core.property.dto.PropertyValuationResult;
+import com.wealthview.core.property.dto.ZillowSearchResult;
 
 public class ZillowScraperClient implements PropertyValuationClient {
 
@@ -32,15 +33,15 @@ public class ZillowScraperClient implements PropertyValuationClient {
     private static final Pattern ZPID_PATTERN = Pattern.compile(
             "\"zpid\"\\s*:\\s*\"?(\\d+)\"?");
     private static final Pattern SEARCH_RESULT_PATTERN = Pattern.compile(
-            "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?" +
-            "\"address\"\\s*:\\s*\"([^\"]+)\"[^}]*?" +
-            "\"zestimate\"\\s*:\\s*(\\d+)");
+            "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?"
+            + "\"address\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
+            + "\"zestimate\"\\s*:\\s*(\\d+)");
     private static final Pattern SEARCH_RESULT_ALT_PATTERN = Pattern.compile(
-            "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?" +
-            "\"streetAddress\"\\s*:\\s*\"([^\"]+)\"[^}]*?" +
-            "\"city\"\\s*:\\s*\"([^\"]+)\"[^}]*?" +
-            "\"state\"\\s*:\\s*\"([^\"]+)\"[^}]*?" +
-            "\"zipcode\"\\s*:\\s*\"([^\"]+)\"");
+            "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?"
+            + "\"streetAddress\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
+            + "\"city\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
+            + "\"state\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
+            + "\"zipcode\"\\s*:\\s*\"([^\"]+)\"");
 
     private final int timeoutMs;
 

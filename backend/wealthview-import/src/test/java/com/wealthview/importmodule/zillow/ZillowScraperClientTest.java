@@ -1,10 +1,10 @@
 package com.wealthview.importmodule.zillow;
 
-import org.jsoup.Jsoup;
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+
+import org.jsoup.Jsoup;
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

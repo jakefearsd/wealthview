@@ -1,18 +1,8 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.api.common.ClientIpResolver;
-import com.wealthview.api.security.TenantUserPrincipal;
-import com.wealthview.core.auth.AuthRequestContext;
-import com.wealthview.core.auth.AuthService;
-import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.dto.AuthIdentityResponse;
-import com.wealthview.core.auth.dto.AuthResult;
-import com.wealthview.core.auth.dto.CurrentUserResponse;
-import com.wealthview.core.auth.dto.LoginOutcome;
-import com.wealthview.core.auth.dto.LoginRequest;
-import com.wealthview.core.auth.dto.MfaChallengeRequest;
-import com.wealthview.core.auth.dto.RegisterRequest;
+import java.time.Duration;
 import java.util.Map;
+
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -29,7 +19,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
+import com.wealthview.api.common.ClientIpResolver;
+import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.auth.AuthRequestContext;
+import com.wealthview.core.auth.AuthService;
+import com.wealthview.core.auth.JwtTokenProvider;
+import com.wealthview.core.auth.dto.AuthIdentityResponse;
+import com.wealthview.core.auth.dto.AuthResult;
+import com.wealthview.core.auth.dto.CurrentUserResponse;
+import com.wealthview.core.auth.dto.LoginOutcome;
+import com.wealthview.core.auth.dto.LoginRequest;
+import com.wealthview.core.auth.dto.MfaChallengeRequest;
+import com.wealthview.core.auth.dto.RegisterRequest;
 
 /**
  * Auth endpoints. Tokens are issued and consumed exclusively as

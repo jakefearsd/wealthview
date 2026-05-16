@@ -1,6 +1,8 @@
 package com.wealthview.importmodule.finnhub;
 
-import com.wealthview.core.pricefeed.dto.QuoteResult;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -9,8 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
+import com.wealthview.core.pricefeed.dto.QuoteResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;

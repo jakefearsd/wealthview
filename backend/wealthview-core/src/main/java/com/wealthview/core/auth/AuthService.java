@@ -1,24 +1,9 @@
 package com.wealthview.core.auth;
 
-import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.auth.dto.AuthResult;
-import com.wealthview.core.auth.dto.LoginOutcome;
-import com.wealthview.core.auth.dto.LoginRequest;
-import com.wealthview.core.auth.dto.RegisterRequest;
-import com.wealthview.core.auth.mfa.MfaService;
-import com.wealthview.core.exception.DuplicateEntityException;
-import com.wealthview.core.common.Entities;
-import com.wealthview.core.exception.InvalidInviteCodeException;
-import com.wealthview.persistence.entity.MfaChallengeEntity;
-import com.wealthview.persistence.entity.RefreshTokenEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.entity.UserSessionEntity;
-import com.wealthview.persistence.repository.InviteCodeRepository;
-import com.wealthview.persistence.repository.MfaChallengeRepository;
-import com.wealthview.persistence.repository.RefreshTokenRepository;
-import com.wealthview.persistence.repository.UserRepository;
-import com.wealthview.persistence.repository.UserSessionRepository;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -30,9 +15,25 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.core.audit.AuditEvent;
+import com.wealthview.core.auth.dto.AuthResult;
+import com.wealthview.core.auth.dto.LoginOutcome;
+import com.wealthview.core.auth.dto.LoginRequest;
+import com.wealthview.core.auth.dto.RegisterRequest;
+import com.wealthview.core.auth.mfa.MfaService;
+import com.wealthview.core.common.Entities;
+import com.wealthview.core.exception.DuplicateEntityException;
+import com.wealthview.core.exception.InvalidInviteCodeException;
+import com.wealthview.persistence.entity.MfaChallengeEntity;
+import com.wealthview.persistence.entity.RefreshTokenEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.entity.UserSessionEntity;
+import com.wealthview.persistence.repository.InviteCodeRepository;
+import com.wealthview.persistence.repository.MfaChallengeRepository;
+import com.wealthview.persistence.repository.RefreshTokenRepository;
+import com.wealthview.persistence.repository.UserRepository;
+import com.wealthview.persistence.repository.UserSessionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 
 @Service
 public class AuthService {
@@ -253,7 +254,8 @@ public class AuthService {
     public AuthResult register(RegisterRequest request, AuthRequestContext context) {
         var transport = context.transport();
         if (commonPasswordChecker.isCommon(request.password())) {
-            throw new IllegalArgumentException("This password is too common and easily guessed. Please choose a different password.");
+            throw new IllegalArgumentException(
+                    "This password is too common and easily guessed. Please choose a different password.");
         }
 
         // Invite validation must run before the email-existence check: otherwise

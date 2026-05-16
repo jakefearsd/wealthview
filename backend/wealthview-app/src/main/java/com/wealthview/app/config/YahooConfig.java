@@ -1,13 +1,13 @@
 package com.wealthview.app.config;
 
-import com.wealthview.importmodule.yahoo.YahooFinanceClient;
-import org.springframework.beans.factory.annotation.Value;
+import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
+import com.wealthview.importmodule.yahoo.YahooFinanceClient;
 
 @Configuration
 public class YahooConfig {

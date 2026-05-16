@@ -1,10 +1,11 @@
 package com.wealthview.core.common;
 
-import com.wealthview.core.exception.EntityNotFoundException;
-import org.junit.jupiter.api.Test;
-
 import java.util.Optional;
 import java.util.UUID;
+
+import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.exception.EntityNotFoundException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

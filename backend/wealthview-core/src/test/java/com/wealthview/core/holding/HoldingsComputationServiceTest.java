@@ -1,12 +1,11 @@
 package com.wealthview.core.holding;
 
-import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
-import com.wealthview.persistence.entity.AccountEntity;
-import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.TransactionEntity;
-import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,11 +14,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
+import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.repository.HoldingRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

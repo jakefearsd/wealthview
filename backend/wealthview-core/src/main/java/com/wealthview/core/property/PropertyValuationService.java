@@ -1,20 +1,21 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.common.Entities;
-import com.wealthview.core.property.dto.PropertyValuationResponse;
-import com.wealthview.persistence.entity.PropertyValuationEntity;
-import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.PropertyValuationRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.wealthview.core.common.Entities;
+import com.wealthview.core.property.dto.PropertyValuationResponse;
+import com.wealthview.persistence.entity.PropertyValuationEntity;
+import com.wealthview.persistence.repository.PropertyRepository;
+import com.wealthview.persistence.repository.PropertyValuationRepository;
 
 @Service
 public class PropertyValuationService {

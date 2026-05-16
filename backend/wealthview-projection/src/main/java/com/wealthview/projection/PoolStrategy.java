@@ -1,18 +1,18 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.core.projection.dto.ProjectionYearDto;
-import com.wealthview.core.projection.strategy.WithdrawalOrder;
-import com.wealthview.core.projection.tax.FilingStatus;
-import com.wealthview.core.projection.tax.CombinedTaxResult;
-import com.wealthview.core.projection.tax.TaxCalculationStrategy;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
+import com.wealthview.core.projection.tax.CombinedTaxResult;
+import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 /**
  * Strategy for managing investment pool balances during projection year-loop.
@@ -547,7 +547,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal fedTax = lastTaxBreakdown != null ? lastTaxBreakdown.federalTax() : null;
             BigDecimal stTax = lastTaxBreakdown != null && lastTaxBreakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
                     ? lastTaxBreakdown.stateTax() : null;
-            BigDecimal saltDed = lastTaxBreakdown != null && lastTaxBreakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
+            BigDecimal saltDed = lastTaxBreakdown != null
+                    && lastTaxBreakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
                     ? lastTaxBreakdown.saltDeduction() : null;
             Boolean usedItemized = lastTaxBreakdown != null ? lastTaxBreakdown.usedItemized() : null;
             lastTaxBreakdown = null;
@@ -562,11 +563,16 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     .taxableGrowth(growthResult.taxable())
                     .traditionalGrowth(growthResult.traditional())
                     .rothGrowth(growthResult.roth())
-                    .taxPaidFromTaxable(combinedTaxSource.fromTaxable().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTaxable() : null)
-                    .taxPaidFromTraditional(combinedTaxSource.fromTraditional().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromTraditional() : null)
-                    .taxPaidFromRoth(combinedTaxSource.fromRoth().compareTo(BigDecimal.ZERO) > 0 ? combinedTaxSource.fromRoth() : null)
-                    .withdrawalFromTaxable(withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTaxable : null)
-                    .withdrawalFromTraditional(withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromTraditional : null)
+                    .taxPaidFromTaxable(combinedTaxSource.fromTaxable().compareTo(BigDecimal.ZERO) > 0
+                            ? combinedTaxSource.fromTaxable() : null)
+                    .taxPaidFromTraditional(combinedTaxSource.fromTraditional().compareTo(BigDecimal.ZERO) > 0
+                            ? combinedTaxSource.fromTraditional() : null)
+                    .taxPaidFromRoth(combinedTaxSource.fromRoth().compareTo(BigDecimal.ZERO) > 0
+                            ? combinedTaxSource.fromRoth() : null)
+                    .withdrawalFromTaxable(withdrawalFromTaxable.compareTo(BigDecimal.ZERO) > 0
+                            ? withdrawalFromTaxable : null)
+                    .withdrawalFromTraditional(withdrawalFromTraditional.compareTo(BigDecimal.ZERO) > 0
+                            ? withdrawalFromTraditional : null)
                     .withdrawalFromRoth(withdrawalFromRoth.compareTo(BigDecimal.ZERO) > 0 ? withdrawalFromRoth : null)
                     .federalTax(fedTax).stateTax(stTax).saltDeduction(saltDed)
                     .usedItemizedDeduction(usedItemized)
@@ -673,8 +679,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 }
                 BigDecimal capped = need.min(total);
                 BigDecimal fromTaxable = capped.multiply(taxable).divide(total, SCALE, ROUNDING).min(taxable);
-                BigDecimal fromTraditional = capped.multiply(traditional).divide(total, SCALE, ROUNDING).min(traditional);
-                BigDecimal fromRoth = capped.subtract(fromTaxable).subtract(fromTraditional).min(roth).max(BigDecimal.ZERO);
+                BigDecimal fromTraditional = capped.multiply(traditional)
+                        .divide(total, SCALE, ROUNDING).min(traditional);
+                BigDecimal fromRoth = capped.subtract(fromTaxable).subtract(fromTraditional)
+                        .min(roth).max(BigDecimal.ZERO);
                 return new Result(fromTaxable, fromTraditional, fromRoth);
             }
         }

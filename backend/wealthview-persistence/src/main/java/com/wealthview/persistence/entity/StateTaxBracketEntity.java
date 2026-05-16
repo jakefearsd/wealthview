@@ -1,10 +1,10 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "state_tax_brackets")
@@ -23,5 +23,7 @@ public class StateTaxBracketEntity extends AbstractTaxBracketEntity {
         this.stateCode = stateCode;
     }
 
-    public String getStateCode() { return stateCode; }
+    public String getStateCode() {
+        return stateCode;
+    }
 }

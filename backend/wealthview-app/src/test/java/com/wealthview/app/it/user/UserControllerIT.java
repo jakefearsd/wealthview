@@ -1,11 +1,12 @@
 package com.wealthview.app.it.user;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
-import java.util.Map;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;

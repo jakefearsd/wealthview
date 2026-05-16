@@ -1,5 +1,10 @@
 package com.wealthview.app.config;
 
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.InviteCodeEntity;
@@ -19,10 +24,6 @@ import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import com.wealthview.persistence.repository.UserRepository;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.context.annotation.Profile;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,9 +31,9 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.times;
 
 /**
  * Unit-level test for DevDataInitializer.run(). Like SampleDataInitializer, the

@@ -1,11 +1,12 @@
 package com.wealthview.app.config;
 
-import com.wealthview.core.pricefeed.PriceSyncService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import com.wealthview.core.pricefeed.PriceSyncService;
 
 @Component
 @ConditionalOnBean(PriceSyncService.class)

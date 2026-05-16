@@ -1,24 +1,5 @@
 package com.wealthview.projection;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.core.projection.dto.IncomeSourceType;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import com.wealthview.core.projection.dto.ProjectionInput;
-import com.wealthview.core.projection.dto.SpendingProfileInput;
-import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import com.wealthview.persistence.repository.StandardDeductionRepository;
-import com.wealthview.persistence.repository.TaxBracketRepository;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.skyscreamer.jsonassert.JSONAssert;
-import org.skyscreamer.jsonassert.JSONCompareMode;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -26,6 +7,26 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.skyscreamer.jsonassert.JSONAssert;
+import org.skyscreamer.jsonassert.JSONCompareMode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static org.mockito.Mockito.mock;

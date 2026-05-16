@@ -1,20 +1,21 @@
 package com.wealthview.core.mobile;
 
-import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.mobile.dto.VersionCheckResponse;
-import com.wealthview.persistence.entity.MobileAppVersionEntity;
-import com.wealthview.persistence.repository.MobileAppVersionRepository;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.mobile.dto.VersionCheckResponse;
+import com.wealthview.persistence.entity.MobileAppVersionEntity;
+import com.wealthview.persistence.repository.MobileAppVersionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Backs the mobile force-update endpoint. Reads/writes the global

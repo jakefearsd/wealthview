@@ -1,5 +1,23 @@
 package com.wealthview.importmodule.ofx;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.CsvRowError;
+import com.wealthview.core.importservice.dto.ImportParseResult;
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.webcohesion.ofx4j.domain.data.MessageSetType;
 import com.webcohesion.ofx4j.domain.data.ResponseEnvelope;
 import com.webcohesion.ofx4j.domain.data.banking.BankStatementResponse;
@@ -14,23 +32,6 @@ import com.webcohesion.ofx4j.domain.data.seclist.BaseSecurityInfo;
 import com.webcohesion.ofx4j.domain.data.seclist.SecurityList;
 import com.webcohesion.ofx4j.domain.data.seclist.SecurityListResponseMessageSet;
 import com.webcohesion.ofx4j.io.AggregateUnmarshaller;
-import com.wealthview.core.importservice.ImportParser;
-import com.wealthview.core.importservice.dto.ImportParseResult;
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Adapter from OFX4J's {@link ResponseEnvelope} format to the app's {@link ImportParseResult}.

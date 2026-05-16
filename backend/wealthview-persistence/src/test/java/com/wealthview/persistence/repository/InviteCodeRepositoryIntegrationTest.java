@@ -1,14 +1,15 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.AbstractIntegrationTest;
-import com.wealthview.persistence.entity.InviteCodeEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
+import java.time.OffsetDateTime;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.time.OffsetDateTime;
+import com.wealthview.persistence.AbstractIntegrationTest;
+import com.wealthview.persistence.entity.InviteCodeEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,12 +1,13 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.projection.dto.IncomeSourceType;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import static com.wealthview.core.common.Money.ROUNDING;
-import static com.wealthview.core.common.Money.SCALE;
-
 import java.math.BigDecimal;
 import java.util.List;
+
+import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 class IncomeContributionCalculator {
 

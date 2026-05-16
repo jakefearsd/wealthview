@@ -1,15 +1,17 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.property.dto.CostSegAllocation;
-import com.wealthview.persistence.entity.PropertyEntity;
-import org.springframework.stereotype.Component;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import org.springframework.stereotype.Component;
+
+import com.wealthview.core.property.dto.CostSegAllocation;
+import com.wealthview.persistence.entity.PropertyEntity;
+
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
@@ -75,7 +77,7 @@ public class DepreciationCalculator {
      * with the remainder on straight-line over the class life.
      * Structural (27.5yr) gets straight-line only, no bonus.
      *
-     * If studyYear is set and later than the in-service year, computes a
+     * <p>If studyYear is set and later than the in-service year, computes a
      * Section 481(a) catch-up adjustment for the study year.
      */
     public Map<Integer, BigDecimal> computeCostSegregation(

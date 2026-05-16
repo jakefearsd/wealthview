@@ -1,7 +1,9 @@
 package com.wealthview.core.auth;
 
-import com.wealthview.persistence.entity.LoginActivityEntity;
-import com.wealthview.persistence.repository.LoginActivityRepository;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -9,9 +11,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.persistence.entity.LoginActivityEntity;
+import com.wealthview.persistence.repository.LoginActivityRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

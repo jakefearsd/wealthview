@@ -1,7 +1,7 @@
 package com.wealthview.app.it.auth;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.util.Map;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -10,7 +10,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
-import java.util.Map;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

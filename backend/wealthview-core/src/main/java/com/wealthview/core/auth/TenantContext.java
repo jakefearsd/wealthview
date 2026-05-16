@@ -1,8 +1,8 @@
 package com.wealthview.core.auth;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-
 import java.util.UUID;
+
+import org.springframework.security.core.context.SecurityContextHolder;
 
 public final class TenantContext {
 
@@ -34,8 +34,11 @@ public final class TenantContext {
     }
 
     public interface AuthenticatedUser {
+
         UUID userId();
+
         UUID tenantId();
+
         String role();
     }
 }

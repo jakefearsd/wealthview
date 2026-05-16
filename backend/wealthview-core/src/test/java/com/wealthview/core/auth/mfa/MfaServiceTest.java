@@ -1,12 +1,9 @@
 package com.wealthview.core.auth.mfa;
 
-import com.wealthview.core.testutil.TestEntityHelper;
-import com.wealthview.persistence.entity.MfaRecoveryCodeEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.MfaRecoveryCodeRepository;
-import com.wealthview.persistence.repository.UserRepository;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,9 +12,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.core.testutil.TestEntityHelper;
+import com.wealthview.persistence.entity.MfaRecoveryCodeEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.MfaRecoveryCodeRepository;
+import com.wealthview.persistence.repository.UserRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

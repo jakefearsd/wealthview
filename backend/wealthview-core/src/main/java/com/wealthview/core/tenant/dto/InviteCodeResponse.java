@@ -1,9 +1,9 @@
 package com.wealthview.core.tenant.dto;
 
-import com.wealthview.persistence.entity.InviteCodeEntity;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.InviteCodeEntity;
 
 public record InviteCodeResponse(
         UUID id,

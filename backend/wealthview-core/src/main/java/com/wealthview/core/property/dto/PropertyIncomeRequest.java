@@ -1,10 +1,10 @@
 package com.wealthview.core.property.dto;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Pattern;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 public record PropertyIncomeRequest(
         @NotNull LocalDate date,

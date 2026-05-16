@@ -1,6 +1,7 @@
 package com.wealthview.app.it.security;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
+import java.util.Random;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -11,7 +12,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 
-import java.util.Random;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

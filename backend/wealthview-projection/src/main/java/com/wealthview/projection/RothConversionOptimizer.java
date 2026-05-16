@@ -1,20 +1,20 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Finds the optimal Roth conversion schedule that minimizes lifetime tax.
@@ -120,8 +120,8 @@ class RothConversionOptimizer {
      * Computes the target traditional IRA balance at RMD start age such that
      * RMDs stay within the user's target bracket (with headroom for market variability).
      *
-     * Formula: targetBalance = availableForRmd × distributionPeriod(rmdStartAge)
-     * where availableForRmd = grossBracketCeiling × (1 - headroom) - otherIncomeAtRmdAge
+     * <p>Formula: targetBalance = availableForRmd × distributionPeriod(rmdStartAge)
+     * where availableForRmd = grossBracketCeiling × (1 - headroom) - otherIncomeAtRmdAge.
      */
     private double computeTargetTraditionalBalance() {
         double distributionPeriod = RmdCalculator.distributionPeriod(rmdStartAge);
@@ -151,10 +151,10 @@ class RothConversionOptimizer {
                 BigDecimal.valueOf(inflationRate)).doubleValue();
         double availableForRmd = grossCeiling * (1 - rmdBracketHeadroom) - otherIncomeAtRmd;
 
-        log.info("Target balance computation: rmdStartAge={}, distributionPeriod={}, " +
-                "rmdYearIndex={}, otherIncomeAtRmd={}, rmdCalendarYear={}, " +
-                "rmdTargetBracketRate={}, grossCeiling={}, headroom={}, availableForRmd={}, " +
-                "result={}",
+        log.info("Target balance computation: rmdStartAge={}, distributionPeriod={}, "
+                + "rmdYearIndex={}, otherIncomeAtRmd={}, rmdCalendarYear={}, "
+                + "rmdTargetBracketRate={}, grossCeiling={}, headroom={}, availableForRmd={}, "
+                + "result={}",
                 rmdStartAge, distributionPeriod, rmdYearIndex, otherIncomeAtRmd,
                 rmdCalendarYear, rmdTargetBracketRate, grossCeiling, rmdBracketHeadroom,
                 availableForRmd, availableForRmd > 0 ? availableForRmd * distributionPeriod : 0);
@@ -200,7 +200,7 @@ class RothConversionOptimizer {
      * Computes rental taxable income adjustment for a single year using
      * RentalLossCalculator with MAGI that includes the conversion amount.
      *
-     * For REPS/active properties, MAGI doesn't affect the result — all losses
+     * <p>For REPS/active properties, MAGI doesn't affect the result — all losses
      * are fully deductible. For passive properties, high MAGI (from conversions)
      * phases out the $25K exception, reducing the deductible loss.
      *
@@ -312,8 +312,13 @@ class RothConversionOptimizer {
     }
 
     private boolean isBetterCandidate(double tax, boolean feasible, double bestTax, boolean bestFeasible) {
-        if (feasible && !bestFeasible) { return true; }
-        if (!feasible && bestFeasible) { return false; }
+        if (feasible && !bestFeasible) {
+            return true;
+        }
+
+        if (!feasible && bestFeasible) {
+            return false;
+        }
         return tax < bestTax;
     }
 
@@ -416,7 +421,9 @@ class RothConversionOptimizer {
 
                 if (age < EARLY_WITHDRAWAL_AGE) {
                     taxable -= conversionTax;
-                    if (taxable < 0) { taxable = 0; }
+                    if (taxable < 0) {
+                        taxable = 0;
+                    }
                 } else {
                     double[] afterDeduct = deductCascade(conversionTax, taxable,
                             traditional, roth);
@@ -490,7 +497,9 @@ class RothConversionOptimizer {
                                          double rmdAmount, double conversionAmount,
                                          int calendarYear) {
             taxable -= need;
-            if (taxable < 0) { taxable = 0; }
+            if (taxable < 0) {
+                taxable = 0;
+            }
             return new WithdrawalResult(taxable, traditional, roth, 0);
         }
     }
@@ -556,7 +565,9 @@ class RothConversionOptimizer {
             double withdrawalTax = 0;
 
             for (var pool : pools) {
-                if (remaining <= 0) { break; }
+                if (remaining <= 0) {
+                    break;
+                }
                 switch (pool) {
                     case PoolStrategy.POOL_TAXABLE -> {
                         double draw = Math.min(remaining, taxable);
@@ -806,7 +817,9 @@ class RothConversionOptimizer {
             int exhaustionAge
     ) {}
 
-    static Builder builder() { return new Builder(); }
+    static Builder builder() {
+        return new Builder();
+    }
 
     static class Builder {
         private double traditional;

@@ -1,11 +1,10 @@
 package com.wealthview.app.it.split;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.app.it.AuthHelper;
-import com.wealthview.core.config.SystemConfigService;
-import com.wealthview.core.split.SplitDetectionClient;
-import com.wealthview.core.split.StockSplitBackfillRunner;
-import com.wealthview.core.split.dto.DetectedSplit;
+import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,10 +14,12 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.AuthHelper;
+import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.core.split.SplitDetectionClient;
+import com.wealthview.core.split.StockSplitBackfillRunner;
+import com.wealthview.core.split.dto.DetectedSplit;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

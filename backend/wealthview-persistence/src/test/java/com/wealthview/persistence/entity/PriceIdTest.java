@@ -1,8 +1,8 @@
 package com.wealthview.persistence.entity;
 
-import org.junit.jupiter.api.Test;
-
 import java.time.LocalDate;
+
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

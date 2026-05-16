@@ -1,18 +1,5 @@
 package com.wealthview.importmodule.finnhub;
 
-import com.wealthview.core.pricefeed.PriceFeedClient;
-import com.wealthview.core.pricefeed.dto.CandleResponse;
-import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
-import com.wealthview.core.pricefeed.dto.QuoteResponse;
-import com.wealthview.core.pricefeed.dto.QuoteResult;
-import io.micrometer.core.annotation.Timed;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -20,6 +7,20 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import com.wealthview.core.pricefeed.PriceFeedClient;
+import com.wealthview.core.pricefeed.dto.CandleResponse;
+import com.wealthview.core.pricefeed.dto.CandleResponse.CandleEntry;
+import com.wealthview.core.pricefeed.dto.QuoteResponse;
+import com.wealthview.core.pricefeed.dto.QuoteResult;
+import io.micrometer.core.annotation.Timed;
 
 public class FinnhubClient implements PriceFeedClient {
 

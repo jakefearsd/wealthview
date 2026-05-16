@@ -1,18 +1,18 @@
 package com.wealthview.persistence.entity;
 
+import java.time.OffsetDateTime;
+import java.util.Map;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.time.OffsetDateTime;
-import java.util.Map;
-import java.util.UUID;
-import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "audit_log")
@@ -61,14 +61,43 @@ public class AuditLogEntity {
         this.details = details;
     }
 
-    public UUID getId() { return id; }
-    public UUID getTenantId() { return tenantId; }
-    public UUID getUserId() { return userId; }
-    public String getAction() { return action; }
-    public String getEntityType() { return entityType; }
-    public UUID getEntityId() { return entityId; }
-    public Map<String, Object> getDetails() { return details; }
-    public String getIpAddress() { return ipAddress; }
-    public void setIpAddress(String ipAddress) { this.ipAddress = ipAddress; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UUID getTenantId() {
+        return tenantId;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public String getAction() {
+        return action;
+    }
+
+    public String getEntityType() {
+        return entityType;
+    }
+
+    public UUID getEntityId() {
+        return entityId;
+    }
+
+    public Map<String, Object> getDetails() {
+        return details;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
+    }
+
+    public void setIpAddress(String ipAddress) {
+        this.ipAddress = ipAddress;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

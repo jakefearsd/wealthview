@@ -1,16 +1,17 @@
 package com.wealthview.core.mobile;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.mobile.dto.VersionCheckResponse;
 import com.wealthview.persistence.entity.MobileAppVersionEntity;
 import com.wealthview.persistence.repository.MobileAppVersionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

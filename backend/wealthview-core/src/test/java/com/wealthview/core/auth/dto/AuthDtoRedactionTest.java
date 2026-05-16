@@ -1,9 +1,10 @@
 package com.wealthview.core.auth.dto;
 
-import com.wealthview.core.tenant.dto.PasswordResetRequest;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 
-import java.util.UUID;
+import com.wealthview.core.tenant.dto.PasswordResetRequest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

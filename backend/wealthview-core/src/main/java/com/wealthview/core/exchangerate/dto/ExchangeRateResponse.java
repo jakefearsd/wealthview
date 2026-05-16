@@ -1,9 +1,9 @@
 package com.wealthview.core.exchangerate.dto;
 
-import com.wealthview.persistence.entity.ExchangeRateEntity;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+
+import com.wealthview.persistence.entity.ExchangeRateEntity;
 
 public record ExchangeRateResponse(
         String currencyCode,

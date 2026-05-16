@@ -1,9 +1,9 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
-
 import java.math.BigDecimal;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.ScenarioIncomeSourceEntity;
 
 public record ScenarioIncomeSourceResponse(
         UUID incomeSourceId,

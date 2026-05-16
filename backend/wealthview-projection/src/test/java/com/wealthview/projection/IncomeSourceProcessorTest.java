@@ -1,22 +1,23 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.projection.dto.IncomeSourceType;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import com.wealthview.core.projection.tax.RentalLossCalculator;
-import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
-import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.tax.RentalLossCalculator;
+import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
+import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

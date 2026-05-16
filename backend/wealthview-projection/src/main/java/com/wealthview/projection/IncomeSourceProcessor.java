@@ -1,5 +1,12 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
@@ -7,15 +14,9 @@ import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
+
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
-
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Processes income sources (rental properties, Social Security, part-time work, etc.)
@@ -59,7 +60,9 @@ class IncomeSourceProcessor {
                     IncomeSourceProcessor.SocialSecurityResult,
                     IncomeSourceProcessor.EmploymentResult,
                     IncomeSourceProcessor.DefaultResult {
+
         BigDecimal cashInflow();
+
         BigDecimal taxableIncome();
     }
 

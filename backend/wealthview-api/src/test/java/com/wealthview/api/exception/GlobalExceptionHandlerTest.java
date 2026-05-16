@@ -1,15 +1,7 @@
 package com.wealthview.api.exception;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.core.read.ListAppender;
-import com.wealthview.core.exception.DuplicateEntityException;
-import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.exception.InvalidInviteCodeException;
-import com.wealthview.core.exception.InvalidSessionException;
-import com.wealthview.core.exception.TenantAccessDeniedException;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.nio.charset.StandardCharsets;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +17,16 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
-import java.nio.charset.StandardCharsets;
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import com.wealthview.core.exception.DuplicateEntityException;
+import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.InvalidInviteCodeException;
+import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.exception.TenantAccessDeniedException;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

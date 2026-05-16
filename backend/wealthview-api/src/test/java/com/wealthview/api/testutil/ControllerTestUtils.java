@@ -1,13 +1,14 @@
 package com.wealthview.api.testutil;
 
-import com.wealthview.api.security.TenantUserPrincipal;
+import java.util.UUID;
+
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
-import java.util.UUID;
+import com.wealthview.api.security.TenantUserPrincipal;
 
 public final class ControllerTestUtils {
 

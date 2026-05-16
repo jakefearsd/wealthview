@@ -1,12 +1,13 @@
 package com.wealthview.app.it.actuator;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,10 +1,10 @@
 package com.wealthview.app.config;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Profile;
 import org.springframework.mock.env.MockEnvironment;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;

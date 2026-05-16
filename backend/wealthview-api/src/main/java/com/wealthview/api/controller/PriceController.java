@@ -1,8 +1,7 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.core.price.PriceService;
-import com.wealthview.core.price.dto.PriceRequest;
-import com.wealthview.core.price.dto.PriceResponse;
+import java.util.List;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -13,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.wealthview.core.price.PriceService;
+import com.wealthview.core.price.dto.PriceRequest;
+import com.wealthview.core.price.dto.PriceResponse;
 
 @RestController
 @RequestMapping("/api/v1/prices")

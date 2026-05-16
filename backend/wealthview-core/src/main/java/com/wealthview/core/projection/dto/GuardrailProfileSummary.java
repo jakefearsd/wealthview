@@ -1,8 +1,8 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
-
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 
 public record GuardrailProfileSummary(
         UUID id,

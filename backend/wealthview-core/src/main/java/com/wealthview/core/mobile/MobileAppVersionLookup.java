@@ -1,11 +1,12 @@
 package com.wealthview.core.mobile;
 
-import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.persistence.entity.MobileAppVersionEntity;
-import com.wealthview.persistence.repository.MobileAppVersionRepository;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.persistence.entity.MobileAppVersionEntity;
+import com.wealthview.persistence.repository.MobileAppVersionRepository;
 
 /**
  * Cached read of the {@code mobile_app_versions} row for a single platform.

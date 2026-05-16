@@ -1,11 +1,11 @@
 package com.wealthview.core.holding.dto;
 
-import com.wealthview.persistence.entity.HoldingEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+
 import com.wealthview.core.common.Money;
+import com.wealthview.persistence.entity.HoldingEntity;
 
 public record HoldingResponse(
         UUID id,

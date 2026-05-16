@@ -1,5 +1,9 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,10 +13,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 import org.hibernate.annotations.Filter;
 
 @Entity
@@ -79,28 +79,99 @@ public class IncomeSourceEntity {
         this.taxTreatment = taxTreatment;
     }
 
-    public UUID getId() { return id; }
-    public TenantEntity getTenant() { return tenant; }
-    public UUID getTenantId() { return tenant.getId(); }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public String getIncomeType() { return incomeType; }
-    public void setIncomeType(String incomeType) { this.incomeType = incomeType; }
-    public BigDecimal getAnnualAmount() { return annualAmount; }
-    public void setAnnualAmount(BigDecimal annualAmount) { this.annualAmount = annualAmount; }
-    public int getStartAge() { return startAge; }
-    public void setStartAge(int startAge) { this.startAge = startAge; }
-    public Integer getEndAge() { return endAge; }
-    public void setEndAge(Integer endAge) { this.endAge = endAge; }
-    public BigDecimal getInflationRate() { return inflationRate; }
-    public void setInflationRate(BigDecimal inflationRate) { this.inflationRate = inflationRate; }
-    public boolean isOneTime() { return oneTime; }
-    public void setOneTime(boolean oneTime) { this.oneTime = oneTime; }
-    public String getTaxTreatment() { return taxTreatment; }
-    public void setTaxTreatment(String taxTreatment) { this.taxTreatment = taxTreatment; }
-    public PropertyEntity getProperty() { return property; }
-    public void setProperty(PropertyEntity property) { this.property = property; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public TenantEntity getTenant() {
+        return tenant;
+    }
+
+    public UUID getTenantId() {
+        return tenant.getId();
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getIncomeType() {
+        return incomeType;
+    }
+
+    public void setIncomeType(String incomeType) {
+        this.incomeType = incomeType;
+    }
+
+    public BigDecimal getAnnualAmount() {
+        return annualAmount;
+    }
+
+    public void setAnnualAmount(BigDecimal annualAmount) {
+        this.annualAmount = annualAmount;
+    }
+
+    public int getStartAge() {
+        return startAge;
+    }
+
+    public void setStartAge(int startAge) {
+        this.startAge = startAge;
+    }
+
+    public Integer getEndAge() {
+        return endAge;
+    }
+
+    public void setEndAge(Integer endAge) {
+        this.endAge = endAge;
+    }
+
+    public BigDecimal getInflationRate() {
+        return inflationRate;
+    }
+
+    public void setInflationRate(BigDecimal inflationRate) {
+        this.inflationRate = inflationRate;
+    }
+
+    public boolean isOneTime() {
+        return oneTime;
+    }
+
+    public void setOneTime(boolean oneTime) {
+        this.oneTime = oneTime;
+    }
+
+    public String getTaxTreatment() {
+        return taxTreatment;
+    }
+
+    public void setTaxTreatment(String taxTreatment) {
+        this.taxTreatment = taxTreatment;
+    }
+
+    public PropertyEntity getProperty() {
+        return property;
+    }
+
+    public void setProperty(PropertyEntity property) {
+        this.property = property;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

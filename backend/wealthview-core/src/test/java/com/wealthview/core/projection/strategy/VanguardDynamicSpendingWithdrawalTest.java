@@ -1,8 +1,8 @@
 package com.wealthview.core.projection.strategy;
 
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
+
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

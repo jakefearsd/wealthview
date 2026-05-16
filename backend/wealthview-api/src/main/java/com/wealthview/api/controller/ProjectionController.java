@@ -1,14 +1,8 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.api.security.TenantUserPrincipal;
-import com.wealthview.core.projection.ProjectionService;
-import com.wealthview.core.projection.ScenarioCrudService;
-import com.wealthview.core.projection.dto.CompareRequest;
-import com.wealthview.core.projection.dto.CompareResponse;
-import com.wealthview.core.projection.dto.CreateScenarioRequest;
-import com.wealthview.core.projection.dto.ProjectionResultResponse;
-import com.wealthview.core.projection.dto.ScenarioResponse;
-import com.wealthview.core.projection.dto.UpdateScenarioRequest;
+import java.util.List;
+import java.util.UUID;
+
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,8 +18,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.projection.ProjectionService;
+import com.wealthview.core.projection.ScenarioCrudService;
+import com.wealthview.core.projection.dto.CompareRequest;
+import com.wealthview.core.projection.dto.CompareResponse;
+import com.wealthview.core.projection.dto.CreateScenarioRequest;
+import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ScenarioResponse;
+import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 
 @RestController
 @RequestMapping("/api/v1/projections")

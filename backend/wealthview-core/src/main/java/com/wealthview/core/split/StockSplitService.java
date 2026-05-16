@@ -1,5 +1,19 @@
 package com.wealthview.core.split;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.StockSplitAdjustmentEntity;
@@ -11,19 +25,6 @@ import com.wealthview.persistence.repository.StockSplitAdjustmentRepository;
 import com.wealthview.persistence.repository.StockSplitRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Apply and unapply stock splits across the entire tenant population.

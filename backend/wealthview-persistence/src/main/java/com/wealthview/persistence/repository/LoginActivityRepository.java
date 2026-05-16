@@ -1,12 +1,13 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.LoginActivityEntity;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
-
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.wealthview.persistence.entity.LoginActivityEntity;
 
 @Repository
 public interface LoginActivityRepository extends JpaRepository<LoginActivityEntity, UUID> {

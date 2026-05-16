@@ -1,10 +1,10 @@
 package com.wealthview.core.split.dto;
 
-import com.wealthview.persistence.entity.StockSplitEntity;
-
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.StockSplitEntity;
 
 /**
  * API representation of a stock split row.

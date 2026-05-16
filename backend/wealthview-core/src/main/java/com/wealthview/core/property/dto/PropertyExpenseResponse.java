@@ -1,10 +1,10 @@
 package com.wealthview.core.property.dto;
 
-import com.wealthview.persistence.entity.PropertyExpenseEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.PropertyExpenseEntity;
 
 public record PropertyExpenseResponse(
         UUID id,

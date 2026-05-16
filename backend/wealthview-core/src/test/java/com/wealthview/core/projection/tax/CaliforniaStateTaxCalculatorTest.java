@@ -1,20 +1,21 @@
 package com.wealthview.core.projection.tax;
 
-import com.wealthview.persistence.entity.StateStandardDeductionEntity;
-import com.wealthview.persistence.entity.StateTaxBracketEntity;
-import com.wealthview.persistence.entity.StateTaxSurchargeEntity;
-import com.wealthview.persistence.repository.StateStandardDeductionRepository;
-import com.wealthview.persistence.repository.StateTaxBracketRepository;
-import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
+import com.wealthview.persistence.entity.StateStandardDeductionEntity;
+import com.wealthview.persistence.entity.StateTaxBracketEntity;
+import com.wealthview.persistence.entity.StateTaxSurchargeEntity;
+import com.wealthview.persistence.repository.StateStandardDeductionRepository;
+import com.wealthview.persistence.repository.StateTaxBracketRepository;
+import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;

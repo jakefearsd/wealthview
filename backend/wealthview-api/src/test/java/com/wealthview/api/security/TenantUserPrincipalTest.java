@@ -1,9 +1,9 @@
 package com.wealthview.api.security;
 
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.GrantedAuthority;
-
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

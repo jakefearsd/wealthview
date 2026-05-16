@@ -1,5 +1,8 @@
 package com.wealthview.persistence.entity;
 
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,9 +12,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "notification_preferences")
@@ -46,17 +46,36 @@ public class NotificationPreferenceEntity {
         this.enabled = enabled;
     }
 
-    public UUID getId() { return id; }
-    public UserEntity getUser() { return user; }
-    public UUID getUserId() { return user.getId(); }
-    public String getNotificationType() { return notificationType; }
-    public boolean isEnabled() { return enabled; }
+    public UUID getId() {
+        return id;
+    }
+
+    public UserEntity getUser() {
+        return user;
+    }
+
+    public UUID getUserId() {
+        return user.getId();
+    }
+
+    public String getNotificationType() {
+        return notificationType;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
         this.updatedAt = OffsetDateTime.now();
     }
 
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
 }

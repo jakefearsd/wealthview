@@ -16,8 +16,8 @@ public final class HistoricalReturns {
         var returnsList = new ArrayList<Double>();
 
         try (var is = HistoricalReturns.class.getResourceAsStream(
-                "/historical-returns/sp500-real-annual-returns.csv");
-             var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+                        "/historical-returns/sp500-real-annual-returns.csv");
+                var reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
 
             reader.readLine(); // skip header
             String line;

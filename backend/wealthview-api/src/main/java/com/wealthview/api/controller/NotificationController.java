@@ -1,9 +1,7 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.api.security.TenantUserPrincipal;
-import com.wealthview.core.notification.NotificationPreferenceService;
-import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
-import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
+import java.util.List;
+
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -13,7 +11,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
+import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.notification.NotificationPreferenceService;
+import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
+import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
 
 @RestController
 @RequestMapping("/api/v1/notifications/preferences")

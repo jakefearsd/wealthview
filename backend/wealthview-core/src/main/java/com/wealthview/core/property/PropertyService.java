@@ -1,10 +1,31 @@
 package com.wealthview.core.property;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Money;
 import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
@@ -12,9 +33,9 @@ import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.core.property.dto.MonthlyCashFlowEntry;
 import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
+import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
-import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
@@ -24,26 +45,6 @@ import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.LinkedHashMap;
-import java.util.Set;
-import java.util.UUID;
-import com.wealthview.core.common.Money;
 
 @Service
 public class PropertyService {
@@ -148,9 +149,10 @@ public class PropertyService {
             var names = linkedSources.stream()
                     .map(IncomeSourceEntity::getName)
                     .toList();
-            throw new IllegalStateException(
-                    "Cannot delete property — it is linked to %d income source(s): %s. Delete these income sources first."
-                            .formatted(names.size(), String.join(", ", names)));
+            throw new IllegalStateException((
+                    "Cannot delete property — it is linked to %d income source(s): %s."
+                    + " Delete these income sources first.")
+                    .formatted(names.size(), String.join(", ", names)));
         }
 
         propertyRepository.delete(property);
@@ -210,7 +212,8 @@ public class PropertyService {
         return new DepreciationScheduleResult(method, depreciableBasis, usefulLifeYears, inServiceDate, entries);
     }
 
-    private DepreciationScheduleResult buildCostSegScheduleResult(PropertyEntity property, BigDecimal depreciableBasis) {
+    private DepreciationScheduleResult buildCostSegScheduleResult(
+            PropertyEntity property, BigDecimal depreciableBasis) {
         var allocations = parseCostSegAllocations(property.getCostSegAllocations());
         var bonusRate = property.getBonusDepreciationRate();
         var schedule = depreciationCalculator.computeCostSegregation(
@@ -572,7 +575,8 @@ public class PropertyService {
 
         if (hasAny && !hasAll) {
             throw new IllegalArgumentException(
-                    "Loan details must be provided in full (loanAmount, annualInterestRate, loanTermMonths, loanStartDate) or not at all");
+                    "Loan details must be provided in full"
+                    + " (loanAmount, annualInterestRate, loanTermMonths, loanStartDate) or not at all");
         }
     }
 }

@@ -1,23 +1,25 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.TransactionEntity;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+import com.wealthview.persistence.entity.TransactionEntity;
+
 public interface TransactionRepository extends JpaRepository<TransactionEntity, UUID> {
 
     Page<TransactionEntity> findByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId, Pageable pageable);
 
-    Page<TransactionEntity> findByAccount_IdAndTenant_IdAndSymbol(UUID accountId, UUID tenantId, String symbol, Pageable pageable);
+    Page<TransactionEntity> findByAccount_IdAndTenant_IdAndSymbol(
+            UUID accountId, UUID tenantId, String symbol, Pageable pageable);
 
     List<TransactionEntity> findByAccount_IdAndSymbol(UUID accountId, String symbol);
 

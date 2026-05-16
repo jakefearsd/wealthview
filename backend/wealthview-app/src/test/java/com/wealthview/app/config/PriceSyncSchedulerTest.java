@@ -1,7 +1,8 @@
 package com.wealthview.app.config;
 
-import com.wealthview.core.pricefeed.PriceSyncService;
 import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.pricefeed.PriceSyncService;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;

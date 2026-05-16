@@ -1,10 +1,5 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-import org.apache.commons.csv.CSVRecord;
-import org.springframework.stereotype.Component;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -12,6 +7,12 @@ import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import org.apache.commons.csv.CSVRecord;
+import org.springframework.stereotype.Component;
+
+import com.wealthview.core.importservice.dto.CsvRowError;
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 
 @Component("vanguardCsvParser")
 public class VanguardCsvParser extends AbstractBrokerCsvParser {

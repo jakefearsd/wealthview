@@ -1,7 +1,5 @@
 package com.wealthview.app.it;
 
-import com.wealthview.app.WealthViewApplication;
-import com.wealthview.app.it.testutil.TestDataHelper;
 import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +10,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import com.wealthview.app.WealthViewApplication;
+import com.wealthview.app.it.testutil.TestDataHelper;
 
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,

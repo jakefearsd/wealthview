@@ -1,15 +1,17 @@
 package com.wealthview.core.projection.tax;
 
-import com.wealthview.persistence.entity.StandardDeductionEntity;
-import com.wealthview.persistence.entity.TaxBracketEntity;
-import com.wealthview.persistence.repository.StandardDeductionRepository;
-import com.wealthview.persistence.repository.TaxBracketRepository;
-import org.springframework.stereotype.Component;
-
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import org.springframework.stereotype.Component;
+
+import com.wealthview.persistence.entity.StandardDeductionEntity;
+import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
+
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 

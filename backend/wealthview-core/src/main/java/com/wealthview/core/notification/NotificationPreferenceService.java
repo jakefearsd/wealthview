@@ -1,18 +1,19 @@
 package com.wealthview.core.notification;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
 import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
 import com.wealthview.persistence.entity.NotificationPreferenceEntity;
 import com.wealthview.persistence.repository.NotificationPreferenceRepository;
 import com.wealthview.persistence.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class NotificationPreferenceService {
@@ -54,7 +55,8 @@ public class NotificationPreferenceService {
                 existing.get().setEnabled(item.enabled());
                 preferenceRepository.save(existing.get());
             } else {
-                preferenceRepository.save(new NotificationPreferenceEntity(user, item.notificationType(), item.enabled()));
+                preferenceRepository.save(
+                        new NotificationPreferenceEntity(user, item.notificationType(), item.enabled()));
             }
         }
     }

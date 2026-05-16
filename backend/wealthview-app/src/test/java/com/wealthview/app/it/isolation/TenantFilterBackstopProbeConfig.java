@@ -1,8 +1,9 @@
 package com.wealthview.app.it.isolation;
 
-import com.wealthview.persistence.repository.AccountRepository;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+
+import com.wealthview.persistence.repository.AccountRepository;
 
 @TestConfiguration
 public class TenantFilterBackstopProbeConfig {

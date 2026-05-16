@@ -1,5 +1,10 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,11 +14,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 import org.hibernate.annotations.Filter;
 
 @Entity
@@ -63,15 +63,47 @@ public class PropertyValuationEntity {
         this.source = source;
     }
 
-    public UUID getId() { return id; }
-    public PropertyEntity getProperty() { return property; }
-    public UUID getPropertyId() { return propertyId; }
-    public TenantEntity getTenant() { return tenant; }
-    public LocalDate getValuationDate() { return valuationDate; }
-    public BigDecimal getValue() { return value; }
-    public void setValue(BigDecimal value) { this.value = value; }
-    public String getSource() { return source; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public PropertyEntity getProperty() {
+        return property;
+    }
+
+    public UUID getPropertyId() {
+        return propertyId;
+    }
+
+    public TenantEntity getTenant() {
+        return tenant;
+    }
+
+    public LocalDate getValuationDate() {
+        return valuationDate;
+    }
+
+    public BigDecimal getValue() {
+        return value;
+    }
+
+    public void setValue(BigDecimal value) {
+        this.value = value;
+    }
+
+    public String getSource() {
+        return source;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

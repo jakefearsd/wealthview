@@ -1,15 +1,16 @@
 package com.wealthview.app.it.isolation;
 
-import com.wealthview.core.auth.CrossTenant;
-import com.wealthview.persistence.entity.AccountEntity;
-import com.wealthview.persistence.repository.AccountRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.core.auth.CrossTenant;
+import com.wealthview.persistence.entity.AccountEntity;
+import com.wealthview.persistence.repository.AccountRepository;
 
 /**
  * Test-only service used by tenant-filter ITs to prove the Hibernate filter

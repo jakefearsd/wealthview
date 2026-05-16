@@ -1,5 +1,27 @@
 package com.wealthview.core.dashboard;
 
+import java.math.BigDecimal;
+import java.math.MathContext;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
 import com.wealthview.core.exchangerate.ExchangeRateService;
@@ -15,27 +37,6 @@ import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.PropertyValuationRepository;
 import io.micrometer.core.annotation.Timed;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.MathContext;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.TreeMap;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import com.wealthview.core.common.Money;
 
 @Service
 public class CombinedPortfolioHistoryService {

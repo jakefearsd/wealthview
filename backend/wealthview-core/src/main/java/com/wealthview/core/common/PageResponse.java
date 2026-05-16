@@ -1,9 +1,9 @@
 package com.wealthview.core.common;
 
-import org.springframework.data.domain.Page;
-
 import java.util.List;
 import java.util.function.Function;
+
+import org.springframework.data.domain.Page;
 
 public record PageResponse<T>(
         List<T> data,

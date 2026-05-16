@@ -1,16 +1,16 @@
 package com.wealthview.importmodule.ofx;
 
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.Map;
+
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseBuyInvestmentTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseInvestmentTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseSellInvestmentTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.IncomeTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.ReinvestIncomeTransaction;
 import com.webcohesion.ofx4j.domain.data.seclist.SecurityId;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-
-import java.math.BigDecimal;
-import java.time.Instant;
-import java.util.Map;
 
 /**
  * Maps OFX4J investment transactions (buy/sell/income/reinvest) to {@link ParsedTransaction}.

@@ -1,15 +1,16 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.persistence.repository.StandardDeductionRepository;
-import com.wealthview.persistence.repository.TaxBracketRepository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.List;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;

@@ -1,12 +1,13 @@
 package com.wealthview.core.property;
 
-import com.wealthview.core.property.dto.CostSegAllocation;
-import org.junit.jupiter.api.Test;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
+import com.wealthview.core.property.dto.CostSegAllocation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

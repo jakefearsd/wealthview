@@ -1,14 +1,5 @@
 package com.wealthview.importmodule.yahoo;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.wealthview.core.price.YahooPriceClient;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientException;
-
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -17,6 +8,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.wealthview.core.price.YahooPriceClient;
 
 public class YahooFinanceClient implements YahooPriceClient {
 

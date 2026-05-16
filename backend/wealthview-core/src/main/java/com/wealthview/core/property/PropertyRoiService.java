@@ -1,5 +1,14 @@
 package com.wealthview.core.property;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.property.dto.HoldScenarioResult;
@@ -8,14 +17,7 @@ import com.wealthview.core.property.dto.SellScenarioResult;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.UUID;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 

@@ -1,13 +1,14 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.PropertyIncomeEntity;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.persistence.entity.PropertyIncomeEntity;
 
 public interface PropertyIncomeRepository extends JpaRepository<PropertyIncomeEntity, UUID> {
 

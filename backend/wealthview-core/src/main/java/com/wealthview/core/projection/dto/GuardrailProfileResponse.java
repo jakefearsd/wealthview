@@ -1,14 +1,14 @@
 package com.wealthview.core.projection.dto;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
-
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 
 public record GuardrailProfileResponse(
         UUID id,

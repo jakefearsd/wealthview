@@ -1,10 +1,10 @@
 package com.wealthview.core.income.dto;
 
-import com.wealthview.persistence.entity.IncomeSourceEntity;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.IncomeSourceEntity;
 
 public record IncomeSourceResponse(
         UUID id,

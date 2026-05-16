@@ -1,5 +1,9 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,10 +13,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @Entity
 @Table(name = "projection_accounts")
@@ -68,19 +68,63 @@ public class ProjectionAccountEntity {
         this.accountType = accountType != null ? accountType : "taxable";
     }
 
-    public UUID getId() { return id; }
-    public ProjectionScenarioEntity getScenario() { return scenario; }
-    public void setScenario(ProjectionScenarioEntity scenario) { this.scenario = scenario; }
-    public AccountEntity getLinkedAccount() { return linkedAccount; }
-    public BigDecimal getInitialBalance() { return initialBalance; }
-    public void setInitialBalance(BigDecimal initialBalance) { this.initialBalance = initialBalance; }
-    public BigDecimal getAnnualContribution() { return annualContribution; }
-    public void setAnnualContribution(BigDecimal annualContribution) { this.annualContribution = annualContribution; }
-    public BigDecimal getExpectedReturn() { return expectedReturn; }
-    public void setExpectedReturn(BigDecimal expectedReturn) { this.expectedReturn = expectedReturn; }
-    public String getAccountType() { return accountType; }
-    public void setAccountType(String accountType) { this.accountType = accountType; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public ProjectionScenarioEntity getScenario() {
+        return scenario;
+    }
+
+    public void setScenario(ProjectionScenarioEntity scenario) {
+        this.scenario = scenario;
+    }
+
+    public AccountEntity getLinkedAccount() {
+        return linkedAccount;
+    }
+
+    public BigDecimal getInitialBalance() {
+        return initialBalance;
+    }
+
+    public void setInitialBalance(BigDecimal initialBalance) {
+        this.initialBalance = initialBalance;
+    }
+
+    public BigDecimal getAnnualContribution() {
+        return annualContribution;
+    }
+
+    public void setAnnualContribution(BigDecimal annualContribution) {
+        this.annualContribution = annualContribution;
+    }
+
+    public BigDecimal getExpectedReturn() {
+        return expectedReturn;
+    }
+
+    public void setExpectedReturn(BigDecimal expectedReturn) {
+        this.expectedReturn = expectedReturn;
+    }
+
+    public String getAccountType() {
+        return accountType;
+    }
+
+    public void setAccountType(String accountType) {
+        this.accountType = accountType;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

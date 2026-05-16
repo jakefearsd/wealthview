@@ -1,5 +1,18 @@
 package com.wealthview.core.projection;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.account.AccountService;
@@ -29,18 +42,6 @@ import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 @Service
 @SuppressWarnings("PMD.CouplingBetweenObjects")
@@ -319,7 +320,9 @@ public class ScenarioCrudService {
 
     private boolean putIfNotNull(ObjectNode node, String key, Object value) {
         switch (value) {
-            case null -> { return false; }
+            case null -> {
+                return false;
+            }
             case Integer i -> node.put(key, i);
             case BigDecimal bd -> node.put(key, bd);
             case String s -> node.put(key, s);

@@ -1,9 +1,10 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.AbstractIntegrationTest;
-import com.wealthview.persistence.entity.TenantEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import com.wealthview.persistence.AbstractIntegrationTest;
+import com.wealthview.persistence.entity.TenantEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

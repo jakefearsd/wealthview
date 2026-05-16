@@ -1,23 +1,24 @@
 package com.wealthview.core.split;
 
-import com.wealthview.core.config.SystemConfigService;
-import com.wealthview.core.split.dto.SplitSyncResult;
-import com.wealthview.persistence.repository.StockSplitRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
-import io.micrometer.core.annotation.Timed;
-import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+
+import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.core.split.dto.SplitSyncResult;
+import com.wealthview.persistence.repository.StockSplitRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * Daily scheduled job: scan every distinct symbol the WealthView deployment

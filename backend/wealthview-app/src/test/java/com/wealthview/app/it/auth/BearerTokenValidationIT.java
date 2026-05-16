@@ -1,7 +1,8 @@
 package com.wealthview.app.it.auth;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.core.auth.JwtTokenProvider;
+import java.util.Map;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
@@ -11,8 +12,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.core.auth.JwtTokenProvider;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;

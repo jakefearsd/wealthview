@@ -1,7 +1,8 @@
 package com.wealthview.core.notification.dto;
 
-import jakarta.validation.constraints.NotNull;
 import java.util.List;
+
+import jakarta.validation.constraints.NotNull;
 
 public record NotificationPreferenceRequest(
         @NotNull List<PreferenceItem> preferences

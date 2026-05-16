@@ -1,11 +1,11 @@
 package com.wealthview.api.dto;
 
-import com.wealthview.core.property.dto.CostSegAllocation;
-import com.wealthview.core.property.dto.DepreciationScheduleResult;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+
+import com.wealthview.core.property.dto.CostSegAllocation;
+import com.wealthview.core.property.dto.DepreciationScheduleResult;
 
 public record DepreciationScheduleResponse(
         String depreciationMethod,

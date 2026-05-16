@@ -1,8 +1,9 @@
 package com.wealthview.core.tenant.dto;
 
-import com.wealthview.persistence.entity.InviteCodeEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
+import java.time.OffsetDateTime;
+import java.util.Set;
+import java.util.UUID;
+
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -10,9 +11,9 @@ import jakarta.validation.ValidatorFactory;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-import java.time.OffsetDateTime;
-import java.util.Set;
-import java.util.UUID;
+import com.wealthview.persistence.entity.InviteCodeEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

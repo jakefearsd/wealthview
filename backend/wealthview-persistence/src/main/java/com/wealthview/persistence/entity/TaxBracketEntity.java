@@ -1,9 +1,9 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "tax_brackets")

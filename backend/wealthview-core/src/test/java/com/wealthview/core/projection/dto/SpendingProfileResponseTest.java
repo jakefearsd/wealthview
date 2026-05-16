@@ -1,10 +1,11 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.persistence.entity.SpendingProfileEntity;
-import com.wealthview.persistence.entity.TenantEntity;
+import java.math.BigDecimal;
+
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
+import com.wealthview.persistence.entity.SpendingProfileEntity;
+import com.wealthview.persistence.entity.TenantEntity;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;

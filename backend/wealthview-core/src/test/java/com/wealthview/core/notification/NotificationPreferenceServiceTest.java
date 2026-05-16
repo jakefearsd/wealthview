@@ -1,12 +1,9 @@
 package com.wealthview.core.notification;
 
-import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
-import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
-import com.wealthview.persistence.entity.NotificationPreferenceEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.NotificationPreferenceRepository;
-import com.wealthview.persistence.repository.UserRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,9 +12,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.core.notification.dto.NotificationPreferenceRequest;
+import com.wealthview.core.notification.dto.NotificationPreferenceResponse;
+import com.wealthview.persistence.entity.NotificationPreferenceEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.NotificationPreferenceRepository;
+import com.wealthview.persistence.repository.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;

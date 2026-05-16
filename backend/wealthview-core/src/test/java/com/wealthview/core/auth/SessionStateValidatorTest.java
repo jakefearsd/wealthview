@@ -1,10 +1,9 @@
 package com.wealthview.core.auth;
 
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.entity.UserSessionEntity;
-import com.wealthview.persistence.repository.UserRepository;
-import com.wealthview.persistence.repository.UserSessionRepository;
+import java.time.OffsetDateTime;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
@@ -12,9 +11,11 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.OffsetDateTime;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.entity.UserSessionEntity;
+import com.wealthview.persistence.repository.UserRepository;
+import com.wealthview.persistence.repository.UserSessionRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.never;

@@ -1,7 +1,9 @@
 package com.wealthview.core.audit;
 
-import com.wealthview.persistence.entity.AuditLogEntity;
-import com.wealthview.persistence.repository.AuditLogRepository;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -10,9 +12,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.persistence.entity.AuditLogEntity;
+import com.wealthview.persistence.repository.AuditLogRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;

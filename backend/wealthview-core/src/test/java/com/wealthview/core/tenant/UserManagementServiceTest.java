@@ -1,13 +1,9 @@
 package com.wealthview.core.tenant;
 
-import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.auth.CommonPasswordChecker;
-import com.wealthview.core.auth.TenantContext;
-import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.testutil.TestEntityHelper;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.UserRepository;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,9 +16,14 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.core.audit.AuditEvent;
+import com.wealthview.core.auth.CommonPasswordChecker;
+import com.wealthview.core.auth.TenantContext;
+import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.testutil.TestEntityHelper;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.UserRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

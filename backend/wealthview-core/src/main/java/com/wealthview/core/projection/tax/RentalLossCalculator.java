@@ -1,8 +1,9 @@
 package com.wealthview.core.projection.tax;
 
+import java.math.BigDecimal;
+
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
@@ -27,6 +28,9 @@ public class RentalLossCalculator {
     ) {}
 
     /**
+     * Applies IRS passive activity loss rules to rental income and computes the deductible and
+     * suspended amounts for the current tax year.
+     *
      * @param netRentalIncome    gross rent minus expenses minus depreciation (can be negative = loss)
      * @param taxTreatment       rental_passive, rental_active_reps, or rental_active_str
      * @param otherPassiveIncome other passive income available to offset losses

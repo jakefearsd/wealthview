@@ -1,11 +1,11 @@
 package com.wealthview.core.transaction.dto;
 
-import com.wealthview.persistence.entity.TransactionEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.TransactionEntity;
 
 public record TransactionResponse(
         UUID id,

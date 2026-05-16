@@ -1,8 +1,9 @@
 package com.wealthview.app.config;
 
+import org.junit.jupiter.api.Test;
+
 import io.micrometer.core.aop.TimedAspect;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

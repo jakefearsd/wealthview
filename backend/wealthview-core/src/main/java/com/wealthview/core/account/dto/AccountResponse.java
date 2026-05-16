@@ -1,10 +1,10 @@
 package com.wealthview.core.account.dto;
 
-import com.wealthview.persistence.entity.AccountEntity;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.AccountEntity;
 
 public record AccountResponse(
         UUID id,

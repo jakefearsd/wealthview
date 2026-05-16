@@ -1,9 +1,5 @@
 package com.wealthview.app.config;
 
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.TenantRepository;
-import com.wealthview.persistence.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -13,6 +9,11 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.TenantRepository;
+import com.wealthview.persistence.repository.UserRepository;
 
 @Component
 @Profile({"dev", "docker", "prod"})

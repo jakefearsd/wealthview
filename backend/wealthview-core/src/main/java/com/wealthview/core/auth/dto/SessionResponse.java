@@ -1,9 +1,9 @@
 package com.wealthview.core.auth.dto;
 
-import com.wealthview.persistence.entity.UserSessionEntity;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.UserSessionEntity;
 
 /**
  * One row of {@code GET /api/v1/auth/sessions}. Marks {@code current=true}

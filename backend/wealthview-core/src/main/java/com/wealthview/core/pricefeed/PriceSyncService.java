@@ -1,5 +1,22 @@
 package com.wealthview.core.pricefeed;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.dao.DataAccessException;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
+
 import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.pricefeed.dto.QuoteResult;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -8,22 +25,6 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
-import org.slf4j.MDC;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.dao.DataAccessException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.UUID;
 
 @Service
 @ConditionalOnExpression("!'${app.finnhub.api-key:}'.isEmpty()")
@@ -59,7 +60,8 @@ public class PriceSyncService {
 
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Timed("wealthview.pricefeed.sync")
-    @SuppressWarnings("PMD.AvoidCatchingGenericException") // intentional per-symbol resilience (logs and continues loop)
+    // intentional per-symbol resilience (logs and continues loop)
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     @Scheduled(cron = "${app.finnhub.sync-cron:0 0 18 * * MON-FRI}", zone = "America/New_York")
     public FinnhubSyncResult syncDailyPrices() {
         MDC.put("operation", "priceSync");

@@ -5,6 +5,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+
 import com.wealthview.core.common.Money;
 
 public final class AmortizationCalculator {
@@ -17,8 +18,8 @@ public final class AmortizationCalculator {
     }
 
     /**
-     * Computes remaining mortgage balance using standard amortization formula:
-     * B = P * [(1+r)^n - (1+r)^p] / [(1+r)^n - 1]
+     * Computes remaining mortgage balance using standard amortization formula
+     * {@code B = P * [(1+r)^n - (1+r)^p] / [(1+r)^n - 1]}.
      *
      * @param loanAmount principal
      * @param annualRate annual interest rate as decimal (e.g., 0.065 for 6.5%)
@@ -64,8 +65,8 @@ public final class AmortizationCalculator {
     }
 
     /**
-     * Computes monthly mortgage payment using the standard amortization formula:
-     * M = P * [r(1+r)^n / ((1+r)^n - 1)]
+     * Computes monthly mortgage payment using the standard amortization formula
+     * {@code M = P * [r(1+r)^n / ((1+r)^n - 1)]}.
      *
      * @param loanAmount principal
      * @param annualRate annual interest rate as decimal (e.g., 0.065 for 6.5%)

@@ -1,12 +1,12 @@
 package com.wealthview.importmodule.ofx;
 
-import com.webcohesion.ofx4j.domain.data.common.Transaction;
-import com.webcohesion.ofx4j.domain.data.common.TransactionType;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-
 import java.math.BigDecimal;
 import java.util.EnumMap;
 import java.util.Map;
+
+import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.webcohesion.ofx4j.domain.data.common.Transaction;
+import com.webcohesion.ofx4j.domain.data.common.TransactionType;
 
 /**
  * Maps OFX4J banking transactions to the app's {@link ParsedTransaction} model.
@@ -19,6 +19,7 @@ final class OfxBankTransactionMapper {
      * here fall through to sign-based inference in {@link #mapBankTransactionType}.
      */
     private static final Map<TransactionType, String> BANK_TXN_TYPE_MAP;
+
     static {
         var map = new EnumMap<TransactionType, String>(TransactionType.class);
         map.put(TransactionType.CREDIT, "deposit");

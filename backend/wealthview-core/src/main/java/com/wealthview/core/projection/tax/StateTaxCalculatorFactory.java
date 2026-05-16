@@ -1,12 +1,13 @@
 package com.wealthview.core.projection.tax;
 
+import java.util.Locale;
+import java.util.Set;
+
+import org.springframework.stereotype.Component;
+
 import com.wealthview.persistence.repository.StateStandardDeductionRepository;
 import com.wealthview.persistence.repository.StateTaxBracketRepository;
 import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
-import org.springframework.stereotype.Component;
-
-import java.util.Locale;
-import java.util.Set;
 
 @Component
 public class StateTaxCalculatorFactory {

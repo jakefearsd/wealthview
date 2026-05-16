@@ -1,13 +1,13 @@
 package com.wealthview.importmodule.csv;
 
-import org.junit.jupiter.api.Test;
-
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+
+import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

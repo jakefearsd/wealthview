@@ -1,14 +1,14 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
 
 @MappedSuperclass
 public abstract class AbstractTaxBracketEntity {
@@ -47,11 +47,31 @@ public abstract class AbstractTaxBracketEntity {
         this.rate = rate;
     }
 
-    public UUID getId() { return id; }
-    public int getTaxYear() { return taxYear; }
-    public String getFilingStatus() { return filingStatus; }
-    public BigDecimal getBracketFloor() { return bracketFloor; }
-    public BigDecimal getBracketCeiling() { return bracketCeiling; }
-    public BigDecimal getRate() { return rate; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public int getTaxYear() {
+        return taxYear;
+    }
+
+    public String getFilingStatus() {
+        return filingStatus;
+    }
+
+    public BigDecimal getBracketFloor() {
+        return bracketFloor;
+    }
+
+    public BigDecimal getBracketCeiling() {
+        return bracketCeiling;
+    }
+
+    public BigDecimal getRate() {
+        return rate;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
 }

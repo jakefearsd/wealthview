@@ -1,10 +1,11 @@
 package com.wealthview.core.projection.dto;
 
-import com.wealthview.core.common.CompoundGrowth;
-
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.wealthview.core.common.CompoundGrowth;
+
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 

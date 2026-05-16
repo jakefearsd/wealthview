@@ -1,8 +1,8 @@
 package com.wealthview.core.config.dto;
 
-import com.wealthview.persistence.entity.SystemConfigEntity;
-
 import java.time.OffsetDateTime;
+
+import com.wealthview.persistence.entity.SystemConfigEntity;
 
 public record SystemConfigResponse(
         String key,

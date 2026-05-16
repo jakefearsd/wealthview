@@ -1,11 +1,11 @@
 package com.wealthview.persistence.entity;
 
+import java.time.OffsetDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.time.OffsetDateTime;
 
 /**
  * Mobile-app version-check row.

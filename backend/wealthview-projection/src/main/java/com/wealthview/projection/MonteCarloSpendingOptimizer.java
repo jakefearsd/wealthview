@@ -1,32 +1,5 @@
 package com.wealthview.projection;
 
-import com.wealthview.core.common.CompoundGrowth;
-import com.wealthview.core.projection.SpendingOptimizer;
-import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
-import com.wealthview.core.projection.dto.GuardrailPhaseInput;
-import com.wealthview.core.projection.dto.GuardrailProfileResponse;
-import com.wealthview.core.projection.dto.GuardrailYearlySpending;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
-import com.wealthview.core.projection.dto.IncomeSourceType;
-import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
-import com.wealthview.core.projection.tax.FederalTaxCalculator;
-import com.wealthview.core.projection.tax.FilingStatus;
-import com.wealthview.core.projection.tax.RentalLossCalculator;
-import io.micrometer.core.annotation.Timed;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.observation.annotation.Observed;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
-import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Component;
-
-import com.wealthview.core.projection.dto.ConversionYearDetail;
-import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
-import static com.wealthview.core.common.Money.ROUNDING;
-import static com.wealthview.core.common.Money.SCALE;
-
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -34,6 +7,34 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
+import org.springframework.stereotype.Component;
+
+import com.wealthview.core.common.CompoundGrowth;
+import com.wealthview.core.projection.SpendingOptimizer;
+import com.wealthview.core.projection.dto.ConversionYearDetail;
+import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
+import com.wealthview.core.projection.dto.GuardrailPhaseInput;
+import com.wealthview.core.projection.dto.GuardrailProfileResponse;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.RentalLossCalculator;
+import io.micrometer.core.annotation.Timed;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.observation.annotation.Observed;
+
+import static com.wealthview.core.common.Money.ROUNDING;
+import static com.wealthview.core.common.Money.SCALE;
 
 @Component
 public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
@@ -310,7 +311,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
                 .build();
 
-        boolean useDynamicSequencing = PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(ctx.portfolio().withdrawalOrder());
+        boolean useDynamicSequencing = PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING
+                .equals(ctx.portfolio().withdrawalOrder());
         RothConversionOptimizer.RothConversionSchedule convSchedule;
 
         if (useDynamicSequencing) {
@@ -616,10 +618,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     }
 
     @Nullable
-    private RothConversionScheduleResponse buildConvScheduleResponse(OptimizationSetup ctx,
-                                                                       GuardrailOptimizationInput input,
-                                                                       RothConversionOptimizer.RothConversionSchedule convSchedule,
-                                                                       double mcExhaustionPct) {
+    private RothConversionScheduleResponse buildConvScheduleResponse(
+            OptimizationSetup ctx,
+            GuardrailOptimizationInput input,
+            RothConversionOptimizer.RothConversionSchedule convSchedule,
+            double mcExhaustionPct) {
         if (convSchedule == null) {
             return null;
         }
@@ -1186,7 +1189,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                         Math.max(0, pools[0] + pools[1] + pools[2])
                                 * CASH_REPLENISHMENT_RATE);
                 pools[0] -= replenishment;
-                if (pools[0] < 0) { pools[1] += pools[0]; pools[0] = 0; }
+                if (pools[0] < 0) {
+                    pools[1] += pools[0]; pools[0] = 0;
+                }
                 return cashBalance + replenishment;
             }
         } else {
@@ -1424,7 +1429,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                            double need, String order, boolean preAge595,
                                            double dsBracketCeiling, double otherIncome,
                                            double conversionAmount, double rmdAmount) {
-        if (need <= 0) { return new PoolWithdrawal(0, 0, 0); }
+        if (need <= 0) {
+            return new PoolWithdrawal(0, 0, 0);
+        }
         if (preAge595) {
             double drawn = Math.min(need, Math.max(0, taxable));
             return new PoolWithdrawal(drawn, 0, 0);
@@ -1462,7 +1469,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double drawn = Math.min(remaining, Math.max(0, pools[i]));
             amounts[mapping[i]] = drawn;
             remaining -= drawn;
-            if (remaining <= 0) { break; }
+            if (remaining <= 0) {
+                break;
+            }
         }
         return new PoolWithdrawal(amounts[0], amounts[1], amounts[2]);
     }
@@ -1475,7 +1484,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     private static double estimateWithdrawalTax(double traditionalWithdrawal,
                                                   double marginalRate) {
-        if (traditionalWithdrawal <= 0) { return 0; }
+        if (traditionalWithdrawal <= 0) {
+            return 0;
+        }
         return traditionalWithdrawal * marginalRate;
     }
 
@@ -1488,7 +1499,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                                int retirementYear, int years,
                                                FilingStatus filingStatus) {
         double[] rates = new double[years];
-        if (taxCalculator == null) { return rates; }
+        if (taxCalculator == null) {
+            return rates;
+        }
 
         double probeAmount = 50_000;
         for (int y = 0; y < years; y++) {

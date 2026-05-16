@@ -1,5 +1,8 @@
 package com.wealthview.core.auth;
 
+import java.util.Locale;
+import java.util.UUID;
+
 import jakarta.persistence.EntityManager;
 import org.hibernate.Filter;
 import org.hibernate.Session;
@@ -8,9 +11,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-
-import java.util.Locale;
-import java.util.UUID;
 
 /**
  * Activates / deactivates the {@code tenantFilter} Hibernate filter on the
@@ -107,7 +107,9 @@ public class TenantFilterActivator {
         }
         for (var ga : auth.getAuthorities()) {
             String a = ga.getAuthority();
-            if (a == null) { continue; }
+            if (a == null) {
+                continue;
+            }
             String upper = a.toUpperCase(Locale.US);
             if (upper.equals("ROLE_" + SUPER_ADMIN_ROLE) || upper.equals(SUPER_ADMIN_ROLE)) {
                 return true;

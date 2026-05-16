@@ -1,14 +1,15 @@
 package com.wealthview.api.security;
 
-import com.wealthview.core.auth.TenantContext;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
-
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import com.wealthview.core.auth.TenantContext;
 
 public record TenantUserPrincipal(
         UUID userId,

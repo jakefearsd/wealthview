@@ -1,15 +1,16 @@
 package com.wealthview.core.auth;
 
-import com.wealthview.core.auth.dto.LoginActivityResponse;
-import com.wealthview.persistence.entity.LoginActivityEntity;
-import com.wealthview.persistence.repository.LoginActivityRepository;
+import java.util.List;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.UUID;
+import com.wealthview.core.auth.dto.LoginActivityResponse;
+import com.wealthview.persistence.entity.LoginActivityEntity;
+import com.wealthview.persistence.repository.LoginActivityRepository;
 
 @Service
 public class LoginActivityService {

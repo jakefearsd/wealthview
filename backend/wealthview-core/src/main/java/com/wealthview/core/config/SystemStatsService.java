@@ -1,15 +1,16 @@
 package com.wealthview.core.config;
 
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.wealthview.core.config.dto.SystemStatsResponse;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
 import com.wealthview.persistence.repository.TenantRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
 import com.wealthview.persistence.repository.UserRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class SystemStatsService {

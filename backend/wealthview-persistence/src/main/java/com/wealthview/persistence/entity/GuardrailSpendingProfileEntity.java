@@ -1,5 +1,9 @@
 package com.wealthview.persistence.entity;
 
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -9,13 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
-
-import java.math.BigDecimal;
-import java.time.OffsetDateTime;
-import java.util.UUID;
-import org.hibernate.annotations.Filter;
 
 @Entity
 @Table(name = "guardrail_spending_profiles")
@@ -126,58 +126,219 @@ public class GuardrailSpendingProfileEntity {
         this.essentialFloor = essentialFloor;
     }
 
-    public UUID getId() { return id; }
-    public TenantEntity getTenant() { return tenant; }
-    public ProjectionScenarioEntity getScenario() { return scenario; }
-    public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
-    public BigDecimal getEssentialFloor() { return essentialFloor; }
-    public void setEssentialFloor(BigDecimal essentialFloor) { this.essentialFloor = essentialFloor; }
-    public BigDecimal getTerminalBalanceTarget() { return terminalBalanceTarget; }
-    public void setTerminalBalanceTarget(BigDecimal terminalBalanceTarget) { this.terminalBalanceTarget = terminalBalanceTarget; }
-    public BigDecimal getReturnMean() { return returnMean; }
-    public void setReturnMean(BigDecimal returnMean) { this.returnMean = returnMean; }
-    public int getTrialCount() { return trialCount; }
-    public void setTrialCount(int trialCount) { this.trialCount = trialCount; }
-    public BigDecimal getConfidenceLevel() { return confidenceLevel; }
-    public void setConfidenceLevel(BigDecimal confidenceLevel) { this.confidenceLevel = confidenceLevel; }
-    public String getPhases() { return phases; }
-    public void setPhases(String phases) { this.phases = phases; }
-    public String getYearlySpending() { return yearlySpending; }
-    public void setYearlySpending(String yearlySpending) { this.yearlySpending = yearlySpending; }
-    public BigDecimal getMedianFinalBalance() { return medianFinalBalance; }
-    public void setMedianFinalBalance(BigDecimal medianFinalBalance) { this.medianFinalBalance = medianFinalBalance; }
-    public BigDecimal getFailureRate() { return failureRate; }
-    public void setFailureRate(BigDecimal failureRate) { this.failureRate = failureRate; }
-    public BigDecimal getPercentile10Final() { return percentile10Final; }
-    public void setPercentile10Final(BigDecimal percentile10Final) { this.percentile10Final = percentile10Final; }
-    public String getScenarioHash() { return scenarioHash; }
-    public void setScenarioHash(String scenarioHash) { this.scenarioHash = scenarioHash; }
-    public BigDecimal getPortfolioFloor() { return portfolioFloor; }
-    public void setPortfolioFloor(BigDecimal portfolioFloor) { this.portfolioFloor = portfolioFloor; }
-    public BigDecimal getMaxAnnualAdjustmentRate() { return maxAnnualAdjustmentRate; }
-    public void setMaxAnnualAdjustmentRate(BigDecimal maxAnnualAdjustmentRate) { this.maxAnnualAdjustmentRate = maxAnnualAdjustmentRate; }
-    public int getPhaseBlendYears() { return phaseBlendYears; }
-    public void setPhaseBlendYears(int phaseBlendYears) { this.phaseBlendYears = phaseBlendYears; }
-    public int getCashReserveYears() { return cashReserveYears; }
-    public void setCashReserveYears(int cashReserveYears) { this.cashReserveYears = cashReserveYears; }
-    public BigDecimal getCashReturnRate() { return cashReturnRate; }
-    public void setCashReturnRate(BigDecimal cashReturnRate) { this.cashReturnRate = cashReturnRate; }
-    public String getRiskTolerance() { return riskTolerance; }
-    public void setRiskTolerance(String riskTolerance) { this.riskTolerance = riskTolerance; }
-    public String getConversionSchedule() { return conversionSchedule; }
-    public void setConversionSchedule(String conversionSchedule) { this.conversionSchedule = conversionSchedule; }
-    public BigDecimal getConversionBracketRate() { return conversionBracketRate; }
-    public void setConversionBracketRate(BigDecimal conversionBracketRate) { this.conversionBracketRate = conversionBracketRate; }
-    public BigDecimal getRmdTargetBracketRate() { return rmdTargetBracketRate; }
-    public void setRmdTargetBracketRate(BigDecimal rmdTargetBracketRate) { this.rmdTargetBracketRate = rmdTargetBracketRate; }
-    public Integer getTraditionalExhaustionBuffer() { return traditionalExhaustionBuffer; }
-    public void setTraditionalExhaustionBuffer(Integer traditionalExhaustionBuffer) { this.traditionalExhaustionBuffer = traditionalExhaustionBuffer; }
-    public BigDecimal getRmdBracketHeadroom() { return rmdBracketHeadroom; }
-    public void setRmdBracketHeadroom(BigDecimal rmdBracketHeadroom) { this.rmdBracketHeadroom = rmdBracketHeadroom; }
-    public boolean isStale() { return stale; }
-    public void setStale(boolean stale) { this.stale = stale; }
-    public OffsetDateTime getCreatedAt() { return createdAt; }
-    public OffsetDateTime getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+    public UUID getId() {
+        return id;
+    }
+
+    public TenantEntity getTenant() {
+        return tenant;
+    }
+
+    public ProjectionScenarioEntity getScenario() {
+        return scenario;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public BigDecimal getEssentialFloor() {
+        return essentialFloor;
+    }
+
+    public void setEssentialFloor(BigDecimal essentialFloor) {
+        this.essentialFloor = essentialFloor;
+    }
+
+    public BigDecimal getTerminalBalanceTarget() {
+        return terminalBalanceTarget;
+    }
+
+    public void setTerminalBalanceTarget(BigDecimal terminalBalanceTarget) {
+        this.terminalBalanceTarget = terminalBalanceTarget;
+    }
+
+    public BigDecimal getReturnMean() {
+        return returnMean;
+    }
+
+    public void setReturnMean(BigDecimal returnMean) {
+        this.returnMean = returnMean;
+    }
+
+    public int getTrialCount() {
+        return trialCount;
+    }
+
+    public void setTrialCount(int trialCount) {
+        this.trialCount = trialCount;
+    }
+
+    public BigDecimal getConfidenceLevel() {
+        return confidenceLevel;
+    }
+
+    public void setConfidenceLevel(BigDecimal confidenceLevel) {
+        this.confidenceLevel = confidenceLevel;
+    }
+
+    public String getPhases() {
+        return phases;
+    }
+
+    public void setPhases(String phases) {
+        this.phases = phases;
+    }
+
+    public String getYearlySpending() {
+        return yearlySpending;
+    }
+
+    public void setYearlySpending(String yearlySpending) {
+        this.yearlySpending = yearlySpending;
+    }
+
+    public BigDecimal getMedianFinalBalance() {
+        return medianFinalBalance;
+    }
+
+    public void setMedianFinalBalance(BigDecimal medianFinalBalance) {
+        this.medianFinalBalance = medianFinalBalance;
+    }
+
+    public BigDecimal getFailureRate() {
+        return failureRate;
+    }
+
+    public void setFailureRate(BigDecimal failureRate) {
+        this.failureRate = failureRate;
+    }
+
+    public BigDecimal getPercentile10Final() {
+        return percentile10Final;
+    }
+
+    public void setPercentile10Final(BigDecimal percentile10Final) {
+        this.percentile10Final = percentile10Final;
+    }
+
+    public String getScenarioHash() {
+        return scenarioHash;
+    }
+
+    public void setScenarioHash(String scenarioHash) {
+        this.scenarioHash = scenarioHash;
+    }
+
+    public BigDecimal getPortfolioFloor() {
+        return portfolioFloor;
+    }
+
+    public void setPortfolioFloor(BigDecimal portfolioFloor) {
+        this.portfolioFloor = portfolioFloor;
+    }
+
+    public BigDecimal getMaxAnnualAdjustmentRate() {
+        return maxAnnualAdjustmentRate;
+    }
+
+    public void setMaxAnnualAdjustmentRate(BigDecimal maxAnnualAdjustmentRate) {
+        this.maxAnnualAdjustmentRate = maxAnnualAdjustmentRate;
+    }
+
+    public int getPhaseBlendYears() {
+        return phaseBlendYears;
+    }
+
+    public void setPhaseBlendYears(int phaseBlendYears) {
+        this.phaseBlendYears = phaseBlendYears;
+    }
+
+    public int getCashReserveYears() {
+        return cashReserveYears;
+    }
+
+    public void setCashReserveYears(int cashReserveYears) {
+        this.cashReserveYears = cashReserveYears;
+    }
+
+    public BigDecimal getCashReturnRate() {
+        return cashReturnRate;
+    }
+
+    public void setCashReturnRate(BigDecimal cashReturnRate) {
+        this.cashReturnRate = cashReturnRate;
+    }
+
+    public String getRiskTolerance() {
+        return riskTolerance;
+    }
+
+    public void setRiskTolerance(String riskTolerance) {
+        this.riskTolerance = riskTolerance;
+    }
+
+    public String getConversionSchedule() {
+        return conversionSchedule;
+    }
+
+    public void setConversionSchedule(String conversionSchedule) {
+        this.conversionSchedule = conversionSchedule;
+    }
+
+    public BigDecimal getConversionBracketRate() {
+        return conversionBracketRate;
+    }
+
+    public void setConversionBracketRate(BigDecimal conversionBracketRate) {
+        this.conversionBracketRate = conversionBracketRate;
+    }
+
+    public BigDecimal getRmdTargetBracketRate() {
+        return rmdTargetBracketRate;
+    }
+
+    public void setRmdTargetBracketRate(BigDecimal rmdTargetBracketRate) {
+        this.rmdTargetBracketRate = rmdTargetBracketRate;
+    }
+
+    public Integer getTraditionalExhaustionBuffer() {
+        return traditionalExhaustionBuffer;
+    }
+
+    public void setTraditionalExhaustionBuffer(Integer traditionalExhaustionBuffer) {
+        this.traditionalExhaustionBuffer = traditionalExhaustionBuffer;
+    }
+
+    public BigDecimal getRmdBracketHeadroom() {
+        return rmdBracketHeadroom;
+    }
+
+    public void setRmdBracketHeadroom(BigDecimal rmdBracketHeadroom) {
+        this.rmdBracketHeadroom = rmdBracketHeadroom;
+    }
+
+    public boolean isStale() {
+        return stale;
+    }
+
+    public void setStale(boolean stale) {
+        this.stale = stale;
+    }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
 }

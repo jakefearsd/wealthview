@@ -1,8 +1,9 @@
 package com.wealthview.app.it.mobile;
 
-import com.wealthview.app.it.AbstractApiIntegrationTest;
-import com.wealthview.app.it.AuthHelper;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,9 +16,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.AuthHelper;
+import io.micrometer.core.instrument.MeterRegistry;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;

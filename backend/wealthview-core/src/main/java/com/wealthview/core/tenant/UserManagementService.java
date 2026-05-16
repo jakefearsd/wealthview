@@ -1,11 +1,11 @@
 package com.wealthview.core.tenant;
 
-import com.wealthview.core.audit.AuditEvent;
-import com.wealthview.core.auth.CommonPasswordChecker;
-import com.wealthview.core.auth.TenantContext;
-import com.wealthview.core.common.Entities;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.UserRepository;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -13,11 +13,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import com.wealthview.core.audit.AuditEvent;
+import com.wealthview.core.auth.CommonPasswordChecker;
+import com.wealthview.core.auth.TenantContext;
+import com.wealthview.core.common.Entities;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.UserRepository;
 
 @Service
 public class UserManagementService {

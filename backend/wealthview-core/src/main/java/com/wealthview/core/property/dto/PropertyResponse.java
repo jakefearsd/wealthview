@@ -1,12 +1,12 @@
 package com.wealthview.core.property.dto;
 
-import com.wealthview.core.property.PropertyService;
-import com.wealthview.persistence.entity.PropertyEntity;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+
+import com.wealthview.core.property.PropertyService;
+import com.wealthview.persistence.entity.PropertyEntity;
 
 public record PropertyResponse(
         UUID id,

@@ -1,9 +1,8 @@
 package com.wealthview.core.split;
 
-import com.wealthview.core.config.SystemConfigService;
-import com.wealthview.persistence.repository.StockSplitRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
-import io.micrometer.core.instrument.MeterRegistry;
+import java.time.LocalDate;
+import java.util.concurrent.Executors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
@@ -13,8 +12,10 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.core.task.support.TaskExecutorAdapter;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-import java.util.concurrent.Executors;
+import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.persistence.repository.StockSplitRepository;
+import com.wealthview.persistence.repository.TransactionRepository;
+import io.micrometer.core.instrument.MeterRegistry;
 
 /**
  * One-time backfill: on first deployment after this feature ships, scan every

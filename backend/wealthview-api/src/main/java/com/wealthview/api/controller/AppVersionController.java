@@ -1,11 +1,12 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.core.mobile.MobileAppVersionService;
-import com.wealthview.core.mobile.dto.VersionCheckResponse;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.wealthview.core.mobile.MobileAppVersionService;
+import com.wealthview.core.mobile.dto.VersionCheckResponse;
 
 /**
  * Anonymous version-check endpoint hit by mobile clients on app launch.

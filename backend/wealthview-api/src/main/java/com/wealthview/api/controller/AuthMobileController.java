@@ -1,5 +1,17 @@
 package com.wealthview.api.controller;
 
+import java.util.Map;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.wealthview.api.common.ClientIpResolver;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.auth.AuthRequestContext;
@@ -11,16 +23,6 @@ import com.wealthview.core.auth.dto.MfaChallengeRequest;
 import com.wealthview.core.auth.dto.MobileAuthResponse;
 import com.wealthview.core.auth.dto.MobileRefreshRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
-import java.util.Map;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Token-in-body auth endpoints for native mobile clients.

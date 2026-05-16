@@ -1,11 +1,11 @@
 package com.wealthview.app.it;
 
-import com.wealthview.persistence.entity.InviteCodeEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.InviteCodeRepository;
-import com.wealthview.persistence.repository.TenantRepository;
-import com.wealthview.persistence.repository.UserRepository;
+import java.net.HttpCookie;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -16,11 +16,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.HttpCookie;
-import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.persistence.entity.InviteCodeEntity;
+import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.UserEntity;
+import com.wealthview.persistence.repository.InviteCodeRepository;
+import com.wealthview.persistence.repository.TenantRepository;
+import com.wealthview.persistence.repository.UserRepository;
 
 /**
  * Integration-test helper for cookie + CSRF auth.

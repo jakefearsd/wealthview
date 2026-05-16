@@ -1,14 +1,15 @@
 package com.wealthview.core.auth;
 
-import com.wealthview.persistence.repository.UserRepository;
-import com.wealthview.persistence.repository.UserSessionRepository;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.OffsetDateTime;
-import java.util.UUID;
+import com.wealthview.persistence.repository.UserRepository;
+import com.wealthview.persistence.repository.UserSessionRepository;
 
 @Service
 public class SessionStateValidator {

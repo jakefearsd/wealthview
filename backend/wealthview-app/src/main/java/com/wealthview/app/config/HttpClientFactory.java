@@ -1,9 +1,9 @@
 package com.wealthview.app.config;
 
+import java.time.Duration;
+
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-
-import java.time.Duration;
 
 final class HttpClientFactory {
 

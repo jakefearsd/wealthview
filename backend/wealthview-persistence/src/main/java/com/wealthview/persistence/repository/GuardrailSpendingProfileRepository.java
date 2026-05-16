@@ -1,11 +1,12 @@
 package com.wealthview.persistence.repository;
 
-import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import java.util.Optional;
+import java.util.UUID;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-import java.util.UUID;
+import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 
 @Repository
 public interface GuardrailSpendingProfileRepository extends JpaRepository<GuardrailSpendingProfileEntity, UUID> {

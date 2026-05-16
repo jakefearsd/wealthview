@@ -1,9 +1,9 @@
 package com.wealthview.core.importservice.dto;
 
-import com.wealthview.persistence.entity.ImportJobEntity;
-
 import java.time.OffsetDateTime;
 import java.util.UUID;
+
+import com.wealthview.persistence.entity.ImportJobEntity;
 
 public record ImportJobResponse(
         UUID id,

@@ -1,6 +1,7 @@
 package com.wealthview.app.config;
 
-import com.wealthview.core.config.SystemConfigService;
+import java.util.LinkedHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -8,7 +9,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-import java.util.LinkedHashMap;
+import com.wealthview.core.config.SystemConfigService;
 
 /**
  * Seeds system configuration defaults into the database on startup.

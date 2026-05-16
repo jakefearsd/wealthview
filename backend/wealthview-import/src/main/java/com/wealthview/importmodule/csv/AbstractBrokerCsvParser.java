@@ -1,13 +1,5 @@
 package com.wealthview.importmodule.csv;
 
-import com.wealthview.core.importservice.ImportParser;
-import com.wealthview.core.importservice.dto.ImportParseResult;
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +12,15 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVRecord;
+
+import com.wealthview.core.importservice.ImportParser;
+import com.wealthview.core.importservice.dto.CsvRowError;
+import com.wealthview.core.importservice.dto.ImportParseResult;
+import com.wealthview.core.importservice.dto.ParsedTransaction;
 
 /**
  * Shared base class for broker-specific CSV transaction parsers.

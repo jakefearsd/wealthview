@@ -1,12 +1,9 @@
 package com.wealthview.api.controller;
 
-import com.wealthview.api.security.TenantUserPrincipal;
-import com.wealthview.core.tenant.TenantService;
-import com.wealthview.core.tenant.UserManagementService;
-import com.wealthview.core.tenant.dto.GenerateInviteRequest;
-import com.wealthview.core.tenant.dto.InviteCodeResponse;
-import com.wealthview.core.tenant.dto.UpdateRoleRequest;
-import com.wealthview.core.tenant.dto.UserResponse;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,9 +17,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.tenant.TenantService;
+import com.wealthview.core.tenant.UserManagementService;
+import com.wealthview.core.tenant.dto.GenerateInviteRequest;
+import com.wealthview.core.tenant.dto.InviteCodeResponse;
+import com.wealthview.core.tenant.dto.UpdateRoleRequest;
+import com.wealthview.core.tenant.dto.UserResponse;
 
 @RestController
 @RequestMapping("/api/v1/tenant")
