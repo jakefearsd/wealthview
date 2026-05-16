@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.auth.SessionService;
 import com.wealthview.core.auth.dto.SessionResponse;
+import com.wealthview.core.exception.EntityNotFoundException;
 
 /**
  * Per-device session management. Listed sessions are non-revoked rows from
@@ -42,10 +43,12 @@ public class SessionController {
                                        @PathVariable("id") UUID id) {
         var revoked = sessionService.revoke(principal.userId(), id);
         if (!revoked) {
-            // Return 404 (not 403) when the session belongs to a different
-            // user. 403 would confirm the id exists somewhere in the system,
+            // Throw 404 (not 403) when the session doesn't belong to this user.
+            // 403 would confirm the id exists somewhere in the system,
             // letting an attacker enumerate sessions across tenants.
-            return ResponseEntity.notFound().build();
+            // EntityNotFoundException routes through GlobalExceptionHandler so
+            // the response carries the standard {error, message, status} envelope.
+            throw new EntityNotFoundException("Session not found: " + id);
         }
         return ResponseEntity.noContent().build();
     }

@@ -83,12 +83,14 @@ class SessionControllerTest {
     @Test
     void revoke_sessionNotFound_returns404() throws Exception {
         // revoke returns false when session doesn't belong to the user,
-        // controller returns 404 to avoid confirming session existence
+        // controller throws EntityNotFoundException → GlobalExceptionHandler
+        // returns the standard {error, message, status} envelope.
         when(sessionService.revoke(eq(USER_ID), eq(SESSION_ID))).thenReturn(false);
 
         mockMvc.perform(delete("/api/v1/auth/sessions/{id}", SESSION_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("NOT_FOUND"));
     }
 
     @Test
