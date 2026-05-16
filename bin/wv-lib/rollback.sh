@@ -20,7 +20,7 @@ USAGE
         esac
     done
 
-    # shellcheck source=scripts/wv-lib/update.sh
+    # shellcheck source=bin/wv-lib/update.sh
     . "$WV_LIB_DIR/update.sh"
 
     local file

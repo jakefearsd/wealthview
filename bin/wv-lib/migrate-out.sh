@@ -50,7 +50,7 @@ USAGE
     trap "rm -rf '$staging'" RETURN
 
     wv_log "Taking migration backup..."
-    # shellcheck source=scripts/wv-lib/backup.sh
+    # shellcheck source=bin/wv-lib/backup.sh
     . "$WV_LIB_DIR/backup.sh"
 
     local backup_path

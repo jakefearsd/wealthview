@@ -53,7 +53,7 @@ USAGE
         cat "$staging/VERSION.pin"
     fi
 
-    # shellcheck source=scripts/wv-lib/restore.sh
+    # shellcheck source=bin/wv-lib/restore.sh
     . "$WV_LIB_DIR/restore.sh"
     wv_restore "$dump"
 }

@@ -29,9 +29,9 @@ USAGE
         esac
     done
 
-    # shellcheck source=down.sh
+    # shellcheck source=bin/wv-lib/down.sh
     . "$WV_LIB_DIR/down.sh"
-    # shellcheck source=up.sh
+    # shellcheck source=bin/wv-lib/up.sh
     . "$WV_LIB_DIR/up.sh"
 
     wv_log "Restart: stopping..."

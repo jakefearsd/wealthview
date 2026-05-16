@@ -49,7 +49,7 @@ USAGE
     fi
 
     wv_log "Step 1/5: Taking pre-update backup."
-    # shellcheck source=scripts/wv-lib/backup.sh
+    # shellcheck source=bin/wv-lib/backup.sh
     . "$WV_LIB_DIR/backup.sh"
     local backup_path
     backup_path="$(wv_backup --label pre-update | tail -n 1)" \
