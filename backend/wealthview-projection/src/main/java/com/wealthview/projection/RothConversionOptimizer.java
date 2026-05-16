@@ -47,7 +47,7 @@ class RothConversionOptimizer {
             double targetTraditionalBalance
     ) {}
 
-    RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
+    private RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
                             double[] otherIncomeByYear, double[] taxableIncomeByYear,
                             int birthYear, int retirementAge, int endAge,
                             int exhaustionBuffer, double conversionBracketRate,

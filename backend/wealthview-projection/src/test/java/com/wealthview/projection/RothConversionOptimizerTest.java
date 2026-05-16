@@ -112,15 +112,18 @@ class RothConversionOptimizerTest {
 
         RothConversionOptimizer build() {
             int years = endAge - retirementAge;
-            return new RothConversionOptimizer(
-                    traditional, roth, taxable,
-                    otherIncome != null ? otherIncome : new double[years],
-                    taxableIncome != null ? taxableIncome : new double[years],
-                    birthYear, retirementAge, endAge, exhaustionBuffer,
-                    conversionBracketRate, rmdTargetBracketRate, returnMean,
-                    essentialFloor, inflationRate, filingStatus, calc,
-                    withdrawalOrder, incomeSources, rentalLossCalculator,
-                    rmdBracketHeadroom, dynamicSequencingBracketRate);
+            return RothConversionOptimizer.builder()
+                    .portfolio(traditional, roth, taxable)
+                    .income(otherIncome != null ? otherIncome : new double[years],
+                            taxableIncome != null ? taxableIncome : new double[years])
+                    .demographics(birthYear, retirementAge, endAge)
+                    .taxConfig(conversionBracketRate, rmdTargetBracketRate, rmdBracketHeadroom,
+                            filingStatus, calc)
+                    .assumptions(returnMean, essentialFloor, inflationRate, exhaustionBuffer,
+                            withdrawalOrder)
+                    .rentals(incomeSources, rentalLossCalculator)
+                    .dynamicSequencingBracketRate(dynamicSequencingBracketRate)
+                    .build();
         }
     }
 
