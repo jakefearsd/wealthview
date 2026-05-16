@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+// TooManyFields / ExcessivePublicCount: this is an immutable per-year projection result record.
+// Every component is a distinct, independently meaningful output of the projection engine;
+// it is a pure data carrier by design (DataClass is already excluded project-wide for records).
+@SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
 public record ProjectionYearDto(
         int year,
         int age,

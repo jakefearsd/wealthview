@@ -49,6 +49,10 @@ final class SustainabilitySearch {
      * Verifies the inflation-adjusted essential floor against portfolio capacity at the
      * required confidence level, returning the affordable floor for each retirement year.
      */
+    // AvoidArrayLoops: PMD sees `floors[y] = inflatedFloors[y]` and assumes a plain array copy,
+    // but the assignment is conditional (the else branch clamps to portfolio capacity), so
+    // Arrays.copyOf / System.arraycopy is not an equivalent substitute.
+    @SuppressWarnings("PMD.AvoidArrayLoops")
     static double[] verifyEssentialFloor(double[][] paths, double[] income,
                                           double essentialFloor,
                                           double confidenceLevel, int years, int trialCount,
@@ -201,6 +205,9 @@ final class SustainabilitySearch {
      * Evaluates the total sustainable first-year spending (essentialFloor + discretionary)
      * for a given conversion schedule. Used by the joint search to score candidate fractions.
      */
+    // UseVarargs: the trailing double[] is a per-year indexed floor array, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
     double evaluateSustainableSpending(SearchContext ctx, double[] floors) {
         double low = 0;
         double high = MAX_SPENDING_CEILING;
@@ -248,6 +255,11 @@ final class SustainabilitySearch {
      * Returns true when the given discretionary plan keeps the portfolio above the
      * terminal target (and portfolio floor, if set) at the required confidence level.
      */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    // NPathComplexity: the trial-loop body fans out over independent per-year guards; the path
+    // count is multiplicative but each branch is a trivial comparison, so it stays readable.
+    @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
     boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
         int trialCount = ctx.trialCount();
         int years = ctx.years();

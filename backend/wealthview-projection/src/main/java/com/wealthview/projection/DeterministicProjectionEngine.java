@@ -41,7 +41,7 @@ import static com.wealthview.core.common.Money.SCALE;
 @Component
 // GodClass: the engine is an orchestrator that wires many projection collaborators;
 // PMD's coupling/cohesion heuristic still flags it after the Phase 3 decomposition.
-@SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
+@SuppressWarnings("PMD.GodClass")
 public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
@@ -141,6 +141,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         return runProjection(ctx);
     }
 
+    // NPathComplexity: this method resolves many independent parameters, each via a small
+    // null-coalescing default (`x != null ? x : default`). The path count is multiplicative
+    // across those defaults but every branch is trivial straight-line resolution.
+    @SuppressWarnings("PMD.NPathComplexity")
     private ResolvedParams resolveProjectionParams(ProjectionInput input, ScenarioParamsParser.ScenarioParams params) {
         int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
         int birthYear = params.birthYear() != null ? params.birthYear() : currentYear - 35;

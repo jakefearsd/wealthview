@@ -44,7 +44,6 @@ import com.wealthview.persistence.repository.TenantRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @Service
-@SuppressWarnings("PMD.CouplingBetweenObjects")
 public class ScenarioCrudService {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioCrudService.class);
@@ -280,7 +279,6 @@ public class ScenarioCrudService {
                 r.primaryResidencePropertyTax(), r.primaryResidenceMortgageInterest());
     }
 
-    @SuppressWarnings("PMD.ExcessiveParameterList") // mirrors request record fields; used by overloads above
     private Map<String, Object> scenarioParams(
             Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
             BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,

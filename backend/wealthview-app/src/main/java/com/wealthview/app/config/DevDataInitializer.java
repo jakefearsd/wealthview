@@ -54,7 +54,6 @@ public class DevDataInitializer implements ApplicationRunner {
     private final InviteCodeRepository inviteCodeRepository;
     private final PasswordEncoder passwordEncoder;
 
-    @SuppressWarnings("PMD.ExcessiveParameterList") // Spring constructor DI with 11 beans
     public DevDataInitializer(TenantRepository tenantRepository,
                               UserRepository userRepository,
                               AccountRepository accountRepository,

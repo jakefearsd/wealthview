@@ -35,6 +35,11 @@ import io.micrometer.observation.annotation.Observed;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
+// GodClass / CyclomaticComplexity: the Monte Carlo spending+conversion optimizer is a cohesive
+// numerical pipeline (grid search, smoothing, response assembly). Its class-level cyclomatic
+// complexity (119) is an outlier driven by many small branch-light helper methods; splitting it
+// across classes would scatter tightly-coupled simulation state without reducing real complexity.
+@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
 @Component
 public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
@@ -234,6 +239,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return new IncomeArrays(incomeByYear, taxableIncomeByYear, surplusTaxByYear);
     }
 
+    // ReturnEmptyCollectionRatherThanNull: the return type is a primitive double[] sentinel, not a
+    // Collection — null signals "no dynamic-sequencing ceilings apply" and callers null-check it.
+    @SuppressWarnings("PMD.ReturnEmptyCollectionRatherThanNull")
     private double[] computeDsBracketCeilings(String withdrawalOrder,
                                                BigDecimal dynamicSequencingBracketRate,
                                                int years, int retirementYear,
@@ -393,6 +401,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * call sites in {@link #jointSearchConversions} only vary by
      * {@code conversionByYear} / {@code conversionTaxByYear}.
      */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
     private double evalSearchSpending(double[][] searchPaths, OptimizationSetup ctx,
                                        double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
                                        double[] conversionByYear, double[] conversionTaxByYear) {
@@ -406,6 +417,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
     private double[] allocateAndSmooth(OptimizationSetup ctx, GuardrailOptimizationInput input,
                                        double[] conversionByYear, double[] conversionTaxByYear) {
         // Priority-weighted discretionary allocation
@@ -449,6 +463,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * Builds the {@link SustainabilitySearch.SearchContext} for the main optimization run
      * from the pre-computed {@link OptimizationSetup} and the chosen conversion schedule.
      */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
     private SustainabilitySearch.SearchContext searchContextFor(OptimizationSetup ctx,
                                                                  double[] conversionByYear,
                                                                  double[] conversionTaxByYear) {
@@ -462,6 +479,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear());
     }
 
+    // NPathComplexity: response assembly fans out over many independent optional fields; the
+    // path count is multiplicative but each branch is a trivial null/empty guard, so the method
+    // is far simpler than its NPath number suggests. Splitting it would only scatter the mapping.
+    @SuppressWarnings("PMD.NPathComplexity")
     private GuardrailProfileResponse buildResponse(OptimizationSetup ctx,
                                                     GuardrailOptimizationInput input,
                                                     double[] discretionaryByYear,
@@ -560,6 +581,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 convScheduleResponse);
     }
 
+    // UseVarargs: the double[] params are per-year indexed arrays, not a variable argument
+    // list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
     private List<GuardrailYearlySpending> buildYearlySpending(OptimizationSetup ctx,
                                                                 GuardrailOptimizationInput input,
                                                                 double[] discretionaryByYear,

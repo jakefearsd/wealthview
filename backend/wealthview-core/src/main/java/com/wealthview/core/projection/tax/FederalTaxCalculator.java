@@ -66,6 +66,10 @@ public class FederalTaxCalculator {
      * {@code bracketInflationRate} per year gap — matching the IRS practice of
      * annually indexing brackets to CPI.
      */
+    // AvoidBranchingStatementAsLastInLoop: this is an intentional find-first-match-and-return
+    // loop — the return exits as soon as the target bracket is located. Rewriting it to break
+    // into a captured variable would be strictly less clear.
+    @SuppressWarnings("PMD.AvoidBranchingStatementAsLastInLoop")
     public BigDecimal computeMaxIncomeForBracket(BigDecimal targetRate, int taxYear,
                                                    FilingStatus status,
                                                    BigDecimal bracketInflationRate) {

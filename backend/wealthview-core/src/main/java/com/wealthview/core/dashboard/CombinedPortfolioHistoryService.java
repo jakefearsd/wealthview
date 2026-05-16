@@ -66,6 +66,10 @@ public class CombinedPortfolioHistoryService {
         this.propertyValuationRepository = propertyValuationRepository;
     }
 
+    // NPathComplexity: the method merges several optional data series (holdings, properties,
+    // valuations), each behind an independent presence guard. The path count multiplies across
+    // those guards but each branch is a simple include/skip, so it stays straightforward.
+    @SuppressWarnings("PMD.NPathComplexity")
     @Timed("wealthview.dashboard.portfolio.history")
     @Transactional(readOnly = true)
     public CombinedPortfolioHistoryResponse computeHistory(UUID tenantId, int years) {

@@ -129,6 +129,11 @@ public class ZillowScraperClient implements PropertyValuationClient {
         return Optional.empty();
     }
 
+    // CognitiveComplexity / AvoidDeeplyNestedIfStmts: HTML scraping of Zillow's search page
+    // inherently requires defensive nested traversal of a fragile, frequently-changing DOM.
+    // The nesting mirrors the document structure; flattening it would not reduce real complexity
+    // and a structural refactor risks breaking the scraper. This is an isolated adapter outlier.
+    @SuppressWarnings({"PMD.CognitiveComplexity", "PMD.AvoidDeeplyNestedIfStmts"})
     List<ZillowSearchResult> extractSearchResults(Document doc) {
         var results = new ArrayList<ZillowSearchResult>();
 

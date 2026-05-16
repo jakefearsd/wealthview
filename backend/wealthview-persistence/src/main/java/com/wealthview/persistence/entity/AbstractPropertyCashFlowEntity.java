@@ -15,6 +15,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 import org.hibernate.annotations.Filter;
 
+// AbstractClassWithoutAbstractMethod: a JPA @MappedSuperclass is abstract by design to share
+// column mappings with concrete subclasses; it intentionally declares no abstract methods.
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 @MappedSuperclass
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public abstract class AbstractPropertyCashFlowEntity {

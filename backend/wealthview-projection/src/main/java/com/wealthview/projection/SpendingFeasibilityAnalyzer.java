@@ -27,6 +27,10 @@ final class SpendingFeasibilityAnalyzer {
      * given spending plan, identifying the first shortfall year and the weakest
      * (inflation-adjusted) retirement year.
      */
+    // NPathComplexity: the per-year walk applies several independent shortfall/weak-year checks.
+    // The path count multiplies across those checks but each is a simple comparison-and-record,
+    // so the method reads sequentially despite the large NPath number.
+    @SuppressWarnings("PMD.NPathComplexity")
     @Nullable
     SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
                                                   @Nullable SpendingPlan spendingPlan,

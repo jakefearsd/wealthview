@@ -10,6 +10,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
+// AbstractClassWithoutAbstractMethod: a JPA @MappedSuperclass is abstract by design to share
+// column mappings with concrete subclasses; it intentionally declares no abstract methods.
+@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 @MappedSuperclass
 public abstract class AbstractTaxBracketEntity {
 

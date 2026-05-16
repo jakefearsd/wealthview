@@ -23,7 +23,7 @@ import com.wealthview.core.projection.tax.RentalLossCalculator;
  *
  * <p>Package-private — not a Spring bean; instantiated by the service layer.
  */
-class RothConversionOptimizer {
+final class RothConversionOptimizer {
 
     private static final Logger log = LoggerFactory.getLogger(RothConversionOptimizer.class);
 
@@ -188,6 +188,9 @@ class RothConversionOptimizer {
         return new Builder();
     }
 
+    // TooManyFields: a builder holds one staging field per constructor argument of the object it
+    // builds; RothConversionOptimizer genuinely needs this many inputs, so the count is inherent.
+    @SuppressWarnings("PMD.TooManyFields")
     static class Builder {
         private double traditional;
         private double roth;
@@ -218,6 +221,9 @@ class RothConversionOptimizer {
             return this;
         }
 
+        // UseVarargs: both params are distinct per-year indexed arrays — making the last one
+        // varargs would let callers omit it or pass loose values, breaking the builder contract.
+        @SuppressWarnings("PMD.UseVarargs")
         Builder income(double[] otherIncome, double[] taxableIncome) {
             this.otherIncomeByYear = Arrays.copyOf(otherIncome, otherIncome.length);
             this.taxableIncomeByYear = Arrays.copyOf(taxableIncome, taxableIncome.length);

@@ -55,6 +55,10 @@ public record GuardrailProfileResponse(
                 2, new BigDecimal("0.04"), null);
     }
 
+    // UseDiamondOperator: the anonymous TypeReference subclasses below MUST keep explicit type
+    // arguments — Jackson captures the generic type via the anonymous class's superclass at
+    // runtime, and a diamond would erase List<...> to a raw type.
+    @SuppressWarnings("PMD.UseDiamondOperator")
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
         List<GuardrailPhaseInput> phases;
         List<GuardrailYearlySpending> yearlySpending;

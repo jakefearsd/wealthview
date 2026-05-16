@@ -276,18 +276,25 @@
                         </rulesets>
                     </configuration>
                     <executions>
-                        <!-- Gate: fail the verify phase on copy-paste duplication.
-                             NOTE: pmd:check (the rule-based gate) is intentionally NOT bound
-                             here yet. The codebase currently has ~88 unsuppressed PMD findings
-                             (mostly CyclomaticComplexity / CognitiveComplexity / NPath across
-                             the projection and optimizer code) that require genuine refactoring,
-                             not blanket suppression. Enabling pmd:check is deferred to a
-                             dedicated complexity-reduction task; cpd-check is clean and gated. -->
+                        <!-- Gate: fail the verify phase on copy-paste duplication. -->
                         <execution>
                             <id>pmd-cpd-check</id>
                             <phase>verify</phase>
                             <goals>
                                 <goal>cpd-check</goal>
+                            </goals>
+                        </execution>
+                        <!-- Gate: fail the verify phase on PMD rule violations (Task 24).
+                             Complexity-rule thresholds in pmd-ruleset.xml are raised to just
+                             above the post-Phase-3 measured peaks, locking in no-regression;
+                             genuine outliers and false positives carry narrow @SuppressWarnings
+                             with justifications in the source. failOnViolation=true is already
+                             set in the pluginManagement <configuration> above. -->
+                        <execution>
+                            <id>pmd-check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
                             </goals>
                         </execution>
                     </executions>

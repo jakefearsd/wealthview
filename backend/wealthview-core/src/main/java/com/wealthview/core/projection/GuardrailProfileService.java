@@ -29,6 +29,10 @@ import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 
+// GodClass: this service is the single orchestration point for the guardrail/Roth optimization
+// lifecycle (validate -> build input -> optimize -> persist -> map). The members are highly
+// cohesive around that one workflow; splitting them would scatter tightly-coupled steps.
+@SuppressWarnings("PMD.GodClass")
 @Service
 public class GuardrailProfileService {
 
@@ -274,6 +278,10 @@ public class GuardrailProfileService {
         }
     }
 
+    // NPathComplexity: this method maps many independent optional request fields, each guarded
+    // by a small null/default check. The path count is multiplicative across those guards but
+    // every branch is trivial; collapsing it into helpers would only scatter straight-line mapping.
+    @SuppressWarnings("PMD.NPathComplexity")
     private GuardrailOptimizationInput buildOptimizationInput(ProjectionScenarioEntity scenario,
                                                                ProjectionInput projectionInput,
                                                                GuardrailOptimizationRequest request,

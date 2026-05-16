@@ -64,6 +64,9 @@ public class TenantFilterActivator {
      * {@code @CrossTenant} bypasses. Returns {@code true} when the filter
      * was previously enabled (so the bypass can restore it on exit).
      */
+    // CloseResource: the Session is unwrapped from the Spring-managed EntityManager;
+    // its lifecycle is owned by the transaction, not by this method.
+    @SuppressWarnings("PMD.CloseResource")
     public boolean disable(EntityManager entityManager) {
         Session session = entityManager.unwrap(Session.class);
         Filter filter = session.getEnabledFilter(FILTER_NAME);
@@ -84,6 +87,10 @@ public class TenantFilterActivator {
         enableForCurrentRequest(entityManager);
     }
 
+    // CloseResource: Session is unwrapped from the Spring-managed EntityManager (transaction-owned).
+    // AvoidCatchingGenericException: enabling the filter must degrade gracefully on any runtime
+    // failure rather than abort the request — the warning log is the recovery path.
+    @SuppressWarnings({"PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
     private boolean enable(EntityManager entityManager, UUID tenantId) {
         Session session = entityManager.unwrap(Session.class);
         if (session.getEnabledFilter(FILTER_NAME) != null) {

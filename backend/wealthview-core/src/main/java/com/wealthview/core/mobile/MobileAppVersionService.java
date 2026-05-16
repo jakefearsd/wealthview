@@ -93,6 +93,10 @@ public class MobileAppVersionService {
                 .toList();
     }
 
+    // UseObjectForClearerAPI: the String params each map directly to a distinct, individually
+    // validated entity field. Wrapping them in a container would only relocate the request DTO
+    // already used at the controller boundary, without making this service method clearer.
+    @SuppressWarnings("PMD.UseObjectForClearerAPI")
     @CacheEvict(value = "mobileAppVersions", key = "#platform.toLowerCase()")
     @Transactional
     public VersionCheckResponse updateVersion(String platform, String minimumSupportedVersion,

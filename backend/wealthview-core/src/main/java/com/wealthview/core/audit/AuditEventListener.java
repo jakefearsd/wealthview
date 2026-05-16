@@ -21,6 +21,9 @@ public class AuditEventListener {
         this.auditLogRepository = auditLogRepository;
     }
 
+    // Intentional identity (==) check: AuditDetailsValidator.validate returns the SAME map
+    // instance when nothing was truncated, so reference inequality reliably detects truncation.
+    @SuppressWarnings("PMD.CompareObjectsWithEquals")
     @TransactionalEventListener(fallbackExecution = true)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void handleAuditEvent(AuditEvent event) {

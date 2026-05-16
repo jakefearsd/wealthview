@@ -42,6 +42,10 @@ public class TenantFilterAspect {
         this.entityManagerFactory = entityManagerFactory;
     }
 
+    // CloseResource: the EntityManager is the Spring-managed transactional one — closing it
+    // here would corrupt the surrounding transaction. AvoidCatchingGenericException: the
+    // finally-block cleanup must swallow any runtime failure from an already-closed session.
+    @SuppressWarnings({"PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
     @Around("@annotation(org.springframework.transaction.annotation.Transactional) "
             + "|| @within(org.springframework.transaction.annotation.Transactional)")
     public Object aroundTransactional(ProceedingJoinPoint pjp) throws Throwable {

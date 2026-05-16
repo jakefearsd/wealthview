@@ -50,6 +50,10 @@ final class TrialSimulator {
      * <p>When {@code config.trackYearBalances()} is true, per-year total balances are
      * recorded in the returned {@link TrialResult#yearBalances()}.
      */
+    // NPathComplexity: the year-by-year simulation loop branches on independent per-year
+    // conditions (tax mode, cash reserve, tracking). The path count is multiplicative but each
+    // branch is a small guarded block, so the method is far simpler than its NPath number.
+    @SuppressWarnings("PMD.NPathComplexity")
     TrialResult simulateTrial(
             double[] nominalReturns,
             double[] income, double[] surplusTax,
@@ -148,6 +152,9 @@ final class TrialSimulator {
      * Deducts a tax amount from pools in order: taxable, traditional, roth.
      * Mutates the pools array in place.
      */
+    // UseVarargs: `pools` is a fixed-length [taxable, traditional, roth] index array mutated in
+    // place, not a variable argument list — varargs would obscure the positional contract.
+    @SuppressWarnings("PMD.UseVarargs")
     private static void deductTaxFromPools(double tax, double[] pools) {
         double rem = tax;
         double fromTaxable = Math.min(rem, Math.max(0, pools[0]));

@@ -24,6 +24,8 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         this.spendingTiers = spendingTiers;
     }
 
+    // ShortMethodName: 'of' is the conventional JDK-style static factory method name.
+    @SuppressWarnings("PMD.ShortMethodName")
     public static TierBasedSpendingPlan of(BigDecimal essential, BigDecimal discretionary,
                                             List<SpendingTierData> tiers) {
         return new TierBasedSpendingPlan(essential, discretionary,

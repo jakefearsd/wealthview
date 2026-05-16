@@ -114,6 +114,8 @@ public class AuthController {
         return ResponseEntity.noContent().headers(headers).build();
     }
 
+    // ShortMethodName: 'me' deliberately mirrors the idiomatic REST '/me' current-user endpoint.
+    @SuppressWarnings("PMD.ShortMethodName")
     @GetMapping("/me")
     public ResponseEntity<CurrentUserResponse> me(@AuthenticationPrincipal TenantUserPrincipal principal) {
         return ResponseEntity.ok(new CurrentUserResponse(

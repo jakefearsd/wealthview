@@ -41,6 +41,10 @@ public class CrossTenantAspect {
         this.entityManagerFactory = entityManagerFactory;
     }
 
+    // CloseResource: the EntityManager is the Spring-managed transactional one — closing it
+    // here would corrupt the surrounding transaction. AvoidCatchingGenericException: the
+    // finally-block cleanup must swallow any runtime failure from an already-closed session.
+    @SuppressWarnings({"PMD.CloseResource", "PMD.AvoidCatchingGenericException"})
     @Around("@annotation(com.wealthview.core.auth.CrossTenant)")
     public Object aroundCrossTenant(ProceedingJoinPoint pjp) throws Throwable {
         EntityManager em = EntityManagerFactoryUtils.getTransactionalEntityManager(entityManagerFactory);

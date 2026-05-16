@@ -13,6 +13,7 @@ import com.wealthview.core.split.dto.DetectedSplit;
  * empty list and log a warning. Splits are discovery-only — a downstream
  * empty list simply means "try again tomorrow", not "no splits exist".
  */
+@FunctionalInterface
 public interface SplitDetectionClient {
 
     List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to);

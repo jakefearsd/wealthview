@@ -17,6 +17,10 @@ import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+// TooManyFields / ExcessivePublicCount: a JPA entity maps one column per persisted attribute,
+// and the guardrail profile genuinely persists this many fields (inputs, results, conversion
+// schedule, audit columns). The accessor pair count follows directly from the column count.
+@SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
 @Entity
 @Table(name = "guardrail_spending_profiles")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")

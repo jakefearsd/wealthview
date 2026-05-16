@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +23,7 @@ public class SystemConfigService {
     private static final Set<String> SENSITIVE_KEYS = Set.of("finnhub.api-key", "jwt.secret");
 
     private final SystemConfigRepository systemConfigRepository;
-    private final ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> cache = new ConcurrentHashMap<>();
 
     public SystemConfigService(SystemConfigRepository systemConfigRepository) {
         this.systemConfigRepository = systemConfigRepository;

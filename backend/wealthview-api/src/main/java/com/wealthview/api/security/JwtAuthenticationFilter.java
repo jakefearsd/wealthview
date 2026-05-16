@@ -31,6 +31,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.sessionStateValidator = sessionStateValidator;
     }
 
+    // AvoidDeeplyNestedIfStmts: the nesting is sequential JWT validation gating (token present ->
+    // valid -> session valid), where each inner block depends on the outer guard passing.
+    // Flattening with early returns would skip the mandatory finally-block MDC cleanup.
+    @SuppressWarnings("PMD.AvoidDeeplyNestedIfStmts")
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,

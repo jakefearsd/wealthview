@@ -84,6 +84,10 @@ public class OfxTransactionParser implements ImportParser {
         return new ImportParseResult(transactions, errors);
     }
 
+    // AvoidDeeplyNestedIfStmts: each level is a distinct null/instanceof guard while descending
+    // the optional OFX security-list structure (envelope -> message set -> list -> infos).
+    // The nesting mirrors that nested data shape; flattening would not reduce real complexity.
+    @SuppressWarnings("PMD.AvoidDeeplyNestedIfStmts")
     private Map<String, String> buildTickerMap(ResponseEnvelope envelope) {
         var map = new HashMap<String, String>();
         var secListMsgSet = envelope.getMessageSet(MessageSetType.investment_security);

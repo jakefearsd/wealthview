@@ -198,6 +198,9 @@ public class SuperAdminController {
         return ResponseEntity.noContent().build();
     }
 
+    // LinguisticNaming: a Spring controller handler named for its HTTP action must return
+    // ResponseEntity, not void — the framework contract overrides the setter naming heuristic.
+    @SuppressWarnings("PMD.LinguisticNaming")
     @PutMapping("/users/{userId}/active")
     public ResponseEntity<Void> setUserActive(@PathVariable UUID userId,
             @RequestBody Map<String, Boolean> body) {
@@ -213,6 +216,9 @@ public class SuperAdminController {
         return systemConfigService.getAll();
     }
 
+    // LinguisticNaming: a Spring controller handler named for its HTTP action must return
+    // ResponseEntity, not void — the framework contract overrides the setter naming heuristic.
+    @SuppressWarnings("PMD.LinguisticNaming")
     @PutMapping("/config/{key}")
     public ResponseEntity<Void> setConfig(@PathVariable String key,
             @RequestBody Map<String, String> body) {
