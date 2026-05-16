@@ -40,7 +40,8 @@ final class OfxBankTransactionMapper {
 
     /** Returns a parsed transaction, or null if the OFX record has no usable amount. */
     static ParsedTransaction map(Transaction txn) {
-        var date = OfxDateUtils.toLocalDate(txn.getDatePosted());
+        var rawDate = txn.getDatePosted();
+        var date = OfxDateUtils.toLocalDate(rawDate != null ? rawDate.toInstant() : null);
         var amount = txn.getBigDecimalAmount();
         if (amount == null && txn.getAmount() != null) {
             amount = BigDecimal.valueOf(txn.getAmount());

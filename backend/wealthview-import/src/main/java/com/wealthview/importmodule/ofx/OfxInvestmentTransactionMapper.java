@@ -9,6 +9,7 @@ import com.webcohesion.ofx4j.domain.data.seclist.SecurityId;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Map;
 
 /**
@@ -24,13 +25,13 @@ final class OfxInvestmentTransactionMapper {
     static ParsedTransaction map(BaseInvestmentTransaction invTxn, Map<String, String> tickerMap) {
         return switch (invTxn) {
             case BaseBuyInvestmentTransaction buy -> buildBuyOrSell(buy.getSecurityId(), tickerMap,
-                    buy.getTradeDate(), "buy", buy.getUnits(), buy.getTotal());
+                    tradeDateAsInstant(buy), "buy", buy.getUnits(), buy.getTotal());
             case BaseSellInvestmentTransaction sell -> buildBuyOrSell(sell.getSecurityId(), tickerMap,
-                    sell.getTradeDate(), "sell", sell.getUnits(), sell.getTotal());
+                    tradeDateAsInstant(sell), "sell", sell.getUnits(), sell.getTotal());
             case ReinvestIncomeTransaction reinvest -> buildBuyOrSell(reinvest.getSecurityId(), tickerMap,
-                    reinvest.getTradeDate(), "buy", reinvest.getUnits(), reinvest.getTotal());
+                    tradeDateAsInstant(reinvest), "buy", reinvest.getUnits(), reinvest.getTotal());
             case IncomeTransaction income -> new ParsedTransaction(
-                    OfxDateUtils.toLocalDate(income.getTradeDate()),
+                    OfxDateUtils.toLocalDate(tradeDateAsInstant(income)),
                     "dividend",
                     resolveSymbol(income.getSecurityId(), tickerMap),
                     null,
@@ -40,7 +41,7 @@ final class OfxInvestmentTransactionMapper {
     }
 
     private static ParsedTransaction buildBuyOrSell(SecurityId secId, Map<String, String> tickerMap,
-                                                    java.util.Date tradeDate, String type,
+                                                    Instant tradeDate, String type,
                                                     Double units, Double total) {
         return new ParsedTransaction(
                 OfxDateUtils.toLocalDate(tradeDate),
@@ -48,6 +49,15 @@ final class OfxInvestmentTransactionMapper {
                 resolveSymbol(secId, tickerMap),
                 absOrNull(units),
                 absOrNull(total));
+    }
+
+    /**
+     * Reads the trade date from an OFX4J investment transaction, converting the
+     * library's {@code java.util.Date} to {@link Instant} at this boundary only.
+     */
+    private static Instant tradeDateAsInstant(BaseInvestmentTransaction txn) {
+        var d = txn.getTradeDate();
+        return d != null ? d.toInstant() : null;
     }
 
     private static String resolveSymbol(SecurityId secId, Map<String, String> tickerMap) {

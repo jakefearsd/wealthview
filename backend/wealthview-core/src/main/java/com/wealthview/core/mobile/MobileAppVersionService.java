@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -51,7 +52,7 @@ public class MobileAppVersionService {
             requireValidSemver(currentVersion, "version");
         } catch (IllegalArgumentException ex) {
             meterRegistry.counter(COUNTER_NAME,
-                    "platform", platform == null ? "unknown" : platform.toLowerCase(),
+                    "platform", platform == null ? "unknown" : platform.toLowerCase(Locale.ROOT),
                     "outcome", "invalid_request").increment();
             throw ex;
         }
@@ -132,7 +133,7 @@ public class MobileAppVersionService {
         if (platform == null || platform.isBlank()) {
             throw new IllegalArgumentException("platform must not be blank");
         }
-        var normalized = platform.toLowerCase();
+        var normalized = platform.toLowerCase(Locale.ROOT);
         if (!SUPPORTED_PLATFORMS.contains(normalized)) {
             throw new IllegalArgumentException(
                     "Unknown platform: " + platform + " (supported: android, ios)");

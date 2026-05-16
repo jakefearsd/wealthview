@@ -58,8 +58,8 @@ public final class JwtTokenProvider {
 
     public String generateAccessToken(UUID userId, UUID tenantId, String role, String email,
                                       int generation, UUID sessionId) {
-        var now = new Date();
-        var expiry = new Date(now.getTime() + accessTokenExpiration);
+        var now = Instant.now();
+        var expiry = now.plusMillis(accessTokenExpiration);
 
         var builder = Jwts.builder()
                 .issuer(issuer)
@@ -70,8 +70,8 @@ public final class JwtTokenProvider {
                 .claim("role", role)
                 .claim("email", email)
                 .claim("generation", generation)
-                .issuedAt(now)
-                .expiration(expiry);
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry));
         if (sessionId != null) {
             builder.claim("sid", sessionId.toString());
         }
@@ -79,8 +79,8 @@ public final class JwtTokenProvider {
     }
 
     public String generateMfaChallenge(UUID userId, String transport, UUID jti, long ttlMillis) {
-        var now = new Date();
-        var expiry = new Date(now.getTime() + ttlMillis);
+        var now = Instant.now();
+        var expiry = now.plusMillis(ttlMillis);
         return Jwts.builder()
                 .issuer(issuer)
                 .audience().add(audience).and()
@@ -88,8 +88,8 @@ public final class JwtTokenProvider {
                 .id(jti.toString())
                 .claim("type", "mfa_challenge")
                 .claim("transport", transport)
-                .issuedAt(now)
-                .expiration(expiry)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
     }
@@ -103,8 +103,8 @@ public final class JwtTokenProvider {
     }
 
     public String generateRefreshToken(UUID userId, int generation, UUID jti) {
-        var now = new Date();
-        var expiry = new Date(now.getTime() + refreshTokenExpiration);
+        var now = Instant.now();
+        var expiry = now.plusMillis(refreshTokenExpiration);
 
         return Jwts.builder()
                 .issuer(issuer)
@@ -113,8 +113,8 @@ public final class JwtTokenProvider {
                 .id(jti.toString())
                 .claim("type", "refresh")
                 .claim("generation", generation)
-                .issuedAt(now)
-                .expiration(expiry)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
     }
