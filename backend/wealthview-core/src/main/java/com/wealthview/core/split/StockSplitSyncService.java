@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -112,7 +113,7 @@ public class StockSplitSyncService {
         try {
             return Instant.parse(stored).atZone(ZoneId.systemDefault())
                     .toLocalDate().minusDays(7);
-        } catch (Exception e) {
+        } catch (DateTimeParseException e) {
             log.warn("Unparseable stock_splits.last_sync_at='{}', defaulting to -7 days", stored);
             return LocalDate.now().minusDays(7);
         }

@@ -7,6 +7,7 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
 
@@ -56,7 +57,7 @@ public final class MfaSecretCipher {
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(ciphertext, 0, combined, iv.length, ciphertext.length);
             return Base64.getEncoder().encodeToString(combined);
-        } catch (Exception e) {
+        } catch (GeneralSecurityException e) {
             throw new IllegalStateException("MFA secret encryption failed", e);
         }
     }
@@ -71,7 +72,7 @@ public final class MfaSecretCipher {
             var cipher = Cipher.getInstance(TRANSFORMATION);
             cipher.init(Cipher.DECRYPT_MODE, keySpec, new GCMParameterSpec(TAG_BITS, iv));
             return new String(cipher.doFinal(rest), StandardCharsets.UTF_8);
-        } catch (Exception e) {
+        } catch (GeneralSecurityException e) {
             throw new IllegalStateException("MFA secret decryption failed", e);
         }
     }

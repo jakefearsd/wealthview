@@ -99,7 +99,7 @@ public class StockSplitService {
         var affectedTenantIds = transactionRepository.findDistinctTenantIdsBySymbol(symbol);
 
         int txnCount = adjustTransactions(split, symbol, effectiveDate, ratio);
-        int priceCount = adjustPrices(split, symbol, effectiveDate, ratio, affectedTenantIds);
+        int priceCount = adjustPrices(split, symbol, effectiveDate, affectedTenantIds);
 
         warnOnManualOverrideHoldings(symbol, affectedTenantIds);
 
@@ -191,7 +191,7 @@ public class StockSplitService {
     }
 
     private int adjustPrices(StockSplitEntity split, String symbol, LocalDate effectiveDate,
-                             BigDecimal ratio, List<UUID> affectedTenantIds) {
+                             List<UUID> affectedTenantIds) {
         if (!adjustHistoricalPrices) {
             return 0;
         }

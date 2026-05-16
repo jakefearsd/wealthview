@@ -544,18 +544,12 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                               BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
                                               BigDecimal withdrawalFromRoth,
                                               TaxSourceResult combinedTaxSource) {
-            BigDecimal fedTax = null;
-            BigDecimal stTax = null;
-            BigDecimal saltDed = null;
-            Boolean usedItemized = null;
-            if (lastTaxBreakdown != null) {
-                fedTax = lastTaxBreakdown.federalTax();
-                stTax = lastTaxBreakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
-                        ? lastTaxBreakdown.stateTax() : null;
-                saltDed = lastTaxBreakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
-                        ? lastTaxBreakdown.saltDeduction() : null;
-                usedItemized = lastTaxBreakdown.usedItemized();
-            }
+            BigDecimal fedTax = lastTaxBreakdown != null ? lastTaxBreakdown.federalTax() : null;
+            BigDecimal stTax = lastTaxBreakdown != null && lastTaxBreakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
+                    ? lastTaxBreakdown.stateTax() : null;
+            BigDecimal saltDed = lastTaxBreakdown != null && lastTaxBreakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
+                    ? lastTaxBreakdown.saltDeduction() : null;
+            Boolean usedItemized = lastTaxBreakdown != null ? lastTaxBreakdown.usedItemized() : null;
             lastTaxBreakdown = null;
 
             return ProjectionYearDto.builder()

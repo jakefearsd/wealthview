@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import java.util.Arrays;
 import java.util.Random;
 
 /**
@@ -22,7 +23,7 @@ public class BlockBootstrapReturnGenerator {
     private final Random rng;
 
     public BlockBootstrapReturnGenerator(double[] historicalReturns, double expectedBlockLength, Random rng) {
-        this.historicalReturns = historicalReturns;
+        this.historicalReturns = Arrays.copyOf(historicalReturns, historicalReturns.length);
         this.expectedBlockLength = expectedBlockLength;
         this.rng = rng;
     }

@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -88,8 +89,8 @@ class RothConversionOptimizer {
         this.initTraditional = initTraditional;
         this.initRoth = initRoth;
         this.initTaxable = initTaxable;
-        this.otherIncomeByYear = otherIncomeByYear;
-        this.taxableIncomeByYear = taxableIncomeByYear;
+        this.otherIncomeByYear = Arrays.copyOf(otherIncomeByYear, otherIncomeByYear.length);
+        this.taxableIncomeByYear = Arrays.copyOf(taxableIncomeByYear, taxableIncomeByYear.length);
         this.birthYear = birthYear;
         this.retirementAge = retirementAge;
         this.endAge = endAge;
@@ -543,7 +544,7 @@ class RothConversionOptimizer {
         private final String[] pools;
 
         OrderedWithdrawalStrategy(String[] pools) {
-            this.pools = pools;
+            this.pools = Arrays.copyOf(pools, pools.length);
         }
 
         @Override
@@ -838,8 +839,8 @@ class RothConversionOptimizer {
         }
 
         Builder income(double[] otherIncome, double[] taxableIncome) {
-            this.otherIncomeByYear = otherIncome;
-            this.taxableIncomeByYear = taxableIncome;
+            this.otherIncomeByYear = Arrays.copyOf(otherIncome, otherIncome.length);
+            this.taxableIncomeByYear = Arrays.copyOf(taxableIncome, taxableIncome.length);
             return this;
         }
 

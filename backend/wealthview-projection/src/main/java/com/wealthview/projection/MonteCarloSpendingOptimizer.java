@@ -364,12 +364,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double spending = evaluateSustainableSpending(
                     searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), input.phases(), ctx.sim().retirementAge(), ctx.sim().years(),
+                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
                     searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), ctx.sim().inflationRate(),
+                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                     searchTaxCtx,
                     schedule.conversionByYear(), schedule.conversionTaxByYear(),
-                    input.birthYear(), ctx.taxIncome().dsBracketCeilingByYear());
+                    ctx.taxIncome().dsBracketCeilingByYear());
 
             if (spending > bestSpending) {
                 bestSpending = spending;
@@ -389,20 +389,20 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
             double sp1 = evaluateSustainableSpending(
                     searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), input.phases(), ctx.sim().retirementAge(), ctx.sim().years(),
+                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
                     searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), ctx.sim().inflationRate(),
+                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                     searchTaxCtx,
-                    s1.conversionByYear(), s1.conversionTaxByYear(), input.birthYear(),
+                    s1.conversionByYear(), s1.conversionTaxByYear(),
                     ctx.taxIncome().dsBracketCeilingByYear());
 
             double sp2 = evaluateSustainableSpending(
                     searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(), searchFloors,
-                    ctx.portfolio().terminalTarget(), input.phases(), ctx.sim().retirementAge(), ctx.sim().years(),
+                    ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
                     searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), ctx.sim().inflationRate(),
+                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                     searchTaxCtx,
-                    s2.conversionByYear(), s2.conversionTaxByYear(), input.birthYear(),
+                    s2.conversionByYear(), s2.conversionTaxByYear(),
                     ctx.taxIncome().dsBracketCeilingByYear());
 
             if (sp1 > sp2) {
@@ -437,7 +437,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.phases(), ctx.sim().retirementAge(), ctx.sim().years(), ctx.sim().trialCount(),
                 ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(), ctx.portfolio().cashReserveYears(),
                 ctx.portfolio().cashReturnRate(), ctx.sim().inflationRate(), ctx.taxIncome().taxCtx(),
-                conversionByYear, conversionTaxByYear, input.birthYear(),
+                conversionByYear, conversionTaxByYear,
                 ctx.taxIncome().dsBracketCeilingByYear());
 
         // Post-processing — phase blending and YoY smoothing
@@ -458,7 +458,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     ctx.taxIncome().adjustedFloors(), discretionaryByYear, ctx.portfolio().terminalTarget(), ctx.sim().years(),
                     ctx.sim().trialCount(), ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
                     ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), ctx.taxIncome().taxCtx(),
-                    conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(), input.birthYear(),
+                    conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
                     ctx.taxIncome().dsBracketCeilingByYear())) {
                 for (int i = 0; i < 10; i++) {
                     for (int y = 0; y < ctx.sim().years(); y++) {
@@ -470,7 +470,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                             ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(), ctx.portfolio().cashReserveYears(),
                             ctx.portfolio().cashReturnRate(), ctx.taxIncome().taxCtx(),
                             conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                            input.birthYear(), ctx.taxIncome().dsBracketCeilingByYear())) {
+                            ctx.taxIncome().dsBracketCeilingByYear())) {
                         break;
                     }
                 }
@@ -489,7 +489,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         // Compute corridors + corridor smoothing
         double[][] corridors = computeCorridors(
                 ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().adjustedFloors(),
-                discretionaryByYear, ctx.portfolio().terminalTarget(), ctx.sim().years(), ctx.sim().trialCount());
+                discretionaryByYear, ctx.sim().years(), ctx.sim().trialCount());
         smoothCorridors(corridors[0], corridors[1], ctx.sim().years());
 
         // Clamp corridors to bracket recommended spending (smoothing can overshoot at phase boundaries)
@@ -793,7 +793,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                        int cashReserveYears, double cashReturnRate,
                                        double inflationRate, TaxContext taxCtx,
                                        double[] conversionByYear,
-                                       double[] conversionTaxByYear, int birthYear,
+                                       double[] conversionTaxByYear,
                                        double[] dsBracketCeilingByYear) {
         double[] discretionary = new double[years];
 
@@ -802,7 +802,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     0, years - 1, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, birthYear,
+                    conversionByYear, conversionTaxByYear, retirementAge,
                     dsBracketCeilingByYear);
             Arrays.fill(discretionary, maxDisc);
             return discretionary;
@@ -817,7 +817,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             return allocateByTargets(paths, income, surplusTax, floors, terminalTarget, phases,
                     retirementAge, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, inflationRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, birthYear,
+                    conversionByYear, conversionTaxByYear,
                     dsBracketCeilingByYear);
         }
 
@@ -842,7 +842,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, birthYear,
+                    conversionByYear, conversionTaxByYear, retirementAge,
                     dsBracketCeilingByYear);
 
             for (int y = phaseStart; y <= phaseEnd; y++) {
@@ -861,7 +861,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         int cashReserveYears, double cashReturnRate,
                                         double inflationRate, TaxContext taxCtx,
                                         double[] conversionByYear,
-                                        double[] conversionTaxByYear, int birthYear,
+                                        double[] conversionTaxByYear,
                                         double[] dsBracketCeilingByYear) {
         double[] discretionary = new double[years];
 
@@ -881,7 +881,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     paths, income, surplusTax, floors, discretionary, terminalTarget,
                     phaseStart, phaseEnd, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, birthYear,
+                    conversionByYear, conversionTaxByYear, retirementAge,
                     dsBracketCeilingByYear);
 
             double capped;
@@ -919,11 +919,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private double evaluateSustainableSpending(
             double[][] paths, double[] income, double[] surplusTax,
             double[] floors, double terminalTarget,
-            List<GuardrailPhaseInput> phases, int retirementAge, int years,
+            int retirementAge, int years,
             int trialCount, double confidenceLevel, double portfolioFloor,
-            int cashReserveYears, double cashReturnRate, double inflationRate,
+            int cashReserveYears, double cashReturnRate,
             TaxContext taxCtx,
-            double[] conversionByYear, double[] conversionTaxByYear, int birthYear,
+            double[] conversionByYear, double[] conversionTaxByYear,
             double[] dsBracketCeilingByYear) {
 
         double low = 0;
@@ -937,7 +937,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             if (isSustainable(paths, income, surplusTax, floors, testDiscretionary,
                     terminalTarget, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, birthYear,
+                    conversionByYear, conversionTaxByYear, retirementAge,
                     dsBracketCeilingByYear)) {
                 low = mid;
             } else {
@@ -958,7 +958,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                               TaxContext taxCtx,
                                               double[] conversionByYear,
                                               double[] conversionTaxByYear,
-                                              int retirementAge, int birthYear,
+                                              int retirementAge,
                                               double[] dsBracketCeilingByYear) {
         double low = 0;
         double high = MAX_SPENDING_CEILING;
@@ -974,7 +974,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             if (isSustainable(paths, income, surplusTax, floors, testDiscretionary,
                     terminalTarget, years, trialCount, confidenceLevel, portfolioFloor,
                     cashReserveYears, cashReturnRate, taxCtx,
-                    conversionByYear, conversionTaxByYear, retirementAge, birthYear,
+                    conversionByYear, conversionTaxByYear, retirementAge,
                     dsBracketCeilingByYear)) {
                 low = mid;
             } else {
@@ -1205,7 +1205,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                    TaxContext taxCtx,
                                    double[] conversionByYear,
                                    double[] conversionTaxByYear,
-                                   int retirementAge, int birthYear,
+                                   int retirementAge,
                                    double[] dsBracketCeilingByYear) {
         double[] finalBalances = new double[trialCount];
         double[] minBalances = new double[trialCount];
@@ -1261,7 +1261,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private double[][] computeCorridors(double[][] paths, double[] income,
                                          double[] floors, double[] discretionary,
-                                         double terminalTarget, int years, int trialCount) {
+                                         int years, int trialCount) {
         double[] corridorLow = new double[years];
         double[] corridorHigh = new double[years];
 

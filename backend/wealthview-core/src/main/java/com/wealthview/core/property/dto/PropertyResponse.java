@@ -69,7 +69,7 @@ public record PropertyResponse(
     private static List<CostSegAllocation> parseCostSegAllocationsQuietly(String json) {
         try {
             return PropertyService.parseCostSegAllocations(json);
-        } catch (Exception e) {
+        } catch (IllegalStateException e) {
             return List.of();
         }
     }
