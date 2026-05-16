@@ -128,8 +128,9 @@ If you catch yourself writing production code first, stop, delete it, write the 
 - For the retirement projection engine, use parameterized tests (`@ParameterizedTest`) with known input/output fixtures.
 
 ### Coverage Expectations
-- Target: 90%+ line coverage on `wealthview-core` and `wealthview-projection`.
-- Target: 80%+ on `wealthview-api` (controllers) and `wealthview-import`.
+- **Enforced** — `jacoco:check` runs on `mvn verify` and FAILS the build when a module is under target.
+- Line-coverage minimums: `wealthview-core` and `wealthview-projection` 90%; `wealthview-api` and `wealthview-import` 80%.
+- Branch-coverage floors lock in the levels reached during the pre-release quality pass: core 0.83, projection 0.84, api 0.85, import 0.71. Raise a floor when you raise the coverage; never lower one.
 - Do NOT write tests solely to increase coverage numbers. Every test should verify meaningful behavior.
 
 ### Test Organization
@@ -391,6 +392,35 @@ mvn clean test && mvn jacoco:report -pl wealthview-core,wealthview-api,wealthvie
 - HTML reports: `<module>/target/site/jacoco/index.html`
 - CSV data: `<module>/target/site/jacoco/jacoco.csv`
 - Coverage targets: core 90%+, projection 90%+, api 80%+, import 80%+
+
+### Quality Gates — enforced on `mvn verify`
+
+PMD, SpotBugs, Checkstyle, CPD, and JaCoCo all FAIL the build on `mvn verify`. They are
+not advisory — new code must pass them before it can be committed/merged.
+
+```bash
+cd backend
+mvn verify -DskipITs          # runs all five gates without Docker
+mvn verify                    # gates + Testcontainers integration tests
+```
+
+- **PMD** (`pmd:check`) — rules in `pmd-ruleset.xml`. Complexity-rule thresholds are tuned
+  to the post-quality-pass baseline. To suppress a finding, use a narrow
+  `@SuppressWarnings("PMD.RuleName")` with an adjacent comment explaining WHY, or a
+  documented threshold/exclude in `pmd-ruleset.xml`. Never globally disable a rule to
+  dodge a finding — fix it or justify the suppression.
+- **CPD** (`pmd:cpd-check`) — copy-paste detector; resolve duplication, don't suppress it.
+- **SpotBugs** (`spotbugs:check`) — exclusions live in `spotbugs-exclude.xml` with comments.
+- **Checkstyle** (`checkstyle:check`) — config in `wealthview_checks.xml`.
+- **JaCoCo** (`jacoco:check`) — per-module line + branch thresholds (see Coverage Expectations).
+
+### Mutation Testing (PIT)
+```bash
+cd backend
+mvn -q test-compile org.pitest:pitest-maven:mutationCoverage -pl wealthview-core,wealthview-projection
+```
+- HTML reports: `<module>/target/pit-reports/`. Advisory (not a build gate) — use it to
+  find tests that pass through coverage without actually pinning behavior.
 
 ### Frontend (development only)
 ```bash
