@@ -782,4 +782,78 @@ class AuthServiceTest {
         verify(mfaService).consumeRecoveryCode(user.getId(), "ABCD1234");
         verify(mfaService, never()).verifyTotp(any(), anyString());
     }
+
+    // --- Golden-master lifecycle characterization -------------------------------
+    // Pins the full login -> refresh -> logout sequence end-to-end ahead of the
+    // Phase 3 decomposition of this God-class. AuthService is deterministic apart
+    // from the random JTI/session UUIDs minted inside each token; those tokens are
+    // therefore characterized at the claim level (which IS deterministic given the
+    // fixed user state) rather than as opaque golden strings. The lifecycle below
+    // is the behavior contract the decomposition must not break.
+
+    @Test
+    void loginRefreshLogout_lifecycle_pinsClaimsAndTokenGenerationProgression() {
+        // Fixed user: known id, tenant, email, role, starting token generation.
+        user.setTokenGeneration(3);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        // 1. LOGIN — issues an access+refresh pair, no MFA on this account.
+        var login = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
+
+        assertThat(login.userId()).isEqualTo(user.getId());
+        assertThat(login.tenantId()).isEqualTo(user.getTenantId());
+        assertThat(login.email()).isEqualTo("test@example.com");
+        assertThat(login.role()).isEqualTo("admin");
+        assertThat(jwtTokenProvider.validateRefreshToken(login.refreshToken())).isTrue();
+        assertThat(jwtTokenProvider.extractUserId(login.accessToken())).isEqualTo(user.getId());
+        assertThat(jwtTokenProvider.extractGeneration(login.accessToken())).isEqualTo(3);
+
+        // 2. REFRESH — rotates the pair; generation advances 3 -> 4, identity stable.
+        var refreshJti = jwtTokenProvider.extractJti(login.refreshToken());
+        var storedRefresh = new com.wealthview.persistence.entity.RefreshTokenEntity(
+                user.getTenantId(), user.getId(), UUID.randomUUID(), refreshJti,
+                OffsetDateTime.now(), OffsetDateTime.now().plusDays(1));
+        when(refreshTokenRepository.findByJti(refreshJti)).thenReturn(Optional.of(storedRefresh));
+
+        var refreshed = authService.refresh(login.refreshToken(), AuthRequestContext.cookie(TEST_IP));
+
+        assertThat(refreshed.userId()).isEqualTo(user.getId());
+        assertThat(refreshed.email()).isEqualTo("test@example.com");
+        assertThat(jwtTokenProvider.extractGeneration(refreshed.accessToken())).isEqualTo(4);
+        assertThat(storedRefresh.getUsedAt()).isNotNull();
+        assertThat(storedRefresh.getReplacedByJti())
+                .isEqualTo(jwtTokenProvider.extractJti(refreshed.refreshToken()));
+
+        // 3. LOGOUT — bumps generation again (4 -> 5), revoking all outstanding tokens.
+        authService.logout(user.getId());
+
+        assertThat(user.getTokenGeneration()).isEqualTo(5);
+        verify(refreshTokenRepository).revokeAllForUser(eq(user.getId()), any(OffsetDateTime.class));
+    }
+
+    @Test
+    void register_validInviteAndPassword_pinsAuthResultClaims() {
+        var inviteCode = new InviteCodeEntity(tenant, "INVITE-GOLDEN", null,
+                OffsetDateTime.now().plusDays(7));
+        when(inviteCodeRepository.findByCode("INVITE-GOLDEN")).thenReturn(Optional.of(inviteCode));
+        when(userRepository.existsByEmail("newcomer@example.com")).thenReturn(false);
+        when(passwordEncoder.encode("Str0ng-Unguessable-Pass")).thenReturn("encoded-hash");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            var u = (UserEntity) inv.getArgument(0);
+            TestEntityHelper.setId(u, UUID.randomUUID());
+            return u;
+        });
+
+        var result = authService.register(
+                new RegisterRequest("newcomer@example.com", "Str0ng-Unguessable-Pass", "INVITE-GOLDEN"));
+
+        assertThat(result.email()).isEqualTo("newcomer@example.com");
+        assertThat(result.role()).isEqualTo("member");
+        assertThat(result.tenantId()).isEqualTo(tenant.getId());
+        assertThat(jwtTokenProvider.validateRefreshToken(result.refreshToken())).isTrue();
+        assertThat(jwtTokenProvider.extractGeneration(result.accessToken())).isEqualTo(0);
+        assertThat(inviteCode.isConsumed()).isTrue();
+    }
 }
