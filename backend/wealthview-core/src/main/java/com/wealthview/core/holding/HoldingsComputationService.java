@@ -50,9 +50,7 @@ public class HoldingsComputationService {
         if (symbol == null || symbol.isBlank()) {
             return;
         }
-        var txns = transactionRepository.findByTenant_Id(tenantId).stream()
-                .filter(t -> symbol.equals(t.getSymbol()))
-                .toList();
+        var txns = transactionRepository.findByTenant_IdAndSymbol(tenantId, symbol);
         var seenAccountIds = new java.util.HashSet<java.util.UUID>();
         for (var txn : txns) {
             if (seenAccountIds.add(txn.getAccount().getId())) {

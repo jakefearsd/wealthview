@@ -231,6 +231,43 @@ class HoldingsComputationServiceTest {
     }
 
     @Test
+    void recomputeAllForTenantAndSymbol_recomputesEachDistinctAccountHoldingSymbol() {
+        var tenantId = UUID.randomUUID();
+        var account2 = new AccountEntity(tenant, "Brokerage 2", "brokerage", "Schwab");
+
+        var txnA1 = txWithAccount(account, tenant, "buy", "AAPL");
+        var txnA2 = txWithAccount(account, tenant, "buy", "AAPL");
+        var txnB1 = txWithAccount(account2, tenant, "buy", "AAPL");
+
+        when(transactionRepository.findByTenant_IdAndSymbol(tenantId, "AAPL"))
+                .thenReturn(List.of(txnA1, txnA2, txnB1));
+        when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
+        when(transactionRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(List.of());
+
+        service.recomputeAllForTenantAndSymbol(tenantId, "AAPL");
+
+        // One recompute per distinct account holding the symbol — two accounts here.
+        verify(transactionRepository).findByTenant_IdAndSymbol(tenantId, "AAPL");
+        verify(holdingRepository, never()).save(any());
+    }
+
+    @Test
+    void recomputeAllForTenantAndSymbol_blankSymbol_doesNothing() {
+        var tenantId = UUID.randomUUID();
+
+        service.recomputeAllForTenantAndSymbol(tenantId, "  ");
+
+        verify(transactionRepository, never()).findByTenant_IdAndSymbol(any(), any());
+        verify(transactionRepository, never()).findByTenant_Id(any());
+    }
+
+    private TransactionEntity txWithAccount(AccountEntity acct, TenantEntity tnt,
+                                            String type, String symbol) {
+        return new TransactionEntity(acct, tnt, LocalDate.now(), type, symbol,
+                new BigDecimal("1"), new BigDecimal("100.0000"));
+    }
+
+    @Test
     void recomputeForAccountAndSymbol_existingHolding_doesNotPublishEvent() {
         var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));

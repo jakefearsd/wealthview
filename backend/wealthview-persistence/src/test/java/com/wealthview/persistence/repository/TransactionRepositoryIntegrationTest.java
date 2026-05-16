@@ -298,6 +298,42 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     // -------------------------------------------------------------------------
+    // findByTenant_IdAndSymbol — tenant + symbol scoped finder
+    // -------------------------------------------------------------------------
+
+    @Test
+    void findByTenantIdAndSymbol_returnsOnlyMatchingSymbolForTenant() {
+        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("2000.00")));
+        transactionRepository.save(tx(accountA, tenantA, "buy", "MSFT", new BigDecimal("500.00")));
+
+        var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "AAPL");
+
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(TransactionEntity::getSymbol).containsOnly("AAPL");
+    }
+
+    @Test
+    void findByTenantIdAndSymbol_isolatesTenants() {
+        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountB, tenantB, "buy", "AAPL", new BigDecimal("9999.00")));
+
+        var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "AAPL");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAmount()).isEqualByComparingTo("1000.00");
+    }
+
+    @Test
+    void findByTenantIdAndSymbol_symbolNotHeld_returnsEmpty() {
+        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+
+        var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "GOOG");
+
+        assertThat(result).isEmpty();
+    }
+
+    // -------------------------------------------------------------------------
     // findByIdAndTenant_Id
     // -------------------------------------------------------------------------
 
