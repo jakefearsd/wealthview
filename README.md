@@ -41,6 +41,29 @@ nightly backup container and stricter config validation).
 For backups, restores, host migrations, secret rotation, and update +
 rollback, see [Operations Handbook](docs/deployment/operations.md).
 
+### Installing `wv` on a production server
+
+The same `wv` tool is meant to be installed system-wide on production
+hosts so you can operate the stack with just containers (no source tree)
+on the box. The tool reads its layout from `/etc/wealthview/wv.conf` —
+see `bin/wv.conf.example` for the schema. Quick install:
+
+```bash
+sudo install -m 0755 bin/wv /usr/local/bin/wv
+sudo install -d /usr/local/lib/wv-lib
+sudo install -m 0644 bin/wv-lib/*.sh /usr/local/lib/wv-lib/
+sudo ln -snf /usr/local/lib/wv-lib /usr/local/bin/wv-lib
+sudo install -d /etc/wealthview
+sudo cp bin/wv.conf.example /etc/wealthview/wv.conf  # edit paths
+sudo wv config-check
+sudo wv up
+```
+
+`wv` can also drive a remote Docker host over SSH — set `WV_HOST` in
+`wv.conf` (or pass `--host user@host`) to operate the prod stack from
+your laptop. Run `wv help` for the full handbook including the override
+hierarchy and remote operation requirements.
+
 For raw `docker compose` access (rarely needed once `./wv` is in your hands):
 
 ```bash

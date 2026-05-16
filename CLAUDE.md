@@ -338,7 +338,7 @@ frontend/src/
 
 ### Running the Application — `./wv` admin entry point
 
-`./wv` is the single command surface for both dev and prod stacks. It auto-detects mode (prod when `WEALTHVIEW_VERSION` is set in `.env`, dev otherwise) and dispatches to the right compose file. See `docs/deployment/operations.md` for the full handbook.
+`./wv` is the single command surface for both dev and prod stacks. The dispatcher lives at `bin/wv` with subcommand libraries in `bin/wv-lib/`; the `./wv` at the repo root is a thin shim. In dev it auto-detects mode (prod when `WEALTHVIEW_VERSION` is set in `.env`, dev otherwise) and dispatches to the right compose file. On a production server, install `bin/wv` to `/usr/local/bin/wv` and drive it via `/etc/wealthview/wv.conf` (see `bin/wv.conf.example`) — the source tree is not required on the host. See `docs/deployment/operations.md` for the full handbook and `wv help` for the operator man page.
 
 ```bash
 ./wv up                                            # Build & start; waits for health

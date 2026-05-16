@@ -2,20 +2,76 @@
 
 # WealthView Admin Operations Handbook
 
-Every routine operation goes through one entry point: `./wv` at the repo
-root. This is the admin's command surface for both dev and prod stacks.
+Every routine operation goes through one entry point: `wv`. The script
+lives at `bin/wv` (with subcommand libraries in `bin/wv-lib/`); the
+`./wv` at the repo root is a convenience shim for development. This is
+the admin's command surface for both dev and prod stacks.
 
 ```
-./wv help        # full reference
-./wv <sub> -h    # per-subcommand details
+wv help          # full operator man page
+wv <sub> -h      # per-subcommand details
 ```
 
-`wv` auto-detects which compose file to use:
-- If `WEALTHVIEW_VERSION` is set in `.env`, it runs against
-  `docker-compose.prod.yml`.
-- Otherwise it runs against the dev `docker-compose.yml`.
+`wv` runs in one of two configurations:
+
+- **Source tree (dev):** invoked from a checkout. It reads
+  `docker-compose.yml` / `docker-compose.prod.yml` and `.env` from the
+  repo. Mode auto-detects: if `WEALTHVIEW_VERSION` is set in `.env`, the
+  prod compose file is used; otherwise the dev compose file.
+- **Production install:** installed system-wide (e.g.
+  `/usr/local/bin/wv`) on a server that has only containers. All paths
+  come from a config file at `/etc/wealthview/wv.conf`. The source tree
+  is not required on the host. See **Installing on a production server**
+  below.
+
+`wv` can also drive a remote Docker daemon over SSH — set `WV_HOST` in
+the config file (or pass `--host user@host`) and every `docker compose`
+call runs against `DOCKER_HOST=ssh://$WV_HOST`. Requires ssh-agent with
+an authorised key on the remote.
 
 This handbook walks each routine operation end-to-end.
+
+---
+
+## Installing on a production server
+
+The minimum a server needs:
+
+```
+/usr/local/bin/wv                  # dispatcher
+/usr/local/lib/wv-lib/             # subcommand implementations
+/etc/wealthview/wv.conf            # paths + project name + remote host
+/etc/wealthview/.env               # secrets (DB_PASSWORD, JWT_SECRET, ...)
+/etc/wealthview/docker-compose.prod.yml
+/var/lib/wealthview/backups/       # backup output directory
+```
+
+One-time install from a checkout:
+
+```bash
+sudo install -m 0755 bin/wv /usr/local/bin/wv
+sudo install -d -m 0755 /usr/local/lib/wv-lib
+sudo install -m 0644 bin/wv-lib/*.sh /usr/local/lib/wv-lib/
+sudo ln -snf /usr/local/lib/wv-lib /usr/local/bin/wv-lib
+
+sudo install -d -m 0755 /etc/wealthview
+sudo cp docker-compose.prod.yml /etc/wealthview/
+sudo cp bin/wv.conf.example /etc/wealthview/wv.conf
+sudo cp .env.example /etc/wealthview/.env
+sudo chmod 0600 /etc/wealthview/.env
+sudo install -d -m 0755 /var/lib/wealthview/backups
+
+# Edit /etc/wealthview/wv.conf to point at the right paths
+# Edit /etc/wealthview/.env to fill in real secrets
+sudo wv config-check
+sudo wv up
+```
+
+The dispatcher resolves its config file in this order (first match wins):
+`--config FILE` → `$WV_CONFIG_FILE` → `/etc/wealthview/wv.conf` →
+`$XDG_CONFIG_HOME/wealthview/wv.conf` → `~/.config/wealthview/wv.conf` →
+source-tree fallback. The config file is shell-syntax `KEY=VALUE` only;
+`wv` refuses to source anything else. Real secrets stay in `.env`.
 
 ---
 
