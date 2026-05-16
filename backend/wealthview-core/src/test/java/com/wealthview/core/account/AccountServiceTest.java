@@ -133,6 +133,42 @@ class AccountServiceTest {
     }
 
     @Test
+    void update_existingAccount_updatesEveryRequestedField() {
+        // Pins each individual setter — a mutant that drops setInstitution,
+        // setName, setType or setCurrency would otherwise survive.
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Old Name", "brokerage", "Old Inst");
+        ReflectionTestUtils.setField(account, "currency", "USD");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = accountService.update(tenantId, accountId,
+                new AccountRequest("New Name", "ira", "New Inst", "EUR"));
+
+        assertThat(result.name()).isEqualTo("New Name");
+        assertThat(result.type()).isEqualTo("ira");
+        assertThat(result.institution()).isEqualTo("New Inst");
+        assertThat(result.currency()).isEqualTo("EUR");
+    }
+
+    @Test
+    void update_withNullCurrency_keepsExistingCurrency() {
+        // A null currency in the request must NOT overwrite the stored value.
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Acct", "brokerage", "Inst");
+        ReflectionTestUtils.setField(account, "currency", "GBP");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var result = accountService.update(tenantId, accountId,
+                new AccountRequest("Acct", "brokerage", "Inst", null));
+
+        assertThat(result.currency()).isEqualTo("GBP");
+    }
+
+    @Test
     void delete_existingAccount_deletesSuccessfully() {
         var accountId = UUID.randomUUID();
         var account = new AccountEntity(tenant, "Delete Me", "bank", null);
@@ -291,6 +327,67 @@ class AccountServiceTest {
         assertThat(result).hasSize(2);
         assertThat(result.get(bankId)).isEqualByComparingTo(new BigDecimal("5000.00"));
         assertThat(result.get(brokerageId)).isEqualByComparingTo(new BigDecimal("2000.00"));
+    }
+
+    @Test
+    void computeAllBalances_bulkBankQuery_includesOnlyBankAccountIds() {
+        // The bulkBankBalances lambda must filter to bank accounts only — a
+        // brokerage account id must NOT be passed to the bank-balance query.
+        var bankAccount = new AccountEntity(tenant, "Checking", "bank", "Chase");
+        var brokerageAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var bankId = UUID.randomUUID();
+        var brokerageId = UUID.randomUUID();
+        ReflectionTestUtils.setField(bankAccount, "id", bankId);
+        ReflectionTestUtils.setField(brokerageAccount, "id", brokerageId);
+        when(accountRepository.findByTenant_Id(tenantId))
+                .thenReturn(List.of(bankAccount, brokerageAccount));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of());
+        when(transactionRepository.computeBalancesByAccountIds(eq(tenantId), any()))
+                .thenReturn(List.of());
+
+        accountService.computeAllBalances(tenantId);
+
+        var idsCaptor = org.mockito.ArgumentCaptor.forClass(List.class);
+        verify(transactionRepository).computeBalancesByAccountIds(eq(tenantId), idsCaptor.capture());
+        assertThat(idsCaptor.getValue()).containsExactly(bankId);
+    }
+
+    @Test
+    void computeAllBalances_noBankAccounts_skipsBankBalanceQuery() {
+        // When there is no bank account the bank-balance query must not run.
+        var brokerageAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        ReflectionTestUtils.setField(brokerageAccount, "id", UUID.randomUUID());
+        when(accountRepository.findByTenant_Id(tenantId)).thenReturn(List.of(brokerageAccount));
+        when(holdingRepository.findByTenant_Id(tenantId)).thenReturn(List.of());
+
+        accountService.computeAllBalances(tenantId);
+
+        verify(transactionRepository, never()).computeBalancesByAccountIds(any(), any());
+    }
+
+    @Test
+    void computeBalance_investmentWithUnpricedSymbol_usesCostBasisForThatHolding() {
+        // computeInvestmentValue's unpriced-symbol branch: a holding with a
+        // priced symbol contributes quantity*price, an unpriced one contributes
+        // its cost basis — both must be summed.
+        var accountId = UUID.randomUUID();
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        var priced = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.00"));
+        var unpriced = new HoldingEntity(account, tenant, "SPAXX",
+                new BigDecimal("100"), new BigDecimal("777.00"));
+        when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
+                .thenReturn(List.of(priced, unpriced));
+        var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
+        when(priceRepository.findLatestBySymbolIn(List.of("AAPL", "SPAXX")))
+                .thenReturn(List.of(price));
+
+        var result = accountService.get(tenantId, accountId);
+
+        // AAPL 10*200 = 2000, SPAXX falls to cost basis 777 -> 2777
+        assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("2777.00"));
     }
 
     @Test
