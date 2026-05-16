@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -25,6 +26,7 @@ import com.wealthview.persistence.repository.TransactionRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -234,7 +236,11 @@ class HoldingsComputationServiceTest {
     void recomputeAllForTenantAndSymbol_recomputesEachDistinctAccountHoldingSymbol() {
         var tenantId = UUID.randomUUID();
         var account2 = new AccountEntity(tenant, "Brokerage 2", "brokerage", "Schwab");
+        var account2Id = UUID.randomUUID();
+        ReflectionTestUtils.setField(account, "id", accountId);
+        ReflectionTestUtils.setField(account2, "id", account2Id);
 
+        // Three transactions across two accounts — `account` appears twice.
         var txnA1 = txWithAccount(account, tenant, "buy", "AAPL");
         var txnA2 = txWithAccount(account, tenant, "buy", "AAPL");
         var txnB1 = txWithAccount(account2, tenant, "buy", "AAPL");
@@ -246,9 +252,12 @@ class HoldingsComputationServiceTest {
 
         service.recomputeAllForTenantAndSymbol(tenantId, "AAPL");
 
-        // One recompute per distinct account holding the symbol — two accounts here.
+        // The two AAPL txns on `account` collapse to ONE recompute (dedup by account
+        // id); `account2` gets its own — exactly two distinct recomputes, not three.
         verify(transactionRepository).findByTenant_IdAndSymbol(tenantId, "AAPL");
-        verify(holdingRepository, never()).save(any());
+        verify(holdingRepository).findByAccount_IdAndSymbol(accountId, "AAPL");
+        verify(holdingRepository).findByAccount_IdAndSymbol(account2Id, "AAPL");
+        verify(holdingRepository, times(2)).findByAccount_IdAndSymbol(any(), any());
     }
 
     @Test

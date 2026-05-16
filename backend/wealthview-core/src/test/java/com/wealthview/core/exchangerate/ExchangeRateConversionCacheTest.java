@@ -15,7 +15,9 @@ import org.springframework.transaction.support.DefaultTransactionStatus;
 import com.wealthview.core.config.CacheConfig;
 import com.wealthview.persistence.entity.ExchangeRateEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ExchangeRateRepository;
+import com.wealthview.persistence.repository.TenantRepository;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -39,18 +41,23 @@ class ExchangeRateConversionCacheTest {
 
     private AnnotationConfigApplicationContext context;
     private ExchangeRateRepository exchangeRateRepository;
+    private AccountRepository accountRepository;
     private ExchangeRateResolver resolver;
 
     @BeforeEach
     void setUp() {
         exchangeRateRepository = mock(ExchangeRateRepository.class);
+        accountRepository = mock(AccountRepository.class);
 
         context = new AnnotationConfigApplicationContext();
         context.registerBean(MeterRegistry.class, SimpleMeterRegistry::new);
         context.registerBean(PlatformTransactionManager.class, NoOpTransactionManager::new);
         context.registerBean(ExchangeRateRepository.class, () -> exchangeRateRepository);
+        context.registerBean(TenantRepository.class, () -> mock(TenantRepository.class));
+        context.registerBean(AccountRepository.class, () -> accountRepository);
         context.register(CacheConfig.class);
         context.register(ExchangeRateResolver.class);
+        context.register(ExchangeRateService.class);
         context.refresh();
 
         resolver = context.getBean(ExchangeRateResolver.class);
@@ -110,6 +117,29 @@ class ExchangeRateConversionCacheTest {
 
         verify(exchangeRateRepository, times(1)).findByTenant_IdAndCurrencyCode(eq(tenantA), eq("EUR"));
         verify(exchangeRateRepository, times(1)).findByTenant_IdAndCurrencyCode(eq(tenantB), eq("EUR"));
+    }
+
+    @Test
+    void rateMutation_evictsConversionCache_soStaleRatesCannotBeServed() {
+        var service = context.getBean(ExchangeRateService.class);
+        var tenantId = UUID.randomUUID();
+        var tenant = new TenantEntity("Test");
+        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "EUR"))
+                .thenReturn(Optional.of(new ExchangeRateEntity(tenant, "EUR", new BigDecimal("1.08"))));
+        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "GBP"))
+                .thenReturn(Optional.of(new ExchangeRateEntity(tenant, "GBP", new BigDecimal("1.27"))));
+
+        // Warm the conversion cache for EUR.
+        resolver.resolveRateToUsd(tenantId, "EUR");
+
+        // A rate mutation (deleting the unrelated GBP rate) must evict the whole
+        // exchangeRateConversions cache, so the cached EUR rate cannot go stale.
+        service.delete(tenantId, "GBP");
+
+        // EUR resolves again -> the repository is consulted a second time.
+        resolver.resolveRateToUsd(tenantId, "EUR");
+
+        verify(exchangeRateRepository, times(2)).findByTenant_IdAndCurrencyCode(eq(tenantId), eq("EUR"));
     }
 
     /** Minimal no-op transaction manager so {@code @Transactional} proxies resolve. */
