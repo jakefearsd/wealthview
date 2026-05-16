@@ -46,9 +46,7 @@ class PoolStrategyTest {
                 PoolStrategy.POOL_TRADITIONAL, traditionalAccounts,
                 PoolStrategy.POOL_ROTH, rothAccounts);
 
-        return new PoolStrategy.MultiPool(
-                grouped,
-                ZERO,           // weightedReturn — no growth under test
+        var config = new PoolStrategy.PoolConfig(
                 FilingStatus.SINGLE,
                 ZERO,           // otherIncome
                 ZERO,           // annualRothConversion
@@ -59,6 +57,11 @@ class PoolStrategyTest {
                 null,           // taxCalculator — no tax in these tests
                 null            // dynamicSequencingBracketRate
         );
+
+        return new PoolStrategy.MultiPool(
+                grouped,
+                ZERO,           // weightedReturn — no growth under test
+                config);
     }
 
     // -------------------------------------------------------------------------

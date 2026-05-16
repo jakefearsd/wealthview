@@ -43,22 +43,25 @@ class MultiPoolDeepTest {
 
     private PoolStrategy.MultiPool pool(String taxable, String traditional, String roth,
                                          WithdrawalOrder order) {
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                order, null, null);
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                order, null, null);
+                ZERO, config);
     }
 
     private PoolStrategy.MultiPool poolWithConversion(String taxable, String traditional, String roth,
                                                         String annualConv, String rothStrategy,
                                                         String targetRate, Integer startYear,
                                                         TaxCalculationStrategy taxCalc) {
-        return new PoolStrategy.MultiPool(
-                grouped(taxable, traditional, roth, "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO,
-                bd(annualConv), rothStrategy,
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, bd(annualConv), rothStrategy,
                 targetRate != null ? bd(targetRate) : null,
                 startYear, WithdrawalOrder.TAXABLE_FIRST, taxCalc, null);
+        return new PoolStrategy.MultiPool(
+                grouped(taxable, traditional, roth, "0", "0", "0"),
+                ZERO, config);
     }
 
     private static TaxCalculationStrategy flatTaxCalc(String rate) {
