@@ -7,8 +7,9 @@ vi.mock('../hooks/useApiQuery', () => ({
     useApiQuery: vi.fn(),
 }));
 
+const mockRole = { value: 'admin' };
 vi.mock('../context/AuthContext', () => ({
-    useAuth: () => ({ role: 'admin' }),
+    useAuth: () => ({ role: mockRole.value }),
 }));
 
 vi.mock('../api/properties', () => ({
@@ -42,9 +43,11 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { deleteProperty } from '../api/properties';
 import PropertiesListPage from './PropertiesListPage';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockDeleteProperty = vi.mocked(deleteProperty);
 
 const sampleProperty: Property = {
     id: 'prop-1',
@@ -88,6 +91,7 @@ function mockReturn(overrides: Partial<ReturnType<typeof useApiQuery>> = {}) {
 describe('PropertiesListPage', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockRole.value = 'admin';
     });
 
     it('renders the list of properties', () => {
@@ -108,5 +112,70 @@ describe('PropertiesListPage', () => {
         fireEvent.click(screen.getByText('New Property'));
         expect(screen.getByTestId('property-form')).toBeInTheDocument();
         expect(screen.getByText('Create Property')).toBeInTheDocument();
+    });
+
+    it('closes the create form when cancelled', () => {
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+        fireEvent.click(screen.getByText('New Property'));
+        fireEvent.click(screen.getByText('X'));
+        expect(screen.queryByTestId('property-form')).not.toBeInTheDocument();
+    });
+
+    it('opens the form in edit mode when Edit is clicked', () => {
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+        fireEvent.click(screen.getByText('Edit'));
+        expect(screen.getByTestId('property-form')).toBeInTheDocument();
+        expect(screen.getByText('Edit Property')).toBeInTheDocument();
+    });
+
+    it('deletes a property after the user confirms', async () => {
+        mockReturn();
+        mockDeleteProperty.mockResolvedValue(undefined);
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+        renderWithRouter(<PropertiesListPage />);
+
+        fireEvent.click(screen.getByText('Delete'));
+
+        await vi.waitFor(() => expect(mockDeleteProperty).toHaveBeenCalledWith('prop-1'));
+        confirmSpy.mockRestore();
+    });
+
+    it('does not delete when the user cancels the confirmation', () => {
+        mockReturn();
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+        renderWithRouter(<PropertiesListPage />);
+
+        fireEvent.click(screen.getByText('Delete'));
+
+        expect(mockDeleteProperty).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
+    it('shows an error state with a retry action', () => {
+        const refetch = vi.fn();
+        mockReturn({ error: 'Failed to load', data: null, refetch });
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.getByText('Failed to load')).toBeInTheDocument();
+        fireEvent.click(screen.getByText(/retry/i));
+        expect(refetch).toHaveBeenCalled();
+    });
+
+    it('shows an empty state when there are no properties', () => {
+        mockReturn({ data: [] });
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.getByText('No properties')).toBeInTheDocument();
+    });
+
+    it('hides write actions for a viewer role', () => {
+        mockRole.value = 'viewer';
+        mockReturn();
+        renderWithRouter(<PropertiesListPage />);
+
+        expect(screen.queryByText('New Property')).not.toBeInTheDocument();
+        expect(screen.queryByText('Edit')).not.toBeInTheDocument();
     });
 });
