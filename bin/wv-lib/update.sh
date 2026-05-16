@@ -3,7 +3,8 @@
 # auto-rollback on failure.
 
 # Where we record the previously-running image so `wv rollback` can find it.
-WV_PREVIOUS_IMAGE_FILE() { printf '%s/.wv-previous-image\n' "$WV_ROOT"; }
+# The path is resolved in common.sh and may be overridden via wv.conf.
+WV_PREVIOUS_IMAGE_FILE() { printf '%s\n' "$WV_PREVIOUS_IMAGE_FILE"; }
 
 wv_update() {
     local do_build=1 auto_rollback=1

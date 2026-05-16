@@ -1,0 +1,55 @@
+# wv.conf — production install configuration for the wv admin tool.
+#
+# Copy this file to /etc/wealthview/wv.conf (or pass it via --config) and
+# adjust paths to match your install layout. Resolution order is documented
+# under CONFIG FILE in `wv help`.
+#
+# IMPORTANT: this file is shell-syntax KEY=VALUE only. Do not put real
+# secrets here — secrets go in WV_ENV_FILE (typically /etc/wealthview/.env)
+# which the docker compose stack reads directly.
+
+# --- Required for prod (no source tree on the host) -----------------------
+
+# Absolute path to the compose file. On a server with only containers
+# installed, copy docker-compose.prod.yml from the release tar into /etc.
+WV_COMPOSE_FILE=/etc/wealthview/docker-compose.prod.yml
+
+# Absolute path to the env file the compose stack reads. Holds secrets
+# (DB_PASSWORD, JWT_SECRET, ...). Permissions: 0600, root-owned.
+WV_ENV_FILE=/etc/wealthview/.env
+
+# Where pg_dump output is written and where `wv backups` looks.
+# Pick a path with plenty of disk; backups accumulate.
+WV_BACKUPS_DIR=/var/lib/wealthview/backups
+
+# --- Optional ------------------------------------------------------------
+
+# Optional second `-f` for docker compose. Use for site-specific tweaks
+# you don't want in the canonical compose file (e.g. extra labels, a
+# logging driver). Leave commented if not needed.
+# WV_COMPOSE_OVERRIDE_FILE=/etc/wealthview/docker-compose.site.yml
+
+# docker compose project name. Default is "wealthview". Change if you
+# run multiple stacks on the same host.
+# WV_COMPOSE_PROJECT=wealthview
+
+# Host port the app is bound to. Affects only the health-check URL —
+# the compose file is still the source of truth for the port mapping.
+# WV_APP_PORT=80
+
+# Full health-check URL. Overrides the default
+# http://<host>:<WV_APP_PORT>/actuator/health. Useful when the app sits
+# behind a reverse proxy on the same box.
+# WV_HEALTH_URL=https://wealthview.example.com/actuator/health
+
+# Where `wv update` records the previously-running image tag so
+# `wv rollback` can find it.
+# WV_PREVIOUS_IMAGE_FILE=/var/lib/wealthview/.wv-previous-image
+
+# --- Remote operation (rare) ---------------------------------------------
+
+# When set, every `wv` invocation drives docker against a remote daemon
+# via DOCKER_HOST=ssh://$WV_HOST. Requires ssh-agent with an authorised
+# key. Backups still land locally because pg_dump streams over the
+# `docker compose exec` pipe.
+# WV_HOST=root@wealthview.example.com

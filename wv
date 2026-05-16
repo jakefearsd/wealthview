@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# wv (repo-root shim) — defer to bin/wv so muscle memory and existing docs
+# (./wv up, ./wv backup, etc.) keep working after the relocation. New
+# automation and production installs should call bin/wv directly.
+set -euo pipefail
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+exec "$SCRIPT_DIR/bin/wv" "$@"

@@ -2,39 +2,87 @@
 # wv — WealthView admin entry point.
 #
 # Single command for all routine operations: bring the stack up, take and
-# verify backups, update to a new image, roll back, migrate between hosts.
+# verify backups, update to a new image, roll back, migrate between hosts,
+# rotate secrets. Designed to be installed as /usr/local/bin/wv on a
+# production server (driven by /etc/wealthview/wv.conf) AND to run inside
+# the source tree during development with no configuration at all.
 #
-# Each subcommand is implemented in scripts/wv-lib/<name>.sh and invoked here.
-# Run `./wv help` for the full reference.
+# Each subcommand is implemented in wv-lib/<name>.sh and invoked here.
+# Run `wv help` for the full operator handbook.
 
 set -euo pipefail
 
-# --- Locate repo root regardless of how the script is invoked. -------------
+# --- Locate ourselves, following symlinks (so /usr/local/bin/wv works). ----
 WV_SELF="${BASH_SOURCE[0]}"
 while [[ -L "$WV_SELF" ]]; do
     WV_LINK_DIR="$(cd -- "$(dirname -- "$WV_SELF")" >/dev/null 2>&1 && pwd)"
     WV_SELF="$(readlink "$WV_SELF")"
     [[ "$WV_SELF" != /* ]] && WV_SELF="$WV_LINK_DIR/$WV_SELF"
 done
-WV_ROOT="$(cd -- "$(dirname -- "$WV_SELF")" >/dev/null 2>&1 && pwd)"
+WV_BIN_DIR="$(cd -- "$(dirname -- "$WV_SELF")" >/dev/null 2>&1 && pwd)"
+export WV_BIN_DIR
+export WV_LIB_DIR="$WV_BIN_DIR/wv-lib"
+
+# WV_ROOT is the "project anchor" — defaults to the parent of bin/ (i.e.
+# the source tree when invoked from a checkout). Production installs override
+# it via wv.conf when needed; most commands resolve concrete paths through
+# common.sh rather than rebuilding them from WV_ROOT.
+WV_ROOT="$(cd -- "$WV_BIN_DIR/.." >/dev/null 2>&1 && pwd)"
 export WV_ROOT
-export WV_LIB_DIR="$WV_ROOT/scripts/wv-lib"
+
+# --- Global flags consumed BEFORE the subcommand. --------------------------
+# These let an operator point at a config file or remote host without
+# repeating the flag on every subcommand.
+while (( $# > 0 )); do
+    case "$1" in
+        --config)
+            shift
+            [[ $# -gt 0 ]] || { echo "ERROR: --config requires a path" >&2; exit 2; }
+            export WV_CONFIG_FILE="$1"
+            shift
+            ;;
+        --config=*)
+            export WV_CONFIG_FILE="${1#--config=}"
+            shift
+            ;;
+        --host)
+            shift
+            [[ $# -gt 0 ]] || { echo "ERROR: --host requires user@host" >&2; exit 2; }
+            export WV_HOST="$1"
+            shift
+            ;;
+        --host=*)
+            export WV_HOST="${1#--host=}"
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 
 # --- Common helpers shared across subcommands. -----------------------------
-# shellcheck source=scripts/wv-lib/common.sh
+# common.sh reads WV_CONFIG_FILE / standard config-file paths and exports
+# the resolved WV_COMPOSE_FILE, WV_ENV_FILE, WV_BACKUPS_DIR, etc.
+# shellcheck source=wv-lib/common.sh
 . "$WV_LIB_DIR/common.sh"
 
 # --- Dispatch. -------------------------------------------------------------
 SUBCOMMAND="${1:-help}"
 shift || true
 
+# Aliases.
+case "$SUBCOMMAND" in
+    list-backups) SUBCOMMAND="backups" ;;
+esac
+
 case "$SUBCOMMAND" in
     -h|--help|help)
-        # shellcheck source=scripts/wv-lib/help.sh
+        # shellcheck source=wv-lib/help.sh
         . "$WV_LIB_DIR/help.sh"
         wv_help "$@"
         ;;
-    up|down|status|logs|psql|backup|backups|restore|verify|update|rollback|\
+    up|down|restart|status|logs|psql|backup|backups|restore|verify|update|rollback|\
     migrate-out|migrate-in|rotate-secret|config-check)
         SUB_FILE="$WV_LIB_DIR/${SUBCOMMAND}.sh"
         if [[ ! -f "$SUB_FILE" ]]; then
@@ -42,7 +90,7 @@ case "$SUBCOMMAND" in
         fi
         # shellcheck disable=SC1090
         . "$SUB_FILE"
-        # The library file defines a function named wv_<subcommand_with_underscores>.
+        # Library file defines a function named wv_<subcommand_with_underscores>.
         FN_NAME="wv_${SUBCOMMAND//-/_}"
         if ! declare -F "$FN_NAME" >/dev/null; then
             wv_die "Subcommand library $SUB_FILE did not define $FN_NAME."
@@ -51,7 +99,7 @@ case "$SUBCOMMAND" in
         ;;
     *)
         wv_err "Unknown subcommand: $SUBCOMMAND"
-        wv_err "Run './wv help' for the full reference."
+        wv_err "Run 'wv help' for the full reference."
         exit 2
         ;;
 esac

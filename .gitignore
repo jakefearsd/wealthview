@@ -22,6 +22,9 @@ out/
 .classpath
 .settings/
 bin/
+# Top-level bin/ holds the wv admin tool, not Eclipse output.
+!/bin/
+!/bin/**
 
 # Node / Workspaces (root-hoisted by npm workspaces)
 node_modules/

@@ -24,6 +24,23 @@ USAGE
 
     local rc=0
 
+    wv_log "Resolved configuration:"
+    printf '  config file : %s\n' "$(wv_config_resolved_path)"
+    printf '  env file    : %s\n' "$WV_ENV_FILE"
+    printf '  compose     : %s\n' "$(wv_compose_file)"
+    local override
+    override="$(wv_compose_override_file)"
+    if [[ -n "$override" && -f "$override" ]]; then
+        printf '  override    : %s\n' "$override"
+    fi
+    printf '  backups dir : %s\n' "$WV_BACKUPS_DIR"
+    printf '  project     : %s\n' "$WV_COMPOSE_PROJECT"
+    if [[ -n "${WV_HOST:-}" ]]; then
+        printf '  remote host : %s (DOCKER_HOST=ssh://%s)\n' "$WV_HOST" "$WV_HOST"
+    else
+        printf '  remote host : (local)\n'
+    fi
+
     wv_log "Required tools:"
     local tool
     for tool in docker curl python3 openssl; do

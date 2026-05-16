@@ -13,16 +13,22 @@ setup() {
     SANDBOX="$BATS_TEST_TMPDIR/repo"
     mkdir -p "$SANDBOX"
     # Symlink the source tree but copy the files we'll mutate so tests don't
-    # touch the real repo.
+    # touch the real repo. wv now lives at bin/wv with libraries under
+    # bin/wv-lib/; ./wv at the repo root is a thin shim that execs bin/wv.
     cp -r "$REPO_ROOT/wv" "$SANDBOX/wv"
+    cp -r "$REPO_ROOT/bin" "$SANDBOX/bin"
     cp -r "$REPO_ROOT/scripts" "$SANDBOX/scripts"
     cp -r "$REPO_ROOT/docker-compose.yml" "$SANDBOX/docker-compose.yml"
     cp -r "$REPO_ROOT/docker-compose.prod.yml" "$SANDBOX/docker-compose.prod.yml"
     cp "$REPO_ROOT/.env.example" "$SANDBOX/.env.example"
     [[ -d "$REPO_ROOT/infra" ]] && cp -r "$REPO_ROOT/infra" "$SANDBOX/infra"
-    chmod +x "$SANDBOX/wv"
+    chmod +x "$SANDBOX/wv" "$SANDBOX/bin/wv"
     cd "$SANDBOX"
     export WV_ASSUME_YES=1
+    # Make sure no real /etc/wealthview/wv.conf or ~/.config/wealthview/wv.conf
+    # leaks into the sandbox; tests assume source-tree resolution.
+    unset WV_CONFIG_FILE WV_HOST
+    export WV_DISABLE_CONFIG_SEARCH=1
 }
 
 # --- Top-level CLI surface ----------------------------------------------------
@@ -30,7 +36,7 @@ setup() {
 @test "help: prints usage and lists subcommands" {
     run ./wv help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Subcommands"* ]]
+    [[ "$output" == *"SUBCOMMANDS"* ]]
     [[ "$output" == *"backup"* ]]
     [[ "$output" == *"restore"* ]]
     [[ "$output" == *"update"* ]]
@@ -44,7 +50,7 @@ setup() {
 @test "no args: defaults to help" {
     run ./wv
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Subcommands"* ]]
+    [[ "$output" == *"SUBCOMMANDS"* ]]
 }
 
 @test "unknown subcommand: exits non-zero with hint" {
@@ -53,8 +59,53 @@ setup() {
     [[ "$output" == *"Unknown subcommand"* ]]
 }
 
+@test "list-backups is an alias for backups" {
+    # The dispatcher rewrites list-backups -> backups before sourcing the
+    # subcommand file, so this should produce identical output to ./wv backups.
+    rm -rf backups
+    mkdir -p backups
+    run ./wv list-backups
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"No backups in"* ]]
+}
+
+@test "--config FILE: explicit config overrides source-tree defaults" {
+    mkdir -p custom/backups
+    cp docker-compose.yml custom/docker-compose.yml
+    cat > custom/wv.conf <<EOF
+WV_COMPOSE_FILE=$PWD/custom/docker-compose.yml
+WV_ENV_FILE=$PWD/.env
+WV_BACKUPS_DIR=$PWD/custom/backups
+EOF
+    # WV_DISABLE_CONFIG_SEARCH is exported by setup; --config wins anyway.
+    unset WV_DISABLE_CONFIG_SEARCH
+    run ./wv --config "$PWD/custom/wv.conf" config-check
+    [ "$status" -eq 0 ] || {
+        echo "config-check failed with explicit --config; output:"
+        echo "$output"
+    }
+    [[ "$output" == *"custom/wv.conf"* ]]
+    [[ "$output" == *"custom/backups"* ]]
+}
+
+@test "--config FILE: refuses a non-existent path" {
+    run ./wv --config /tmp/does-not-exist-$RANDOM.conf status
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"doesn't exist"* ]]
+}
+
+@test "config-file syntax sniff: rejects lines that look like code" {
+    cat > bad.conf <<'EOF'
+WV_BACKUPS_DIR=/tmp/x
+echo "this is not a config line"
+EOF
+    run ./wv --config "$PWD/bad.conf" status
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"Refusing to source"* ]]
+}
+
 @test "each subcommand supports --help" {
-    for sub in up down status logs psql backup backups restore verify update rollback migrate-out migrate-in rotate-secret config-check; do
+    for sub in up down restart status logs psql backup backups restore verify update rollback migrate-out migrate-in rotate-secret config-check; do
         run ./wv "$sub" --help
         [ "$status" -eq 0 ] || {
             echo "FAILED: ./wv $sub --help (status $status)"
@@ -75,7 +126,7 @@ setup() {
     rm -f .env
     run ./wv config-check
     [ "$status" -ne 0 ]
-    [[ "$output" == *"No .env file"* ]]
+    [[ "$output" == *"No env file"* ]]
 }
 
 @test "config-check: fails when required vars are placeholder CHANGE_ME" {
@@ -90,6 +141,7 @@ setup() {
 DB_PASSWORD=test_pw_value
 JWT_SECRET=test_jwt_secret_value_at_least_32_chars_long_xx
 SUPER_ADMIN_PASSWORD=test_admin_pw
+MFA_ENCRYPTION_KEY=test_mfa_key_value_at_least_32_chars_long_yyy
 EOF
     run ./wv config-check
     [ "$status" -eq 0 ]
