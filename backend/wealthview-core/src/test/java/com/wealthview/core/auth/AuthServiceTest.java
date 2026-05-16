@@ -538,6 +538,28 @@ class AuthServiceTest {
     }
 
     @Test
+    void register_validInvite_marksInviteConsumedByNewUser() {
+        // Registration must consume the invite — setConsumedBy and
+        // setConsumedAt — so the code cannot be reused.
+        var invite = new InviteCodeEntity(tenant, "ONCE", user, OffsetDateTime.now().plusDays(7));
+        when(userRepository.existsByEmail("new@example.com")).thenReturn(false);
+        when(inviteCodeRepository.findByCode("ONCE")).thenReturn(Optional.of(invite));
+        when(passwordEncoder.encode("myuniquephrase")).thenReturn("encoded");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> {
+            UserEntity saved = inv.getArgument(0);
+            TestEntityHelper.setId(saved, UUID.randomUUID());
+            return saved;
+        });
+        when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        authService.register(new RegisterRequest("new@example.com", "myuniquephrase", "ONCE"));
+
+        assertThat(invite.getConsumedAt()).isNotNull();
+        assertThat(invite.getConsumedBy()).isNotNull();
+        assertThat(invite.isConsumed()).isTrue();
+    }
+
+    @Test
     void register_uncommonPassword_succeeds() {
         var inviteCode = new InviteCodeEntity(tenant, "VALID", user,
                 OffsetDateTime.now().plusDays(7));

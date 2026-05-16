@@ -357,6 +357,15 @@ class StockSplitServiceTest {
     }
 
     @Test
+    void applySplit_zeroDenominator_throwsIllegalArgument() {
+        // Boundary: denominator == 0 must be rejected — pins the <=0 guard
+        // against a <0 boundary mutant.
+        assertThatThrownBy(() -> service.applySplit("AAPL", LocalDate.of(2020, 8, 31), 1, 0, "manual"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("positive");
+    }
+
+    @Test
     void applySplit_ratioOfOneToOne_isAccepted() {
         // 1:1 is the boundary: numerator and denominator are both exactly 1,
         // which must pass the >0 check (a <=0 / <0 mutant boundary).
