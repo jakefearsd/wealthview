@@ -187,8 +187,8 @@ class MultiPoolDeepTest {
     void getWeightedReturn_returnsConfiguredRate() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "100", "100", "0", "0", "0"),
-                bd("0.075"), FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+                bd("0.075"), new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         assertThat(p.getWeightedReturn()).isEqualByComparingTo(bd("0.075"));
     }
@@ -199,8 +199,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingEarlyAge_drawsTaxableOnly() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "500", "300", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.DYNAMIC_SEQUENCING, null, bd("0.22"));
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.DYNAMIC_SEQUENCING, null, bd("0.22")));
 
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY);
 
@@ -213,8 +213,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingFillsBracketFromTraditional() {
         var p = new PoolStrategy.MultiPool(
                 grouped("200", "500", "100", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.DYNAMIC_SEQUENCING, flatTaxCalc("0.22"), bd("0.22"));
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.DYNAMIC_SEQUENCING, flatTaxCalc("0.22"), bd("0.22")));
 
         // Bracket ceiling = 100000 from flatTaxCalc; all need fits, pulls from traditional up to bracket
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
@@ -228,8 +228,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingNoBracketRate_fallsBackToOrderedStrategy() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "300", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.DYNAMIC_SEQUENCING, null, null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.DYNAMIC_SEQUENCING, null, null));
 
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
@@ -245,8 +245,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_traditionalOnlyWithTaxCalc_computesTaxAndDeductsFromPools() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         // need 100 from traditional; tax = 100 * 0.20 = 20, deducted from pools (taxable=0 → traditional)
         var r = p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
@@ -260,8 +260,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_withConversionAmount_computesMarginalTaxOnly() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         // Conversion of 50 already taxed. Additional withdrawal 100 from traditional.
         // detailed tax on (100+50) = 30; base tax on (50) = 10; marginal = 30 - 10 = 20
@@ -285,8 +285,8 @@ class MultiPoolDeepTest {
         // taxable empty → tax deduction cascades to traditional, then roth
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "10", "1000", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("1.0"), null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("1.0"), null));
 
         // Withdrawal = 10 from traditional, tax = 10 * 1.0 = 10.
         // taxable (0) < 10 → take 0. traditional (now 0 after withdrawal) < 10 → take 0. roth: -10 (unconditional subtract).
@@ -403,8 +403,8 @@ class MultiPoolDeepTest {
     void applyContributions_addsToEachPool() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "50", "10", "20", "5"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         var total = p.applyContributions();
 
@@ -416,8 +416,8 @@ class MultiPoolDeepTest {
     void applyGrowth_producesGrowthPerPool() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "100", "0", "0", "0"),
-                bd("0.10"), FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+                bd("0.10"), new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         var g = p.applyGrowth();
 
@@ -455,8 +455,8 @@ class MultiPoolDeepTest {
     void computeEffectiveOtherIncome_sumsAllComponents() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, bd("10000"), ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, bd("10000"), ZERO, "fixed", null, null,
+                        WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         var effective = p.computeEffectiveOtherIncome(bd("5000"), bd("2000"));
 
@@ -467,8 +467,8 @@ class MultiPoolDeepTest {
     void getMagi_returnsOtherIncome() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "100", "0", "0", "0", "0"),
-                ZERO, FilingStatus.MARRIED_FILING_JOINTLY, bd("55000"), ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.MARRIED_FILING_JOINTLY, bd("55000"), ZERO, "fixed", null, null,
+                        WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         assertThat(p.getMagi()).isEqualByComparingTo(bd("55000"));
         assertThat(p.getFilingStatusString()).isEqualTo("married_filing_jointly");
@@ -478,8 +478,8 @@ class MultiPoolDeepTest {
     void getLastTaxBreakdown_exposesBreakdownAfterWithdrawalWithTaxCalc() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
@@ -493,7 +493,7 @@ class MultiPoolDeepTest {
     void buildYearDto_withTaxBreakdown_populatesFederalAndStateTaxFields() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                 WithdrawalOrder.TRADITIONAL_FIRST,
                 new TaxCalculationStrategy() {
                     @Override
@@ -510,7 +510,7 @@ class MultiPoolDeepTest {
                     public CombinedTaxResult computeDetailedTax(BigDecimal g, int y, FilingStatus fs) {
                         return new CombinedTaxResult(bd("15"), bd("5"), bd("20"), bd("3"), bd("10"), true);
                     }
-                }, null);
+                }, null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO,
@@ -545,8 +545,8 @@ class MultiPoolDeepTest {
     void buildYearDto_stateTaxZero_leavesStateTaxNull() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null);
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
