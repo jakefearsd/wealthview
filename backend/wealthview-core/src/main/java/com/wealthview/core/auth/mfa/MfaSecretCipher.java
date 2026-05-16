@@ -24,7 +24,7 @@ import java.util.Base64;
  * delivers.
  */
 @Component
-public class MfaSecretCipher {
+public final class MfaSecretCipher {
 
     private static final String ALGORITHM = "AES";
     private static final String TRANSFORMATION = "AES/GCM/NoPadding";

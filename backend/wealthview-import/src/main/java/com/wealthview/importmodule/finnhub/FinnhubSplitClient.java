@@ -51,7 +51,7 @@ public class FinnhubSplitClient implements SplitDetectionClient {
 
             var results = new ArrayList<DetectedSplit>();
             for (var entry : dto) {
-                if (entry.date == null || entry.fromFactor == null || entry.toFactor == null) {
+                if (entry.date() == null || entry.fromFactor() == null || entry.toFactor() == null) {
                     log.warn("Skipping malformed split row for {}: {}", symbol, entry);
                     continue;
                 }
@@ -59,8 +59,8 @@ public class FinnhubSplitClient implements SplitDetectionClient {
                 // toFactor / fromFactor = ratio of new-to-old, i.e. numerator/denominator
                 // for our model. Multiply through by 1000 to get integers since Finnhub
                 // returns doubles like 1.0, 4.0, 0.5.
-                int numerator = (int) Math.round(entry.toFactor * 1000);
-                int denominator = (int) Math.round(entry.fromFactor * 1000);
+                int numerator = (int) Math.round(entry.toFactor() * 1000);
+                int denominator = (int) Math.round(entry.fromFactor() * 1000);
                 int g = gcd(numerator, denominator);
                 if (g > 0) {
                     numerator /= g;
@@ -68,7 +68,7 @@ public class FinnhubSplitClient implements SplitDetectionClient {
                 }
                 try {
                     results.add(new DetectedSplit(symbol,
-                            LocalDate.parse(entry.date), numerator, denominator));
+                            LocalDate.parse(entry.date()), numerator, denominator));
                 } catch (IllegalArgumentException e) {
                     log.warn("Skipping invalid split for {} on {}: {}", symbol, entry.date, e.getMessage());
                 }
@@ -91,11 +91,5 @@ public class FinnhubSplitClient implements SplitDetectionClient {
      * Finnhub /stock/split response row.
      * <pre>{ "symbol": "AAPL", "date": "2020-08-31", "fromFactor": 1.0, "toFactor": 4.0 }</pre>
      */
-    @SuppressWarnings({"PMD.FieldNamingConventions", "PMD.DataClass"})
-    public static final class FinnhubSplitDto {
-        public String symbol;
-        public String date;
-        public Double fromFactor;
-        public Double toFactor;
-    }
+    public record FinnhubSplitDto(String symbol, String date, Double fromFactor, Double toFactor) {}
 }

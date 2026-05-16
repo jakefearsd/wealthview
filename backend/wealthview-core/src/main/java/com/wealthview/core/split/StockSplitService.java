@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -275,7 +276,7 @@ public class StockSplitService {
     }
 
     private static UUID priceUuid(String symbol, LocalDate date) {
-        return UUID.nameUUIDFromBytes(("price:" + symbol + ":" + date).getBytes());
+        return UUID.nameUUIDFromBytes(("price:" + symbol + ":" + date).getBytes(StandardCharsets.UTF_8));
     }
 
     /**

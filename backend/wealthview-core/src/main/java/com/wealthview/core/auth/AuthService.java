@@ -201,7 +201,6 @@ public class AuthService {
     @Transactional
     public AuthResult completeMfaChallenge(String mfaToken, String totpCode, String recoveryCode,
                                            AuthRequestContext context) {
-        var transport = context.transport();
         if (!jwtTokenProvider.validateMfaChallenge(mfaToken)) {
             log.warn("MFA challenge failed: invalid token");
             meterRegistry.counter("wealthview.mfa.failed", "scope", "challenge_token").increment();
