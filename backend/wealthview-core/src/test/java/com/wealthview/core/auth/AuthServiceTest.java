@@ -593,4 +593,171 @@ class AuthServiceTest {
         assertThat(counter).isNotNull();
         assertThat(counter.count()).isEqualTo(1.0);
     }
+
+    // --- MFA-required login branch + completeMfaChallenge -------------------
+
+    @Test
+    void loginInitiate_mfaEnabledUser_returnsMfaRequiredWithoutTokens() {
+        // An MFA-enabled user must NOT receive access/refresh tokens directly;
+        // loginInitiate must hand back an MfaRequired challenge instead.
+        user.setMfaEnabled(true);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        var outcome = authService.loginInitiate(
+                new LoginRequest("test@example.com", "password"),
+                AuthRequestContext.cookie(TEST_IP));
+
+        assertThat(outcome).isInstanceOf(com.wealthview.core.auth.dto.LoginOutcome.MfaRequired.class);
+        var challenge = (com.wealthview.core.auth.dto.LoginOutcome.MfaRequired) outcome;
+        assertThat(challenge.mfaToken()).isNotBlank();
+        verify(mfaChallengeRepository).save(any(com.wealthview.persistence.entity.MfaChallengeEntity.class));
+    }
+
+    @Test
+    void login_mfaEnabledUser_throwsBecauseLegacyEntryPointCannotIssueTokens() {
+        // The legacy login() entry point cannot complete an MFA login — it must
+        // reject rather than silently hand back tokens.
+        user.setMfaEnabled(true);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.login(
+                new LoginRequest("test@example.com", "password"), TEST_IP))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("MFA");
+    }
+
+    @Test
+    void completeMfaChallenge_invalidMfaToken_throwsBadCredentials() {
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                "not-a-real-token", "123456", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA challenge");
+    }
+
+    @Test
+    void completeMfaChallenge_jtiNotFound_throwsBadCredentials() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "123456", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA challenge");
+    }
+
+    @Test
+    void completeMfaChallenge_alreadyUsedChallenge_throwsBadCredentials() {
+        // A challenge whose used_at is already set must be rejected: it is
+        // single-use, so replay must fail.
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        stored.setUsedAt(OffsetDateTime.now().minusSeconds(10));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "123456", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA challenge");
+    }
+
+    @Test
+    void completeMfaChallenge_expiredChallenge_throwsBadCredentials() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().minusSeconds(1));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "123456", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA challenge");
+    }
+
+    @Test
+    void completeMfaChallenge_challengeBoundToDifferentUser_throwsBadCredentials() {
+        // The stored challenge's user_id must match the user_id in the JWT;
+        // a mismatch must be rejected even when the token itself is valid.
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), UUID.randomUUID(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "123456", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA challenge");
+    }
+
+    @Test
+    void completeMfaChallenge_noTotpOrRecoveryCode_throwsMissingCode() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "  ", "  ", AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Missing TOTP or recovery code");
+    }
+
+    @Test
+    void completeMfaChallenge_wrongTotpCode_throwsInvalidMfaCode() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+        when(mfaService.verifyTotp(user.getId(), "000000")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.completeMfaChallenge(
+                mfaToken, "000000", null, AuthRequestContext.cookie(TEST_IP)))
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessageContaining("Invalid MFA code");
+    }
+
+    @Test
+    void completeMfaChallenge_validTotpCode_marksChallengeUsedAndReturnsTokens() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+        when(mfaService.verifyTotp(user.getId(), "123456")).thenReturn(true);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        var result = authService.completeMfaChallenge(
+                mfaToken, "123456", null, AuthRequestContext.cookie(TEST_IP));
+
+        assertThat(result.accessToken()).isNotBlank();
+        assertThat(result.email()).isEqualTo("test@example.com");
+        assertThat(stored.getUsedAt()).isNotNull();
+        verify(mfaChallengeRepository).save(stored);
+    }
+
+    @Test
+    void completeMfaChallenge_validRecoveryCode_consumesCodeAndReturnsTokens() {
+        var jti = UUID.randomUUID();
+        var mfaToken = jwtTokenProvider.generateMfaChallenge(user.getId(), "cookie", jti, 60_000L);
+        var stored = new com.wealthview.persistence.entity.MfaChallengeEntity(
+                tenant.getId(), user.getId(), jti, "cookie", OffsetDateTime.now().plusMinutes(5));
+        when(mfaChallengeRepository.findByJti(jti)).thenReturn(Optional.of(stored));
+        when(mfaService.consumeRecoveryCode(user.getId(), "ABCD1234")).thenReturn(true);
+        when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
+
+        var result = authService.completeMfaChallenge(
+                mfaToken, null, "ABCD1234", AuthRequestContext.cookie(TEST_IP));
+
+        assertThat(result.accessToken()).isNotBlank();
+        verify(mfaService).consumeRecoveryCode(user.getId(), "ABCD1234");
+        verify(mfaService, never()).verifyTotp(any(), anyString());
+    }
 }
