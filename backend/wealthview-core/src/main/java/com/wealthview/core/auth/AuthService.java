@@ -196,8 +196,8 @@ public class AuthService {
     @Transactional
     public AuthResult completeMfaChallenge(String mfaToken, String totpCode, String recoveryCode,
                                            AuthRequestContext context) {
-        return mfaChallengeService.complete(mfaToken, totpCode, recoveryCode, context,
-                (user, ctx) -> completeLoginSuccess(user, ctx, ctx.ipAddress()));
+        var user = mfaChallengeService.complete(mfaToken, totpCode, recoveryCode);
+        return completeLoginSuccess(user, context, context.ipAddress());
     }
 
     @Transactional

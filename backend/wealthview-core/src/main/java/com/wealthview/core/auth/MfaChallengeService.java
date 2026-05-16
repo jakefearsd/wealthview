@@ -2,13 +2,11 @@ package com.wealthview.core.auth;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import java.util.function.BiFunction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
 
-import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.mfa.MfaService;
 import com.wealthview.core.common.Entities;
 import com.wealthview.persistence.entity.MfaChallengeEntity;
@@ -77,19 +75,17 @@ final class MfaChallengeService {
     }
 
     /**
-     * Complete an MFA challenge. Validates the challenge token, the persisted
+     * Verify an MFA challenge. Validates the challenge token, the persisted
      * single-use row (found / unused / unexpired / bound to the same user), and
      * the supplied TOTP or recovery code; on success marks the challenge used
-     * and delegates token issuance to {@code completeLogin}. Throws
-     * {@link BadCredentialsException} for every rejection reason. Behavior
-     * preserved verbatim from the original {@code AuthService.completeMfaChallenge}.
+     * and returns the verified user for the orchestrator to complete the login.
+     * Throws {@link BadCredentialsException} for every rejection reason. The
+     * verification logic is preserved verbatim from the original
+     * {@code AuthService.completeMfaChallenge}.
      *
-     * @param completeLogin invoked with the resolved user + request context to
-     *                       finish the login (record activity, mint tokens)
+     * @return the verified user whose MFA challenge succeeded
      */
-    AuthResult complete(String mfaToken, String totpCode, String recoveryCode,
-                        AuthRequestContext context,
-                        BiFunction<UserEntity, AuthRequestContext, AuthResult> completeLogin) {
+    UserEntity complete(String mfaToken, String totpCode, String recoveryCode) {
         if (!jwtTokenProvider.validateMfaChallenge(mfaToken)) {
             log.warn("MFA challenge failed: invalid token");
             meterRegistry.counter("wealthview.mfa.failed", "scope", "challenge_token").increment();
@@ -124,7 +120,6 @@ final class MfaChallengeService {
         stored.setUsedAt(OffsetDateTime.now());
         mfaChallengeRepository.save(stored);
 
-        var user = userRepository.findById(userId).orElseThrow(Entities.notFound("User"));
-        return completeLogin.apply(user, context);
+        return userRepository.findById(userId).orElseThrow(Entities.notFound("User"));
     }
 }
