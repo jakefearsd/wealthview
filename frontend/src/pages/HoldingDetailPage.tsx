@@ -24,14 +24,18 @@ export default function HoldingDetailPage() {
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [txnLoading, setTxnLoading] = useState(true);
 
+    const holdingAccountId = holding?.account_id;
+    const holdingSymbol = holding?.symbol;
+
     useEffect(() => {
-        if (!holding) return;
+        if (!holdingAccountId || !holdingSymbol) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- idiomatic loading flag for a data-fetching effect
         setTxnLoading(true);
-        listTransactions(holding.account_id, 0, 100, holding.symbol)
+        listTransactions(holdingAccountId, 0, 100, holdingSymbol)
             .then((page) => setTransactions(page.data))
             .catch(() => setTransactions([]))
             .finally(() => setTxnLoading(false));
-    }, [holding?.account_id, holding?.symbol]);
+    }, [holdingAccountId, holdingSymbol]);
 
     const [editing, setEditing] = useState(false);
     const [editQty, setEditQty] = useState('');

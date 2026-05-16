@@ -152,7 +152,7 @@ export interface CreateScenarioRequest {
     income_sources?: ScenarioIncomeSourceInput[];
 }
 
-export interface UpdateScenarioRequest extends CreateScenarioRequest {}
+export type UpdateScenarioRequest = CreateScenarioRequest;
 
 export interface SpendingTier {
     name: string;
@@ -179,7 +179,7 @@ export interface CreateSpendingProfileRequest {
     spending_tiers: SpendingTier[];
 }
 
-export interface UpdateSpendingProfileRequest extends CreateSpendingProfileRequest {}
+export type UpdateSpendingProfileRequest = CreateSpendingProfileRequest;
 
 export interface ProjectionMonthPoint {
     label: string;

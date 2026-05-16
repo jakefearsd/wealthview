@@ -37,6 +37,7 @@ export default function PricesPage() {
     }
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data load; fetchLatestPrices sets an idiomatic loading flag
         fetchLatestPrices();
     }, []);
 

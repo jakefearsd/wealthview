@@ -110,7 +110,7 @@ export default function PropertyDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
     const canWrite = role === 'admin' || role === 'member';
-    const range = useMemo(getDefaultRange, []);
+    const range = useMemo(() => getDefaultRange(), []);
     const [refreshing, setRefreshing] = useState(false);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
@@ -275,16 +275,17 @@ export default function PropertyDetailPage() {
         setTimeout(refetchAnalytics, 0);
     }
 
+    const purchaseDate = property?.purchase_date;
     const analyticsYearOptions = useMemo(() => {
-        if (!property?.purchase_date) return [];
-        const purchaseYear = new Date(property.purchase_date).getFullYear();
+        if (!purchaseDate) return [];
+        const purchaseYear = new Date(purchaseDate).getFullYear();
         const currentYear = new Date().getFullYear();
         const years: number[] = [];
         for (let y = purchaseYear; y <= currentYear; y++) {
             years.push(y);
         }
         return years;
-    }, [property?.purchase_date]);
+    }, [purchaseDate]);
 
     const badgeStyle = (color: string, bg: string) => ({
         display: 'inline-block',

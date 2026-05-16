@@ -10,14 +10,6 @@ async function loginAsUser(page: Page, email: string, password: string) {
     await login(page, { email, password });
 }
 
-/** Helper to fill a labelled input (finds label, then sibling input). */
-async function fillField(page: Page, labelText: string, value: string) {
-    const label = page.locator(`label:has-text("${labelText}")`).first();
-    const container = label.locator('..');
-    const input = container.locator('input, select').first();
-    await input.fill(value);
-}
-
 /** Helper to select a dropdown option by label text. */
 async function selectField(page: Page, labelText: string, value: string) {
     const label = page.locator(`label:has-text("${labelText}")`).first();
@@ -206,8 +198,8 @@ test.describe.serial('User 1: Comfortable Couple — Sustainable Retirement', ()
         const propertiesResp = await page.request.get('/api/v1/properties', {
             headers: { Authorization: `Bearer ${token}` },
         });
-        const properties = await propertiesResp.json();
-        const propertyId = properties.find((p: any) => p.address.includes('456 Rental Way'))?.id;
+        const properties: Array<{ id: string; address: string }> = await propertiesResp.json();
+        const propertyId = properties.find((p) => p.address.includes('456 Rental Way'))?.id;
         expect(propertyId).toBeTruthy();
 
         // Social Security
@@ -496,8 +488,8 @@ test.describe.serial('User 1: Comfortable Couple — Sustainable Retirement', ()
         const listResp = await page.request.get('/api/v1/projections', {
             headers: { Authorization: `Bearer ${token}` },
         });
-        const scenarios = await listResp.json();
-        const caScenario = scenarios.find((s: any) => s.name === 'Couple CA Full Plan');
+        const scenarios: Array<{ id: string; name: string }> = await listResp.json();
+        const caScenario = scenarios.find((s) => s.name === 'Couple CA Full Plan');
 
         // Run both projections via API (GET endpoint)
         await page.request.get(`/api/v1/projections/${caScenario.id}/run`, {

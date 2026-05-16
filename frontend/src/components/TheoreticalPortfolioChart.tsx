@@ -43,6 +43,7 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
 
     useEffect(() => {
         let cancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- idiomatic loading flag for a data-fetching effect
         setLoading(true);
         setError(false);
         getTheoreticalHistory(accountId, months)
@@ -59,6 +60,18 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
         }));
     }, [data]);
 
+    const growthStats = useMemo(() => {
+        if (chartData.length < 2) return null;
+        const startValue = chartData[0].value;
+        const endValue = chartData[chartData.length - 1].value;
+        if (startValue === 0) return null;
+        const totalGrowth = endValue - startValue;
+        const totalReturn = totalGrowth / startValue;
+        const years = months / 12;
+        const annualizedRate = Math.pow(1 + totalReturn, 1 / years) - 1;
+        return { totalGrowth, annualizedRate };
+    }, [chartData, months]);
+
     if (accountType === 'bank') {
         return (
             <div style={chartCardStyle}>
@@ -72,18 +85,6 @@ export default function TheoreticalPortfolioChart({ accountId, accountType }: Pr
 
     const tickInterval = Math.max(1, Math.floor(chartData.length / 10));
     const selectedLabel = TIME_HORIZONS.find(h => h.value === months)?.label ?? `${months} months`;
-
-    const growthStats = useMemo(() => {
-        if (chartData.length < 2) return null;
-        const startValue = chartData[0].value;
-        const endValue = chartData[chartData.length - 1].value;
-        if (startValue === 0) return null;
-        const totalGrowth = endValue - startValue;
-        const totalReturn = totalGrowth / startValue;
-        const years = months / 12;
-        const annualizedRate = Math.pow(1 + totalReturn, 1 / years) - 1;
-        return { totalGrowth, annualizedRate };
-    }, [chartData, months]);
 
     return (
         <div style={chartCardStyle}>

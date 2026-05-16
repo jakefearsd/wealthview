@@ -5,8 +5,8 @@ import type { ProjectionYear, ScenarioIncomeSourceResponse } from '../types/proj
 let capturedBarChartData: Record<string, number | string>[] | null = null;
 
 vi.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
-    BarChart: ({ data, children }: any) => {
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    BarChart: ({ data, children }: { data: Record<string, number | string>[]; children: React.ReactNode }) => {
         capturedBarChartData = data;
         return <div data-testid="bar-chart">{children}</div>;
     },

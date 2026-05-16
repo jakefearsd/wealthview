@@ -54,6 +54,9 @@ export default function ProjectionDetailPage() {
             setSearchParams({}, { replace: true });
             handleRun();
         }
+        // Runs once after the scenario loads; autoRanRef guards against re-execution,
+        // so handleRun/searchParams/setSearchParams are intentionally not dependencies.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scenario]);
 
     async function handleRun() {

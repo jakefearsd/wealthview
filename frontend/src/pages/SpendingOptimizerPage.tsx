@@ -30,6 +30,7 @@ export interface PlanDiagnostics {
     depletionAgeP25: number | null;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- pure helper shared with OptimizerResultsView and unit-tested
 export function computePlanDiagnostics(
     phases: GuardrailPhase[],
     yearlySpending: GuardrailYearlySpending[],

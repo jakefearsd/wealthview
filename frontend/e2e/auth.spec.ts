@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { DEMO_USER, login } from './helpers';
+import { login } from './helpers';
 
 test.describe('Authentication', () => {
     test('1: login page renders with email and password fields', async ({ page }) => {

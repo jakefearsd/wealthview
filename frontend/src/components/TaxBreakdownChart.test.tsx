@@ -4,10 +4,14 @@ import TaxBreakdownChart from './TaxBreakdownChart';
 import type { ProjectionYear } from '../types/projection';
 
 vi.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: any) => <div data-testid="responsive-container">{children}</div>,
-    ComposedChart: ({ children }: any) => <div data-testid="composed-chart">{children}</div>,
-    Bar: ({ name, hide }: any) => hide ? null : <div>{name}</div>,
-    Line: ({ name }: any) => <div>{name}</div>,
+    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
+        <div data-testid="responsive-container">{children}</div>
+    ),
+    ComposedChart: ({ children }: { children: React.ReactNode }) => (
+        <div data-testid="composed-chart">{children}</div>
+    ),
+    Bar: ({ name, hide }: { name: string; hide?: boolean }) => hide ? null : <div>{name}</div>,
+    Line: ({ name }: { name: string }) => <div>{name}</div>,
     XAxis: () => null,
     YAxis: () => null,
     Tooltip: () => null,

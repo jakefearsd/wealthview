@@ -52,7 +52,7 @@ export default function UsersSection() {
         try {
             await updateUserRole(userId, newRole);
             toast.success('Role updated');
-            isSuperAdmin ? refetchAdmin() : refetchTenant();
+            if (isSuperAdmin) refetchAdmin(); else refetchTenant();
         } catch {
             toast.error('Failed to update role');
         }
@@ -63,7 +63,7 @@ export default function UsersSection() {
         try {
             await deleteUser(userId);
             toast.success('User removed');
-            isSuperAdmin ? refetchAdmin() : refetchTenant();
+            if (isSuperAdmin) refetchAdmin(); else refetchTenant();
         } catch {
             toast.error('Failed to remove user');
         }

@@ -28,6 +28,7 @@ export default function PropertyAnalyticsSection({
 
     useEffect(() => {
         if (depreciationMethod === 'none') {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- clears stale fetched schedule when method changes
             setDepreciationSchedule(null);
             return;
         }
