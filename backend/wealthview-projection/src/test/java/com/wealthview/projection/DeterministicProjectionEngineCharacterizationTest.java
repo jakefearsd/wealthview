@@ -59,8 +59,6 @@ class DeterministicProjectionEngineCharacterizationTest {
 
         ProjectionResultResponse result = engine.run(goldenInput());
 
-        assertThat(result.scenarioId()).isEqualTo(goldenInput().scenarioId() == null
-                ? result.scenarioId() : result.scenarioId());
         assertThat(result.yearlyData()).hasSize(50);
         assertThat(result.yearsInRetirement()).isEqualTo(35);
         assertThat(result.finalBalance()).isEqualByComparingTo(bd("1933805.2738"));

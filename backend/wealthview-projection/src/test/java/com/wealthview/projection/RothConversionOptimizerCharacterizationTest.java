@@ -9,6 +9,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.data.Offset.offset;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.nullable;
@@ -79,12 +80,12 @@ class RothConversionOptimizerCharacterizationTest {
         var schedule = goldenOptimizer().optimize();
 
         assertThat(schedule.conversionByYear()).hasSize(28);
-        assertThat(schedule.conversionFraction()).isEqualTo(1.0, org.assertj.core.data.Offset.offset(TOL));
-        assertThat(schedule.lifetimeTaxWith()).isEqualTo(302676.54723117733, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(463987.1013815104, org.assertj.core.data.Offset.offset(1e-3));
+        assertThat(schedule.conversionFraction()).isEqualTo(1.0, offset(TOL));
+        assertThat(schedule.lifetimeTaxWith()).isEqualTo(302676.54723117733, offset(1e-3));
+        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(463987.1013815104, offset(1e-3));
         assertThat(schedule.exhaustionAge()).isEqualTo(82);
         assertThat(schedule.exhaustionTargetMet()).isTrue();
-        assertThat(schedule.targetTraditionalBalance()).isEqualTo(1217700.0, org.assertj.core.data.Offset.offset(1e-3));
+        assertThat(schedule.targetTraditionalBalance()).isEqualTo(1217700.0, offset(1e-3));
     }
 
     @Test
@@ -99,22 +100,22 @@ class RothConversionOptimizerCharacterizationTest {
     void optimize_largeTraditionalIraScenario_pinsFirstConversionYear() {
         var schedule = goldenOptimizer().optimize();
 
-        assertThat(schedule.conversionByYear()[0]).isEqualTo(100000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.conversionTaxByYear()[0]).isEqualTo(20000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.traditionalBalance()[0]).isEqualTo(854000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.rothBalance()[0]).isEqualTo(153000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.taxableBalance()[0]).isEqualTo(99000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.projectedRmd()[0]).isEqualTo(0.0, org.assertj.core.data.Offset.offset(TOL));
+        assertThat(schedule.conversionByYear()[0]).isEqualTo(100000.0, offset(1e-3));
+        assertThat(schedule.conversionTaxByYear()[0]).isEqualTo(20000.0, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[0]).isEqualTo(854000.0, offset(1e-3));
+        assertThat(schedule.rothBalance()[0]).isEqualTo(153000.0, offset(1e-3));
+        assertThat(schedule.taxableBalance()[0]).isEqualTo(99000.0, offset(1e-3));
+        assertThat(schedule.projectedRmd()[0]).isEqualTo(0.0, offset(TOL));
     }
 
     @Test
     void optimize_largeTraditionalIraScenario_pinsSecondConversionYear() {
         var schedule = goldenOptimizer().optimize();
 
-        assertThat(schedule.conversionByYear()[1]).isEqualTo(100000.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.traditionalBalance()[1]).isEqualTo(805240.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.rothBalance()[1]).isEqualTo(262180.0, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.taxableBalance()[1]).isEqualTo(43740.0, org.assertj.core.data.Offset.offset(1e-3));
+        assertThat(schedule.conversionByYear()[1]).isEqualTo(100000.0, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[1]).isEqualTo(805240.0, offset(1e-3));
+        assertThat(schedule.rothBalance()[1]).isEqualTo(262180.0, offset(1e-3));
+        assertThat(schedule.taxableBalance()[1]).isEqualTo(43740.0, offset(1e-3));
     }
 
     @Test
@@ -122,20 +123,20 @@ class RothConversionOptimizerCharacterizationTest {
         var schedule = goldenOptimizer().optimize();
 
         // Index 13 = age 75, first year an RMD applies for a 1963 birth year.
-        assertThat(schedule.conversionByYear()[13]).isEqualTo(0.0, org.assertj.core.data.Offset.offset(TOL));
-        assertThat(schedule.traditionalBalance()[13]).isEqualTo(417108.03964045603, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.rothBalance()[13]).isEqualTo(896472.2964736733, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.projectedRmd()[13]).isEqualTo(18976.287612797838, org.assertj.core.data.Offset.offset(1e-3));
+        assertThat(schedule.conversionByYear()[13]).isEqualTo(0.0, offset(TOL));
+        assertThat(schedule.traditionalBalance()[13]).isEqualTo(417108.03964045603, offset(1e-3));
+        assertThat(schedule.rothBalance()[13]).isEqualTo(896472.2964736733, offset(1e-3));
+        assertThat(schedule.projectedRmd()[13]).isEqualTo(18976.287612797838, offset(1e-3));
     }
 
     @Test
     void optimize_largeTraditionalIraScenario_pinsFinalYear() {
         var schedule = goldenOptimizer().optimize();
 
-        assertThat(schedule.conversionByYear()[27]).isEqualTo(0.0, org.assertj.core.data.Offset.offset(TOL));
-        assertThat(schedule.traditionalBalance()[27]).isEqualTo(0.0, org.assertj.core.data.Offset.offset(TOL));
-        assertThat(schedule.rothBalance()[27]).isEqualTo(1314306.55831796, org.assertj.core.data.Offset.offset(1e-3));
-        assertThat(schedule.taxableBalance()[27]).isEqualTo(0.0, org.assertj.core.data.Offset.offset(TOL));
+        assertThat(schedule.conversionByYear()[27]).isEqualTo(0.0, offset(TOL));
+        assertThat(schedule.traditionalBalance()[27]).isEqualTo(0.0, offset(TOL));
+        assertThat(schedule.rothBalance()[27]).isEqualTo(1314306.55831796, offset(1e-3));
+        assertThat(schedule.taxableBalance()[27]).isEqualTo(0.0, offset(TOL));
     }
 
     @Test
