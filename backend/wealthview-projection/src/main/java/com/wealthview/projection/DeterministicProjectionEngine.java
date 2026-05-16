@@ -39,12 +39,13 @@ import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
 @Component
+// GodClass: the engine is an orchestrator that wires many projection collaborators;
+// PMD's coupling/cohesion heuristic still flags it after the Phase 3 decomposition.
 @SuppressWarnings({"PMD.GodClass", "PMD.CouplingBetweenObjects"})
 public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
-    private static final BigDecimal IRMAA_BRACKET_RATE = new BigDecimal("0.22");
 
     private final ScenarioParamsParser paramsParser = new ScenarioParamsParser();
     private final SpendingFeasibilityAnalyzer feasibilityAnalyzer = new SpendingFeasibilityAnalyzer();
