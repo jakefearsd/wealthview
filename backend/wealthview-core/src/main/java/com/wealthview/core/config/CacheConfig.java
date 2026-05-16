@@ -31,6 +31,7 @@ public class CacheConfig {
                 buildCache("accountBalances", 5, TimeUnit.MINUTES, 200, meterRegistry),
                 buildCache("latestPrices", 10, TimeUnit.MINUTES, 500, meterRegistry),
                 buildCache("exchangeRates", 30, TimeUnit.MINUTES, 200, meterRegistry),
+                buildCache("exchangeRateConversions", 30, TimeUnit.MINUTES, 200, meterRegistry),
                 buildCache("taxBrackets", 24, TimeUnit.HOURS, 10, meterRegistry),
                 buildCache("standardDeductions", 24, TimeUnit.HOURS, 10, meterRegistry),
                 buildCache("mobileAppVersions", 5, TimeUnit.MINUTES, 10, meterRegistry)

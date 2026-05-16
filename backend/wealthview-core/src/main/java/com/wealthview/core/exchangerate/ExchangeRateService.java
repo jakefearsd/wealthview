@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,16 +32,22 @@ public class ExchangeRateService {
     private final ExchangeRateRepository exchangeRateRepository;
     private final TenantRepository tenantRepository;
     private final AccountRepository accountRepository;
+    private final ExchangeRateResolver exchangeRateResolver;
 
     public ExchangeRateService(ExchangeRateRepository exchangeRateRepository,
                                TenantRepository tenantRepository,
-                               AccountRepository accountRepository) {
+                               AccountRepository accountRepository,
+                               ExchangeRateResolver exchangeRateResolver) {
         this.exchangeRateRepository = exchangeRateRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
+        this.exchangeRateResolver = exchangeRateResolver;
     }
 
-    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
+    @Caching(evict = {
+            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
+            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
+    })
     @Transactional
     public ExchangeRateResponse create(UUID tenantId, ExchangeRateRequest request) {
         if ("USD".equals(request.currencyCode())) {
@@ -63,7 +70,10 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
-    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
+    @Caching(evict = {
+            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
+            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
+    })
     @Transactional
     public ExchangeRateResponse update(UUID tenantId, String currencyCode, BigDecimal rateToUsd) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)
@@ -77,7 +87,10 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
-    @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId")
+    @Caching(evict = {
+            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
+            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
+    })
     @Transactional
     public void delete(UUID tenantId, String currencyCode) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)
@@ -110,11 +123,7 @@ public class ExchangeRateService {
             return amount;
         }
 
-        var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currency)
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "No exchange rate found for " + currency
-                                + " — add one in Settings before using this currency"));
-
-        return amount.multiply(entity.getRateToUsd()).setScale(Money.SCALE, Money.ROUNDING);
+        var rate = exchangeRateResolver.resolveRateToUsd(tenantId, currency);
+        return amount.multiply(rate).setScale(Money.SCALE, Money.ROUNDING);
     }
 }

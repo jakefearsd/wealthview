@@ -34,6 +34,7 @@ class ExchangeRateServiceTest {
     @Mock private ExchangeRateRepository exchangeRateRepository;
     @Mock private TenantRepository tenantRepository;
     @Mock private AccountRepository accountRepository;
+    @Mock private ExchangeRateResolver exchangeRateResolver;
     @InjectMocks private ExchangeRateService exchangeRateService;
 
     private TenantEntity tenant;
@@ -148,8 +149,8 @@ class ExchangeRateServiceTest {
 
     @Test
     void convertToUsd_eurCurrency_multipliesByRate() {
-        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "EUR"))
-                .thenReturn(Optional.of(new ExchangeRateEntity(tenant, "EUR", new BigDecimal("1.08"))));
+        when(exchangeRateResolver.resolveRateToUsd(tenantId, "EUR"))
+                .thenReturn(new BigDecimal("1.08"));
 
         var result = exchangeRateService.convertToUsd(new BigDecimal("1000.00"), "EUR", tenantId);
 
@@ -158,8 +159,8 @@ class ExchangeRateServiceTest {
 
     @Test
     void convertToUsd_missingRate_throwsEntityNotFound() {
-        when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "JPY"))
-                .thenReturn(Optional.empty());
+        when(exchangeRateResolver.resolveRateToUsd(tenantId, "JPY"))
+                .thenThrow(new EntityNotFoundException("No exchange rate found for JPY"));
 
         assertThatThrownBy(() -> exchangeRateService.convertToUsd(
                 new BigDecimal("10000"), "JPY", tenantId))
