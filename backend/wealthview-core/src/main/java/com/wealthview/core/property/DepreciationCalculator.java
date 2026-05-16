@@ -16,6 +16,14 @@ import static com.wealthview.core.common.Money.SCALE;
 @Component
 public class DepreciationCalculator {
 
+    private static final Set<String> BONUS_ELIGIBLE_CLASSES = Set.of("5yr", "7yr", "15yr");
+
+    private static final Map<String, BigDecimal> CLASS_LIFE_YEARS = Map.of(
+            "5yr", new BigDecimal("5"),
+            "7yr", new BigDecimal("7"),
+            "15yr", new BigDecimal("15"),
+            "27_5yr", new BigDecimal("27.5"));
+
     /**
      * Computes a straight-line depreciation schedule using IRS mid-month convention.
      * First year is prorated based on the month placed in service.
@@ -60,14 +68,6 @@ public class DepreciationCalculator {
 
         return schedule;
     }
-
-    private static final Set<String> BONUS_ELIGIBLE_CLASSES = Set.of("5yr", "7yr", "15yr");
-
-    private static final Map<String, BigDecimal> CLASS_LIFE_YEARS = Map.of(
-            "5yr", new BigDecimal("5"),
-            "7yr", new BigDecimal("7"),
-            "15yr", new BigDecimal("15"),
-            "27_5yr", new BigDecimal("27.5"));
 
     /**
      * Computes a cost segregation depreciation schedule.

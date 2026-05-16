@@ -20,8 +20,6 @@ package com.wealthview.projection;
  */
 final class RmdCalculator {
 
-    private RmdCalculator() {}
-
     // ── Legislative constants (SECURE Act 2.0 / Pub. L. 117-328) ──────────────
 
     /** Birth year threshold distinguishing the two RMD start ages under SECURE Act 2.0. */
@@ -94,6 +92,8 @@ final class RmdCalculator {
          2.3, // 119
          2.0  // 120
     };
+
+    private RmdCalculator() {}
 
     /**
      * Returns the IRS Uniform Lifetime Table distribution period for the given age.

@@ -10,6 +10,10 @@ public record CombinedTaxResult(
         BigDecimal itemizedDeductions,
         boolean usedItemized) {
 
+    public static final CombinedTaxResult ZERO = new CombinedTaxResult(
+            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+            BigDecimal.ZERO, BigDecimal.ZERO, false);
+
     public CombinedTaxResult add(CombinedTaxResult other) {
         return new CombinedTaxResult(
                 federalTax.add(other.federalTax),
@@ -20,8 +24,4 @@ public record CombinedTaxResult(
                 other.itemizedDeductions.compareTo(BigDecimal.ZERO) > 0 ? other.itemizedDeductions : itemizedDeductions,
                 usedItemized || other.usedItemized);
     }
-
-    public static final CombinedTaxResult ZERO = new CombinedTaxResult(
-            BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            BigDecimal.ZERO, BigDecimal.ZERO, false);
 }

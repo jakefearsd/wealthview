@@ -19,6 +19,8 @@ import java.util.UUID;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    static final String BEARER_AUTHENTICATED_ATTRIBUTE = "BEARER_AUTHENTICATED";
+
     private final JwtTokenProvider jwtTokenProvider;
     private final SessionStateValidator sessionStateValidator;
 
@@ -27,8 +29,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         this.jwtTokenProvider = jwtTokenProvider;
         this.sessionStateValidator = sessionStateValidator;
     }
-
-    static final String BEARER_AUTHENTICATED_ATTRIBUTE = "BEARER_AUTHENTICATED";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,

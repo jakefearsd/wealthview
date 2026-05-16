@@ -33,21 +33,6 @@ class RothConversionOptimizer {
     /** Binary search iterations used to find the maximum affordable conversion amount. */
     private static final int AFFORDABILITY_BINARY_SEARCH_ITERATIONS = 30;
 
-    record RothConversionSchedule(
-            double[] conversionByYear,
-            double[] conversionTaxByYear,
-            double[] traditionalBalance,
-            double[] rothBalance,
-            double[] taxableBalance,
-            double[] projectedRmd,
-            double lifetimeTaxWith,
-            double lifetimeTaxWithout,
-            int exhaustionAge,
-            boolean exhaustionTargetMet,
-            double conversionFraction,
-            double targetTraditionalBalance
-    ) {}
-
     private final double initTraditional;
     private final double initRoth;
     private final double initTaxable;
@@ -72,6 +57,21 @@ class RothConversionOptimizer {
     private final double rmdBracketHeadroom;
     private final double targetTraditionalBalance;
     private final double dynamicSequencingBracketRate;
+
+    record RothConversionSchedule(
+            double[] conversionByYear,
+            double[] conversionTaxByYear,
+            double[] traditionalBalance,
+            double[] rothBalance,
+            double[] taxableBalance,
+            double[] projectedRmd,
+            double lifetimeTaxWith,
+            double lifetimeTaxWithout,
+            int exhaustionAge,
+            boolean exhaustionTargetMet,
+            double conversionFraction,
+            double targetTraditionalBalance
+    ) {}
 
     RothConversionOptimizer(double initTraditional, double initRoth, double initTaxable,
                             double[] otherIncomeByYear, double[] taxableIncomeByYear,
