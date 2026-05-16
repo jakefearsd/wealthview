@@ -89,6 +89,14 @@
         <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
         <maven-surefire-report-plugin.version>3.5.5</maven-surefire-report-plugin.version>
         <versions-maven-plugin.version>2.21.0</versions-maven-plugin.version>
+        <!-- JaCoCo coverage gate thresholds (jacoco:check on the verify phase).
+             Defaults are conservative; each gated module overrides these in its
+             own <properties> block. LINE minimums track the CLAUDE.md targets;
+             BRANCH floors are set just below the levels reached during the
+             coverage-hardening pass so the gate locks in gains without flaking. -->
+        <jacoco.line.minimum>0.00</jacoco.line.minimum>
+        <jacoco.branch.minimum>0.00</jacoco.branch.minimum>
+        <jacoco.check.skip>true</jacoco.check.skip>
     </properties>
 
     <dependencyManagement>
@@ -348,6 +356,39 @@
                             <goals>
                                 <goal>report</goal>
                             </goals>
+                        </execution>
+                        <!-- Gate: fail the verify phase when coverage drops below the
+                             per-module floor. Reads the unit-test jacoco.exec produced
+                             by prepare-agent. Skipped by default (jacoco.check.skip=true);
+                             each gated module enables it and supplies its own thresholds
+                             via the jacoco.line.minimum / jacoco.branch.minimum
+                             properties. -->
+                        <execution>
+                            <id>check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                            <configuration>
+                                <skip>${jacoco.check.skip}</skip>
+                                <rules>
+                                    <rule>
+                                        <element>BUNDLE</element>
+                                        <limits>
+                                            <limit>
+                                                <counter>LINE</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>${jacoco.line.minimum}</minimum>
+                                            </limit>
+                                            <limit>
+                                                <counter>BRANCH</counter>
+                                                <value>COVEREDRATIO</value>
+                                                <minimum>${jacoco.branch.minimum}</minimum>
+                                            </limit>
+                                        </limits>
+                                    </rule>
+                                </rules>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>

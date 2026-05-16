@@ -13,6 +13,14 @@
     <artifactId>wealthview-import</artifactId>
     <name>WealthView Import</name>
 
+    <properties>
+        <!-- JaCoCo gate: CLAUDE.md line target 0.80; branch floor just below
+             the measured 0.7372 reached in the coverage-hardening pass. -->
+        <jacoco.check.skip>false</jacoco.check.skip>
+        <jacoco.line.minimum>0.80</jacoco.line.minimum>
+        <jacoco.branch.minimum>0.71</jacoco.branch.minimum>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.wealthview</groupId>
