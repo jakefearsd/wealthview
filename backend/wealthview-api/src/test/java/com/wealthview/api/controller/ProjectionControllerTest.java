@@ -212,6 +212,28 @@ class ProjectionControllerTest {
     }
 
     @Test
+    void create_withNullAccounts_returns201AndLogsZero() throws Exception {
+        // Covers the `request.accounts() != null ? request.accounts().size() : 0` else-branch in the log statement
+        when(scenarioCrudService.createScenario(eq(TENANT_ID), any()))
+                .thenReturn(sampleScenario());
+
+        mockMvc.perform(post("/api/v1/projections")
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                    "name": "Retirement Plan",
+                                    "retirement_date": "2055-01-01",
+                                    "end_age": 90,
+                                    "inflation_rate": 0.03,
+                                    "birth_year": 1990
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("Retirement Plan"));
+    }
+
+    @Test
     void run_existingScenario_returns200() throws Exception {
         var result = new ProjectionResultResponse(
                 SCENARIO_ID,

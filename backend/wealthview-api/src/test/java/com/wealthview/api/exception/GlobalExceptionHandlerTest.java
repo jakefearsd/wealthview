@@ -2,6 +2,8 @@ package com.wealthview.api.exception;
 
 import java.nio.charset.StandardCharsets;
 
+import java.io.UncheckedIOException;
+
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -15,6 +17,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import ch.qos.logback.classic.Level;
@@ -283,6 +286,96 @@ class GlobalExceptionHandlerTest {
         assertThat(appender.list.get(0).getFormattedMessage())
                 .doesNotContain("\r")
                 .doesNotContain("\n");
+    }
+
+    @Test
+    void handleTypeMismatch_requiredTypeNotNull_returns400WithTypeName() {
+        var ex = org.mockito.Mockito.mock(MethodArgumentTypeMismatchException.class);
+        org.mockito.Mockito.when(ex.getName()).thenReturn("size");
+        org.mockito.Mockito.when(ex.getRequiredType()).thenReturn((Class) Integer.class);
+
+        var response = handler.handleTypeMismatch(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("'size'").contains("Integer");
+        assertCounter("MethodArgumentTypeMismatchException", "400", 1);
+    }
+
+    @Test
+    void handleTypeMismatch_requiredTypeNull_usesGenericValueLabel() {
+        // Covers the `requiredType != null ? ... : "value"` null branch
+        var ex = org.mockito.Mockito.mock(MethodArgumentTypeMismatchException.class);
+        org.mockito.Mockito.when(ex.getName()).thenReturn("accountId");
+        org.mockito.Mockito.when(ex.getRequiredType()).thenReturn(null);
+
+        var response = handler.handleTypeMismatch(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("'accountId'").contains("value");
+    }
+
+    @Test
+    void handleValidation_noFieldErrors_usesOrElseFallback() {
+        // Covers the `.orElse("Validation failed")` branch when stream is empty
+        var bindingResult = new BeanPropertyBindingResult(new Object(), "request");
+        // no field errors added — the stream is empty, orElse("Validation failed") fires
+        var ex = new MethodArgumentNotValidException(null, bindingResult);
+
+        var response = handler.handleValidation(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).isEqualTo("Validation failed");
+    }
+
+    @Test
+    void handleUncheckedIo_withMessage_returns400WithMessage() {
+        var io = new java.io.IOException("Disk full");
+        var ex = new UncheckedIOException(io);
+
+        var response = handler.handleUncheckedIo(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("Disk full");
+        assertCounter("UncheckedIOException", "400", 1);
+    }
+
+    @Test
+    void handleUncheckedIo_withNullMessage_usesDefaultIoError() {
+        // Covers the `ex.getMessage() != null ? ex.getMessage() : "I/O error"` null branch
+        var io = new java.io.IOException();
+        var ex = new UncheckedIOException(io) {
+            @Override
+            public String getMessage() { return null; }
+        };
+
+        var response = handler.handleUncheckedIo(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("I/O error");
+    }
+
+    @Test
+    void handleDataIntegrity_returns400() {
+        var cause = new org.hibernate.exception.ConstraintViolationException(
+                "duplicate key", new java.sql.SQLException("detail"), "uq_accounts_name");
+        var ex = new org.springframework.dao.DataIntegrityViolationException("conflict", cause);
+
+        var response = handler.handleDataIntegrity(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("database constraint");
+        assertCounter("DataIntegrityViolationException", "400", 1);
+    }
+
+    @Test
+    void handleDateTimeParse_returns400() {
+        var ex = new java.time.format.DateTimeParseException("Unparseable", "2024-99", 5);
+
+        var response = handler.handleDateTimeParse(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("2024-99");
+        assertCounter("DateTimeParseException", "400", 1);
     }
 
     private void assertCounter(String exception, String status, double expected) {

@@ -189,4 +189,41 @@ class AuthControllerTest {
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized());
     }
+
+    @Test
+    void login_mfaRequired_returnsMfaToken() throws Exception {
+        // Covers the `outcome instanceof LoginOutcome.MfaRequired` branch in login()
+        when(authService.loginInitiate(any(LoginRequest.class), any(AuthRequestContext.class)))
+                .thenReturn(new com.wealthview.core.auth.dto.LoginOutcome.MfaRequired("mfa-challenge-token-abc"));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "mfa@example.com", "password": "mypassword1"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.mfa_required").value(true))
+                .andExpect(jsonPath("$.mfa_token").value("mfa-challenge-token-abc"));
+    }
+
+    @Test
+    void refresh_withBlankRefreshToken_returns401() throws Exception {
+        // Covers the `refreshToken.isBlank()` branch in the null-or-blank guard
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .with(csrf())
+                        .cookie(new Cookie("refresh_token", "   ")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    void refresh_withUnrelatedCookie_returns401() throws Exception {
+        // Covers the case where cookies exist but none is named "refresh_token"
+        // The for-loop in readCookie finds no match, returns null → 401
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .with(csrf())
+                        .cookie(new Cookie("some_other_cookie", "value")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("UNAUTHORIZED"));
+    }
 }

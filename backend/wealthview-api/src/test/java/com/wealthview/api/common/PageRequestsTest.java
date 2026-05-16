@@ -30,4 +30,26 @@ class PageRequestsTest {
     void maxPageSize_isSaneDefault() {
         assertThat(PageRequests.MAX_PAGE_SIZE).isEqualTo(200);
     }
+
+    @Test
+    void clampPage_withinLimit_returnsSameValue() {
+        assertThat(PageRequests.clampPage(0)).isEqualTo(0);
+        assertThat(PageRequests.clampPage(5)).isEqualTo(5);
+        assertThat(PageRequests.clampPage(PageRequests.MAX_PAGE_INDEX))
+                .isEqualTo(PageRequests.MAX_PAGE_INDEX);
+    }
+
+    @Test
+    void clampPage_overLimit_returnsMax() {
+        assertThat(PageRequests.clampPage(PageRequests.MAX_PAGE_INDEX + 1))
+                .isEqualTo(PageRequests.MAX_PAGE_INDEX);
+        assertThat(PageRequests.clampPage(Integer.MAX_VALUE))
+                .isEqualTo(PageRequests.MAX_PAGE_INDEX);
+    }
+
+    @Test
+    void clampPage_negative_returnsZero() {
+        assertThat(PageRequests.clampPage(-1)).isEqualTo(0);
+        assertThat(PageRequests.clampPage(-100)).isEqualTo(0);
+    }
 }

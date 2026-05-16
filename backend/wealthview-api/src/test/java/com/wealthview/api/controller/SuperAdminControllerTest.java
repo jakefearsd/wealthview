@@ -24,6 +24,8 @@ import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
 import com.wealthview.core.auth.LoginActivityService;
 import com.wealthview.core.auth.SessionStateValidator;
+import com.wealthview.core.pricefeed.PriceSyncService;
+import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.auth.dto.LoginActivityResponse;
 import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.config.SystemStatsService;
@@ -93,6 +95,9 @@ class SuperAdminControllerTest {
 
     @MockBean
     private SystemConfigService systemConfigService;
+
+    @MockBean
+    private PriceSyncService priceSyncService;
 
     private TenantEntity createTenantEntity() throws Exception {
         var tenant = new TenantEntity("Test Tenant");
@@ -204,6 +209,20 @@ class SuperAdminControllerTest {
                                 {"active": false}
                                 """))
                 .andExpect(status().isNoContent());
+    }
+
+    // --- Price sync ---
+
+    @Test
+    void triggerPriceSync_whenFinnhubConfigured_returns200() throws Exception {
+        when(priceSyncService.syncDailyPrices())
+                .thenReturn(new FinnhubSyncResult(12, 12, List.of()));
+
+        mockMvc.perform(post("/api/v1/admin/prices/sync")
+                        .with(authenticatedSuperAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.succeeded").value(12))
+                .andExpect(jsonPath("$.total").value(12));
     }
 
     // --- Existing price tests ---
