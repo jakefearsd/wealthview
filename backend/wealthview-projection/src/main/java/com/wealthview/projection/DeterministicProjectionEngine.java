@@ -173,7 +173,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 withdrawalRate, inflationRate, strategy, spendingPlan, incomeSources, properties);
     }
 
-    private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts, ScenarioParamsParser.ScenarioParams params,
+    private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts,
+                                              ScenarioParamsParser.ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy) {
         var config = new PoolStrategy.PoolConfig(
                 params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
@@ -272,8 +273,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
                 growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
         yearDto = applyPropertyEquity(yearDto, propertyEquity);
-        yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement, ctx.inflationRate(),
-                incomeResult.totalActiveIncome());
+        yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
+                ctx.inflationRate(), incomeResult.totalActiveIncome());
         yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,

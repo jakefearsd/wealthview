@@ -226,9 +226,19 @@
                     <configuration>
                         <effort>Max</effort>
                         <threshold>Medium</threshold>
-                        <failOnError>false</failOnError>
+                        <failOnError>true</failOnError>
                         <excludeFilterFile>${maven.multiModuleProjectDirectory}/spotbugs-exclude.xml</excludeFilterFile>
                     </configuration>
+                    <executions>
+                        <!-- Gate: fail the verify phase on any SpotBugs violation. -->
+                        <execution>
+                            <id>spotbugs-check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -237,9 +247,20 @@
                     <configuration>
                         <configLocation>${maven.multiModuleProjectDirectory}/wealthview_checks.xml</configLocation>
                         <consoleOutput>true</consoleOutput>
-                        <failOnViolation>false</failOnViolation>
+                        <failOnViolation>true</failOnViolation>
+                        <failsOnError>true</failsOnError>
                         <violationSeverity>warning</violationSeverity>
                     </configuration>
+                    <executions>
+                        <!-- Gate: fail the verify phase on any Checkstyle violation. -->
+                        <execution>
+                            <id>checkstyle-check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
@@ -247,13 +268,29 @@
                     <version>${pmd-plugin.version}</version>
                     <configuration>
                         <targetJdk>21</targetJdk>
-                        <failOnViolation>false</failOnViolation>
+                        <failOnViolation>true</failOnViolation>
                         <printFailingErrors>true</printFailingErrors>
                         <linkXRef>true</linkXRef>
                         <rulesets>
                             <ruleset>pmd-ruleset.xml</ruleset>
                         </rulesets>
                     </configuration>
+                    <executions>
+                        <!-- Gate: fail the verify phase on copy-paste duplication.
+                             NOTE: pmd:check (the rule-based gate) is intentionally NOT bound
+                             here yet. The codebase currently has ~88 unsuppressed PMD findings
+                             (mostly CyclomaticComplexity / CognitiveComplexity / NPath across
+                             the projection and optimizer code) that require genuine refactoring,
+                             not blanket suppression. Enabling pmd:check is deferred to a
+                             dedicated complexity-reduction task; cpd-check is clean and gated. -->
+                        <execution>
+                            <id>pmd-cpd-check</id>
+                            <phase>verify</phase>
+                            <goals>
+                                <goal>cpd-check</goal>
+                            </goals>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.pitest</groupId>
@@ -313,6 +350,19 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+            </plugin>
+            <!-- Quality gates: bound to the verify phase via executions in pluginManagement. -->
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-pmd-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
