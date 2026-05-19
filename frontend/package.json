@@ -14,18 +14,18 @@
   },
   "dependencies": {
     "@wealthview/shared": "*",
-    "axios": "^1.15.0",
+    "axios": "^1.16.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.4.1",
-    "react-router": "^7.14.0",
+    "react-router": "^7.15.1",
     "react-test-renderer": "19.2.3",
     "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.2",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.60.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.5.2",
@@ -39,7 +39,7 @@
     "globals": "^17.6.0",
     "jsdom": "^27.4.0",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.59.3",
+    "typescript-eslint": "^8.59.4",
     "vite": "^7.3.2",
     "vitest": "^3.2.4"
   }

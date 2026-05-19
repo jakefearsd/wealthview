@@ -76,7 +76,7 @@
         <commons-csv.version>1.14.1</commons-csv.version>
         <ofx4j.version>1.39</ofx4j.version>
         <jsoup.version>1.22.2</jsoup.version>
-        <caffeine.version>3.2.3</caffeine.version>
+        <caffeine.version>3.2.4</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.9.8.3</spotbugs-maven-plugin.version>
@@ -310,7 +310,7 @@
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.23.0</version>
+                    <version>1.23.1</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
