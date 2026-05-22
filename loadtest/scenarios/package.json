@@ -1,0 +1,13 @@
+{
+  "name": "wealthview-loadtest-scenarios",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild baseline.ts hotpaths.ts ramp.ts soak.ts --bundle --format=esm --platform=neutral --external:k6 --external:k6/* --outdir=dist"
+  },
+  "devDependencies": {
+    "@types/k6": "^1.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.0"
+  }
+}

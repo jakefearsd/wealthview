@@ -96,3 +96,8 @@ coverage/
 
 # Infrastructure (local-only overrides; infra/backup/ is committed)
 infra/local/
+
+# Load test harness
+loadtest/results/
+loadtest/scenarios/dist/
+loadtest/scenarios/node_modules/
