@@ -28,6 +28,14 @@ regexes = [
     '''default-secret-key-must-be-at-least-32-characters-long''',
     '''production-secret-key-must-be-at-least-32-characters''',
 
+    # Isolated load-test stack fake-only boot secrets (loadtest profile only,
+    # never prod/docker). Both are obviously non-secret by inspection: the JWT
+    # secret says so in plain text, and the MFA key is base64 of
+    # "LOADTEST-ONLY-FAKE-MFA-KEY-32BYT". The loadtest profile is not validated
+    # by ProductionConfigValidator, so these never reach production.
+    '''loadtest-only-fake-jwt-secret-min-32-characters-long-xxxx''',
+    '''TE9BRFRFU1QtT05MWS1GQUtFLU1GQS1LRVktMzJCWVQ=''',
+
     # Synthetic test emails / role strings used in unit fixtures
     '''@(?:example|test|x)\.(?:com|org)''',
 ]

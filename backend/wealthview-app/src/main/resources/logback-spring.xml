@@ -18,8 +18,11 @@
         logger_name / thread_name / mdc / stack_trace.
     -->
 
-    <!-- Dev profile: human-readable with MDC fields -->
-    <springProfile name="dev | default">
+    <!-- Dev / loadtest profile: human-readable with MDC fields. The isolated
+         loadtest stack reuses the dev console appender so its startup and
+         seeding output is visible (otherwise the root logger would have no
+         appender under the loadtest profile). -->
+    <springProfile name="dev | default | loadtest">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
                 <pattern>%d{HH:mm:ss.SSS} %-5level [%X{requestId:-}] [t:%X{tenantId:-}] [u:%X{userId:-}] [op:%X{operation:-}] %logger{36} - %msg%n</pattern>
