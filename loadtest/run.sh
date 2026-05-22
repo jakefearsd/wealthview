@@ -71,6 +71,11 @@ echo "==> Building k6 scenarios"
 ( cd scenarios && npm install --silent && npm run build --silent )
 
 START_EPOCH=$(date +%s)
+# k6 exits 99 when a threshold is crossed. For a ramp/soak that IS the point —
+# we ramp until latency/errors breach the thresholds. So capture k6's exit code
+# instead of letting `set -e`/`pipefail` abort the script before we collect the
+# pprof, the Prometheus snapshot, and REPORT.md. (`|| true` keeps the pipeline
+# from tripping `set -e`; PIPESTATUS[0] is k6's real exit code.)
 # --no-deps: the app+stack are already up and seeded. Without this, `compose run`
 # recreates the app container, which re-runs the (non-idempotent) seeder against
 # the already-seeded DB and crashes on a duplicate-key. The stack is healthy here.
@@ -83,15 +88,28 @@ if [[ "$SMOKE" == "1" ]]; then
   $COMPOSE run --rm --no-deps -e VUS_MAX=1 k6 run --vus 1 --duration 30s \
     -o experimental-prometheus-rw \
     --summary-export="/loadtest/results/$TS/k6-summary.json" \
-    /scripts/hotpaths.js | tee "$OUT/k6-stdout.txt"
+    /scripts/hotpaths.js | tee "$OUT/k6-stdout.txt" || true
 else
   echo "==> k6 $PROFILE run (VUS_MAX=$VUS_MAX)"
-  $COMPOSE run --rm --no-deps k6 run \
+  # `compose run` does NOT inherit the host shell's env into the container, and
+  # the k6 service's env block doesn't declare VUS_MAX/SOAK_DURATION — so the
+  # scenarios would otherwise fall back to their compiled-in defaults (VUS_MAX
+  # 200) and ignore --vus-max/--profile soak duration. Pass them through with -e.
+  $COMPOSE run --rm --no-deps \
+    -e "VUS_MAX=$VUS_MAX" \
+    -e "SOAK_DURATION=${SOAK_DURATION:-}" \
+    k6 run \
     -o experimental-prometheus-rw \
     --summary-export="/loadtest/results/$TS/k6-summary.json" \
-    "/scripts/$PROFILE.js" | tee "$OUT/k6-stdout.txt"
+    "/scripts/$PROFILE.js" | tee "$OUT/k6-stdout.txt" || true
 fi
+K6_EXIT="${PIPESTATUS[0]}"
 END_EPOCH=$(date +%s)
+case "$K6_EXIT" in
+  0)  echo "    k6 exited 0 (all thresholds held)";;
+  99) echo "    k6 exited 99 — a threshold was crossed (expected at the breaking point); continuing to collect artifacts";;
+  *)  echo "    k6 exited $K6_EXIT (run may be incomplete); continuing to collect artifacts";;
+esac
 
 echo "==> Exporting pprof CPU profile for the run window (best-effort)"
 PPROF_OK=0

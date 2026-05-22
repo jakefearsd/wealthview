@@ -65,6 +65,15 @@ services:
       # Auth uses Secure cookies by default; the smoke check hits plain http on
       # 8081, so disable the Secure flag for the loadtest stack.
       APP_COOKIE_SECURE: "false"
+      # Disable the per-IP / per-user request rate limiter for the loadtest
+      # stack. RateLimitFilter caps auth endpoints at 60/min PER IP and API
+      # endpoints at 300/min PER user; under a multi-VU ramp every k6 VU shares
+      # one source IP, so logins get 429'd, VUs end up unauthenticated, and the
+      # hot-path scenario can't reach the projection/optimize endpoints we're
+      # here to profile. The harness measures app/DB/CPU capacity, not the rate
+      # limiter, so it is turned off here. (matchIfMissing=true means the filter
+      # is on by default; this property is what disables it.)
+      APP_RATE_LIMIT_ENABLED: "false"
       # Continuous JVM profiling via the Pyroscope Java agent. The agent jar is
       # mounted (not baked into the image) and attached through JAVA_TOOL_OPTIONS,
       # which the JVM honors additively on top of the ENTRYPOINT (`java -jar

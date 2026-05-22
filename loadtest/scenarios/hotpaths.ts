@@ -23,7 +23,9 @@ export default function (): void {
   const list = authedGet('/api/v1/projections', 'scenario_list');
   check(list, { 'scenarios 200': (r) => r.status === 200 });
   const scenarios = list.json() as Array<{ id: string }>;
-  if (!scenarios || scenarios.length === 0) {
+  // Guard against a non-array body (e.g. an error envelope if a request was
+  // throttled or auth lapsed) so the VU skips the iteration instead of throwing.
+  if (!Array.isArray(scenarios) || scenarios.length === 0 || !scenarios[0]?.id) {
     return;
   }
   const sid = scenarios[0].id;

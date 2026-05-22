@@ -102,3 +102,4 @@ loadtest/results/
 loadtest/scenarios/dist/
 loadtest/scenarios/node_modules/
 loadtest/observability/pyroscope/pyroscope.jar
+loadtest/__pycache__/
