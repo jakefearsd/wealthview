@@ -1,0 +1,32 @@
+# Load-test profile — used ONLY by the isolated loadtest Docker stack.
+# Datasource points at the dedicated loadtest Postgres; never the dev DB.
+spring:
+  datasource:
+    url: ${LOADTEST_DB_URL:jdbc:postgresql://loadtest-db:5432/wealthview_loadtest}
+    username: ${LOADTEST_DB_USER:wv_loadtest}
+    password: ${LOADTEST_DB_PASSWORD:loadtest_local_pw}
+    hikari:
+      maximum-pool-size: ${LOADTEST_HIKARI_MAX:20}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.batch_size: 200
+        order_inserts: true
+        order_updates: true
+  flyway:
+    enabled: true
+
+# Knobs the seeder reads (LoadTestDataSeeder, added in a later task).
+loadtest:
+  seed:
+    tenants: ${LOADTEST_TENANTS:25}
+    transactions-per-tenant: ${LOADTEST_TXNS_PER_TENANT:1500}
+    manifest-path: ${LOADTEST_MANIFEST_PATH:/loadtest/results/manifest.json}
+    password: ${LOADTEST_TENANT_PASSWORD:LoadTest-Fake-Pw-123}
+
+management:
+  metrics:
+    tags:
+      application: wealthview-loadtest
