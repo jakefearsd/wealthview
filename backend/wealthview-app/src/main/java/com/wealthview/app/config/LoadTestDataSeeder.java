@@ -203,7 +203,7 @@ public class LoadTestDataSeeder implements ApplicationRunner {
 
     /**
      * Creates one minimal-but-valid projection scenario per tenant with a projection account for
-     * each pool type (traditional, roth, taxable), so {@code GET /api/v1/projection/scenarios}
+     * each pool type (traditional, roth, taxable), so {@code GET /api/v1/projections}
      * lists it and a projection run can execute.
      */
     private void seedScenario(TenantEntity tenant, AccountEntity brokerage,
