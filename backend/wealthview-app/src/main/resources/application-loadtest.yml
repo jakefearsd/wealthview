@@ -30,3 +30,9 @@ management:
   metrics:
     tags:
       application: wealthview-loadtest
+    distribution:
+      # Emit per-URI latency histogram buckets so the Grafana "HTTP server p95
+      # by URI" panel can run histogram_quantile. Loadtest profile only —
+      # histogram buckets add cardinality we don't want enabled in prod.
+      percentiles-histogram:
+        http.server.requests: true
