@@ -71,5 +71,27 @@ services:
       timeout: 5s
       retries: 40
 
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+      - --web.enable-admin-api
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    environment:
+      DATA_SOURCE_NAME: "postgresql://wv_loadtest:loadtest_local_pw@loadtest-db:5432/wealthview_loadtest?sslmode=disable"
+    depends_on:
+      loadtest-db:
+        condition: service_healthy
+
 volumes:
   loadtest-db-data:
+  prometheus-data:

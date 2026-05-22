@@ -5,6 +5,8 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -29,6 +31,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final Environment environment;
 
     @Value("${app.cors.allowed-origins:http://localhost:5173}")
     private List<String> allowedOrigins;
@@ -36,8 +39,9 @@ public class SecurityConfig {
     @Value("${app.cookie.secure:true}")
     private boolean cookieSecure;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter, Environment environment) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.environment = environment;
     }
 
     @Bean
@@ -71,7 +75,19 @@ public class SecurityConfig {
                                 bearerAuthorizationHeaderMatcher()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
+                .authorizeHttpRequests(auth -> {
+                    // Loadtest-only exception: under the isolated, throwaway,
+                    // synthetic-data loadtest stack (which is local and not
+                    // internet-facing), permit Prometheus to scrape the app's
+                    // metrics endpoints anonymously. In-network scraping is the
+                    // standard pattern there. Under EVERY other profile
+                    // (prod/dev/docker/it/default) the posture is UNCHANGED:
+                    // /actuator/** stays SUPER_ADMIN-only (PrometheusEndpointIT,
+                    // which runs under the `it` profile, still asserts 401/403/200).
+                    if (environment.acceptsProfiles(Profiles.of("loadtest"))) {
+                        auth.requestMatchers("/actuator/prometheus", "/actuator/metrics").permitAll();
+                    }
+                    auth
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/actuator/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/v1/auth/me").authenticated()
@@ -128,8 +144,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/**").hasAnyRole("ADMIN", "MEMBER", "SUPER_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/**").permitAll()
-                        .anyRequest().authenticated()
-                )
+                        .anyRequest().authenticated();
+                })
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint((request, response, authException) -> {
                             response.setStatus(401);
