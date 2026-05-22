@@ -89,8 +89,11 @@ public class GuardrailProfileService {
 
             deleteExistingProfile(scenario, scenarioId);
 
+            // name + essential_floor are NOT NULL; a minimal request may omit both.
+            // Default name to the scenario name and floor to the resolved input value.
+            String profileName = request.name() != null ? request.name() : scenario.getName();
             var entity = new GuardrailSpendingProfileEntity(
-                    scenario.getTenant(), scenario, request.name(), request.essentialFloor());
+                    scenario.getTenant(), scenario, profileName, optimizationInput.essentialFloor());
             populateGuardrailEntity(entity, scenario, request, optimizationInput, optimizerResult);
 
             var saved = guardrailRepository.save(entity);
@@ -296,7 +299,7 @@ public class GuardrailProfileService {
                 scenario.getInflationRate() != null ? scenario.getInflationRate() : BigDecimal.ZERO,
                 projectionInput.accounts(),
                 projectionInput.incomeSources(),
-                request.essentialFloor(),
+                request.essentialFloor() != null ? request.essentialFloor() : BigDecimal.ZERO,
                 request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
                 request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,

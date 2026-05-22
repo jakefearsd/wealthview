@@ -124,6 +124,50 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void optimize_nullEssentialFloor_defaultsToZero() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId))
+                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
+                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
+                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
+                        List.of(new HypotheticalAccountInput(
+                                new BigDecimal("500000"), BigDecimal.ZERO,
+                                new BigDecimal("0.07"), "taxable")),
+                        null));
+        when(guardrailRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.empty());
+
+        var optimizerResponse = new GuardrailProfileResponse(
+                null, scenarioId, null, BigDecimal.ZERO, BigDecimal.ZERO,
+                new BigDecimal("0.10"), 5000, new BigDecimal("0.95"),
+                List.of(), List.of(),
+                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("100000"), false,
+                OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(optimizerResponse);
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        // A minimal request body (every field null) — the optimize endpoint must
+        // not NPE; essentialFloor should fall back to ZERO like the other knobs.
+        var request = new GuardrailOptimizationRequest(
+                scenarioId, null, null, null,
+                null, null, null, null,
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        service.optimize(tenantId, scenarioId, request);
+
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        verify(spendingOptimizer).optimize(captor.capture());
+        assertThat(captor.getValue().essentialFloor()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
     void optimize_scenarioNotFound_throws() {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.empty());

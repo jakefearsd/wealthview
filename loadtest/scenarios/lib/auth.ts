@@ -7,6 +7,15 @@ export interface Session {
     xsrf: string;
 }
 
+// Reads the current CSRF token straight from the per-VU cookie jar. The server
+// uses double-submit-cookie CSRF and ROTATES the XSRF-TOKEN cookie on every
+// response, so the token must be read fresh at POST time — a value captured at
+// login is stale by the next request and the POST would 403.
+function currentXsrf(): string {
+    const cookies = http.cookieJar().cookiesForURL(BASE_URL);
+    return cookies['XSRF-TOKEN'] ? cookies['XSRF-TOKEN'][0] : '';
+}
+
 // Logs in; k6's per-VU cookie jar retains the auth cookies automatically.
 export function login(tenant: TenantManifest): Session {
     const res = http.post(
@@ -15,20 +24,17 @@ export function login(tenant: TenantManifest): Session {
         { headers: { 'Content-Type': 'application/json' }, tags: { name: 'login' } },
     );
     check(res, { 'login 200': (r) => r.status === 200 });
-
-    const jar = http.cookieJar();
-    const cookies = jar.cookiesForURL(BASE_URL);
-    const xsrf = cookies['XSRF-TOKEN'] ? cookies['XSRF-TOKEN'][0] : '';
-    return { xsrf };
+    return { xsrf: currentXsrf() };
 }
 
 export function authedGet(path: string, name: string): RefinedResponse<ResponseType | undefined> {
     return http.get(`${BASE_URL}${path}`, { tags: { name } });
 }
 
-export function authedPost(path: string, body: unknown, name: string, session: Session) {
+export function authedPost(path: string, body: unknown, name: string, _session?: Session) {
     return http.post(`${BASE_URL}${path}`, JSON.stringify(body), {
-        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': session.xsrf },
+        // Read the token fresh from the jar (it rotates per response).
+        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': currentXsrf() },
         tags: { name },
     });
 }

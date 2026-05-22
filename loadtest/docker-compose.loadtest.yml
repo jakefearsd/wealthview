@@ -113,6 +113,21 @@ services:
     ports:
       - "4040:4040"
 
+  k6:
+    image: grafana/k6:latest
+    profiles: ["k6"]
+    environment:
+      K6_PROMETHEUS_RW_SERVER_URL: http://prometheus:9090/api/v1/write
+      K6_PROMETHEUS_RW_TREND_STATS: "p(50),p(95),p(99)"
+      BASE_URL: http://loadtest-app:8080
+      MANIFEST_PATH: /loadtest/results/manifest.json
+    volumes:
+      - ./scenarios/dist:/scripts:ro
+      - ./results:/loadtest/results
+    depends_on:
+      loadtest-app:
+        condition: service_healthy
+
   grafana:
     image: grafana/grafana:latest
     ports:
