@@ -50,8 +50,7 @@ class LoadTestDataSeederTest extends AbstractApiIntegrationTest {
 
     private LoadTestDataSeeder newSeeder() {
         return new LoadTestDataSeeder(userRepository, tenantRepository, accountRepository,
-                transactionRepository, holdingRepository, projectionScenarioRepository,
-                jdbcTemplate, passwordEncoder,
+                projectionScenarioRepository, jdbcTemplate, passwordEncoder,
                 3, 50, "/tmp/loadtest-seeder-test-manifest.json", "LoadTest-Fake-Pw-123");
     }
 

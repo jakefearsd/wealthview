@@ -31,10 +31,8 @@ import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.AccountRepository;
-import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.TenantRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
 import com.wealthview.persistence.repository.UserRepository;
 
 /**
@@ -63,8 +61,6 @@ public class LoadTestDataSeeder implements ApplicationRunner {
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final AccountRepository accountRepository;
-    private final TransactionRepository transactionRepository;
-    private final HoldingRepository holdingRepository;
     private final ProjectionScenarioRepository projectionScenarioRepository;
     private final JdbcTemplate jdbcTemplate;
     private final PasswordEncoder passwordEncoder;
@@ -78,8 +74,6 @@ public class LoadTestDataSeeder implements ApplicationRunner {
     public LoadTestDataSeeder(UserRepository userRepository,
                               TenantRepository tenantRepository,
                               AccountRepository accountRepository,
-                              TransactionRepository transactionRepository,
-                              HoldingRepository holdingRepository,
                               ProjectionScenarioRepository projectionScenarioRepository,
                               JdbcTemplate jdbcTemplate,
                               PasswordEncoder passwordEncoder,
@@ -90,8 +84,6 @@ public class LoadTestDataSeeder implements ApplicationRunner {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
         this.accountRepository = accountRepository;
-        this.transactionRepository = transactionRepository;
-        this.holdingRepository = holdingRepository;
         this.projectionScenarioRepository = projectionScenarioRepository;
         this.jdbcTemplate = jdbcTemplate;
         this.passwordEncoder = passwordEncoder;
