@@ -37,6 +37,8 @@ services:
         condition: service_healthy
       loadtest-results-init:
         condition: service_completed_successfully
+      pyroscope:
+        condition: service_started
     ports:
       - "8081:8080"
     environment:
@@ -63,8 +65,22 @@ services:
       # Auth uses Secure cookies by default; the smoke check hits plain http on
       # 8081, so disable the Secure flag for the loadtest stack.
       APP_COOKIE_SECURE: "false"
+      # Continuous JVM profiling via the Pyroscope Java agent. The agent jar is
+      # mounted (not baked into the image) and attached through JAVA_TOOL_OPTIONS,
+      # which the JVM honors additively on top of the ENTRYPOINT (`java -jar
+      # app.jar`). itimer mode is signal-based (NOT perf_events), so it works in
+      # an unprivileged container without extra capabilities.
+      JAVA_TOOL_OPTIONS: "-javaagent:/pyroscope/pyroscope.jar"
+      PYROSCOPE_APPLICATION_NAME: wealthview-loadtest
+      PYROSCOPE_SERVER_ADDRESS: http://pyroscope:4040
+      PYROSCOPE_PROFILING_INTERVAL: 10ms
+      PYROSCOPE_PROFILER_EVENT: itimer
+      PYROSCOPE_PROFILER_ALLOC: 512k
+      PYROSCOPE_PROFILER_LOCK: 10ms
+      PYROSCOPE_FORMAT: jfr
     volumes:
       - ./results:/loadtest/results
+      - ./observability/pyroscope:/pyroscope:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
       interval: 5s
@@ -91,6 +107,11 @@ services:
     depends_on:
       loadtest-db:
         condition: service_healthy
+
+  pyroscope:
+    image: grafana/pyroscope:latest
+    ports:
+      - "4040:4040"
 
 volumes:
   loadtest-db-data:

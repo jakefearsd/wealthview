@@ -101,3 +101,4 @@ infra/local/
 loadtest/results/
 loadtest/scenarios/dist/
 loadtest/scenarios/node_modules/
+loadtest/observability/pyroscope/pyroscope.jar
