@@ -48,6 +48,7 @@ services:
       LOADTEST_DB_PASSWORD: loadtest_local_pw
       LOADTEST_TENANTS: ${LOADTEST_TENANTS:-25}
       LOADTEST_TXNS_PER_TENANT: ${LOADTEST_TXNS_PER_TENANT:-1500}
+      LOADTEST_HIKARI_MAX: ${LOADTEST_HIKARI_MAX:-20}
       LOADTEST_MANIFEST_PATH: /loadtest/results/manifest.json
       # Required boot env vars for the base application.yml under the loadtest
       # profile. These are obviously-fake, loadtest-only values — never real
