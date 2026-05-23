@@ -10,13 +10,14 @@ on:
 
 jobs:
   shellcheck-and-bats:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Ensure shellcheck is on PATH
         run: |
           set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
           if ! command -v shellcheck >/dev/null 2>&1; then
             SC_VER=0.10.0
             tmp=$(mktemp -d)
@@ -43,6 +44,7 @@ jobs:
       - name: Ensure age is on PATH (for encryption tests)
         run: |
           set -euo pipefail
+          mkdir -p "$HOME/.local/bin"
           if ! command -v age >/dev/null 2>&1; then
             AGE_VER=1.2.0
             tmp=$(mktemp -d)
