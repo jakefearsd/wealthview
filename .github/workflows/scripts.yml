@@ -1,27 +1,11 @@
 name: Admin Scripts
 
+# Builds run ONLY when a version tag (v*) is created. workflow_dispatch is a
+# manual re-run escape hatch and never triggers automatically.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'wv'
-      - 'scripts/**'
-      - 'infra/**'
-      - 'dev-backup.sh'
-      - 'dev-restore.sh'
-      - 'deploy.sh'
-      - 'fulltestsuite.sh'
-      - '.github/workflows/scripts.yml'
-  pull_request:
-    paths:
-      - 'wv'
-      - 'scripts/**'
-      - 'infra/**'
-      - 'dev-backup.sh'
-      - 'dev-restore.sh'
-      - 'deploy.sh'
-      - 'fulltestsuite.sh'
-      - '.github/workflows/scripts.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:

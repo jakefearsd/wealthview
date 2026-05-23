@@ -1,14 +1,11 @@
 name: Staging Deploy
 
+# Builds + deploys ONLY when a version tag (v*) is created. workflow_dispatch is
+# a manual re-run escape hatch and never triggers automatically.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-      - 'pom.xml'
-      - 'Dockerfile'
-      - 'docker-compose*.yml'
-      - '.github/workflows/staging-deploy.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 concurrency:
@@ -32,8 +29,11 @@ jobs:
             echo "api.version=1.44" > "$dir/docker-java.properties"
           done
 
-      - name: Run tests
-        run: cd backend && mvn clean test -T 1C -B
+      - name: Run full verification (unit + integration tests + quality gates)
+        # `verify` (not `test`) so the release build runs the Failsafe integration
+        # tests and the enforced PMD/CPD/SpotBugs/Checkstyle/JaCoCo gates, which
+        # are bound to the verify phase. Testcontainers needs Docker (self-hosted).
+        run: cd backend && mvn clean verify -B
 
   build-and-deploy:
     needs: test

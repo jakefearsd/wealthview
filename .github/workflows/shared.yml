@@ -1,19 +1,11 @@
 name: Shared Workspace
 
+# Builds run ONLY when a version tag (v*) is created. workflow_dispatch is a
+# manual re-run escape hatch and never triggers automatically.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/shared.yml'
-  pull_request:
-    paths:
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/shared.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:

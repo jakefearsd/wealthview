@@ -1,21 +1,11 @@
 name: Web Frontend
 
+# Builds run ONLY when a version tag (v*) is created. workflow_dispatch is a
+# manual re-run escape hatch and never triggers automatically.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'frontend/**'
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/web.yml'
-  pull_request:
-    paths:
-      - 'frontend/**'
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/web.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:

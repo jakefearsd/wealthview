@@ -3,22 +3,12 @@ name: Mobile App
 # Linux CI runs typecheck + Jest only. Android Gradle and iOS xcodebuild
 # happen locally on a developer machine — see mobile/README.md.
 
+# Builds run ONLY when a version tag (v*) is created. workflow_dispatch is a
+# manual re-run escape hatch and never triggers automatically.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'mobile/**'
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/mobile.yml'
-  pull_request:
-    paths:
-      - 'mobile/**'
-      - 'shared/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/mobile.yml'
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
