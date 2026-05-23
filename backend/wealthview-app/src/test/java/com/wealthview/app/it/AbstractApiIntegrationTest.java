@@ -59,8 +59,14 @@ public abstract class AbstractApiIntegrationTest {
         var httpClient = org.apache.hc.client5.http.impl.classic.HttpClientBuilder.create()
                 .disableCookieManagement()
                 .build();
-        restTemplate.getRestTemplate().setRequestFactory(
-                new HttpComponentsClientHttpRequestFactory(httpClient));
+        var requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
+        // Generous, explicit timeouts. CI runs on small shared (2-core) GitHub-hosted
+        // runners where the full Testcontainers suite contends for CPU, so heavier
+        // requests (e.g. stock-split unapply, or a GET while a backfill runs) can be
+        // slow; the default socket timeout otherwise trips as "Read timed out".
+        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(15));
+        requestFactory.setReadTimeout(java.time.Duration.ofSeconds(90));
+        restTemplate.getRestTemplate().setRequestFactory(requestFactory);
     }
 
     @BeforeEach

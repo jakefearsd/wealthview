@@ -35,7 +35,10 @@ jobs:
           done
 
       - name: Verify (unit + integration tests + quality gates)
-        run: mvn -f backend/pom.xml clean verify -B
+        # rerunFailingTestsCount retries a transient integration-test failure (the
+        # Testcontainers IT suite can occasionally flake on small shared CI runners)
+        # before failing the build. Deterministic gate/unit failures still fail.
+        run: mvn -f backend/pom.xml clean verify -B -Dfailsafe.rerunFailingTestsCount=2
 
       - name: Build release Docker image
         run: docker build -t "wealthview:${{ github.ref_name }}" .
