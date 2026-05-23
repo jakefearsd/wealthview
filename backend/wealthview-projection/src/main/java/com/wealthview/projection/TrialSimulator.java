@@ -65,7 +65,9 @@ final class TrialSimulator {
 
         // pools[0] = taxable, pools[1] = traditional, pools[2] = roth
         double[] pools = { config.initTaxable(), config.initTraditional(), config.initRoth() };
-        String order = config.withdrawalOrder();
+        // Resolve the withdrawal order once per trial (constant for the run) so the
+        // per-year splitWithdrawal calls do no String.equals work.
+        WithdrawalOrder order = resolveOrder(config.withdrawalOrder());
 
         double cashBalance = 0;
         if (config.cashReserveYears() > 0) {
@@ -270,6 +272,17 @@ final class TrialSimulator {
                                            double need, String order, boolean preAge595,
                                            double dsBracketCeiling, double otherIncome,
                                            double conversionAmount, double rmdAmount) {
+        // Resolve the string order to the enum once for non-hot-path callers (the
+        // facade + tests). The hot trial loop resolves it once per trial instead
+        // (see simulateTrial) and calls the enum overload directly.
+        return splitWithdrawal(taxable, traditional, roth, need, resolveOrder(order), preAge595,
+                dsBracketCeiling, otherIncome, conversionAmount, rmdAmount);
+    }
+
+    static PoolWithdrawal splitWithdrawal(double taxable, double traditional, double roth,
+                                           double need, WithdrawalOrder order, boolean preAge595,
+                                           double dsBracketCeiling, double otherIncome,
+                                           double conversionAmount, double rmdAmount) {
         if (need <= 0) {
             return new PoolWithdrawal(0, 0, 0);
         }
@@ -278,43 +291,67 @@ final class TrialSimulator {
             return new PoolWithdrawal(drawn, 0, 0);
         }
 
-        // Dynamic Sequencing: Traditional first up to bracket space, then taxable, then Roth
-        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(order)) {
-            double bracketSpace = Math.max(0,
-                    dsBracketCeiling - otherIncome - conversionAmount - rmdAmount);
-            double fromTrad = Math.min(bracketSpace, Math.min(Math.max(0, traditional), need));
-            double remaining = need - fromTrad;
-            double fromTax = Math.min(remaining, Math.max(0, taxable));
-            remaining -= fromTax;
-            double fromRoth = Math.min(remaining, Math.max(0, roth));
-            return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
-        }
-
-        double[] pools;
-        int[] mapping; // maps pool index -> result index (0=taxable, 1=traditional, 2=roth)
-
-        if ("traditional_first".equals(order)) {
-            pools = new double[]{traditional, taxable, roth};
-            mapping = new int[]{1, 0, 2};
-        } else if ("roth_first".equals(order)) {
-            pools = new double[]{roth, taxable, traditional};
-            mapping = new int[]{2, 0, 1};
-        } else { // taxable_first (default)
-            pools = new double[]{taxable, traditional, roth};
-            mapping = new int[]{0, 1, 2};
-        }
-
-        double[] amounts = new double[3];
-        double remaining = need;
-        for (int i = 0; i < 3; i++) {
-            double drawn = Math.min(remaining, Math.max(0, pools[i]));
-            amounts[mapping[i]] = drawn;
-            remaining -= drawn;
-            if (remaining <= 0) {
-                break;
+        // Scalar greedy draw in priority order — no per-call array allocation. Each
+        // branch draws pools in its order, capping at the available balance, and
+        // returns the result mapped to (taxable, traditional, roth).
+        switch (order) {
+            case DYNAMIC_SEQUENCING: {
+                // Traditional first up to bracket space, then taxable, then Roth.
+                double bracketSpace = Math.max(0,
+                        dsBracketCeiling - otherIncome - conversionAmount - rmdAmount);
+                double fromTrad = Math.min(bracketSpace, Math.min(Math.max(0, traditional), need));
+                double remaining = need - fromTrad;
+                double fromTax = Math.min(remaining, Math.max(0, taxable));
+                remaining -= fromTax;
+                double fromRoth = Math.min(remaining, Math.max(0, roth));
+                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
+            }
+            case TRADITIONAL_FIRST: {
+                double fromTrad = Math.min(need, Math.max(0, traditional));
+                double remaining = need - fromTrad;
+                double fromTax = Math.min(remaining, Math.max(0, taxable));
+                remaining -= fromTax;
+                double fromRoth = Math.min(remaining, Math.max(0, roth));
+                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
+            }
+            case ROTH_FIRST: {
+                double fromRoth = Math.min(need, Math.max(0, roth));
+                double remaining = need - fromRoth;
+                double fromTax = Math.min(remaining, Math.max(0, taxable));
+                remaining -= fromTax;
+                double fromTrad = Math.min(remaining, Math.max(0, traditional));
+                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
+            }
+            default: { // TAXABLE_FIRST
+                double fromTax = Math.min(need, Math.max(0, taxable));
+                double remaining = need - fromTax;
+                double fromTrad = Math.min(remaining, Math.max(0, traditional));
+                remaining -= fromTrad;
+                double fromRoth = Math.min(remaining, Math.max(0, roth));
+                return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
             }
         }
-        return new PoolWithdrawal(amounts[0], amounts[1], amounts[2]);
+    }
+
+    /** Withdrawal ordering, resolved once from the string config to avoid per-call String.equals. */
+    enum WithdrawalOrder { TAXABLE_FIRST, TRADITIONAL_FIRST, ROTH_FIRST, DYNAMIC_SEQUENCING }
+
+    /**
+     * Maps the string withdrawal-order config to the enum, preserving the original
+     * precedence: dynamic sequencing, then traditional-first, then roth-first, else
+     * taxable-first (the default).
+     */
+    static WithdrawalOrder resolveOrder(String order) {
+        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(order)) {
+            return WithdrawalOrder.DYNAMIC_SEQUENCING;
+        }
+        if ("traditional_first".equals(order)) {
+            return WithdrawalOrder.TRADITIONAL_FIRST;
+        }
+        if ("roth_first".equals(order)) {
+            return WithdrawalOrder.ROTH_FIRST;
+        }
+        return WithdrawalOrder.TAXABLE_FIRST;
     }
 
     /**
