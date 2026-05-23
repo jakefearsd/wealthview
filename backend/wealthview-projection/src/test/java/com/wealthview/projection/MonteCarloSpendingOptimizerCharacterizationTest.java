@@ -134,4 +134,33 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
                     .isEqualByComparingTo(b.yearlySpending().get(i).recommended());
         }
     }
+
+    @Test
+    void optimize_sameSeed_everyYearlyFieldByteIdenticalAcrossRuns() {
+        // Stronger reproducibility gate than the recommended-only check above: asserts
+        // EVERY field of EVERY yearly entry is byte-identical across two seeded runs. This
+        // is the end-to-end determinism safety-net that makes parallelizing the trial loop
+        // safe — parallel execution must not perturb any output value.
+        var optimizer = new MonteCarloSpendingOptimizer(null);
+
+        GuardrailProfileResponse a = optimizer.optimize(goldenInput());
+        GuardrailProfileResponse b = optimizer.optimize(goldenInput());
+
+        assertThat(a.medianFinalBalance()).isEqualByComparingTo(b.medianFinalBalance());
+        assertThat(a.failureRate()).isEqualByComparingTo(b.failureRate());
+        assertThat(a.percentile10Final()).isEqualByComparingTo(b.percentile10Final());
+        assertThat(a.yearlySpending()).hasSameSizeAs(b.yearlySpending());
+        for (int i = 0; i < a.yearlySpending().size(); i++) {
+            GuardrailYearlySpending ya = a.yearlySpending().get(i);
+            GuardrailYearlySpending yb = b.yearlySpending().get(i);
+            assertThat(ya.year()).isEqualTo(yb.year());
+            assertThat(ya.age()).isEqualTo(yb.age());
+            assertThat(ya.phaseName()).isEqualTo(yb.phaseName());
+            assertThat(ya.recommended()).isEqualByComparingTo(yb.recommended());
+            assertThat(ya.corridorLow()).isEqualByComparingTo(yb.corridorLow());
+            assertThat(ya.corridorHigh()).isEqualByComparingTo(yb.corridorHigh());
+            assertThat(ya.portfolioWithdrawal()).isEqualByComparingTo(yb.portfolioWithdrawal());
+            assertThat(ya.portfolioBalanceMedian()).isEqualByComparingTo(yb.portfolioBalanceMedian());
+        }
+    }
 }

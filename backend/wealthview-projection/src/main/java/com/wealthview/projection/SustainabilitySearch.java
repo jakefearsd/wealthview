@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
@@ -26,6 +27,23 @@ final class SustainabilitySearch {
     private static final int SPENDING_BINARY_SEARCH_ITERATIONS = 30;
     /** Binary search iterations used in {@link #binarySearchDiscretionary}. */
     private static final int PHASE_BINARY_SEARCH_ITERATIONS = 40;
+
+    /**
+     * Minimum trial count at which the {@link #isSustainable} trial loop runs in parallel.
+     * Below this, the fork/join overhead outweighs the gain, so the loop stays sequential.
+     */
+    private static final int PARALLEL_MIN_TRIALS = 256;
+
+    /**
+     * Test seam: when {@code false}, the {@link #isSustainable} trial loop always runs
+     * sequentially regardless of trial count. Production keeps this {@code true}; the
+     * parallel-vs-sequential equivalence test flips it to prove the two paths agree
+     * byte-for-byte. Package-private and mutable on purpose — reset it in test teardown.
+     */
+    // MutableStaticState: an intentional package-private test seam, not shared production state —
+    // production never writes it (always true); only the equivalence test toggles it.
+    @SuppressWarnings("PMD.MutableStaticState")
+    static boolean parallelTrials = true;
 
     private final TrialSimulator trialSimulator;
 
@@ -262,7 +280,6 @@ final class SustainabilitySearch {
     @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
     boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
         int trialCount = ctx.trialCount();
-        int years = ctx.years();
         double[][] paths = ctx.paths();
         TaxContext taxCtx = ctx.taxCtx();
 
@@ -282,26 +299,16 @@ final class SustainabilitySearch {
                 ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
                 ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(), false);
 
-        double[] nominalReturns = new double[years];
-        for (int t = 0; t < trialCount; t++) {
-            // Derive nominal returns from pre-computed path ratios
-            for (int y = 0; y < years; y++) {
-                nominalReturns[y] = paths[t][y + 1] / paths[t][y] - 1.0;
-            }
-
-            // For non-pool trials, initial balance varies per trial
-            TrialSimulator.SimulationConfig trialConfig = hasPools ? config
-                    : new TrialSimulator.SimulationConfig(
-                            paths[t][0], 0, 0, order, null,
-                            ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
-                            ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(),
-                            ctx.cashReturnRate(), false);
-
-            var result = trialSimulator.simulateTrial(nominalReturns, ctx.income(), ctx.surplusTax(),
-                    floors, discretionary, years, trialConfig);
-            finalBalances[t] = result.finalBalance();
-            minBalances[t] = result.minBalance();
+        // The trial loop is embarrassingly parallel: the paths matrix is generated (seeded)
+        // before this loop, each trial is a pure function of its fixed path writing to a
+        // distinct result index, and TrialSimulator is stateless. nominalReturns is allocated
+        // PER TRIAL (inside simulateOneTrial) — a single shared buffer would be a data race.
+        IntStream trials = IntStream.range(0, trialCount);
+        if (parallelTrials && trialCount >= PARALLEL_MIN_TRIALS) {
+            trials = trials.parallel();
         }
+        trials.forEach(t -> simulateOneTrial(ctx, floors, discretionary, hasPools, order,
+                config, finalBalances, minBalances, t));
 
         Arrays.sort(finalBalances);
         double balanceAtConfidence =
@@ -320,5 +327,38 @@ final class SustainabilitySearch {
         }
 
         return true;
+    }
+
+    /**
+     * Runs a single trial of the {@link #isSustainable} loop and writes its outcome to the
+     * distinct result indices {@code finalBalances[t]} / {@code minBalances[t]}. Pure with
+     * respect to shared state: it reads only the (read-only) context arrays and allocates its
+     * own {@code nominalReturns} buffer, so it is safe to invoke concurrently across trials.
+     */
+    private void simulateOneTrial(SearchContext ctx, double[] floors, double[] discretionary,
+                                  boolean hasPools, String order,
+                                  TrialSimulator.SimulationConfig config,
+                                  double[] finalBalances, double[] minBalances, int t) {
+        int years = ctx.years();
+        double[][] paths = ctx.paths();
+
+        // Per-trial buffer (thread-local): a single shared array would be a data race.
+        double[] nominalReturns = new double[years];
+        for (int y = 0; y < years; y++) {
+            nominalReturns[y] = paths[t][y + 1] / paths[t][y] - 1.0;
+        }
+
+        // For non-pool trials, initial balance varies per trial
+        TrialSimulator.SimulationConfig trialConfig = hasPools ? config
+                : new TrialSimulator.SimulationConfig(
+                        paths[t][0], 0, 0, order, null,
+                        ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
+                        ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(),
+                        ctx.cashReturnRate(), false);
+
+        var result = trialSimulator.simulateTrial(nominalReturns, ctx.income(), ctx.surplusTax(),
+                floors, discretionary, years, trialConfig);
+        finalBalances[t] = result.finalBalance();
+        minBalances[t] = result.minBalance();
     }
 }
