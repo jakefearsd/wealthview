@@ -145,6 +145,15 @@ go tool pprof -http=:8080 loadtest/results/<ts>/cpu.pprof
 go tool pprof -top -nodecount=20 loadtest/results/<ts>/cpu.pprof
 ```
 
+No Go toolchain? `analyze_pprof.py` gives a CPU-weighted top breakdown
+(self/leaf and cumulative) from the same file, stdlib-only:
+
+```bash
+python3 loadtest/analyze_pprof.py loadtest/results/<ts>/cpu.pprof --top 20
+# isolate the app's own frames:
+python3 loadtest/analyze_pprof.py loadtest/results/<ts>/cpu.pprof --filter com/wealthview
+```
+
 > The pprof is exported by `profilecli` from *inside* the Pyroscope container
 > (the render API on this Pyroscope version returns a JSON flamebearer, not a
 > binary pprof). On tiny runs (e.g. `--smoke`) the profile is near-empty; under a
