@@ -1,6 +1,7 @@
 package com.wealthview.app.config;
 
 import java.io.File;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.file.Files;
@@ -116,7 +117,6 @@ public class LoadTestDataSeeder implements ApplicationRunner {
 
         long totalTxns = 0;
         long totalHoldings = 0;
-        long totalPrices = 0;
 
         for (int n = 1; n <= tenants; n++) {
             var tenant = tenantRepository.save(new TenantEntity("LoadTest Tenant " + n));
@@ -141,7 +141,7 @@ public class LoadTestDataSeeder implements ApplicationRunner {
             seedScenario(tenant, brokerage, ira, roth);
         }
 
-        totalPrices = seedPrices();
+        long totalPrices = seedPrices();
 
         writeManifest(new SeedManifest(manifestTenants));
 
@@ -259,7 +259,7 @@ public class LoadTestDataSeeder implements ApplicationRunner {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, manifest);
             log.info("Wrote load-test manifest with {} tenants to {}",
                     manifest.tenants().size(), manifestPath);
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new IllegalStateException("Failed to write load-test manifest to " + manifestPath, e);
         }
     }
