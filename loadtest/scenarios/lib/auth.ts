@@ -5,7 +5,15 @@ import { BASE_URL } from './config';
 
 export interface Session {
     xsrf: string;
+    ok: boolean;
 }
+
+// Per-VU flag: each VU gets its own module instance and its own cookie jar,
+// both of which persist across iterations, so we authenticate once per VU and
+// reuse the session. This keeps the workload representative (real clients log
+// in once, not every request) and stops bcrypt password hashing from dominating
+// the CPU profile of an otherwise read/compute-bound workload.
+let authenticated = false;
 
 // Reads the current CSRF token straight from the per-VU cookie jar. The server
 // uses double-submit-cookie CSRF and ROTATES the XSRF-TOKEN cookie on every
@@ -23,8 +31,21 @@ export function login(tenant: TenantManifest): Session {
         JSON.stringify({ email: tenant.email, password: tenant.password }),
         { headers: { 'Content-Type': 'application/json' }, tags: { name: 'login' } },
     );
-    check(res, { 'login 200': (r) => r.status === 200 });
-    return { xsrf: currentXsrf() };
+    const ok = res.status === 200;
+    check(res, { 'login 200': () => ok });
+    return { xsrf: currentXsrf(), ok };
+}
+
+// Authenticate at most once per VU. Subsequent calls are no-ops while the VU's
+// cookie jar still holds a valid session. Only latches on success, so a failed
+// first attempt is retried on the next iteration.
+export function loginOnce(tenant: TenantManifest): void {
+    if (authenticated) {
+        return;
+    }
+    if (login(tenant).ok) {
+        authenticated = true;
+    }
 }
 
 export function authedGet(path: string, name: string): RefinedResponse<ResponseType | undefined> {

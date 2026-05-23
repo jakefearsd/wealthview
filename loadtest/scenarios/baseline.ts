@@ -1,13 +1,14 @@
 import { sleep, check } from 'k6';
 import exec from 'k6/execution';
-import { login, authedGet } from './lib/auth';
+import { loginOnce, authedGet } from './lib/auth';
 import { tenantForVu } from './lib/manifest';
 
-// Read-baseline scenario: each VU logs in as its assigned tenant and exercises
-// the cheap read endpoints (accounts list + dashboard summary + portfolio history).
+// Read-baseline scenario: each VU authenticates once (reusing the session on
+// later iterations) then exercises the cheap read endpoints (accounts list +
+// dashboard summary + portfolio history).
 export default function (): void {
   const tenant = tenantForVu(exec.vu.idInTest);
-  login(tenant);
+  loginOnce(tenant);
 
   const accounts = authedGet('/api/v1/accounts', 'accounts');
   check(accounts, { 'accounts 200': (r) => r.status === 200 });
