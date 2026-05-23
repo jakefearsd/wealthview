@@ -79,7 +79,8 @@ public class LoadTestDataSeeder implements ApplicationRunner {
                               PasswordEncoder passwordEncoder,
                               @Value("${loadtest.seed.tenants:25}") int configuredTenants,
                               @Value("${loadtest.seed.transactions-per-tenant:1500}") int configuredTxnsPerTenant,
-                              @Value("${loadtest.seed.manifest-path:/loadtest/results/manifest.json}") String manifestPath,
+                              @Value("${loadtest.seed.manifest-path:/loadtest/results/manifest.json}")
+                              String manifestPath,
                               @Value("${loadtest.seed.password:LoadTest-Fake-Pw-123}") String password) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
