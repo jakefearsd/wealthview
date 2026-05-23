@@ -8,12 +8,15 @@ export interface Session {
     ok: boolean;
 }
 
-// Per-VU flag: each VU gets its own module instance and its own cookie jar,
-// both of which persist across iterations, so we authenticate once per VU and
-// reuse the session. This keeps the workload representative (real clients log
-// in once, not every request) and stops bcrypt password hashing from dominating
-// the CPU profile of an otherwise read/compute-bound workload.
-let authenticated = false;
+// Captured access-token cookie value for this VU (module state is per-VU and
+// persists across iterations). We hash the password only ONCE per VU and then
+// re-assert the captured token each iteration. This keeps the workload
+// representative (real clients log in once, not every request) and stops bcrypt
+// password hashing from dominating the CPU profile of an otherwise read/compute
+// workload. Empirically, k6's per-VU cookie jar does NOT reliably carry the
+// httpOnly access_token across iterations, so relying on the jar alone leaves
+// iterations 2+ unauthenticated — hence the explicit re-assert below.
+let authToken = '';
 
 // Reads the current CSRF token straight from the per-VU cookie jar. The server
 // uses double-submit-cookie CSRF and ROTATES the XSRF-TOKEN cookie on every
@@ -36,15 +39,21 @@ export function login(tenant: TenantManifest): Session {
     return { xsrf: currentXsrf(), ok };
 }
 
-// Authenticate at most once per VU. Subsequent calls are no-ops while the VU's
-// cookie jar still holds a valid session. Only latches on success, so a failed
-// first attempt is retried on the next iteration.
+// Ensure this VU is authenticated for the current iteration, hashing the
+// password at most once per VU. On the first call we log in and capture the
+// access_token cookie value; on later calls we just re-assert that cookie into
+// the jar (cheap, no bcrypt). If the token can't be read back from the jar,
+// authToken stays empty and we simply log in again next iteration — correct,
+// just not amortized — so this can never hard-fail authentication.
 export function loginOnce(tenant: TenantManifest): void {
-    if (authenticated) {
+    const jar = http.cookieJar();
+    if (authToken) {
+        jar.set(BASE_URL, 'access_token', authToken);
         return;
     }
     if (login(tenant).ok) {
-        authenticated = true;
+        const cookies = jar.cookiesForURL(BASE_URL);
+        authToken = cookies['access_token'] ? cookies['access_token'][0] : '';
     }
 }
 
