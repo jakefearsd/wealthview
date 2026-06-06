@@ -13,14 +13,14 @@ vi.mock('./client', () => ({
 import { downloadBlob, downloadJson, downloadCsv } from './export';
 
 describe('api/export', () => {
-    let createObjectURL: ReturnType<typeof vi.fn>;
-    let revokeObjectURL: ReturnType<typeof vi.fn>;
+    let createObjectURL: ReturnType<typeof vi.fn<(obj: Blob | MediaSource) => string>>;
+    let revokeObjectURL: ReturnType<typeof vi.fn<(url: string) => void>>;
     let clickSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
         mocks.get.mockReset();
-        createObjectURL = vi.fn(() => 'blob:mock-url');
-        revokeObjectURL = vi.fn();
+        createObjectURL = vi.fn<(obj: Blob | MediaSource) => string>(() => 'blob:mock-url');
+        revokeObjectURL = vi.fn<(url: string) => void>();
         URL.createObjectURL = createObjectURL;
         URL.revokeObjectURL = revokeObjectURL;
         clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
