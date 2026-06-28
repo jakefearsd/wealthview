@@ -20,9 +20,6 @@ import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingPlan;
-import com.wealthview.core.projection.strategy.DynamicPercentageWithdrawal;
-import com.wealthview.core.projection.strategy.FixedPercentageWithdrawal;
-import com.wealthview.core.projection.strategy.VanguardDynamicSpendingWithdrawal;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -35,13 +32,14 @@ import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 
-import static com.wealthview.core.common.Money.ROUNDING;
-import static com.wealthview.core.common.Money.SCALE;
-
+/**
+ * Deterministic year-by-year retirement projection engine. It orchestrates a set of focused
+ * collaborators — parameter parsing, pool strategy, income-source and contribution processing,
+ * retirement withdrawals, tax annotation, feasibility analysis — and delegates self-contained
+ * concerns to {@link WithdrawalStrategyFactory}, {@link PropertyEquityCalculator}, and
+ * {@link IncomeSourceFieldMapper}.
+ */
 @Component
-// GodClass: the engine is an orchestrator that wires many projection collaborators;
-// PMD's coupling/cohesion heuristic still flags it after the Phase 3 decomposition.
-@SuppressWarnings("PMD.GodClass")
 public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
@@ -161,7 +159,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 ? input.inflationRate()
                 : BigDecimal.ZERO;
 
-        WithdrawalStrategy strategy = resolveStrategy(params, withdrawalRate);
+        WithdrawalStrategy strategy = WithdrawalStrategyFactory.create(params, withdrawalRate);
         SpendingPlan spendingPlan = null;
         if (input.guardrailSpending() != null) {
             spendingPlan = input.guardrailSpending();
@@ -271,15 +269,15 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         pool.floorAtZero();
 
         int yearsElapsed = year - ctx.currentYear();
-        BigDecimal propertyEquity = computePropertyEquity(ctx.properties(), yearsElapsed);
+        BigDecimal propertyEquity = PropertyEquityCalculator.compute(ctx.properties(), yearsElapsed);
 
         var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
                 totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
                 growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
-        yearDto = applyPropertyEquity(yearDto, propertyEquity);
+        yearDto = PropertyEquityCalculator.apply(yearDto, propertyEquity);
         yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
                 ctx.inflationRate(), incomeResult.totalActiveIncome());
-        yearDto = applyIncomeSourceFields(yearDto, incomeResult.isResult());
+        yearDto = IncomeSourceFieldMapper.apply(yearDto, incomeResult.isResult());
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,
                 wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
@@ -343,95 +341,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,
                 conversion.amountConverted(), conversion.taxLiability(), suspendedLoss, conversion.taxSource());
-    }
-
-    private WithdrawalStrategy resolveStrategy(ScenarioParamsParser.ScenarioParams params, BigDecimal withdrawalRate) {
-        if (params.withdrawalStrategy() == null || params.withdrawalStrategy().isBlank()) {
-            return new FixedPercentageWithdrawal(withdrawalRate);
-        }
-        return switch (params.withdrawalStrategy()) {
-            case "dynamic_percentage" -> new DynamicPercentageWithdrawal(withdrawalRate);
-            case "vanguard_dynamic_spending" -> {
-                BigDecimal ceiling = params.dynamicCeiling() != null
-                        ? params.dynamicCeiling() : new BigDecimal("0.05");
-                BigDecimal floor = params.dynamicFloor() != null
-                        ? params.dynamicFloor() : new BigDecimal("-0.025");
-                yield new VanguardDynamicSpendingWithdrawal(withdrawalRate, ceiling, floor);
-            }
-            default -> new FixedPercentageWithdrawal(withdrawalRate);
-        };
-    }
-
-    private ProjectionYearDto applyIncomeSourceFields(ProjectionYearDto base,
-                                                        IncomeSourceProcessor.IncomeSourceYearResult isResult) {
-        if (isResult == null) {
-            return base;
-        }
-
-        BigDecimal totalIncome = isResult.totalCashInflow();
-        var incomeBySource = isResult.incomeBySource().isEmpty() ? null : isResult.incomeBySource();
-        var rentalDetails = isResult.rentalPropertyDetails().isEmpty()
-                ? null : isResult.rentalPropertyDetails();
-
-        return base.withIncomeSourceFields(
-                positiveOrDefault(totalIncome, base.incomeStreamsTotal()),
-                nullIfZero(isResult.rentalIncomeGross()),
-                nullIfZero(isResult.rentalExpensesTotal()),
-                nullIfZero(isResult.depreciationTotal()),
-                nullIfZero(isResult.rentalLossApplied()),
-                nullIfZero(isResult.suspendedLossCarryforward()),
-                nullIfZero(isResult.socialSecurityTaxable()),
-                nullIfZero(isResult.selfEmploymentTax()),
-                incomeBySource,
-                rentalDetails);
-    }
-
-    private BigDecimal nullIfZero(BigDecimal value) {
-        return value.compareTo(BigDecimal.ZERO) > 0 ? value : null;
-    }
-
-    private BigDecimal positiveOrDefault(BigDecimal value, BigDecimal fallback) {
-        return value.compareTo(BigDecimal.ZERO) > 0 ? value : fallback;
-    }
-
-    private BigDecimal computePropertyEquity(List<ProjectionPropertyInput> properties, int yearsElapsed) {
-        if (properties.isEmpty()) {
-            return null;
-        }
-        BigDecimal totalEquity = BigDecimal.ZERO;
-        for (var prop : properties) {
-            BigDecimal appreciationFactor = BigDecimal.ONE.add(prop.annualAppreciationRate())
-                    .pow(yearsElapsed);
-            BigDecimal projectedValue = prop.currentValue()
-                    .multiply(appreciationFactor)
-                    .setScale(SCALE, ROUNDING);
-
-            BigDecimal mortgageBalance;
-            if (prop.loanAmount() != null && prop.annualInterestRate() != null
-                    && prop.loanTermMonths() > 0 && prop.loanStartDate() != null) {
-                // Amortize from the start of the projection to projection year
-                LocalDate asOf = prop.loanStartDate()
-                        .plusYears(yearsElapsed)
-                        .withDayOfYear(1);
-                mortgageBalance = com.wealthview.core.property.AmortizationCalculator
-                        .remainingBalance(prop.loanAmount(), prop.annualInterestRate(),
-                                prop.loanTermMonths(), prop.loanStartDate(), asOf)
-                        .max(BigDecimal.ZERO);
-            } else {
-                mortgageBalance = prop.mortgageBalance() != null ? prop.mortgageBalance() : BigDecimal.ZERO;
-            }
-
-            totalEquity = totalEquity.add(projectedValue.subtract(mortgageBalance));
-        }
-        return totalEquity;
-    }
-
-    private ProjectionYearDto applyPropertyEquity(ProjectionYearDto base, BigDecimal propertyEquity) {
-        if (propertyEquity == null) {
-            return base;
-        }
-        BigDecimal totalNetWorth = base.endBalance().add(propertyEquity);
-        return base.withPropertyEquity(propertyEquity, totalNetWorth);
     }
 
 }
