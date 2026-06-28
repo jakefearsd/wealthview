@@ -16,7 +16,7 @@ import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
-public class BracketBasedStateTaxCalculator implements StateTaxCalculator {
+public final class BracketBasedStateTaxCalculator implements StateTaxCalculator {
 
     private final String stateCode;
     private final boolean capitalGainsAsOrdinary;
