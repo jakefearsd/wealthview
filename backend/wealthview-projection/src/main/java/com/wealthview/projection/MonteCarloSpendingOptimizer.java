@@ -28,21 +28,18 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.observation.annotation.Observed;
 
 
-// GodClass / CyclomaticComplexity: the Monte Carlo spending+conversion optimizer is a cohesive
-// numerical pipeline (context prep, grid search, smoothing, response assembly). Decomposition is
-// in progress: the terminal simulation + response assembly was extracted to GuardrailResponseBuilder,
-// dropping class-level cyclomatic complexity from 119 to 90. It still exceeds the threshold; the
-// remaining over-budget pieces (the joint conversion search and the tax/income context builders)
-// are the next extractions. Suppressed until that work lands rather than masking the whole class.
-@SuppressWarnings({"PMD.GodClass", "PMD.CyclomaticComplexity"})
+// GodClass: the Monte Carlo spending+conversion optimizer is a cohesive numerical pipeline
+// (context prep, grid search, smoothing, response assembly). Decomposition is in progress: the
+// terminal simulation + response assembly moved to GuardrailResponseBuilder and the Roth joint
+// search moved to JointConversionSearch, dropping class-level cyclomatic complexity from 119 to 67
+// (now within the CyclomaticComplexity threshold — that suppression has been removed). Only the
+// GodClass breadth metric remains; the tax/income-context builders are the final planned
+// extraction, after which this suppression should be removed too.
+@SuppressWarnings("PMD.GodClass")
 @Component
 public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
 
     private static final Logger log = LoggerFactory.getLogger(MonteCarloSpendingOptimizer.class);
-    private static final int JOINT_GRID_SIZE = 20;
-    private static final double JOINT_REFINE_HALF_WIDTH = 0.1;
-    private static final int JOINT_REFINE_ITERATIONS = 10;
-    private static final int JOINT_SEARCH_TRIALS = 500;
     /** Reduction factor applied per iteration when a smoothed plan fails sustainability. */
     private static final double SUSTAINABILITY_REDUCTION_FACTOR = 0.95;
 
@@ -52,6 +49,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private final TrialSimulator trialSimulator = new TrialSimulator();
     private final SustainabilitySearch sustainabilitySearch = new SustainabilitySearch(trialSimulator);
     private final GuardrailResponseBuilder responseBuilder = new GuardrailResponseBuilder(trialSimulator);
+    private final JointConversionSearch jointConversionSearch;
 
     /** Test-friendly constructor that omits the optional meter registry. */
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator) {
@@ -63,12 +61,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         @Nullable MeterRegistry meterRegistry) {
         this.taxCalculator = taxCalculator;
         this.meterRegistry = meterRegistry;
+        this.jointConversionSearch = new JointConversionSearch(taxCalculator, sustainabilitySearch);
     }
-
-    private record ConversionResult(
-            double[] byYear, double[] taxByYear,
-            RothConversionOptimizer.RothConversionSchedule schedule
-    ) {}
 
     /** Pre-computed per-year income and tax arrays for the optimization run. */
     private record IncomeArrays(double[] incomeByYear, double[] taxableIncomeByYear,
@@ -90,7 +84,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 return emptyResult(input);
             }
 
-            var conv = optimizeConversions(ctx, input);
+            var conv = jointConversionSearch.optimize(ctx, input);
             var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
             return responseBuilder.build(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
                     conv.schedule());
@@ -160,8 +154,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 portfolioPaths, incomeArrays.incomeByYear(), essentialFloor,
                 confidenceLevel, years, trialCount, inflationRate);
 
-        double[] marginalRates = precomputeMarginalRates(
-                rentalAwareTaxableIncome, retirementYear, years, filingStatus);
+        double[] marginalRates = MarginalRateCalculator.compute(
+                taxCalculator, rentalAwareTaxableIncome, retirementYear, years, filingStatus);
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
                         withdrawalOrder, marginalRates)
@@ -223,162 +217,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return ceilings;
     }
 
-    private ConversionResult optimizeConversions(OptimizationSetup ctx,
-                                                 GuardrailOptimizationInput input) {
-        if (!input.optimizeConversions() || ctx.portfolio().initTraditional() <= 0 || taxCalculator == null) {
-            return new ConversionResult(null, null, null);
-        }
-
-        var convOptimizer = RothConversionOptimizer.builder()
-                .portfolio(ctx.portfolio().initTraditional(), ctx.portfolio().initRoth(), ctx.portfolio().initTaxable())
-                .income(
-                        Arrays.stream(ctx.taxIncome().incomeData())
-                                .mapToDouble(IncomeYearData::totalIncome).toArray(),
-                        Arrays.stream(ctx.taxIncome().incomeData())
-                                .mapToDouble(IncomeYearData::taxableIncome).toArray())
-                .demographics(input.birthYear(), ctx.sim().retirementAge(), ctx.sim().endAge())
-                .taxConfig(
-                        input.conversionBracketRate() != null
-                                ? input.conversionBracketRate().doubleValue() : 0.22,
-                        input.rmdTargetBracketRate() != null
-                                ? input.rmdTargetBracketRate().doubleValue() : 0.12,
-                        input.rmdBracketHeadroom() != null
-                                ? input.rmdBracketHeadroom().doubleValue() : 0.10,
-                        ctx.taxIncome().filingStatus(), taxCalculator)
-                .assumptions(
-                        input.returnMean() != null
-                                ? input.returnMean().doubleValue() : 0.10,
-                        ctx.taxIncome().essentialFloor(), ctx.sim().inflationRate(),
-                        input.traditionalExhaustionBuffer(), ctx.portfolio().withdrawalOrder())
-                .rentals(input.incomeSources(), new RentalLossCalculator())
-                .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
-                        ? input.dynamicSequencingBracketRate().doubleValue() : 0.0)
-                .build();
-
-        boolean useDynamicSequencing = PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING
-                .equals(ctx.portfolio().withdrawalOrder());
-        RothConversionOptimizer.RothConversionSchedule convSchedule;
-
-        if (useDynamicSequencing) {
-            // When Dynamic Sequencing is active, conversions and DS are complementary
-            // strategies — conversions happen first (Phase 1), then DS handles spending
-            // withdrawals from whatever Traditional remains. Use Phase 1's tax-minimization
-            // schedule directly; the joint search would incorrectly compete the two strategies
-            // (DS draws Traditional for spending, making conversions look expensive).
-            convSchedule = convOptimizer.optimize();
-            log.info("DS mode: using Phase 1 conversion schedule (fraction={})",
-                    convSchedule.conversionFraction());
-        } else {
-            convSchedule = jointSearchConversions(ctx, input, convOptimizer);
-        }
-
-        return new ConversionResult(
-                convSchedule.conversionByYear(), convSchedule.conversionTaxByYear(), convSchedule);
-    }
-
-    private RothConversionOptimizer.RothConversionSchedule jointSearchConversions(
-            OptimizationSetup ctx, GuardrailOptimizationInput input,
-            RothConversionOptimizer convOptimizer) {
-        // Joint optimization: search conversion fractions by sustainable spending.
-        // Each fraction is scored by how much the MC optimizer can sustain.
-        int searchTrials = Math.min(JOINT_SEARCH_TRIALS, ctx.sim().trialCount());
-        Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
-        double[] historicalReturns = HistoricalReturns.getReturns();
-        double[][] searchPaths = PortfolioPathGenerator.generatePaths(
-                searchTrials, ctx.sim().years(), ctx.portfolio().initialPortfolio(), historicalReturns,
-                searchRng, ctx.sim().inflationRate());
-
-        double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
-                searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),
-                ctx.sim().confidenceLevel(), ctx.sim().years(), searchTrials, ctx.sim().inflationRate());
-
-        double[] searchMarginalRates = precomputeMarginalRates(
-                ctx.taxIncome().rentalAwareTaxableIncome(), ctx.sim().retirementYear(), ctx.sim().years(),
-                ctx.taxIncome().filingStatus());
-        TaxContext searchTaxCtx = new TaxContext(ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
-                ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchMarginalRates);
-
-        int gridSize = JOINT_GRID_SIZE;
-        double bestFraction = 0.0;
-        double bestSpending = 0.0;
-        RothConversionOptimizer.RothConversionSchedule bestSchedule =
-                convOptimizer.baselineSchedule();
-
-        for (int i = 0; i <= gridSize; i++) {
-            double fraction = (double) i / gridSize;
-            var schedule = convOptimizer.scheduleForFraction(fraction);
-
-            double spending = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    schedule.conversionByYear(), schedule.conversionTaxByYear());
-
-            if (spending > bestSpending) {
-                bestSpending = spending;
-                bestFraction = fraction;
-                bestSchedule = schedule;
-            }
-        }
-
-        double lo = Math.max(0.0, bestFraction - JOINT_REFINE_HALF_WIDTH);
-        double hi = Math.min(1.0, bestFraction + JOINT_REFINE_HALF_WIDTH);
-        for (int iter = 0; iter < JOINT_REFINE_ITERATIONS; iter++) {
-            double m1 = lo + (hi - lo) / 3.0;
-            double m2 = hi - (hi - lo) / 3.0;
-
-            var s1 = convOptimizer.scheduleForFraction(m1);
-            var s2 = convOptimizer.scheduleForFraction(m2);
-
-            double sp1 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    s1.conversionByYear(), s1.conversionTaxByYear());
-
-            double sp2 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    s2.conversionByYear(), s2.conversionTaxByYear());
-
-            if (sp1 > sp2) {
-                hi = m2;
-            } else {
-                lo = m1;
-            }
-
-            if (sp1 > bestSpending) {
-                bestSpending = sp1;
-                bestFraction = m1;
-                bestSchedule = s1;
-            }
-            if (sp2 > bestSpending) {
-                bestSpending = sp2;
-                bestFraction = m2;
-                bestSchedule = s2;
-            }
-        }
-
-        log.info("Joint optimization: best fraction={}, sustainable spending={}",
-                bestFraction, bestSpending);
-        return bestSchedule;
-    }
-
-    /**
-     * Convenience wrapper around {@link SustainabilitySearch#evaluateSustainableSpending} that
-     * captures the fixed search-phase args ({@code searchPaths}, the {@link OptimizationSetup}
-     * fields, {@code searchFloors}, {@code searchTrials}, and {@code searchTaxCtx}) so the repeated
-     * call sites in {@link #jointSearchConversions} only vary by
-     * {@code conversionByYear} / {@code conversionTaxByYear}.
-     */
-    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
-    // argument list — varargs would change the call contract and invite accidental misuse.
-    @SuppressWarnings("PMD.UseVarargs")
-    private double evalSearchSpending(double[][] searchPaths, OptimizationSetup ctx,
-                                       double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
-                                       double[] conversionByYear, double[] conversionTaxByYear) {
-        var searchContext = new SustainabilitySearch.SearchContext(
-                searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
-                ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
-                searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                ctx.sim().inflationRate(), searchTaxCtx, conversionByYear, conversionTaxByYear,
-                ctx.taxIncome().dsBracketCeilingByYear());
-        return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
-    }
-
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
     @SuppressWarnings("PMD.UseVarargs")
@@ -404,21 +242,32 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                     ctx.sim().years(), input.phases(), ctx.sim().retirementAge());
 
             // Re-verify sustainability of smoothed plan; reduce if broken
-            if (!sustainabilitySearch.isSustainable(searchContext, ctx.taxIncome().adjustedFloors(),
-                    discretionaryByYear)) {
-                for (int i = 0; i < 10; i++) {
-                    for (int y = 0; y < ctx.sim().years(); y++) {
-                        discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
-                    }
-                    if (sustainabilitySearch.isSustainable(searchContext,
-                            ctx.taxIncome().adjustedFloors(), discretionaryByYear)) {
-                        break;
-                    }
-                }
-            }
+            reduceUntilSustainable(discretionaryByYear, searchContext, ctx);
         }
 
         return discretionaryByYear;
+    }
+
+    /**
+     * Scales discretionary spending down by {@link #SUSTAINABILITY_REDUCTION_FACTOR} each
+     * iteration until the smoothed plan is sustainable again, up to a fixed iteration cap.
+     * No-op when the plan is already sustainable. Mutates {@code discretionaryByYear} in place.
+     */
+    private void reduceUntilSustainable(double[] discretionaryByYear,
+                                        SustainabilitySearch.SearchContext searchContext,
+                                        OptimizationSetup ctx) {
+        double[] floors = ctx.taxIncome().adjustedFloors();
+        if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
+            return;
+        }
+        for (int i = 0; i < 10; i++) {
+            for (int y = 0; y < ctx.sim().years(); y++) {
+                discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
+            }
+            if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
+                return;
+            }
+        }
     }
 
     /**
@@ -519,33 +368,6 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                            double conversionAmount, double rmdAmount) {
         return TrialSimulator.splitWithdrawal(taxable, traditional, roth, need, order, preAge595,
                 dsBracketCeiling, otherIncome, conversionAmount, rmdAmount);
-    }
-
-    /**
-     * Pre-computes the marginal tax rate for traditional withdrawals at each
-     * retirement year. Uses a representative withdrawal amount ($50K) to find
-     * the marginal rate at the income level of (taxableIncome + $50K).
-     */
-    private double[] precomputeMarginalRates(double[] taxableIncomeByYear,
-                                               int retirementYear, int years,
-                                               FilingStatus filingStatus) {
-        double[] rates = new double[years];
-        if (taxCalculator == null) {
-            return rates;
-        }
-
-        double probeAmount = 50_000;
-        for (int y = 0; y < years; y++) {
-            int taxYear = retirementYear + y;
-            double baseIncome = taxableIncomeByYear[y];
-            double baseTax = baseIncome > 0
-                    ? taxCalculator.computeTax(BigDecimal.valueOf(baseIncome), taxYear, filingStatus).doubleValue()
-                    : 0;
-            double totalTax = taxCalculator.computeTax(
-                    BigDecimal.valueOf(baseIncome + probeAmount), taxYear, filingStatus).doubleValue();
-            rates[y] = (totalTax - baseTax) / probeAmount;
-        }
-        return rates;
     }
 
     private double computeSurplusTax(double taxableIncome, int taxYear, FilingStatus filingStatus) {
