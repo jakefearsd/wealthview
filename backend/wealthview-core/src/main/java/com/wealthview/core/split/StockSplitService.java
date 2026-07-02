@@ -3,6 +3,8 @@ package com.wealthview.core.split;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
+import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.StockSplitAdjustmentEntity;
 import com.wealthview.persistence.entity.StockSplitEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
@@ -129,23 +132,17 @@ public class StockSplitService {
 
         var adjustments = adjustmentRepository.findBySplit_Id(splitId);
 
-        int txnRestored = 0;
-        int priceRestored = 0;
+        var txnAdjustments = new ArrayList<StockSplitAdjustmentEntity>();
+        var priceAdjustments = new ArrayList<StockSplitAdjustmentEntity>();
         for (var adj : adjustments) {
             switch (adj.getTargetTable()) {
-                case "transactions" -> {
-                    if (restoreTransaction(adj)) {
-                        txnRestored++;
-                    }
-                }
-                case "prices" -> {
-                    if (restorePrice(adj)) {
-                        priceRestored++;
-                    }
-                }
+                case "transactions" -> txnAdjustments.add(adj);
+                case "prices" -> priceAdjustments.add(adj);
                 default -> log.warn("Unknown target_table on split adjustment: {}", adj.getTargetTable());
             }
         }
+        int txnRestored = restoreTransactions(txnAdjustments);
+        int priceRestored = restorePrices(split, priceAdjustments);
 
         var symbol = split.getSymbol();
         var tenantIds = transactionRepository.findDistinctTenantIdsBySymbol(symbol);
@@ -228,41 +225,59 @@ public class StockSplitService {
         }
     }
 
-    private boolean restoreTransaction(StockSplitAdjustmentEntity adj) {
-        var txnOpt = transactionRepository.findById(adj.getTargetRowId());
-        if (txnOpt.isEmpty()) {
-            log.warn("Transaction {} referenced by split adjustment {} no longer exists",
-                    adj.getTargetRowId(), adj.getId());
-            return false;
+    private int restoreTransactions(List<StockSplitAdjustmentEntity> adjustments) {
+        if (adjustments.isEmpty()) {
+            return 0;
         }
-        var txn = txnOpt.orElseThrow();
-        if ("quantity".equals(adj.getFieldName())) {
+        var targetIds = adjustments.stream().map(StockSplitAdjustmentEntity::getTargetRowId).toList();
+        var txnsById = new HashMap<UUID, TransactionEntity>();
+        for (var txn : transactionRepository.findAllById(targetIds)) {
+            txnsById.put(txn.getId(), txn);
+        }
+
+        int restored = 0;
+        for (var adj : adjustments) {
+            var txn = txnsById.get(adj.getTargetRowId());
+            if (txn == null) {
+                log.warn("Transaction {} referenced by split adjustment {} no longer exists",
+                        adj.getTargetRowId(), adj.getId());
+                continue;
+            }
+            if (!"quantity".equals(adj.getFieldName())) {
+                log.warn("Unknown transaction field on split adjustment: {}", adj.getFieldName());
+                continue;
+            }
             txn.setQuantity(adj.getOldValue().setScale(4, VALUE_ROUNDING));
-            return true;
+            restored++;
         }
-        log.warn("Unknown transaction field on split adjustment: {}", adj.getFieldName());
-        return false;
+        return restored;
     }
 
-    private boolean restorePrice(StockSplitAdjustmentEntity adj) {
-        // Recover the (symbol, date) from the deterministic UUID is not feasible.
-        // Look up the price row via the split's symbol + the inverse ratio scan:
-        // we instead store enough info to find the row. The adjustment's
-        // target_row_id is the deterministic UUID we created from (symbol, date)
-        // at apply time. To restore, scan prices for the split's symbol and
-        // recompute candidate UUIDs.
-        var split = adj.getSplit();
-        var prices = priceRepository.findBySymbolAndDateBefore(split.getSymbol(), split.getEffectiveDate());
-        for (var price : prices) {
-            if (priceUuid(price.getSymbol(), price.getDate()).equals(adj.getTargetRowId())
-                    && "close_price".equals(adj.getFieldName())) {
-                price.setClosePrice(adj.getOldValue().setScale(4, VALUE_ROUNDING));
-                return true;
-            }
+    private int restorePrices(StockSplitEntity split, List<StockSplitAdjustmentEntity> adjustments) {
+        if (adjustments.isEmpty()) {
+            return 0;
         }
-        // Price row may have been deleted between apply and unapply — non-fatal.
-        log.warn("Price row for split adjustment {} not found; skipping restore", adj.getId());
-        return false;
+        // The adjustment's target_row_id is the deterministic UUID created from
+        // (symbol, date) at apply time — it cannot be reversed into a lookup key.
+        // Load the symbol's price history once and index it by that UUID so each
+        // adjustment restores via a map hit instead of rescanning every price row.
+        var pricesByUuid = new HashMap<UUID, PriceEntity>();
+        for (var price : priceRepository.findBySymbolAndDateBefore(split.getSymbol(), split.getEffectiveDate())) {
+            pricesByUuid.put(priceUuid(price.getSymbol(), price.getDate()), price);
+        }
+
+        int restored = 0;
+        for (var adj : adjustments) {
+            var price = pricesByUuid.get(adj.getTargetRowId());
+            if (price == null || !"close_price".equals(adj.getFieldName())) {
+                // Price row may have been deleted between apply and unapply — non-fatal.
+                log.warn("Price row for split adjustment {} not found; skipping restore", adj.getId());
+                continue;
+            }
+            price.setClosePrice(adj.getOldValue().setScale(4, VALUE_ROUNDING));
+            restored++;
+        }
+        return restored;
     }
 
     private static UUID priceUuid(String symbol, LocalDate date) {

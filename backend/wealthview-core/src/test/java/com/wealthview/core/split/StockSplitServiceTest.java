@@ -274,7 +274,7 @@ class StockSplitServiceTest {
 
         when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
         when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj));
-        when(transactionRepository.findById(txnId)).thenReturn(Optional.of(txn));
+        when(transactionRepository.findAllById(List.of(txnId))).thenReturn(List.of(txn));
         when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of(tenantId));
 
         service.unapplySplit(splitId);
@@ -303,7 +303,7 @@ class StockSplitServiceTest {
         var capturedAdj = adjCaptor.getValue();
         when(stockSplitRepository.findById(applied.getId())).thenReturn(Optional.of(applied));
         when(adjustmentRepository.findBySplit_Id(applied.getId())).thenReturn(List.of(capturedAdj));
-        when(transactionRepository.findById(txnId)).thenReturn(Optional.of(txn));
+        when(transactionRepository.findAllById(List.of(txnId))).thenReturn(List.of(txn));
 
         service.unapplySplit(applied.getId());
 
@@ -418,7 +418,7 @@ class StockSplitServiceTest {
                 "quantity", new BigDecimal("100"), new BigDecimal("400"));
         when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
         when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj));
-        when(transactionRepository.findById(missingTxnId)).thenReturn(Optional.empty());
+        when(transactionRepository.findAllById(List.of(missingTxnId))).thenReturn(List.of());
         when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
 
         service.unapplySplit(splitId);
@@ -447,6 +447,62 @@ class StockSplitServiceTest {
         service.unapplySplit(splitId);
 
         assertThat(price.getClosePrice()).isEqualByComparingTo("400.0000");
+    }
+
+    @Test
+    void unapplySplit_manyPriceAdjustments_loadsPriceHistoryOnce() {
+        // Restoring must not reload the symbol's full price history per adjustment
+        // row — that is O(n^2) in price count and stalls unapply for real datasets.
+        var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
+        var splitId = UUID.randomUUID();
+        var price1 = new PriceEntity("AAPL", LocalDate.of(2020, 1, 1), new BigDecimal("100.0000"), "finnhub");
+        var price2 = new PriceEntity("AAPL", LocalDate.of(2020, 1, 2), new BigDecimal("50.0000"), "finnhub");
+        var adj1 = new StockSplitAdjustmentEntity(split, tenantId, "prices", priceUuid("AAPL", price1.getDate()),
+                "close_price", new BigDecimal("400.00000000"), new BigDecimal("100.00000000"));
+        var adj2 = new StockSplitAdjustmentEntity(split, tenantId, "prices", priceUuid("AAPL", price2.getDate()),
+                "close_price", new BigDecimal("200.00000000"), new BigDecimal("50.00000000"));
+        when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
+        when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj1, adj2));
+        when(priceRepository.findBySymbolAndDateBefore("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(List.of(price1, price2));
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        service.unapplySplit(splitId);
+
+        assertThat(price1.getClosePrice()).isEqualByComparingTo("400.0000");
+        assertThat(price2.getClosePrice()).isEqualByComparingTo("200.0000");
+        verify(priceRepository, times(1)).findBySymbolAndDateBefore("AAPL", LocalDate.of(2020, 8, 31));
+    }
+
+    @Test
+    void unapplySplit_manyTransactionAdjustments_loadsTransactionsInOneBatch() {
+        // Restoring must fetch the affected transactions with a single batched
+        // query instead of one SELECT per adjustment row.
+        var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
+        var splitId = UUID.randomUUID();
+        var txn1 = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "AAPL",
+                new BigDecimal("400"), new BigDecimal("8000.0000"));
+        var txn2 = txn(UUID.randomUUID(), LocalDate.of(2020, 2, 1), "buy", "AAPL",
+                new BigDecimal("40"), new BigDecimal("900.0000"));
+        var adj1 = new StockSplitAdjustmentEntity(split, tenantId, "transactions", txn1.getId(),
+                "quantity", new BigDecimal("100"), new BigDecimal("400"));
+        var adj2 = new StockSplitAdjustmentEntity(split, tenantId, "transactions", txn2.getId(),
+                "quantity", new BigDecimal("10"), new BigDecimal("40"));
+        when(stockSplitRepository.findById(splitId)).thenReturn(Optional.of(split));
+        when(adjustmentRepository.findBySplit_Id(splitId)).thenReturn(List.of(adj1, adj2));
+        when(transactionRepository.findAllById(any())).thenReturn(List.of(txn1, txn2));
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        service.unapplySplit(splitId);
+
+        assertThat(txn1.getQuantity()).isEqualByComparingTo("100");
+        assertThat(txn2.getQuantity()).isEqualByComparingTo("10");
+        verify(transactionRepository, never()).findById(any());
+    }
+
+    private static UUID priceUuid(String symbol, LocalDate date) {
+        return UUID.nameUUIDFromBytes(
+                ("price:" + symbol + ":" + date).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
     private TransactionEntity txn(UUID id, LocalDate date, String type, String symbol,
