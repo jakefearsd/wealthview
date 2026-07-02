@@ -147,6 +147,26 @@ class StockSplitRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     // -------------------------------------------------------------------------
+    // findBySymbolAndEffectiveDateGreaterThanEqualOrderByEffectiveDateAsc
+    // -------------------------------------------------------------------------
+
+    @Test
+    void findBySymbolAndEffectiveDateGreaterThanEqual_returnsOnOrAfterOrderedAsc() {
+        stockSplitRepository.save(new StockSplitEntity("AAPL", LocalDate.of(2014, 6, 9), 7, 1, "manual"));
+        stockSplitRepository.save(new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual"));
+        stockSplitRepository.save(new StockSplitEntity("MSFT", LocalDate.of(2003, 2, 18), 2, 1, "manual"));
+
+        var forOldTxn = stockSplitRepository
+                .findBySymbolAndEffectiveDateGreaterThanEqualOrderByEffectiveDateAsc("AAPL", LocalDate.of(2013, 1, 1));
+        assertThat(forOldTxn).extracting(StockSplitEntity::getEffectiveDate)
+                .containsExactly(LocalDate.of(2014, 6, 9), LocalDate.of(2020, 8, 31));
+
+        var forRecentTxn = stockSplitRepository
+                .findBySymbolAndEffectiveDateGreaterThanEqualOrderByEffectiveDateAsc("AAPL", LocalDate.of(2020, 9, 1));
+        assertThat(forRecentTxn).isEmpty();
+    }
+
+    // -------------------------------------------------------------------------
     // StockSplitAdjustmentRepository — tenant-scoped isolation
     // -------------------------------------------------------------------------
 

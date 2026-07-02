@@ -20,6 +20,9 @@ public interface StockSplitRepository extends JpaRepository<StockSplitEntity, ja
 
     List<StockSplitEntity> findBySymbolOrderByEffectiveDateAsc(String symbol);
 
+    List<StockSplitEntity> findBySymbolAndEffectiveDateGreaterThanEqualOrderByEffectiveDateAsc(
+            String symbol, LocalDate date);
+
     @Query("""
             SELECT s FROM StockSplitEntity s
             WHERE s.symbol IN :symbols
