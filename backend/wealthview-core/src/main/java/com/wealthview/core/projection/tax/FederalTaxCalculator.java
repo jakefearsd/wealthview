@@ -1,9 +1,9 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
 
@@ -20,8 +20,10 @@ public class FederalTaxCalculator {
 
     private final TaxBracketRepository taxBracketRepository;
     private final StandardDeductionRepository standardDeductionRepository;
-    private final Map<String, List<TaxBracketEntity>> bracketCache = new HashMap<>();
-    private final Map<String, BigDecimal> deductionCache = new HashMap<>();
+    // ConcurrentHashMap: this singleton is shared by concurrent projection requests, which
+    // populate these caches via computeIfAbsent from multiple threads.
+    private final Map<String, List<TaxBracketEntity>> bracketCache = new ConcurrentHashMap<>();
+    private final Map<String, BigDecimal> deductionCache = new ConcurrentHashMap<>();
 
     public FederalTaxCalculator(TaxBracketRepository taxBracketRepository,
                                  StandardDeductionRepository standardDeductionRepository) {

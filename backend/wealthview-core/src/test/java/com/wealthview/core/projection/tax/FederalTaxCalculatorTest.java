@@ -1,8 +1,13 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +17,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 
@@ -23,6 +29,8 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets
 import static com.wealthview.core.testutil.TaxBracketFixtures.singleDeduction2022;
 import static com.wealthview.core.testutil.TaxBracketFixtures.singleDeduction2025;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
@@ -293,6 +301,46 @@ class FederalTaxCalculatorTest {
         var tax = calculator.computeTaxWithDeduction(BigDecimal.ZERO, bd("15000"), 2025, FilingStatus.SINGLE);
 
         assertThat(tax).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void loadStandardDeduction_concurrentAccessAcrossManyYears_returnsConsistentValues() throws Exception {
+        // The calculator is a shared singleton hit by concurrent projection requests; its
+        // deduction/bracket caches must survive parallel computeIfAbsent calls across many
+        // distinct keys (which force internal map resizes) without corruption.
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(anyInt(), anyString()))
+                .thenAnswer(inv -> Optional.of(new StandardDeductionEntity(
+                        inv.getArgument(0), inv.getArgument(1),
+                        BigDecimal.valueOf((int) inv.getArgument(0)))));
+
+        int threads = 8;
+        int yearsPerThread = 2000;
+        var executor = Executors.newFixedThreadPool(threads);
+        var mismatches = new AtomicInteger();
+        try {
+            var tasks = new ArrayList<Callable<Void>>();
+            for (int i = 0; i < threads; i++) {
+                tasks.add(() -> {
+                    for (int j = 0; j < yearsPerThread; j++) {
+                        int year = 1000 + j;
+                        var deduction = calculator.loadStandardDeduction(year, FilingStatus.SINGLE);
+                        if (deduction == null || deduction.intValue() != year) {
+                            mismatches.incrementAndGet();
+                        }
+                    }
+                    return null;
+                });
+            }
+
+            var futures = executor.invokeAll(tasks, 30, TimeUnit.SECONDS);
+            for (var future : futures) {
+                future.get();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertThat(mismatches).hasValue(0);
     }
 
     @Test
