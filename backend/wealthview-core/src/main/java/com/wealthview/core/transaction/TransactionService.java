@@ -16,6 +16,7 @@ import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.PageResponse;
 import com.wealthview.core.holding.HoldingsComputationService;
+import com.wealthview.core.split.SplitAdjustmentApplier;
 import com.wealthview.core.transaction.dto.TransactionRequest;
 import com.wealthview.core.transaction.dto.TransactionResponse;
 import com.wealthview.persistence.entity.TransactionEntity;
@@ -31,15 +32,18 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final HoldingsComputationService holdingsComputationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final SplitAdjustmentApplier splitAdjustmentApplier;
 
     public TransactionService(TransactionRepository transactionRepository,
                               AccountRepository accountRepository,
                               HoldingsComputationService holdingsComputationService,
-                              ApplicationEventPublisher eventPublisher) {
+                              ApplicationEventPublisher eventPublisher,
+                              SplitAdjustmentApplier splitAdjustmentApplier) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.holdingsComputationService = holdingsComputationService;
         this.eventPublisher = eventPublisher;
+        this.splitAdjustmentApplier = splitAdjustmentApplier;
     }
 
     @CacheEvict(value = "accountBalances", key = "#tenantId")
@@ -51,6 +55,7 @@ public class TransactionService {
         var txn = new TransactionEntity(account, account.getTenant(), request.date(),
                 request.type(), request.symbol(), request.quantity(), request.amount());
         txn = transactionRepository.save(txn);
+        splitAdjustmentApplier.adjustNewTransaction(txn);
 
         holdingsComputationService.recomputeForAccountAndSymbol(
                 account, account.getTenant(), request.symbol());
@@ -71,6 +76,7 @@ public class TransactionService {
                 request.type(), request.symbol(), request.quantity(), request.amount());
         txn.setImportHash(importHash);
         txn = transactionRepository.save(txn);
+        splitAdjustmentApplier.adjustNewTransaction(txn);
 
         holdingsComputationService.recomputeForAccountAndSymbol(
                 account, account.getTenant(), request.symbol());
@@ -89,6 +95,7 @@ public class TransactionService {
                 request.type(), request.symbol(), request.quantity(), request.amount());
         txn.setImportHash(importHash);
         txn = transactionRepository.save(txn);
+        splitAdjustmentApplier.adjustNewTransaction(txn);
 
         log.info("Transaction {} created for account {} with import hash (no recompute)", txn.getId(), accountId);
         return TransactionResponse.from(txn);

@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageRequest;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
+import com.wealthview.core.split.SplitAdjustmentApplier;
 import com.wealthview.core.transaction.dto.TransactionRequest;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -31,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -51,6 +53,9 @@ class TransactionServiceTest {
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private SplitAdjustmentApplier splitAdjustmentApplier;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -82,6 +87,23 @@ class TransactionServiceTest {
         assertThat(result.symbol()).isEqualTo("AAPL");
         verify(holdingsComputationService).recomputeForAccountAndSymbol(
                 eq(account), any(), eq("AAPL"));
+    }
+
+    @Test
+    void create_adjustsForSplitsBeforeRecomputingHoldings() {
+        var request = new TransactionRequest(LocalDate.of(2019, 1, 1), "buy", "AAPL",
+                new BigDecimal("100"), new BigDecimal("8000"));
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(account));
+        when(transactionRepository.save(any(TransactionEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        transactionService.create(tenantId, accountId, request);
+
+        var order = inOrder(splitAdjustmentApplier, holdingsComputationService);
+        order.verify(splitAdjustmentApplier).adjustNewTransaction(any(TransactionEntity.class));
+        order.verify(holdingsComputationService)
+                .recomputeForAccountAndSymbol(eq(account), any(), eq("AAPL"));
     }
 
     @Test
