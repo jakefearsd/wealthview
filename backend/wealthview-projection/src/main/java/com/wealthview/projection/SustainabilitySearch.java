@@ -69,20 +69,20 @@ final class SustainabilitySearch {
             floorWithdrawals[y] = Math.max(0, inflatedFloors[y] - income[y]);
         }
 
+        // Simulate year-by-year balances with floor withdrawals and compounded growth,
+        // advancing every trial one year per outer iteration. Using raw cumulative
+        // subtraction from the unconstrained path would overestimate the remaining
+        // balance because withdrawn dollars would have compounded if left.
+        double[] balances = new double[trialCount];
+        for (int t = 0; t < trialCount; t++) {
+            balances[t] = paths[t][0];
+        }
+        double[] balancesAtYear = new double[trialCount];
         for (int y = 0; y < years; y++) {
-            double[] balancesAtYear = new double[trialCount];
             for (int t = 0; t < trialCount; t++) {
-                // Simulate year-by-year balance with floor withdrawals and compounded growth.
-                // Using raw cumulative subtraction from the unconstrained path would overestimate
-                // the remaining balance because withdrawn dollars would have compounded if left.
-                double balance = paths[t][0];
-                for (int py = 0; py <= y; py++) {
-                    double growthFactor = paths[t][py + 1] / paths[t][py];
-                    balance *= growthFactor;
-                    balance -= floorWithdrawals[py];
-                    balance = Math.max(0, balance);
-                }
-                balancesAtYear[t] = balance;
+                double growthFactor = paths[t][y + 1] / paths[t][y];
+                balances[t] = Math.max(0, balances[t] * growthFactor - floorWithdrawals[y]);
+                balancesAtYear[t] = balances[t];
             }
             Arrays.sort(balancesAtYear);
 
@@ -110,8 +110,10 @@ final class SustainabilitySearch {
                               List<GuardrailPhaseInput> phases) {
         double[] discretionary = new double[ctx.years()];
 
+        double[][] returns = nominalReturns(ctx);
+
         if (phases == null || phases.isEmpty()) {
-            double maxDisc = binarySearchDiscretionary(ctx, floors, discretionary,
+            double maxDisc = binarySearchDiscretionary(ctx, returns, floors, discretionary,
                     0, ctx.years() - 1);
             Arrays.fill(discretionary, maxDisc);
             return discretionary;
@@ -123,7 +125,7 @@ final class SustainabilitySearch {
                         && p.targetSpending().compareTo(BigDecimal.ZERO) > 0);
 
         if (hasTargets) {
-            return allocateByTargets(ctx, floors, phases);
+            return allocateByTargets(ctx, returns, floors, phases);
         }
 
         // Legacy: sort phases by priority weight (highest first)
@@ -143,7 +145,7 @@ final class SustainabilitySearch {
                 continue;
             }
 
-            double maxDisc = binarySearchDiscretionary(ctx, floors, discretionary,
+            double maxDisc = binarySearchDiscretionary(ctx, returns, floors, discretionary,
                     phaseStart, phaseEnd);
 
             for (int y = phaseStart; y <= phaseEnd; y++) {
@@ -154,7 +156,7 @@ final class SustainabilitySearch {
         return discretionary;
     }
 
-    private double[] allocateByTargets(SearchContext ctx, double[] floors,
+    private double[] allocateByTargets(SearchContext ctx, double[][] returns, double[] floors,
                                        List<GuardrailPhaseInput> phases) {
         double[] discretionary = new double[ctx.years()];
 
@@ -170,7 +172,7 @@ final class SustainabilitySearch {
                 continue;
             }
 
-            double found = binarySearchDiscretionary(ctx, floors, discretionary,
+            double found = binarySearchDiscretionary(ctx, returns, floors, discretionary,
                     phaseStart, phaseEnd);
 
             double capped;
@@ -211,13 +213,14 @@ final class SustainabilitySearch {
     double evaluateSustainableSpending(SearchContext ctx, double[] floors) {
         double low = 0;
         double high = MAX_SPENDING_CEILING;
+        double[][] returns = nominalReturns(ctx);
         double[] testDiscretionary = new double[ctx.years()];
 
         for (int iter = 0; iter < SPENDING_BINARY_SEARCH_ITERATIONS; iter++) {
             double mid = (low + high) / 2;
             Arrays.fill(testDiscretionary, mid);
 
-            if (isSustainable(ctx, floors, testDiscretionary)) {
+            if (isSustainable(ctx, returns, floors, testDiscretionary)) {
                 low = mid;
             } else {
                 high = mid;
@@ -227,7 +230,7 @@ final class SustainabilitySearch {
         return floors[0] + low;
     }
 
-    private double binarySearchDiscretionary(SearchContext ctx, double[] floors,
+    private double binarySearchDiscretionary(SearchContext ctx, double[][] returns, double[] floors,
                                              double[] currentDiscretionary,
                                              int phaseStart, int phaseEnd) {
         double low = 0;
@@ -241,7 +244,7 @@ final class SustainabilitySearch {
                 testDiscretionary[y] = mid;
             }
 
-            if (isSustainable(ctx, floors, testDiscretionary)) {
+            if (isSustainable(ctx, returns, floors, testDiscretionary)) {
                 low = mid;
             } else {
                 high = mid;
@@ -257,10 +260,34 @@ final class SustainabilitySearch {
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
+        return isSustainable(ctx, nominalReturns(ctx), floors, discretionary);
+    }
+
+    /**
+     * Derives per-trial nominal returns from the path ratios once per search run. The
+     * binary searches call {@code isSustainable} hundreds of times against the same
+     * immutable paths, so recomputing the ratios per call would dominate the loop.
+     */
+    private static double[][] nominalReturns(SearchContext ctx) {
+        double[][] paths = ctx.paths();
+        double[][] returns = new double[ctx.trialCount()][ctx.years()];
+        for (int t = 0; t < ctx.trialCount(); t++) {
+            for (int y = 0; y < ctx.years(); y++) {
+                returns[t][y] = paths[t][y + 1] / paths[t][y] - 1.0;
+            }
+        }
+        return returns;
+    }
+
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
     // NPathComplexity: the trial-loop body fans out over independent per-year guards; the path
     // count is multiplicative but each branch is a trivial comparison, so it stays readable.
     @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
-    boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
+    private boolean isSustainable(SearchContext ctx, double[][] returns, double[] floors,
+                                  double[] discretionary) {
         int trialCount = ctx.trialCount();
         int years = ctx.years();
         double[][] paths = ctx.paths();
@@ -282,13 +309,7 @@ final class SustainabilitySearch {
                 ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
                 ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(), false);
 
-        double[] nominalReturns = new double[years];
         for (int t = 0; t < trialCount; t++) {
-            // Derive nominal returns from pre-computed path ratios
-            for (int y = 0; y < years; y++) {
-                nominalReturns[y] = paths[t][y + 1] / paths[t][y] - 1.0;
-            }
-
             // For non-pool trials, initial balance varies per trial
             TrialSimulator.SimulationConfig trialConfig = hasPools ? config
                     : new TrialSimulator.SimulationConfig(
@@ -297,7 +318,7 @@ final class SustainabilitySearch {
                             ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(),
                             ctx.cashReturnRate(), false);
 
-            var result = trialSimulator.simulateTrial(nominalReturns, ctx.income(), ctx.surplusTax(),
+            var result = trialSimulator.simulateTrial(returns[t], ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);
             finalBalances[t] = result.finalBalance();
             minBalances[t] = result.minBalance();
