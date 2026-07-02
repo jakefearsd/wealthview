@@ -17,8 +17,15 @@ import com.wealthview.persistence.repository.StockSplitRepository;
  *
  * <p>Maintains the invariant that every stored transaction is split-adjusted.
  * One {@code stock_split_adjustment} row is written per split, oldest first,
- * so {@link StockSplitService#unapplySplit} reverses these transactions too,
- * and per-split unapply composes correctly across multiple splits.
+ * so {@link StockSplitService#unapplySplit} reverses these transactions too.
+ *
+ * <p>Each row captures a chained {@code old->new} intermediate, matching the
+ * apply-time rows written by {@link StockSplitService#adjustTransactions}. As
+ * with those, unapplying multiple splits is only correct newest-first: each
+ * restore writes back a captured intermediate, so unapplying an older split
+ * while a newer one is still applied would restore a stale quantity. This is a
+ * pre-existing feature-wide property of the chained-adjustment model, not
+ * specific to this class.
  */
 @Component
 public class SplitAdjustmentApplier {
