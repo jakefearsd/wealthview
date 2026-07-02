@@ -1,6 +1,5 @@
 package com.wealthview.core.split;
 
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
@@ -96,10 +95,9 @@ public class StockSplitService {
         var split = stockSplitRepository.save(
                 new StockSplitEntity(symbol, effectiveDate, numerator, denominator, source));
 
-        var ratio = ratio(numerator, denominator);
         var affectedTenantIds = transactionRepository.findDistinctTenantIdsBySymbol(symbol);
 
-        int txnCount = adjustTransactions(split, symbol, effectiveDate, ratio);
+        int txnCount = adjustTransactions(split, symbol, effectiveDate);
         int priceCount = adjustPrices(split, symbol, effectiveDate, affectedTenantIds);
 
         warnOnManualOverrideHoldings(symbol, affectedTenantIds);
@@ -169,8 +167,7 @@ public class StockSplitService {
                 splitId, symbol, split.getEffectiveDate(), txnRestored, priceRestored);
     }
 
-    private int adjustTransactions(StockSplitEntity split, String symbol,
-                                   LocalDate effectiveDate, BigDecimal ratio) {
+    private int adjustTransactions(StockSplitEntity split, String symbol, LocalDate effectiveDate) {
         var txns = transactionRepository.findBySymbolAndDateOnOrBefore(symbol, effectiveDate);
         int adjusted = 0;
         for (var txn : txns) {
@@ -178,7 +175,7 @@ public class StockSplitService {
                 continue;
             }
             var oldQty = txn.getQuantity();
-            var newQty = oldQty.multiply(ratio).setScale(4, VALUE_ROUNDING);
+            var newQty = SplitMath.adjustShares(oldQty, split.getNumerator(), split.getDenominator());
             txn.setQuantity(newQty);
 
             adjustmentRepository.save(new StockSplitAdjustmentEntity(
@@ -203,12 +200,11 @@ public class StockSplitService {
             return 0;
         }
         var anchorTenantId = affectedTenantIds.get(0);
-        var inverseRatio = inverseRatio(split.getNumerator(), split.getDenominator());
         var prices = priceRepository.findBySymbolAndDateBefore(symbol, effectiveDate);
         int adjusted = 0;
         for (var price : prices) {
             var oldClose = price.getClosePrice();
-            var newClose = oldClose.multiply(inverseRatio).setScale(4, VALUE_ROUNDING);
+            var newClose = SplitMath.adjustPrice(oldClose, split.getNumerator(), split.getDenominator());
             price.setClosePrice(newClose);
 
             adjustmentRepository.save(new StockSplitAdjustmentEntity(
@@ -267,14 +263,6 @@ public class StockSplitService {
         // Price row may have been deleted between apply and unapply — non-fatal.
         log.warn("Price row for split adjustment {} not found; skipping restore", adj.getId());
         return false;
-    }
-
-    private static BigDecimal ratio(int numerator, int denominator) {
-        return BigDecimal.valueOf(numerator).divide(BigDecimal.valueOf(denominator), VALUE_SCALE, VALUE_ROUNDING);
-    }
-
-    private static BigDecimal inverseRatio(int numerator, int denominator) {
-        return BigDecimal.valueOf(denominator).divide(BigDecimal.valueOf(numerator), VALUE_SCALE, VALUE_ROUNDING);
     }
 
     private static UUID priceUuid(String symbol, LocalDate date) {

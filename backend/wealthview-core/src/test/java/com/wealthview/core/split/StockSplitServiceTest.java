@@ -147,6 +147,34 @@ class StockSplitServiceTest {
     }
 
     @Test
+    void applySplit_reverseSplitOddRatio_adjustsQuantityExactly() {
+        // 1:3 reverse split of 300 shares lands on exactly 100.0000 under both the
+        // old pre-divided-ratio math and the new SplitMath (300 is a multiple of 3,
+        // so the two roundings happen to agree) — pinned here as a regression guard.
+        var evenTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "ABC",
+                new BigDecimal("300"), new BigDecimal("3000"));
+        // 5003 shares is where the old scale-8 pre-divided ratio (1/3 rounded to
+        // 0.33333333) actually drifts: 5003 * 0.33333333 rounds to 1667.6666,
+        // one cent short of the exact 1667.6667 that SplitMath.adjustShares produces.
+        var oddTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 2), "buy", "ABC",
+                new BigDecimal("5003"), new BigDecimal("50030"));
+
+        when(stockSplitRepository.findBySymbolAndEffectiveDate("ABC", LocalDate.of(2020, 8, 31)))
+                .thenReturn(Optional.empty());
+        when(stockSplitRepository.save(any(StockSplitEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(transactionRepository.findDistinctTenantIdsBySymbol("ABC")).thenReturn(List.of(tenantId));
+        when(transactionRepository.findBySymbolAndDateOnOrBefore("ABC", LocalDate.of(2020, 8, 31)))
+                .thenReturn(List.of(evenTxn, oddTxn));
+        when(priceRepository.findBySymbolAndDateBefore("ABC", LocalDate.of(2020, 8, 31)))
+                .thenReturn(List.of());
+
+        service.applySplit("ABC", LocalDate.of(2020, 8, 31), 1, 3, "manual");
+
+        assertThat(evenTxn.getQuantity()).isEqualByComparingTo("100.0000");
+        assertThat(oddTxn.getQuantity()).isEqualByComparingTo("1667.6667");
+    }
+
+    @Test
     void applySplit_compoundsCorrectlyOverTwoSplits() {
         // 2:1 forward then 1:2 reverse should restore original quantity.
         var txn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "FOO",
