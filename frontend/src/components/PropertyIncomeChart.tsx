@@ -4,6 +4,7 @@ import {
     ReferenceLine, CartesianGrid,
 } from 'recharts';
 import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/properties';
+import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
@@ -239,9 +240,7 @@ export default function PropertyIncomeChart({
     const effectiveAnnualRent = annualRent ?? monthlyRentEstimate * 12;
 
     useEffect(() => {
-        const now = new Date();
-        const from = `${now.getFullYear() - 1}-${String(now.getMonth() + 2).padStart(2, '0')}`;
-        const to = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const { from, to } = trailingTwelveMonthRange();
 
         Promise.all([
             getCashFlowDetail(propertyId, from, to).catch(() => null),

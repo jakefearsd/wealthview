@@ -6,6 +6,7 @@ import type { Property, ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
+import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency, toPercent } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import PropertyAnalyticsSection from '../components/PropertyAnalyticsSection';
@@ -97,20 +98,11 @@ const CATEGORY_LABELS: Record<string, string> = {
     mgmt_fee: 'Management Fee',
 };
 
-function getDefaultRange() {
-    const now = new Date();
-    const from = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-    return {
-        from: `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}`,
-        to: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,
-    };
-}
-
 export default function PropertyDetailPage() {
     const { id } = useParams<{ id: string }>();
     const { role } = useAuth();
     const canWrite = role === 'admin' || role === 'member';
-    const range = useMemo(() => getDefaultRange(), []);
+    const range = useMemo(() => trailingTwelveMonthRange(), []);
     const [refreshing, setRefreshing] = useState(false);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
