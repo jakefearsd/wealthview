@@ -43,28 +43,26 @@ public class SplitAdjustmentApplier {
      */
     public void adjustNewTransaction(TransactionEntity txn) {
         var symbol = txn.getSymbol();
-        var quantity = txn.getQuantity();
-        if (symbol == null || symbol.isBlank() || quantity == null || quantity.signum() == 0) {
+        if (symbol == null || symbol.isBlank()
+                || txn.getQuantity() == null || txn.getQuantity().signum() == 0) {
             return;
         }
-        var tenantId = txn.getTenantId();
-        var txnId = txn.getId();
         var splits = stockSplitRepository
                 .findBySymbolAndEffectiveDateGreaterThanEqualOrderByEffectiveDateAsc(symbol, txn.getDate());
         if (splits.isEmpty()) {
             return;
         }
-        var running = quantity;
+        var running = txn.getQuantity();
         for (var split : splits) {
             var next = SplitMath.adjustShares(running, split.getNumerator(), split.getDenominator());
             adjustmentRepository.save(new StockSplitAdjustmentEntity(
-                    split, tenantId, "transactions", txnId, "quantity",
+                    split, txn.getTenantId(), "transactions", txn.getId(), "quantity",
                     running.setScale(VALUE_SCALE, ROUNDING),
                     next.setScale(VALUE_SCALE, ROUNDING)));
             running = next;
         }
         txn.setQuantity(running);
         log.info("Adjusted late-arriving transaction {} for {} across {} split(s)",
-                txnId, symbol, splits.size());
+                txn.getId(), symbol, splits.size());
     }
 }

@@ -20,6 +20,7 @@ import com.wealthview.persistence.repository.StockSplitRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,8 +46,8 @@ class SplitAdjustmentApplierTest {
         when(t.getSymbol()).thenReturn(symbol);
         when(t.getQuantity()).thenReturn(quantity);
         when(t.getDate()).thenReturn(TXN_DATE);
-        when(t.getId()).thenReturn(TXN_ID);
-        when(t.getTenantId()).thenReturn(TENANT_ID);
+        lenient().when(t.getId()).thenReturn(TXN_ID);
+        lenient().when(t.getTenantId()).thenReturn(TENANT_ID);
         return t;
     }
 
@@ -112,7 +113,7 @@ class SplitAdjustmentApplierTest {
     void adjustNewTransaction_nullSymbol_isNoOp() {
         var t = mock(TransactionEntity.class);
         when(t.getSymbol()).thenReturn(null);
-        when(t.getQuantity()).thenReturn(new BigDecimal("100"));
+        lenient().when(t.getQuantity()).thenReturn(new BigDecimal("100"));
 
         applier.adjustNewTransaction(t);
 
