@@ -21,12 +21,23 @@ class RmdCalculatorTest {
         "95, 8.9",
         "100, 6.4",
         "105, 4.6",
-        "110, 3.2",
-        "115, 2.1",
+        "110, 3.5",
+        "111, 3.4",
+        "115, 2.9",
+        "116, 2.8",
         "120, 2.0"
     })
     void distributionPeriod_matchesIrsTable(int age, double expectedPeriod) {
         assertThat(RmdCalculator.distributionPeriod(age)).isEqualTo(expectedPeriod);
+    }
+
+    @Test
+    void distributionPeriod_strictlyDecreasesAcrossFullTableRange() {
+        for (int age = 73; age <= 120; age++) {
+            assertThat(RmdCalculator.distributionPeriod(age))
+                    .as("period at age %d must be below period at age %d", age, age - 1)
+                    .isLessThan(RmdCalculator.distributionPeriod(age - 1));
+        }
     }
 
     @Test
