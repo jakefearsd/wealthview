@@ -78,6 +78,7 @@
         <jsoup.version>1.22.2</jsoup.version>
         <caffeine.version>3.2.4</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
+        <guava.version>33.4.8-jre</guava.version>
         <!-- Quality tool versions -->
         <spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
@@ -177,6 +178,15 @@
                 <groupId>dev.samstevens.totp</groupId>
                 <artifactId>totp</artifactId>
                 <version>${samstevens-totp.version}</version>
+            </dependency>
+            <!-- Override the ancient guava 15.0 (2013) that zxing:javase (pulled by
+                 the TOTP QR library) drags in transitively. 15.0 carries assorted
+                 DoS/local-temp-file CVEs; pin a current release. zxing uses only a
+                 small, stable slice of guava, so the bump is API-compatible. -->
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>${guava.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
