@@ -1,6 +1,11 @@
 import type { GuardrailProfileResponse } from '../types/projection';
 import { computePlanDiagnostics } from '../pages/SpendingOptimizerPage';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
+import {
+    formatWholeCurrency as fmt,
+    formatCompactCurrency as fmtShort,
+    formatPercent as pct,
+} from '../utils/format';
 import SpendingCorridorChart from './SpendingCorridorChart';
 import PortfolioFanChart from './PortfolioFanChart';
 import TaxSavingsSummary from './TaxSavingsSummary';
@@ -11,18 +16,12 @@ import NearTermSpendingGuide from './NearTermSpendingGuide';
 interface OptimizerResultsViewProps {
     result: GuardrailProfileResponse;
     onReoptimize: () => void;
-    fmt: (n: number | null | undefined) => string;
-    fmtShort: (n: number | null | undefined) => string;
-    pct: (n: number | null | undefined) => string;
     retirementDate: string;
 }
 
 export default function OptimizerResultsView({
     result,
     onReoptimize,
-    fmt,
-    fmtShort,
-    pct,
     retirementDate,
 }: OptimizerResultsViewProps) {
     const diagnostics = computePlanDiagnostics(result.phases, result.yearly_spending, result.failure_rate);

@@ -2,7 +2,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
     Legend, CartesianGrid, ReferenceLine,
 } from 'recharts';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCompactCurrency } from '../utils/format';
 import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear, ScenarioIncomeSourceResponse } from '../types/projection';
 import type { RechartsTooltipProps } from '../types/recharts';
@@ -19,8 +19,7 @@ interface IncomeStreamsChartProps {
 }
 
 export default function IncomeStreamsChart({ data, incomeSources, retirementYear }: IncomeStreamsChartProps) {
-    const tickFormatter = (v: number) =>
-        Math.abs(v) >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`;
+    const tickFormatter = (v: number) => formatCompactCurrency(v);
 
     const retiredYears = data.filter(y => y.retired);
     if (retiredYears.length === 0 || incomeSources.length === 0) return null;

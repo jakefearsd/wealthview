@@ -39,10 +39,6 @@ const baseResult = {
     ],
 };
 
-const fmt = (n: number | null | undefined) => `$${(n ?? 0).toLocaleString()}`;
-const fmtShort = (n: number | null | undefined) => `$${Math.round((n ?? 0) / 1000)}k`;
-const pct = (n: number | null | undefined) => `${((n ?? 0) * 100).toFixed(1)}%`;
-
 describe('OptimizerResultsView', () => {
     it('renders failure rate card with formatted value', () => {
         render(
@@ -50,9 +46,6 @@ describe('OptimizerResultsView', () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 result={baseResult as any}
                 onReoptimize={vi.fn()}
-                fmt={fmt}
-                fmtShort={fmtShort}
-                pct={pct}
                 retirementDate="2035-01-01"
             />
         );
@@ -67,9 +60,6 @@ describe('OptimizerResultsView', () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 result={{ ...baseResult, stale: true } as any}
                 onReoptimize={onReoptimize}
-                fmt={fmt}
-                fmtShort={fmtShort}
-                pct={pct}
                 retirementDate="2035-01-01"
             />
         );
@@ -90,9 +80,6 @@ describe('OptimizerResultsView', () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 result={baseResult as any}
                 onReoptimize={vi.fn()}
-                fmt={fmt}
-                fmtShort={fmtShort}
-                pct={pct}
                 retirementDate="2035-01-01"
             />
         );
@@ -106,9 +93,6 @@ describe('OptimizerResultsView', () => {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 result={baseResult as any}
                 onReoptimize={vi.fn()}
-                fmt={fmt}
-                fmtShort={fmtShort}
-                pct={pct}
                 retirementDate="2035-01-01"
             />
         );

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { listScenarios, compareScenarios } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
-import { formatCurrency } from '../utils/format';
+import { formatCurrency, formatCompactCurrency } from '../utils/format';
 import { cardStyle, inputStyle, labelStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
@@ -47,8 +47,7 @@ export default function ProjectionComparePage() {
 
     if (loading) return <LoadingState message="Loading scenarios..." />;
 
-    const tickFormatter = (v: number) =>
-        Math.abs(v) >= 1000000 ? `$${(v / 1000000).toFixed(1)}M` : `$${(v / 1000).toFixed(0)}k`;
+    const tickFormatter = (v: number) => formatCompactCurrency(v);
 
     // Build overlay chart data
     const chartData: Record<string, number>[] = [];

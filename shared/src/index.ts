@@ -1,4 +1,12 @@
-export { formatCurrency, toPercent, parseCurrencyInput, formatCurrencyInput } from './format';
+export {
+    formatCurrency,
+    toPercent,
+    parseCurrencyInput,
+    formatCurrencyInput,
+    formatWholeCurrency,
+    formatCompactCurrency,
+    formatPercent,
+} from './format';
 export { createApiClient } from './api/client';
 export type { ApiClientConfig } from './api/client';
 export { createAuthApi } from './api/auth';

@@ -1,14 +1,12 @@
 import type { RothConversionScheduleResponse } from '../types/projection';
 import { cardStyle } from '../utils/styles';
+import { formatWholeCurrency as fmt, formatPercent } from '../utils/format';
 
 interface Props {
     schedule: RothConversionScheduleResponse;
 }
 
-const fmt = (n: number) =>
-    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-const pctFmt = (n: number) => `${(n * 100).toFixed(0)}%`;
+const pctFmt = (n: number) => formatPercent(n, 0);
 
 export default function TaxSavingsSummary({ schedule }: Props) {
     const savingsColor = schedule.tax_savings > 0 ? '#2e7d32' : '#d32f2f';

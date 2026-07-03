@@ -1,20 +1,10 @@
 import type { ConversionYearDetail } from '../types/projection';
 import { tableStyle, thStyle as baseThStyle, tdStyle as baseTdStyle, trHoverStyle } from '../utils/styles';
+import { formatWholeCurrency as fmt, formatCompactCurrency as fmtShort } from '../utils/format';
 
 interface Props {
     years: ConversionYearDetail[];
 }
-
-const fmt = (n: number) =>
-    n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-
-const fmtShort = (n: number) => {
-    const abs = Math.abs(n);
-    const sign = n < 0 ? '-' : '';
-    if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-    if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
-    return `${sign}$${Math.round(abs)}`;
-};
 
 const localThStyle: React.CSSProperties = {
     ...baseThStyle,

@@ -5,6 +5,7 @@ import { getScenario, optimizeSpending, getGuardrailProfile, reoptimize } from '
 import type { Scenario, GuardrailPhase, GuardrailProfileResponse, GuardrailOptimizationRequest, GuardrailYearlySpending } from '../types/projection';
 import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle, inputStyle } from '../utils/styles';
+import { formatWholeCurrency } from '../utils/format';
 import LoadingState from '../components/LoadingState';
 import CurrencyInput from '../components/CurrencyInput';
 import FormField from '../components/FormField';
@@ -299,17 +300,6 @@ export default function SpendingOptimizerPage() {
         await reoptimizeMutation.mutate(undefined);
     };
 
-    const fmt = (n: number | null | undefined) => n != null ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) : '--';
-    const fmtShort = (n: number | null | undefined) => {
-        if (n == null) return '--';
-        const abs = Math.abs(n);
-        const sign = n < 0 ? '-' : '';
-        if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
-        if (abs >= 1_000) return `${sign}$${Math.round(abs / 1_000)}k`;
-        return `${sign}$${Math.round(abs)}`;
-    };
-    const pct = (n: number | null | undefined) => n != null ? `${(n * 100).toFixed(1)}%` : '--';
-
     if (!scenario) {
         return <LoadingState message="Loading scenario..." />;
     }
@@ -371,7 +361,7 @@ export default function SpendingOptimizerPage() {
                                     <strong style={{ color: '#666' }}>{type}:</strong>{' '}
                                     {accounts.map((a, i) => (
                                         <span key={a.id}>
-                                            {a.name} ({a.initial_balance.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })})
+                                            {a.name} ({formatWholeCurrency(a.initial_balance)})
                                             {i < accounts.length - 1 ? ', ' : ''}
                                         </span>
                                     ))}
@@ -385,7 +375,7 @@ export default function SpendingOptimizerPage() {
                         <strong style={{ color: '#666' }}>Income:</strong>{' '}
                         {scenario.income_sources.slice(0, 3).map((src, i, arr) => (
                             <span key={src.income_source_id}>
-                                {src.name} ({src.effective_amount.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })})
+                                {src.name} ({formatWholeCurrency(src.effective_amount)})
                                 {i < arr.length - 1 ? ' · ' : ''}
                             </span>
                         ))}
@@ -600,9 +590,6 @@ export default function SpendingOptimizerPage() {
                 <OptimizerResultsView
                     result={result}
                     onReoptimize={handleReoptimize}
-                    fmt={fmt}
-                    fmtShort={fmtShort}
-                    pct={pct}
                     retirementDate={scenario.retirement_date}
                 />
             )}
