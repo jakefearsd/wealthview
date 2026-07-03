@@ -248,7 +248,7 @@ retirement year." They are NOT separate features — they are two implementation
 table has two FK columns (`spending_profile_id` and `guardrail_profile_id`) that are mutually exclusive:
 - Setting a spending profile clears the guardrail profile, and vice versa.
 - Setting "None" clears both — the engine falls back to a withdrawal-rate strategy.
-- This mutual exclusivity is enforced in `ProjectionService.updateScenario()` and
+- This mutual exclusivity is enforced in `ScenarioCrudService.updateScenario()` and
   `GuardrailProfileService.optimize()`. The UI presents a unified "Spending Plan" dropdown.
 
 **Frontend:** `ScenarioForm` shows a single "Spending Plan" dropdown containing regular spending profiles
