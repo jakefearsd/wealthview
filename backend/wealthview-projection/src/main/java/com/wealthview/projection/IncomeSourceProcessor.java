@@ -11,6 +11,7 @@ import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
+import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
@@ -68,7 +69,7 @@ class IncomeSourceProcessor {
 
     IncomeSourceYearResult process(
             List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
-            int taxYear, BigDecimal magi, String filingStatus, BigDecimal priorSuspendedLoss) {
+            int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss) {
 
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
@@ -229,12 +230,12 @@ class IncomeSourceProcessor {
 
     private SocialSecurityResult processSocialSecurityIncome(
             BigDecimal nominal,
-            BigDecimal nonSSIncome, BigDecimal magi, String filingStatus) {
+            BigDecimal nonSSIncome, BigDecimal magi, FilingStatus filingStatus) {
 
         var taxableAmount = ssTaxCalculator.computeTaxableAmount(
                 nominal,
                 nonSSIncome.add(magi),
-                "married_filing_jointly".equals(filingStatus) ? "married_filing_jointly" : "single");
+                filingStatus.value());
         return new SocialSecurityResult(nominal, taxableAmount, taxableAmount);
     }
 

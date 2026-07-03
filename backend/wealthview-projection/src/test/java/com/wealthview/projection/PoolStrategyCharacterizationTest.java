@@ -139,11 +139,11 @@ class PoolStrategyCharacterizationTest {
         PoolStrategy.WithdrawalTaxResult withdrawal = pool.executeWithdrawals(
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
 
-        ProjectionYearDto dto = pool.buildYearDto(2030, 65, bd("550000"),
+        ProjectionYearDto dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(2030, 65, bd("550000"),
                 contributions, growth.total(), withdrawal.totalWithdrawn(), true,
                 BigDecimal.ZERO, BigDecimal.ZERO, growth,
                 withdrawal.fromTaxable(), withdrawal.fromTraditional(), withdrawal.fromRoth(),
-                PoolStrategy.TaxSourceResult.ZERO);
+                PoolStrategy.TaxSourceResult.ZERO));
 
         assertThat(dto.endBalance()).isEqualByComparingTo(bd("405800.0006"));
         assertThat(dto.traditionalBalance()).isEqualByComparingTo(bd("292477.2732"));
@@ -160,11 +160,11 @@ class PoolStrategyCharacterizationTest {
         PoolStrategy.WithdrawalTaxResult withdrawal = pool.executeWithdrawals(
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
 
-        ProjectionYearDto dto = pool.buildYearDto(2030, 65, bd("550000"),
+        ProjectionYearDto dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(2030, 65, bd("550000"),
                 contributions, growth.total(), withdrawal.totalWithdrawn(), true,
                 BigDecimal.ZERO, BigDecimal.ZERO, growth,
                 withdrawal.fromTaxable(), withdrawal.fromTraditional(), withdrawal.fromRoth(),
-                PoolStrategy.TaxSourceResult.ZERO);
+                PoolStrategy.TaxSourceResult.ZERO));
 
         BigDecimal sumOfPools = dto.traditionalBalance()
                 .add(dto.rothBalance())

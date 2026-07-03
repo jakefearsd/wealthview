@@ -3,7 +3,6 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -45,6 +44,20 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome);
 
+    /**
+     * Everything the engine knows about a projection year when it asks the
+     * strategy to assemble the year DTO. Pool balances are the strategy's own
+     * state and deliberately absent — each implementation appends what it has.
+     */
+    record YearDtoContext(int year, int age, BigDecimal startBalance,
+                          BigDecimal contributions, BigDecimal totalGrowth,
+                          BigDecimal withdrawals, boolean retired,
+                          BigDecimal conversionAmount, BigDecimal taxLiability,
+                          GrowthResult growthResult,
+                          BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
+                          BigDecimal withdrawalFromRoth,
+                          TaxSourceResult combinedTaxSource) {}
+
     default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
                                                             BigDecimal overrideAmount) {
         return executeRothConversion(year, effectiveOtherIncome);
@@ -57,14 +70,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      */
     void depositToTaxable(BigDecimal amount);
 
-    ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
-                                   BigDecimal contributions, BigDecimal totalGrowth,
-                                   BigDecimal withdrawals, boolean retired,
-                                   BigDecimal conversionAmount, BigDecimal taxLiability,
-                                   GrowthResult growthResult,
-                                   BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
-                                   BigDecimal withdrawalFromRoth,
-                                   TaxSourceResult combinedTaxSource);
+    ProjectionYearDto buildYearDto(YearDtoContext ctx);
 
     /**
      * Returns the MAGI value to pass to processIncomeSources.
@@ -72,9 +78,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     BigDecimal getMagi();
 
     /**
-     * Returns the filing status string to pass to processIncomeSources.
+     * Returns the filing status to use for tax computations and income-source processing.
      */
-    String getFilingStatusString();
+    FilingStatus getFilingStatus();
 
     /**
      * Whether income sources should be processed every year (true) or only when retired (false).
@@ -83,10 +89,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     /**
      * Returns the accumulated tax breakdown from the most recent withdrawal + conversion cycle.
-     * Only meaningful for MultiPool when a CombinedTaxCalculator is in use.
+     * Present only for MultiPool when a CombinedTaxCalculator is in use.
      */
-    default CombinedTaxResult getLastTaxBreakdown() {
-        return null;
+    default Optional<CombinedTaxResult> getLastTaxBreakdown() {
+        return Optional.empty();
     }
 
     /**
@@ -260,16 +266,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
-                                              BigDecimal contributions, BigDecimal totalGrowth,
-                                              BigDecimal withdrawals, boolean retired,
-                                              BigDecimal conversionAmount, BigDecimal taxLiability,
-                                              GrowthResult growthResult,
-                                              BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
-                                              BigDecimal withdrawalFromRoth,
-                                              TaxSourceResult combinedTaxSource) {
-            return ProjectionYearDto.simple(year, age, startBalance, contributions,
-                    totalGrowth, withdrawals, balance, retired);
+        public ProjectionYearDto buildYearDto(YearDtoContext ctx) {
+            return ProjectionYearDto.simple(ctx.year(), ctx.age(), ctx.startBalance(), ctx.contributions(),
+                    ctx.totalGrowth(), ctx.withdrawals(), balance, ctx.retired());
         }
 
         @Override
@@ -278,8 +277,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public String getFilingStatusString() {
-            return "single";
+        public FilingStatus getFilingStatus() {
+            return FilingStatus.SINGLE;
         }
 
         @Override
@@ -511,8 +510,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public CombinedTaxResult getLastTaxBreakdown() {
-            return lastTaxBreakdown.orElse(null);
+        public Optional<CombinedTaxResult> getLastTaxBreakdown() {
+            return lastTaxBreakdown;
         }
 
         @Override
@@ -521,19 +520,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public ProjectionYearDto buildYearDto(int year, int age, BigDecimal startBalance,
-                                              BigDecimal contributions, BigDecimal totalGrowth,
-                                              BigDecimal withdrawals, boolean retired,
-                                              BigDecimal conversionAmount, BigDecimal taxLiability,
-                                              GrowthResult growthResult,
-                                              BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
-                                              BigDecimal withdrawalFromRoth,
-                                              TaxSourceResult combinedTaxSource) {
+        public ProjectionYearDto buildYearDto(YearDtoContext ctx) {
             var inputs = new MultiPoolYearDtoBuilder.YearDtoInputs(
-                    year, age, startBalance, contributions, totalGrowth, withdrawals, retired,
-                    conversionAmount, taxLiability, growthResult,
-                    withdrawalFromTaxable, withdrawalFromTraditional, withdrawalFromRoth,
-                    combinedTaxSource, getTotal(), taxable, traditional, roth);
+                    ctx.year(), ctx.age(), ctx.startBalance(), ctx.contributions(), ctx.totalGrowth(),
+                    ctx.withdrawals(), ctx.retired(),
+                    ctx.conversionAmount(), ctx.taxLiability(), ctx.growthResult(),
+                    ctx.withdrawalFromTaxable(), ctx.withdrawalFromTraditional(), ctx.withdrawalFromRoth(),
+                    ctx.combinedTaxSource(), getTotal(), taxable, traditional, roth);
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
             CombinedTaxResult breakdown = lastTaxBreakdown.orElse(null);
@@ -547,8 +540,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public String getFilingStatusString() {
-            return filingStatus.name().toLowerCase(Locale.US);
+        public FilingStatus getFilingStatus() {
+            return filingStatus;
         }
 
         @Override

@@ -81,7 +81,7 @@ final class RetirementWithdrawalProcessor {
                 BigDecimal tax = BigDecimal.ZERO;
                 if (taxStrategy != null) {
                     BigDecimal surplusTaxableIncome = effectiveOtherIncome.add(conversionAmount);
-                    FilingStatus filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+                    FilingStatus filingStatus = pool.getFilingStatus();
                     BigDecimal fullTax = taxStrategy.computeTotalTax(surplusTaxableIncome, year, filingStatus);
 
                     if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {

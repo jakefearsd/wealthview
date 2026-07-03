@@ -98,7 +98,7 @@ class MultiPoolDeepTest {
 
         assertThat(strategy).isInstanceOf(PoolStrategy.SinglePool.class);
         assertThat(strategy.getTotal()).isEqualByComparingTo(bd("100000"));
-        assertThat(strategy.getFilingStatusString()).isEqualTo("single");
+        assertThat(strategy.getFilingStatus()).isEqualTo(FilingStatus.SINGLE);
         assertThat(strategy.processIncomeSourcesEveryYear()).isFalse();
         assertThat(strategy.tracksSETax()).isFalse();
         assertThat(strategy.getMagi()).isEqualByComparingTo(ZERO);
@@ -118,7 +118,7 @@ class MultiPoolDeepTest {
 
         assertThat(strategy).isInstanceOf(PoolStrategy.MultiPool.class);
         assertThat(strategy.getTotal()).isEqualByComparingTo(bd("300000"));
-        assertThat(strategy.getFilingStatusString()).isEqualTo("married_filing_jointly");
+        assertThat(strategy.getFilingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
         assertThat(strategy.processIncomeSourcesEveryYear()).isTrue();
         assertThat(strategy.tracksSETax()).isTrue();
         assertThat(strategy.logTag()).isEqualTo("Projection with pools");
@@ -471,7 +471,7 @@ class MultiPoolDeepTest {
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
 
         assertThat(p.getMagi()).isEqualByComparingTo(bd("55000"));
-        assertThat(p.getFilingStatusString()).isEqualTo("married_filing_jointly");
+        assertThat(p.getFilingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
     }
 
     @Test
@@ -483,8 +483,8 @@ class MultiPoolDeepTest {
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
-        assertThat(p.getLastTaxBreakdown()).isNotNull();
-        assertThat(p.getLastTaxBreakdown().totalTax()).isEqualByComparingTo(bd("20"));
+        assertThat(p.getLastTaxBreakdown()).isPresent();
+        assertThat(p.getLastTaxBreakdown().get().totalTax()).isEqualByComparingTo(bd("20"));
     }
 
     // ---- buildYearDto ----
@@ -513,11 +513,11 @@ class MultiPoolDeepTest {
                 }, null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
-        var dto = p.buildYearDto(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO,
+        var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO,
                 bd("100"), true, ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 ZERO, bd("100"), ZERO,
-                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO));
+                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO)));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("15"));
         assertThat(dto.stateTax()).isEqualByComparingTo(bd("5"));
@@ -529,11 +529,11 @@ class MultiPoolDeepTest {
     void buildYearDto_noTaxBreakdown_leavesFieldsNull() {
         var p = pool("100", "0", "0", WithdrawalOrder.TAXABLE_FIRST);
 
-        var dto = p.buildYearDto(YEAR, AGE_RETIRED, bd("100"), ZERO, ZERO,
+        var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("100"), ZERO, ZERO,
                 bd("50"), true, ZERO, ZERO,
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 bd("50"), ZERO, ZERO,
-                PoolStrategy.TaxSourceResult.ZERO);
+                PoolStrategy.TaxSourceResult.ZERO));
 
         assertThat(dto.federalTax()).isNull();
         assertThat(dto.stateTax()).isNull();
@@ -549,10 +549,10 @@ class MultiPoolDeepTest {
                         WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
-        var dto = p.buildYearDto(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
+        var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
                 ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
-                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO);
+                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("20"));
         assertThat(dto.stateTax()).isNull();

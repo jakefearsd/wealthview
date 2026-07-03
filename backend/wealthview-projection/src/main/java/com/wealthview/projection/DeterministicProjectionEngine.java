@@ -271,9 +271,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         int yearsElapsed = year - ctx.currentYear();
         BigDecimal propertyEquity = PropertyEquityCalculator.compute(ctx.properties(), yearsElapsed);
 
-        var yearDto = pool.buildYearDto(year, age, startBalance, contributions,
+        var yearDto = pool.buildYearDto(new PoolStrategy.YearDtoContext(
+                year, age, startBalance, contributions,
                 totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
-                growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource);
+                growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource));
         yearDto = PropertyEquityCalculator.apply(yearDto, propertyEquity);
         yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
                 ctx.inflationRate(), incomeResult.totalActiveIncome());
@@ -317,7 +318,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
             incomeSourceResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
-                    year, pool.getMagi(), pool.getFilingStatusString(), suspendedLoss);
+                    year, pool.getMagi(), pool.getFilingStatus(), suspendedLoss);
             suspendedLoss = incomeSourceResult.suspendedLossCarryforward();
             totalActiveIncome = incomeSourceResult.totalCashInflow();
             taxableActiveIncome = incomeSourceResult.totalTaxableIncome();

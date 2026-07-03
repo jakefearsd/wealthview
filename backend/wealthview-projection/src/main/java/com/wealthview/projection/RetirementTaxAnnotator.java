@@ -5,7 +5,6 @@ import java.math.BigDecimal;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.ProjectionYearDto;
-import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 /**
@@ -48,7 +47,7 @@ final class RetirementTaxAnnotator {
         if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
             BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
                     .add(effectiveOtherIncome);
-            var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+            var filingStatus = pool.getFilingStatus();
             var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
             BigDecimal fedTax = breakdown.federalTax();
             BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
@@ -59,7 +58,7 @@ final class RetirementTaxAnnotator {
         }
         if (retired && age >= 63 && taxStrategy != null) {
             BigDecimal totalIncome = effectiveOtherIncome.add(conversionAmount).add(wdFromTraditional);
-            var filingStatus = FilingStatus.fromString(pool.getFilingStatusString());
+            var filingStatus = pool.getFilingStatus();
             BigDecimal irmaaCeiling = taxStrategy.computeMaxIncomeForTargetRate(
                     IRMAA_BRACKET_RATE, year, filingStatus);
             if (irmaaCeiling.compareTo(BigDecimal.ZERO) > 0
