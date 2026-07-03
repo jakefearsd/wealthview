@@ -54,4 +54,32 @@ class MoneyTest {
         assertThat(helper).isEqualByComparingTo(inline);
         assertThat(helper.scale()).isEqualTo(inline.scale());
     }
+
+    @Test
+    void sum_ignoresNullsAndAddsTheRest() {
+        var result = Money.sum(new BigDecimal("1.50"), null, new BigDecimal("2.25"));
+
+        assertThat(result).isEqualByComparingTo("3.75");
+    }
+
+    @Test
+    void sum_allNull_returnsZero() {
+        assertThat(Money.sum(null, null)).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void sum_noArguments_returnsZero() {
+        assertThat(Money.sum()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void nullIfZero_zeroBecomesNull() {
+        assertThat(Money.nullIfZero(new BigDecimal("0.00"))).isNull();
+        assertThat(Money.nullIfZero(null)).isNull();
+    }
+
+    @Test
+    void nullIfZero_nonZeroPassesThrough() {
+        assertThat(Money.nullIfZero(new BigDecimal("5"))).isEqualByComparingTo("5");
+    }
 }

@@ -25,7 +25,7 @@ import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
 import com.wealthview.core.exchangerate.ExchangeRateService;
-import com.wealthview.core.property.AmortizationCalculator;
+import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -271,15 +271,7 @@ public class CombinedPortfolioHistoryService {
     }
 
     private BigDecimal computeMortgageBalance(LocalDate date, PropertyEntity property) {
-        if (property.hasLoanDetails()) {
-            return AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(),
-                    property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(),
-                    property.getLoanStartDate(),
-                    date);
-        }
-        return property.getMortgageBalance();
+        return PropertyFinance.mortgageBalanceAsOf(property, date);
     }
 
     private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {

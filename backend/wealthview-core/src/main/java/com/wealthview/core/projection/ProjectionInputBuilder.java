@@ -27,8 +27,8 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
-import com.wealthview.core.property.AmortizationCalculator;
 import com.wealthview.core.property.DepreciationCalculator;
+import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -95,15 +95,7 @@ public class ProjectionInputBuilder {
     }
 
     private ProjectionPropertyInput toPropertyInput(PropertyEntity property) {
-        BigDecimal mortgageBalance;
-        if (property.hasLoanDetails()) {
-            mortgageBalance = AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(), property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(), property.getLoanStartDate(),
-                    LocalDate.now());
-        } else {
-            mortgageBalance = property.getMortgageBalance();
-        }
+        var mortgageBalance = PropertyFinance.mortgageBalanceAsOf(property, LocalDate.now());
 
         return new ProjectionPropertyInput(
                 property.getId(),
@@ -198,23 +190,14 @@ public class ProjectionInputBuilder {
         if ("rental_property".equals(source.getIncomeType()) && source.getProperty() != null) {
             var property = source.getProperty();
 
-            annualOpEx = sumNullable(property.getAnnualInsuranceCost(), property.getAnnualMaintenanceCost());
+            annualOpEx = Money.nullIfZero(Money.sum(
+                    property.getAnnualInsuranceCost(), property.getAnnualMaintenanceCost()));
             annualPropertyTax = property.getAnnualPropertyTax();
 
-            if (property.hasLoanDetails()) {
-                var remainingBalance = AmortizationCalculator.remainingBalance(
-                        property.getLoanAmount(), property.getAnnualInterestRate(),
-                        property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
-                if (remainingBalance.compareTo(BigDecimal.ZERO) > 0) {
-                    annualMortgageInterest = remainingBalance.multiply(property.getAnnualInterestRate())
-                            .setScale(Money.SCALE, Money.ROUNDING);
-                    BigDecimal annualPayment = AmortizationCalculator.monthlyPayment(
-                            property.getLoanAmount(), property.getAnnualInterestRate(),
-                            property.getLoanTermMonths())
-                            .multiply(new BigDecimal("12"));
-                    annualMortgagePrincipal = annualPayment.subtract(annualMortgageInterest)
-                            .max(BigDecimal.ZERO);
-                }
+            var debtService = PropertyFinance.annualDebtService(property, LocalDate.now());
+            if (debtService.isPresent()) {
+                annualMortgageInterest = debtService.get().interest();
+                annualMortgagePrincipal = debtService.get().principal();
             }
 
             depreciationMethod = property.getDepreciationMethod();
@@ -233,13 +216,4 @@ public class ProjectionInputBuilder {
                 depreciationMethod, depreciationByYear);
     }
 
-    private BigDecimal sumNullable(BigDecimal... values) {
-        var sum = BigDecimal.ZERO;
-        for (var v : values) {
-            if (v != null) {
-                sum = sum.add(v);
-            }
-        }
-        return sum.compareTo(BigDecimal.ZERO) == 0 ? null : sum;
-    }
 }

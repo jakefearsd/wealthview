@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.HoldScenarioResult;
 import com.wealthview.core.property.dto.RoiAnalysisResponse;
 import com.wealthview.core.property.dto.SellScenarioResult;
@@ -133,10 +134,10 @@ public class PropertyRoiService {
         BigDecimal endingMortgageBalance;
         BigDecimal annualMortgagePayment;
         if (property.hasLoanDetails()) {
-            var futureDate = LocalDate.now().plusYears(years);
-            endingMortgageBalance = AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(), property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(), property.getLoanStartDate(), futureDate);
+            // Deliberately ZERO (not the manual mortgageBalance) without loan details:
+            // a manual balance is a snapshot and cannot be projected years ahead.
+            endingMortgageBalance = PropertyFinance.mortgageBalanceAsOf(
+                    property, LocalDate.now().plusYears(years));
             annualMortgagePayment = AmortizationCalculator.monthlyPayment(
                     property.getLoanAmount(), property.getAnnualInterestRate(),
                     property.getLoanTermMonths()).multiply(new BigDecimal("12"));
@@ -146,7 +147,7 @@ public class PropertyRoiService {
         }
 
         // Annual operating expenses from property entity
-        var baseExpenses = sumNullable(
+        var baseExpenses = Money.sum(
                 property.getAnnualPropertyTax(),
                 property.getAnnualInsuranceCost(),
                 property.getAnnualMaintenanceCost());
@@ -163,10 +164,7 @@ public class PropertyRoiService {
             BigDecimal mortgageThisYear = BigDecimal.ZERO;
             if (property.hasLoanDetails()) {
                 var yearStartDate = LocalDate.now().plusYears(y);
-                var yearStartBalance = AmortizationCalculator.remainingBalance(
-                        property.getLoanAmount(), property.getAnnualInterestRate(),
-                        property.getLoanTermMonths(), property.getLoanStartDate(),
-                        yearStartDate);
+                var yearStartBalance = PropertyFinance.mortgageBalanceAsOf(property, yearStartDate);
                 if (yearStartBalance.compareTo(BigDecimal.ZERO) > 0) {
                     mortgageThisYear = annualMortgagePayment;
                 }
@@ -189,16 +187,6 @@ public class PropertyRoiService {
 
         return new HoldScenarioResult(endingPropertyValue, endingMortgageBalance,
                 cumulativeNetCashFlow, endingNetWorth);
-    }
-
-    private BigDecimal sumNullable(BigDecimal... values) {
-        var sum = BigDecimal.ZERO;
-        for (var v : values) {
-            if (v != null) {
-                sum = sum.add(v);
-            }
-        }
-        return sum;
     }
 
     private BigDecimal compound(BigDecimal principal, BigDecimal annualRate, int years) {

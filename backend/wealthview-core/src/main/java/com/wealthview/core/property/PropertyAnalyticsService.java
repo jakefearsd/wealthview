@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
+import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.EquityGrowthPoint;
 import com.wealthview.core.property.dto.MortgageProgress;
 import com.wealthview.core.property.dto.PropertyAnalyticsResponse;
@@ -78,7 +79,7 @@ public class PropertyAnalyticsService {
                     || property.getAnnualMaintenanceCost() != null;
 
             if (hasEntityFields) {
-                var totalOperatingExpenses = sumNullable(
+                var totalOperatingExpenses = Money.sum(
                         property.getAnnualPropertyTax(),
                         property.getAnnualInsuranceCost(),
                         property.getAnnualMaintenanceCost());
@@ -181,17 +182,7 @@ public class PropertyAnalyticsService {
 
             var propertyValue = findValueForMonth(current, valuations, currentValue);
 
-            BigDecimal mortgageBalance;
-            if (property.hasLoanDetails()) {
-                mortgageBalance = AmortizationCalculator.remainingBalance(
-                        property.getLoanAmount(),
-                        property.getAnnualInterestRate(),
-                        property.getLoanTermMonths(),
-                        property.getLoanStartDate(),
-                        monthDate);
-            } else {
-                mortgageBalance = property.getMortgageBalance();
-            }
+            var mortgageBalance = PropertyFinance.mortgageBalanceAsOf(property, monthDate);
 
             var equity = propertyValue.subtract(mortgageBalance);
 
@@ -255,16 +246,6 @@ public class PropertyAnalyticsService {
         long overlappingMonths = overlapStart.until(overlapEnd, java.time.temporal.ChronoUnit.MONTHS) + 1;
         return amount.multiply(new BigDecimal(overlappingMonths))
                 .divide(new BigDecimal("12"), 4, RoundingMode.HALF_UP);
-    }
-
-    private BigDecimal sumNullable(BigDecimal... values) {
-        var sum = BigDecimal.ZERO;
-        for (var v : values) {
-            if (v != null) {
-                sum = sum.add(v);
-            }
-        }
-        return sum;
     }
 
     private BigDecimal percentageOf(BigDecimal numerator, BigDecimal denominator) {

@@ -29,7 +29,7 @@ import com.wealthview.core.projection.dto.ScenarioParamsSource;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
-import com.wealthview.core.property.AmortizationCalculator;
+import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -334,36 +334,12 @@ public class ScenarioCrudService {
         if (!"rental_property".equals(incomeType) || property == null) {
             return null;
         }
-        BigDecimal expenses = sumNullable(property.getAnnualInsuranceCost(),
+        var expenses = Money.sum(property.getAnnualInsuranceCost(),
                 property.getAnnualMaintenanceCost(),
-                property.getAnnualPropertyTax());
-        if (property.hasLoanDetails()) {
-            var remaining = AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(), property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(), property.getLoanStartDate(), LocalDate.now());
-            if (remaining.compareTo(BigDecimal.ZERO) > 0) {
-                var interest = remaining.multiply(property.getAnnualInterestRate())
-                        .setScale(Money.SCALE, Money.ROUNDING);
-                var annualPayment = AmortizationCalculator.monthlyPayment(
-                        property.getLoanAmount(), property.getAnnualInterestRate(),
-                        property.getLoanTermMonths()).multiply(new BigDecimal("12"));
-                var principal = annualPayment.subtract(interest).max(BigDecimal.ZERO);
-                var debtService = interest.add(principal);
-                expenses = expenses == null ? debtService : expenses.add(debtService);
-            }
-        }
-        return expenses != null
-                ? grossAnnual.subtract(expenses).max(BigDecimal.ZERO)
-                : grossAnnual;
-    }
-
-    private static BigDecimal sumNullable(BigDecimal... values) {
-        BigDecimal total = null;
-        for (var v : values) {
-            if (v != null) {
-                total = total == null ? v : total.add(v);
-            }
-        }
-        return total;
+                property.getAnnualPropertyTax())
+                .add(PropertyFinance.annualDebtService(property, LocalDate.now())
+                        .map(PropertyFinance.AnnualDebtService::total)
+                        .orElse(BigDecimal.ZERO));
+        return grossAnnual.subtract(expenses).max(BigDecimal.ZERO);
     }
 }

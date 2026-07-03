@@ -2,7 +2,6 @@ package com.wealthview.core.dashboard;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +19,7 @@ import com.wealthview.core.dashboard.dto.DashboardSummaryResponse;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AccountSummary;
 import com.wealthview.core.dashboard.dto.DashboardSummaryResponse.AllocationEntry;
 import com.wealthview.core.exchangerate.ExchangeRateService;
-import com.wealthview.core.property.AmortizationCalculator;
+import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
@@ -103,15 +102,7 @@ public class DashboardService {
     }
 
     private BigDecimal computeEffectiveBalance(PropertyEntity property) {
-        if (property.isUseComputedBalance() && property.hasLoanDetails()) {
-            return AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(),
-                    property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(),
-                    property.getLoanStartDate(),
-                    LocalDate.now());
-        }
-        return property.getMortgageBalance();
+        return PropertyFinance.effectiveCurrentMortgageBalance(property);
     }
 
     private List<AllocationEntry> buildAllocation(Map<String, BigDecimal> map, BigDecimal total) {

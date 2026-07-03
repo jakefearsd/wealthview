@@ -1,7 +1,6 @@
 package com.wealthview.core.property;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.List;
@@ -235,15 +234,7 @@ public class PropertyService {
     }
 
     BigDecimal computeEffectiveBalance(PropertyEntity property) {
-        if (property.isUseComputedBalance() && property.hasLoanDetails()) {
-            return AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(),
-                    property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(),
-                    property.getLoanStartDate(),
-                    LocalDate.now());
-        }
-        return property.getMortgageBalance();
+        return PropertyFinance.effectiveCurrentMortgageBalance(property);
     }
 
     private PropertyResponse buildResponse(PropertyEntity property) {

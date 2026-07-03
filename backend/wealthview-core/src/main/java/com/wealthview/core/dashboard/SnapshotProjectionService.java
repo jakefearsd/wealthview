@@ -18,7 +18,7 @@ import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionDataPointDto;
 import com.wealthview.core.dashboard.dto.SnapshotProjectionResponse;
 import com.wealthview.core.portfolio.TheoreticalPortfolioService;
-import com.wealthview.core.property.AmortizationCalculator;
+import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.AccountRepository;
@@ -171,20 +171,7 @@ public class SnapshotProjectionService {
                 : property.getCurrentValue().multiply(
                         BigDecimal.valueOf(Math.pow(BigDecimal.ONE.add(appreciationRate).doubleValue(), year)), MC);
 
-        // Mortgage balance
-        BigDecimal mortgageBalance;
-        if (property.hasLoanDetails()) {
-            mortgageBalance = AmortizationCalculator.remainingBalance(
-                    property.getLoanAmount(),
-                    property.getAnnualInterestRate(),
-                    property.getLoanTermMonths(),
-                    property.getLoanStartDate(),
-                    asOfDate);
-        } else {
-            mortgageBalance = property.getMortgageBalance();
-        }
-
-        return appreciatedValue.subtract(mortgageBalance);
+        return appreciatedValue.subtract(PropertyFinance.mortgageBalanceAsOf(property, asOfDate));
     }
 
     private record AccountProjection(BigDecimal currentValue, BigDecimal cagr) {}
