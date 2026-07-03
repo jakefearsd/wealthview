@@ -46,6 +46,7 @@ import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -393,6 +394,21 @@ class PropertyControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("updated"));
+    }
+
+    @Test
+    void selectZpid_nonNumericZpid_returns400() throws Exception {
+        // zpid flows into an outbound Zillow URL path; reject anything but digits
+        // at the request boundary so path/query injection can't be attempted.
+        mockMvc.perform(post("/api/v1/properties/{id}/valuations/select-zpid", PROPERTY_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"zpid": "../search?q=x"}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(syncService);
     }
 
     @Test
