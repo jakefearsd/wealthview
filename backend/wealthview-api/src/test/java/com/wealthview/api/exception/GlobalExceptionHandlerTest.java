@@ -28,6 +28,7 @@ import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.exception.TenantAccessDeniedException;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
@@ -86,6 +87,19 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().status()).isEqualTo(401);
         assertThat(response.getBody().error()).isEqualTo("UNAUTHORIZED");
         assertCounter("InvalidSessionException", "401", 1);
+    }
+
+    @Test
+    void handleServiceUnavailable_returns503AndRecordsMetric() {
+        var ex = new ServiceUnavailableException("Yahoo Finance client is not configured");
+
+        var response = handler.handleServiceUnavailable(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody().status()).isEqualTo(503);
+        assertThat(response.getBody().error()).isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(response.getBody().message()).isEqualTo("Yahoo Finance client is not configured");
+        assertCounter("ServiceUnavailableException", "503", 1);
     }
 
     @Test

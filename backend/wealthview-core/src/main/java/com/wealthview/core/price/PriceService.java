@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.CsvImportResult;
 import com.wealthview.core.price.dto.PriceRequest;
@@ -47,6 +48,13 @@ public class PriceService {
         this.priceRepository = priceRepository;
         this.holdingRepository = holdingRepository;
         this.yahooPriceClient = yahooPriceClient;
+    }
+
+    private YahooPriceClient requireYahooClient() {
+        if (yahooPriceClient == null) {
+            throw new ServiceUnavailableException("Yahoo Finance client is not configured");
+        }
+        return yahooPriceClient;
     }
 
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
@@ -100,13 +108,7 @@ public class PriceService {
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public YahooSyncResult syncFromYahoo(List<String> symbols) {
-        if (yahooPriceClient == null) {
-            log.warn("Yahoo Finance client not configured; marking all symbols as failed");
-            var failures = symbols.stream()
-                    .map(s -> new YahooSyncResult.SymbolError(s, "Yahoo Finance client is not configured"))
-                    .toList();
-            return new YahooSyncResult(0, 0, new ArrayList<>(failures));
-        }
+        var client = requireYahooClient();
 
         var today = LocalDate.now();
         var from = today.minusDays(5);
@@ -115,7 +117,7 @@ public class PriceService {
         var failures = new ArrayList<YahooSyncResult.SymbolError>();
 
         for (var symbol : symbols) {
-            var fetchResult = yahooPriceClient.fetchHistory(symbol, from, today);
+            var fetchResult = client.fetchHistory(symbol, from, today);
             if (fetchResult.failed()) {
                 failures.add(new YahooSyncResult.SymbolError(symbol, fetchResult.errorReason()));
                 continue;
@@ -143,13 +145,11 @@ public class PriceService {
 
     @Transactional(readOnly = true)
     public List<PriceResponse> fetchFromYahoo(YahooFetchRequest request) {
-        if (yahooPriceClient == null) {
-            throw new IllegalStateException("Yahoo Finance client is not configured");
-        }
+        var client = requireYahooClient();
 
         var responses = new ArrayList<PriceResponse>();
         for (var symbol : request.symbols()) {
-            var fetchResult = yahooPriceClient.fetchHistory(symbol, request.fromDate(), request.toDate());
+            var fetchResult = client.fetchHistory(symbol, request.fromDate(), request.toDate());
             for (var point : fetchResult.points()) {
                 responses.add(new PriceResponse(symbol, point.date(), point.closePrice(), SOURCE_YAHOO));
             }

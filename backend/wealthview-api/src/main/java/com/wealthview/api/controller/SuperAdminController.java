@@ -21,13 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.wealthview.api.dto.ErrorResponse;
 import com.wealthview.core.auth.LoginActivityService;
 import com.wealthview.core.auth.dto.LoginActivityResponse;
 import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.config.SystemStatsService;
 import com.wealthview.core.config.dto.SystemConfigResponse;
 import com.wealthview.core.config.dto.SystemStatsResponse;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.price.PriceService;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.CsvImportResult;
@@ -113,10 +113,8 @@ public class SuperAdminController {
     @PostMapping("/prices/sync")
     public ResponseEntity<?> triggerPriceSync() {
         if (priceSyncService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-                    .body(new ErrorResponse("SERVICE_UNAVAILABLE",
-                            "Finnhub API key is not configured. Set app.finnhub.api-key in your environment.",
-                            503));
+            throw new ServiceUnavailableException(
+                    "Finnhub API key is not configured. Set app.finnhub.api-key in your environment.");
         }
         var result = priceSyncService.syncDailyPrices();
         return ResponseEntity.ok(result);

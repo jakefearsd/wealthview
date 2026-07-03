@@ -27,6 +27,7 @@ import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
 import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.exception.TenantAccessDeniedException;
 import io.micrometer.core.instrument.MeterRegistry;
 
@@ -127,6 +128,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleTenantAccessDenied(
             TenantAccessDeniedException ex, HttpServletRequest request) {
         return respond(ex, request, HttpStatus.FORBIDDEN, "FORBIDDEN", "Tenant access denied", ex.getMessage());
+    }
+
+    @ExceptionHandler(ServiceUnavailableException.class)
+    public ResponseEntity<ErrorResponse> handleServiceUnavailable(
+            ServiceUnavailableException ex, HttpServletRequest request) {
+        return respond(ex, request, HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
+                "Optional service not configured", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)

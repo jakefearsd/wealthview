@@ -23,6 +23,7 @@ import com.wealthview.core.property.PropertyValuationService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -62,20 +63,24 @@ class PropertyControllerNoSyncServiceTest {
     private static final UUID PROPERTY_ID = UUID.randomUUID();
 
     @Test
-    void refreshValuation_whenSyncServiceUnavailable_returns503() throws Exception {
+    void refreshValuation_whenSyncServiceUnavailable_returns503WithErrorEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/properties/{id}/valuations/refresh", PROPERTY_ID)
                         .with(authenticatedAdmin()))
-                .andExpect(status().isServiceUnavailable());
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.status").value(503));
     }
 
     @Test
-    void selectZpid_whenSyncServiceUnavailable_returns503() throws Exception {
+    void selectZpid_whenSyncServiceUnavailable_returns503WithErrorEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/properties/{id}/valuations/select-zpid", PROPERTY_ID)
                         .with(authenticatedAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"zpid": "12345"}
                                 """))
-                .andExpect(status().isServiceUnavailable());
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.error").value("SERVICE_UNAVAILABLE"))
+                .andExpect(jsonPath("$.status").value(503));
     }
 }

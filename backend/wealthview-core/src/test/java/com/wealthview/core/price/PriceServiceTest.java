@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.price.dto.BulkPriceRequest;
 import com.wealthview.core.price.dto.PriceRequest;
 import com.wealthview.core.price.dto.YahooFetchRequest;
@@ -187,15 +188,12 @@ class PriceServiceTest {
     }
 
     @Test
-    void syncFromYahoo_nullClient_allSymbolsFailWithConfigReason() {
+    void syncFromYahoo_nullClient_throwsServiceUnavailable() {
         var service = new PriceService(priceRepository, holdingRepository, null);
 
-        var result = service.syncFromYahoo(List.of("AAPL", "MSFT"));
-
-        assertThat(result.failures()).hasSize(2);
-        assertThat(result.failures().get(0).symbol()).isEqualTo("AAPL");
-        assertThat(result.failures().get(0).reason()).contains("not configured");
-        assertThat(result.failures().get(1).symbol()).isEqualTo("MSFT");
+        assertThatThrownBy(() -> service.syncFromYahoo(List.of("AAPL", "MSFT")))
+                .isInstanceOf(ServiceUnavailableException.class)
+                .hasMessageContaining("not configured");
         verify(priceRepository, never()).save(any());
     }
 
@@ -219,7 +217,7 @@ class PriceServiceTest {
     }
 
     @Test
-    void fetchFromYahoo_nullClient_throwsIllegalState() {
+    void fetchFromYahoo_nullClient_throwsServiceUnavailable() {
         var service = new PriceService(priceRepository, holdingRepository, null);
         var request = new YahooFetchRequest(
                 List.of("AAPL"),
@@ -227,7 +225,7 @@ class PriceServiceTest {
                 LocalDate.of(2024, 1, 5));
 
         assertThatThrownBy(() -> service.fetchFromYahoo(request))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessageContaining("not configured");
     }
 

@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.wealthview.api.dto.DepreciationScheduleResponse;
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.property.PropertyAnalyticsService;
 import com.wealthview.core.property.PropertyRoiService;
 import com.wealthview.core.property.PropertyService;
@@ -180,7 +181,8 @@ public class PropertyController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
         if (syncService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+            throw new ServiceUnavailableException(
+                    "Property valuation sync is not configured. Set the Zillow scraper settings in your environment.");
         }
         var result = syncService.refreshProperty(principal.tenantId(), id);
         return ResponseEntity.ok(result);
@@ -200,7 +202,8 @@ public class PropertyController {
             @PathVariable UUID id,
             @Valid @RequestBody SelectZpidRequest request) {
         if (syncService == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+            throw new ServiceUnavailableException(
+                    "Property valuation sync is not configured. Set the Zillow scraper settings in your environment.");
         }
         var result = syncService.selectZpid(principal.tenantId(), id, request.zpid());
         return ResponseEntity.ok(result);
