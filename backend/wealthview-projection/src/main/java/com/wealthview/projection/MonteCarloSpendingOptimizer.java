@@ -177,6 +177,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 BigDecimal.ZERO, BigDecimal.ZERO,
                 BigDecimal.ZERO,
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+                input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
+                input.phaseBlendYears(), null,
+                input.cashReserveYears(), input.cashReturnRate(), null);
     }
 }

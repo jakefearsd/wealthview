@@ -134,7 +134,9 @@ final class GuardrailResponseBuilder {
                 toBD(medianFinal), toBD(failureRate),
                 toBD(p10Final),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"),
+                input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
+                input.phaseBlendYears(), null,
+                input.cashReserveYears(), input.cashReturnRate(),
                 convScheduleResponse);
     }
 

@@ -45,33 +45,6 @@ class GuardrailProfileResponseTest {
     }
 
     @Test
-    void legacyShortConstructor_defaultsNewFieldsToSensibleZeros() {
-        // The shorter constructor exists for older code paths that don't yet supply
-        // portfolio-floor / phase-blend / cash-reserve fields.
-        var id = UUID.randomUUID();
-        var scenarioId = UUID.randomUUID();
-        var now = OffsetDateTime.now();
-
-        var response = new GuardrailProfileResponse(
-                id, scenarioId, "Legacy",
-                new BigDecimal("50000"), BigDecimal.ZERO,
-                new BigDecimal("0.07"),
-                500, new BigDecimal("0.85"),
-                List.of(), List.of(),
-                new BigDecimal("1000000"), new BigDecimal("0.05"),
-                new BigDecimal("500000"),
-                false, now, now);
-
-        assertThat(response.portfolioFloor()).isEqualByComparingTo("0");
-        assertThat(response.maxAnnualAdjustmentRate()).isNull();
-        assertThat(response.phaseBlendYears()).isZero();
-        assertThat(response.riskTolerance()).isNull();
-        assertThat(response.cashReserveYears()).isEqualTo(2);
-        assertThat(response.cashReturnRate()).isEqualByComparingTo("0.04");
-        assertThat(response.conversionSchedule()).isNull();
-    }
-
-    @Test
     void from_withValidJsonFields_mapsAllFields() {
         var entity = baseEntity();
         when(entity.getPhases()).thenReturn("""

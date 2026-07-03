@@ -38,23 +38,6 @@ public record GuardrailProfileResponse(
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    public GuardrailProfileResponse(UUID id, UUID scenarioId, String name,
-                                     BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
-                                     BigDecimal returnMean,
-                                     int trialCount, BigDecimal confidenceLevel,
-                                     List<GuardrailPhaseInput> phases,
-                                     List<GuardrailYearlySpending> yearlySpending,
-                                     BigDecimal medianFinalBalance, BigDecimal failureRate,
-                                     BigDecimal percentile10Final,
-                                     boolean stale, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
-        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget,
-                returnMean, trialCount, confidenceLevel,
-                phases, yearlySpending, medianFinalBalance, failureRate,
-                percentile10Final, stale, createdAt, updatedAt,
-                BigDecimal.ZERO, null, 0, null,
-                2, new BigDecimal("0.04"), null);
-    }
-
     // UseDiamondOperator: the anonymous TypeReference subclasses below MUST keep explicit type
     // arguments — Jackson captures the generic type via the anonymous class's superclass at
     // runtime, and a diamond would erase List<...> to a raw type.

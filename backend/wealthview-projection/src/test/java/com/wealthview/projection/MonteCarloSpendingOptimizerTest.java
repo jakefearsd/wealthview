@@ -93,6 +93,33 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
+    void optimize_response_echoesConfigurationActuallyUsed() {
+        var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 2));
+
+        var input = buildInputWithCashBuffer(
+                new BigDecimal("1000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                phases,
+                List.of(),
+                200,
+                42L,
+                new BigDecimal("50000"),
+                new BigDecimal("0.15"),
+                3,
+                1,
+                new BigDecimal("0.03"));
+
+        var response = optimizer.optimize(input);
+
+        assertThat(response.portfolioFloor()).isEqualByComparingTo(new BigDecimal("50000"));
+        assertThat(response.maxAnnualAdjustmentRate()).isEqualByComparingTo(new BigDecimal("0.15"));
+        assertThat(response.phaseBlendYears()).isEqualTo(3);
+        assertThat(response.cashReserveYears()).isEqualTo(1);
+        assertThat(response.cashReturnRate()).isEqualByComparingTo(new BigDecimal("0.03"));
+    }
+
+    @Test
     void optimize_basicScenario_producesYearlySpending() {
         var phases = List.of(
                 new GuardrailPhaseInput("Early", 62, 72, 3),
