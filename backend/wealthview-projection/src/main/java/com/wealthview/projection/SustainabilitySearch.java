@@ -255,22 +255,13 @@ final class SustainabilitySearch {
     }
 
     /**
-     * Returns true when the given discretionary plan keeps the portfolio above the
-     * terminal target (and portfolio floor, if set) at the required confidence level.
-     */
-    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
-    // argument list — varargs would change the call contract and invite accidental misuse.
-    @SuppressWarnings("PMD.UseVarargs")
-    boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
-        return isSustainable(ctx, nominalReturns(ctx), floors, discretionary);
-    }
-
-    /**
      * Derives per-trial nominal returns from the path ratios once per search run. The
      * binary searches call {@code isSustainable} hundreds of times against the same
      * immutable paths, so recomputing the ratios per call would dominate the loop.
+     * Package-private so external repeated-check loops (the MC optimizer's
+     * reduce-until-sustainable pass) can precompute once too.
      */
-    private static double[][] nominalReturns(SearchContext ctx) {
+    static double[][] nominalReturns(SearchContext ctx) {
         double[][] paths = ctx.paths();
         double[][] returns = new double[ctx.trialCount()][ctx.years()];
         for (int t = 0; t < ctx.trialCount(); t++) {
@@ -281,13 +272,19 @@ final class SustainabilitySearch {
         return returns;
     }
 
+    /**
+     * Returns true when the given discretionary plan keeps the portfolio above the
+     * terminal target (and portfolio floor, if set) at the required confidence level.
+     * {@code returns} must come from {@link #nominalReturns(SearchContext)} — callers
+     * checking repeatedly against the same context precompute it once.
+     */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
     // NPathComplexity: the trial-loop body fans out over independent per-year guards; the path
     // count is multiplicative but each branch is a trivial comparison, so it stays readable.
     @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
-    private boolean isSustainable(SearchContext ctx, double[][] returns, double[] floors,
-                                  double[] discretionary) {
+    boolean isSustainable(SearchContext ctx, double[][] returns, double[] floors,
+                          double[] discretionary) {
         int trialCount = ctx.trialCount();
         int years = ctx.years();
         double[][] paths = ctx.paths();

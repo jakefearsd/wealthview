@@ -121,14 +121,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         SustainabilitySearch.SearchContext searchContext,
                                         OptimizationSetup ctx) {
         double[] floors = ctx.taxIncome().adjustedFloors();
-        if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
+        double[][] returns = SustainabilitySearch.nominalReturns(searchContext);
+        if (sustainabilitySearch.isSustainable(searchContext, returns, floors, discretionaryByYear)) {
             return;
         }
         for (int i = 0; i < 10; i++) {
             for (int y = 0; y < ctx.sim().years(); y++) {
                 discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
             }
-            if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
+            if (sustainabilitySearch.isSustainable(searchContext, returns, floors, discretionaryByYear)) {
                 return;
             }
         }

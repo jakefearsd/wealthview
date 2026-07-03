@@ -32,6 +32,14 @@ final class RothConversionOptimizer {
     private final ConversionSimulator simulator;
     private final FractionSearch fractionSearch;
 
+    /**
+     * Lazily computed no-conversion simulation. ConversionSimulator is pure, so
+     * the fraction-0 result never changes for a given optimizer instance —
+     * without this cache the joint search recomputed it on every one of its
+     * ~41 scheduleForFraction evaluations.
+     */
+    private SimResult baselineResult;
+
     record RothConversionSchedule(
             double[] conversionByYear,
             double[] conversionTaxByYear,
@@ -134,8 +142,15 @@ final class RothConversionOptimizer {
         return availableForRmd * distributionPeriod;
     }
 
+    private SimResult baseline() {
+        if (baselineResult == null) {
+            baselineResult = simulator.simulateForFraction(0.0);
+        }
+        return baselineResult;
+    }
+
     RothConversionSchedule optimize() {
-        var baseline = simulator.simulateForFraction(0.0);
+        var baseline = baseline();
 
         if (config.initTraditional() <= 0) {
             return buildSchedule(baseline, baseline.lifetimeTax(), 0.0);
@@ -152,17 +167,15 @@ final class RothConversionOptimizer {
      * joint search loop, which scores fractions by sustainable spending rather than lifetime tax.
      */
     RothConversionSchedule scheduleForFraction(double fraction) {
-        var result = simulator.simulateForFraction(fraction);
-        var baseline = simulator.simulateForFraction(0.0);
-        return buildSchedule(result, baseline.lifetimeTax(), fraction);
+        var result = fraction == 0.0 ? baseline() : simulator.simulateForFraction(fraction);
+        return buildSchedule(result, baseline().lifetimeTax(), fraction);
     }
 
     /**
      * Returns the baseline (no conversion) schedule.
      */
     RothConversionSchedule baselineSchedule() {
-        var baseline = simulator.simulateForFraction(0.0);
-        return buildSchedule(baseline, baseline.lifetimeTax(), 0.0);
+        return buildSchedule(baseline(), baseline().lifetimeTax(), 0.0);
     }
 
     private RothConversionSchedule buildSchedule(SimResult result, double baselineTax,
