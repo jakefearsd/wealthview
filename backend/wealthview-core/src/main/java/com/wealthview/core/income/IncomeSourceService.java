@@ -12,14 +12,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.income.dto.CreateIncomeSourceRequest;
 import com.wealthview.core.income.dto.IncomeSourceResponse;
 import com.wealthview.core.income.dto.UpdateIncomeSourceRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 @Service
 public class IncomeSourceService {
@@ -37,20 +36,19 @@ public class IncomeSourceService {
 
     private final IncomeSourceRepository incomeSourceRepository;
     private final PropertyRepository propertyRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
 
     public IncomeSourceService(IncomeSourceRepository incomeSourceRepository,
                                PropertyRepository propertyRepository,
-                               TenantRepository tenantRepository) {
+                               TenantLookup tenantLookup) {
         this.incomeSourceRepository = incomeSourceRepository;
         this.propertyRepository = propertyRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
     }
 
     @Transactional
     public IncomeSourceResponse create(UUID tenantId, CreateIncomeSourceRequest request) {
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         validateIncomeType(request.incomeType());
         var taxTreatment = request.taxTreatment() != null ? request.taxTreatment() : "taxable";

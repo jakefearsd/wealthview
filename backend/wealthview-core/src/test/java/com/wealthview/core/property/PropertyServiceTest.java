@@ -25,6 +25,7 @@ import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
@@ -34,7 +35,6 @@ import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -59,7 +59,7 @@ class PropertyServiceTest {
     private IncomeSourceRepository incomeSourceRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -81,7 +81,7 @@ class PropertyServiceTest {
 
     @Test
     void create_validRequest_returnsPropertyResponse() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -97,7 +97,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withLoanDetails_computesMortgageBalance() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -116,7 +116,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withPartialLoanDetails_throwsValidation() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
@@ -216,7 +216,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withPropertyType_setsPropertyType() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -231,7 +231,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withoutPropertyType_defaultsToPrimaryResidence() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -246,7 +246,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withInvalidPropertyType_throwsIllegalArgument() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
@@ -438,7 +438,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withDepreciationFields_setsDepreciation() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -456,7 +456,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withNullDepreciationMethod_defaultsToNone() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -471,7 +471,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withInvalidDepreciationMethod_throwsIllegalArgument() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
@@ -486,7 +486,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withFinancialFields_mapsFieldsToResponse() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -504,7 +504,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withNullFinancialFields_returnsNulls() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
@@ -956,7 +956,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withStraightLineAndNullInServiceDate_throwsIllegalArgument() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
@@ -1104,7 +1104,7 @@ class PropertyServiceTest {
 
     @Test
     void create_withCostSegAllocations_savesFieldsAndSchedule() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var allocations = List.of(
@@ -1126,7 +1126,7 @@ class PropertyServiceTest {
 
     @Test
     void create_costSeg_sumMismatch_throwsWithBothAmounts() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         // Depreciable basis = 300000 - 50000 = 250000, but allocations sum to 200000
         var allocations = List.of(
@@ -1149,7 +1149,7 @@ class PropertyServiceTest {
 
     @Test
     void create_costSeg_invalidClass_throws() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var allocations = List.of(
                 new CostSegAllocation("10yr", new BigDecimal("250000")));

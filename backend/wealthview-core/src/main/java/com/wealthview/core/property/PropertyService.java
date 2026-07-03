@@ -16,7 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
@@ -26,6 +25,7 @@ import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.core.property.dto.PropertyResponse;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
@@ -34,7 +34,6 @@ import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 @Service
 public class PropertyService {
@@ -46,7 +45,7 @@ public class PropertyService {
     private final PropertyExpenseRepository expenseRepository;
     private final PropertyIncomeRepository incomeRepository;
     private final IncomeSourceRepository incomeSourceRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final ApplicationEventPublisher eventPublisher;
     private final PropertyDepreciationService depreciationService;
     private final PropertyCashFlowService cashFlowService;
@@ -55,14 +54,14 @@ public class PropertyService {
                            PropertyExpenseRepository expenseRepository,
                            PropertyIncomeRepository incomeRepository,
                            IncomeSourceRepository incomeSourceRepository,
-                           TenantRepository tenantRepository,
+                           TenantLookup tenantLookup,
                            ApplicationEventPublisher eventPublisher,
                            DepreciationCalculator depreciationCalculator) {
         this.propertyRepository = propertyRepository;
         this.expenseRepository = expenseRepository;
         this.incomeRepository = incomeRepository;
         this.incomeSourceRepository = incomeSourceRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
         this.eventPublisher = eventPublisher;
         this.depreciationService = new PropertyDepreciationService(depreciationCalculator);
         this.cashFlowService = new PropertyCashFlowService();
@@ -70,8 +69,7 @@ public class PropertyService {
 
     @Transactional
     public PropertyResponse create(UUID tenantId, PropertyRequest request) {
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         validateLoanDetails(request);
 

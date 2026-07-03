@@ -16,13 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.exchangerate.dto.ExchangeRateRequest;
 import com.wealthview.core.exchangerate.dto.ExchangeRateResponse;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.ExchangeRateEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ExchangeRateRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 @Service
 public class ExchangeRateService {
@@ -30,16 +29,16 @@ public class ExchangeRateService {
     private static final Logger log = LoggerFactory.getLogger(ExchangeRateService.class);
 
     private final ExchangeRateRepository exchangeRateRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final AccountRepository accountRepository;
     private final ExchangeRateResolver exchangeRateResolver;
 
     public ExchangeRateService(ExchangeRateRepository exchangeRateRepository,
-                               TenantRepository tenantRepository,
+                               TenantLookup tenantLookup,
                                AccountRepository accountRepository,
                                ExchangeRateResolver exchangeRateResolver) {
         this.exchangeRateRepository = exchangeRateRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
         this.accountRepository = accountRepository;
         this.exchangeRateResolver = exchangeRateResolver;
     }
@@ -54,8 +53,7 @@ public class ExchangeRateService {
             throw new IllegalArgumentException("Cannot create exchange rate for USD — it is always 1.0");
         }
 
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         var existing = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, request.currencyCode());
         if (existing.isPresent()) {

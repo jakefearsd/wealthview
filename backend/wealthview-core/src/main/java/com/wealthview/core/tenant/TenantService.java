@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.exception.EntityNotFoundException;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.tenant.dto.TenantDetailResponse;
 import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
@@ -36,17 +35,20 @@ public class TenantService {
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final InviteCodeRepository inviteCodeRepository;
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     public TenantService(TenantRepository tenantRepository,
+                         TenantLookup tenantLookup,
                          InviteCodeRepository inviteCodeRepository,
                          UserRepository userRepository,
                          AccountRepository accountRepository,
                          ApplicationEventPublisher eventPublisher) {
         this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
         this.inviteCodeRepository = inviteCodeRepository;
         this.userRepository = userRepository;
         this.accountRepository = accountRepository;
@@ -107,8 +109,7 @@ public class TenantService {
 
     @Transactional
     public InviteCodeEntity generateInviteCode(UUID tenantId, UUID createdByUserId, int expiryDays) {
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         var creator = userRepository.findById(createdByUserId)
                 .orElseThrow(Entities.notFound("User", createdByUserId));

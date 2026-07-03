@@ -17,13 +17,13 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.PropertyRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -63,7 +63,7 @@ class PropertyServiceCharacterizationTest {
     private IncomeSourceRepository incomeSourceRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -104,7 +104,7 @@ class PropertyServiceCharacterizationTest {
 
     @Test
     void create_fullInvestmentPropertyRequest_pinsEveryResponseField() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = propertyService.create(tenantId, goldenRequest());

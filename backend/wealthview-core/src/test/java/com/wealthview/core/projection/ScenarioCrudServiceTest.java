@@ -20,6 +20,7 @@ import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
@@ -35,7 +36,6 @@ import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -54,7 +54,7 @@ class ScenarioCrudServiceTest {
     private ProjectionScenarioRepository scenarioRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @Mock
     private AccountRepository accountRepository;
@@ -87,14 +87,14 @@ class ScenarioCrudServiceTest {
         scenarioId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
         meterRegistry = new SimpleMeterRegistry();
-        service = new ScenarioCrudService(scenarioRepository, tenantRepository, accountRepository,
+        service = new ScenarioCrudService(scenarioRepository, tenantLookup, accountRepository,
                 spendingProfileRepository, accountService, scenarioIncomeSourceRepository,
                 incomeSourceRepository, guardrailProfileRepository, meterRegistry);
     }
 
     @Test
     void createScenario_validRequest_createsAndReturns() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateScenarioRequest(
                 "Retirement Plan",
@@ -133,7 +133,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withDynamicStrategy_persistsInParamsJson() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateScenarioRequest(
                 "Dynamic Plan",
@@ -170,7 +170,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withAccountTypes_persistsTypes() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateScenarioRequest(
                 "Multi-Pool Plan",
@@ -205,7 +205,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withWithdrawalOrder_persistsInParamsJson() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateScenarioRequest(
                 "Traditional First Plan",
@@ -239,7 +239,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withFillBracketStrategy_persistsInParamsJson() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateScenarioRequest(
                 "Fill Bracket Plan",
@@ -274,7 +274,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withLinkedAccount_storesNullBalance() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         var linkedAccountId = UUID.randomUUID();
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
 
@@ -559,7 +559,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withIncomeSources_linksIncomeSources() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var incomeSourceId = UUID.randomUUID();
         var incomeSource = new IncomeSourceEntity(
@@ -594,7 +594,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_withInvalidIncomeSourceId_throwsEntityNotFound() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var badId = UUID.randomUUID();
         when(incomeSourceRepository.findByTenant_IdAndId(tenantId, badId))

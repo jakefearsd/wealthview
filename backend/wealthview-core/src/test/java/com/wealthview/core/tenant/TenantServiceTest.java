@@ -38,6 +38,9 @@ class TenantServiceTest {
     private TenantRepository tenantRepository;
 
     @Mock
+    private TenantLookup tenantLookup;
+
+    @Mock
     private InviteCodeRepository inviteCodeRepository;
 
     @Mock
@@ -79,7 +82,7 @@ class TenantServiceTest {
         var tenantId = UUID.randomUUID();
         var userId = UUID.randomUUID();
 
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -100,7 +103,7 @@ class TenantServiceTest {
         var tenantId = UUID.randomUUID();
         var userId = UUID.randomUUID();
 
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -120,7 +123,7 @@ class TenantServiceTest {
         var tenantId = UUID.randomUUID();
         var userId = UUID.randomUUID();
 
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -142,7 +145,7 @@ class TenantServiceTest {
         var tenantId = UUID.randomUUID();
         var userId = UUID.randomUUID();
 
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -162,7 +165,7 @@ class TenantServiceTest {
         var tenantId = UUID.randomUUID();
         var userId = UUID.randomUUID();
 
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(inviteCodeRepository.save(any(InviteCodeEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -177,7 +180,8 @@ class TenantServiceTest {
     @Test
     void generateInviteCode_nonExistentTenant_throwsNotFound() {
         var tenantId = UUID.randomUUID();
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
+        when(tenantLookup.requireTenant(tenantId))
+                .thenThrow(new InvalidSessionException("Session expired — please log in again"));
 
         assertThatThrownBy(() -> tenantService.generateInviteCode(tenantId, UUID.randomUUID()))
                 .isInstanceOf(InvalidSessionException.class);

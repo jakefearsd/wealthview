@@ -19,12 +19,12 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.income.dto.CreateIncomeSourceRequest;
 import com.wealthview.core.income.dto.IncomeSourceResponse;
 import com.wealthview.core.income.dto.UpdateIncomeSourceRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -42,7 +42,7 @@ class IncomeSourceServiceTest {
     private PropertyRepository propertyRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @InjectMocks
     private IncomeSourceService service;
@@ -58,7 +58,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_validRequest_createsAndReturns() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -82,7 +82,7 @@ class IncomeSourceServiceTest {
     @Test
     void create_withPropertyLink_setsProperty() {
         var propertyId = UUID.randomUUID();
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         var property = new PropertyEntity(tenant, "123 Elm St", new BigDecimal("300000"),
                 LocalDate.of(2020, 1, 1), new BigDecimal("350000"), BigDecimal.ZERO);
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
@@ -104,7 +104,7 @@ class IncomeSourceServiceTest {
     @Test
     void create_withInvalidPropertyId_throwsEntityNotFound() {
         var propertyId = UUID.randomUUID();
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.findByTenant_IdAndId(tenantId, propertyId))
                 .thenReturn(Optional.empty());
 
@@ -119,7 +119,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_invalidIncomeType_throwsIllegalArgument() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateIncomeSourceRequest(
                 "Bad Type", "invalid_type", new BigDecimal("10000"),
@@ -132,7 +132,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_invalidTaxTreatment_throwsIllegalArgument() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
         var request = new CreateIncomeSourceRequest(
                 "Pension", "pension", new BigDecimal("20000"),
@@ -145,7 +145,8 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_invalidTenant_throwsInvalidSession() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
+        when(tenantLookup.requireTenant(tenantId))
+                .thenThrow(new InvalidSessionException("Session expired — please log in again"));
 
         var request = new CreateIncomeSourceRequest(
                 "SS", "social_security", new BigDecimal("30000"),
@@ -279,7 +280,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_withNullOneTime_defaultsToFalse() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -294,7 +295,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_withNullInflationRate_defaultsToZero() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -309,7 +310,7 @@ class IncomeSourceServiceTest {
 
     @Test
     void create_withNullTaxTreatment_defaultsToTaxable() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 

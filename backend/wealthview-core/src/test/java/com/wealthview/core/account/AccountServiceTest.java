@@ -19,6 +19,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -26,7 +27,6 @@ import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,7 +44,7 @@ class AccountServiceTest {
     private AccountRepository accountRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @Mock
     private HoldingRepository holdingRepository;
@@ -72,7 +72,7 @@ class AccountServiceTest {
 
     @Test
     void create_validRequest_returnsAccountResponseWithZeroBalance() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard", null));
@@ -280,7 +280,7 @@ class AccountServiceTest {
 
     @Test
     void create_withCurrency_setsAccountCurrency() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = accountService.create(tenantId, new AccountRequest("Euro IRA", "ira", "Degiro", "EUR"));
@@ -290,7 +290,7 @@ class AccountServiceTest {
 
     @Test
     void create_withNullCurrency_defaultsToUsd() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(accountRepository.save(any(AccountEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         var result = accountService.create(tenantId, new AccountRequest("My IRA", "ira", "Vanguard", null));

@@ -12,15 +12,14 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.common.Entities;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 @Service
 public class SpendingProfileService {
@@ -29,21 +28,20 @@ public class SpendingProfileService {
 
     private final SpendingProfileRepository profileRepository;
     private final ProjectionScenarioRepository scenarioRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public SpendingProfileService(SpendingProfileRepository profileRepository,
                                    ProjectionScenarioRepository scenarioRepository,
-                                   TenantRepository tenantRepository) {
+                                   TenantLookup tenantLookup) {
         this.profileRepository = profileRepository;
         this.scenarioRepository = scenarioRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
     }
 
     @Transactional
     public SpendingProfileResponse createProfile(UUID tenantId, CreateSpendingProfileRequest request) {
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         var entity = new SpendingProfileEntity(
                 tenant,

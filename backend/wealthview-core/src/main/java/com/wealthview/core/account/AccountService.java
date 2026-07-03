@@ -22,14 +22,13 @@ import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.common.PageResponse;
-import com.wealthview.core.exception.InvalidSessionException;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 @Service
@@ -38,17 +37,17 @@ public class AccountService {
     private static final Logger log = LoggerFactory.getLogger(AccountService.class);
 
     private final AccountRepository accountRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final HoldingRepository holdingRepository;
     private final TransactionRepository transactionRepository;
     private final PriceRepository priceRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    public AccountService(AccountRepository accountRepository, TenantRepository tenantRepository,
+    public AccountService(AccountRepository accountRepository, TenantLookup tenantLookup,
                           HoldingRepository holdingRepository, TransactionRepository transactionRepository,
                           PriceRepository priceRepository, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
         this.holdingRepository = holdingRepository;
         this.transactionRepository = transactionRepository;
         this.priceRepository = priceRepository;
@@ -57,8 +56,7 @@ public class AccountService {
 
     @Transactional
     public AccountResponse create(UUID tenantId, AccountRequest request) {
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         var currency = request.currency() != null ? request.currency() : "USD";
         var account = new AccountEntity(tenant, request.name(), request.type(), request.institution(), currency);

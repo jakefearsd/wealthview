@@ -13,11 +13,11 @@ import org.springframework.transaction.support.AbstractPlatformTransactionManage
 import org.springframework.transaction.support.DefaultTransactionStatus;
 
 import com.wealthview.core.config.CacheConfig;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.ExchangeRateEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ExchangeRateRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -53,7 +53,7 @@ class ExchangeRateConversionCacheTest {
         context.registerBean(MeterRegistry.class, SimpleMeterRegistry::new);
         context.registerBean(PlatformTransactionManager.class, NoOpTransactionManager::new);
         context.registerBean(ExchangeRateRepository.class, () -> exchangeRateRepository);
-        context.registerBean(TenantRepository.class, () -> mock(TenantRepository.class));
+        context.registerBean(TenantLookup.class, () -> mock(TenantLookup.class));
         context.registerBean(AccountRepository.class, () -> accountRepository);
         context.register(CacheConfig.class);
         context.register(ExchangeRateResolver.class);

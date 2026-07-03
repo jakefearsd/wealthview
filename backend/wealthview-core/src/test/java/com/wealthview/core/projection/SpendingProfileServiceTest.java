@@ -17,11 +17,11 @@ import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.SpendingTierRequest;
 import com.wealthview.core.projection.dto.UpdateSpendingProfileRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,7 +40,7 @@ class SpendingProfileServiceTest {
     private ProjectionScenarioRepository scenarioRepository;
 
     @Mock
-    private TenantRepository tenantRepository;
+    private TenantLookup tenantLookup;
 
     @InjectMocks
     private SpendingProfileService service;
@@ -58,7 +58,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_validRequest_createsAndReturns() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(profileRepository.save(any(SpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -77,7 +77,8 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_tenantNotFound_throws() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.empty());
+        when(tenantLookup.requireTenant(tenantId))
+                .thenThrow(new InvalidSessionException("Session expired — please log in again"));
 
         var request = new CreateSpendingProfileRequest(
                 "Plan", BigDecimal.ZERO, BigDecimal.ZERO, null);
@@ -185,7 +186,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_withSpendingTiers_serializesAndReturns() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(profileRepository.save(any(SpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -210,7 +211,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_withNullTiers_returnsEmptyTiersList() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(profileRepository.save(any(SpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -225,7 +226,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_withEmptyTiers_returnsEmptyTiersList() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(profileRepository.save(any(SpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -264,7 +265,7 @@ class SpendingProfileServiceTest {
 
     @Test
     void createProfile_withTierNullEndAge_preservesNullEndAge() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(profileRepository.save(any(SpendingProfileEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 

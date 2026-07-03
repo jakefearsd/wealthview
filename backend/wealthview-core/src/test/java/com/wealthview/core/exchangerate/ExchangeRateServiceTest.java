@@ -15,12 +15,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.dto.ExchangeRateRequest;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ExchangeRateEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ExchangeRateRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -32,7 +32,7 @@ import static org.mockito.Mockito.when;
 class ExchangeRateServiceTest {
 
     @Mock private ExchangeRateRepository exchangeRateRepository;
-    @Mock private TenantRepository tenantRepository;
+    @Mock private TenantLookup tenantLookup;
     @Mock private AccountRepository accountRepository;
     @Mock private ExchangeRateResolver exchangeRateResolver;
     @InjectMocks private ExchangeRateService exchangeRateService;
@@ -48,7 +48,7 @@ class ExchangeRateServiceTest {
 
     @Test
     void create_validRequest_returnsResponse() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "EUR"))
                 .thenReturn(Optional.empty());
         when(exchangeRateRepository.save(any(ExchangeRateEntity.class)))
@@ -63,7 +63,7 @@ class ExchangeRateServiceTest {
 
     @Test
     void create_duplicateCurrency_throwsDuplicateEntity() {
-        when(tenantRepository.findById(tenantId)).thenReturn(Optional.of(tenant));
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, "EUR"))
                 .thenReturn(Optional.of(new ExchangeRateEntity(tenant, "EUR", new BigDecimal("1.08"))));
 

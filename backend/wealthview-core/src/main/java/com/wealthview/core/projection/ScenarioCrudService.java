@@ -18,7 +18,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
-import com.wealthview.core.exception.InvalidSessionException;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.GuardrailProfileSummary;
@@ -30,6 +29,7 @@ import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.core.property.PropertyFinance;
+import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
@@ -40,7 +40,6 @@ import com.wealthview.persistence.repository.IncomeSourceRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
-import com.wealthview.persistence.repository.TenantRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 
 @Service
@@ -52,7 +51,7 @@ public class ScenarioCrudService {
     private static final int MAX_END_AGE = 120;
 
     private final ProjectionScenarioRepository scenarioRepository;
-    private final TenantRepository tenantRepository;
+    private final TenantLookup tenantLookup;
     private final AccountRepository accountRepository;
     private final SpendingProfileRepository spendingProfileRepository;
     private final AccountService accountService;
@@ -63,7 +62,7 @@ public class ScenarioCrudService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ScenarioCrudService(ProjectionScenarioRepository scenarioRepository,
-                               TenantRepository tenantRepository,
+                               TenantLookup tenantLookup,
                                AccountRepository accountRepository,
                                SpendingProfileRepository spendingProfileRepository,
                                AccountService accountService,
@@ -72,7 +71,7 @@ public class ScenarioCrudService {
                                GuardrailSpendingProfileRepository guardrailProfileRepository,
                                MeterRegistry meterRegistry) {
         this.scenarioRepository = scenarioRepository;
-        this.tenantRepository = tenantRepository;
+        this.tenantLookup = tenantLookup;
         this.accountRepository = accountRepository;
         this.spendingProfileRepository = spendingProfileRepository;
         this.accountService = accountService;
@@ -85,8 +84,7 @@ public class ScenarioCrudService {
     @Transactional
     public ScenarioResponse createScenario(UUID tenantId, CreateScenarioRequest request) {
         validateEndAge(request.endAge());
-        var tenant = tenantRepository.findById(tenantId)
-                .orElseThrow(() -> new InvalidSessionException("Session expired — please log in again"));
+        var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = buildParamsJson(extractParamsFromRequest(request));
 
