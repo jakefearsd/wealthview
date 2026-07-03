@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.stereotype.Service;
+
 import com.wealthview.core.property.dto.MonthlyCashFlowDetailEntry;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
@@ -26,6 +28,7 @@ import com.wealthview.persistence.entity.PropertyExpenseEntity;
  * the overlapping expenses, and hands the resolved entity plus its expenses to this
  * collaborator for pure arithmetic spreading.
  */
+@Service
 class PropertyCashFlowService {
 
     /**

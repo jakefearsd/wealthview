@@ -10,25 +10,18 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
-import com.wealthview.core.auth.mfa.MfaService;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.InvalidInviteCodeException;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
-import com.wealthview.persistence.repository.MfaChallengeRepository;
-import com.wealthview.persistence.repository.RefreshTokenRepository;
 import com.wealthview.persistence.repository.UserRepository;
-import com.wealthview.persistence.repository.UserSessionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 
 /**
@@ -36,9 +29,7 @@ import io.micrometer.core.instrument.MeterRegistry;
  * lockout, login activity recording and invite-based registration, and the
  * {@code @Transactional} boundaries for the whole auth surface. Delegates the
  * MFA challenge flow to {@link MfaChallengeService} and the token issue/refresh
- * lifecycle to {@link TokenService} — both are stateless helpers built in this
- * constructor from the orchestrator's injected dependencies so the public
- * constructor signature stays stable.
+ * lifecycle to {@link TokenService}, both injected as beans.
  */
 @Service
 public class AuthService {
@@ -65,17 +56,13 @@ public class AuthService {
     public AuthService(UserRepository userRepository,
                        InviteCodeRepository inviteCodeRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider,
                        ApplicationEventPublisher eventPublisher,
                        LoginActivityService loginActivityService,
                        MeterRegistry meterRegistry,
                        LoginAttemptService loginAttemptService,
                        CommonPasswordChecker commonPasswordChecker,
-                       RefreshTokenRepository refreshTokenRepository,
-                       UserSessionRepository userSessionRepository,
-                       MfaChallengeRepository mfaChallengeRepository,
-                       MfaService mfaService,
-                       PlatformTransactionManager transactionManager) {
+                       MfaChallengeService mfaChallengeService,
+                       TokenService tokenService) {
         this.userRepository = userRepository;
         this.inviteCodeRepository = inviteCodeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -84,35 +71,8 @@ public class AuthService {
         this.meterRegistry = meterRegistry;
         this.loginAttemptService = loginAttemptService;
         this.commonPasswordChecker = commonPasswordChecker;
-        var requiresNewTx = new TransactionTemplate(transactionManager);
-        requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
-        this.mfaChallengeService = new MfaChallengeService(
-                userRepository, jwtTokenProvider, mfaChallengeRepository, mfaService, meterRegistry);
-        this.tokenService = new TokenService(
-                userRepository, jwtTokenProvider, refreshTokenRepository,
-                userSessionRepository, meterRegistry, requiresNewTx);
-    }
-
-    @Transactional
-    public AuthResult login(LoginRequest request, String ipAddress) {
-        return login(request, AuthRequestContext.cookie(ipAddress));
-    }
-
-    @Transactional
-    public AuthResult login(LoginRequest request, String ipAddress, String transport) {
-        return login(request, new AuthRequestContext(transport, ipAddress, null, null));
-    }
-
-    @Transactional
-    public AuthResult login(LoginRequest request, AuthRequestContext context) {
-        var outcome = loginInitiate(request, context);
-        if (outcome instanceof LoginOutcome.Tokens tokens) {
-            return tokens.result();
-        }
-        // Legacy callers (older direct calls / older tests) called login()
-        // for accounts that ARE NOT MFA-enabled. If MFA is now required they
-        // must use loginInitiate() and the challenge flow instead.
-        throw new BadCredentialsException("Account requires MFA — use loginInitiate");
+        this.mfaChallengeService = mfaChallengeService;
+        this.tokenService = tokenService;
     }
 
     @Transactional
@@ -201,16 +161,6 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthResult register(RegisterRequest request) {
-        return register(request, AuthRequestContext.cookie(null));
-    }
-
-    @Transactional
-    public AuthResult register(RegisterRequest request, String transport) {
-        return register(request, new AuthRequestContext(transport, null, null, null));
-    }
-
-    @Transactional
     public AuthResult register(RegisterRequest request, AuthRequestContext context) {
         var transport = context.transport();
         if (commonPasswordChecker.isCommon(request.password())) {
@@ -263,16 +213,6 @@ public class AuthService {
         eventPublisher.publishEvent(new AuditEvent(user.getTenantId(), user.getId(), "REGISTER", "user",
                 user.getId(), Map.of("email", request.email())));
         return tokenService.issueTokens(user, context, null);
-    }
-
-    @Transactional
-    public AuthResult refresh(String refreshToken) {
-        return refresh(refreshToken, AuthRequestContext.cookie(null));
-    }
-
-    @Transactional
-    public AuthResult refresh(String refreshToken, String transport) {
-        return refresh(refreshToken, new AuthRequestContext(transport, null, null, null));
     }
 
     @Transactional

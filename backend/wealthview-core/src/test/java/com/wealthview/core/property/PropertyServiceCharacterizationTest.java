@@ -69,7 +69,11 @@ class PropertyServiceCharacterizationTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Spy
-    private DepreciationCalculator depreciationCalculator = new DepreciationCalculator();
+    private PropertyDepreciationService depreciationService =
+            new PropertyDepreciationService(new DepreciationCalculator());
+
+    @Spy
+    private PropertyCashFlowService cashFlowService = new PropertyCashFlowService();
 
     @InjectMocks
     private PropertyService propertyService;

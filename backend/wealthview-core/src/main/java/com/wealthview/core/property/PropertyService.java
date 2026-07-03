@@ -56,15 +56,16 @@ public class PropertyService {
                            IncomeSourceRepository incomeSourceRepository,
                            TenantLookup tenantLookup,
                            ApplicationEventPublisher eventPublisher,
-                           DepreciationCalculator depreciationCalculator) {
+                           PropertyDepreciationService depreciationService,
+                           PropertyCashFlowService cashFlowService) {
         this.propertyRepository = propertyRepository;
         this.expenseRepository = expenseRepository;
         this.incomeRepository = incomeRepository;
         this.incomeSourceRepository = incomeSourceRepository;
         this.tenantLookup = tenantLookup;
         this.eventPublisher = eventPublisher;
-        this.depreciationService = new PropertyDepreciationService(depreciationCalculator);
-        this.cashFlowService = new PropertyCashFlowService();
+        this.depreciationService = depreciationService;
+        this.cashFlowService = cashFlowService;
     }
 
     @Transactional

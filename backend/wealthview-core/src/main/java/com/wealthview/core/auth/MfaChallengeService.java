@@ -6,6 +6,7 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.stereotype.Service;
 
 import com.wealthview.core.auth.mfa.MfaService;
 import com.wealthview.core.common.Entities;
@@ -29,7 +30,8 @@ import io.micrometer.core.instrument.MeterRegistry;
  * {@code @Transactional} boundaries; this helper runs inside the orchestrator's
  * transaction.
  */
-final class MfaChallengeService {
+@Service
+class MfaChallengeService {
 
     private static final Logger log = LoggerFactory.getLogger(MfaChallengeService.class);
 

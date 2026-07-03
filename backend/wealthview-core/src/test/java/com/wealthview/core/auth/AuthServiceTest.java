@@ -98,11 +98,14 @@ class AuthServiceTest {
                 "test-secret-key-that-is-at-least-32-characters-long",
                 3600000, 86400000);
         meterRegistry = new SimpleMeterRegistry();
+        var tokenService = new TokenService(userRepository, jwtTokenProvider,
+                refreshTokenRepository, userSessionRepository, meterRegistry, transactionManager);
+        var mfaChallengeService = new MfaChallengeService(userRepository, jwtTokenProvider,
+                mfaChallengeRepository, mfaService, meterRegistry);
         authService = new AuthService(userRepository, inviteCodeRepository,
-                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
+                passwordEncoder, eventPublisher, loginActivityService,
                 meterRegistry, new LoginAttemptService(), new CommonPasswordChecker(),
-                refreshTokenRepository, userSessionRepository, mfaChallengeRepository, mfaService,
-                transactionManager);
+                mfaChallengeService, tokenService);
         // Default mocking: when AuthService asks for a new session row, give it
         // back something with an id set so the access-token sid claim is populated.
         org.mockito.Mockito.lenient().when(userSessionRepository.save(any(com.wealthview.persistence.entity.UserSessionEntity.class)))
@@ -118,12 +121,40 @@ class AuthServiceTest {
         TestEntityHelper.setId(user, UUID.randomUUID());
     }
 
+    // Test-local adapters for the removed convenience overloads: the production
+    // API takes AuthRequestContext; these keep the 47 call sites below readable.
+    private com.wealthview.core.auth.dto.AuthResult login(LoginRequest request, String ip) {
+        var outcome = authService.loginInitiate(request, AuthRequestContext.cookie(ip));
+        return ((com.wealthview.core.auth.dto.LoginOutcome.Tokens) outcome).result();
+    }
+
+    private com.wealthview.core.auth.dto.AuthResult login(LoginRequest request, String ip, String transport) {
+        var outcome = authService.loginInitiate(request, new AuthRequestContext(transport, ip, null, null));
+        return ((com.wealthview.core.auth.dto.LoginOutcome.Tokens) outcome).result();
+    }
+
+    private com.wealthview.core.auth.dto.AuthResult register(RegisterRequest request) {
+        return authService.register(request, AuthRequestContext.cookie(null));
+    }
+
+    private com.wealthview.core.auth.dto.AuthResult register(RegisterRequest request, String transport) {
+        return authService.register(request, new AuthRequestContext(transport, null, null, null));
+    }
+
+    private com.wealthview.core.auth.dto.AuthResult refresh(String refreshToken) {
+        return authService.refresh(refreshToken, AuthRequestContext.cookie(null));
+    }
+
+    private com.wealthview.core.auth.dto.AuthResult refresh(String refreshToken, String transport) {
+        return authService.refresh(refreshToken, new AuthRequestContext(transport, null, null, null));
+    }
+
     @Test
     void login_validCredentials_returnsAuthResponse() {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
 
-        var response = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
+        var response = login(new LoginRequest("test@example.com", "password"), TEST_IP);
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.email()).isEqualTo("test@example.com");
@@ -139,7 +170,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
 
-        var response = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
+        var response = login(new LoginRequest("test@example.com", "password"), TEST_IP);
 
         assertThat(jwtTokenProvider.extractGeneration(response.accessToken())).isEqualTo(5);
     }
@@ -149,7 +180,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
 
-        assertThatThrownBy(() -> authService.login(new LoginRequest("test@example.com", "wrong"), TEST_IP))
+        assertThatThrownBy(() -> login(new LoginRequest("test@example.com", "wrong"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(loginActivityService).record("test@example.com", user.getTenantId(), false, TEST_IP);
@@ -159,7 +190,7 @@ class AuthServiceTest {
     void login_unknownEmail_throwsBadCredentialsAndRecordsFailure() {
         when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(
+        assertThatThrownBy(() -> login(
                 new LoginRequest("nobody@example.com", "pass"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class);
 
@@ -170,7 +201,7 @@ class AuthServiceTest {
     void login_unknownEmail_runsPasswordCheckToPreventTimingEnumeration() {
         when(userRepository.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(
+        assertThatThrownBy(() -> login(
                 new LoginRequest("nobody@example.com", "pass"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class);
 
@@ -186,9 +217,9 @@ class AuthServiceTest {
         when(passwordEncoder.matches(anyString(), anyString())).thenReturn(false);
 
         var unknownEmailError = org.assertj.core.api.Assertions.catchThrowable(
-                () -> authService.login(new LoginRequest("nobody@example.com", "wrong"), TEST_IP));
+                () -> login(new LoginRequest("nobody@example.com", "wrong"), TEST_IP));
         var badPasswordError = org.assertj.core.api.Assertions.catchThrowable(
-                () -> authService.login(new LoginRequest("test@example.com", "wrong"), TEST_IP));
+                () -> login(new LoginRequest("test@example.com", "wrong"), TEST_IP));
 
         assertThat(unknownEmailError).isInstanceOf(BadCredentialsException.class);
         assertThat(badPasswordError).isInstanceOf(BadCredentialsException.class);
@@ -201,7 +232,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.login(
+        assertThatThrownBy(() -> login(
                 new LoginRequest("test@example.com", "password"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("Account is disabled");
@@ -215,7 +246,7 @@ class AuthServiceTest {
         when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.login(
+        assertThatThrownBy(() -> login(
                 new LoginRequest("test@example.com", "password"), TEST_IP))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("disabled");
@@ -238,7 +269,7 @@ class AuthServiceTest {
         });
         when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = authService.register(new RegisterRequest("new@example.com", "mytestpass", "VALID"));
+        var response = register(new RegisterRequest("new@example.com", "mytestpass", "VALID"));
 
         assertThat(response.email()).isEqualTo("new@example.com");
         assertThat(response.role()).isEqualTo("member");
@@ -251,7 +282,7 @@ class AuthServiceTest {
         when(inviteCodeRepository.findByCode("CODE")).thenReturn(Optional.of(invite));
         when(userRepository.existsByEmail("exists@example.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("exists@example.com", "mytestpass", "CODE")))
                 .isInstanceOf(DuplicateEntityException.class);
     }
@@ -263,7 +294,7 @@ class AuthServiceTest {
         // codes and watching for DuplicateEntity vs InvalidInviteCode responses.
         when(inviteCodeRepository.findByCode("BOGUS")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("any@example.com", "mytestpass", "BOGUS")))
                 .isInstanceOf(InvalidInviteCodeException.class);
 
@@ -277,7 +308,7 @@ class AuthServiceTest {
 
         when(inviteCodeRepository.findByCode("EXPIRED")).thenReturn(Optional.of(expired));
 
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("new@example.com", "mytestpass", "EXPIRED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
@@ -292,7 +323,7 @@ class AuthServiceTest {
 
         when(inviteCodeRepository.findByCode("USED")).thenReturn(Optional.of(consumed));
 
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("new@example.com", "mytestpass", "USED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
@@ -306,7 +337,7 @@ class AuthServiceTest {
 
         when(inviteCodeRepository.findByCode("REVOKED")).thenReturn(Optional.of(revoked));
 
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("new@example.com", "mytestpass", "REVOKED")))
                 .isInstanceOf(InvalidInviteCodeException.class)
                 .hasMessageContaining("Invalid or expired invite code");
@@ -318,7 +349,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = authService.refresh(refreshToken);
+        var response = refresh(refreshToken);
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.refreshToken()).isNotBlank();
@@ -336,7 +367,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_invalidToken_throwsBadCredentials() {
-        assertThatThrownBy(() -> authService.refresh("invalid.token"))
+        assertThatThrownBy(() -> refresh("invalid.token"))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
@@ -345,7 +376,7 @@ class AuthServiceTest {
         var accessToken = jwtTokenProvider.generateAccessToken(
                 user.getId(), tenant.getId(), "admin", "test@example.com");
 
-        assertThatThrownBy(() -> authService.refresh(accessToken))
+        assertThatThrownBy(() -> refresh(accessToken))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
@@ -355,7 +386,7 @@ class AuthServiceTest {
         user.setActive(false);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("disabled");
     }
@@ -366,7 +397,7 @@ class AuthServiceTest {
         tenant.setActive(false);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("disabled");
     }
@@ -377,7 +408,7 @@ class AuthServiceTest {
         user.setTokenGeneration(1);
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("revoked");
     }
@@ -392,7 +423,7 @@ class AuthServiceTest {
         when(userRepository.save(any(UserEntity.class)))
                 .thenThrow(new ObjectOptimisticLockingFailureException(UserEntity.class, user.getId()));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("revoked");
     }
@@ -403,7 +434,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.refresh(refreshToken);
+        refresh(refreshToken);
 
         assertThat(user.getTokenGeneration()).isEqualTo(1);
     }
@@ -414,7 +445,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         // Note: trackedRefreshToken NOT called, so findByJti returns Optional.empty()
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("revoked");
 
@@ -435,7 +466,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(alreadyUsed));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class);
 
         assertThat(user.getTokenGeneration()).isEqualTo(1);
@@ -455,7 +486,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(revoked));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class);
 
         var counter = meterRegistry.find("wealthview.auth.refresh")
@@ -474,7 +505,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(refreshTokenRepository.findByJti(jti)).thenReturn(Optional.of(dbExpired));
 
-        assertThatThrownBy(() -> authService.refresh(refreshToken))
+        assertThatThrownBy(() -> refresh(refreshToken))
                 .isInstanceOf(BadCredentialsException.class);
 
         var counter = meterRegistry.find("wealthview.auth.refresh")
@@ -494,7 +525,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.refresh(refreshToken);
+        refresh(refreshToken);
 
         assertThat(stored.getUsedAt()).isNotNull();
         assertThat(stored.getReplacedByJti()).isNotNull();
@@ -517,21 +548,25 @@ class AuthServiceTest {
         for (int i = 0; i < 5; i++) {
             attemptService.recordFailure("test@example.com");
         }
+        var lockedMeterRegistry = new SimpleMeterRegistry();
+        var lockedTokenService = new TokenService(userRepository, jwtTokenProvider,
+                refreshTokenRepository, userSessionRepository, lockedMeterRegistry, transactionManager);
+        var lockedMfaChallengeService = new MfaChallengeService(userRepository, jwtTokenProvider,
+                mfaChallengeRepository, mfaService, lockedMeterRegistry);
         var lockedAuthService = new AuthService(userRepository, inviteCodeRepository,
-                passwordEncoder, jwtTokenProvider, eventPublisher, loginActivityService,
-                new SimpleMeterRegistry(), attemptService, new CommonPasswordChecker(),
-                refreshTokenRepository, userSessionRepository, mfaChallengeRepository, mfaService,
-                transactionManager);
+                passwordEncoder, eventPublisher, loginActivityService,
+                lockedMeterRegistry, attemptService, new CommonPasswordChecker(),
+                lockedMfaChallengeService, lockedTokenService);
 
-        assertThatThrownBy(() -> lockedAuthService.login(
-                new LoginRequest("test@example.com", "password"), "127.0.0.1"))
+        assertThatThrownBy(() -> lockedAuthService.loginInitiate(
+                new LoginRequest("test@example.com", "password"), AuthRequestContext.cookie("127.0.0.1")))
                 .isInstanceOf(BadCredentialsException.class)
                 .hasMessageContaining("temporarily locked");
     }
 
     @Test
     void register_commonPassword_throwsIllegalArgument() {
-        assertThatThrownBy(() -> authService.register(
+        assertThatThrownBy(() -> register(
                 new RegisterRequest("new@example.com", "password123", "CODE")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("too common");
@@ -552,7 +587,7 @@ class AuthServiceTest {
         });
         when(inviteCodeRepository.save(any(InviteCodeEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.register(new RegisterRequest("new@example.com", "myuniquephrase", "ONCE"));
+        register(new RegisterRequest("new@example.com", "myuniquephrase", "ONCE"));
 
         assertThat(invite.getConsumedAt()).isNotNull();
         assertThat(invite.getConsumedBy()).isNotNull();
@@ -573,7 +608,7 @@ class AuthServiceTest {
         });
         when(inviteCodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        var response = authService.register(
+        var response = register(
                 new RegisterRequest("new@example.com", "myuniquephrase", "VALID"));
 
         assertThat(response.accessToken()).isNotBlank();
@@ -585,7 +620,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
         when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        authService.refresh(refreshToken);
+        refresh(refreshToken);
 
         var counter = meterRegistry.find("wealthview.auth.refresh")
                 .tag("result", "success").tag("reason", "ok").counter();
@@ -595,7 +630,7 @@ class AuthServiceTest {
 
     @Test
     void refresh_invalidToken_recordsFailureMetric() {
-        assertThatThrownBy(() -> authService.refresh("invalid.token"))
+        assertThatThrownBy(() -> refresh("invalid.token"))
                 .isInstanceOf(BadCredentialsException.class);
 
         var counter = meterRegistry.find("wealthview.auth.refresh")
@@ -634,20 +669,6 @@ class AuthServiceTest {
         var challenge = (com.wealthview.core.auth.dto.LoginOutcome.MfaRequired) outcome;
         assertThat(challenge.mfaToken()).isNotBlank();
         verify(mfaChallengeRepository).save(any(com.wealthview.persistence.entity.MfaChallengeEntity.class));
-    }
-
-    @Test
-    void login_mfaEnabledUser_throwsBecauseLegacyEntryPointCannotIssueTokens() {
-        // The legacy login() entry point cannot complete an MFA login — it must
-        // reject rather than silently hand back tokens.
-        user.setMfaEnabled(true);
-        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("password", "encoded")).thenReturn(true);
-
-        assertThatThrownBy(() -> authService.login(
-                new LoginRequest("test@example.com", "password"), TEST_IP))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessageContaining("MFA");
     }
 
     @Test
@@ -800,7 +821,7 @@ class AuthServiceTest {
         when(userRepository.findById(user.getId())).thenReturn(Optional.of(user));
 
         // 1. LOGIN — issues an access+refresh pair, no MFA on this account.
-        var login = authService.login(new LoginRequest("test@example.com", "password"), TEST_IP);
+        var login = login(new LoginRequest("test@example.com", "password"), TEST_IP);
 
         assertThat(login.userId()).isEqualTo(user.getId());
         assertThat(login.tenantId()).isEqualTo(user.getTenantId());
@@ -846,7 +867,7 @@ class AuthServiceTest {
             return u;
         });
 
-        var result = authService.register(
+        var result = register(
                 new RegisterRequest("newcomer@example.com", "Str0ng-Unguessable-Pass", "INVITE-GOLDEN"));
 
         assertThat(result.email()).isEqualTo("newcomer@example.com");

@@ -7,6 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import com.wealthview.core.auth.dto.AuthResult;
@@ -32,7 +35,8 @@ import io.micrometer.core.instrument.MeterRegistry;
  * generation bump still runs in a {@code REQUIRES_NEW} transaction so it commits
  * even when the surrounding method throws.
  */
-final class TokenService {
+@Service
+class TokenService {
 
     private static final Logger log = LoggerFactory.getLogger(TokenService.class);
 
@@ -50,13 +54,14 @@ final class TokenService {
                  RefreshTokenRepository refreshTokenRepository,
                  UserSessionRepository userSessionRepository,
                  MeterRegistry meterRegistry,
-                 TransactionTemplate requiresNewTx) {
+                 PlatformTransactionManager transactionManager) {
         this.userRepository = userRepository;
         this.jwtTokenProvider = jwtTokenProvider;
         this.refreshTokenRepository = refreshTokenRepository;
         this.userSessionRepository = userSessionRepository;
         this.meterRegistry = meterRegistry;
-        this.requiresNewTx = requiresNewTx;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
