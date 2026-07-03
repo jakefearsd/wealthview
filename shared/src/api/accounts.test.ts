@@ -9,7 +9,7 @@ const SAMPLE_ACCOUNT: AccountResponse = {
     type: 'brokerage',
     institution: 'Fidelity',
     currency: 'USD',
-    balance: '456789.00',
+    balance: 456789.0,
     created_at: '2026-01-01T00:00:00Z',
 };
 
@@ -64,7 +64,7 @@ describe('createAccountsApi', () => {
             const page = await api.list();
 
             expect(page.data).toHaveLength(1);
-            expect(page.data[0].balance).toBe('456789.00');
+            expect(page.data[0].balance).toBe(456789.0);
             expect(page.total).toBe(1);
         });
 

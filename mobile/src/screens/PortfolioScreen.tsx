@@ -45,12 +45,12 @@ const CHIP_TYPES: Array<{ key: string; label: string }> = [
  * the wider bucket here because the chip area is space-constrained and
  * users care about "stocks vs cash vs property" first.
  */
-function chipAmounts(summary: DashboardSummaryResponse | null): Array<{ key: string; label: string; amount: string }> {
+function chipAmounts(summary: DashboardSummaryResponse | null): Array<{ key: string; label: string; amount: number }> {
     if (!summary) return [];
-    const result: Array<{ key: string; label: string; amount: string }> = [];
-    const investments = parseFloat(summary.total_investments);
-    const cash = parseFloat(summary.total_cash);
-    const property = parseFloat(summary.total_property_equity);
+    const result: Array<{ key: string; label: string; amount: number }> = [];
+    const investments = summary.total_investments;
+    const cash = summary.total_cash;
+    const property = summary.total_property_equity;
     if (investments > 0) result.push({ key: 'investment', label: 'Investments', amount: summary.total_investments });
     if (cash > 0) result.push({ key: 'cash', label: 'Cash', amount: summary.total_cash });
     if (property > 0) result.push({ key: 'property', label: 'Property', amount: summary.total_property_equity });

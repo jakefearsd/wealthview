@@ -102,7 +102,7 @@ export interface AccountResponse {
     type: string;
     institution: string | null;
     currency: string;
-    balance: string;
+    balance: number;
     created_at: string;
 }
 
@@ -122,26 +122,26 @@ export interface AccountResponse {
 export interface DashboardAccountSummary {
     name: string;
     type: string;
-    balance: string;
+    balance: number;
 }
 
 /** One slice of the allocation pie. Percentage is 0–100, NOT 0–1. */
 export interface DashboardAllocationEntry {
     category: string;
-    value: string;
-    percentage: string;
+    value: number;
+    percentage: number;
 }
 
 /**
- * Response body for `GET /api/v1/dashboard/summary`. All monetary fields
- * arrive as decimal strings (BigDecimal serialized by Jackson) so callers
- * preserve precision; convert to Number only at display boundaries.
+ * Response body for `GET /api/v1/dashboard/summary`. Monetary fields arrive
+ * as JSON numbers (Jackson's default BigDecimal serialization — the backend
+ * does not enable any as-string mode).
  */
 export interface DashboardSummaryResponse {
-    net_worth: string;
-    total_investments: string;
-    total_cash: string;
-    total_property_equity: string;
+    net_worth: number;
+    total_investments: number;
+    total_cash: number;
+    total_property_equity: number;
     accounts: DashboardAccountSummary[];
     allocation: DashboardAllocationEntry[];
 }

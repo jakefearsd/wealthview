@@ -4,17 +4,17 @@ import { createDashboardApi } from './dashboard';
 import type { DashboardSummaryResponse } from './types';
 
 const SAMPLE_SUMMARY: DashboardSummaryResponse = {
-    net_worth: '1234567.89',
-    total_investments: '890000.00',
-    total_cash: '44567.89',
-    total_property_equity: '300000.00',
+    net_worth: 1234567.89,
+    total_investments: 890000.0,
+    total_cash: 44567.89,
+    total_property_equity: 300000.0,
     accounts: [
-        { name: 'Fidelity', type: 'brokerage', balance: '456789.00' },
-        { name: 'Chase Checking', type: 'bank', balance: '12345.67' },
+        { name: 'Fidelity', type: 'brokerage', balance: 456789.0 },
+        { name: 'Chase Checking', type: 'bank', balance: 12345.67 },
     ],
     allocation: [
-        { category: 'brokerage', value: '456789.00', percentage: '37.00' },
-        { category: 'bank', value: '12345.67', percentage: '1.00' },
+        { category: 'brokerage', value: 456789.0, percentage: 37.0 },
+        { category: 'bank', value: 12345.67, percentage: 1.0 },
     ],
 };
 
@@ -51,7 +51,7 @@ describe('createDashboardApi', () => {
 
             const summary = await api.getSummary();
 
-            expect(summary.net_worth).toBe('1234567.89');
+            expect(summary.net_worth).toBe(1234567.89);
             expect(summary.accounts).toHaveLength(2);
             expect(summary.allocation[0].category).toBe('brokerage');
         });

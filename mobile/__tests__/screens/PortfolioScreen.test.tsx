@@ -44,7 +44,7 @@ const ACCOUNT_BROKERAGE: AccountResponse = {
     type: 'brokerage',
     institution: 'Fidelity',
     currency: 'USD',
-    balance: '456789.00',
+    balance: 456789.0,
     created_at: '2026-01-01T00:00:00Z',
 };
 
@@ -54,20 +54,20 @@ const ACCOUNT_BANK: AccountResponse = {
     type: 'bank',
     institution: 'Chase',
     currency: 'USD',
-    balance: '12345.67',
+    balance: 12345.67,
     created_at: '2026-01-01T00:00:00Z',
 };
 
 const SUMMARY: DashboardSummaryResponse = {
-    net_worth: '1234567.89',
-    total_investments: '890000.00',
-    total_cash: '44567.89',
-    total_property_equity: '300000.00',
+    net_worth: 1234567.89,
+    total_investments: 890000.0,
+    total_cash: 44567.89,
+    total_property_equity: 300000.0,
     accounts: [],
     allocation: [
-        { category: 'brokerage', value: '456789.00', percentage: '37.00' },
-        { category: 'bank', value: '12345.67', percentage: '1.00' },
-        { category: 'property', value: '300000.00', percentage: '24.00' },
+        { category: 'brokerage', value: 456789.0, percentage: 37.0 },
+        { category: 'bank', value: 12345.67, percentage: 1.0 },
+        { category: 'property', value: 300000.0, percentage: 24.0 },
     ],
 };
 

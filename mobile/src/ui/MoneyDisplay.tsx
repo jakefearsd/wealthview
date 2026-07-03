@@ -16,10 +16,9 @@ export interface MoneyDisplayProps {
 }
 
 /**
- * Renders a monetary amount with consistent typography. Accepts a string
- * (the BigDecimal-as-string we get from the backend) or a Number; the
- * conversion to display happens here so callers don't have to remember
- * `Number(...)` everywhere.
+ * Renders a monetary amount with consistent typography. The API delivers
+ * monetary fields as JSON numbers; the string branch is kept for callers
+ * formatting user-entered input that hasn't been parsed yet.
  */
 export function MoneyDisplay({
     value,
