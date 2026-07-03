@@ -66,6 +66,56 @@ describe('useApiQuery', () => {
         expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 
+    it('re-runs the fetch when a value in deps changes', async () => {
+        const fetchFn = vi.fn((years: number) => Promise.resolve(`data-${years}`));
+        const { result, rerender } = renderHook(
+            ({ years }: { years: number }) => useApiQuery(() => fetchFn(years), [years]),
+            { initialProps: { years: 1 } },
+        );
+
+        await waitFor(() => expect(result.current.data).toBe('data-1'));
+
+        rerender({ years: 5 });
+        expect(result.current.loading).toBe(true);
+
+        await waitFor(() => expect(result.current.data).toBe('data-5'));
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not re-run the fetch when deps are unchanged across rerenders', async () => {
+        const fetchFn = vi.fn().mockResolvedValue('stable');
+        const { result, rerender } = renderHook(
+            ({ years }: { years: number }) => useApiQuery(fetchFn, [years]),
+            { initialProps: { years: 1 } },
+        );
+
+        await waitFor(() => expect(result.current.data).toBe('stable'));
+        rerender({ years: 1 });
+        rerender({ years: 1 });
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears a prior error when a deps change triggers a new fetch', async () => {
+        let shouldFail = true;
+        const fetchFn = vi.fn(() =>
+            shouldFail ? Promise.reject(new Error('boom')) : Promise.resolve('ok'),
+        );
+        const { result, rerender } = renderHook(
+            ({ key }: { key: number }) => useApiQuery(fetchFn, [key]),
+            { initialProps: { key: 1 } },
+        );
+
+        await waitFor(() => expect(result.current.error).toBe('boom'));
+
+        shouldFail = false;
+        rerender({ key: 2 });
+
+        await waitFor(() => expect(result.current.data).toBe('ok'));
+        expect(result.current.error).toBeNull();
+    });
+
     it('ignores a stale resolution after unmount (no state update warning)', async () => {
         let resolveFn: (v: string) => void = () => {};
         const fetchFn = vi.fn(

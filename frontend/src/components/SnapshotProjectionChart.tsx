@@ -1,9 +1,9 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getSnapshotProjection } from '../api/dashboard';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle, selectStyle } from '../utils/styles';
-import { extractErrorMessage } from '../utils/errorMessage';
 import type { SnapshotProjection } from '../types/dashboard';
 
 const PROJECTION_HORIZONS = [
@@ -18,19 +18,10 @@ const horizonSelectStyle = { ...selectStyle, padding: '0.3rem 0.5rem', fontSize:
 
 export default function SnapshotProjectionChart() {
     const [years, setYears] = useState(10);
-    const [data, setData] = useState<SnapshotProjection | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(null);
-        getSnapshotProjection(years)
-            .then((result) => { if (!cancelled) { setData(result); setLoading(false); } })
-            .catch((err) => { if (!cancelled) { setError(extractErrorMessage(err)); setLoading(false); } });
-        return () => { cancelled = true; };
-    }, [years]);
+    const { data, loading, error } = useApiQuery<SnapshotProjection>(
+        () => getSnapshotProjection(years),
+        [years],
+    );
 
     const chartData = useMemo(() => {
         if (!data?.data_points) return [];

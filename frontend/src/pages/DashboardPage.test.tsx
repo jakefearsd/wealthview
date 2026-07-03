@@ -11,6 +11,12 @@ vi.mock('../components/CombinedPortfolioChart', () => ({
     default: () => <div data-testid="combined-portfolio-chart" />,
 }));
 
+// SnapshotProjectionChart now uses the (mocked) useApiQuery hook, whose stubbed
+// return value is shaped for the dashboard summary — stub the chart out instead.
+vi.mock('../components/SnapshotProjectionChart', () => ({
+    default: () => <div data-testid="snapshot-projection-chart" />,
+}));
+
 vi.mock('../components/SummaryCard', () => ({
     default: ({ label, value }: { label: string; value: string }) => (
         <div data-testid={`summary-card-${label}`}>{label}: {value}</div>

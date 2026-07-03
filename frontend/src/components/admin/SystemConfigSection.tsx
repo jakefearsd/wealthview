@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getConfig, setConfig } from '../../api/adminSystem';
-import type { SystemConfig } from '../../api/adminSystem';
+import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle } from '../../utils/styles';
 import Button from '../Button';
 import toast from 'react-hot-toast';
@@ -24,28 +24,17 @@ const CONFIG_SECTIONS: { title: string; keys: string[] }[] = [
 ];
 
 export default function SystemConfigSection() {
-    const [configs, setConfigs] = useState<SystemConfig[]>([]);
-    const [loading, setLoading] = useState(true);
     const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
     const [saving, setSaving] = useState(false);
     const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
-    useEffect(() => {
-        loadConfigs();
-    }, []);
+    const { data, loading, error, refetch } = useApiQuery(getConfig);
+    const configs = data ?? [];
 
-    async function loadConfigs() {
-        setLoading(true);
-        try {
-            const data = await getConfig();
-            setConfigs(data);
-        } catch {
-            toast.error('Failed to load config');
-        } finally {
-            setLoading(false);
-        }
-    }
+    useEffect(() => {
+        if (error) toast.error('Failed to load config');
+    }, [error]);
 
     function getConfigValue(key: string): string {
         return configs.find((c) => c.key === key)?.value ?? '';
@@ -84,7 +73,7 @@ export default function SystemConfigSection() {
             await setConfig(editingKey, editValue);
             toast.success('Config updated');
             setEditingKey(null);
-            loadConfigs();
+            refetch();
         } catch {
             toast.error('Failed to save config');
         } finally {
@@ -99,7 +88,7 @@ export default function SystemConfigSection() {
         try {
             await setConfig(key, newVal);
             toast.success('Config updated');
-            loadConfigs();
+            refetch();
         } catch {
             toast.error('Failed to save config');
         } finally {

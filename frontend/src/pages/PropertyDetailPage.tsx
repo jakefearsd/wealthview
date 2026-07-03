@@ -2,8 +2,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { getProperty, updateProperty, addPropertyExpense, deletePropertyExpense, getCashFlow, getValuationHistory, refreshValuation, selectZpid, getPropertyAnalytics, listPropertyExpenses } from '../api/properties';
 import { listIncomeSources } from '../api/incomeSources';
-import type { Property, ZillowSearchResult } from '../types/property';
+import type { Property, PropertyExpenseRequest, ValuationRefreshResponse, ZillowSearchResult } from '../types/property';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { useAuth } from '../context/AuthContext';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
@@ -103,7 +104,6 @@ export default function PropertyDetailPage() {
     const { role } = useAuth();
     const canWrite = role === 'admin' || role === 'member';
     const range = useMemo(() => trailingTwelveMonthRange(), []);
-    const [refreshing, setRefreshing] = useState(false);
     const [zillowCandidates, setZillowCandidates] = useState<ZillowSearchResult[] | null>(null);
     const [analyticsYear, setAnalyticsYear] = useState<number | undefined>(undefined);
     const [showEditForm, setShowEditForm] = useState(false);
@@ -111,7 +111,7 @@ export default function PropertyDetailPage() {
     const { data: property, refetch: refetchProperty } = useApiQuery(() => getProperty(id!));
     const { data: cashFlow, refetch: refetchCashFlow } = useApiQuery(() => getCashFlow(id!, range.from, range.to));
     const { data: valuations, refetch: refetchValuations } = useApiQuery(() => getValuationHistory(id!));
-    const { data: analytics, refetch: refetchAnalytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear));
+    const { data: analytics } = useApiQuery(() => getPropertyAnalytics(id!, analyticsYear), [analyticsYear]);
     const { data: allIncomeSources } = useApiQuery(listIncomeSources);
     const { data: expenses, refetch: refetchExpenses } = useApiQuery(() => listPropertyExpenses(id!));
 
@@ -129,12 +129,7 @@ export default function PropertyDetailPage() {
         return updateProperty(id!, buildRequest(data));
     }, [id]);
 
-    const createFn = useCallback(async (_data: PropertyFormData): Promise<Property> => {
-        throw new Error('Create not supported on detail page');
-    }, []);
-
     const { formData, setFormData, handleSave, resetForm: crudReset, startEdit } = useCrudForm<Property, PropertyFormData>({
-        createFn,
         updateFn,
         entityName: 'Property',
         initialFormData,
@@ -193,78 +188,88 @@ export default function PropertyDetailPage() {
         setShowEditForm(false);
     }
 
-    async function handleAddExpense(data: { date: string; amount: number; category: string; description?: string; frequency?: string }) {
-        try {
-            await addPropertyExpense(id!, data);
-            toast.success('Expense added');
-            refetchCashFlow();
-            refetchExpenses();
-        } catch {
-            toast.error('Failed to add expense');
-        }
+    const addExpense = useApiMutation(
+        (data: PropertyExpenseRequest) => addPropertyExpense(id!, data),
+        {
+            successMessage: 'Expense added',
+            errorMessage: 'Failed to add expense',
+            onSuccess: () => {
+                refetchCashFlow();
+                refetchExpenses();
+            },
+        },
+    );
+
+    async function handleAddExpense(data: PropertyExpenseRequest): Promise<void> {
+        await addExpense.mutate(data);
     }
 
-    async function handleDeleteExpense(expenseId: string) {
+    const deleteExpense = useApiMutation(
+        (expenseId: string) => deletePropertyExpense(id!, expenseId),
+        {
+            successMessage: 'Expense deleted',
+            errorMessage: 'Failed to delete expense',
+            onSuccess: () => {
+                refetchCashFlow();
+                refetchExpenses();
+            },
+        },
+    );
+
+    function handleDeleteExpense(expenseId: string) {
         if (!confirm('Delete this expense?')) return;
-        try {
-            await deletePropertyExpense(id!, expenseId);
-            toast.success('Expense deleted');
-            refetchCashFlow();
-            refetchExpenses();
-        } catch {
-            toast.error('Failed to delete expense');
-        }
+        void deleteExpense.mutate(expenseId);
     }
 
-    async function handleRefreshValuation() {
-        setRefreshing(true);
-        try {
-            const result = await refreshValuation(id!);
-            if (result.status === 'updated') {
-                toast.success(`Valuation updated: $${result.value?.toLocaleString()}`);
-                refetchValuations();
-                refetchProperty();
-            } else if (result.status === 'multiple_matches') {
-                setZillowCandidates(result.candidates);
-            } else {
-                toast.error('No Zillow results found for this address');
-            }
-        } catch (err: unknown) {
-            if (err && typeof err === 'object' && 'response' in err) {
-                const axiosErr = err as { response?: { status?: number } };
-                if (axiosErr.response?.status === 503) {
-                    toast.error('Valuation service is not enabled. Set app.zillow.enabled=true to use this feature.');
-                    return;
+    const handleValuationResult = useCallback((result: ValuationRefreshResponse, noMatchMessage: string) => {
+        if (result.status === 'updated') {
+            toast.success(`Valuation updated: $${result.value?.toLocaleString()}`);
+            refetchValuations();
+            refetchProperty();
+        } else if (result.status === 'multiple_matches') {
+            setZillowCandidates(result.candidates);
+        } else {
+            toast.error(noMatchMessage);
+        }
+    }, [refetchValuations, refetchProperty]);
+
+    const refreshValuationMutation = useApiMutation<void, ValuationRefreshResponse>(
+        () => refreshValuation(id!),
+        {
+            onSuccess: (result) => handleValuationResult(result, 'No Zillow results found for this address'),
+            errorMessage: (err) => {
+                if (err && typeof err === 'object' && 'response' in err) {
+                    const axiosErr = err as { response?: { status?: number } };
+                    if (axiosErr.response?.status === 503) {
+                        return 'Valuation service is not enabled. Set app.zillow.enabled=true to use this feature.';
+                    }
                 }
-            }
-            toast.error('Failed to refresh valuation');
-        } finally {
-            setRefreshing(false);
-        }
+                return 'Failed to refresh valuation';
+            },
+        },
+    );
+
+    const selectZpidMutation = useApiMutation(
+        (zpid: string) => selectZpid(id!, zpid),
+        {
+            onSuccess: (result) => handleValuationResult(result, 'Could not fetch valuation for the selected property'),
+            errorMessage: 'Failed to select property',
+        },
+    );
+
+    function handleRefreshValuation() {
+        void refreshValuationMutation.mutate();
     }
 
-    async function handleSelectZpid(zpid: string) {
+    function handleSelectZpid(zpid: string) {
         setZillowCandidates(null);
-        setRefreshing(true);
-        try {
-            const result = await selectZpid(id!, zpid);
-            if (result.status === 'updated') {
-                toast.success(`Valuation updated: $${result.value?.toLocaleString()}`);
-                refetchValuations();
-                refetchProperty();
-            } else {
-                toast.error('Could not fetch valuation for the selected property');
-            }
-        } catch {
-            toast.error('Failed to select property');
-        } finally {
-            setRefreshing(false);
-        }
+        void selectZpidMutation.mutate(zpid);
     }
+
+    const refreshing = refreshValuationMutation.loading || selectZpidMutation.loading;
 
     function handleAnalyticsYearChange(value: string) {
         setAnalyticsYear(value === '' ? undefined : Number(value));
-        setTimeout(refetchAnalytics, 0);
     }
 
     const purchaseDate = property?.purchase_date;

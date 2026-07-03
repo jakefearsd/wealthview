@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { createPrice, listLatestPrices } from '../api/prices';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
@@ -19,26 +20,8 @@ export default function PricesPage() {
     const [date, setDate] = useState('');
     const [price, setPrice] = useState('');
     const [recentPrices, setRecentPrices] = useState<Array<{ symbol: string; date: string; close_price: number }>>([]);
-    const [latestPrices, setLatestPrices] = useState<Price[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    async function fetchLatestPrices() {
-        setLoading(true);
-        setError(null);
-        try {
-            const data = await listLatestPrices();
-            setLatestPrices(data);
-        } catch {
-            setError('Failed to load prices. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    }
-
-    useEffect(() => {
-        fetchLatestPrices();
-    }, []);
+    const { data, loading, error, refetch } = useApiQuery<Price[]>(listLatestPrices);
+    const latestPrices = data ?? [];
 
     async function handleAddPrice() {
         try {
@@ -52,7 +35,7 @@ export default function PricesPage() {
             setSymbol('');
             setDate('');
             setPrice('');
-            await fetchLatestPrices();
+            refetch();
         } catch {
             toast.error('Failed to save price');
         }
@@ -87,7 +70,7 @@ export default function PricesPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                     <h3 style={{ margin: 0 }}>Latest Prices</h3>
                     <button
-                        onClick={fetchLatestPrices}
+                        onClick={refetch}
                         disabled={loading}
                         style={{ padding: '0.4rem 0.9rem', background: '#f5f5f5', border: '1px solid #ccc', borderRadius: '4px', cursor: loading ? 'not-allowed' : 'pointer', fontSize: '0.85rem' }}
                     >
@@ -97,7 +80,7 @@ export default function PricesPage() {
                 {loading ? (
                     <LoadingState message="Loading prices..." />
                 ) : error ? (
-                    <ErrorState message={error} onRetry={fetchLatestPrices} />
+                    <ErrorState message="Failed to load prices. Please try again." onRetry={refetch} />
                 ) : latestPrices.length === 0 ? (
                     <EmptyState title="No prices on record" />
                 ) : (

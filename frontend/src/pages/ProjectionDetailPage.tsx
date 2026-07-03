@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useSearchParams, Link, useNavigate } from 'react-router';
 import { getScenario, runProjection, updateScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { formatCurrency } from '../utils/format';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
@@ -15,8 +16,6 @@ import DataTableTab from '../components/DataTableTab';
 import IncomeTaxTab from '../components/IncomeTaxTab';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
-import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../utils/errorMessage';
 import { useProjectionCache } from '../context/ProjectionCacheContext';
 import type { ProjectionResult, ProjectionYear, CreateScenarioRequest } from '../types/projection';
 import { downloadBlob } from '../api/export';
@@ -42,7 +41,6 @@ export default function ProjectionDetailPage() {
     const cache = useProjectionCache();
     const { data: scenario, loading, refetch } = useApiQuery(() => getScenario(id!));
     const [result, setResult] = useState<ProjectionResult | null>(() => cache.get(id!));
-    const [running, setRunning] = useState(false);
     const [activeTab, setActiveTab] = useState<TabId>('chart');
     const [editing, setEditing] = useState(false);
     const [expandedTaxYears, setExpandedTaxYears] = useState<Set<number>>(new Set());
@@ -59,35 +57,36 @@ export default function ProjectionDetailPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scenario]);
 
-    async function handleRun() {
-        setRunning(true);
-        try {
-            const data = await runProjection(id!);
-            setResult(data);
-            cache.set(id!, data);
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        } finally {
-            setRunning(false);
-        }
+    const runMutation = useApiMutation<void, ProjectionResult>(
+        () => runProjection(id!),
+        {
+            onSuccess: (data) => {
+                setResult(data);
+                cache.set(id!, data);
+            },
+        },
+    );
+    const running = runMutation.loading;
+
+    function handleRun() {
+        void runMutation.mutate();
     }
 
+    const updateMutation = useApiMutation(
+        (data: CreateScenarioRequest) => updateScenario(id!, data),
+        {
+            successMessage: 'Scenario updated',
+            onSuccess: () => {
+                setEditing(false);
+                refetch();
+            },
+        },
+    );
+
     async function handleUpdate(data: CreateScenarioRequest) {
-        try {
-            await updateScenario(id!, data);
-            toast.success('Scenario updated');
-            setEditing(false);
-            refetch();
-            setRunning(true);
-            try {
-                const res = await runProjection(id!);
-                setResult(res);
-                cache.set(id!, res);
-            } finally {
-                setRunning(false);
-            }
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
+        const updated = await updateMutation.mutate(data);
+        if (updated !== null) {
+            await runMutation.mutate();
         }
     }
 

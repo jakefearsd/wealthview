@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router';
 import { listSpendingProfiles, createSpendingProfile, updateSpendingProfile, deleteSpendingProfile } from '../api/spendingProfiles';
 import { listScenarios, getGuardrailProfile, deleteGuardrailProfile, reoptimize } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useCrudForm } from '../hooks/useCrudForm';
 import { cardStyle, inputStyle, labelStyle } from '../utils/styles';
 import { formatCurrency } from '../utils/format';
@@ -36,7 +37,6 @@ export default function SpendingProfilesPage() {
     const [showForm, setShowForm] = useState(false);
     const [guardrails, setGuardrails] = useState<GuardrailWithScenario[]>([]);
     const [guardrailsLoading, setGuardrailsLoading] = useState(true);
-    const [reoptimizingId, setReoptimizingId] = useState<string | null>(null);
 
     const loadGuardrails = useCallback(async () => {
         setGuardrailsLoading(true);
@@ -58,17 +58,18 @@ export default function SpendingProfilesPage() {
 
     useEffect(() => { loadGuardrails(); }, [loadGuardrails]);
 
-    async function handleReoptimize(scenarioId: string) {
-        setReoptimizingId(scenarioId);
-        try {
-            await reoptimize(scenarioId);
-            toast.success('Re-optimization complete');
-            loadGuardrails();
-        } catch {
-            toast.error('Re-optimization failed');
-        } finally {
-            setReoptimizingId(null);
-        }
+    const reoptimizeMutation = useApiMutation(
+        (scenarioId: string) => reoptimize(scenarioId),
+        {
+            successMessage: 'Re-optimization complete',
+            errorMessage: 'Re-optimization failed',
+            onSuccess: () => loadGuardrails(),
+        },
+    );
+    const reoptimizingId = reoptimizeMutation.pendingInput;
+
+    function handleReoptimize(scenarioId: string) {
+        void reoptimizeMutation.mutate(scenarioId);
     }
 
     async function handleDeleteGuardrail(scenarioId: string) {

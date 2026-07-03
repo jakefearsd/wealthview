@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { listExchangeRates, createExchangeRate, updateExchangeRate, deleteExchangeRate } from '../../api/exchangeRates';
-import type { ExchangeRate } from '../../types/exchangeRate';
+import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle, inputFieldStyle } from '../../utils/styles';
 import { extractErrorMessage } from '../../utils/errorMessage';
 import Button from '../Button';
 import toast from 'react-hot-toast';
 
 export default function ExchangeRatesSection() {
-    const [rates, setRates] = useState<ExchangeRate[]>([]);
-    const [loading, setLoading] = useState(true);
     const [editingCode, setEditingCode] = useState<string | null>(null);
     const [editRate, setEditRate] = useState('');
     const [showAdd, setShowAdd] = useState(false);
@@ -16,20 +14,12 @@ export default function ExchangeRatesSection() {
     const [newRate, setNewRate] = useState('');
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        loadRates();
-    }, []);
+    const { data, loading, error, refetch } = useApiQuery(listExchangeRates);
+    const rates = data ?? [];
 
-    async function loadRates() {
-        setLoading(true);
-        try {
-            setRates(await listExchangeRates());
-        } catch (err) {
-            toast.error(`Failed to load exchange rates: ${extractErrorMessage(err)}`);
-        } finally {
-            setLoading(false);
-        }
-    }
+    useEffect(() => {
+        if (error) toast.error(`Failed to load exchange rates: ${error}`);
+    }, [error]);
 
     async function handleAdd() {
         if (!newCode || !newRate) return;
@@ -43,7 +33,7 @@ export default function ExchangeRatesSection() {
             setShowAdd(false);
             setNewCode('');
             setNewRate('');
-            loadRates();
+            refetch();
         } catch (err) {
             toast.error(`Failed to add exchange rate: ${extractErrorMessage(err)}`);
         } finally {
@@ -61,7 +51,7 @@ export default function ExchangeRatesSection() {
             });
             toast.success(`${currencyCode} rate updated`);
             setEditingCode(null);
-            loadRates();
+            refetch();
         } catch (err) {
             toast.error(`Failed to update exchange rate: ${extractErrorMessage(err)}`);
         } finally {
@@ -74,7 +64,7 @@ export default function ExchangeRatesSection() {
         try {
             await deleteExchangeRate(currencyCode);
             toast.success(`${currencyCode} rate deleted`);
-            loadRates();
+            refetch();
         } catch (err) {
             toast.error(`Failed to delete — accounts may still use this currency (${extractErrorMessage(err)})`);
         }

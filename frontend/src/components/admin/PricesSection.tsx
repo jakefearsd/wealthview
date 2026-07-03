@@ -9,9 +9,9 @@ import {
 } from '../../api/adminPrices';
 import type { PriceSyncStatus, PriceEntry } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
-import { extractErrorMessage } from '../../utils/errorMessage';
 import PriceBrowserTab from './PriceBrowserTab';
 import Button from '../Button';
 import toast from 'react-hot-toast';
@@ -71,29 +71,31 @@ export default function PricesSection() {
 
 function FinnhubTab() {
     const { data: statuses, loading, refetch } = useApiQuery(getPriceStatus);
-    const [syncing, setSyncing] = useState(false);
 
-    async function handleSync() {
-        setSyncing(true);
-        try {
-            const result = await syncFinnhub();
-            if (result.failures.length === 0) {
-                toast.success(`Finnhub sync complete: ${result.succeeded} of ${result.total} symbols updated`);
-            } else {
-                const failDetails = result.failures
-                    .map((f) => `${f.symbol} (${f.reason})`)
-                    .join(', ');
-                toast.error(
-                    `Synced ${result.succeeded} of ${result.total}. Failed: ${failDetails}`,
-                    { duration: 10000 },
-                );
-            }
-            refetch();
-        } catch (err) {
-            toast.error(extractErrorMessage(err), { duration: 8000 });
-        } finally {
-            setSyncing(false);
-        }
+    const syncMutation = useApiMutation(
+        () => syncFinnhub(),
+        {
+            onSuccess: (result) => {
+                if (result.failures.length === 0) {
+                    toast.success(`Finnhub sync complete: ${result.succeeded} of ${result.total} symbols updated`);
+                } else {
+                    const failDetails = result.failures
+                        .map((f) => `${f.symbol} (${f.reason})`)
+                        .join(', ');
+                    toast.error(
+                        `Synced ${result.succeeded} of ${result.total}. Failed: ${failDetails}`,
+                        { duration: 10000 },
+                    );
+                }
+                refetch();
+            },
+            errorToastDuration: 8000,
+        },
+    );
+    const syncing = syncMutation.loading;
+
+    function handleSync() {
+        void syncMutation.mutate(undefined);
     }
 
     return (
@@ -156,37 +158,49 @@ function FinnhubTab() {
 }
 
 function YahooTab() {
-    const [syncingAll, setSyncingAll] = useState(false);
     const [symbolInput, setSymbolInput] = useState('');
     const [fromDate, setFromDate] = useState(thirtyDaysAgoStr());
     const [toDate, setToDate] = useState(todayStr());
-    const [fetching, setFetching] = useState(false);
     const [preview, setPreview] = useState<PriceEntry[] | null>(null);
-    const [saving, setSaving] = useState(false);
 
-    async function handleSyncAll() {
-        setSyncingAll(true);
-        try {
-            const result = await syncYahoo();
-            if (result.failures.length === 0) {
-                toast.success(`Inserted ${result.inserted}, updated ${result.updated}.`);
-            } else {
-                const failDetails = result.failures
-                    .map((f) => `${f.symbol} (${f.reason})`)
-                    .join(', ');
-                toast.error(
-                    `Inserted ${result.inserted}, updated ${result.updated}. Failed: ${failDetails}`,
-                    { duration: 10000 },
-                );
-            }
-        } catch (err) {
-            toast.error(extractErrorMessage(err), { duration: 8000 });
-        } finally {
-            setSyncingAll(false);
-        }
+    const syncAllMutation = useApiMutation(
+        () => syncYahoo(),
+        {
+            onSuccess: (result) => {
+                if (result.failures.length === 0) {
+                    toast.success(`Inserted ${result.inserted}, updated ${result.updated}.`);
+                } else {
+                    const failDetails = result.failures
+                        .map((f) => `${f.symbol} (${f.reason})`)
+                        .join(', ');
+                    toast.error(
+                        `Inserted ${result.inserted}, updated ${result.updated}. Failed: ${failDetails}`,
+                        { duration: 10000 },
+                    );
+                }
+            },
+            errorToastDuration: 8000,
+        },
+    );
+    const syncingAll = syncAllMutation.loading;
+
+    function handleSyncAll() {
+        void syncAllMutation.mutate(undefined);
     }
 
-    async function handleFetchPreview() {
+    const fetchPreviewMutation = useApiMutation(
+        (symbols: string[]) => fetchYahoo({ symbols, from_date: fromDate, to_date: toDate }),
+        {
+            onSuccess: (prices) => {
+                setPreview(prices);
+                if (prices.length === 0) toast('No prices returned for those symbols and dates');
+            },
+            errorToastDuration: 8000,
+        },
+    );
+    const fetching = fetchPreviewMutation.loading;
+
+    function handleFetchPreview() {
         const symbols = symbolInput
             .split(',')
             .map((s) => s.trim().toUpperCase())
@@ -197,31 +211,23 @@ function YahooTab() {
             return;
         }
 
-        setFetching(true);
         setPreview(null);
-        try {
-            const prices = await fetchYahoo({ symbols, from_date: fromDate, to_date: toDate });
-            setPreview(prices);
-            if (prices.length === 0) toast('No prices returned for those symbols and dates');
-        } catch (err) {
-            toast.error(extractErrorMessage(err), { duration: 8000 });
-        } finally {
-            setFetching(false);
-        }
+        void fetchPreviewMutation.mutate(symbols);
     }
 
-    async function handleSaveAll() {
+    const saveAllMutation = useApiMutation(
+        (prices: PriceEntry[]) => saveYahooPrices(prices),
+        {
+            successMessage: (_result, prices) => `Saved ${prices.length} price entries`,
+            onSuccess: () => setPreview(null),
+            errorToastDuration: 8000,
+        },
+    );
+    const saving = saveAllMutation.loading;
+
+    function handleSaveAll() {
         if (!preview || preview.length === 0) return;
-        setSaving(true);
-        try {
-            await saveYahooPrices(preview);
-            toast.success(`Saved ${preview.length} price entries`);
-            setPreview(null);
-        } catch (err) {
-            toast.error(extractErrorMessage(err), { duration: 8000 });
-        } finally {
-            setSaving(false);
-        }
+        void saveAllMutation.mutate(preview);
     }
 
     return (
@@ -322,31 +328,34 @@ function YahooTab() {
 
 function CsvTab() {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploading, setUploading] = useState(false);
     const [importedCount, setImportedCount] = useState<number | null>(null);
     const [errors, setErrors] = useState<string[]>([]);
+
+    const uploadMutation = useApiMutation(
+        (file: File) => uploadPriceCsv(file),
+        {
+            onSuccess: (result) => {
+                setImportedCount(result.imported);
+                setErrors(result.errors);
+                if (result.errors.length === 0) {
+                    toast.success(`Imported ${result.imported} prices`);
+                } else {
+                    toast(`Imported ${result.imported} prices with ${result.errors.length} error(s)`);
+                }
+            },
+            errorToastDuration: 8000,
+        },
+    );
+    const uploading = uploadMutation.loading;
 
     async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
         const file = e.target.files?.[0];
         if (!file) return;
-        setUploading(true);
         setImportedCount(null);
         setErrors([]);
-        try {
-            const result = await uploadPriceCsv(file);
-            setImportedCount(result.imported);
-            setErrors(result.errors);
-            if (result.errors.length === 0) {
-                toast.success(`Imported ${result.imported} prices`);
-            } else {
-                toast(`Imported ${result.imported} prices with ${result.errors.length} error(s)`);
-            }
-        } catch (err) {
-            toast.error(extractErrorMessage(err), { duration: 8000 });
-        } finally {
-            setUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
+        // mutate never rejects, so the input reset runs after both success and failure.
+        await uploadMutation.mutate(file);
+        if (fileInputRef.current) fileInputRef.current.value = '';
     }
 
     return (

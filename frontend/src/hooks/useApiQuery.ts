@@ -7,7 +7,7 @@ interface UseApiQueryResult<T> {
     refetch: () => void;
 }
 
-export function useApiQuery<T>(fetchFn: () => Promise<T>): UseApiQueryResult<T> {
+export function useApiQuery<T>(fetchFn: () => Promise<T>, deps: unknown[] = []): UseApiQueryResult<T> {
     const [data, setData] = useState<T | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -36,8 +36,10 @@ export function useApiQuery<T>(fetchFn: () => Promise<T>): UseApiQueryResult<T> 
             cancelled = true;
         };
         // fetchFn is intentionally omitted: callers typically pass an inline closure
-        // that would change every render. refetch() is the controlled way to re-run.
-    }, [trigger]); // eslint-disable-line react-hooks/exhaustive-deps
+        // that would change every render. Pass the closure's inputs via `deps` to
+        // re-run when they change; refetch() is the manual way to re-run.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trigger, ...deps]);
 
     return { data, loading, error, refetch };
 }

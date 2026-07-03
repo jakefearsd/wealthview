@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { getRoiAnalysis } from '../api/properties';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import type { RoiAnalysisResponse } from '../types/property';
@@ -12,36 +13,49 @@ interface PropertyRoiCardProps {
 
 const YEAR_OPTIONS = [5, 10, 15, 20];
 
+interface RoiParams {
+    years: number;
+    investmentReturn: number;
+    rentGrowth: number;
+    expenseInflation: number;
+}
+
+const DEFAULT_PARAMS: RoiParams = {
+    years: 10,
+    investmentReturn: 0.07,
+    rentGrowth: 0.03,
+    expenseInflation: 0.03,
+};
+
 export default function PropertyRoiCard({ propertyId, incomeSource }: PropertyRoiCardProps) {
     const [years, setYears] = useState(10);
     const [investmentReturn, setInvestmentReturn] = useState('7');
     const [rentGrowth, setRentGrowth] = useState('3');
     const [expenseInflation, setExpenseInflation] = useState('3');
-    const [analysis, setAnalysis] = useState<RoiAnalysisResponse | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [params, setParams] = useState<RoiParams>(DEFAULT_PARAMS);
 
-    const fetchAnalysis = useCallback(() => {
-        const ir = parseFloat(investmentReturn);
-        const rg = parseFloat(rentGrowth);
-        const ei = parseFloat(expenseInflation);
-        if (isNaN(ir) || isNaN(rg) || isNaN(ei)) return;
-
-        setLoading(true);
-        getRoiAnalysis(propertyId, incomeSource.id, {
-            years,
-            investmentReturn: ir / 100,
-            rentGrowth: rg / 100,
-            expenseInflation: ei / 100,
-        })
-            .then(setAnalysis)
-            .catch(() => setAnalysis(null))
-            .finally(() => setLoading(false));
-    }, [propertyId, incomeSource.id, years, investmentReturn, rentGrowth, expenseInflation]);
-
+    // Debounce input changes into a committed params object; invalid numbers
+    // are ignored so the last valid analysis stays on screen while typing.
     useEffect(() => {
-        const timer = setTimeout(fetchAnalysis, 400);
+        const timer = setTimeout(() => {
+            const ir = parseFloat(investmentReturn);
+            const rg = parseFloat(rentGrowth);
+            const ei = parseFloat(expenseInflation);
+            if (isNaN(ir) || isNaN(rg) || isNaN(ei)) return;
+            setParams({
+                years,
+                investmentReturn: ir / 100,
+                rentGrowth: rg / 100,
+                expenseInflation: ei / 100,
+            });
+        }, 400);
         return () => clearTimeout(timer);
-    }, [fetchAnalysis]);
+    }, [years, investmentReturn, rentGrowth, expenseInflation]);
+
+    const { data: analysis, loading } = useApiQuery<RoiAnalysisResponse | null>(
+        () => getRoiAnalysis(propertyId, incomeSource.id, params).catch(() => null),
+        [propertyId, incomeSource.id, params],
+    );
 
     const inputStyle = {
         padding: '0.3rem 0.5rem',

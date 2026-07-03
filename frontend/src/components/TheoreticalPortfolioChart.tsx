@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getTheoreticalHistory } from '../api/accounts';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import type { PortfolioHistory } from '../types/portfolio';
@@ -37,19 +38,10 @@ const selectStyle = {
 
 export default function TheoreticalPortfolioChart({ accountId, accountType }: Props) {
     const [months, setMonths] = useState(24);
-    const [data, setData] = useState<PortfolioHistory | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(false);
-        getTheoreticalHistory(accountId, months)
-            .then((result) => { if (!cancelled) { setData(result); setLoading(false); } })
-            .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
-        return () => { cancelled = true; };
-    }, [accountId, months]);
+    const { data, loading, error } = useApiQuery<PortfolioHistory>(
+        () => getTheoreticalHistory(accountId, months),
+        [accountId, months],
+    );
 
     const chartData = useMemo(() => {
         if (!data?.data_points) return [];

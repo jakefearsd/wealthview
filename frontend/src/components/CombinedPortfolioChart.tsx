@@ -1,6 +1,7 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { getCombinedPortfolioHistory } from '../api/dashboard';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
 import type { CombinedPortfolioHistory } from '../types/dashboard';
@@ -30,19 +31,10 @@ const selectStyle = {
 
 export default function CombinedPortfolioChart() {
     const [years, setYears] = useState(2);
-    const [data, setData] = useState<CombinedPortfolioHistory | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(false);
-
-    useEffect(() => {
-        let cancelled = false;
-        setLoading(true);
-        setError(false);
-        getCombinedPortfolioHistory(years)
-            .then((result) => { if (!cancelled) { setData(result); setLoading(false); } })
-            .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
-        return () => { cancelled = true; };
-    }, [years]);
+    const { data, loading, error } = useApiQuery<CombinedPortfolioHistory>(
+        () => getCombinedPortfolioHistory(years),
+        [years],
+    );
 
     const chartData = useMemo(() => {
         if (!data?.data_points) return [];

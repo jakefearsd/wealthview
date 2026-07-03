@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams, Link } from 'react-router';
 import { getHolding, updateHolding } from '../api/holdings';
 import { listTransactions } from '../api/transactions';
@@ -21,20 +21,16 @@ export default function HoldingDetailPage() {
 
     const { data: holding, loading: holdingLoading, refetch: refetchHolding } = useApiQuery(() => getHolding(id!));
 
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [txnLoading, setTxnLoading] = useState(true);
-
     const holdingAccountId = holding?.account_id;
     const holdingSymbol = holding?.symbol;
 
-    useEffect(() => {
-        if (!holdingAccountId || !holdingSymbol) return;
-        setTxnLoading(true);
-        listTransactions(holdingAccountId, 0, 100, holdingSymbol)
-            .then((page) => setTransactions(page.data))
-            .catch(() => setTransactions([]))
-            .finally(() => setTxnLoading(false));
-    }, [holdingAccountId, holdingSymbol]);
+    const { data: txnPage, loading: txnLoading, error: txnError } = useApiQuery(
+        () => holdingAccountId && holdingSymbol
+            ? listTransactions(holdingAccountId, 0, 100, holdingSymbol)
+            : Promise.resolve(null),
+        [holdingAccountId, holdingSymbol],
+    );
+    const transactions: Transaction[] = txnError ? [] : (txnPage?.data ?? []);
 
     const [editing, setEditing] = useState(false);
     const [editQty, setEditQty] = useState('');

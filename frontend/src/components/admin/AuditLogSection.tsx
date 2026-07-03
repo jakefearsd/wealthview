@@ -1,27 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { getAuditLogs } from '../../api/audit';
+import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
-import type { AuditLogEntry } from '../../types/audit';
 
 const ENTITY_TYPES = ['', 'account', 'transaction', 'holding', 'property', 'user', 'tenant'];
 
 export default function AuditLogSection() {
-    const [entries, setEntries] = useState<AuditLogEntry[]>([]);
-    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
     const [page, setPage] = useState(0);
-    const [total, setTotal] = useState(0);
 
-    useEffect(() => {
-        setLoading(true);
-        getAuditLogs(page, 50, filter || undefined)
-            .then((res) => {
-                setEntries(res.data);
-                setTotal(res.total);
-            })
-            .catch(() => setEntries([]))
-            .finally(() => setLoading(false));
-    }, [page, filter]);
+    const { data, loading, error } = useApiQuery(
+        () => getAuditLogs(page, 50, filter || undefined),
+        [page, filter],
+    );
+    const entries = error ? [] : (data?.data ?? []);
+    const total = data?.total ?? 0;
 
     return (
         <div>

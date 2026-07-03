@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
     ReferenceLine, CartesianGrid,
 } from 'recharts';
 import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/properties';
+import { useApiQuery } from '../hooks/useApiQuery';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
@@ -231,27 +232,26 @@ export default function PropertyIncomeChart({
     annualRent,
     inflationRate = 0,
 }: PropertyIncomeChartProps) {
-    const [trailingData, setTrailingData] = useState<MonthlyCashFlowDetailEntry[] | null>(null);
-    const [depSchedule, setDepSchedule] = useState<DepreciationScheduleResponse | null>(null);
-    const [property, setProperty] = useState<Property | null>(null);
-    const [loading, setLoading] = useState(true);
     const [horizon, setHorizon] = useState<Horizon>('trailing');
 
     const effectiveAnnualRent = annualRent ?? monthlyRentEstimate * 12;
 
-    useEffect(() => {
-        const { from, to } = trailingTwelveMonthRange();
-
-        Promise.all([
-            getCashFlowDetail(propertyId, from, to).catch(() => null),
-            getDepreciationSchedule(propertyId).catch(() => null),
-            getProperty(propertyId).catch(() => null),
-        ]).then(([cashFlow, dep, prop]) => {
-            setTrailingData(cashFlow);
-            setDepSchedule(dep);
-            setProperty(prop);
-        }).finally(() => setLoading(false));
-    }, [propertyId]);
+    const { data, loading } = useApiQuery<[
+        MonthlyCashFlowDetailEntry[] | null,
+        DepreciationScheduleResponse | null,
+        Property | null,
+    ]>(
+        () => {
+            const { from, to } = trailingTwelveMonthRange();
+            return Promise.all([
+                getCashFlowDetail(propertyId, from, to).catch(() => null),
+                getDepreciationSchedule(propertyId).catch(() => null),
+                getProperty(propertyId).catch(() => null),
+            ]);
+        },
+        [propertyId],
+    );
+    const [trailingData, depSchedule, property] = data ?? [null, null, null];
 
     if (loading) {
         return <div style={{ ...cardStyle, textAlign: 'center', padding: '1.5rem', color: '#999' }}>Loading property data...</div>;

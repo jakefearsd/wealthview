@@ -182,6 +182,36 @@ describe('useCrudForm', () => {
         expect(toast.error).not.toHaveBeenCalled();
     });
 
+    it('handleSave without createFn calls updateFn when editing (edit-only usage)', async () => {
+        const options = createOptions({ createFn: undefined });
+        const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));
+
+        act(() => {
+            result.current.startEdit('existing-1', { name: 'Existing', value: 7 });
+        });
+
+        await act(async () => {
+            await result.current.handleSave();
+        });
+
+        expect(options.updateFn).toHaveBeenCalledWith('existing-1', { name: 'Existing', value: 7 });
+        expect(toast.success).toHaveBeenCalledWith('Widget updated');
+    });
+
+    it('handleSave without createFn and no editingId shows error toast and does not save', async () => {
+        const options = createOptions({ createFn: undefined });
+        const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));
+
+        await act(async () => {
+            await result.current.handleSave();
+        });
+
+        expect(options.updateFn).not.toHaveBeenCalled();
+        expect(toast.success).not.toHaveBeenCalled();
+        expect(toast.error).toHaveBeenCalledWith('Creating a Widget is not supported here');
+        expect(options.onSuccess).not.toHaveBeenCalled();
+    });
+
     it('resetForm clears editingId and resets formData', () => {
         const options = createOptions();
         const { result } = renderHook(() => useCrudForm<unknown, TestFormData>(options));

@@ -129,6 +129,30 @@ describe('useApiMutation', () => {
         expect(toast.error).toHaveBeenCalledWith('raw');
     });
 
+    it('errorToastDuration is passed through to the error toast', async () => {
+        const fn = vi.fn().mockRejectedValue(new Error('slow down'));
+        const { result } = renderHook(() =>
+            useApiMutation(fn, { errorToastDuration: 8000 })
+        );
+
+        await act(async () => {
+            await result.current.mutate({});
+        });
+
+        expect(toast.error).toHaveBeenCalledWith('slow down', { duration: 8000 });
+    });
+
+    it('error toast receives no options when errorToastDuration is omitted', async () => {
+        const fn = vi.fn().mockRejectedValue(new Error('plain'));
+        const { result } = renderHook(() => useApiMutation(fn));
+
+        await act(async () => {
+            await result.current.mutate({});
+        });
+
+        expect(toast.error).toHaveBeenCalledWith('plain');
+    });
+
     it('onSuccess callback fires with result and input', async () => {
         const onSuccess = vi.fn();
         const fn = vi.fn().mockResolvedValue('result-value');
@@ -152,6 +176,45 @@ describe('useApiMutation', () => {
         });
 
         expect(onError).toHaveBeenCalledWith(err);
+    });
+
+    it('exposes the in-flight input via pendingInput while mutating', async () => {
+        let resolveFn: (v: string) => void = () => {};
+        const fn = vi.fn(
+            (input: string) => new Promise<string>((resolve) => {
+                resolveFn = resolve;
+                void input;
+            }),
+        );
+        const { result } = renderHook(() => useApiMutation(fn));
+
+        expect(result.current.pendingInput).toBeNull();
+
+        let promise: Promise<string | null> = Promise.resolve(null);
+        act(() => {
+            promise = result.current.mutate('scenario-1');
+        });
+
+        expect(result.current.pendingInput).toBe('scenario-1');
+        expect(result.current.loading).toBe(true);
+
+        await act(async () => {
+            resolveFn('done');
+            await promise;
+        });
+
+        expect(result.current.pendingInput).toBeNull();
+    });
+
+    it('clears pendingInput after a failed mutation', async () => {
+        const fn = vi.fn().mockRejectedValue(new Error('boom'));
+        const { result } = renderHook(() => useApiMutation(fn));
+
+        await act(async () => {
+            await result.current.mutate('scenario-2');
+        });
+
+        expect(result.current.pendingInput).toBeNull();
     });
 
     it('reset clears data and error', async () => {

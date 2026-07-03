@@ -3,7 +3,8 @@ import toast from 'react-hot-toast';
 import { extractErrorMessage } from '../utils/errorMessage';
 
 interface UseCrudFormOptions<T, FormData> {
-    createFn: (data: FormData) => Promise<T>;
+    /** Omit for edit-only forms (e.g. detail pages) — saving without an editingId then shows an error toast. */
+    createFn?: (data: FormData) => Promise<T>;
     updateFn: (id: string, data: FormData) => Promise<T>;
     deleteFn?: (id: string) => Promise<void>;
     entityName: string;
@@ -50,12 +51,17 @@ export function useCrudForm<T, FormData>(options: UseCrudFormOptions<T, FormData
             }
         }
 
+        if (!editingId && !createFn) {
+            toast.error(`Creating a ${entityName} is not supported here`);
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             if (editingId) {
                 await updateFn(editingId, formData);
                 toast.success(`${entityName} updated`);
-            } else {
+            } else if (createFn) {
                 await createFn(formData);
                 toast.success(`${entityName} created`);
             }
