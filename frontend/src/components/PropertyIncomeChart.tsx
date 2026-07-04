@@ -8,6 +8,7 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency } from '../utils/format';
 import { cardStyle } from '../utils/styles';
+import StatTile from './StatTile';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
 import type { RechartsTooltipProps } from '../types/recharts';
 
@@ -336,20 +337,14 @@ function TrailingView({ data, monthlyRent }: { data: MonthlyCashFlowDetailEntry[
     return (
         <>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Total Income</div>
-                    <div style={{ color: '#2e7d32', fontWeight: 600 }}>{formatCurrency(annualIncome)}</div>
-                </div>
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Total Expenses</div>
-                    <div style={{ color: '#d32f2f', fontWeight: 600 }}>{formatCurrency(annualExpenses)}</div>
-                </div>
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Net Cash Flow</div>
-                    <div style={{ color: annualNet >= 0 ? '#2e7d32' : '#d32f2f', fontWeight: 700, fontSize: '1rem' }}>
-                        {annualNet >= 0 ? '+' : ''}{formatCurrency(annualNet)}
-                    </div>
-                </div>
+                <StatTile label="Total Income" value={formatCurrency(annualIncome)} valueColor="#2e7d32" valueStyle={{ fontWeight: 600 }} />
+                <StatTile label="Total Expenses" value={formatCurrency(annualExpenses)} valueColor="#d32f2f" valueStyle={{ fontWeight: 600 }} />
+                <StatTile
+                    label="Net Cash Flow"
+                    value={`${annualNet >= 0 ? '+' : ''}${formatCurrency(annualNet)}`}
+                    valueColor={annualNet >= 0 ? '#2e7d32' : '#d32f2f'}
+                    valueStyle={{ fontWeight: 700, fontSize: '1rem' }}
+                />
             </div>
             <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={chartData} stackOffset="sign" margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
@@ -414,26 +409,22 @@ function ForwardView({
     return (
         <>
             <div style={{ display: 'grid', gridTemplateColumns: hasDepreciation ? '1fr 1fr 1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{years}yr Total Income</div>
-                    <div style={{ color: '#2e7d32', fontWeight: 600 }}>{formatCurrency(totalIncome)}</div>
-                </div>
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{years}yr Total Expenses</div>
-                    <div style={{ color: '#d32f2f', fontWeight: 600 }}>{formatCurrency(totalExpenses)}</div>
-                </div>
+                <StatTile label={`${years}yr Total Income`} value={formatCurrency(totalIncome)} valueColor="#2e7d32" valueStyle={{ fontWeight: 600 }} />
+                <StatTile label={`${years}yr Total Expenses`} value={formatCurrency(totalExpenses)} valueColor="#d32f2f" valueStyle={{ fontWeight: 600 }} />
                 {hasDepreciation && (
-                    <div>
-                        <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{years}yr Depreciation</div>
-                        <div style={{ color: DEPRECIATION_COLOR, fontWeight: 600 }}>{formatCurrency(totalDepreciation)}</div>
-                    </div>
+                    <StatTile
+                        label={`${years}yr Depreciation`}
+                        value={formatCurrency(totalDepreciation)}
+                        valueColor={DEPRECIATION_COLOR}
+                        valueStyle={{ fontWeight: 600 }}
+                    />
                 )}
-                <div>
-                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{years}yr Net Cash Flow</div>
-                    <div style={{ color: totalNetCash >= 0 ? '#2e7d32' : '#d32f2f', fontWeight: 700, fontSize: '1rem' }}>
-                        {totalNetCash >= 0 ? '+' : ''}{formatCurrency(totalNetCash)}
-                    </div>
-                </div>
+                <StatTile
+                    label={`${years}yr Net Cash Flow`}
+                    value={`${totalNetCash >= 0 ? '+' : ''}${formatCurrency(totalNetCash)}`}
+                    valueColor={totalNetCash >= 0 ? '#2e7d32' : '#d32f2f'}
+                    valueStyle={{ fontWeight: 700, fontSize: '1rem' }}
+                />
             </div>
 
             <ResponsiveContainer width="100%" height={340}>

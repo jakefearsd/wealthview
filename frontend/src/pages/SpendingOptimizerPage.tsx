@@ -11,6 +11,7 @@ import CurrencyInput from '../components/CurrencyInput';
 import FormField from '../components/FormField';
 import PhaseEditor from '../components/PhaseEditor';
 import OptimizerResultsView from '../components/OptimizerResultsView';
+import Button from '../components/Button';
 
 type OptimizerState = 'configure' | 'running' | 'results';
 type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
@@ -316,21 +317,18 @@ export default function SpendingOptimizerPage() {
                 <h2 style={{ margin: 0 }}>Spending Optimizer</h2>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {state === 'configure' && (
-                        <button onClick={handleOptimize}
-                            style={{ padding: '0.5rem 1rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                        <Button onClick={handleOptimize} style={{ background: '#7c3aed' }}>
                             Run Optimization
-                        </button>
+                        </Button>
                     )}
                     {state === 'results' && (
                         <>
-                            <button onClick={() => setState('configure')}
-                                style={{ padding: '0.5rem 1rem', background: '#ff9800', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            <Button variant="warning" onClick={() => setState('configure')}>
                                 Adjust &amp; Re-run
-                            </button>
-                            <button onClick={() => navigate(`/projections/${id}`)}
-                                style={{ padding: '0.5rem 1rem', background: '#1976d2', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            </Button>
+                            <Button onClick={() => navigate(`/projections/${id}`)}>
                                 Back to Scenario
-                            </button>
+                            </Button>
                         </>
                     )}
                 </div>

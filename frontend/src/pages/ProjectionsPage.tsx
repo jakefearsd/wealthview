@@ -10,6 +10,7 @@ import { extractErrorMessage } from '../utils/errorMessage';
 import type { CreateScenarioRequest } from '../types/projection';
 import ScenarioForm from '../components/ScenarioForm';
 import Button from '../components/Button';
+import LinkButton from '../components/LinkButton';
 
 export default function ProjectionsPage() {
     const { data: scenarios, loading, refetch } = useApiQuery(listScenarios);
@@ -78,12 +79,9 @@ export default function ProjectionsPage() {
                                 >
                                     {s.name}
                                 </Link>
-                                <button
-                                    onClick={() => handleDelete(s.id)}
-                                    style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem', padding: '0' }}
-                                >
+                                <LinkButton variant="danger" onClick={() => handleDelete(s.id)} style={{ padding: '0' }}>
                                     Delete
-                                </button>
+                                </LinkButton>
                             </div>
                             <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '0.75rem', fontSize: '0.9rem', color: '#444' }}>
                                 <div><span style={{ color: '#999' }}>Retire:</span> {s.retirement_date}</div>

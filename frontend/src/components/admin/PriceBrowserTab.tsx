@@ -4,6 +4,7 @@ import client from '../../api/client';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
 import Button from '../Button';
+import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
 
 interface PriceRecord {
@@ -152,12 +153,9 @@ export default function PriceBrowserTab() {
                                             {p.source ?? '-'}
                                         </td>
                                         <td style={{ ...tdStyle, textAlign: 'center' }}>
-                                            <button
-                                                onClick={() => handleDelete(p.date)}
-                                                style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
+                                            <LinkButton variant="danger" onClick={() => handleDelete(p.date)}>
                                                 Delete
-                                            </button>
+                                            </LinkButton>
                                         </td>
                                     </tr>
                                 ))}

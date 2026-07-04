@@ -3,6 +3,7 @@ import { listInviteCodes, generateInviteCodeWithExpiry, revokeInviteCode, delete
 import { useApiQuery } from '../../hooks/useApiQuery';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import Button from '../Button';
+import LinkButton from '../LinkButton';
 import toast from 'react-hot-toast';
 
 const EXPIRY_OPTIONS = [
@@ -154,19 +155,13 @@ export default function InviteCodesSection() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>
                                         <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                                            <button
-                                                onClick={() => handleCopy(code.code)}
-                                                style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
+                                            <LinkButton onClick={() => handleCopy(code.code)}>
                                                 Copy
-                                            </button>
+                                            </LinkButton>
                                             {status === 'Active' && (
-                                                <button
-                                                    onClick={() => handleRevoke(code.id)}
-                                                    style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                                >
+                                                <LinkButton variant="danger" onClick={() => handleRevoke(code.id)}>
                                                     Revoke
-                                                </button>
+                                                </LinkButton>
                                             )}
                                         </div>
                                     </td>

@@ -364,6 +364,123 @@ describe('createApiClient — cookie transport', () => {
     });
 });
 
+describe('createApiClient — skipRefreshPaths', () => {
+    const SKIP_PATHS = ['/auth/refresh', '/auth/login', '/auth/register'];
+
+    function cookieClient(overrides: { onAuthFailed?: () => void } = {}) {
+        return createApiClient({
+            baseURL: '/api/v1',
+            transport: 'cookie',
+            getAccessToken: () => null,
+            getRefreshToken: () => null,
+            onTokensRefreshed: () => {},
+            onAuthFailed: overrides.onAuthFailed ?? (() => {}),
+            skipRefreshPaths: SKIP_PATHS,
+        });
+    }
+
+    it('rejects a 401 from a skip path immediately without attempting refresh', async () => {
+        const onAuthFailed = vi.fn();
+        const client = cookieClient({ onAuthFailed });
+
+        client.defaults.adapter = (async (config: InternalAxiosRequestConfig) =>
+            Promise.reject({ response: unauthorized(config), config })) as AxiosAdapter;
+
+        let refreshCalls = 0;
+        const originalAdapter = axios.defaults.adapter;
+        axios.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+            refreshCalls++;
+            return ok(config, {});
+        }) as AxiosAdapter;
+
+        try {
+            await expect(client.post('/auth/login', {})).rejects.toBeDefined();
+            expect(refreshCalls).toBe(0);
+            expect(onAuthFailed).not.toHaveBeenCalled();
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+    });
+
+    it('matches skip paths by URL suffix', async () => {
+        const client = cookieClient();
+
+        client.defaults.adapter = (async (config: InternalAxiosRequestConfig) =>
+            Promise.reject({ response: unauthorized(config), config })) as AxiosAdapter;
+
+        let refreshCalls = 0;
+        const originalAdapter = axios.defaults.adapter;
+        axios.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+            refreshCalls++;
+            return ok(config, {});
+        }) as AxiosAdapter;
+
+        try {
+            await expect(client.post('/auth/refresh', null)).rejects.toBeDefined();
+            expect(refreshCalls).toBe(0);
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+    });
+
+    it('still refreshes 401s from paths NOT in skipRefreshPaths', async () => {
+        const client = cookieClient();
+
+        let firstCall = true;
+        client.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+            if (firstCall) {
+                firstCall = false;
+                return Promise.reject({ response: unauthorized(config), config });
+            }
+            return ok(config, { ok: true });
+        }) as AxiosAdapter;
+
+        let refreshCalls = 0;
+        const originalAdapter = axios.defaults.adapter;
+        axios.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+            refreshCalls++;
+            return ok(config, {});
+        }) as AxiosAdapter;
+
+        try {
+            const response = await client.get('/auth/me');
+            expect(response.data).toEqual({ ok: true });
+            expect(refreshCalls).toBe(1);
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+    });
+
+    it('applies to bearer transport too', async () => {
+        const client = createApiClient({
+            baseURL: 'https://api.example.com',
+            transport: 'bearer',
+            getAccessToken: () => 'stale-at',
+            getRefreshToken: () => 'refresh-abc',
+            onTokensRefreshed: () => {},
+            onAuthFailed: () => {},
+            skipRefreshPaths: ['/auth/login'],
+        });
+
+        client.defaults.adapter = (async (config: InternalAxiosRequestConfig) =>
+            Promise.reject({ response: unauthorized(config), config })) as AxiosAdapter;
+
+        let refreshCalls = 0;
+        const originalAdapter = axios.defaults.adapter;
+        axios.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+            refreshCalls++;
+            return ok(config, REFRESHED);
+        }) as AxiosAdapter;
+
+        try {
+            await expect(client.post('/auth/login', {})).rejects.toBeDefined();
+            expect(refreshCalls).toBe(0);
+        } finally {
+            axios.defaults.adapter = originalAdapter;
+        }
+    });
+});
+
 describe('createApiClient — isolation', () => {
     it('is safe to call multiple times: each instance has its own interceptor state', async () => {
         const a = createApiClient({

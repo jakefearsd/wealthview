@@ -47,6 +47,15 @@ export interface ApiClientConfig {
      * login screen.
      */
     onAuthFailed: () => void;
+    /**
+     * URL suffixes whose 401 responses must NOT trigger a refresh attempt.
+     * A 401 from a matching request rejects immediately — no refresh call,
+     * no {@link onAuthFailed}. Use this for the auth endpoints themselves:
+     * refreshing on a failed `/auth/refresh` would loop, and refreshing on a
+     * failed `/auth/login` is pointless (the form handles the error).
+     * Matched with `url.endsWith(path)`. Optional; defaults to no exclusions.
+     */
+    skipRefreshPaths?: string[];
 }
 
 interface RetryFlag {
@@ -61,6 +70,14 @@ interface RetryFlag {
  */
 export function createApiClient(config: ApiClientConfig): AxiosInstance {
     const isBearer = config.transport === 'bearer';
+    const skipRefreshPaths = config.skipRefreshPaths ?? [];
+
+    function isRefreshExempt(url: string | undefined): boolean {
+        if (!url) {
+            return false;
+        }
+        return skipRefreshPaths.some((path) => url.endsWith(path));
+    }
 
     const client = axios.create({
         baseURL: config.baseURL,
@@ -109,7 +126,12 @@ export function createApiClient(config: ApiClientConfig): AxiosInstance {
             const original = error.config as
                 | (InternalAxiosRequestConfig & RetryFlag)
                 | undefined;
-            if (!original || error.response?.status !== 401 || original._wvRetried) {
+            if (
+                !original ||
+                error.response?.status !== 401 ||
+                original._wvRetried ||
+                isRefreshExempt(original.url)
+            ) {
                 return Promise.reject(error);
             }
             original._wvRetried = true;

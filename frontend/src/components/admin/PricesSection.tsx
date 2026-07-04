@@ -14,20 +14,17 @@ import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../uti
 import { formatCurrency } from '../../utils/format';
 import PriceBrowserTab from './PriceBrowserTab';
 import Button from '../Button';
+import TabBar from '../TabBar';
 import toast from 'react-hot-toast';
 
 type TabId = 'finnhub' | 'yahoo' | 'csv' | 'browse';
 
-const tabButtonStyle = (active: boolean) => ({
-    padding: '0.5rem 1rem',
-    background: 'none',
-    border: 'none',
-    borderBottom: `2px solid ${active ? '#1976d2' : 'transparent'}`,
-    color: active ? '#1976d2' : '#666',
-    fontWeight: active ? 600 as const : 400 as const,
-    cursor: 'pointer' as const,
-    fontSize: '0.95rem',
-});
+const TABS: Array<{ key: TabId; label: string }> = [
+    { key: 'finnhub', label: 'Finnhub Sync' },
+    { key: 'yahoo', label: 'Yahoo Finance' },
+    { key: 'csv', label: 'CSV Upload' },
+    { key: 'browse', label: 'Browse' },
+];
 
 function todayStr(): string {
     return new Date().toISOString().slice(0, 10);
@@ -46,20 +43,7 @@ export default function PricesSection() {
         <div>
             <h2 style={{ marginBottom: '1.5rem' }}>Prices</h2>
 
-            <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '1.5rem', borderBottom: '1px solid #e0e0e0' }}>
-                <button style={tabButtonStyle(activeTab === 'finnhub')} onClick={() => setActiveTab('finnhub')}>
-                    Finnhub Sync
-                </button>
-                <button style={tabButtonStyle(activeTab === 'yahoo')} onClick={() => setActiveTab('yahoo')}>
-                    Yahoo Finance
-                </button>
-                <button style={tabButtonStyle(activeTab === 'csv')} onClick={() => setActiveTab('csv')}>
-                    CSV Upload
-                </button>
-                <button style={tabButtonStyle(activeTab === 'browse')} onClick={() => setActiveTab('browse')}>
-                    Browse
-                </button>
-            </div>
+            <TabBar tabs={TABS} active={activeTab} onSelect={setActiveTab} style={{ marginBottom: '1.5rem' }} />
 
             {activeTab === 'finnhub' && <FinnhubTab />}
             {activeTab === 'yahoo' && <YahooTab />}

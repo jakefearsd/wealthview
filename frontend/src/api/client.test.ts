@@ -23,8 +23,8 @@ function unauthorized(config: InternalAxiosRequestConfig): AxiosResponse {
 }
 
 /**
- * Import a fresh copy of the client module so the module-level `isRefreshing` /
- * `failedQueue` state doesn't leak between tests.
+ * Import a fresh copy of the client module so the per-instance refresh state
+ * (the shared client's in-flight refresh promise) doesn't leak between tests.
  */
 async function freshClient() {
     vi.resetModules();
@@ -143,6 +143,26 @@ describe('api client — 401 response handling', () => {
         await expect(client.get('/accounts')).rejects.toBeDefined();
         expect(refreshCalls).toBe(1);
     });
+
+    it.each(['/auth/login', '/auth/register', '/auth/refresh'])(
+        'does not refresh or redirect on a 401 from %s',
+        async (path) => {
+            const client = await freshClient();
+
+            let refreshCalls = 0;
+            axios.defaults.adapter = (async (config: InternalAxiosRequestConfig) => {
+                refreshCalls++;
+                return ok(config, {});
+            }) as AxiosAdapter;
+
+            client.defaults.adapter = (async (config: InternalAxiosRequestConfig) =>
+                Promise.reject({ response: unauthorized(config), config })) as AxiosAdapter;
+
+            await expect(client.post(path, {})).rejects.toBeDefined();
+            expect(refreshCalls).toBe(0);
+            expect(window.location.href).toBe('');
+        }
+    );
 
     it('passes through non-401 errors without triggering refresh', async () => {
         const client = await freshClient();

@@ -12,6 +12,8 @@ import HelpText from '../components/HelpText';
 import InfoSection from '../components/InfoSection';
 import PropertyIncomeChart from '../components/PropertyIncomeChart';
 import Button from '../components/Button';
+import LinkButton from '../components/LinkButton';
+import StatTile from '../components/StatTile';
 import type { IncomeSource, CreateIncomeSourceRequest } from '../types/projection';
 
 const INCOME_TYPES = [
@@ -347,8 +349,8 @@ export default function IncomeSourcesPage() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                         <h3 style={{ margin: 0, fontSize: '1.1rem' }}>{s.name}</h3>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button onClick={() => startEdit(s)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
-                                            <button onClick={() => handleDelete(s.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
+                                            <LinkButton onClick={() => startEdit(s)}>Edit</LinkButton>
+                                            <LinkButton variant="danger" onClick={() => handleDelete(s.id)}>Delete</LinkButton>
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#1b5e20' }}>
@@ -356,27 +358,20 @@ export default function IncomeSourcesPage() {
                                         <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> {s.one_time ? '(one-time)' : '/ year'}</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>{s.one_time ? 'Payment Age' : 'Age Range'}</div>
-                                            <div style={{ color: '#444', fontWeight: 500 }}>
-                                                {s.one_time ? `Age ${s.start_age}` : `${s.start_age} - ${s.end_age ?? 'Lifetime'}`}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Tax Treatment</div>
-                                            <div style={{ color: '#444', fontWeight: 500 }}>{treatmentLabel(s.tax_treatment)}</div>
-                                        </div>
+                                        <StatTile
+                                            label={s.one_time ? 'Payment Age' : 'Age Range'}
+                                            value={s.one_time ? `Age ${s.start_age}` : `${s.start_age} - ${s.end_age ?? 'Lifetime'}`}
+                                            valueStyle={{ fontWeight: 500 }}
+                                        />
+                                        <StatTile label="Tax Treatment" value={treatmentLabel(s.tax_treatment)} valueStyle={{ fontWeight: 500 }} />
                                         {!s.one_time && (
-                                            <div>
-                                                <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Annual Adjustment</div>
-                                                <div style={{ color: '#444' }}>{s.inflation_rate > 0 ? `${(s.inflation_rate * 100).toFixed(1)}% / year` : 'None (fixed)'}</div>
-                                            </div>
+                                            <StatTile
+                                                label="Annual Adjustment"
+                                                value={s.inflation_rate > 0 ? `${(s.inflation_rate * 100).toFixed(1)}% / year` : 'None (fixed)'}
+                                            />
                                         )}
                                         {!s.one_time && (
-                                            <div>
-                                                <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Monthly Equivalent</div>
-                                                <div style={{ color: '#444' }}>{formatCurrency(s.annual_amount / 12)}</div>
-                                            </div>
+                                            <StatTile label="Monthly Equivalent" value={formatCurrency(s.annual_amount / 12)} />
                                         )}
                                     </div>
                                     {s.property_id && s.property_address && (

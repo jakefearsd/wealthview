@@ -10,6 +10,7 @@ import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
+import StatTile from '../components/StatTile';
 import toast from 'react-hot-toast';
 
 export default function AccountsListPage() {
@@ -144,14 +145,8 @@ export default function AccountsListPage() {
                                 {formatCurrency(account.balance, account.currency)}
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Institution</div>
-                                    <div style={{ color: '#444' }}>{account.institution || 'Not specified'}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Created</div>
-                                    <div style={{ color: '#444' }}>{new Date(account.created_at).toLocaleDateString()}</div>
-                                </div>
+                                <StatTile label="Institution" value={account.institution || 'Not specified'} />
+                                <StatTile label="Created" value={new Date(account.created_at).toLocaleDateString()} />
                             </div>
                         </Link>
                         {canWrite && (

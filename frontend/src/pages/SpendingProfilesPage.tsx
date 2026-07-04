@@ -13,6 +13,8 @@ import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
 import toast from 'react-hot-toast';
 import Button from '../components/Button';
+import LinkButton from '../components/LinkButton';
+import StatTile from '../components/StatTile';
 import type { SpendingProfile, CreateSpendingProfileRequest, SpendingTier, GuardrailProfileResponse } from '../types/projection';
 
 function defaultSpendingTier(): SpendingTier {
@@ -230,30 +232,18 @@ export default function SpendingProfilesPage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                                 <h3 style={{ margin: 0 }}>{p.name}</h3>
                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                    <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}>Edit</button>
-                                    <button onClick={() => handleDelete(p.id)} style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}>Delete</button>
+                                    <LinkButton onClick={() => startEdit(p)}>Edit</LinkButton>
+                                    <LinkButton variant="danger" onClick={() => handleDelete(p.id)}>Delete</LinkButton>
                                 </div>
                             </div>
                             <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#b71c1c' }}>
                                 {formatCurrency(totalBase)}<span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> / year</span>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Essential</div>
-                                    <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(p.essential_expenses)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Discretionary</div>
-                                    <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(p.discretionary_expenses)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Monthly Equivalent</div>
-                                    <div style={{ color: '#444' }}>{formatCurrency(totalBase / 12)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Spending Tiers</div>
-                                    <div style={{ color: '#444' }}>{p.spending_tiers?.length > 0 ? `${p.spending_tiers.length} phase${p.spending_tiers.length > 1 ? 's' : ''}` : 'None (flat spending)'}</div>
-                                </div>
+                                <StatTile label="Essential" value={formatCurrency(p.essential_expenses)} valueStyle={{ fontWeight: 500 }} />
+                                <StatTile label="Discretionary" value={formatCurrency(p.discretionary_expenses)} valueStyle={{ fontWeight: 500 }} />
+                                <StatTile label="Monthly Equivalent" value={formatCurrency(totalBase / 12)} />
+                                <StatTile label="Spending Tiers" value={p.spending_tiers?.length > 0 ? `${p.spending_tiers.length} phase${p.spending_tiers.length > 1 ? 's' : ''}` : 'None (flat spending)'} />
                             </div>
                             {p.spending_tiers?.length > 0 && (
                                 <div style={{ borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>
@@ -300,25 +290,19 @@ export default function SpendingProfilesPage() {
                                                     Stale
                                                 </span>
                                             )}
-                                            <button
-                                                onClick={() => navigate(`/projections/${g.scenario_id}/optimize`)}
-                                                style={{ background: 'none', border: 'none', color: '#1976d2', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
+                                            <LinkButton onClick={() => navigate(`/projections/${g.scenario_id}/optimize`)}>
                                                 View
-                                            </button>
-                                            <button
+                                            </LinkButton>
+                                            <LinkButton
                                                 onClick={() => handleReoptimize(g.scenario_id)}
                                                 disabled={reoptimizingId === g.scenario_id}
-                                                style={{ background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: '0.85rem', opacity: reoptimizingId === g.scenario_id ? 0.5 : 1 }}
+                                                style={{ color: '#7c3aed', opacity: reoptimizingId === g.scenario_id ? 0.5 : 1 }}
                                             >
                                                 {reoptimizingId === g.scenario_id ? 'Running...' : 'Re-optimize'}
-                                            </button>
-                                            <button
-                                                onClick={() => handleDeleteGuardrail(g.scenario_id)}
-                                                style={{ background: 'none', border: 'none', color: '#d32f2f', cursor: 'pointer', fontSize: '0.85rem' }}
-                                            >
+                                            </LinkButton>
+                                            <LinkButton variant="danger" onClick={() => handleDeleteGuardrail(g.scenario_id)}>
                                                 Delete
-                                            </button>
+                                            </LinkButton>
                                         </div>
                                     </div>
                                     <div style={{ fontSize: '1.3rem', fontWeight: 700, marginBottom: '1rem', color: '#7c3aed' }}>
@@ -326,38 +310,26 @@ export default function SpendingProfilesPage() {
                                         <span style={{ fontSize: '0.8rem', fontWeight: 400, color: '#888' }}> / year range</span>
                                     </div>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Essential Floor</div>
-                                            <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(g.essential_floor)}</div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Failure Rate</div>
-                                            <div style={{ color: g.failure_rate > 0.1 ? '#d32f2f' : '#2e7d32', fontWeight: 500 }}>
-                                                {(g.failure_rate * 100).toFixed(1)}%
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Median Final Balance</div>
-                                            <div style={{ color: '#444', fontWeight: 500 }}>{formatCurrency(g.median_final_balance)}</div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Trials</div>
-                                            <div style={{ color: '#444' }}>
-                                                {g.trial_count.toLocaleString()} at {(g.confidence_level * 100).toFixed(0)}% confidence
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Cash Buffer</div>
-                                            <div style={{ color: '#444' }}>
-                                                {g.cash_reserve_years ?? 2}yr reserve, {((g.cash_return_rate ?? 0.04) * 100).toFixed(1)}% cash rate
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Balance Range (P10-P50)</div>
-                                            <div style={{ color: '#444' }}>
-                                                {formatCurrency(g.percentile10_final)} &ndash; {formatCurrency(g.median_final_balance)}
-                                            </div>
-                                        </div>
+                                        <StatTile label="Essential Floor" value={formatCurrency(g.essential_floor)} valueStyle={{ fontWeight: 500 }} />
+                                        <StatTile
+                                            label="Failure Rate"
+                                            value={`${(g.failure_rate * 100).toFixed(1)}%`}
+                                            valueColor={g.failure_rate > 0.1 ? '#d32f2f' : '#2e7d32'}
+                                            valueStyle={{ fontWeight: 500 }}
+                                        />
+                                        <StatTile label="Median Final Balance" value={formatCurrency(g.median_final_balance)} valueStyle={{ fontWeight: 500 }} />
+                                        <StatTile
+                                            label="Trials"
+                                            value={`${g.trial_count.toLocaleString()} at ${(g.confidence_level * 100).toFixed(0)}% confidence`}
+                                        />
+                                        <StatTile
+                                            label="Cash Buffer"
+                                            value={`${g.cash_reserve_years ?? 2}yr reserve, ${((g.cash_return_rate ?? 0.04) * 100).toFixed(1)}% cash rate`}
+                                        />
+                                        <StatTile
+                                            label="Balance Range (P10-P50)"
+                                            value={<>{formatCurrency(g.percentile10_final)} &ndash; {formatCurrency(g.median_final_balance)}</>}
+                                        />
                                     </div>
                                     {g.phases.length > 0 && (
                                         <div style={{ borderTop: '1px solid #eee', paddingTop: '0.75rem' }}>

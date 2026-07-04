@@ -10,6 +10,7 @@ import LoadingState from '../components/LoadingState';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
+import StatTile from '../components/StatTile';
 import type { Property } from '../types/property';
 
 const initialFormData: PropertyFormValues = {
@@ -203,34 +204,28 @@ export default function PropertiesListPage() {
                                 </div>
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Current Value</div>
-                                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1b5e20' }}>{formatCurrency(p.current_value)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Equity</div>
-                                    <div style={{ fontSize: '1.3rem', fontWeight: 700, color: '#1565c0' }}>{formatCurrency(p.equity)}</div>
-                                </div>
+                                <StatTile
+                                    label="Current Value"
+                                    value={formatCurrency(p.current_value)}
+                                    valueColor="#1b5e20"
+                                    valueStyle={{ fontSize: '1.3rem', fontWeight: 700 }}
+                                />
+                                <StatTile
+                                    label="Equity"
+                                    value={formatCurrency(p.equity)}
+                                    valueColor="#1565c0"
+                                    valueStyle={{ fontSize: '1.3rem', fontWeight: 700 }}
+                                />
                             </div>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.9rem' }}>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Purchase Price</div>
-                                    <div style={{ color: '#444' }}>{formatCurrency(p.purchase_price)}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Mortgage Balance</div>
-                                    <div style={{ color: '#444' }}>{p.mortgage_balance ? formatCurrency(p.mortgage_balance) : 'None'}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Purchase Date</div>
-                                    <div style={{ color: '#444' }}>{new Date(p.purchase_date + 'T00:00:00').toLocaleDateString()}</div>
-                                </div>
-                                <div>
-                                    <div style={{ color: '#999', fontSize: '0.75rem', marginBottom: '0.15rem' }}>Appreciation</div>
-                                    <div style={{ color: p.current_value >= p.purchase_price ? '#2e7d32' : '#d32f2f' }}>
-                                        {formatCurrency(p.current_value - p.purchase_price)} ({((p.current_value - p.purchase_price) / p.purchase_price * 100).toFixed(1)}%)
-                                    </div>
-                                </div>
+                                <StatTile label="Purchase Price" value={formatCurrency(p.purchase_price)} />
+                                <StatTile label="Mortgage Balance" value={p.mortgage_balance ? formatCurrency(p.mortgage_balance) : 'None'} />
+                                <StatTile label="Purchase Date" value={new Date(p.purchase_date + 'T00:00:00').toLocaleDateString()} />
+                                <StatTile
+                                    label="Appreciation"
+                                    value={`${formatCurrency(p.current_value - p.purchase_price)} (${((p.current_value - p.purchase_price) / p.purchase_price * 100).toFixed(1)}%)`}
+                                    valueColor={p.current_value >= p.purchase_price ? '#2e7d32' : '#d32f2f'}
+                                />
                             </div>
                             {(p.has_loan_details || p.annual_appreciation_rate != null) && (
                                 <div style={{ borderTop: '1px solid #eee', marginTop: '0.75rem', paddingTop: '0.75rem', display: 'flex', gap: '1.5rem', fontSize: '0.85rem', color: '#666', flexWrap: 'wrap' }}>
