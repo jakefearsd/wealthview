@@ -4,56 +4,295 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-// TooManyFields / ExcessivePublicCount: this is an immutable per-year projection result record.
-// Every component is a distinct, independently meaningful output of the projection engine;
-// it is a pure data carrier by design (DataClass is already excluded project-wide for records).
-@SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+
+// ExcessivePublicCount: the per-year projection result exposes a wide, flat read API (one
+// accessor per output value) plus a builder facade. Internally the ~45 values are grouped
+// into cohesive nested records; each group is @JsonUnwrapped so the JSON wire format stays
+// flat (see ProjectionYearDtoSerializationTest and the projection golden files). The flat
+// accessors below delegate to those groups, preserving every existing call site.
+@SuppressWarnings("PMD.ExcessivePublicCount")
 public record ProjectionYearDto(
         int year,
         int age,
-        BigDecimal startBalance,
-        BigDecimal contributions,
-        BigDecimal growth,
-        BigDecimal withdrawals,
-        BigDecimal endBalance,
         boolean retired,
-        BigDecimal traditionalBalance,
-        BigDecimal rothBalance,
-        BigDecimal taxableBalance,
-        BigDecimal rothConversionAmount,
-        BigDecimal taxLiability,
-        BigDecimal essentialExpenses,
-        BigDecimal discretionaryExpenses,
-        BigDecimal incomeStreamsTotal,
-        BigDecimal netSpendingNeed,
-        BigDecimal spendingSurplus,
-        BigDecimal discretionaryAfterCuts,
-        BigDecimal rentalIncomeGross,
-        BigDecimal rentalExpensesTotal,
-        BigDecimal depreciationTotal,
-        BigDecimal rentalLossApplied,
-        BigDecimal suspendedLossCarryforward,
-        BigDecimal socialSecurityTaxable,
-        BigDecimal selfEmploymentTax,
-        Map<String, BigDecimal> incomeBySource,
-        BigDecimal propertyEquity,
-        BigDecimal totalNetWorth,
-        BigDecimal surplusReinvested,
-        BigDecimal taxableGrowth,
-        BigDecimal traditionalGrowth,
-        BigDecimal rothGrowth,
-        BigDecimal taxPaidFromTaxable,
-        BigDecimal taxPaidFromTraditional,
-        BigDecimal taxPaidFromRoth,
-        BigDecimal withdrawalFromTaxable,
-        BigDecimal withdrawalFromTraditional,
-        BigDecimal withdrawalFromRoth,
-        List<RentalPropertyYearDetail> rentalPropertyDetails,
-        BigDecimal federalTax,
-        BigDecimal stateTax,
-        BigDecimal saltDeduction,
-        Boolean usedItemizedDeduction,
-        Boolean irmaaWarning) {
+        @JsonUnwrapped BalanceFlow flow,
+        @JsonUnwrapped PoolBalances pools,
+        @JsonUnwrapped PoolGrowth poolGrowth,
+        @JsonUnwrapped PoolTaxPaid poolTaxPaid,
+        @JsonUnwrapped PoolWithdrawals poolWithdrawals,
+        @JsonUnwrapped Viability viability,
+        @JsonUnwrapped IncomeDetail income,
+        @JsonUnwrapped TaxBreakdown tax,
+        @JsonUnwrapped NetWorth netWorth) {
+
+    /**
+     * Never-null-group invariant: an {@code @JsonUnwrapped} group that is {@code null} would
+     * cause Jackson to omit all of its keys, silently breaking the flat wire contract. Groups
+     * carry {@code null} <em>components</em> for absent values, but the group itself is always
+     * present. This compact constructor enforces that for any construction path.
+     */
+    public ProjectionYearDto {
+        flow = flow != null ? flow : BalanceFlow.empty();
+        pools = pools != null ? pools : PoolBalances.empty();
+        poolGrowth = poolGrowth != null ? poolGrowth : PoolGrowth.empty();
+        poolTaxPaid = poolTaxPaid != null ? poolTaxPaid : PoolTaxPaid.empty();
+        poolWithdrawals = poolWithdrawals != null ? poolWithdrawals : PoolWithdrawals.empty();
+        viability = viability != null ? viability : Viability.empty();
+        income = income != null ? income : IncomeDetail.empty();
+        tax = tax != null ? tax : TaxBreakdown.empty();
+        netWorth = netWorth != null ? netWorth : NetWorth.empty();
+    }
+
+    // --- Grouped value carriers. Component names match the flat wire field names so that
+    //     @JsonUnwrapped + the global SNAKE_CASE strategy reproduce the exact JSON keys. ---
+
+    /** Core per-year balance flow: opening balance, contributions, growth, withdrawals, close. */
+    public record BalanceFlow(BigDecimal startBalance, BigDecimal contributions, BigDecimal growth,
+                              BigDecimal withdrawals, BigDecimal endBalance) {
+        static BalanceFlow empty() {
+            return new BalanceFlow(null, null, null, null, null);
+        }
+    }
+
+    /** Ending sub-pool balances by tax treatment. */
+    public record PoolBalances(BigDecimal traditionalBalance, BigDecimal rothBalance,
+                               BigDecimal taxableBalance) {
+        static PoolBalances empty() {
+            return new PoolBalances(null, null, null);
+        }
+    }
+
+    /** Per-pool investment growth for the year. */
+    public record PoolGrowth(BigDecimal taxableGrowth, BigDecimal traditionalGrowth,
+                             BigDecimal rothGrowth) {
+        static PoolGrowth empty() {
+            return new PoolGrowth(null, null, null);
+        }
+    }
+
+    /** Tax dollars sourced from each pool to pay the year's liability. */
+    public record PoolTaxPaid(BigDecimal taxPaidFromTaxable, BigDecimal taxPaidFromTraditional,
+                              BigDecimal taxPaidFromRoth) {
+        static PoolTaxPaid empty() {
+            return new PoolTaxPaid(null, null, null);
+        }
+    }
+
+    /** Spending withdrawals drawn from each pool for the year. */
+    public record PoolWithdrawals(BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
+                                  BigDecimal withdrawalFromRoth) {
+        static PoolWithdrawals empty() {
+            return new PoolWithdrawals(null, null, null);
+        }
+    }
+
+    /** Spending-feasibility view: needs, income offset, surplus, and post-cut discretionary. */
+    public record Viability(BigDecimal essentialExpenses, BigDecimal discretionaryExpenses,
+                            BigDecimal incomeStreamsTotal, BigDecimal netSpendingNeed,
+                            BigDecimal spendingSurplus, BigDecimal discretionaryAfterCuts) {
+        static Viability empty() {
+            return new Viability(null, null, null, null, null, null);
+        }
+    }
+
+    /** Income-source detail: rental cash/tax components, SS/SE tax, and per-source breakdown. */
+    public record IncomeDetail(BigDecimal rentalIncomeGross, BigDecimal rentalExpensesTotal,
+                               BigDecimal depreciationTotal, BigDecimal rentalLossApplied,
+                               BigDecimal suspendedLossCarryforward, BigDecimal socialSecurityTaxable,
+                               BigDecimal selfEmploymentTax, Map<String, BigDecimal> incomeBySource,
+                               List<RentalPropertyYearDetail> rentalPropertyDetails) {
+        static IncomeDetail empty() {
+            return new IncomeDetail(null, null, null, null, null, null, null, null, null);
+        }
+    }
+
+    /** Tax outputs for the year: conversion amount, total liability, and the itemized breakdown. */
+    public record TaxBreakdown(BigDecimal rothConversionAmount, BigDecimal taxLiability,
+                               BigDecimal federalTax, BigDecimal stateTax, BigDecimal saltDeduction,
+                               Boolean usedItemizedDeduction, Boolean irmaaWarning) {
+        static TaxBreakdown empty() {
+            return new TaxBreakdown(null, null, null, null, null, null, null);
+        }
+    }
+
+    /** Net-worth view: property equity, total net worth, and surplus reinvested this year. */
+    public record NetWorth(BigDecimal propertyEquity, BigDecimal totalNetWorth,
+                           BigDecimal surplusReinvested) {
+        static NetWorth empty() {
+            return new NetWorth(null, null, null);
+        }
+    }
+
+    // --- Flat read API. Delegates to the grouped carriers; every historical accessor preserved. ---
+
+    public BigDecimal startBalance() {
+        return flow.startBalance();
+    }
+
+    public BigDecimal contributions() {
+        return flow.contributions();
+    }
+
+    public BigDecimal growth() {
+        return flow.growth();
+    }
+
+    public BigDecimal withdrawals() {
+        return flow.withdrawals();
+    }
+
+    public BigDecimal endBalance() {
+        return flow.endBalance();
+    }
+
+    public BigDecimal traditionalBalance() {
+        return pools.traditionalBalance();
+    }
+
+    public BigDecimal rothBalance() {
+        return pools.rothBalance();
+    }
+
+    public BigDecimal taxableBalance() {
+        return pools.taxableBalance();
+    }
+
+    public BigDecimal taxableGrowth() {
+        return poolGrowth.taxableGrowth();
+    }
+
+    public BigDecimal traditionalGrowth() {
+        return poolGrowth.traditionalGrowth();
+    }
+
+    public BigDecimal rothGrowth() {
+        return poolGrowth.rothGrowth();
+    }
+
+    public BigDecimal taxPaidFromTaxable() {
+        return poolTaxPaid.taxPaidFromTaxable();
+    }
+
+    public BigDecimal taxPaidFromTraditional() {
+        return poolTaxPaid.taxPaidFromTraditional();
+    }
+
+    public BigDecimal taxPaidFromRoth() {
+        return poolTaxPaid.taxPaidFromRoth();
+    }
+
+    public BigDecimal withdrawalFromTaxable() {
+        return poolWithdrawals.withdrawalFromTaxable();
+    }
+
+    public BigDecimal withdrawalFromTraditional() {
+        return poolWithdrawals.withdrawalFromTraditional();
+    }
+
+    public BigDecimal withdrawalFromRoth() {
+        return poolWithdrawals.withdrawalFromRoth();
+    }
+
+    public BigDecimal essentialExpenses() {
+        return viability.essentialExpenses();
+    }
+
+    public BigDecimal discretionaryExpenses() {
+        return viability.discretionaryExpenses();
+    }
+
+    public BigDecimal incomeStreamsTotal() {
+        return viability.incomeStreamsTotal();
+    }
+
+    public BigDecimal netSpendingNeed() {
+        return viability.netSpendingNeed();
+    }
+
+    public BigDecimal spendingSurplus() {
+        return viability.spendingSurplus();
+    }
+
+    public BigDecimal discretionaryAfterCuts() {
+        return viability.discretionaryAfterCuts();
+    }
+
+    public BigDecimal rentalIncomeGross() {
+        return income.rentalIncomeGross();
+    }
+
+    public BigDecimal rentalExpensesTotal() {
+        return income.rentalExpensesTotal();
+    }
+
+    public BigDecimal depreciationTotal() {
+        return income.depreciationTotal();
+    }
+
+    public BigDecimal rentalLossApplied() {
+        return income.rentalLossApplied();
+    }
+
+    public BigDecimal suspendedLossCarryforward() {
+        return income.suspendedLossCarryforward();
+    }
+
+    public BigDecimal socialSecurityTaxable() {
+        return income.socialSecurityTaxable();
+    }
+
+    public BigDecimal selfEmploymentTax() {
+        return income.selfEmploymentTax();
+    }
+
+    public Map<String, BigDecimal> incomeBySource() {
+        return income.incomeBySource();
+    }
+
+    public List<RentalPropertyYearDetail> rentalPropertyDetails() {
+        return income.rentalPropertyDetails();
+    }
+
+    public BigDecimal rothConversionAmount() {
+        return tax.rothConversionAmount();
+    }
+
+    public BigDecimal taxLiability() {
+        return tax.taxLiability();
+    }
+
+    public BigDecimal federalTax() {
+        return tax.federalTax();
+    }
+
+    public BigDecimal stateTax() {
+        return tax.stateTax();
+    }
+
+    public BigDecimal saltDeduction() {
+        return tax.saltDeduction();
+    }
+
+    public Boolean usedItemizedDeduction() {
+        return tax.usedItemizedDeduction();
+    }
+
+    public Boolean irmaaWarning() {
+        return tax.irmaaWarning();
+    }
+
+    public BigDecimal propertyEquity() {
+        return netWorth.propertyEquity();
+    }
+
+    public BigDecimal totalNetWorth() {
+        return netWorth.totalNetWorth();
+    }
+
+    public BigDecimal surplusReinvested() {
+        return netWorth.surplusReinvested();
+    }
 
     public static Builder builder() {
         return new Builder();
@@ -144,6 +383,9 @@ public record ProjectionYearDto(
                 .build();
     }
 
+    // TooManyFields: the builder is a flat construction facade over the grouped record above;
+    // one mutable field per output value is intentional. build() re-groups them.
+    @SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
     public static final class Builder {
         private int year;
         private int age;
@@ -470,20 +712,20 @@ public record ProjectionYearDto(
 
         public ProjectionYearDto build() {
             return new ProjectionYearDto(
-                    year, age, startBalance, contributions, growth, withdrawals, endBalance, retired,
-                    traditionalBalance, rothBalance, taxableBalance,
-                    rothConversionAmount, taxLiability,
-                    essentialExpenses, discretionaryExpenses,
-                    incomeStreamsTotal, netSpendingNeed, spendingSurplus, discretionaryAfterCuts,
-                    rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
-                    rentalLossApplied, suspendedLossCarryforward,
-                    socialSecurityTaxable, selfEmploymentTax, incomeBySource,
-                    propertyEquity, totalNetWorth, surplusReinvested,
-                    taxableGrowth, traditionalGrowth, rothGrowth,
-                    taxPaidFromTaxable, taxPaidFromTraditional, taxPaidFromRoth,
-                    withdrawalFromTaxable, withdrawalFromTraditional, withdrawalFromRoth,
-                    rentalPropertyDetails,
-                    federalTax, stateTax, saltDeduction, usedItemizedDeduction, irmaaWarning);
+                    year, age, retired,
+                    new BalanceFlow(startBalance, contributions, growth, withdrawals, endBalance),
+                    new PoolBalances(traditionalBalance, rothBalance, taxableBalance),
+                    new PoolGrowth(taxableGrowth, traditionalGrowth, rothGrowth),
+                    new PoolTaxPaid(taxPaidFromTaxable, taxPaidFromTraditional, taxPaidFromRoth),
+                    new PoolWithdrawals(withdrawalFromTaxable, withdrawalFromTraditional, withdrawalFromRoth),
+                    new Viability(essentialExpenses, discretionaryExpenses, incomeStreamsTotal,
+                            netSpendingNeed, spendingSurplus, discretionaryAfterCuts),
+                    new IncomeDetail(rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
+                            rentalLossApplied, suspendedLossCarryforward, socialSecurityTaxable,
+                            selfEmploymentTax, incomeBySource, rentalPropertyDetails),
+                    new TaxBreakdown(rothConversionAmount, taxLiability, federalTax, stateTax,
+                            saltDeduction, usedItemizedDeduction, irmaaWarning),
+                    new NetWorth(propertyEquity, totalNetWorth, surplusReinvested));
         }
     }
 }
