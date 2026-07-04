@@ -5,52 +5,42 @@ import java.util.Map;
 
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 
 import com.wealthview.app.it.AuthHelper;
 
 /**
  * Shared helper for creating test entities via the REST API in integration tests.
- * Eliminates duplicated private helper methods across IT classes.
+ * Eliminates duplicated private helper methods across IT classes. All calls go
+ * through {@link ApiClient} as the bootstrapped admin; creator methods return the
+ * response body map so callers can pull whatever field they need (usually "id")
+ * or ignore the result entirely.
  */
 public class TestDataHelper {
 
-    public static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
+    public static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE = ApiClient.MAP_TYPE;
 
     public static final ParameterizedTypeReference<List<Map<String, Object>>> LIST_MAP_TYPE =
-            new ParameterizedTypeReference<>() {};
+            ApiClient.LIST_MAP_TYPE;
 
-    private final TestRestTemplate restTemplate;
-    private final AuthHelper authHelper;
+    private final ApiClient api;
 
     public TestDataHelper(TestRestTemplate restTemplate, AuthHelper authHelper) {
-        this.restTemplate = restTemplate;
-        this.authHelper = authHelper;
+        this.api = new ApiClient(restTemplate, authHelper);
     }
 
     // ── Accounts ─────────────────────────────────────────────────────────
 
-    public String createAccountAndGetId(String name, String type) {
-        var body = Map.of("name", name, "type", type);
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
-    }
-
-    public void createAccount(String name, String type) {
-        var body = Map.of("name", name, "type", type);
-        restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+    public Map<String, Object> createAccount(String name, String type) {
+        return api.post("/api/v1/accounts", Map.of("name", name, "type", type));
     }
 
     public String createBrokerageAccountAndGetId() {
-        return createAccountAndGetId("Test Brokerage", "brokerage");
+        return (String) createAccount("Test Brokerage", "brokerage").get("id");
     }
 
     // ── Transactions ─────────────────────────────────────────────────────
 
-    public void createBuyTransaction(String accountId, String symbol, int quantity, int amount) {
+    public Map<String, Object> createBuyTransaction(String accountId, String symbol, int quantity, int amount) {
         var body = Map.of(
                 "date", "2024-01-15",
                 "type", "buy",
@@ -58,21 +48,7 @@ public class TestDataHelper {
                 "quantity", quantity,
                 "amount", amount
         );
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-    }
-
-    public String createBuyTransactionAndGetId(String accountId, String symbol, int quantity, int amount) {
-        var body = Map.of(
-                "date", "2024-01-15",
-                "type", "buy",
-                "symbol", symbol,
-                "quantity", quantity,
-                "amount", amount
-        );
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+        return api.post("/api/v1/accounts/" + accountId + "/transactions", body);
     }
 
     public void addTransaction(String accountId, String type, String symbol,
@@ -83,8 +59,7 @@ public class TestDataHelper {
                 "symbol", symbol,
                 "quantity", quantity,
                 "amount", amount);
-        restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        api.post("/api/v1/accounts/" + accountId + "/transactions", body);
     }
 
     public String createBuyTransactionOnDateAndGetId(String accountId, String date, String symbol,
@@ -95,28 +70,19 @@ public class TestDataHelper {
                 "symbol", symbol,
                 "quantity", quantity,
                 "amount", amount);
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+        return (String) api.post("/api/v1/accounts/" + accountId + "/transactions", body).get("id");
     }
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getTransactions(String accountId) {
-        var response = restTemplate.exchange(
-                "/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
-        return (List<Map<String, Object>>) response.getBody().get("data");
+        var response = api.get("/api/v1/accounts/" + accountId + "/transactions");
+        return (List<Map<String, Object>>) response.get("data");
     }
 
     // ── Holdings ─────────────────────────────────────────────────────────
 
-    @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getHoldings(String accountId) {
-        var response = restTemplate.exchange(
-                "/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
-        return response.getBody();
+        return api.getList("/api/v1/accounts/" + accountId + "/holdings");
     }
 
     // ── Properties ───────────────────────────────────────────────────────
@@ -129,9 +95,7 @@ public class TestDataHelper {
                 "current_value", 350000,
                 "mortgage_balance", 200000
         );
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+        return (String) api.post("/api/v1/properties", body).get("id");
     }
 
     public String createPropertyWithLoanAndGetId() {
@@ -146,9 +110,7 @@ public class TestDataHelper {
                 "loan_start_date", "2020-01-01",
                 "use_computed_balance", false
         );
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+        return (String) api.post("/api/v1/properties", body).get("id");
     }
 
     // ── Scenarios ────────────────────────────────────────────────────────
@@ -171,29 +133,19 @@ public class TestDataHelper {
         );
     }
 
-    public void createScenario(String name) {
-        restTemplate.exchange("/api/v1/projections",
-                HttpMethod.POST, authHelper.authEntity(scenarioBody(name), authHelper.adminToken()), MAP_TYPE);
-    }
-
-    public String createScenarioAndGetId(String name) {
-        var response = restTemplate.exchange("/api/v1/projections",
-                HttpMethod.POST, authHelper.authEntity(scenarioBody(name), authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+    public Map<String, Object> createScenario(String name) {
+        return api.post("/api/v1/projections", scenarioBody(name));
     }
 
     // ── Exchange Rates ──────────────────────────────────────────────────
+
     public void createExchangeRate(String currencyCode, double rateToUsd) {
-        var body = Map.of("currency_code", currencyCode, "rate_to_usd", rateToUsd);
-        restTemplate.exchange("/api/v1/exchange-rates",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        api.post("/api/v1/exchange-rates", Map.of("currency_code", currencyCode, "rate_to_usd", rateToUsd));
     }
 
     public String createAccountWithCurrencyAndGetId(String name, String type, String currency) {
         var body = Map.of("name", name, "type", type, "currency", currency);
-        var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+        return (String) api.post("/api/v1/accounts", body).get("id");
     }
 
     // ── Spending Profiles ────────────────────────────────────────────────
@@ -206,14 +158,7 @@ public class TestDataHelper {
         );
     }
 
-    public void createSpendingProfile(String name) {
-        restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(spendingProfileBody(name), authHelper.adminToken()), MAP_TYPE);
-    }
-
-    public String createSpendingProfileAndGetId(String name) {
-        var response = restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(spendingProfileBody(name), authHelper.adminToken()), MAP_TYPE);
-        return (String) response.getBody().get("id");
+    public Map<String, Object> createSpendingProfile(String name) {
+        return api.post("/api/v1/spending-profiles", spendingProfileBody(name));
     }
 }

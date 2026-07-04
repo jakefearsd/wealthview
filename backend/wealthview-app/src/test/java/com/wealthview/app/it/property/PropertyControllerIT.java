@@ -5,13 +5,10 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static java.util.Map.entry;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -27,8 +24,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "mortgage_balance", 200000
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(((Number) response.getBody().get("mortgage_balance")).intValue()).isEqualTo(200000);
@@ -49,8 +45,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", true
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("use_computed_balance")).isEqualTo(true);
@@ -61,8 +56,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
     void get_existingProperty_returnsLoanFields() {
         var id = data.createPropertyAndGetId();
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("address")).isEqualTo("123 Main St");
@@ -83,8 +77,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", true
         );
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/properties/" + id, updateBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("use_computed_balance")).isEqualTo(true);
@@ -102,8 +95,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", false
         );
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/properties/" + id, updateBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("use_computed_balance")).isEqualTo(false);
@@ -121,8 +113,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", true
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -141,8 +132,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", true
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("mortgage_balance")).isNotNull();
@@ -162,8 +152,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "use_computed_balance", true
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(((Number) response.getBody().get("mortgage_balance")).doubleValue()).isEqualTo(0.0);
@@ -179,8 +168,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "description", "January rent"
         );
 
-        var response = restTemplate.exchange("/api/v1/properties/" + propertyId + "/income",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), Void.class);
+        var response = api.postForEntity("/api/v1/properties/" + propertyId + "/income", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
@@ -195,8 +183,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "description", "Plumbing repair"
         );
 
-        var response = restTemplate.exchange("/api/v1/properties/" + propertyId + "/expenses",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), Void.class);
+        var response = api.postForEntity("/api/v1/properties/" + propertyId + "/expenses", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
@@ -205,13 +192,10 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
     void getCashFlow_returns200() {
         var propertyId = data.createPropertyAndGetId();
         var incomeBody = Map.of("date", "2024-01-15", "amount", 2000, "category", "rent");
-        restTemplate.exchange("/api/v1/properties/" + propertyId + "/income",
-                HttpMethod.POST, authHelper.authEntity(incomeBody, authHelper.adminToken()), Void.class);
+        api.post("/api/v1/properties/" + propertyId + "/income", incomeBody);
 
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + propertyId + "/cashflow?from=2024-01&to=2024-12",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntity(
+                "/api/v1/properties/" + propertyId + "/cashflow?from=2024-01&to=2024-12");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotEmpty();
@@ -219,10 +203,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void getValuations_nonExistentProperty_returns404() {
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + UUID.randomUUID() + "/valuations",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+        var response = api.getForEntity("/api/v1/properties/" + UUID.randomUUID() + "/valuations");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -237,21 +218,17 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "current_value", 550000,
                 "mortgage_balance", 400000
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(createBody, authHelper.adminToken()), MAP_TYPE);
+        var createResponse = api.postForEntity("/api/v1/properties", createBody);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var id = (String) createResponse.getBody().get("id");
 
         // List
-        var listResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var listResponse = api.getListForEntity("/api/v1/properties");
         assertThat(listResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(listResponse.getBody()).hasSize(1);
 
         // Get
-        var getResponse = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var getResponse = api.getForEntity("/api/v1/properties/" + id);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // Update
@@ -262,19 +239,16 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "current_value", 600000,
                 "mortgage_balance", 380000
         );
-        var updateResponse = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var updateResponse = api.putForEntity("/api/v1/properties/" + id, updateBody);
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(updateResponse.getBody().get("address")).isEqualTo("CRUD Test St Updated");
 
         // Delete
-        var deleteResponse = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
+        var deleteResponse = api.deleteForEntity("/api/v1/properties/" + id);
         assertThat(deleteResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // Verify deleted
-        var afterDelete = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var afterDelete = api.getForEntity("/api/v1/properties/" + id);
         assertThat(afterDelete.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -293,12 +267,9 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 entry("use_computed_balance", true),
                 entry("property_type", "primary_residence")
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        var id = (String) createResponse.getBody().get("id");
+        var id = (String) api.post("/api/v1/properties", body).get("id");
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id + "/analytics",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id + "/analytics");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("property_type")).isEqualTo("primary_residence");
@@ -327,28 +298,23 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 entry("use_computed_balance", false),
                 entry("property_type", "investment")
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var createResponse = api.postForEntity("/api/v1/properties", body);
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var id = (String) createResponse.getBody().get("id");
 
         // Add rent income
         var incomeBody = Map.of("date", "2025-06-15", "amount", 2500, "category", "rent");
-        restTemplate.exchange("/api/v1/properties/" + id + "/income",
-                HttpMethod.POST, authHelper.authEntity(incomeBody, authHelper.adminToken()), Void.class);
+        api.post("/api/v1/properties/" + id + "/income", incomeBody);
 
         // Add operating expense (tax)
         var taxBody = Map.of("date", "2025-06-20", "amount", 500, "category", "tax");
-        restTemplate.exchange("/api/v1/properties/" + id + "/expenses",
-                HttpMethod.POST, authHelper.authEntity(taxBody, authHelper.adminToken()), Void.class);
+        api.post("/api/v1/properties/" + id + "/expenses", taxBody);
 
         // Add mortgage expense
         var mortgageBody = Map.of("date", "2025-06-01", "amount", 1800, "category", "mortgage");
-        restTemplate.exchange("/api/v1/properties/" + id + "/expenses",
-                HttpMethod.POST, authHelper.authEntity(mortgageBody, authHelper.adminToken()), Void.class);
+        api.post("/api/v1/properties/" + id + "/expenses", mortgageBody);
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id + "/analytics",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id + "/analytics");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("property_type")).isEqualTo("investment");
@@ -362,9 +328,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void getAnalytics_nonExistentProperty_returns404() {
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + UUID.randomUUID() + "/analytics",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + UUID.randomUUID() + "/analytics");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
@@ -380,8 +344,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "property_type", "investment"
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("property_type")).isEqualTo("investment");
@@ -397,8 +360,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "mortgage_balance", 180000
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("property_type")).isEqualTo("primary_residence");
@@ -414,13 +376,9 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "mortgage_balance", 200000,
                 "property_type", "investment"
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        var id = (String) createResponse.getBody().get("id");
+        var id = (String) api.post("/api/v1/properties", body).get("id");
 
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + id + "/analytics?year=2025",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id + "/analytics?year=2025");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("property_type")).isEqualTo("investment");
@@ -437,12 +395,9 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "mortgage_balance", 300000,
                 "property_type", "vacation"
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        var id = (String) createResponse.getBody().get("id");
+        var id = (String) api.post("/api/v1/properties", body).get("id");
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id + "/analytics",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id + "/analytics");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("property_type")).isEqualTo("vacation");
@@ -459,12 +414,9 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "purchase_date", "2023-01-01",
                 "current_value", 220000
         );
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
-        var id = (String) createResponse.getBody().get("id");
+        var id = (String) api.post("/api/v1/properties", body).get("id");
 
-        var response = restTemplate.exchange("/api/v1/properties/" + id + "/analytics",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/properties/" + id + "/analytics");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("mortgage_progress")).isNull();
@@ -481,8 +433,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "property_type", "commercial"
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -501,8 +452,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 entry("annual_insurance_cost", 1800)
         );
 
-        var createResponse = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var createResponse = api.postForEntity("/api/v1/properties", body);
 
         assertThat(createResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(((Number) createResponse.getBody().get("annual_appreciation_rate")).doubleValue()).isEqualTo(0.03);
@@ -511,8 +461,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
 
         // Verify persistence via GET
         var id = (String) createResponse.getBody().get("id");
-        var getResponse = restTemplate.exchange("/api/v1/properties/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var getResponse = api.getForEntity("/api/v1/properties/" + id);
 
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) getResponse.getBody().get("annual_appreciation_rate")).doubleValue()).isEqualTo(0.03);
@@ -529,8 +478,7 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
                 "current_value", 310000
         );
 
-        var response = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/properties", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("annual_appreciation_rate")).isNull();
@@ -542,9 +490,8 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
     void refreshValuation_zillowDisabled_returns503() {
         var propertyId = data.createPropertyAndGetId();
 
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + propertyId + "/valuations/refresh",
-                HttpMethod.POST, authHelper.authEntity(authHelper.adminToken()), Void.class);
+        var response = api.postForEntity(
+                "/api/v1/properties/" + propertyId + "/valuations/refresh", null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }
@@ -554,9 +501,8 @@ class PropertyControllerIT extends AbstractApiIntegrationTest {
         var propertyId = data.createPropertyAndGetId();
         var body = Map.of("zpid", "12345");
 
-        var response = restTemplate.exchange(
-                "/api/v1/properties/" + propertyId + "/valuations/select-zpid",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), Void.class);
+        var response = api.postForEntity(
+                "/api/v1/properties/" + propertyId + "/valuations/select-zpid", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
     }

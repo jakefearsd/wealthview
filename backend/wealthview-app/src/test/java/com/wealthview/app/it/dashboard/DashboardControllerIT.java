@@ -40,7 +40,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         var data = new TestDataHelper(restTemplate, authHelper);
 
         // Create an account with transactions
-        var accountId = data.createAccountAndGetId("Dashboard Brokerage", "brokerage");
+        var accountId = (String) data.createAccount("Dashboard Brokerage", "brokerage").get("id");
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
 
         // Add a VOO transaction — VOO has seed price data, unlike AAPL
@@ -57,15 +57,13 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
                 "current_value", 350000,
                 "mortgage_balance", 200000
         );
-        restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST, authHelper.authEntity(propertyBody, authHelper.adminToken()), MAP_TYPE);
+        api.post("/api/v1/properties", propertyBody);
     }
 
     @Test
     @Order(1)
     void getSummary_withAccountsAndProperties_returnsCorrectNetWorth() {
-        var response = restTemplate.exchange("/api/v1/dashboard/summary",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/dashboard/summary");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsKeys("total_investments", "total_property_equity", "net_worth");
@@ -75,8 +73,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(2)
     void getPortfolioHistory_withData_returns200WithDataPoints() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/dashboard/portfolio-history?years=2");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var body = response.getBody();
@@ -93,11 +90,10 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(3)
     void getPortfolioHistory_allDatesAreFridaysExceptTodayAtEnd() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body = api.get("/api/v1/dashboard/portfolio-history?years=2");
 
         @SuppressWarnings("unchecked")
-        var dataPoints = (List<Map<String, Object>>) response.getBody().get("data_points");
+        var dataPoints = (List<Map<String, Object>>) body.get("data_points");
         assertThat(dataPoints).isNotEmpty();
 
         var dates = dataPoints.stream()
@@ -116,11 +112,10 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(4)
     void getPortfolioHistory_datesAreSortedChronologically() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body = api.get("/api/v1/dashboard/portfolio-history?years=2");
 
         @SuppressWarnings("unchecked")
-        var dataPoints = (List<Map<String, Object>>) response.getBody().get("data_points");
+        var dataPoints = (List<Map<String, Object>>) body.get("data_points");
         var dates = dataPoints.stream()
                 .map(dp -> LocalDate.parse((String) dp.get("date")))
                 .toList();
@@ -131,11 +126,10 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(5)
     void getPortfolioHistory_totalEqualsInvestmentPlusProperty() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body = api.get("/api/v1/dashboard/portfolio-history?years=2");
 
         @SuppressWarnings("unchecked")
-        var dataPoints = (List<Map<String, Object>>) response.getBody().get("data_points");
+        var dataPoints = (List<Map<String, Object>>) body.get("data_points");
         assertThat(dataPoints).isNotEmpty();
 
         for (var dp : dataPoints) {
@@ -149,13 +143,11 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(6)
     void getPortfolioHistory_yearsParam_affectsWeekCount() {
-        var response1 = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=1",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
-        var response2 = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body1 = api.get("/api/v1/dashboard/portfolio-history?years=1");
+        var body2 = api.get("/api/v1/dashboard/portfolio-history?years=2");
 
-        int weeks1 = ((Number) response1.getBody().get("weeks")).intValue();
-        int weeks2 = ((Number) response2.getBody().get("weeks")).intValue();
+        int weeks1 = ((Number) body1.get("weeks")).intValue();
+        int weeks2 = ((Number) body2.get("weeks")).intValue();
 
         assertThat(weeks1).isBetween(50, 54);
         assertThat(weeks2).isBetween(102, 106);
@@ -164,20 +156,18 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(7)
     void getPortfolioHistory_bankAccountsExcluded() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=2",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body = api.get("/api/v1/dashboard/portfolio-history?years=2");
 
-        assertThat(((Number) response.getBody().get("investment_account_count")).intValue()).isEqualTo(1);
+        assertThat(((Number) body.get("investment_account_count")).intValue()).isEqualTo(1);
     }
 
     @Test
     @Order(8)
     void getPortfolioHistory_propertyEquityZeroBeforePurchase() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history?years=10",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var body = api.get("/api/v1/dashboard/portfolio-history?years=10");
 
         @SuppressWarnings("unchecked")
-        var dataPoints = (List<Map<String, Object>>) response.getBody().get("data_points");
+        var dataPoints = (List<Map<String, Object>>) body.get("data_points");
         var purchaseDate = LocalDate.of(2020, 6, 1);
 
         var beforePurchase = new ArrayList<Double>();
@@ -211,8 +201,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(10)
     void getSnapshotProjection_withData_returnsProjectedDataPoints() {
-        var response = restTemplate.exchange("/api/v1/dashboard/snapshot-projection?years=10&lookback=10",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/dashboard/snapshot-projection?years=10&lookback=10");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var body = response.getBody();
@@ -256,8 +245,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         databaseCleaner.clean();
         authHelper.bootstrap(restTemplate);
 
-        var response = restTemplate.exchange("/api/v1/dashboard/summary",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/dashboard/summary");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) response.getBody().get("net_worth")).doubleValue()).isEqualTo(0.0);
@@ -269,8 +257,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
         databaseCleaner.clean();
         authHelper.bootstrap(restTemplate);
 
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/dashboard/portfolio-history");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var body = response.getBody();

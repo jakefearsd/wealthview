@@ -44,7 +44,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingAccount_returns200() {
-        var accountId = data.createAccountAndGetId("My IRA", "ira");
+        var accountId = (String) data.createAccount("My IRA", "ira").get("id");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -63,7 +63,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingAccount_returns200() {
-        var accountId = data.createAccountAndGetId("Old Name", "brokerage");
+        var accountId = (String) data.createAccount("Old Name", "brokerage").get("id");
         var updateBody = Map.of("name", "New Name", "type", "brokerage", "institution", "Schwab");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
@@ -76,7 +76,7 @@ class AccountControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingAccount_returns204() {
-        var accountId = data.createAccountAndGetId("To Delete", "brokerage");
+        var accountId = (String) data.createAccount("To Delete", "brokerage").get("id");
 
         var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);

@@ -900,7 +900,7 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
-    void getScenario_usesEagerFetchForIncomeSources() {
+    void getScenario_withLinkedIncomeSource_returnsIncomeSourceData() {
         var scenario = new ProjectionScenarioEntity(
                 tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null);
@@ -913,15 +913,20 @@ class ScenarioCrudServiceTest {
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
+        // Only the eager-fetch finder is stubbed: the income-source data below can
+        // only appear in the response if the service reads through that fetch.
         when(scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()))
                 .thenReturn(List.of(link));
 
         var result = service.getScenario(tenantId, scenarioId);
 
         assertThat(result.incomeSources()).hasSize(1);
-        // Should use the eager-fetch method, not the N+1 method
-        verify(scenarioIncomeSourceRepository).findWithIncomeSourceByScenarioId(scenario.getId());
-        verify(scenarioIncomeSourceRepository, never()).findByScenario_Id(any());
+        var isResp = result.incomeSources().getFirst();
+        assertThat(isResp.name()).isEqualTo("Pension");
+        assertThat(isResp.incomeType()).isEqualTo("pension");
+        assertThat(isResp.annualAmount()).isEqualByComparingTo(new BigDecimal("36000"));
+        assertThat(isResp.effectiveAmount()).isEqualByComparingTo(new BigDecimal("36000"));
+        assertThat(isResp.startAge()).isEqualTo(65);
     }
 
     @Test

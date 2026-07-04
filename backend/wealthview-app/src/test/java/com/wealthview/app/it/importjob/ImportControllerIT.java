@@ -25,7 +25,7 @@ class ImportControllerIT extends AbstractApiIntegrationTest {
     @Override
     protected void setUp() {
         super.setUp();
-        accountId = data.createAccountAndGetId("Import Test Account", "brokerage");
+        accountId = (String) data.createAccount("Import Test Account", "brokerage").get("id");
     }
 
     @Test

@@ -48,7 +48,7 @@ class ImportBoundaryFuzzIT extends AbstractApiIntegrationTest {
     @Override
     protected void setUp() {
         super.setUp();
-        accountId = data.createAccountAndGetId("Import Fuzz Account", "brokerage");
+        accountId = (String) data.createAccount("Import Fuzz Account", "brokerage").get("id");
     }
 
     @Test

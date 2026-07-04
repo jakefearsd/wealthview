@@ -12,6 +12,7 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.wealthview.app.WealthViewApplication;
+import com.wealthview.app.it.testutil.ApiClient;
 import com.wealthview.app.it.testutil.TestDataHelper;
 
 @SpringBootTest(
@@ -49,6 +50,14 @@ public abstract class AbstractApiIntegrationTest {
 
     protected TestDataHelper data;
 
+    /**
+     * Authenticated HTTP client for the bootstrapped admin (with {@code *As} variants
+     * for explicit tokens). Initialized in {@link #configureRestTemplate()} rather than
+     * {@link #setUp()} so subclasses that suppress the per-test setUp (e.g. ordered
+     * PER_CLASS suites) can still use it; tokens are resolved per call.
+     */
+    protected ApiClient api;
+
     @PostConstruct
     void configureRestTemplate() {
         // Use Apache HttpClient5, but disable automatic cookie retention so each
@@ -67,6 +76,7 @@ public abstract class AbstractApiIntegrationTest {
         requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(15));
         requestFactory.setReadTimeout(java.time.Duration.ofSeconds(90));
         restTemplate.getRestTemplate().setRequestFactory(requestFactory);
+        api = new ApiClient(restTemplate, authHelper);
     }
 
     @BeforeEach

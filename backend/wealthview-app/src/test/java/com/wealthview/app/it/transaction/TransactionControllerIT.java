@@ -78,7 +78,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingTransaction_returns200() {
-        var txId = data.createBuyTransactionAndGetId(accountId, "AAPL", 10, 1500);
+        var txId = (String) data.createBuyTransaction(accountId, "AAPL", 10, 1500).get("id");
         var updateBody = Map.of(
                 "date", "2024-01-20",
                 "type", "buy",
@@ -95,7 +95,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingTransaction_returns204() {
-        var txId = data.createBuyTransactionAndGetId(accountId, "MSFT", 8, 2400);
+        var txId = (String) data.createBuyTransaction(accountId, "MSFT", 8, 2400).get("id");
 
         var response = restTemplate.exchange("/api/v1/transactions/" + txId,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);

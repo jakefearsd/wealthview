@@ -42,7 +42,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingProfile_returns200() {
-        var id = data.createSpendingProfileAndGetId("My Profile");
+        var id = (String) data.createSpendingProfile("My Profile").get("id");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -53,7 +53,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingProfile_returns200() {
-        var id = data.createSpendingProfileAndGetId("Old Profile");
+        var id = (String) data.createSpendingProfile("Old Profile").get("id");
         var updateBody = data.spendingProfileBody("Updated Profile");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
@@ -65,7 +65,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingProfile_returns204() {
-        var id = data.createSpendingProfileAndGetId("To Delete");
+        var id = (String) data.createSpendingProfile("To Delete").get("id");
 
         var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
@@ -110,7 +110,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     @SuppressWarnings("unchecked")
     void update_withSpendingTiers_replacesTiers() {
         // Create without tiers
-        var id = data.createSpendingProfileAndGetId("No Tiers");
+        var id = (String) data.createSpendingProfile("No Tiers").get("id");
 
         // PUT with tiers
         var updateBody = profileBodyWithTiers("With Tiers");

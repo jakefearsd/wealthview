@@ -41,7 +41,7 @@ class ScenarioControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void get_existingScenario_returns200() {
-        var id = data.createScenarioAndGetId("My Scenario");
+        var id = (String) data.createScenario("My Scenario").get("id");
 
         var response = restTemplate.exchange("/api/v1/projections/" + id,
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
@@ -52,7 +52,7 @@ class ScenarioControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void update_existingScenario_returns200() {
-        var id = data.createScenarioAndGetId("Old Name");
+        var id = (String) data.createScenario("Old Name").get("id");
         var updateBody = data.scenarioBody("Updated Name");
 
         var response = restTemplate.exchange("/api/v1/projections/" + id,
@@ -64,7 +64,7 @@ class ScenarioControllerIT extends AbstractApiIntegrationTest {
 
     @Test
     void delete_existingScenario_returns204() {
-        var id = data.createScenarioAndGetId("To Delete");
+        var id = (String) data.createScenario("To Delete").get("id");
 
         var response = restTemplate.exchange("/api/v1/projections/" + id,
                 HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
