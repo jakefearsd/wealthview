@@ -4,7 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
 
+import jakarta.persistence.AttributeOverride;
+import jakarta.persistence.AttributeOverrides;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -14,12 +17,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "properties")
-@SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
+// ExcessivePublicCount/GodClass: this is a JPA data-carrier facade — every accessor is a
+// thin null-guarded delegate to the LoanDetails/DepreciationSettings embeddables, not real
+// behavioral complexity. The delegation is required to preserve the public API for downstream modules.
+@SuppressWarnings({"PMD.ExcessivePublicCount", "PMD.GodClass"})
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
 public class PropertyEntity extends Auditable {
 
@@ -46,32 +50,26 @@ public class PropertyEntity extends Auditable {
     @Column(name = "mortgage_balance", nullable = false, precision = 19, scale = 4)
     private BigDecimal mortgageBalance = BigDecimal.ZERO;
 
-    @Column(name = "loan_amount", precision = 19, scale = 4)
-    private BigDecimal loanAmount;
-
-    @Column(name = "annual_interest_rate", precision = 7, scale = 5)
-    private BigDecimal annualInterestRate;
-
-    @Column(name = "loan_term_months")
-    private Integer loanTermMonths;
-
-    @Column(name = "loan_start_date")
-    private LocalDate loanStartDate;
-
-    @Column(name = "use_computed_balance", nullable = false)
-    private boolean useComputedBalance = false;
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "loanAmount",
+                column = @Column(name = "loan_amount", precision = 19, scale = 4)),
+        @AttributeOverride(name = "annualInterestRate",
+                column = @Column(name = "annual_interest_rate", precision = 7, scale = 5)),
+        @AttributeOverride(name = "loanTermMonths",
+                column = @Column(name = "loan_term_months")),
+        @AttributeOverride(name = "loanStartDate",
+                column = @Column(name = "loan_start_date")),
+        @AttributeOverride(name = "useComputedBalance",
+                column = @Column(name = "use_computed_balance", nullable = false))
+    })
+    private LoanDetails loanDetails = new LoanDetails();
 
     @Column(name = "property_type", nullable = false)
     private String propertyType = "primary_residence";
 
     @Column(name = "zillow_zpid")
     private String zillowZpid;
-
-    @Column(name = "in_service_date")
-    private LocalDate inServiceDate;
-
-    @Column(name = "land_value", precision = 19, scale = 4)
-    private BigDecimal landValue;
 
     @Column(name = "annual_appreciation_rate", precision = 7, scale = 5)
     private BigDecimal annualAppreciationRate;
@@ -85,21 +83,24 @@ public class PropertyEntity extends Auditable {
     @Column(name = "annual_maintenance_cost", precision = 19, scale = 4)
     private BigDecimal annualMaintenanceCost;
 
-    @Column(name = "depreciation_method", nullable = false)
-    private String depreciationMethod = "none";
-
-    @Column(name = "useful_life_years", nullable = false, precision = 4, scale = 1)
-    private BigDecimal usefulLifeYears = new BigDecimal("27.5");
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "cost_seg_allocations", nullable = false, columnDefinition = "jsonb")
-    private String costSegAllocations = "[]";
-
-    @Column(name = "bonus_depreciation_rate", nullable = false, precision = 5, scale = 4)
-    private BigDecimal bonusDepreciationRate = BigDecimal.ONE;
-
-    @Column(name = "cost_seg_study_year")
-    private Integer costSegStudyYear;
+    // cost_seg_allocations keeps its @JdbcTypeCode/@Column on the embeddable field (jsonb
+    // mappings cannot be expressed via @AttributeOverride); the other columns are overridden here.
+    @Embedded
+    @AttributeOverrides({
+        @AttributeOverride(name = "inServiceDate",
+                column = @Column(name = "in_service_date")),
+        @AttributeOverride(name = "landValue",
+                column = @Column(name = "land_value", precision = 19, scale = 4)),
+        @AttributeOverride(name = "depreciationMethod",
+                column = @Column(name = "depreciation_method", nullable = false)),
+        @AttributeOverride(name = "usefulLifeYears",
+                column = @Column(name = "useful_life_years", nullable = false, precision = 4, scale = 1)),
+        @AttributeOverride(name = "bonusDepreciationRate",
+                column = @Column(name = "bonus_depreciation_rate", nullable = false, precision = 5, scale = 4)),
+        @AttributeOverride(name = "costSegStudyYear",
+                column = @Column(name = "cost_seg_study_year"))
+    })
+    private DepreciationSettings depreciationSettings = new DepreciationSettings();
 
     protected PropertyEntity() {
     }
@@ -167,43 +168,43 @@ public class PropertyEntity extends Auditable {
     }
 
     public BigDecimal getLoanAmount() {
-        return loanAmount;
+        return loanDetails == null ? null : loanDetails.getLoanAmount();
     }
 
     public void setLoanAmount(BigDecimal loanAmount) {
-        this.loanAmount = loanAmount;
+        ensureLoanDetails().setLoanAmount(loanAmount);
     }
 
     public BigDecimal getAnnualInterestRate() {
-        return annualInterestRate;
+        return loanDetails == null ? null : loanDetails.getAnnualInterestRate();
     }
 
     public void setAnnualInterestRate(BigDecimal annualInterestRate) {
-        this.annualInterestRate = annualInterestRate;
+        ensureLoanDetails().setAnnualInterestRate(annualInterestRate);
     }
 
     public Integer getLoanTermMonths() {
-        return loanTermMonths;
+        return loanDetails == null ? null : loanDetails.getLoanTermMonths();
     }
 
     public void setLoanTermMonths(Integer loanTermMonths) {
-        this.loanTermMonths = loanTermMonths;
+        ensureLoanDetails().setLoanTermMonths(loanTermMonths);
     }
 
     public LocalDate getLoanStartDate() {
-        return loanStartDate;
+        return loanDetails == null ? null : loanDetails.getLoanStartDate();
     }
 
     public void setLoanStartDate(LocalDate loanStartDate) {
-        this.loanStartDate = loanStartDate;
+        ensureLoanDetails().setLoanStartDate(loanStartDate);
     }
 
     public boolean isUseComputedBalance() {
-        return useComputedBalance;
+        return loanDetails != null && loanDetails.isUseComputedBalance();
     }
 
     public void setUseComputedBalance(boolean useComputedBalance) {
-        this.useComputedBalance = useComputedBalance;
+        ensureLoanDetails().setUseComputedBalance(useComputedBalance);
     }
 
     public String getPropertyType() {
@@ -255,67 +256,80 @@ public class PropertyEntity extends Auditable {
     }
 
     public LocalDate getInServiceDate() {
-        return inServiceDate;
+        return depreciationSettings == null ? null : depreciationSettings.getInServiceDate();
     }
 
     public void setInServiceDate(LocalDate inServiceDate) {
-        this.inServiceDate = inServiceDate;
+        ensureDepreciationSettings().setInServiceDate(inServiceDate);
     }
 
     public BigDecimal getLandValue() {
-        return landValue;
+        return depreciationSettings == null ? null : depreciationSettings.getLandValue();
     }
 
     public void setLandValue(BigDecimal landValue) {
-        this.landValue = landValue;
+        ensureDepreciationSettings().setLandValue(landValue);
     }
 
     public String getDepreciationMethod() {
-        return depreciationMethod;
+        return depreciationSettings == null ? null : depreciationSettings.getDepreciationMethod();
     }
 
     public void setDepreciationMethod(String depreciationMethod) {
-        this.depreciationMethod = depreciationMethod;
+        ensureDepreciationSettings().setDepreciationMethod(depreciationMethod);
     }
 
     public BigDecimal getUsefulLifeYears() {
-        return usefulLifeYears;
+        return depreciationSettings == null ? null : depreciationSettings.getUsefulLifeYears();
     }
 
     public void setUsefulLifeYears(BigDecimal usefulLifeYears) {
-        this.usefulLifeYears = usefulLifeYears;
+        ensureDepreciationSettings().setUsefulLifeYears(usefulLifeYears);
     }
 
     public String getCostSegAllocations() {
-        return costSegAllocations;
+        return depreciationSettings == null ? null : depreciationSettings.getCostSegAllocations();
     }
 
     public void setCostSegAllocations(String costSegAllocations) {
-        this.costSegAllocations = costSegAllocations;
+        ensureDepreciationSettings().setCostSegAllocations(costSegAllocations);
     }
 
     public BigDecimal getBonusDepreciationRate() {
-        return bonusDepreciationRate;
+        return depreciationSettings == null ? null : depreciationSettings.getBonusDepreciationRate();
     }
 
     public void setBonusDepreciationRate(BigDecimal bonusDepreciationRate) {
-        this.bonusDepreciationRate = bonusDepreciationRate;
+        ensureDepreciationSettings().setBonusDepreciationRate(bonusDepreciationRate);
     }
 
     public Integer getCostSegStudyYear() {
-        return costSegStudyYear;
+        return depreciationSettings == null ? null : depreciationSettings.getCostSegStudyYear();
     }
 
     public void setCostSegStudyYear(Integer costSegStudyYear) {
-        this.costSegStudyYear = costSegStudyYear;
+        ensureDepreciationSettings().setCostSegStudyYear(costSegStudyYear);
     }
 
     public boolean hasLoanDetails() {
-        return loanAmount != null && annualInterestRate != null
-                && loanTermMonths != null && loanStartDate != null;
+        return loanDetails != null && loanDetails.isComplete();
     }
 
     public BigDecimal getEquity() {
         return currentValue.subtract(mortgageBalance);
+    }
+
+    private LoanDetails ensureLoanDetails() {
+        if (loanDetails == null) {
+            loanDetails = new LoanDetails();
+        }
+        return loanDetails;
+    }
+
+    private DepreciationSettings ensureDepreciationSettings() {
+        if (depreciationSettings == null) {
+            depreciationSettings = new DepreciationSettings();
+        }
+        return depreciationSettings;
     }
 }
