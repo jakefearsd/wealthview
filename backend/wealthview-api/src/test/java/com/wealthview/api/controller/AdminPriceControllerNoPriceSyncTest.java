@@ -12,13 +12,8 @@ import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
 import com.wealthview.api.testutil.TestMetricsConfig;
 import com.wealthview.core.auth.JwtTokenProvider;
-import com.wealthview.core.auth.LoginActivityService;
 import com.wealthview.core.auth.SessionStateValidator;
-import com.wealthview.core.config.SystemConfigService;
-import com.wealthview.core.config.SystemStatsService;
 import com.wealthview.core.price.PriceService;
-import com.wealthview.core.tenant.TenantService;
-import com.wealthview.core.tenant.UserManagementService;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedSuperAdmin;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,39 +21,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Tests the SuperAdminController.triggerPriceSync() 503 branch: when
+ * Tests the AdminPriceController.triggerPriceSync() 503 branch: when
  * PriceSyncService is not available (Finnhub not configured), the endpoint
  * returns 503 with a descriptive error body.
  *
  * <p>Uses a separate test class without @MockBean for PriceSyncService
  * so that it is null (injected as @Nullable), triggering the 503 branch.
  */
-@WebMvcTest(SuperAdminController.class)
+@WebMvcTest(AdminPriceController.class)
 @Import({SecurityConfig.class, GlobalExceptionHandler.class, JwtAuthenticationFilter.class, TestMetricsConfig.class})
-class SuperAdminControllerNoPriceSyncTest {
+class AdminPriceControllerNoPriceSyncTest {
 
     @Autowired
     private MockMvc mockMvc;
-
-    @MockBean
-    private TenantService tenantService;
 
     // PriceSyncService intentionally NOT mocked — @Nullable injection → null → 503
 
     @MockBean
     private PriceService priceService;
-
-    @MockBean
-    private SystemStatsService systemStatsService;
-
-    @MockBean
-    private LoginActivityService loginActivityService;
-
-    @MockBean
-    private UserManagementService userManagementService;
-
-    @MockBean
-    private SystemConfigService systemConfigService;
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
