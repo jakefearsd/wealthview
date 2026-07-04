@@ -63,9 +63,7 @@ final class IncomeProjector {
 
                 // Apply boundary multiplier (0.5 at startAge/endAge) for recurring sources only.
                 // One-time sources pay their full amount at startAge, matching ICC and ISP.
-                if (!source.oneTime()
-                        && (age == source.startAge()
-                                || (source.endAge() != null && age == source.endAge()))) {
+                if (IncomeYearMath.isBoundaryAge(source, age)) {
                     amount *= 0.5;
                 }
                 totalIncome += amount;

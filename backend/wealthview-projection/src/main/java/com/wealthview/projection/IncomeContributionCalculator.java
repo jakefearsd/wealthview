@@ -20,9 +20,9 @@ class IncomeContributionCalculator {
 
         BigDecimal total = BigDecimal.ZERO;
         for (var source : sources) {
-            if (isActiveAtAge(source, age)) {
+            if (ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 BigDecimal amount = computeAmount(source, yearsInRetirement);
-                if (!source.oneTime() && isBoundaryAge(source, age)) {
+                if (IncomeYearMath.isBoundaryAge(source, age)) {
                     amount = amount.divide(TWO, SCALE, ROUNDING);
                 }
                 total = total.add(amount);
@@ -31,31 +31,8 @@ class IncomeContributionCalculator {
         return total;
     }
 
-    private boolean isActiveAtAge(ProjectionIncomeSourceInput source, int age) {
-        if (source.oneTime()) {
-            return age == source.startAge();
-        }
-        if (age < source.startAge()) {
-            return false;
-        }
-        return source.endAge() == null || age <= source.endAge();
-    }
-
-    private boolean isBoundaryAge(ProjectionIncomeSourceInput source, int age) {
-        return age == source.startAge()
-                || (source.endAge() != null && age == source.endAge());
-    }
-
     private BigDecimal computeAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
-        BigDecimal gross;
-        if (source.oneTime() || yearsInRetirement <= 1
-                || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
-            gross = source.annualAmount();
-        } else {
-            BigDecimal factor = BigDecimal.ONE.add(source.inflationRate())
-                    .pow(yearsInRetirement - 1);
-            gross = source.annualAmount().multiply(factor).setScale(SCALE, ROUNDING);
-        }
+        BigDecimal gross = IncomeYearMath.nominalAmount(source, yearsInRetirement);
         if (source.incomeType() == IncomeSourceType.RENTAL_PROPERTY) {
             gross = gross.subtract(sumExpenses(source));
         }

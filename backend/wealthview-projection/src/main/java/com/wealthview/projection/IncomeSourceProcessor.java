@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
@@ -264,22 +263,10 @@ class IncomeSourceProcessor {
     // --- Utility methods ---
 
     private BigDecimal transitionMultiplier(ProjectionIncomeSourceInput source, int age) {
-        if (source.oneTime()) {
-            return BigDecimal.ONE;
-        }
-        if (age == source.startAge()
-                || (source.endAge() != null && age == source.endAge())) {
-            return new BigDecimal("0.5");
-        }
-        return BigDecimal.ONE;
+        return IncomeYearMath.isBoundaryAge(source, age) ? new BigDecimal("0.5") : BigDecimal.ONE;
     }
 
     BigDecimal computeNominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
-        if (source.oneTime() || yearsInRetirement <= 1
-                || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
-            return source.annualAmount();
-        }
-        return CompoundGrowth.inflate(source.annualAmount(), source.inflationRate(), yearsInRetirement - 1)
-                .setScale(SCALE, ROUNDING);
+        return IncomeYearMath.nominalAmount(source, yearsInRetirement);
     }
 }
