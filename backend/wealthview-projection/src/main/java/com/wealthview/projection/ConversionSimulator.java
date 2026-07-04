@@ -23,7 +23,6 @@ import com.wealthview.core.projection.tax.FilingStatus;
  */
 final class ConversionSimulator {
 
-    private static final int EARLY_WITHDRAWAL_AGE = 60; // proxy for 59.5
     private static final int MAGI_CONVERGENCE_ITERATIONS = 3;
     private static final double CONVERGENCE_THRESHOLD_DOLLARS = 100;
     /** Binary search iterations used to find the maximum affordable conversion amount. */
@@ -161,7 +160,7 @@ final class ConversionSimulator {
                 traditional -= conversionAmount;
                 roth += conversionAmount;
 
-                if (age < EARLY_WITHDRAWAL_AGE) {
+                if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
                     taxable -= conversionTax;
                     if (taxable < 0) {
                         taxable = 0;
@@ -338,7 +337,7 @@ final class ConversionSimulator {
     }
 
     private SpendingWithdrawalStrategy selectWithdrawalStrategy(int age) {
-        if (age < EARLY_WITHDRAWAL_AGE) {
+        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
             return new EarlyWithdrawalStrategy();
         }
         if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
@@ -369,13 +368,13 @@ final class ConversionSimulator {
     /**
      * Constrains the conversion amount so the tax on the conversion can be paid
      * from the taxable account without depleting funds needed for essential spending.
-     * Only applies before age 59.5 (EARLY_WITHDRAWAL_AGE), when penalty-free
+     * Only applies before age 59.5 (RetirementAges.EARLY_WITHDRAWAL_AGE), when penalty-free
      * traditional/Roth withdrawals are unavailable.
      */
     private double constrainConversionByAffordability(
             double maxConversion, double effectiveIncome, double taxable,
             double baseOtherIncome, int yearIndex, int age, int calendarYear) {
-        if (age >= EARLY_WITHDRAWAL_AGE) {
+        if (age >= RetirementAges.EARLY_WITHDRAWAL_AGE) {
             return maxConversion;
         }
         double tentativeTax = computeIncrementalTax(

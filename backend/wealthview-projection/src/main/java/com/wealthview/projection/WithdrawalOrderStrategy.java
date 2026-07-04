@@ -22,8 +22,6 @@ sealed interface WithdrawalOrderStrategy
     int SCALE = 4;
     RoundingMode ROUNDING = RoundingMode.HALF_UP;
 
-    /** Proxy for the 59.5 early-withdrawal-penalty threshold. */
-    int EARLY_WITHDRAWAL_AGE = 60;
 
     /** The amount drawn from each sub-pool for a single withdrawal. */
     record Result(BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth) {}
@@ -76,7 +74,7 @@ sealed interface WithdrawalOrderStrategy
 
         @Override
         public Result execute(BigDecimal need, BigDecimal taxable, BigDecimal traditional, BigDecimal roth) {
-            if (context.age() < EARLY_WITHDRAWAL_AGE) {
+            if (context.age() < RetirementAges.EARLY_WITHDRAWAL_AGE) {
                 // Before 59.5 (using 60 as proxy): taxable only to avoid early withdrawal penalties
                 return new Result(need.min(taxable), BigDecimal.ZERO, BigDecimal.ZERO);
             } else if (bracketRate != null && taxCalc != null) {

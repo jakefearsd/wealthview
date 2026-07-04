@@ -17,8 +17,6 @@ final class TrialSimulator {
 
     /** Fraction of equity portfolio used each year to replenish the cash reserve bucket. */
     private static final double CASH_REPLENISHMENT_RATE = 0.10;
-    /** Proxy for age 59.5 — the minimum age for penalty-free retirement account withdrawals. */
-    static final int EARLY_WITHDRAWAL_AGE = 60;
 
     /** Per-trial simulation result. */
     record TrialResult(
@@ -106,7 +104,7 @@ final class TrialSimulator {
             double withdrawal = Math.max(0, spending - income[y]);
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60)
-            boolean preAge595 = hasConversions && age < EARLY_WITHDRAWAL_AGE;
+            boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
             double dsCeiling = config.dsBracketCeilingByYear() != null
                     ? config.dsBracketCeilingByYear()[y] : 0;
             double dsConvAmt = config.conversionByYear() != null
@@ -183,7 +181,7 @@ final class TrialSimulator {
         double actualTax = (actualConv < conversionByYear[y])
                 ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
                 : conversionTaxByYear[y];
-        if (age < EARLY_WITHDRAWAL_AGE) {
+        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
             pools[0] -= Math.min(actualTax, Math.max(0, pools[0]));
         } else {
             deductTaxFromPools(actualTax, pools);
