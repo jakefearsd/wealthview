@@ -3,9 +3,7 @@ package com.wealthview.core.projection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -14,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
@@ -24,7 +21,7 @@ import com.wealthview.core.projection.dto.GuardrailProfileSummary;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
-import com.wealthview.core.projection.dto.ScenarioParamsSource;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
 import com.wealthview.core.projection.dto.UpdateScenarioRequest;
@@ -86,7 +83,7 @@ public class ScenarioCrudService {
         validateEndAge(request.endAge());
         var tenant = tenantLookup.requireTenant(tenantId);
 
-        String paramsJson = buildParamsJson(extractParamsFromRequest(request));
+        String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
 
         var scenario = new ProjectionScenarioEntity(
                 tenant, request.name(), request.retirementDate(),
@@ -134,7 +131,7 @@ public class ScenarioCrudService {
         scenario.setRetirementDate(request.retirementDate());
         scenario.setEndAge(request.endAge());
         scenario.setInflationRate(request.inflationRate());
-        scenario.setParamsJson(buildParamsJson(extractParamsFromRequest(request)));
+        scenario.setParamsJson(ScenarioParams.from(request).toJson(objectMapper));
         scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
@@ -266,65 +263,6 @@ public class ScenarioCrudService {
             throw new IllegalArgumentException(
                     "end_age must be between " + MIN_END_AGE + " and " + MAX_END_AGE);
         }
-    }
-
-    private Map<String, Object> extractParamsFromRequest(ScenarioParamsSource r) {
-        return scenarioParams(r.birthYear(), r.withdrawalRate(), r.withdrawalStrategy(),
-                r.dynamicCeiling(), r.dynamicFloor(), r.filingStatus(),
-                r.otherIncome(), r.annualRothConversion(), r.withdrawalOrder(),
-                r.dynamicSequencingBracketRate(), r.rothConversionStrategy(),
-                r.targetBracketRate(), r.rothConversionStartYear(), r.state(),
-                r.primaryResidencePropertyTax(), r.primaryResidenceMortgageInterest());
-    }
-
-    private Map<String, Object> scenarioParams(
-            Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
-            BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
-            BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
-            BigDecimal dynamicSequencingBracketRate, String rothConversionStrategy,
-            BigDecimal targetBracketRate, Integer rothConversionStartYear,
-            String state, BigDecimal primaryResidencePropertyTax,
-            BigDecimal primaryResidenceMortgageInterest) {
-        var params = new LinkedHashMap<String, Object>();
-        params.put("birth_year", birthYear);
-        params.put("withdrawal_rate", withdrawalRate);
-        params.put("withdrawal_strategy", withdrawalStrategy);
-        params.put("dynamic_ceiling", dynamicCeiling);
-        params.put("dynamic_floor", dynamicFloor);
-        params.put("filing_status", filingStatus);
-        params.put("other_income", otherIncome);
-        params.put("annual_roth_conversion", annualRothConversion);
-        params.put("withdrawal_order", withdrawalOrder);
-        params.put("dynamic_sequencing_bracket_rate", dynamicSequencingBracketRate);
-        params.put("roth_conversion_strategy", rothConversionStrategy);
-        params.put("target_bracket_rate", targetBracketRate);
-        params.put("roth_conversion_start_year", rothConversionStartYear);
-        params.put("state", state);
-        params.put("primary_residence_property_tax", primaryResidencePropertyTax);
-        params.put("primary_residence_mortgage_interest", primaryResidenceMortgageInterest);
-        return params;
-    }
-
-    private String buildParamsJson(Map<String, Object> params) {
-        ObjectNode node = objectMapper.createObjectNode();
-        boolean hasContent = false;
-        for (var entry : params.entrySet()) {
-            hasContent |= putIfNotNull(node, entry.getKey(), entry.getValue());
-        }
-        return hasContent ? node.toString() : null;
-    }
-
-    private boolean putIfNotNull(ObjectNode node, String key, Object value) {
-        switch (value) {
-            case null -> {
-                return false;
-            }
-            case Integer i -> node.put(key, i);
-            case BigDecimal bd -> node.put(key, bd);
-            case String s -> node.put(key, s);
-            default -> { }
-        }
-        return true;
     }
 
     private BigDecimal computeRentalNetCashFlow(String incomeType, PropertyEntity property,

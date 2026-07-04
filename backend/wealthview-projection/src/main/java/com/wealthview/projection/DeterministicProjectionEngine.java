@@ -19,6 +19,7 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingPlan;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -143,7 +144,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     // null-coalescing default (`x != null ? x : default`). The path count is multiplicative
     // across those defaults but every branch is trivial straight-line resolution.
     @SuppressWarnings("PMD.NPathComplexity")
-    private ResolvedParams resolveProjectionParams(ProjectionInput input, ScenarioParamsParser.ScenarioParams params) {
+    private ResolvedParams resolveProjectionParams(ProjectionInput input, ScenarioParams params) {
         int currentYear = input.referenceYear() != null ? input.referenceYear() : LocalDate.now().getYear();
         int birthYear = params.birthYear() != null ? params.birthYear() : currentYear - 35;
         int retirementYear = input.retirementDate() != null
@@ -176,14 +177,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     }
 
     private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts,
-                                              ScenarioParamsParser.ScenarioParams params,
+                                              ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy) {
         var config = new PoolStrategy.PoolConfig(
                 params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
                 params.annualRothConversion() != null ? params.annualRothConversion() : BigDecimal.ZERO,
                 params.rothConversionStrategy(), params.targetBracketRate(),
-                params.rothConversionStartYear(), params.withdrawalOrder(), taxStrategy,
+                params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate());
         return PoolStrategy.create(accounts, config);
     }

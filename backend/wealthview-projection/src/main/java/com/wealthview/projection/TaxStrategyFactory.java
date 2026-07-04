@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.tax.CombinedTaxCalculator;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -30,7 +31,7 @@ final class TaxStrategyFactory {
     }
 
     @Nullable
-    TaxCalculationStrategy buildTaxStrategy(ScenarioParamsParser.ScenarioParams params) {
+    TaxCalculationStrategy buildTaxStrategy(ScenarioParams params) {
         if (taxCalculator == null) {
             return null;
         }

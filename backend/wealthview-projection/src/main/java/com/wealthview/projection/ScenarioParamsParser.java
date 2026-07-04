@@ -10,9 +10,9 @@ import org.springframework.lang.Nullable;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.TierBasedSpendingPlan;
-import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
  * Parses scenario {@code params_json} blobs and spending-profile tier JSON into
@@ -25,61 +25,12 @@ final class ScenarioParamsParser {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** Strongly-typed view of a scenario's {@code params_json} blob. */
-    record ScenarioParams(
-            Integer birthYear,
-            BigDecimal withdrawalRate,
-            String withdrawalStrategy,
-            BigDecimal dynamicCeiling,
-            BigDecimal dynamicFloor,
-            String filingStatus,
-            BigDecimal otherIncome,
-            BigDecimal annualRothConversion,
-            WithdrawalOrder withdrawalOrder,
-            String rothConversionStrategy,
-            BigDecimal targetBracketRate,
-            Integer rothConversionStartYear,
-            String state,
-            BigDecimal primaryResidencePropertyTax,
-            BigDecimal primaryResidenceMortgageInterest,
-            BigDecimal dynamicSequencingBracketRate) {
-    }
-
     ScenarioParams parseParams(@Nullable String paramsJson) {
-        if (paramsJson == null || paramsJson.isBlank()) {
-            return defaultParams();
-        }
-        try {
-            JsonNode node = objectMapper.readTree(paramsJson);
-            WithdrawalOrder withdrawalOrder = node.has("withdrawal_order")
-                    ? WithdrawalOrder.fromString(node.get("withdrawal_order").asText())
-                    : WithdrawalOrder.TAXABLE_FIRST;
-            return new ScenarioParams(
-                    parseOptionalInt(node, "birth_year"),
-                    parseOptionalBigDecimal(node, "withdrawal_rate"),
-                    parseOptionalString(node, "withdrawal_strategy"),
-                    parseOptionalBigDecimal(node, "dynamic_ceiling"),
-                    parseOptionalBigDecimal(node, "dynamic_floor"),
-                    parseOptionalString(node, "filing_status"),
-                    parseOptionalBigDecimal(node, "other_income"),
-                    parseOptionalBigDecimal(node, "annual_roth_conversion"),
-                    withdrawalOrder,
-                    parseOptionalString(node, "roth_conversion_strategy"),
-                    parseOptionalBigDecimal(node, "target_bracket_rate"),
-                    parseOptionalInt(node, "roth_conversion_start_year"),
-                    parseOptionalString(node, "state"),
-                    parseOptionalBigDecimal(node, "primary_residence_property_tax"),
-                    parseOptionalBigDecimal(node, "primary_residence_mortgage_interest"),
-                    parseOptionalBigDecimal(node, "dynamic_sequencing_bracket_rate"));
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | NumberFormatException e) {
-            log.warn("Failed to parse params_json", e);
-            return defaultParams();
-        }
+        return ScenarioParams.parseOrEmpty(objectMapper, paramsJson);
     }
 
     ScenarioParams defaultParams() {
-        return new ScenarioParams(null, null, null, null, null, null, null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null, null, null, null, null, null);
+        return ScenarioParams.EMPTY;
     }
 
     @Nullable
@@ -109,18 +60,6 @@ final class ScenarioParamsParser {
         }
 
         return TierBasedSpendingPlan.of(profile.essentialExpenses(), profile.discretionaryExpenses(), tiers);
-    }
-
-    private BigDecimal parseOptionalBigDecimal(JsonNode node, String fieldName) {
-        return node.has(fieldName) ? new BigDecimal(node.get(fieldName).asText()) : null;
-    }
-
-    private Integer parseOptionalInt(JsonNode node, String fieldName) {
-        return node.has(fieldName) ? node.get(fieldName).asInt() : null;
-    }
-
-    private String parseOptionalString(JsonNode node, String fieldName) {
-        return node.has(fieldName) ? node.get(fieldName).asText() : null;
     }
 
     private BigDecimal getDecimal(JsonNode item, String camelCase, String snakeCase, BigDecimal fallback) {

@@ -7,7 +7,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -24,6 +23,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
@@ -75,10 +75,12 @@ public class GuardrailProfileService {
 
             var projectionInput = projectionInputBuilder.build(scenario, tenantId);
 
-            int birthYear = parseBirthYear(scenario.getParamsJson());
-            String filingStatus = parseFilingStatus(scenario.getParamsJson()).orElse(null);
-            String withdrawalOrder = parseStringParam(scenario.getParamsJson(), "withdrawal_order")
-                    .orElse("taxable_first");
+            var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+            int birthYear = params.birthYear() != null
+                    ? params.birthYear() : java.time.LocalDate.now().getYear() - 35;
+            String filingStatus = params.filingStatus();
+            String withdrawalOrder = params.withdrawalOrder() != null
+                    ? params.withdrawalOrder() : "taxable_first";
 
             BigDecimal confidence = resolveConfidence(request);
 
@@ -254,15 +256,9 @@ public class GuardrailProfileService {
                 .append('|').append(scenario.getInflationRate());
 
         // Only birth_year from paramsJson affects guardrail optimization
-        if (scenario.getParamsJson() != null) {
-            try {
-                var node = MAPPER.readTree(scenario.getParamsJson());
-                if (node.has("birth_year")) {
-                    sb.append('|').append(node.get("birth_year").asInt());
-                }
-            } catch (JsonProcessingException ignored) {
-                // missing birth_year just means it won't affect the hash
-            }
+        var hashParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+        if (hashParams.birthYear() != null) {
+            sb.append('|').append(hashParams.birthYear());
         }
 
         for (var acct : scenario.getAccounts()) {
@@ -328,25 +324,6 @@ public class GuardrailProfileService {
         );
     }
 
-    private Optional<String> parseFilingStatus(String paramsJson) {
-        return parseStringParam(paramsJson, "filing_status");
-    }
-
-    private Optional<String> parseStringParam(String paramsJson, String field) {
-        if (paramsJson == null || paramsJson.isBlank()) {
-            return Optional.empty();
-        }
-        try {
-            var node = MAPPER.readTree(paramsJson);
-            if (node.has(field)) {
-                return Optional.of(node.get(field).asText());
-            }
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to parse {} from paramsJson", field, e);
-        }
-        return Optional.empty();
-    }
-
     private BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
         if (request.confidenceLevel() != null) {
             return request.confidenceLevel();
@@ -362,18 +339,4 @@ public class GuardrailProfileService {
         return DEFAULT_CONFIDENCE;
     }
 
-    private int parseBirthYear(String paramsJson) {
-        if (paramsJson == null || paramsJson.isBlank()) {
-            return java.time.LocalDate.now().getYear() - 35;
-        }
-        try {
-            var node = MAPPER.readTree(paramsJson);
-            if (node.has("birth_year")) {
-                return node.get("birth_year").asInt();
-            }
-        } catch (JsonProcessingException e) {
-            log.warn("Failed to parse birth_year from paramsJson", e);
-        }
-        return java.time.LocalDate.now().getYear() - 35;
-    }
 }

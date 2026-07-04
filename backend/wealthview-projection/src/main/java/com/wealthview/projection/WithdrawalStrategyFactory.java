@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.strategy.DynamicPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.FixedPercentageWithdrawal;
 import com.wealthview.core.projection.strategy.VanguardDynamicSpendingWithdrawal;
@@ -16,7 +17,7 @@ final class WithdrawalStrategyFactory {
     private WithdrawalStrategyFactory() {
     }
 
-    static WithdrawalStrategy create(ScenarioParamsParser.ScenarioParams params, BigDecimal withdrawalRate) {
+    static WithdrawalStrategy create(ScenarioParams params, BigDecimal withdrawalRate) {
         if (params.withdrawalStrategy() == null || params.withdrawalStrategy().isBlank()) {
             return new FixedPercentageWithdrawal(withdrawalRate);
         }
