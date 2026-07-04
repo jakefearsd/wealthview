@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -71,6 +72,26 @@ public final class ProjectionTestFixtures {
         return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
                 retDate, endAge, inflation, paramsJson, accounts, spendingProfile,
                 null, incomeSources);
+    }
+
+    public static ProjectionInput createInput(LocalDate retDate, int endAge,
+                                               BigDecimal inflation, String paramsJson,
+                                               List<ProjectionAccountInput> accounts,
+                                               SpendingProfileInput spendingProfile,
+                                               Integer referenceYear,
+                                               List<ProjectionIncomeSourceInput> incomeSources) {
+        return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
+                retDate, endAge, inflation, paramsJson, accounts, spendingProfile,
+                referenceYear, incomeSources);
+    }
+
+    public static ProjectionInput createGuardrailInput(LocalDate retDate, int endAge,
+                                                        BigDecimal inflation, String paramsJson,
+                                                        List<ProjectionAccountInput> accounts,
+                                                        GuardrailSpendingInput guardrailSpending) {
+        return new ProjectionInput(UUID.randomUUID(), "Test Scenario",
+                retDate, endAge, inflation, paramsJson, accounts, null,
+                null, List.of(), guardrailSpending);
     }
 
     public static ProjectionInput createInputWithProperties(LocalDate retDate, int endAge,
