@@ -166,7 +166,7 @@ final class ConversionSimulator {
                         taxable = 0;
                     }
                 } else {
-                    double[] afterDeduct = deductCascade(conversionTax, taxable,
+                    double[] afterDeduct = PoolTaxCascade.deduct(conversionTax, taxable,
                             traditional, roth);
                     taxable = afterDeduct[0];
                     traditional = afterDeduct[1];
@@ -499,26 +499,6 @@ final class ConversionSimulator {
             }
         }
         return lo;
-    }
-
-    private double[] deductCascade(double amount, double taxable, double traditional,
-                                    double roth) {
-        double remaining = amount;
-        if (remaining > 0 && taxable > 0) {
-            double draw = Math.min(remaining, taxable);
-            taxable -= draw;
-            remaining -= draw;
-        }
-        if (remaining > 0 && traditional > 0) {
-            double draw = Math.min(remaining, traditional);
-            traditional -= draw;
-            remaining -= draw;
-        }
-        if (remaining > 0 && roth > 0) {
-            double draw = Math.min(remaining, roth);
-            roth -= draw;
-        }
-        return new double[]{taxable, traditional, roth};
     }
 
     private String[] parseWithdrawalOrder() {

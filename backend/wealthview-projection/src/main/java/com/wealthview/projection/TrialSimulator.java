@@ -1,5 +1,7 @@
 package com.wealthview.projection;
 
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
+
 /**
  * Runs single-path Monte Carlo trials for the spending optimizer: year-by-year
  * portfolio evolution with growth, Roth conversions, withdrawals, withdrawal tax,
@@ -65,7 +67,7 @@ final class TrialSimulator {
         double[] pools = { config.initTaxable(), config.initTraditional(), config.initRoth() };
         // Resolve the withdrawal order once per trial (constant for the run) so the
         // per-year splitWithdrawal calls do no String.equals work.
-        WithdrawalOrder order = resolveOrder(config.withdrawalOrder());
+        WithdrawalOrder order = WithdrawalOrder.fromString(config.withdrawalOrder());
 
         double cashBalance = 0;
         if (config.cashReserveYears() > 0) {
@@ -150,20 +152,16 @@ final class TrialSimulator {
 
     /**
      * Deducts a tax amount from pools in order: taxable, traditional, roth.
-     * Mutates the pools array in place.
+     * Mutates the pools array in place via the shared {@link PoolTaxCascade}.
      */
     // UseVarargs: `pools` is a fixed-length [taxable, traditional, roth] index array mutated in
     // place, not a variable argument list — varargs would obscure the positional contract.
     @SuppressWarnings("PMD.UseVarargs")
     private static void deductTaxFromPools(double tax, double[] pools) {
-        double rem = tax;
-        double fromTaxable = Math.min(rem, Math.max(0, pools[0]));
-        pools[0] -= fromTaxable;
-        rem -= fromTaxable;
-        double fromTrad = Math.min(rem, Math.max(0, pools[1]));
-        pools[1] -= fromTrad;
-        rem -= fromTrad;
-        pools[2] -= rem;
+        double[] after = PoolTaxCascade.deduct(tax, pools[0], pools[1], pools[2]);
+        pools[0] = after[0];
+        pools[1] = after[1];
+        pools[2] = after[2];
     }
 
     /**
@@ -273,8 +271,8 @@ final class TrialSimulator {
         // Resolve the string order to the enum once for non-hot-path callers (the
         // facade + tests). The hot trial loop resolves it once per trial instead
         // (see simulateTrial) and calls the enum overload directly.
-        return splitWithdrawal(taxable, traditional, roth, need, resolveOrder(order), preAge595,
-                dsBracketCeiling, otherIncome, conversionAmount, rmdAmount);
+        return splitWithdrawal(taxable, traditional, roth, need, WithdrawalOrder.fromString(order),
+                preAge595, dsBracketCeiling, otherIncome, conversionAmount, rmdAmount);
     }
 
     static PoolWithdrawal splitWithdrawal(double taxable, double traditional, double roth,
@@ -320,7 +318,7 @@ final class TrialSimulator {
                 double fromTrad = Math.min(remaining, Math.max(0, traditional));
                 return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
             }
-            default: { // TAXABLE_FIRST
+            default: { // TAXABLE_FIRST (and PRO_RATA, which the MC path treats as taxable-first)
                 double fromTax = Math.min(need, Math.max(0, taxable));
                 double remaining = need - fromTax;
                 double fromTrad = Math.min(remaining, Math.max(0, traditional));
@@ -329,27 +327,6 @@ final class TrialSimulator {
                 return new PoolWithdrawal(fromTax, fromTrad, fromRoth);
             }
         }
-    }
-
-    /** Withdrawal ordering, resolved once from the string config to avoid per-call String.equals. */
-    enum WithdrawalOrder { TAXABLE_FIRST, TRADITIONAL_FIRST, ROTH_FIRST, DYNAMIC_SEQUENCING }
-
-    /**
-     * Maps the string withdrawal-order config to the enum, preserving the original
-     * precedence: dynamic sequencing, then traditional-first, then roth-first, else
-     * taxable-first (the default).
-     */
-    static WithdrawalOrder resolveOrder(String order) {
-        if (PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(order)) {
-            return WithdrawalOrder.DYNAMIC_SEQUENCING;
-        }
-        if ("traditional_first".equals(order)) {
-            return WithdrawalOrder.TRADITIONAL_FIRST;
-        }
-        if ("roth_first".equals(order)) {
-            return WithdrawalOrder.ROTH_FIRST;
-        }
-        return WithdrawalOrder.TAXABLE_FIRST;
     }
 
     /**
