@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -10,11 +9,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 
-// AbstractClassWithoutAbstractMethod: a JPA @MappedSuperclass is abstract by design to share
-// column mappings with concrete subclasses; it intentionally declares no abstract methods.
-@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 @MappedSuperclass
-public abstract class AbstractTaxBracketEntity {
+public abstract class AbstractTaxBracketEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -34,9 +30,6 @@ public abstract class AbstractTaxBracketEntity {
 
     @Column(nullable = false, precision = 5, scale = 4)
     private BigDecimal rate;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected AbstractTaxBracketEntity() {
     }
@@ -74,7 +67,4 @@ public abstract class AbstractTaxBracketEntity {
         return rate;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

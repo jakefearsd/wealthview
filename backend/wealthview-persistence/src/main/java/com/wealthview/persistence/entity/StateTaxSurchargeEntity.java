@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -13,7 +12,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "state_tax_surcharges")
-public class StateTaxSurchargeEntity {
+public class StateTaxSurchargeEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -36,9 +35,6 @@ public class StateTaxSurchargeEntity {
 
     @Column(nullable = false, precision = 5, scale = 4)
     private BigDecimal rate;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected StateTaxSurchargeEntity() {
     }
@@ -81,7 +77,4 @@ public class StateTaxSurchargeEntity {
         return rate;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

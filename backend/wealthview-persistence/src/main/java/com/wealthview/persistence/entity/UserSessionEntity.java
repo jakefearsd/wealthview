@@ -14,7 +14,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "user_sessions")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class UserSessionEntity {
+public class UserSessionEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,9 +37,6 @@ public class UserSessionEntity {
 
     @Column(name = "user_agent")
     private String userAgent;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     @Column(name = "last_used_at", nullable = false)
     private OffsetDateTime lastUsedAt = OffsetDateTime.now();
@@ -86,10 +83,6 @@ public class UserSessionEntity {
 
     public String getUserAgent() {
         return userAgent;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
     }
 
     public OffsetDateTime getLastUsedAt() {

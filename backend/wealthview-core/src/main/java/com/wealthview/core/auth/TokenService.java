@@ -172,7 +172,6 @@ class TokenService {
             requiresNewTx.executeWithoutResult(status -> {
                 var u = userRepository.findById(userId).orElseThrow();
                 u.setTokenGeneration(u.getTokenGeneration() + 1);
-                u.setUpdatedAt(OffsetDateTime.now());
                 userRepository.save(u);
                 refreshTokenRepository.revokeAllForUser(userId, OffsetDateTime.now());
             });
@@ -206,7 +205,6 @@ class TokenService {
         }
 
         user.setTokenGeneration(user.getTokenGeneration() + 1);
-        user.setUpdatedAt(OffsetDateTime.now());
         try {
             userRepository.save(user);
         } catch (ObjectOptimisticLockingFailureException e) {
@@ -230,7 +228,6 @@ class TokenService {
         var now = OffsetDateTime.now();
         stored.setUsedAt(now);
         stored.setReplacedByJti(newJti);
-        stored.setUpdatedAt(now);
         refreshTokenRepository.save(stored);
 
         meterRegistry.counter("wealthview.auth.refresh",
@@ -247,7 +244,6 @@ class TokenService {
         var user = userRepository.findById(userId)
                 .orElseThrow(Entities.notFound("User"));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         var now = OffsetDateTime.now();
         refreshTokenRepository.revokeAllForUser(userId, now);

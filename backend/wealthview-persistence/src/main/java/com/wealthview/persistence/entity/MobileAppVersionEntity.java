@@ -1,7 +1,5 @@
 package com.wealthview.persistence.entity;
 
-import java.time.OffsetDateTime;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -19,7 +17,7 @@ import jakarta.persistence.Table;
  */
 @Entity
 @Table(name = "mobile_app_versions")
-public class MobileAppVersionEntity {
+public class MobileAppVersionEntity extends Auditable {
 
     @Id
     @Column(nullable = false)
@@ -36,12 +34,6 @@ public class MobileAppVersionEntity {
 
     @Column(name = "message")
     private String message;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected MobileAppVersionEntity() {
     }
@@ -91,15 +83,4 @@ public class MobileAppVersionEntity {
         this.message = message;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

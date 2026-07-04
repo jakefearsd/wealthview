@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -18,7 +17,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "property_depreciation_schedule")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class PropertyDepreciationScheduleEntity {
+public class PropertyDepreciationScheduleEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,12 +36,6 @@ public class PropertyDepreciationScheduleEntity {
 
     @Column(name = "depreciation_amount", nullable = false, precision = 19, scale = 4)
     private BigDecimal depreciationAmount;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected PropertyDepreciationScheduleEntity() {
     }
@@ -83,15 +76,4 @@ public class PropertyDepreciationScheduleEntity {
         this.depreciationAmount = depreciationAmount;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

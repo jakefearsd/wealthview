@@ -83,7 +83,6 @@ public class MfaService {
         user.setMfaSecretEncrypted(cipher.encrypt(secret));
         user.setMfaSetupAt(null);
         user.setMfaEnabled(false);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
 
         recoveryCodeRepository.deleteAllForUser(userId);
@@ -121,7 +120,6 @@ public class MfaService {
         }
         user.setMfaEnabled(true);
         user.setMfaSetupAt(OffsetDateTime.now());
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         meterRegistry.counter("wealthview.mfa.verified").increment();
         log.info("MFA enabled for user {}", userId);
@@ -142,7 +140,6 @@ public class MfaService {
         user.setMfaEnabled(false);
         user.setMfaSecretEncrypted(null);
         user.setMfaSetupAt(null);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         recoveryCodeRepository.deleteAllForUser(userId);
         log.info("MFA disabled for user {}", userId);
@@ -188,7 +185,6 @@ public class MfaService {
         for (var row : unused) {
             if (passwordEncoder.matches(code, row.getCodeHash())) {
                 row.setUsedAt(OffsetDateTime.now());
-                row.setUpdatedAt(OffsetDateTime.now());
                 recoveryCodeRepository.save(row);
                 log.info("Recovery code consumed for user {}", userId);
                 return true;

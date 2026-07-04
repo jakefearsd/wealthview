@@ -2,7 +2,6 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,7 +12,7 @@ import jakarta.persistence.Table;
 @Entity
 @Table(name = "prices")
 @IdClass(PriceId.class)
-public class PriceEntity {
+public class PriceEntity extends CreatedAtEntity {
 
     @Id
     @Column(nullable = false)
@@ -28,9 +27,6 @@ public class PriceEntity {
 
     @Column(nullable = false)
     private String source;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected PriceEntity() {
     }
@@ -66,7 +62,4 @@ public class PriceEntity {
         this.source = source;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

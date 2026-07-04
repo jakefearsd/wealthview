@@ -1,6 +1,5 @@
 package com.wealthview.core.projection;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,7 +63,6 @@ public class SpendingProfileService {
         entity.setEssentialExpenses(request.essentialExpenses());
         entity.setDiscretionaryExpenses(request.discretionaryExpenses());
         entity.setSpendingTiers(serializeSpendingTiers(request.spendingTiers()));
-        entity.setUpdatedAt(OffsetDateTime.now());
 
         var saved = profileRepository.save(entity);
         log.info("Spending profile {} updated for tenant {}", profileId, tenantId);

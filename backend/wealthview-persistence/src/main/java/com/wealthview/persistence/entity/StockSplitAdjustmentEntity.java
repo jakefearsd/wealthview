@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -25,7 +24,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "stock_split_adjustments")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class StockSplitAdjustmentEntity {
+public class StockSplitAdjustmentEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -52,9 +51,6 @@ public class StockSplitAdjustmentEntity {
 
     @Column(name = "new_value", nullable = false, precision = 19, scale = 8)
     private BigDecimal newValue;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected StockSplitAdjustmentEntity() {
     }
@@ -107,7 +103,4 @@ public class StockSplitAdjustmentEntity {
         return newValue;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

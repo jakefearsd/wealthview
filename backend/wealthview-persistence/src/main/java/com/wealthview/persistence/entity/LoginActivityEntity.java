@@ -1,6 +1,5 @@
 package com.wealthview.persistence.entity;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -13,7 +12,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "login_activity")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class LoginActivityEntity {
+public class LoginActivityEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue
@@ -30,9 +29,6 @@ public class LoginActivityEntity {
 
     @Column(name = "ip_address")
     private String ipAddress;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected LoginActivityEntity() {
     }
@@ -64,7 +60,4 @@ public class LoginActivityEntity {
         return ipAddress;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

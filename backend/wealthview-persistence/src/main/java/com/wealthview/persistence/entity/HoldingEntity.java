@@ -2,7 +2,6 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -19,7 +18,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "holdings")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class HoldingEntity {
+public class HoldingEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -53,12 +52,6 @@ public class HoldingEntity {
 
     @Column(name = "as_of_date", nullable = false)
     private LocalDate asOfDate = LocalDate.now();
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected HoldingEntity() {
     }
@@ -140,15 +133,4 @@ public class HoldingEntity {
         this.asOfDate = asOfDate;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

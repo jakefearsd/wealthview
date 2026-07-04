@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -16,7 +15,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "projection_accounts")
-public class ProjectionAccountEntity {
+public class ProjectionAccountEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -41,12 +40,6 @@ public class ProjectionAccountEntity {
 
     @Column(name = "account_type", nullable = false)
     private String accountType = "taxable";
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected ProjectionAccountEntity() {
     }
@@ -116,15 +109,4 @@ public class ProjectionAccountEntity {
         this.accountType = accountType;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

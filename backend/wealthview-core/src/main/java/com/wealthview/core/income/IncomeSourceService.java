@@ -1,7 +1,6 @@
 package com.wealthview.core.income;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -113,7 +112,6 @@ public class IncomeSourceService {
             entity.setProperty(null);
         }
 
-        entity.setUpdatedAt(OffsetDateTime.now());
         entity = incomeSourceRepository.save(entity);
         log.info("Income source '{}' ({}) updated for tenant {}", entity.getName(), sourceId, tenantId);
         return IncomeSourceResponse.from(entity);

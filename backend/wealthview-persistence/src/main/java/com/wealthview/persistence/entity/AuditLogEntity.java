@@ -1,6 +1,5 @@
 package com.wealthview.persistence.entity;
 
-import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -17,7 +16,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "audit_log")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class AuditLogEntity {
+public class AuditLogEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -44,9 +43,6 @@ public class AuditLogEntity {
 
     @Column(name = "ip_address")
     private String ipAddress;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected AuditLogEntity() {
     }
@@ -97,7 +93,4 @@ public class AuditLogEntity {
         this.ipAddress = ipAddress;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

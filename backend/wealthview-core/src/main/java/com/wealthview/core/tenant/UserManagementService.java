@@ -1,6 +1,5 @@
 package com.wealthview.core.tenant;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,7 +61,6 @@ public class UserManagementService {
         var oldRole = user.getRole();
         user.setRole(newRole);
         user.setTokenGeneration(user.getTokenGeneration() + 1);
-        user.setUpdatedAt(OffsetDateTime.now());
         var saved = userRepository.save(user);
         log.info("Updated role for user {} to {} (token generation bumped)", userId, newRole);
         publishAudit(user.getTenantId(), "USER_ROLE_UPDATE", userId,
@@ -92,7 +90,6 @@ public class UserManagementService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         log.info("Password reset for user {} in tenant {} (token generation bumped)", userId, tenantId);
         publishAudit(user.getTenantId(), "USER_PASSWORD_RESET", userId,
@@ -105,7 +102,6 @@ public class UserManagementService {
                 .orElseThrow(Entities.notFound("User"));
 
         user.setActive(active);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         log.info("User {} in tenant {} set active={}", userId, tenantId, active);
         publishAudit(user.getTenantId(), "USER_SET_ACTIVE", userId, Map.of("active", active));
@@ -126,7 +122,6 @@ public class UserManagementService {
 
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setTokenGeneration(user.getTokenGeneration() + 1);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         log.info("Password reset for user {} by super_admin (token generation bumped)", userId);
         publishAudit(user.getTenantId(), "USER_PASSWORD_RESET", userId,
@@ -139,7 +134,6 @@ public class UserManagementService {
                 .orElseThrow(Entities.notFound("User", userId));
 
         user.setActive(active);
-        user.setUpdatedAt(OffsetDateTime.now());
         userRepository.save(user);
         log.info("User {} set active={} by super_admin", userId, active);
         publishAudit(user.getTenantId(), "USER_SET_ACTIVE", userId,

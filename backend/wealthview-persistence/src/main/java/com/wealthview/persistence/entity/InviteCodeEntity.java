@@ -17,7 +17,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "invite_codes")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class InviteCodeEntity {
+public class InviteCodeEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -46,12 +46,6 @@ public class InviteCodeEntity {
 
     @Column(name = "is_revoked", nullable = false)
     private boolean isRevoked = false;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected InviteCodeEntity() {
     }
@@ -97,18 +91,6 @@ public class InviteCodeEntity {
 
     public OffsetDateTime getExpiresAt() {
         return expiresAt;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public boolean isRevoked() {

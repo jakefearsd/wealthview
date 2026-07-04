@@ -2,7 +2,6 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -22,7 +21,7 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "properties")
 @SuppressWarnings({"PMD.TooManyFields", "PMD.ExcessivePublicCount"})
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class PropertyEntity {
+public class PropertyEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -101,12 +100,6 @@ public class PropertyEntity {
 
     @Column(name = "cost_seg_study_year")
     private Integer costSegStudyYear;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected PropertyEntity() {
     }
@@ -320,18 +313,6 @@ public class PropertyEntity {
     public boolean hasLoanDetails() {
         return loanAmount != null && annualInterestRate != null
                 && loanTermMonths != null && loanStartDate != null;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public BigDecimal getEquity() {

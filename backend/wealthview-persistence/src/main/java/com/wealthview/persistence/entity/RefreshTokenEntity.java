@@ -14,7 +14,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "refresh_tokens")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class RefreshTokenEntity {
+public class RefreshTokenEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -46,12 +46,6 @@ public class RefreshTokenEntity {
 
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected RefreshTokenEntity() {
     }
@@ -123,15 +117,4 @@ public class RefreshTokenEntity {
         this.revokedAt = revokedAt;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

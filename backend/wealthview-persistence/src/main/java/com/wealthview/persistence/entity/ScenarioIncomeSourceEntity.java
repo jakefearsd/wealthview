@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -16,7 +15,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "scenario_income_sources")
-public class ScenarioIncomeSourceEntity {
+public class ScenarioIncomeSourceEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -32,9 +31,6 @@ public class ScenarioIncomeSourceEntity {
 
     @Column(name = "override_annual_amount", precision = 19, scale = 4)
     private BigDecimal overrideAnnualAmount;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected ScenarioIncomeSourceEntity() {
     }
@@ -75,7 +71,4 @@ public class ScenarioIncomeSourceEntity {
         this.overrideAnnualAmount = overrideAnnualAmount;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

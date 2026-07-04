@@ -1,7 +1,6 @@
 package com.wealthview.core.exchangerate;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -79,7 +78,6 @@ public class ExchangeRateService {
                         "Exchange rate not found for currency: " + currencyCode));
 
         entity.setRateToUsd(rateToUsd);
-        entity.setUpdatedAt(OffsetDateTime.now());
         entity = exchangeRateRepository.save(entity);
         log.info("Exchange rate updated: {} = {} USD for tenant {}", currencyCode, rateToUsd, tenantId);
         return ExchangeRateResponse.from(entity);

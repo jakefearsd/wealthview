@@ -14,7 +14,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "mfa_challenges")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class MfaChallengeEntity {
+public class MfaChallengeEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,9 +37,6 @@ public class MfaChallengeEntity {
 
     @Column(name = "used_at")
     private OffsetDateTime usedAt;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected MfaChallengeEntity() {
     }
@@ -85,7 +82,4 @@ public class MfaChallengeEntity {
         this.usedAt = usedAt;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

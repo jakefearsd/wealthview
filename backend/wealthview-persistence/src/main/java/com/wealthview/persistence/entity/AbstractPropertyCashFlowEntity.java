@@ -2,7 +2,6 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -15,12 +14,9 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MappedSuperclass;
 import org.hibernate.annotations.Filter;
 
-// AbstractClassWithoutAbstractMethod: a JPA @MappedSuperclass is abstract by design to share
-// column mappings with concrete subclasses; it intentionally declares no abstract methods.
-@SuppressWarnings("PMD.AbstractClassWithoutAbstractMethod")
 @MappedSuperclass
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public abstract class AbstractPropertyCashFlowEntity {
+public abstract class AbstractPropertyCashFlowEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -47,12 +43,6 @@ public abstract class AbstractPropertyCashFlowEntity {
 
     @Column(nullable = false)
     private String frequency = "monthly";
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected AbstractPropertyCashFlowEntity() {
     }
@@ -97,7 +87,4 @@ public abstract class AbstractPropertyCashFlowEntity {
         return frequency;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

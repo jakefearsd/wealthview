@@ -1,7 +1,6 @@
 package com.wealthview.core.property;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.Map;
@@ -121,7 +120,6 @@ public class PropertyService {
         applyPropertyType(property, request.propertyType());
         applyFinancialFields(property, request);
         depreciationService.applyDepreciationFields(property, request);
-        property.setUpdatedAt(OffsetDateTime.now());
         property = propertyRepository.save(property);
         log.info("Property {} updated for tenant {}", propertyId, tenantId);
         return buildResponse(property);

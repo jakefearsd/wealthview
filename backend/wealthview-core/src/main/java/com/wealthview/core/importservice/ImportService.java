@@ -2,7 +2,6 @@ package com.wealthview.core.importservice;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -235,7 +234,6 @@ public class ImportService {
         if (!messages.isEmpty()) {
             job.setErrorMessage(String.join("; ", messages));
         }
-        job.setUpdatedAt(OffsetDateTime.now());
         importJobRepository.save(job);
     }
 

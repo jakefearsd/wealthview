@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -18,7 +17,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "exchange_rates")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class ExchangeRateEntity {
+public class ExchangeRateEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -33,12 +32,6 @@ public class ExchangeRateEntity {
 
     @Column(name = "rate_to_usd", nullable = false, precision = 19, scale = 8)
     private BigDecimal rateToUsd;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected ExchangeRateEntity() {
     }
@@ -73,15 +66,4 @@ public class ExchangeRateEntity {
         this.rateToUsd = rateToUsd;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

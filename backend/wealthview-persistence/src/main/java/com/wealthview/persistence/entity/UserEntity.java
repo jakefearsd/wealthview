@@ -18,7 +18,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "users")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class UserEntity {
+public class UserEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -58,12 +58,6 @@ public class UserEntity {
     @Version
     @Column(name = "version", nullable = false)
     private long version;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected UserEntity() {
     }
@@ -125,18 +119,6 @@ public class UserEntity {
 
     public void setActive(boolean active) {
         isActive = active;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public int getTokenGeneration() {

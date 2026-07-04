@@ -2,7 +2,6 @@ package com.wealthview.core.property;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,7 +43,6 @@ public class PropertyValuationService {
         if (existing.isPresent()) {
             valuation = existing.orElseThrow();
             valuation.setValue(value);
-            valuation.setUpdatedAt(OffsetDateTime.now());
             log.info("Updated {} valuation for property {} on {}", source, propertyId, date);
         } else {
             valuation = new PropertyValuationEntity(property, property.getTenant(), date, value, source);
@@ -53,7 +51,6 @@ public class PropertyValuationService {
         valuation = valuationRepository.save(valuation);
 
         property.setCurrentValue(value);
-        property.setUpdatedAt(OffsetDateTime.now());
         propertyRepository.save(property);
 
         return PropertyValuationResponse.from(valuation);

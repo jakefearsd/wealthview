@@ -2,7 +2,6 @@ package com.wealthview.core.holding;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -98,7 +97,6 @@ public class HoldingService {
         holding.setCostBasis(request.costBasis());
         holding.setManualOverride(true);
         holding.setAsOfDate(LocalDate.now());
-        holding.setUpdatedAt(OffsetDateTime.now());
         holding = holdingRepository.save(holding);
         log.info("Manual holding updated for account {} symbol {} ({})", holding.getAccount().getId(),
                 holding.getSymbol(), holdingId);

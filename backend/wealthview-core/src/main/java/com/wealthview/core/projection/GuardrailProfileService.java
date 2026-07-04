@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.time.OffsetDateTime;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
@@ -102,7 +101,6 @@ public class GuardrailProfileService {
 
             scenario.setSpendingProfile(null);
             scenario.setGuardrailProfile(saved);
-            scenario.setUpdatedAt(OffsetDateTime.now());
             scenarioRepository.save(scenario);
 
             log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);

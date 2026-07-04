@@ -1,6 +1,5 @@
 package com.wealthview.persistence.entity;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -17,7 +16,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "accounts")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class AccountEntity {
+public class AccountEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,12 +36,6 @@ public class AccountEntity {
 
     @Column(nullable = false)
     private String currency = "USD";
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected AccountEntity() {
     }
@@ -103,15 +96,4 @@ public class AccountEntity {
         this.currency = currency;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

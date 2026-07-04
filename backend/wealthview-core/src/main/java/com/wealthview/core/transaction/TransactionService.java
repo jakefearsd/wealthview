@@ -1,6 +1,5 @@
 package com.wealthview.core.transaction;
 
-import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
@@ -126,7 +125,6 @@ public class TransactionService {
         txn.setSymbol(request.symbol());
         txn.setQuantity(request.quantity());
         txn.setAmount(request.amount());
-        txn.setUpdatedAt(OffsetDateTime.now());
         txn = transactionRepository.save(txn);
 
         var account = txn.getAccount();

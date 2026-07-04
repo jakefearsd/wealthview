@@ -1,6 +1,5 @@
 package com.wealthview.core.config;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,7 +62,6 @@ public class SystemConfigService {
         var entity = systemConfigRepository.findById(key)
                 .orElse(new SystemConfigEntity(key, value));
         entity.setValue(value);
-        entity.setUpdatedAt(OffsetDateTime.now());
         systemConfigRepository.save(entity);
         cache.put(key, value);
         log.info("System config updated: {}", key);

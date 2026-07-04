@@ -1,6 +1,5 @@
 package com.wealthview.core.property;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -152,7 +151,6 @@ public class PropertyValuationSyncService {
 
     private void storeZpid(PropertyEntity property, String zpid) {
         property.setZillowZpid(zpid);
-        property.setUpdatedAt(OffsetDateTime.now());
         propertyRepository.save(property);
     }
 }

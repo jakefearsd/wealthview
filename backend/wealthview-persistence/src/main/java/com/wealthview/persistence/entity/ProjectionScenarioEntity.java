@@ -2,7 +2,6 @@ package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -25,7 +24,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "projection_scenarios")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class ProjectionScenarioEntity {
+public class ProjectionScenarioEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -61,12 +60,6 @@ public class ProjectionScenarioEntity {
 
     @OneToMany(mappedBy = "scenario", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProjectionAccountEntity> accounts = new ArrayList<>();
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected ProjectionScenarioEntity() {
     }
@@ -151,18 +144,6 @@ public class ProjectionScenarioEntity {
 
     public List<ProjectionAccountEntity> getAccounts() {
         return accounts;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public void addAccount(ProjectionAccountEntity account) {

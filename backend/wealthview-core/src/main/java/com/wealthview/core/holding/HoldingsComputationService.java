@@ -3,7 +3,6 @@ package com.wealthview.core.holding;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -122,7 +121,6 @@ public class HoldingsComputationService {
             holding.setQuantity(netQuantity);
             holding.setCostBasis(totalCost);
             holding.setAsOfDate(LocalDate.now());
-            holding.setUpdatedAt(OffsetDateTime.now());
             applyMoneyMarketFlag(holding, symbol);
             holdingRepository.save(holding);
             log.info("Holdings updated for account {} symbol {}: qty={} cost={}",

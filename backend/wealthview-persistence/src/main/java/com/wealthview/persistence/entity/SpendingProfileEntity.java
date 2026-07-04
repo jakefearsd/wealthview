@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -20,7 +19,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "spending_profiles")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class SpendingProfileEntity {
+public class SpendingProfileEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -46,12 +45,6 @@ public class SpendingProfileEntity {
     @Column(name = "spending_tiers", columnDefinition = "jsonb", nullable = false)
     @JdbcTypeCode(SqlTypes.JSON)
     private String spendingTiers = "[]";
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected SpendingProfileEntity() {
     }
@@ -114,15 +107,4 @@ public class SpendingProfileEntity {
         this.spendingTiers = spendingTiers;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

@@ -1,6 +1,5 @@
 package com.wealthview.persistence.entity;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -12,7 +11,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "tenants")
-public class TenantEntity {
+public class TenantEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,12 +22,6 @@ public class TenantEntity {
 
     @Column(name = "is_active", nullable = false)
     private boolean isActive = true;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected TenantEntity() {
     }
@@ -47,18 +40,6 @@ public class TenantEntity {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
     public boolean isActive() {

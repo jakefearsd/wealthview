@@ -1,7 +1,6 @@
 package com.wealthview.core.account;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,7 +88,6 @@ public class AccountService {
         account.setType(request.type());
         account.setInstitution(request.institution());
         account.setCurrency(request.currency() != null ? request.currency() : account.getCurrency());
-        account.setUpdatedAt(OffsetDateTime.now());
         account = accountRepository.save(account);
         log.info("Account {} updated for tenant {}", accountId, tenantId);
         return AccountResponse.from(account, computeBalance(account, tenantId));

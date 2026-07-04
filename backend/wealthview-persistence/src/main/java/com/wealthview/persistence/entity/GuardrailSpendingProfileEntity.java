@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -24,7 +23,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "guardrail_spending_profiles")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class GuardrailSpendingProfileEntity {
+public class GuardrailSpendingProfileEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -112,12 +111,6 @@ public class GuardrailSpendingProfileEntity {
 
     @Column(name = "is_stale", nullable = false)
     private boolean stale = false;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected GuardrailSpendingProfileEntity() {
     }
@@ -334,15 +327,4 @@ public class GuardrailSpendingProfileEntity {
         this.stale = stale;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

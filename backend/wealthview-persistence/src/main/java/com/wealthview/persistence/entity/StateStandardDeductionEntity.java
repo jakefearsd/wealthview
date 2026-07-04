@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -13,7 +12,7 @@ import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "state_standard_deductions")
-public class StateStandardDeductionEntity {
+public class StateStandardDeductionEntity extends CreatedAtEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -30,9 +29,6 @@ public class StateStandardDeductionEntity {
 
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     protected StateStandardDeductionEntity() {
     }
@@ -64,7 +60,4 @@ public class StateStandardDeductionEntity {
         return amount;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
 }

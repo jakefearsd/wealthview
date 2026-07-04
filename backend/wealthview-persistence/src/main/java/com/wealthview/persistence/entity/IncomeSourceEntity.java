@@ -1,7 +1,6 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -18,7 +17,7 @@ import org.hibernate.annotations.Filter;
 @Entity
 @Table(name = "income_sources")
 @Filter(name = "tenantFilter", condition = "tenant_id = :tenantId")
-public class IncomeSourceEntity {
+public class IncomeSourceEntity extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -55,12 +54,6 @@ public class IncomeSourceEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "property_id")
     private PropertyEntity property;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private OffsetDateTime createdAt = OffsetDateTime.now();
-
-    @Column(name = "updated_at", nullable = false)
-    private OffsetDateTime updatedAt = OffsetDateTime.now();
 
     protected IncomeSourceEntity() {
     }
@@ -163,15 +156,4 @@ public class IncomeSourceEntity {
         this.property = property;
     }
 
-    public OffsetDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public OffsetDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void setUpdatedAt(OffsetDateTime updatedAt) {
-        this.updatedAt = updatedAt;
-    }
 }

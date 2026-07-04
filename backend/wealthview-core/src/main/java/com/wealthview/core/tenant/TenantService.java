@@ -146,7 +146,6 @@ public class TenantService {
         }
 
         invite.setRevoked(true);
-        invite.setUpdatedAt(OffsetDateTime.now());
         inviteCodeRepository.save(invite);
         log.info("Invite code {} revoked for tenant {}", codeId, tenantId);
     }

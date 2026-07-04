@@ -1,6 +1,5 @@
 package com.wealthview.core.mobile;
 
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -115,7 +114,6 @@ public class MobileAppVersionService {
         entity.setLatestVersion(latestVersion);
         entity.setStoreUrl(storeUrl);
         entity.setMessage(message);
-        entity.setUpdatedAt(OffsetDateTime.now());
         repository.save(entity);
         log.info("Mobile app version updated: platform={} min={} latest={}",
                 normalized, minimumSupportedVersion, latestVersion);
