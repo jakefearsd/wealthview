@@ -5,7 +5,12 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-public record CreateScenarioRequest(
+/**
+ * Request body for both scenario create and update — the two endpoints take
+ * an identical payload. Implements {@link ScenarioParamsSource} so the params
+ * blob is serialized through {@link ScenarioParams}.
+ */
+public record ScenarioRequest(
         String name,
         LocalDate retirementDate,
         Integer endAge,

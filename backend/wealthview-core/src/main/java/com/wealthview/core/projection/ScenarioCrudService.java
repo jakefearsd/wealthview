@@ -2,7 +2,6 @@ package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,15 +15,14 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
-import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.GuardrailProfileSummary;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
 import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
-import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
@@ -79,7 +77,7 @@ public class ScenarioCrudService {
     }
 
     @Transactional
-    public ScenarioResponse createScenario(UUID tenantId, CreateScenarioRequest request) {
+    public ScenarioResponse createScenario(UUID tenantId, ScenarioRequest request) {
         validateEndAge(request.endAge());
         var tenant = tenantLookup.requireTenant(tenantId);
 
@@ -122,7 +120,7 @@ public class ScenarioCrudService {
     }
 
     @Transactional
-    public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, UpdateScenarioRequest request) {
+    public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, ScenarioRequest request) {
         validateEndAge(request.endAge());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
@@ -132,7 +130,6 @@ public class ScenarioCrudService {
         scenario.setEndAge(request.endAge());
         scenario.setInflationRate(request.inflationRate());
         scenario.setParamsJson(ScenarioParams.from(request).toJson(objectMapper));
-        scenario.setUpdatedAt(OffsetDateTime.now());
 
         if (request.spendingProfileId() != null) {
             var profile = spendingProfileRepository.findByTenant_IdAndId(tenantId, request.spendingProfileId())
@@ -158,7 +155,6 @@ public class ScenarioCrudService {
             var newHash = GuardrailProfileService.computeScenarioHash(saved);
             if (!newHash.equals(profile.getScenarioHash())) {
                 profile.setStale(true);
-                profile.setUpdatedAt(OffsetDateTime.now());
                 guardrailProfileRepository.save(profile);
                 log.info("Guardrail profile marked stale for scenario {}", scenarioId);
             }

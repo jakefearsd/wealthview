@@ -17,9 +17,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
-import com.wealthview.core.projection.dto.CreateScenarioRequest;
+import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
-import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -96,7 +95,7 @@ class ScenarioCrudServiceTest {
     void createScenario_validRequest_createsAndReturns() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Retirement Plan",
                 LocalDate.of(2055, 1, 1),
                 90,
@@ -135,7 +134,7 @@ class ScenarioCrudServiceTest {
     void createScenario_withDynamicStrategy_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Dynamic Plan",
                 LocalDate.of(2055, 1, 1),
                 90,
@@ -172,7 +171,7 @@ class ScenarioCrudServiceTest {
     void createScenario_withAccountTypes_persistsTypes() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Multi-Pool Plan",
                 LocalDate.of(2055, 1, 1),
                 90,
@@ -207,7 +206,7 @@ class ScenarioCrudServiceTest {
     void createScenario_withWithdrawalOrder_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Traditional First Plan",
                 LocalDate.of(2055, 1, 1),
                 90,
@@ -241,7 +240,7 @@ class ScenarioCrudServiceTest {
     void createScenario_withFillBracketStrategy_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Fill Bracket Plan",
                 LocalDate.of(2055, 1, 1),
                 90,
@@ -285,7 +284,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Linked Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -387,7 +386,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Updated Plan",
                 LocalDate.of(2060, 6, 15),
                 95,
@@ -419,7 +418,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_endAgeOver120_throwsIllegalArgument() {
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Bad Plan",
                 LocalDate.of(2055, 1, 1),
                 150,
@@ -435,7 +434,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void createScenario_endAgeBelow50_throwsIllegalArgument() {
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Bad Plan",
                 LocalDate.of(2055, 1, 1),
                 30,
@@ -451,7 +450,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_endAgeOver120_throwsIllegalArgument() {
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 200,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -467,7 +466,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -492,7 +491,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -572,7 +571,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan with Income", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
                 null, null, null, null, null, null, null, null, null, null, null,
@@ -602,7 +601,7 @@ class ScenarioCrudServiceTest {
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new CreateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -635,7 +634,7 @@ class ScenarioCrudServiceTest {
         when(incomeSourceRepository.findByTenant_IdAndId(tenantId, incomeSourceId))
                 .thenReturn(Optional.of(incomeSource));
 
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Updated Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -700,7 +699,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Change endAge to trigger hash change
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Old Plan", LocalDate.of(2055, 1, 1), 95,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -734,7 +733,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Same fields — no real change
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null, null,
@@ -768,7 +767,7 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(guardrailProfile));
 
         // Add filing_status and withdrawal_strategy — these should NOT affect guardrail hash
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), 1990, null,
                 "vanguard_dynamic_spending", null, null,
@@ -826,7 +825,7 @@ class ScenarioCrudServiceTest {
         when(guardrailProfileRepository.findByScenario_Id(scenarioId))
                 .thenReturn(Optional.empty());
 
-        var request = new UpdateScenarioRequest(
+        var request = new ScenarioRequest(
                 "Updated", LocalDate.of(2060, 1, 1), 95,
                 new BigDecimal("0.02"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,

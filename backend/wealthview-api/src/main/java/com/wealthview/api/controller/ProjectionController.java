@@ -23,10 +23,9 @@ import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
-import com.wealthview.core.projection.dto.CreateScenarioRequest;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
-import com.wealthview.core.projection.dto.UpdateScenarioRequest;
 
 @RestController
 @RequestMapping("/api/v1/projections")
@@ -46,7 +45,7 @@ public class ProjectionController {
     @PostMapping
     public ResponseEntity<ScenarioResponse> create(
             @AuthenticationPrincipal TenantUserPrincipal principal,
-            @RequestBody CreateScenarioRequest request) {
+            @RequestBody ScenarioRequest request) {
         log.info("Creating projection scenario '{}' for tenant {} with {} accounts",
                 request.name(), principal.tenantId(), request.accounts() != null ? request.accounts().size() : 0);
         var result = scenarioCrudService.createScenario(principal.tenantId(), request);
@@ -77,7 +76,7 @@ public class ProjectionController {
     public ResponseEntity<ScenarioResponse> update(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id,
-            @RequestBody UpdateScenarioRequest request) {
+            @RequestBody ScenarioRequest request) {
         return ResponseEntity.ok(scenarioCrudService.updateScenario(principal.tenantId(), id, request));
     }
 
