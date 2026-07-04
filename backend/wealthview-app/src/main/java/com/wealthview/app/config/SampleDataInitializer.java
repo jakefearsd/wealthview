@@ -2,6 +2,8 @@ package com.wealthview.app.config;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,21 +15,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.wealthview.persistence.entity.AccountEntity;
-import com.wealthview.persistence.entity.HoldingEntity;
+import com.wealthview.app.config.DemoDataSeeder.ExpenseSpec;
+import com.wealthview.app.config.DemoDataSeeder.IncomeSpec;
+import com.wealthview.app.config.DemoDataSeeder.TxnSpec;
 import com.wealthview.persistence.entity.PropertyEntity;
-import com.wealthview.persistence.entity.PropertyExpenseEntity;
-import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.entity.UserEntity;
-import com.wealthview.persistence.repository.AccountRepository;
-import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
-import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TenantRepository;
-import com.wealthview.persistence.repository.TransactionRepository;
 import com.wealthview.persistence.repository.UserRepository;
 
 @Component
@@ -41,31 +35,16 @@ public class SampleDataInitializer implements ApplicationRunner {
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
-    private final AccountRepository accountRepository;
-    private final TransactionRepository transactionRepository;
-    private final HoldingRepository holdingRepository;
-    private final PropertyRepository propertyRepository;
-    private final PropertyIncomeRepository incomeRepository;
-    private final PropertyExpenseRepository expenseRepository;
+    private final DemoDataSeeder demoDataSeeder;
     private final PasswordEncoder passwordEncoder;
 
     public SampleDataInitializer(UserRepository userRepository,
                                  TenantRepository tenantRepository,
-                                 AccountRepository accountRepository,
-                                 TransactionRepository transactionRepository,
-                                 HoldingRepository holdingRepository,
-                                 PropertyRepository propertyRepository,
-                                 PropertyIncomeRepository incomeRepository,
-                                 PropertyExpenseRepository expenseRepository,
+                                 DemoDataSeeder demoDataSeeder,
                                  PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.tenantRepository = tenantRepository;
-        this.accountRepository = accountRepository;
-        this.transactionRepository = transactionRepository;
-        this.holdingRepository = holdingRepository;
-        this.propertyRepository = propertyRepository;
-        this.incomeRepository = incomeRepository;
-        this.expenseRepository = expenseRepository;
+        this.demoDataSeeder = demoDataSeeder;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -94,146 +73,73 @@ public class SampleDataInitializer implements ApplicationRunner {
     }
 
     private void seedBrokerageAccount(TenantEntity tenant) {
-        var account = accountRepository.save(
-                new AccountEntity(tenant, "Fidelity Brokerage", "brokerage", "Fidelity"));
-
-        // Buy AAPL
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 3, 15), "buy", "AAPL",
-                new BigDecimal("25"), new BigDecimal("3875.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 1, 10), "buy", "AAPL",
-                BigDecimal.TEN, new BigDecimal("1850.00")));
-
-        // Buy NVDA
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 6, 20), "buy", "NVDA",
-                new BigDecimal("40"), new BigDecimal("16800.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 8, 5), "buy", "NVDA",
-                new BigDecimal("15"), new BigDecimal("17250.00")));
-
-        // Buy GOOG
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 9, 12), "buy", "GOOG",
-                new BigDecimal("50"), new BigDecimal("6700.00")));
-
-        // Buy VOO (S&P 500 ETF)
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2022, 11, 1), "buy", "VOO",
-                new BigDecimal("20"), new BigDecimal("7200.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 4, 15), "buy", "VOO",
-                BigDecimal.TEN, new BigDecimal("4950.00")));
-
-        // Sell some GOOG
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 8), "sell", "GOOG",
-                new BigDecimal("20"), new BigDecimal("3900.00")));
-
-        // Holdings (net positions)
-        holdingRepository.save(new HoldingEntity(account, tenant, "AAPL",
-                new BigDecimal("35"), new BigDecimal("5725.00")));
-        holdingRepository.save(new HoldingEntity(account, tenant, "NVDA",
-                new BigDecimal("55"), new BigDecimal("34050.00")));
-        holdingRepository.save(new HoldingEntity(account, tenant, "GOOG",
-                new BigDecimal("30"), new BigDecimal("4020.00")));
-        holdingRepository.save(new HoldingEntity(account, tenant, "VOO",
-                new BigDecimal("30"), new BigDecimal("12150.00")));
+        // Holdings (AAPL 35/5725, NVDA 55/34050, GOOG 30/4020, VOO 30/12150) are derived
+        // from these transactions by DemoDataSeeder, not hand-written.
+        demoDataSeeder.seedAccount(tenant, "Fidelity Brokerage", "brokerage", "Fidelity", List.of(
+                buyTxn("2023-03-15", "AAPL", "25", "3875.00"),
+                buyTxn("2024-01-10", "AAPL", "10", "1850.00"),
+                buyTxn("2023-06-20", "NVDA", "40", "16800.00"),
+                buyTxn("2024-08-05", "NVDA", "15", "17250.00"),
+                buyTxn("2023-09-12", "GOOG", "50", "6700.00"),
+                buyTxn("2022-11-01", "VOO", "20", "7200.00"),
+                buyTxn("2024-04-15", "VOO", "10", "4950.00"),
+                new TxnSpec(LocalDate.parse("2025-01-08"), "sell", "GOOG",
+                        new BigDecimal("20"), new BigDecimal("3900.00"))));
     }
 
     private void seedRetirementAccount(TenantEntity tenant) {
-        var account = accountRepository.save(
-                new AccountEntity(tenant, "Fidelity 401(k)", "401k", "Fidelity"));
-
-        // Regular contributions to FXAIX and SCHD
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 1, 15), "buy", "FXAIX",
-                new BigDecimal("30"), new BigDecimal("4500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 7, 15), "buy", "FXAIX",
-                new BigDecimal("28"), new BigDecimal("4500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 1, 15), "buy", "FXAIX",
-                new BigDecimal("25"), new BigDecimal("4500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 7, 15), "buy", "FXAIX",
-                new BigDecimal("24"), new BigDecimal("4500.00")));
-
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 3, 1), "buy", "SCHD",
-                new BigDecimal("60"), new BigDecimal("4500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 3, 1), "buy", "SCHD",
-                new BigDecimal("55"), new BigDecimal("4500.00")));
-
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2023, 6, 1), "buy", "VXUS",
-                new BigDecimal("80"), new BigDecimal("4400.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2024, 6, 1), "buy", "VXUS",
-                new BigDecimal("75"), new BigDecimal("4200.00")));
-
-        holdingRepository.save(new HoldingEntity(account, tenant, "FXAIX",
-                new BigDecimal("107"), new BigDecimal("18000.00")));
-        holdingRepository.save(new HoldingEntity(account, tenant, "SCHD",
-                new BigDecimal("115"), new BigDecimal("9000.00")));
-        holdingRepository.save(new HoldingEntity(account, tenant, "VXUS",
-                new BigDecimal("155"), new BigDecimal("8600.00")));
+        // Derived holdings: FXAIX 107/18000, SCHD 115/9000, VXUS 155/8600.
+        demoDataSeeder.seedAccount(tenant, "Fidelity 401(k)", "401k", "Fidelity", List.of(
+                buyTxn("2023-01-15", "FXAIX", "30", "4500.00"),
+                buyTxn("2023-07-15", "FXAIX", "28", "4500.00"),
+                buyTxn("2024-01-15", "FXAIX", "25", "4500.00"),
+                buyTxn("2024-07-15", "FXAIX", "24", "4500.00"),
+                buyTxn("2023-03-01", "SCHD", "60", "4500.00"),
+                buyTxn("2024-03-01", "SCHD", "55", "4500.00"),
+                buyTxn("2023-06-01", "VXUS", "80", "4400.00"),
+                buyTxn("2024-06-01", "VXUS", "75", "4200.00")));
     }
 
     private void seedBankAccount(TenantEntity tenant) {
-        var account = accountRepository.save(
-                new AccountEntity(tenant, "Chase Checking", "bank", "Chase"));
+        demoDataSeeder.seedAccount(tenant, "Chase Checking", "bank", "Chase", List.of(
+                cashTxn("2025-01-01", "deposit", "8500.00"),
+                cashTxn("2025-01-15", "deposit", "8500.00"),
+                cashTxn("2025-02-01", "deposit", "8500.00"),
+                cashTxn("2025-02-15", "deposit", "8500.00"),
+                cashTxn("2025-01-05", "withdrawal", "3200.00"),
+                cashTxn("2025-02-05", "withdrawal", "3200.00")));
+    }
 
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 1), "deposit", null,
-                null, new BigDecimal("8500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 15), "deposit", null,
-                null, new BigDecimal("8500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 2, 1), "deposit", null,
-                null, new BigDecimal("8500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 2, 15), "deposit", null,
-                null, new BigDecimal("8500.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 1, 5), "withdrawal", null,
-                null, new BigDecimal("3200.00")));
-        transactionRepository.save(new TransactionEntity(account, tenant,
-                LocalDate.of(2025, 2, 5), "withdrawal", null,
-                null, new BigDecimal("3200.00")));
+    private static TxnSpec buyTxn(String date, String symbol, String quantity, String amount) {
+        return new TxnSpec(LocalDate.parse(date), "buy", symbol,
+                new BigDecimal(quantity), new BigDecimal(amount));
+    }
+
+    private static TxnSpec cashTxn(String date, String type, String amount) {
+        return new TxnSpec(LocalDate.parse(date), type, null, null, new BigDecimal(amount));
     }
 
     private void seedProperties(TenantEntity tenant) {
         // Rental property 1
-        var rental1 = propertyRepository.save(new PropertyEntity(tenant,
+        var rental1 = new PropertyEntity(tenant,
                 "742 Evergreen Terrace, Springfield",
                 new BigDecimal("285000.00"), LocalDate.of(2019, 8, 15),
-                new BigDecimal("340000.00"), new BigDecimal("195000.00")));
+                new BigDecimal("340000.00"), new BigDecimal("195000.00"));
 
-        // 12 months of rent
+        var rental1Income = new ArrayList<IncomeSpec>();
         for (int month = 1; month <= 12; month++) {
-            incomeRepository.save(new PropertyIncomeEntity(rental1, tenant,
-                    LocalDate.of(2025, month, 1), new BigDecimal("2200.00"),
-                    "rent", "Monthly rent"));
+            rental1Income.add(rent(LocalDate.of(2025, month, 1), "2200.00"));
         }
-        // Annual expenses
-        expenseRepository.save(new PropertyExpenseEntity(rental1, tenant,
-                LocalDate.of(2025, 1, 15), new BigDecimal("3800.00"),
-                "insurance", "Annual homeowners insurance"));
-        expenseRepository.save(new PropertyExpenseEntity(rental1, tenant,
-                LocalDate.of(2025, 3, 10), new BigDecimal("1200.00"),
-                "maintenance", "HVAC service and filter replacement"));
-        expenseRepository.save(new PropertyExpenseEntity(rental1, tenant,
-                LocalDate.of(2025, 6, 20), new BigDecimal("4200.00"),
-                "tax", "Property tax - H1"));
-        expenseRepository.save(new PropertyExpenseEntity(rental1, tenant,
-                LocalDate.of(2025, 7, 5), new BigDecimal("850.00"),
-                "maintenance", "Plumbing repair"));
+        var rental1Expenses = List.of(
+                expense(LocalDate.of(2025, 1, 15), "3800.00",
+                        "insurance", "Annual homeowners insurance"),
+                expense(LocalDate.of(2025, 3, 10), "1200.00",
+                        "maintenance", "HVAC service and filter replacement"),
+                expense(LocalDate.of(2025, 6, 20), "4200.00", "tax", "Property tax - H1"),
+                expense(LocalDate.of(2025, 7, 5), "850.00", "maintenance", "Plumbing repair"));
+        demoDataSeeder.seedProperty(tenant, rental1, rental1Income, rental1Expenses);
 
-        // Rental property 2 — real test case
+        // Rental property 2 — real test case, with computed loan balance
         var rental2 = new PropertyEntity(tenant,
                 "2020 Beryl Street, San Diego CA 92109",
                 new BigDecimal("1300000.00"), LocalDate.of(2020, 9, 1),
@@ -243,21 +149,25 @@ public class SampleDataInitializer implements ApplicationRunner {
         rental2.setLoanTermMonths(360);
         rental2.setLoanStartDate(LocalDate.of(2020, 9, 1));
         rental2.setUseComputedBalance(true);
-        rental2 = propertyRepository.save(rental2);
 
+        var rental2Income = new ArrayList<IncomeSpec>();
         for (int month = 1; month <= 12; month++) {
-            incomeRepository.save(new PropertyIncomeEntity(rental2, tenant,
-                    LocalDate.of(2025, month, 1), new BigDecimal("4200.00"),
-                    "rent", "Monthly rent"));
+            rental2Income.add(rent(LocalDate.of(2025, month, 1), "4200.00"));
         }
-        expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 2, 1), new BigDecimal("6200.00"),
-                "insurance", "Annual homeowners insurance"));
-        expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 4, 10), new BigDecimal("7800.00"),
-                "tax", "Property tax - H1"));
-        expenseRepository.save(new PropertyExpenseEntity(rental2, tenant,
-                LocalDate.of(2025, 8, 15), new BigDecimal("1500.00"),
-                "maintenance", "Landscaping and irrigation repair"));
+        var rental2Expenses = List.of(
+                expense(LocalDate.of(2025, 2, 1), "6200.00",
+                        "insurance", "Annual homeowners insurance"),
+                expense(LocalDate.of(2025, 4, 10), "7800.00", "tax", "Property tax - H1"),
+                expense(LocalDate.of(2025, 8, 15), "1500.00",
+                        "maintenance", "Landscaping and irrigation repair"));
+        demoDataSeeder.seedProperty(tenant, rental2, rental2Income, rental2Expenses);
+    }
+
+    private static IncomeSpec rent(LocalDate date, String amount) {
+        return new IncomeSpec(date, new BigDecimal(amount), "rent", "Monthly rent");
+    }
+
+    private static ExpenseSpec expense(LocalDate date, String amount, String category, String description) {
+        return new ExpenseSpec(date, new BigDecimal(amount), category, description);
     }
 }
