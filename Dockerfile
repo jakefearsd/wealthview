@@ -19,8 +19,10 @@ RUN npm run build --workspace=frontend
 # Result: /app/frontend/dist
 
 # Stage 2: Build backend
-# Pinned by digest (maven:3.9-eclipse-temurin-21, JDK 21.0.10+7 at time of pin).
-FROM maven:3.9-eclipse-temurin-21@sha256:8e7dc4215c70f922e798c9f8aafa0a3734ca386342427b3dbb17cecc4a429c8e AS build
+# Pinned by digest (maven:3.9-eclipse-temurin-25, JDK 25.0.3+9 at time of pin).
+# To upgrade: `docker pull maven:3.9-eclipse-temurin-25` then
+# `docker inspect --format='{{index .RepoDigests 0}}' maven:3.9-eclipse-temurin-25`.
+FROM maven:3.9-eclipse-temurin-25@sha256:7e461cec477077c1d9e50b13df8aef9018764410f4c4cd7c34803f10c4c99e4c AS build
 WORKDIR /app
 COPY backend/pom.xml backend/pom.xml
 COPY backend/wealthview-persistence/pom.xml backend/wealthview-persistence/pom.xml
@@ -34,8 +36,10 @@ COPY backend backend
 RUN cd backend && mvn clean package -DskipTests -q
 
 # Stage 3: Runtime
-# Pinned by digest (eclipse-temurin:21-jre-alpine, JDK 21.0.10+7 at time of pin).
-FROM eclipse-temurin:21-jre-alpine@sha256:ad0cdd9782db550ca7dde6939a16fd850d04e683d37d3cff79d84a5848ba6a5a
+# Pinned by digest (eclipse-temurin:25-jre-alpine, JDK 25.0.3+9 at time of pin).
+# To upgrade: `docker pull eclipse-temurin:25-jre-alpine` then
+# `docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:25-jre-alpine`.
+FROM eclipse-temurin:25-jre-alpine@sha256:28db6fdf60e38945e43d840c0333aeaec66c15943070104f7586fd3c9d1665b0
 WORKDIR /app
 RUN addgroup -S wv && adduser -S wv -G wv
 COPY --from=build --chown=wv:wv /app/backend/wealthview-app/target/*.jar app.jar
