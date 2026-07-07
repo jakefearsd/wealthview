@@ -7,14 +7,13 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
@@ -26,6 +25,7 @@ import com.wealthview.core.auth.SessionStateValidator;
 import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
+import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.EMAIL;
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;

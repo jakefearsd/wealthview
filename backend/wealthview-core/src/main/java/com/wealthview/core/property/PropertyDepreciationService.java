@@ -6,13 +6,13 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.DepreciationScheduleResult;
 import com.wealthview.core.property.dto.PropertyRequest;
 import com.wealthview.persistence.entity.PropertyEntity;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Coordinates depreciation configuration for properties.
@@ -83,7 +83,7 @@ class PropertyDepreciationService {
 
         try {
             property.setCostSegAllocations(MAPPER.writeValueAsString(allocations));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize cost seg allocations", e);
         }
         property.setBonusDepreciationRate(
@@ -126,7 +126,7 @@ class PropertyDepreciationService {
         }
         try {
             return MAPPER.readValue(json, new TypeReference<>() {});
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to parse cost seg allocations", e);
         }
     }

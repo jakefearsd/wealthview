@@ -8,11 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.dto.TierBasedSpendingPlan;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Parses scenario {@code params_json} blobs and spending-profile tier JSON into
@@ -55,7 +55,7 @@ final class ScenarioParamsParser {
                 }
                 tiers = tierList;
             }
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             log.warn("Failed to parse spending_tiers", e);
         }
 

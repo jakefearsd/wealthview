@@ -3,8 +3,8 @@ package com.wealthview.core.audit;
 import java.util.List;
 import java.util.Map;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 public final class AuditDetailsValidator {
 
@@ -56,7 +56,7 @@ public final class AuditDetailsValidator {
     private static int serializedSize(Map<String, Object> details) {
         try {
             return MAPPER.writeValueAsBytes(details).length;
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             // If it can't serialize, treat it as oversize so the caller emits a marker
             // rather than attempting to persist an unserializable map.
             return Integer.MAX_VALUE;

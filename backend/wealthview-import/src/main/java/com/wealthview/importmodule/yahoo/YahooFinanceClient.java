@@ -16,9 +16,9 @@ import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.price.YahooPriceClient;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 public class YahooFinanceClient implements YahooPriceClient {
 
@@ -27,11 +27,11 @@ public class YahooFinanceClient implements YahooPriceClient {
 
     private final RestClient restClient;
     private final long rateLimitMs;
-    // Parse Yahoo's JSON with our own Jackson 2 tree reader rather than requesting
-    // JsonNode from the RestClient: Spring Framework 7's default converters read
-    // into Jackson 3 (tools.jackson), which cannot populate a Jackson 2 JsonNode.
-    // Owning the ObjectMapper keeps the parsing independent of the HTTP converter
-    // stack. (Jackson 3 source migration is a separate phase.)
+    // Own a bare tree-reading ObjectMapper and fetch the response as a String,
+    // parsing it ourselves rather than asking the RestClient for a JsonNode. This
+    // keeps Yahoo parsing independent of the HTTP converter stack and its
+    // configuration, and the navigation below only reads literal field names, so a
+    // default mapper is sufficient.
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public YahooFinanceClient(RestClient restClient, long rateLimitMs) {

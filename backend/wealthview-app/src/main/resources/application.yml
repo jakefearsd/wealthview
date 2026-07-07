@@ -27,17 +27,26 @@ spring:
     enabled: true
     locations: classpath:db/migration
   jackson:
-    # Boot 4 defaults to Jackson 3 (tools.jackson). use-jackson2-defaults keeps
-    # the wire format Jackson-2-compatible: it configures the mapper via
-    # builder.configureForJackson2(), which disables WRITE_DATES_AS_TIMESTAMPS /
-    # WRITE_DURATIONS_AS_TIMESTAMPS and FAIL_ON_UNKNOWN_PROPERTIES — the behavior
-    # the old explicit serialization.write-dates-as-timestamps: false gave us.
-    # That key is dropped here because Jackson 3 moved the flag off
-    # SerializationFeature onto DateTimeFeature, so binding it under
-    # spring.jackson.serialization now fails. property-naming-strategy keeps
-    # responses snake_case. The Jackson 3 source migration is a separate phase.
-    use-jackson2-defaults: true
+    # Boot 4 auto-configures a native Jackson 3 (tools.jackson) JsonMapper for the
+    # HTTP message converters. With the Jackson-2 compatibility bridge removed,
+    # these explicit toggles reproduce the exact wire format the bridge used to
+    # provide (it ran builder.configureForJackson2() then re-disabled the same four
+    # features below):
+    #   - snake_case field names
+    #   - ISO-8601 date/duration strings, never epoch timestamps. In Jackson 3 these
+    #     flags moved off SerializationFeature onto DateTimeFeature, so they bind
+    #     under spring.jackson.datatype.datetime.*, not spring.jackson.serialization.*
+    #   - lenient deserialization: unknown JSON properties are ignored, not 400s
+    #   - no @JsonView default property inclusion
     property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: false
+    mapper:
+      default-view-inclusion: false
+    datatype:
+      datetime:
+        write-dates-as-timestamps: false
+        write-durations-as-timestamps: false
   servlet:
     multipart:
       max-file-size: 10MB

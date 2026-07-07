@@ -25,7 +25,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -35,6 +34,7 @@ import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.UserRepository;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Profile-gated bulk data seeder for the isolated load-test stack.

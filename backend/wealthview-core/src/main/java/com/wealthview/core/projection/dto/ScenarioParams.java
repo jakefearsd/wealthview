@@ -8,11 +8,11 @@ import org.springframework.lang.Nullable;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.annotation.JsonNaming;
 
 /**
  * The strongly-typed contents of a scenario's {@code params_json} column — the
@@ -72,7 +72,7 @@ public record ScenarioParams(
         }
         try {
             return mapper.readValue(paramsJson, ScenarioParams.class);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to parse params_json; treating scenario as parameterless", e);
             return EMPTY;
         }
@@ -86,7 +86,7 @@ public record ScenarioParams(
         }
         try {
             return mapper.writeValueAsString(this);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("ScenarioParams serialization failed", e);
         }
     }

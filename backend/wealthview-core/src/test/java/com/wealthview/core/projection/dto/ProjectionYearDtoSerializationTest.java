@@ -8,9 +8,10 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.PropertyNamingStrategies;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,8 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ProjectionYearDtoSerializationTest {
 
     private static final ObjectMapper CAMEL = new ObjectMapper();
-    private static final ObjectMapper SNAKE = new ObjectMapper()
-            .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+    private static final ObjectMapper SNAKE = JsonMapper.builder()
+            .propertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE)
+            .build();
 
     private static final Set<String> CAMEL_KEYS = Set.of(
             "year", "age", "startBalance", "contributions", "growth", "withdrawals", "endBalance",

@@ -8,8 +8,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.projection.dto.CreateSpendingProfileRequest;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
@@ -19,6 +17,8 @@ import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.SpendingProfileRepository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class SpendingProfileService {
@@ -105,7 +105,7 @@ public class SpendingProfileService {
         }
         try {
             return objectMapper.writeValueAsString(tiers);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to serialize spending tiers", e);
             return "[]";
         }

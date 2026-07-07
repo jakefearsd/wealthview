@@ -38,14 +38,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
-        <!-- Jackson 2 compatibility bridge (Boot 4 stop-gap): keeps the assembled
-             app configured with the Jackson 2 ObjectMapper (com.fasterxml.jackson)
-             via spring.jackson.use-jackson2-defaults, preserving snake_case wire
-             behavior. Removed when the Jackson 3 source migration lands. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-jackson2</artifactId>
-        </dependency>
         <!--
             OpenTelemetry tracing — DISABLED BY DEFAULT.
             Activated via management.tracing.enabled=true and an OTLP endpoint

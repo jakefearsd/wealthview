@@ -11,8 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.exchangerate.ExchangeRateService;
@@ -36,6 +34,8 @@ import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class ProjectionInputBuilder {
@@ -136,7 +136,7 @@ public class ProjectionInputBuilder {
             }
 
             return new GuardrailSpendingInput(yearlySpending, conversionByYear);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             log.warn("Failed to parse guardrail yearly_spending", e);
             return null;
         }

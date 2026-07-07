@@ -8,10 +8,10 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.SpendingProfileEntity;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 public record SpendingProfileResponse(
         UUID id,
@@ -32,7 +32,7 @@ public record SpendingProfileResponse(
                 tiers = MAPPER.readValue(entity.getSpendingTiers(),
                         new TypeReference<>() {});
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             log.warn("Failed to parse spending tiers JSON for profile {}", entity.getId(), e);
         }
 

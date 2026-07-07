@@ -7,13 +7,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
   jackson:
-    # Boot 4 defaults to Jackson 3. use-jackson2-defaults restores the
-    # Jackson-2-compatible wire behavior (dropped the explicit
-    # serialization.write-dates-as-timestamps: false, which no longer binds under
-    # Jackson 3's SerializationFeature). Mirrors the app's base profile.
-    use-jackson2-defaults: true
-    property-naming-strategy: SNAKE_CASE
-  jackson2:
+    # Native Jackson 3 wire config. The date/duration timestamp toggles,
+    # lenient-unknown-properties, and view-inclusion settings are inherited from the
+    # app's base application.yml (deep-merged for the "it" profile); snake_case is
+    # restated here for clarity.
     property-naming-strategy: SNAKE_CASE
 
 management:

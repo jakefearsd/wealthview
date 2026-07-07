@@ -14,8 +14,6 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
@@ -27,6 +25,8 @@ import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 // GodClass: this service is the single orchestration point for the guardrail/Roth optimization
 // lifecycle (validate -> build input -> optimize -> persist -> map). The members are highly
@@ -183,7 +183,7 @@ public class GuardrailProfileService {
             if (optimizerResult.conversionSchedule() != null) {
                 entity.setConversionSchedule(MAPPER.writeValueAsString(optimizerResult.conversionSchedule()));
             }
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize guardrail data", e);
         }
     }
@@ -218,7 +218,7 @@ public class GuardrailProfileService {
         try {
             phases = MAPPER.readValue(existing.getPhases(),
                     MAPPER.getTypeFactory().constructCollectionType(List.class, GuardrailPhaseInput.class));
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             phases = List.of();
         }
 

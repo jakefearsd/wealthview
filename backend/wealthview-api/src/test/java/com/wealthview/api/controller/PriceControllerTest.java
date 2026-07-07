@@ -7,12 +7,11 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.api.exception.GlobalExceptionHandler;
 import com.wealthview.api.security.JwtAuthenticationFilter;
 import com.wealthview.api.security.SecurityConfig;
@@ -23,10 +22,12 @@ import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.price.PriceService;
 import com.wealthview.core.price.dto.PriceRequest;
 import com.wealthview.core.price.dto.PriceResponse;
+import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedMember;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedViewer;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -94,6 +95,29 @@ class PriceControllerTest {
                         .with(authenticatedAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.close_price").value(185.50));
+    }
+
+    @Test
+    void getLatest_serializesDateAsIsoStringMoneyWithScaleAndSnakeCase() throws Exception {
+        // Wire-format characterization guard for the Jackson 3 migration: the JSON
+        // contract must keep ISO-8601 date STRINGS (never epoch numbers/arrays),
+        // BigDecimal money with its scale preserved (185.50, not 185.5), and
+        // snake_case field names. Asserts the raw response body, not jsonPath
+        // coercions, so string-vs-number and scale drift are actually caught.
+        var response = new PriceResponse("AAPL", LocalDate.of(2025, 1, 15),
+                new BigDecimal("185.50"), "manual");
+        when(priceService.getLatestPrice("AAPL")).thenReturn(response);
+
+        var content = mockMvc.perform(get("/api/v1/prices/AAPL/latest")
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(content)
+                .contains("\"date\":\"2025-01-15\"")
+                .contains("\"close_price\":185.50")
+                .doesNotContain("closePrice")
+                .doesNotContain("1736899200");
     }
 
     @Test

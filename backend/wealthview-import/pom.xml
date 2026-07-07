@@ -38,12 +38,5 @@
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
         </dependency>
-        <!-- Jackson 2 compatibility bridge (Boot 4 stop-gap): YahooFinanceClient
-             parses responses with com.fasterxml.jackson (Jackson 2). Removed when
-             the Jackson 3 source migration lands. -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-jackson2</artifactId>
-        </dependency>
     </dependencies>
 </project>

@@ -6,9 +6,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 public record GuardrailProfileResponse(
         UUID id,
@@ -50,7 +50,7 @@ public record GuardrailProfileResponse(
                     new TypeReference<List<GuardrailPhaseInput>>() {});
             yearlySpending = MAPPER.readValue(entity.getYearlySpending(),
                     new TypeReference<List<GuardrailYearlySpending>>() {});
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+        } catch (tools.jackson.core.JacksonException e) {
             phases = List.of();
             yearlySpending = List.of();
         }
@@ -60,7 +60,7 @@ public record GuardrailProfileResponse(
             try {
                 conversionSchedule = MAPPER.readValue(entity.getConversionSchedule(),
                         RothConversionScheduleResponse.class);
-            } catch (com.fasterxml.jackson.core.JsonProcessingException ignored) {
+            } catch (tools.jackson.core.JacksonException ignored) {
                 // leave null — entity predates conversion optimizer
             }
         }
