@@ -34,6 +34,7 @@ import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.UserRepository;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -259,7 +260,7 @@ public class LoadTestDataSeeder implements ApplicationRunner {
             objectMapper.writerWithDefaultPrettyPrinter().writeValue(file, manifest);
             log.info("Wrote load-test manifest with {} tenants to {}",
                     manifest.tenants().size(), manifestPath);
-        } catch (IOException e) {
+        } catch (IOException | JacksonException e) {
             throw new IllegalStateException("Failed to write load-test manifest to " + manifestPath, e);
         }
     }
