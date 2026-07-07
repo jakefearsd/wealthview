@@ -17,6 +17,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wealthview.core.price.YahooPriceClient;
 
 public class YahooFinanceClient implements YahooPriceClient {
@@ -26,6 +27,12 @@ public class YahooFinanceClient implements YahooPriceClient {
 
     private final RestClient restClient;
     private final long rateLimitMs;
+    // Parse Yahoo's JSON with our own Jackson 2 tree reader rather than requesting
+    // JsonNode from the RestClient: Spring Framework 7's default converters read
+    // into Jackson 3 (tools.jackson), which cannot populate a Jackson 2 JsonNode.
+    // Owning the ObjectMapper keeps the parsing independent of the HTTP converter
+    // stack. (Jackson 3 source migration is a separate phase.)
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public YahooFinanceClient(RestClient restClient, long rateLimitMs) {
         this.restClient = restClient;
@@ -39,14 +46,14 @@ public class YahooFinanceClient implements YahooPriceClient {
             long period1 = from.atStartOfDay().toEpochSecond(ZoneOffset.UTC);
             long period2 = to.atTime(23, 59, 59).toEpochSecond(ZoneOffset.UTC);
 
-            var response = restClient.get()
+            var body = restClient.get()
                     .uri(CHART_PATH + "{symbol}?period1={p1}&period2={p2}&interval=1d",
                             symbol, period1, period2)
                     .header("User-Agent", "Mozilla/5.0")
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
 
-            var points = parseChartResponse(response);
+            var points = parseChartResponse(body == null ? null : objectMapper.readTree(body));
             sleepForRateLimit();
             if (points.isEmpty()) {
                 return FetchResult.failure(
@@ -75,13 +82,13 @@ public class YahooFinanceClient implements YahooPriceClient {
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     public Optional<BigDecimal> fetchCurrentPrice(String symbol) {
         try {
-            var response = restClient.get()
+            var body = restClient.get()
                     .uri(CHART_PATH + "{symbol}?range=1d&interval=1d", symbol)
                     .header("User-Agent", "Mozilla/5.0")
                     .retrieve()
-                    .body(JsonNode.class);
+                    .body(String.class);
 
-            var points = parseChartResponse(response);
+            var points = parseChartResponse(body == null ? null : objectMapper.readTree(body));
             if (points.isEmpty()) {
                 return Optional.empty();
             }

@@ -18,9 +18,15 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
+        <!-- Boot 4 modularized the monolithic spring-boot-autoconfigure: the
+             Flyway auto-configuration now lives in spring-boot-flyway, pulled by
+             this starter. Depending on raw flyway-core alone (the Boot 3 setup)
+             no longer wires migrations, so both the app and @DataJpaTest slices
+             would skip them. flyway-database-postgresql stays explicit — the
+             starter does not bring the PostgreSQL-specific extension. -->
         <dependency>
-            <groupId>org.flywaydb</groupId>
-            <artifactId>flyway-core</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
@@ -30,6 +36,15 @@
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <!-- Boot 4 moved the @DataJpaTest slice (plus @AutoConfigureTestDatabase
+             and TestEntityManager) out of spring-boot-starter-test into dedicated
+             test-slice modules. This starter restores them for the repository
+             integration tests. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

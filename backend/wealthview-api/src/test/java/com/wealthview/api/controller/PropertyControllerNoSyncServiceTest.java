@@ -4,8 +4,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests PropertyController's 503 branches for endpoints that depend on
  * {@link com.wealthview.core.property.PropertyValuationSyncService}.
  *
- * <p>Uses a separate test class without @MockBean for PropertyValuationSyncService
+ * <p>Uses a separate test class without @MockitoBean for PropertyValuationSyncService
  * so that the @Nullable injection resolves to null, triggering the 503 paths.
  */
 @WebMvcTest(PropertyController.class)
@@ -40,24 +40,24 @@ class PropertyControllerNoSyncServiceTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private PropertyService propertyService;
 
-    @MockBean
+    @MockitoBean
     private PropertyValuationService valuationService;
 
-    @MockBean
+    @MockitoBean
     private PropertyAnalyticsService analyticsService;
 
-    @MockBean
+    @MockitoBean
     private PropertyRoiService roiService;
 
     // PropertyValuationSyncService intentionally NOT mocked — @Nullable → null → 503
 
-    @MockBean
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
+    @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();

@@ -4,7 +4,8 @@ import jakarta.annotation.PostConstruct;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -19,6 +20,9 @@ import com.wealthview.app.it.testutil.TestDataHelper;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         classes = WealthViewApplication.class
 )
+// Boot 4 moved TestRestTemplate into spring-boot-resttestclient; @SpringBootTest no
+// longer registers the bean automatically, so opt in explicitly.
+@AutoConfigureTestRestTemplate
 @ActiveProfiles("it")
 public abstract class AbstractApiIntegrationTest {
 
@@ -65,15 +69,22 @@ public abstract class AbstractApiIntegrationTest {
         // request via AuthHelper#authHeaders. Without this, the cookie jar would
         // make `HttpEntity.EMPTY` requests appear authenticated as soon as one
         // earlier login in the same test ran.
+        // Spring Framework 7 removed HttpComponentsClientHttpRequestFactory#setConnectTimeout;
+        // the TCP connect timeout is now configured on the HttpClient5 connection manager.
+        var connectionManager = org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder.create()
+                .setDefaultConnectionConfig(org.apache.hc.client5.http.config.ConnectionConfig.custom()
+                        .setConnectTimeout(org.apache.hc.core5.util.Timeout.ofSeconds(15))
+                        .build())
+                .build();
         var httpClient = org.apache.hc.client5.http.impl.classic.HttpClientBuilder.create()
                 .disableCookieManagement()
+                .setConnectionManager(connectionManager)
                 .build();
         var requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
-        // Generous, explicit timeouts. CI runs on small shared (2-core) GitHub-hosted
+        // Generous, explicit read timeout. CI runs on small shared (2-core) GitHub-hosted
         // runners where the full Testcontainers suite contends for CPU, so heavier
         // requests (e.g. stock-split unapply, or a GET while a backfill runs) can be
         // slow; the default socket timeout otherwise trips as "Read timed out".
-        requestFactory.setConnectTimeout(java.time.Duration.ofSeconds(15));
         requestFactory.setReadTimeout(java.time.Duration.ofSeconds(90));
         restTemplate.getRestTemplate().setRequestFactory(requestFactory);
         api = new ApiClient(restTemplate, authHelper);

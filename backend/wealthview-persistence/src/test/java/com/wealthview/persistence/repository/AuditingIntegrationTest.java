@@ -2,7 +2,7 @@ package com.wealthview.persistence.repository;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
+import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 
 import com.wealthview.persistence.AbstractIntegrationTest;
 import com.wealthview.persistence.entity.AccountEntity;

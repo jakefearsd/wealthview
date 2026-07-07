@@ -51,5 +51,13 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Boot 4 moved the @WebMvcTest slice out of spring-boot-starter-test
+             into its own module. This starter restores @WebMvcTest and the
+             MockMvc auto-configuration the controller tests rely on. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

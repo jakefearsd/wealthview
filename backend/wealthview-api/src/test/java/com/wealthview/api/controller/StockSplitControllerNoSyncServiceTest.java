@@ -2,8 +2,8 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * Tests the StockSplitController.sync() 503 branch: when StockSplitSyncService
  * is not available (Finnhub not configured), the endpoint returns 503.
  *
- * <p>Uses a separate test class without @MockBean for StockSplitSyncService
+ * <p>Uses a separate test class without @MockitoBean for StockSplitSyncService
  * so that Spring's ObjectProvider.getIfAvailable() returns null, triggering
  * the service-unavailable branch.
  */
@@ -34,16 +34,16 @@ class StockSplitControllerNoSyncServiceTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean
+    @MockitoBean
     private StockSplitService stockSplitService;
 
     // Note: StockSplitSyncService is intentionally NOT mocked here,
     // so ObjectProvider.getIfAvailable() returns null → 503 branch is exercised.
 
-    @MockBean
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
+    @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
     @Test

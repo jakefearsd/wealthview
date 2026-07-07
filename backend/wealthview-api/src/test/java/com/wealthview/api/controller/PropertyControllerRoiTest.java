@@ -5,8 +5,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -40,13 +40,13 @@ class PropertyControllerRoiTest {
     @Autowired
     private MockMvc mockMvc;
 
-    @MockBean private PropertyService propertyService;
-    @MockBean private PropertyValuationService valuationService;
-    @MockBean private PropertyAnalyticsService analyticsService;
-    @MockBean private PropertyRoiService roiService;
-    @MockBean(name = "propertyValuationSyncService") private PropertyValuationSyncService syncService;
-    @MockBean private JwtTokenProvider jwtTokenProvider;
-    @MockBean private SessionStateValidator sessionStateValidator;
+    @MockitoBean private PropertyService propertyService;
+    @MockitoBean private PropertyValuationService valuationService;
+    @MockitoBean private PropertyAnalyticsService analyticsService;
+    @MockitoBean private PropertyRoiService roiService;
+    @MockitoBean(name = "propertyValuationSyncService") private PropertyValuationSyncService syncService;
+    @MockitoBean private JwtTokenProvider jwtTokenProvider;
+    @MockitoBean private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();
     private static final UUID SOURCE_ID = UUID.randomUUID();

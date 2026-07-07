@@ -23,10 +23,15 @@ public final class TenantContext {
 
     private static AuthenticatedUser getAuthenticatedUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth == null || auth.getPrincipal() == null) {
+        if (auth == null) {
             throw new IllegalStateException("No authentication context available");
         }
+        // Spring Security 7 marks Authentication#getPrincipal() @Nullable (JSpecify);
+        // read it once and null-check the local so the dereference below is guarded.
         var principal = auth.getPrincipal();
+        if (principal == null) {
+            throw new IllegalStateException("No authentication context available");
+        }
         if (principal instanceof AuthenticatedUser user) {
             return user;
         }

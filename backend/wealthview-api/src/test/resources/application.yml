@@ -1,3 +1,14 @@
 spring:
   jackson:
+    # Boot 4 defaults to Jackson 3 (tools.jackson); use-jackson2-defaults keeps
+    # the Jackson-2-compatible wire behavior (matches the app's base profile).
+    # property-naming-strategy configures the Jackson 3 HTTP converter used by
+    # the @WebMvcTest slice to emit/read snake_case.
+    use-jackson2-defaults: true
+    property-naming-strategy: SNAKE_CASE
+  # The Jackson 2 compatibility bridge binds its ObjectMapper (the one injected
+  # into controller tests via @Autowired ObjectMapper) under the spring.jackson2
+  # prefix. Mirror the naming strategy here so test-serialized request bodies
+  # match what the controller converter expects.
+  jackson2:
     property-naming-strategy: SNAKE_CASE

@@ -2,8 +2,8 @@ package com.wealthview.api.controller;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * PriceSyncService is not available (Finnhub not configured), the endpoint
  * returns 503 with a descriptive error body.
  *
- * <p>Uses a separate test class without @MockBean for PriceSyncService
+ * <p>Uses a separate test class without @MockitoBean for PriceSyncService
  * so that it is null (injected as @Nullable), triggering the 503 branch.
  */
 @WebMvcTest(AdminPriceController.class)
@@ -37,13 +37,13 @@ class AdminPriceControllerNoPriceSyncTest {
 
     // PriceSyncService intentionally NOT mocked — @Nullable injection → null → 503
 
-    @MockBean
+    @MockitoBean
     private PriceService priceService;
 
-    @MockBean
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
+    @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
     @Test

@@ -20,7 +20,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.header.writers.StaticHeadersWriter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -48,7 +48,9 @@ public class SecurityConfig {
     @SuppressWarnings("PMD.SignatureDeclareThrowsException")
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         var csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
-        csrfRepo.setSecure(cookieSecure);
+        // Spring Security 7 removed setSecure(boolean); drive the cookie's Secure
+        // flag through the cookie customizer instead (identical behavior).
+        csrfRepo.setCookieCustomizer(cookie -> cookie.secure(cookieSecure));
         var csrfHandler = new CsrfTokenRequestAttributeHandler();
         // Resolve the token from the X-XSRF-TOKEN header, not as a request parameter,
         // since we use the double-submit-cookie pattern with header echo.
@@ -67,11 +69,16 @@ public class SecurityConfig {
                         // re-check the Authorization header directly here rather than
                         // relying on the filter's request attribute.
                         .ignoringRequestMatchers(
-                                new AntPathRequestMatcher("/api/v1/auth/login", "POST"),
-                                new AntPathRequestMatcher("/api/v1/auth/register", "POST"),
-                                new AntPathRequestMatcher("/api/v1/auth/refresh", "POST"),
-                                new AntPathRequestMatcher("/api/v1/auth/mfa/challenge", "POST"),
-                                new AntPathRequestMatcher("/api/v1/auth/token/**"),
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher(HttpMethod.POST, "/api/v1/auth/login"),
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher(HttpMethod.POST, "/api/v1/auth/register"),
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher(HttpMethod.POST, "/api/v1/auth/refresh"),
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher(HttpMethod.POST, "/api/v1/auth/mfa/challenge"),
+                                PathPatternRequestMatcher.withDefaults()
+                                        .matcher("/api/v1/auth/token/**"),
                                 bearerAuthorizationHeaderMatcher()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

@@ -60,11 +60,22 @@
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
+            <artifactId>spring-boot-starter-aspectj</artifactId>
         </dependency>
         <dependency>
             <groupId>dev.samstevens.totp</groupId>
             <artifactId>totp</artifactId>
+        </dependency>
+        <!-- Jackson 2 compatibility bridge (Boot 4 stop-gap). Boot 4 defaults to
+             Jackson 3 (tools.jackson); this restores the Jackson 2 databind
+             (com.fasterxml.jackson.*) that the projection/audit DTOs and services
+             compile against, plus the auto-config selected by
+             spring.jackson.use-jackson2-defaults. Flows transitively to the api,
+             import, projection, and app modules. Removed when the Jackson 3 source
+             migration lands (separate phase). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jackson2</artifactId>
         </dependency>
     </dependencies>
 

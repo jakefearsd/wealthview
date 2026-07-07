@@ -10,8 +10,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -65,25 +65,25 @@ class PropertyControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @MockitoBean
     private PropertyService propertyService;
 
-    @MockBean
+    @MockitoBean
     private PropertyValuationService valuationService;
 
-    @MockBean
+    @MockitoBean
     private PropertyAnalyticsService analyticsService;
 
-    @MockBean
+    @MockitoBean
     private PropertyRoiService roiService;
 
-    @MockBean(name = "propertyValuationSyncService")
+    @MockitoBean(name = "propertyValuationSyncService")
     private PropertyValuationSyncService syncService;
 
-    @MockBean
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
-    @MockBean
+    @MockitoBean
     private SessionStateValidator sessionStateValidator;
 
     private static final UUID PROPERTY_ID = UUID.randomUUID();

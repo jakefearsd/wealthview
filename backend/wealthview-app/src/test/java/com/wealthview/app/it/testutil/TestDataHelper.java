@@ -3,7 +3,7 @@ package com.wealthview.app.it.testutil;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 
 import com.wealthview.app.it.AuthHelper;
