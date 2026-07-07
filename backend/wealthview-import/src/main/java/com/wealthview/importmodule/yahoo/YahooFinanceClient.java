@@ -92,7 +92,7 @@ public class YahooFinanceClient implements YahooPriceClient {
             if (points.isEmpty()) {
                 return Optional.empty();
             }
-            return Optional.of(points.get(points.size() - 1).closePrice());
+            return Optional.of(points.getLast().closePrice());
         } catch (RestClientException e) {
             log.warn("Failed to fetch Yahoo current price for symbol {}", symbol, e);
             return Optional.empty();
