@@ -19,7 +19,7 @@
     <description>
         Self-hosted, multi-tenant personal finance platform covering investment portfolio monitoring,
         rental property tracking, and tax-aware retirement projection modeling.
-        Built on Java 21 / Spring Boot 3.5 / PostgreSQL 16.
+        Built on Java 25 / Spring Boot 4.1 / PostgreSQL 16.
     </description>
     <url>https://github.com/jakefearsd/wealthview</url>
     <inceptionYear>2024</inceptionYear>
@@ -516,7 +516,7 @@
                     <quiet>true</quiet>
                     <detectJavaApiLink>true</detectJavaApiLink>
                     <links>
-                        <link>https://docs.spring.io/spring-framework/docs/6.1.x/javadoc-api/</link>
+                        <link>https://docs.spring.io/spring-framework/docs/current/javadoc-api/</link>
                         <link>https://docs.spring.io/spring-data/commons/docs/current/api/</link>
                     </links>
                     <groups>

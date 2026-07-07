@@ -4,7 +4,7 @@
 
 WealthView is a self-hosted, multi-tenant personal finance app (investments, rental properties, retirement projections). See PROJECT.md for full architecture, data model, and feature roadmap.
 
-**Tech stack:** Java 21+ / Spring Boot 3.3+ / Maven multi-module backend, React 18+ / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
+**Tech stack:** Java 25 / Spring Boot 4.1 / Maven multi-module backend, React 18+ / Vite frontend, PostgreSQL 16+, Docker Compose deployment.
 
 **Monorepo layout:**
 - `backend/` — Maven multi-module: wealthview-api, wealthview-core, wealthview-persistence, wealthview-import, wealthview-projection, wealthview-app
@@ -42,7 +42,7 @@ If you catch yourself writing production code first, stop, delete it, write the 
 
 ---
 
-## Java Coding Conventions (Java 21+)
+## Java Coding Conventions (Java 25+)
 
 ### Modern Idioms — Use Them
 - **Records** for all DTOs, request/response objects, and value objects. Only use classes when you need mutability or inheritance.
