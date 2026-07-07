@@ -73,7 +73,7 @@ public class CombinedPortfolioHistoryService {
     @Timed("wealthview.dashboard.portfolio.history")
     @Transactional(readOnly = true)
     public CombinedPortfolioHistoryResponse computeHistory(UUID tenantId, int years) {
-        var clampedYears = Math.max(MIN_YEARS, Math.min(MAX_YEARS, years));
+        var clampedYears = Math.clamp(years, MIN_YEARS, MAX_YEARS);
         var endDate = LocalDate.now();
         var startDate = endDate.minusYears(clampedYears);
 
@@ -98,7 +98,7 @@ public class CombinedPortfolioHistoryService {
 
         var dataPointDates = generateFridays(startDate, endDate);
         // Always include today so the chart extends to the current date
-        if (dataPointDates.isEmpty() || !dataPointDates.get(dataPointDates.size() - 1).equals(endDate)) {
+        if (dataPointDates.isEmpty() || !dataPointDates.getLast().equals(endDate)) {
             dataPointDates.add(endDate);
         }
         if (dataPointDates.isEmpty()) {

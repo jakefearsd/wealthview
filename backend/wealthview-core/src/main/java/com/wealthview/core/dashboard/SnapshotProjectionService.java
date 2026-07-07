@@ -52,8 +52,8 @@ public class SnapshotProjectionService {
 
     @Transactional(readOnly = true)
     public SnapshotProjectionResponse computeProjection(UUID tenantId, int projectionYears, int lookbackYears) {
-        var clampedYears = Math.max(MIN_PROJECTION_YEARS, Math.min(MAX_PROJECTION_YEARS, projectionYears));
-        var clampedLookback = Math.max(MIN_LOOKBACK_YEARS, Math.min(MAX_LOOKBACK_YEARS, lookbackYears));
+        var clampedYears = Math.clamp(projectionYears, MIN_PROJECTION_YEARS, MAX_PROJECTION_YEARS);
+        var clampedLookback = Math.clamp(lookbackYears, MIN_LOOKBACK_YEARS, MAX_LOOKBACK_YEARS);
 
         var accounts = accountRepository.findByTenant_Id(tenantId);
         var properties = propertyRepository.findByTenant_Id(tenantId);
@@ -123,8 +123,8 @@ public class SnapshotProjectionService {
             return new AccountProjection(BigDecimal.ZERO, BigDecimal.ZERO);
         }
 
-        var first = dataPoints.get(0);
-        var last = dataPoints.get(dataPoints.size() - 1);
+        var first = dataPoints.getFirst();
+        var last = dataPoints.getLast();
         var currentValue = last.totalValue();
 
         // Need at least MIN_MONTHS_FOR_CAGR months of data

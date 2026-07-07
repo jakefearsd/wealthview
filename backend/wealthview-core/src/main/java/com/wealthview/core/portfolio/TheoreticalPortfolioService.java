@@ -53,7 +53,7 @@ public class TheoreticalPortfolioService {
 
     @Transactional(readOnly = true)
     public PortfolioHistoryResponse computeHistory(UUID tenantId, UUID accountId, int months) {
-        var clampedMonths = Math.max(MIN_MONTHS, Math.min(MAX_MONTHS, months));
+        var clampedMonths = Math.clamp(months, MIN_MONTHS, MAX_MONTHS);
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(Entities.notFound("Account"));
 
@@ -97,7 +97,7 @@ public class TheoreticalPortfolioService {
 
         var dataPointDates = generateFridays(startDate, endDate);
         // Always include today so the chart extends to the current date
-        if (dataPointDates.isEmpty() || !dataPointDates.get(dataPointDates.size() - 1).equals(endDate)) {
+        if (dataPointDates.isEmpty() || !dataPointDates.getLast().equals(endDate)) {
             dataPointDates.add(endDate);
         }
         var hasMoneyMarket = !moneyMarketHoldings.isEmpty();

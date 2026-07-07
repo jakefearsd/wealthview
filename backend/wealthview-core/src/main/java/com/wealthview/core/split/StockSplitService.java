@@ -196,7 +196,7 @@ public class StockSplitService {
             // recorded for future buyers.
             return 0;
         }
-        var anchorTenantId = affectedTenantIds.get(0);
+        var anchorTenantId = affectedTenantIds.getFirst();
         var prices = priceRepository.findBySymbolAndDateBefore(symbol, effectiveDate);
         int adjusted = 0;
         for (var price : prices) {

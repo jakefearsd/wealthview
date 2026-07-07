@@ -116,7 +116,7 @@ public class PropertyValuationSyncService {
         }
 
         if (candidates.size() == 1) {
-            var candidate = candidates.get(0);
+            var candidate = candidates.getFirst();
             storeZpid(property, candidate.zpid());
             return fetchByZpid(tenantId, propertyId, candidate.zpid());
         }
