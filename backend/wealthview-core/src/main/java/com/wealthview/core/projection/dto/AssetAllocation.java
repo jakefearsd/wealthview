@@ -9,6 +9,9 @@ public record AssetAllocation(Map<AssetClass, BigDecimal> weights) {
 
     private static final int SCALE = 6;
 
+    public static final AssetAllocation ALL_US =
+            fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
+
     public AssetAllocation {
         if (weights == null || weights.isEmpty()) {
             throw new IllegalArgumentException("AssetAllocation requires at least one weight");
@@ -46,7 +49,4 @@ public record AssetAllocation(Map<AssetClass, BigDecimal> weights) {
         weights.forEach((k, v) -> bd.put(k, BigDecimal.valueOf(v)));
         return new AssetAllocation(bd);
     }
-
-    public static final AssetAllocation ALL_US =
-            fromDoubles(Map.of(AssetClass.US_STOCK, 1.0));
 }

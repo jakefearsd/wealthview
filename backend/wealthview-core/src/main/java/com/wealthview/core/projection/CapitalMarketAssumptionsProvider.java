@@ -21,12 +21,32 @@ public class CapitalMarketAssumptionsProvider {
     private final AtomicReference<RealReturnMatrix> cachedMatrix = new AtomicReference<>();
     private final AtomicReference<Map<AssetClass, Double>> cachedGeoMeans = new AtomicReference<>();
 
+    /**
+     * A dense grid of historical real (inflation-adjusted) returns by year and asset class.
+     *
+     * <p><strong>Read-only view — do not mutate.</strong> Instances of this record are built once
+     * and cached by {@link CapitalMarketAssumptionsProvider} for reuse across the Monte Carlo hot
+     * path. The {@code years}, {@code classes}, and {@code realReturns} accessors return the
+     * backing arrays <em>by reference</em>, not a defensive copy — cheap access is the whole point
+     * of the cache. Any caller that mutates an element of these arrays corrupts the shared cache
+     * for every other caller. Treat every array returned from this record as immutable; copy it
+     * yourself before mutating if you ever need a scratch buffer.
+     */
     public record RealReturnMatrix(int[] years, AssetClass[] classes, double[][] realReturns) {}
 
     public CapitalMarketAssumptionsProvider(AssetClassReturnRepository repository) {
         this.repository = repository;
     }
 
+    /**
+     * Returns the cached {@link RealReturnMatrix}, building it on first access.
+     *
+     * <p><strong>Read-only view — do not mutate.</strong> The returned matrix (and its
+     * {@code years}/{@code classes}/{@code realReturns} arrays) is the single shared instance
+     * cached for all callers; it is not copied per call. Callers MUST NOT write into any of its
+     * arrays. This is a deliberate performance tradeoff for the Monte Carlo hot path — do not
+     * "fix" this by adding defensive copies here, as that would defeat the cache.
+     */
     public RealReturnMatrix matrix() {
         var existing = cachedMatrix.get();
         if (existing != null) {
