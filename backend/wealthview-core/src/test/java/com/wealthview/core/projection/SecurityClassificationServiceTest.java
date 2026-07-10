@@ -140,6 +140,25 @@ class SecurityClassificationServiceTest {
     }
 
     @Test
+    void deriveAllocation_moneyMarketHoldingWithNoPriceRow_classifiesAsCashUsingQuantity() {
+        // SPAXX (and other money-market sweep funds) have no row in the prices table at all --
+        // findLatestBySymbolIn() returns nothing for them. That must NOT cause the holding to be
+        // dropped: money-market holdings are valued at their quantity (stable $1.00 NAV) and
+        // classified as CASH regardless of price data.
+        var spaxx = moneyMarketHolding("SPAXX", "500");
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)).thenReturn(List.of(spaxx));
+        when(priceRepository.findLatestBySymbolIn(anyList())).thenReturn(List.of());
+
+        var result = service.deriveAllocation(tenantId, accountId);
+
+        assertThat(result.allocation().weights()).containsOnlyKeys(AssetClass.CASH);
+        assertThat(result.allocation().weights().get(AssetClass.CASH)).isEqualByComparingTo("1");
+        assertThat(result.unclassifiedSymbols()).isEmpty();
+        verify(overrideRepository, never()).findByTenantIdAndSymbol(any(), any());
+        verify(seedRepository, never()).findBySymbol(any());
+    }
+
+    @Test
     void deriveAllocation_holdingWithNoPrice_excludedFromAllocationTotal() {
         var unpriced = unpricedHolding("UNPRICED");
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)).thenReturn(List.of(unpriced));

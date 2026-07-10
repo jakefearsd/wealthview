@@ -63,12 +63,14 @@ public class SecurityClassificationService {
     /**
      * Derives the value-weighted asset-class mix of the account's current holdings.
      *
-     * <p>Money-market holdings are always classified as {@link AssetClass#CASH}. Any other
+     * <p>Money-market holdings are always classified as {@link AssetClass#CASH}, valued at
+     * their quantity (a money-market fund's NAV is a stable $1.00/share) — this happens
+     * unconditionally, regardless of whether a price row exists for the symbol. Any other
      * symbol with neither a tenant override nor a seed classification falls back to
      * {@link AssetClass#US_STOCK} and is collected into {@code unclassifiedSymbols} so callers
-     * can prompt for a manual classification. Holdings with no known price, or with a
-     * zero/negative value, do not contribute to the allocation. An account with no priced value
-     * (no holdings, or all holdings unpriced/zero) resolves to {@link AssetAllocation#ALL_US}
+     * can prompt for a manual classification. Non-money-market holdings with no known price, or
+     * with a zero/negative value, do not contribute to the allocation. An account with no priced
+     * value (no holdings, or all holdings unpriced/zero) resolves to {@link AssetAllocation#ALL_US}
      * with an empty unclassified set.
      */
     @Transactional(readOnly = true)
@@ -87,6 +89,19 @@ public class SecurityClassificationService {
         var total = BigDecimal.ZERO;
 
         for (var holding : holdings) {
+            if (holding.isMoneyMarket()) {
+                // Stable $1.00 NAV: dollar value equals share quantity. Classified as CASH
+                // unconditionally, even when the symbol has no row in the prices table (e.g.
+                // SPAXX, which has zero seeded price data).
+                var value = holding.getQuantity();
+                if (value.signum() <= 0) {
+                    continue;
+                }
+                valueByClass.merge(AssetClass.CASH, value, BigDecimal::add);
+                total = total.add(value);
+                continue;
+            }
+
             var price = latestPrices.get(holding.getSymbol());
             if (price == null) {
                 continue;
@@ -108,9 +123,6 @@ public class SecurityClassificationService {
     }
 
     private AssetClass classifyHolding(UUID tenantId, HoldingEntity holding, Set<String> unclassified) {
-        if (holding.isMoneyMarket()) {
-            return AssetClass.CASH;
-        }
         var explicit = resolveExplicitClass(tenantId, holding.getSymbol());
         if (explicit.isEmpty()) {
             unclassified.add(holding.getSymbol());
