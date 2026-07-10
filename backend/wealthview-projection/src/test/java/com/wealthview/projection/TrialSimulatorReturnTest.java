@@ -22,7 +22,7 @@ class TrialSimulatorReturnTest {
                 initTaxable, initTraditional, initRoth,
                 "taxable_first", null, null, null, 62, null,
                 cashReserveYears, 0.0, false,
-                taxableReturns, traditionalReturns, rothReturns);
+                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE);
     }
 
     @Test
@@ -75,7 +75,7 @@ class TrialSimulatorReturnTest {
         var config = new TrialSimulator.SimulationConfig(
                 100.0, 0.0, 0.0, "taxable_first", null,
                 null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn);
+                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE);
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {80.0, 80.0};        // year 2 floor (80) unfundable: only ~20 left
@@ -93,7 +93,7 @@ class TrialSimulatorReturnTest {
         var config = new TrialSimulator.SimulationConfig(
                 1000.0, 0.0, 0.0, "taxable_first", null,
                 null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn);
+                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE);
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {50.0, 50.0};
@@ -102,5 +102,26 @@ class TrialSimulatorReturnTest {
         var result = sim.simulateTrial(income, zero, floors, discretionary, 2, config);
 
         assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void simulateTrial_rmdAgeReached_forcesTraditionalDistributionToTaxable() {
+        // 1 year, no growth, no spending: taxable=0, traditional=100000, roth=0,
+        // marginalRateByYear={0.20}, rmdStartAge=75, retirementAge=75 (age year0 = 75).
+        // divisor(75)=24.6 -> rmd = 100000 / 24.6 = 4065.0406504065...
+        // Nothing is drawn for spending, so extra = rmd (capped at the 100000 traditional balance).
+        // taxExtra = rmd * 0.20; pools: traditional = 100000 - rmd; taxable += rmd - taxExtra.
+        // finalBalance = (100000 - rmd) + (rmd - taxExtra) = 100000 - taxExtra ~= 99186.99
+        // (the tax on the forced distribution is the only amount that leaves the portfolio).
+        double[] flatNoReturn = {0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                0.0, 100_000.0, 0.0, "taxable_first", new double[]{0.20},
+                null, null, 75, null, 0, 0.0, false,
+                flatNoReturn, flatNoReturn, flatNoReturn, 75);
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(99186.99, within(0.01));
     }
 }

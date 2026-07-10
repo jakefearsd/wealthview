@@ -188,7 +188,8 @@ final class JointConversionSearch {
                 ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                 ctx.sim().inflationRate(), searchTaxCtx, conversionByYear, conversionTaxByYear,
                 ctx.taxIncome().dsBracketCeilingByYear(),
-                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns());
+                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
+                ctx.sim().rmdStartAge());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

@@ -37,12 +37,13 @@ final class OptimizationContextBuilder {
         int retirementAge = retirementYear - input.birthYear();
         int endAge = input.endAge();
         int years = endAge - retirementAge;
+        int rmdStartAge = RmdCalculator.rmdStartAge(input.birthYear());
 
         if (years <= 0) {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null),
+                            null, null, null, null, rmdStartAge),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null));
         }
 
@@ -118,7 +119,7 @@ final class OptimizationContextBuilder {
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
-                        returnPaths.rothReturns()),
+                        returnPaths.rothReturns(), rmdStartAge),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),

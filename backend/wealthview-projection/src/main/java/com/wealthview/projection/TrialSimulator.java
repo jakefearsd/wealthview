@@ -43,7 +43,8 @@ final class TrialSimulator {
             double[] dsBracketCeilingByYear,
             int cashReserveYears, double cashReturnRate,
             boolean trackYearBalances,
-            double[] taxableReturns, double[] traditionalReturns, double[] rothReturns
+            double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+            int rmdStartAge
     ) {}
 
     /**
@@ -113,12 +114,17 @@ final class TrialSimulator {
                             / preGrowthTotal
                     : 0.0;
 
+            // Prior-year-end traditional balance — the IRS RMD basis for this year, snapshotted
+            // before this year's growth is applied.
+            double pools1PreGrowth = pools[1];
+
             pools[0] *= (1 + taxableReturn);
             pools[1] *= (1 + traditionalReturn);
             pools[2] *= (1 + rothReturn);
             cashBalance *= (1 + config.cashReturnRate());
 
             int age = config.retirementAge() + y;
+            double rmd = computeYearRmd(pools1PreGrowth, age, config.rmdStartAge());
 
             // Roth conversion execution
             applyTrialConversion(pools, config.conversionByYear(), config.conversionTaxByYear(), y, age);
@@ -134,7 +140,7 @@ final class TrialSimulator {
                     ? config.conversionByYear()[y] : 0;
             var drawn = splitWithdrawal(pools[0], pools[1], pools[2],
                     withdrawal, order, preAge595,
-                    dsCeiling, income[y], dsConvAmt, 0);
+                    dsCeiling, income[y], dsConvAmt, rmd);
 
             // Estimate tax on traditional withdrawal using pre-computed marginal rate
             double withdrawalTax = 0;
@@ -148,6 +154,13 @@ final class TrialSimulator {
             cashBalance = applyTrialWithdrawals(pools, cashBalance, drawn, withdrawalTax,
                     withdrawal, spending, hasPools, config.cashReserveYears(), portfolioReturn);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
+
+            // If the RMD exceeds what the spend withdrawal already drew from traditional, force
+            // the excess out physically -- it's a real, legally-required distribution even when
+            // the retiree doesn't need the cash. The after-tax remainder is reinvested to taxable.
+            double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
+            forceRmdExcess(pools, rmd, drawn.traditional(), marginalRate);
+
             double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
             if (resourcesForSpending < floors[y] - 1e-6) {
                 essentialFloorMet = false;
@@ -189,6 +202,40 @@ final class TrialSimulator {
         pools[0] = after[0];
         pools[1] = after[1];
         pools[2] = after[2];
+    }
+
+    /**
+     * Computes this year's Required Minimum Distribution from the prior-year-end traditional
+     * balance ({@code pools1PreGrowth}), per the IRS Uniform Lifetime Table. Returns {@code 0}
+     * before the owner reaches {@code rmdStartAge}, when there is no traditional balance, or
+     * when the table has no distribution period for the age (outside 72-120).
+     */
+    private static double computeYearRmd(double pools1PreGrowth, int age, int rmdStartAge) {
+        if (age < rmdStartAge || pools1PreGrowth <= 0) {
+            return 0;
+        }
+        double divisor = RmdCalculator.distributionPeriod(age);
+        return divisor > 0 ? pools1PreGrowth / divisor : 0;
+    }
+
+    /**
+     * Forces the RMD excess out of the traditional pool when the spend withdrawal didn't already
+     * draw enough to satisfy it: it's a real, legally-required distribution even when the retiree
+     * doesn't need the cash for spending. The after-tax remainder is reinvested to taxable; the
+     * tax on the forced distribution leaves the portfolio entirely (it is not itself reinvested).
+     */
+    private static void forceRmdExcess(double[] pools, double rmd, double traditionalDrawnForSpending,
+                                        double marginalRate) {
+        if (rmd <= 0) {
+            return;
+        }
+        double extra = Math.max(0, rmd - traditionalDrawnForSpending);
+        extra = Math.min(extra, pools[1]);
+        if (extra > 0) {
+            pools[1] -= extra;
+            double taxExtra = extra * marginalRate;
+            pools[0] += extra - taxExtra;
+        }
     }
 
     /**
