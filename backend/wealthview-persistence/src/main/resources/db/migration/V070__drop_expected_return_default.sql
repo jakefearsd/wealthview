@@ -1,0 +1,12 @@
+-- V070: drop the stale DEFAULT 0.07 on projection_accounts.expected_return.
+--
+-- V009 created expected_return as `numeric(5,4) NOT NULL DEFAULT 0.07`. V069
+-- dropped the NOT NULL constraint, turning the column into an optional
+-- override (null => derive the account's expected return from its
+-- allocation), but left the DEFAULT 0.07 in place. That's harmless through
+-- JPA -- Hibernate always writes an explicit NULL for a null field -- but it
+-- is a latent trap for any raw/bulk SQL INSERT that omits the column: such a
+-- row would silently receive 0.07, forcing the legacy override path and
+-- bypassing allocation-driven returns instead of falling through to the
+-- intended "derive from allocation" default behavior.
+ALTER TABLE projection_accounts ALTER COLUMN expected_return DROP DEFAULT;
