@@ -5,13 +5,9 @@ import java.util.List;
 
 import org.springframework.lang.Nullable;
 
-import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingFeasibilitySummary;
 import com.wealthview.core.projection.dto.SpendingPlan;
-
-import static com.wealthview.core.common.Money.ROUNDING;
-import static com.wealthview.core.common.Money.SCALE;
 
 /**
  * Evaluates whether a spending plan is sustainable across the projected years and
@@ -25,7 +21,9 @@ final class SpendingFeasibilityAnalyzer {
     /**
      * Walks the projected years and produces an overall feasibility summary for the
      * given spending plan, identifying the first shortfall year and the weakest
-     * (inflation-adjusted) retirement year.
+     * retirement year. The projection runs in real (today's-dollars) terms, so
+     * withdrawals, income and spending are already real and are compared directly —
+     * no per-year inflation deflation is applied.
      */
     // NPathComplexity: the per-year walk applies several independent shortfall/weak-year checks.
     // The path count multiplies across those checks but each is a simple comparison-and-record,
@@ -33,8 +31,7 @@ final class SpendingFeasibilityAnalyzer {
     @SuppressWarnings("PMD.NPathComplexity")
     @Nullable
     SpendingFeasibilitySummary computeFeasibility(List<ProjectionYearDto> yearlyData,
-                                                  @Nullable SpendingPlan spendingPlan,
-                                                  BigDecimal inflationRate) {
+                                                  @Nullable SpendingPlan spendingPlan) {
         if (spendingPlan == null) {
             return null;
         }
@@ -52,12 +49,10 @@ final class SpendingFeasibilityAnalyzer {
         BigDecimal sustainableForWeakest = null;
         BigDecimal requiredForWeakest = null;
 
-        int retiredYearIndex = 0;
         for (var year : yearlyData) {
             if (!year.retired()) {
                 continue;
             }
-            retiredYearIndex++;
 
             if (year.spendingSurplus() != null && year.spendingSurplus().compareTo(SHORTFALL_TOLERANCE) < 0
                     && firstShortfallYear == null) {
@@ -65,33 +60,21 @@ final class SpendingFeasibilityAnalyzer {
                 firstShortfallAge = year.age();
             }
 
-            BigDecimal availableNominal = year.withdrawals();
+            BigDecimal realAvailable = year.withdrawals();
             if (year.incomeStreamsTotal() != null) {
-                availableNominal = availableNominal.add(year.incomeStreamsTotal());
+                realAvailable = realAvailable.add(year.incomeStreamsTotal());
             }
 
-            BigDecimal nominalRequired = BigDecimal.ZERO;
+            BigDecimal realRequired = BigDecimal.ZERO;
             if (year.essentialExpenses() != null) {
-                nominalRequired = nominalRequired.add(year.essentialExpenses());
+                realRequired = realRequired.add(year.essentialExpenses());
             }
             if (year.discretionaryExpenses() != null) {
-                nominalRequired = nominalRequired.add(year.discretionaryExpenses());
+                realRequired = realRequired.add(year.discretionaryExpenses());
             }
             if (year.taxLiability() != null) {
-                nominalRequired = nominalRequired.add(year.taxLiability());
+                realRequired = realRequired.add(year.taxLiability());
             }
-
-            BigDecimal expenseInflationFactor = retiredYearIndex > 1
-                    ? CompoundGrowth.factor(inflationRate, retiredYearIndex - 1)
-                    : BigDecimal.ONE;
-
-            BigDecimal realAvailable = expenseInflationFactor.compareTo(BigDecimal.ZERO) > 0
-                    ? availableNominal.divide(expenseInflationFactor, SCALE, ROUNDING)
-                    : availableNominal;
-
-            BigDecimal realRequired = expenseInflationFactor.compareTo(BigDecimal.ZERO) > 0
-                    ? nominalRequired.divide(expenseInflationFactor, SCALE, ROUNDING)
-                    : nominalRequired;
 
             BigDecimal realSurplus = realAvailable.subtract(realRequired);
 

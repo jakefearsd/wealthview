@@ -59,11 +59,11 @@ class PortfolioPathGeneratorTest {
     }
 
     @Test
-    void generate_overrideAccount_growsAtFixedNominalWithNoVolatility() {
-        // Override real = (1.05 / 1.00) - 1 = 0.05 at zero inflation; toNominal(0.05, 0) = 0.05.
+    void generate_overrideAccount_growsAtFixedRealWithNoVolatility() {
+        // Override real = (1.05 / 1.00) - 1 = 0.05 at zero inflation; real terms grows at 0.05 directly.
         var model = PoolReturnModel.from(List.of(overrideAccount("100000", "0.05", "taxable")), 0.0);
 
-        var paths = PortfolioPathGenerator.generate(3, 4, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+        var paths = PortfolioPathGenerator.generate(3, 4, model, FLAT_US_MATRIX, new Random(1L));
 
         for (int t = 0; t < 3; t++) {
             assertAllClose(paths.taxableReturns()[t], 0.05);
@@ -71,14 +71,15 @@ class PortfolioPathGeneratorTest {
     }
 
     @Test
-    void generate_allocationAccount_appliesMatrixReturnAsNominal() {
-        // ALL_US against the flat +10% real matrix, 3% inflation -> nominal = 1.10 * 1.03 - 1 = 0.133.
+    void generate_allocationAccount_appliesMatrixReturnAsReal() {
+        // Real terms: ALL_US against the flat +10% real matrix grows at the real 0.10 directly
+        // (no Fisher conversion to nominal), regardless of the inflation assumption.
         var model = PoolReturnModel.from(List.of(allocationAccount("100000", AssetAllocation.ALL_US, "taxable")),
                 0.03);
 
-        var paths = PortfolioPathGenerator.generate(2, 3, model, FLAT_US_MATRIX, new Random(1L), 0.03);
+        var paths = PortfolioPathGenerator.generate(2, 3, model, FLAT_US_MATRIX, new Random(1L));
 
-        assertAllClose(paths.taxableReturns()[0], 1.10 * 1.03 - 1);
+        assertAllClose(paths.taxableReturns()[0], 0.10);
     }
 
     @Test
@@ -88,7 +89,7 @@ class PortfolioPathGeneratorTest {
                 overrideAccount("100000", "0.05", "taxable"),
                 allocationAccount("300000", AssetAllocation.ALL_US, "taxable")), 0.0);
 
-        var paths = PortfolioPathGenerator.generate(1, 2, model, FLAT_US_MATRIX, new Random(1L), 0.0);
+        var paths = PortfolioPathGenerator.generate(1, 2, model, FLAT_US_MATRIX, new Random(1L));
 
         assertAllClose(paths.taxableReturns()[0], 0.0875);
     }
@@ -101,7 +102,7 @@ class PortfolioPathGeneratorTest {
                 allocationAccount("100000", AssetAllocation.ALL_US, "taxable"),
                 allocationAccount("100000", AssetAllocation.ALL_US, "traditional")), 0.0);
 
-        var paths = PortfolioPathGenerator.generate(2, 3, model, FLAT_US_MATRIX, new Random(7L), 0.0);
+        var paths = PortfolioPathGenerator.generate(2, 3, model, FLAT_US_MATRIX, new Random(7L));
 
         for (int t = 0; t < 2; t++) {
             assertArraysClose(paths.rothReturns()[t], paths.taxableReturns()[t]);
@@ -122,7 +123,7 @@ class PortfolioPathGeneratorTest {
         var stockBond = AssetAllocation.fromDoubles(Map.of(AssetClass.US_STOCK, 0.7, AssetClass.BOND, 0.3));
         var model = PoolReturnModel.from(List.of(allocationAccount("500000", stockBond, "taxable")), 0.02);
 
-        var paths = PortfolioPathGenerator.generate(200, 25, model, matrix, new Random(42L), 0.02);
+        var paths = PortfolioPathGenerator.generate(200, 25, model, matrix, new Random(42L));
 
         double first = paths.portfolioPaths()[0][25];
         boolean anyDifferent = false;

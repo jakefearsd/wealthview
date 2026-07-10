@@ -963,8 +963,8 @@
     "spendingFeasible" : false,
     "firstShortfallYear" : 2044,
     "firstShortfallAge" : 84,
-    "sustainableAnnualSpending" : 58420.5443,
-    "requiredAnnualSpending" : 62731.4629
+    "sustainableAnnualSpending" : 102440.7780,
+    "requiredAnnualSpending" : 110000.0000
   },
   "finalNetWorth" : null
 }

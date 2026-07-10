@@ -191,9 +191,9 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
-    void optimize_essentialFloorInflatesOverTime() {
-        // The essential floor should increase with the scenario's inflation rate.
-        // $30k floor at 3% inflation should be ~$68.5k by year 28 (age 89).
+    void optimize_essentialFloorConstantRealOverTime() {
+        // Real terms: the essential floor is expressed in today's dollars and held CONSTANT real
+        // across all years — it does NOT inflate.
         var phases = List.of(
                 new GuardrailPhaseInput("All", 62, null, 1));
 
@@ -215,10 +215,10 @@ class MonteCarloSpendingOptimizerTest {
                 .as("First year floor should be ~$30k")
                 .isCloseTo(30000, org.assertj.core.data.Offset.offset(1000.0));
 
-        // 30000 * (1.03)^27 = ~66,685 (year index 27, 28 years total)
+        // Constant real: last-year floor equals the first-year floor (~$30k), no inflation escalation.
         assertThat(lastYear.essentialFloor().doubleValue())
-                .as("Last year floor should be inflated: $30k * (1.03)^27 ≈ $66.7k")
-                .isGreaterThan(60000);
+                .as("Last year floor should still be ~$30k (constant real)")
+                .isCloseTo(30000, org.assertj.core.data.Offset.offset(1000.0));
     }
 
     @Test
@@ -672,7 +672,7 @@ class MonteCarloSpendingOptimizerTest {
                     .max(BigDecimal.ZERO);
             assertThat(year.portfolioWithdrawal())
                     .as("Age %d: portfolio_withdrawal should equal recommended - income_offset", year.age())
-                    .isEqualByComparingTo(expectedWithdrawal);
+                    .isCloseTo(expectedWithdrawal, org.assertj.core.data.Offset.offset(new BigDecimal("0.01")));
         }
     }
 
@@ -718,9 +718,10 @@ class MonteCarloSpendingOptimizerTest {
                 .filter(y -> y.age() == 65)
                 .findFirst().orElseThrow();
 
+        // Real terms: gross deflated over 3 years at 3% ($100k/1.03^3 ≈ $91.5k) minus real $60k ≈ $31.5k.
         assertThat(atAge65.incomeOffset().doubleValue())
-                .as("Rental income at non-boundary age should be net: $100k - $60k = $40k")
-                .isCloseTo(40000, org.assertj.core.data.Offset.offset(1000.0));
+                .as("Rental income at non-boundary age should be net of expenses (real terms)")
+                .isCloseTo(31514, org.assertj.core.data.Offset.offset(1000.0));
     }
 
     @Test
@@ -751,9 +752,10 @@ class MonteCarloSpendingOptimizerTest {
                 .filter(y -> y.age() == 65)
                 .findFirst().orElseThrow();
 
+        // Real terms: fixed-nominal SS deflated over 3 years at 3% ($30k/1.03^3 ≈ $27,454); no expenses.
         assertThat(atAge65.incomeOffset().doubleValue())
-                .as("Non-rental income should use full amount")
-                .isCloseTo(30000, org.assertj.core.data.Offset.offset(1000.0));
+                .as("Non-rental income should use full amount, net of no expenses (real terms)")
+                .isCloseTo(27454, org.assertj.core.data.Offset.offset(1000.0));
     }
 
     @Test
@@ -1417,11 +1419,10 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
-    void optimize_withInflation_nominalReturnsProduceHigherSpending() {
-        // Bootstrap returns are real (~7% mean). With 3% inflation, nominal returns
-        // become ~10%. Portfolio grows faster in nominal terms → can sustain more
-        // nominal spending. Before fix: inflation makes optimizer pessimistic (FAILS).
-        // After fix: nominal returns match nominal spending → higher spending (PASSES).
+    void optimize_realTerms_inflationDoesNotChangeAllocationDrivenSpending() {
+        // Real terms: an allocation-driven portfolio grows at REAL matrix returns (inflation-
+        // independent) and spending is constant real, so the scenario inflation rate does not change
+        // the recommended REAL spending. With the same seed, the 3% and 0% runs are essentially equal.
         var phases = List.of(
                 new GuardrailPhaseInput("All", 62, null, 1));
 
@@ -1455,9 +1456,8 @@ class MonteCarloSpendingOptimizerTest {
         var resultWithInflation = optimizer.optimize(withInflation);
         var resultNoInflation = optimizer.optimize(noInflation);
 
-        // With inflation: floors inflate (spending grows) but portfolio also grows
-        // at nominal rate. Discretionary should be higher because portfolio has
-        // more nominal growth to fund the nominal spending.
+        // Real terms: inflation is neutral for allocation-driven portfolios, so the average
+        // discretionary spending is essentially identical between the 3% and 0% runs.
         var avgDiscWithInflation = resultWithInflation.yearlySpending().stream()
                 .mapToDouble(y -> y.discretionary().doubleValue())
                 .average().orElse(0);
@@ -1466,8 +1466,8 @@ class MonteCarloSpendingOptimizerTest {
                 .average().orElse(0);
 
         assertThat(avgDiscWithInflation)
-                .as("With inflation, nominal portfolio growth should fund more discretionary spending")
-                .isGreaterThan(avgDiscNoInflation);
+                .as("Real terms: inflation does not change allocation-driven real discretionary spending")
+                .isCloseTo(avgDiscNoInflation, org.assertj.core.data.Percentage.withPercentage(1.0));
     }
 
     @Test
@@ -1544,9 +1544,12 @@ class MonteCarloSpendingOptimizerTest {
                 .filter(y -> y.age() == 65)
                 .findFirst().orElseThrow();
 
+        // Real terms: gross deflated to today's dollars over 3 years at 3% ($100k/1.03^3 = $91,514),
+        // then real/constant expenses+principal ($60k) deducted -> $31,514. Principal is still deducted
+        // (without it the offset would be ~$51,514).
         assertThat(atAge65.incomeOffset().doubleValue())
-                .as("Income offset must deduct mortgage principal: $100k - $30k - $10k - $20k = $40k")
-                .isCloseTo(40000, org.assertj.core.data.Offset.offset(500.0));
+                .as("Income offset must deduct mortgage principal (real terms)")
+                .isCloseTo(31514, org.assertj.core.data.Offset.offset(500.0));
     }
 
     @Test
@@ -1621,16 +1624,17 @@ class MonteCarloSpendingOptimizerTest {
 
         var result = optimizer.optimize(input);
 
-        // At age 67 (year 6, non-boundary): gross = $100k × 1.1^5 ≈ $161k, net = $161k - $60k ≈ $101k
-        // Pre-fix: ($100k - $60k) × 1.1^5 = $64.4k
+        // Real terms, age 67 (5 steps): gross grows at source 10% then deflates at scenario 3%
+        // ($100k × 1.10^5 / 1.03^5 ≈ $138.9k), THEN real expenses ($60k) are subtracted ≈ $78.9k.
+        // The gross-before-expenses path (~$78.9k) stays well above the inflate-net path
+        // (($100k-$60k) × 1.10^5 / 1.03^5 ≈ $55.6k).
         var atAge67 = result.yearlySpending().stream()
                 .filter(y -> y.age() == 67)
                 .findFirst().orElseThrow();
 
         assertThat(atAge67.incomeOffset().doubleValue())
-                .as("Rental income after 5yr at 10% inflation: gross inflates to ~$161k, net = ~$101k. "
-                        + "Pre-fix (inflate net) would give ~$64k.")
-                .isGreaterThan(90000);
+                .as("Rental income (real terms): gross grown-then-deflated before subtracting expenses")
+                .isGreaterThan(75000);
     }
 
     // === Withdrawal tax modeling ===

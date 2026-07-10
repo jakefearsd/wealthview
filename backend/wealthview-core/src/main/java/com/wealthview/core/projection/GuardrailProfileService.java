@@ -44,7 +44,11 @@ public class GuardrailProfileService {
     private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
     private static final int DEFAULT_PHASE_BLEND_YEARS = 1;
     private static final int DEFAULT_CASH_RESERVE_YEARS = 2;
-    private static final BigDecimal DEFAULT_CASH_RETURN_RATE = new BigDecimal("0.04");
+    // Real-terms projection: the cash-reserve sleeve return is a REAL rate. A ~4% nominal money-market
+    // yield deflated at 2.5% inflation is ~1.5% real.
+    private static final BigDecimal DEFAULT_CASH_RETURN_RATE = new BigDecimal("0.015");
+    // Real-terms default inflation assumption (matches the deterministic engine).
+    private static final BigDecimal DEFAULT_INFLATION_RATE = new BigDecimal("0.025");
 
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final ProjectionScenarioRepository scenarioRepository;
@@ -290,7 +294,7 @@ public class GuardrailProfileService {
                 scenario.getRetirementDate(),
                 birthYear,
                 scenario.getEndAge() != null ? scenario.getEndAge() : 90,
-                scenario.getInflationRate() != null ? scenario.getInflationRate() : BigDecimal.ZERO,
+                scenario.getInflationRate() != null ? scenario.getInflationRate() : DEFAULT_INFLATION_RATE,
                 projectionInput.accounts(),
                 projectionInput.incomeSources(),
                 request.essentialFloor() != null ? request.essentialFloor() : BigDecimal.ZERO,

@@ -25,10 +25,11 @@ import static org.mockito.Mockito.when;
  * the same schedule.
  *
  * <p>The fixture is a single-filer with a large traditional IRA and a flat-20% tax model
- * (matching the sibling {@code RothConversionOptimizerTest} stub). The captured schedule
- * shows a genuine Roth-conversion benefit — lifetime tax falls from $463,987 to $302,677 —
- * and the traditional balance is fully drawn down by the end age, both of which are
- * plausible. These assertions are the contract the Phase 3 decomposition must preserve.
+ * (matching the sibling {@code RothConversionOptimizerTest} stub). The projection runs in REAL
+ * (today's-dollars) terms: the portfolio grows at the real return assumption and spending is
+ * constant real, so the captured schedule still shows a genuine Roth-conversion benefit — lifetime
+ * tax falls from $405,160 to $337,312 — while the slower, constant-real drawdown leaves a small
+ * traditional balance at the end age. These assertions are the contract the decomposition must preserve.
  */
 class RothConversionOptimizerCharacterizationTest {
 
@@ -81,10 +82,12 @@ class RothConversionOptimizerCharacterizationTest {
 
         assertThat(schedule.conversionByYear()).hasSize(28);
         assertThat(schedule.conversionFraction()).isEqualTo(1.0, offset(TOL));
-        assertThat(schedule.lifetimeTaxWith()).isEqualTo(302676.54723117733, offset(1e-3));
-        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(463987.1013815104, offset(1e-3));
-        assertThat(schedule.exhaustionAge()).isEqualTo(82);
-        assertThat(schedule.exhaustionTargetMet()).isTrue();
+        assertThat(schedule.lifetimeTaxWith()).isEqualTo(337311.70943966054, offset(1e-3));
+        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(405159.95124977175, offset(1e-3));
+        assertThat(schedule.exhaustionAge()).isEqualTo(90);
+        // Real terms: constant-real (lower) spending draws down traditional more slowly, so it is not
+        // fully exhausted to the target by the end age (see pinsFinalYear: $46,131 remains).
+        assertThat(schedule.exhaustionTargetMet()).isFalse();
         assertThat(schedule.targetTraditionalBalance()).isEqualTo(1217700.0, offset(1e-3));
     }
 
@@ -115,7 +118,7 @@ class RothConversionOptimizerCharacterizationTest {
         assertThat(schedule.conversionByYear()[1]).isEqualTo(100000.0, offset(1e-3));
         assertThat(schedule.traditionalBalance()[1]).isEqualTo(805240.0, offset(1e-3));
         assertThat(schedule.rothBalance()[1]).isEqualTo(262180.0, offset(1e-3));
-        assertThat(schedule.taxableBalance()[1]).isEqualTo(43740.0, offset(1e-3));
+        assertThat(schedule.taxableBalance()[1]).isEqualTo(44940.0, offset(1e-3));
     }
 
     @Test
@@ -124,9 +127,9 @@ class RothConversionOptimizerCharacterizationTest {
 
         // Index 13 = age 75, first year an RMD applies for a 1963 birth year.
         assertThat(schedule.conversionByYear()[13]).isEqualTo(0.0, offset(TOL));
-        assertThat(schedule.traditionalBalance()[13]).isEqualTo(417108.03964045603, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[13]).isEqualTo(568949.8286769011, offset(1e-3));
         assertThat(schedule.rothBalance()[13]).isEqualTo(896472.2964736733, offset(1e-3));
-        assertThat(schedule.projectedRmd()[13]).isEqualTo(18976.287612797838, offset(1e-3));
+        assertThat(schedule.projectedRmd()[13]).isEqualTo(24284.169272487674, offset(1e-3));
     }
 
     @Test
@@ -134,8 +137,8 @@ class RothConversionOptimizerCharacterizationTest {
         var schedule = goldenOptimizer().optimize();
 
         assertThat(schedule.conversionByYear()[27]).isEqualTo(0.0, offset(TOL));
-        assertThat(schedule.traditionalBalance()[27]).isEqualTo(0.0, offset(TOL));
-        assertThat(schedule.rothBalance()[27]).isEqualTo(1314306.55831796, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[27]).isEqualTo(46131.06304972322, offset(1e-3));
+        assertThat(schedule.rothBalance()[27]).isEqualTo(2026837.7613215828, offset(1e-3));
         assertThat(schedule.taxableBalance()[27]).isEqualTo(0.0, offset(TOL));
     }
 

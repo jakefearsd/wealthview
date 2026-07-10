@@ -68,16 +68,17 @@ final class OptimizationContextBuilder {
         // Run MC trials (no withdrawals) to get per-pool return sequences plus the blended
         // total-portfolio path. Each account's real return comes from a fixed override or its
         // allocation blended against the capital-market matrix (shared index sequence per trial);
-        // per-pool returns are balance-weighted and converted to nominal (Fisher) so growth matches
-        // the nominal spending/income model.
+        // per-pool returns are balance-weighted. The projection is REAL terms, so pools grow at
+        // these real returns directly (no Fisher conversion), matching the constant-real
+        // spending/income model.
         PoolReturnModel returnModel = PoolReturnModel.from(input.accounts(), inflationRate);
         PortfolioReturnPaths returnPaths = PortfolioPathGenerator.generate(
-                trialCount, years, returnModel, matrix, rng, inflationRate);
+                trialCount, years, returnModel, matrix, rng);
         double[][] portfolioPaths = returnPaths.portfolioPaths();
 
-        // Compute deterministic income for each year
+        // Compute deterministic income for each year (real terms: deflated by scenario inflation)
         IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(
-                input.incomeSources(), retirementAge, years);
+                input.incomeSources(), retirementAge, years, inflationRate);
         FilingStatus filingStatus = input.filingStatus() != null
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
@@ -91,10 +92,10 @@ final class OptimizationContextBuilder {
                 incomeArrays.taxableIncomeByYear(), input.incomeSources(),
                 retirementAge, input.birthYear(), years);
 
-        // Verify essential floor feasibility (inflation-adjusted)
+        // Verify essential floor feasibility (constant real)
         double[] adjustedFloors = SustainabilitySearch.verifyEssentialFloor(
                 portfolioPaths, incomeArrays.incomeByYear(), essentialFloor,
-                confidenceLevel, years, trialCount, inflationRate);
+                confidenceLevel, years, trialCount);
 
         double[] marginalRates = MarginalRateCalculator.compute(
                 taxCalculator, rentalAwareTaxableIncome, retirementYear, years, filingStatus);
@@ -105,7 +106,7 @@ final class OptimizationContextBuilder {
 
         double[] dsBracketCeilingByYear = computeDsBracketCeilings(
                 withdrawalOrder, input.dynamicSequencingBracketRate(),
-                years, retirementYear, filingStatus, input.inflationRate());
+                years, retirementYear, filingStatus);
 
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
@@ -145,8 +146,7 @@ final class OptimizationContextBuilder {
     private double[] computeDsBracketCeilings(String withdrawalOrder,
                                               BigDecimal dynamicSequencingBracketRate,
                                               int years, int retirementYear,
-                                              FilingStatus filingStatus,
-                                              BigDecimal inflationRate) {
+                                              FilingStatus filingStatus) {
         if (!PoolStrategy.WITHDRAWAL_ORDER_DYNAMIC_SEQUENCING.equals(withdrawalOrder)
                 || dynamicSequencingBracketRate == null
                 || taxCalculator == null) {
@@ -154,9 +154,10 @@ final class OptimizationContextBuilder {
         }
         double[] ceilings = new double[years];
         for (int y = 0; y < years; y++) {
+            // Real-terms: brackets are constant real, so the ceiling is NOT inflation-indexed.
             ceilings[y] = taxCalculator.computeMaxIncomeForBracket(
                     dynamicSequencingBracketRate, retirementYear + y, filingStatus,
-                    inflationRate).doubleValue();
+                    BigDecimal.ZERO).doubleValue();
         }
         return ceilings;
     }

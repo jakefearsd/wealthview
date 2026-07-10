@@ -121,11 +121,12 @@ final class RothConversionOptimizer {
             otherIncomeAtRmd += rentalAdj;
         }
 
-        // Bracket ceiling with headroom
+        // Bracket ceiling with headroom. Real-terms: brackets are constant real, so the ceiling is
+        // NOT inflation-indexed.
         int rmdCalendarYear = birthYear + rmdStartAge;
         double grossCeiling = config.taxCalculator().computeMaxIncomeForBracket(
                 BigDecimal.valueOf(rmdTargetBracketRate), rmdCalendarYear, config.filingStatus(),
-                BigDecimal.valueOf(config.inflationRate())).doubleValue();
+                BigDecimal.ZERO).doubleValue();
         double availableForRmd = grossCeiling * (1 - rmdBracketHeadroom) - otherIncomeAtRmd;
 
         log.info("Target balance computation: rmdStartAge={}, distributionPeriod={}, "

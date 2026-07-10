@@ -517,7 +517,8 @@ class GuardrailProfileServiceTest {
         assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("0.05");
         assertThat(input.phaseBlendYears()).isEqualTo(1);
         assertThat(input.cashReserveYears()).isEqualTo(2);
-        assertThat(input.cashReturnRate()).isEqualByComparingTo("0.04");
+        // Real terms: the cash-reserve sleeve return default is a REAL rate (~4% nominal deflated).
+        assertThat(input.cashReturnRate()).isEqualByComparingTo("0.015");
         assertThat(input.terminalBalanceTarget()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.phases()).isEmpty();
     }
@@ -528,7 +529,8 @@ class GuardrailProfileServiceTest {
                 tenant, "Empty", LocalDate.of(2030, 1, 1), null, null, null);
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioSansDefaults);
         assertThat(input.endAge()).isEqualTo(90);
-        assertThat(input.inflationRate()).isEqualByComparingTo(BigDecimal.ZERO);
+        // Real terms: inflation defaults to 2.5% (matches the deterministic engine).
+        assertThat(input.inflationRate()).isEqualByComparingTo(new BigDecimal("0.025"));
     }
 
     // ---- paramsJson parsing ----

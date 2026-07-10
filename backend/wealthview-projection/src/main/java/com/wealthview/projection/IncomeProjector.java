@@ -22,7 +22,7 @@ final class IncomeProjector {
     }
 
     static IncomeYearData[] computeDeterministic(List<ProjectionIncomeSourceInput> sources,
-                                                 int retirementAge, int years) {
+                                                 int retirementAge, int years, double scenarioInflationRate) {
         IncomeYearData[] result = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
             result[y] = new IncomeYearData(0, 0);
@@ -40,14 +40,7 @@ final class IncomeProjector {
                 if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
-                double gross = source.annualAmount().doubleValue();
-
-                if (source.inflationRate() != null
-                        && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-                    gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), yearsInRetirement - 1);
-                }
-
-                double amount = gross;
+                double amount = realGrossForYear(source, yearsInRetirement - 1, scenarioInflationRate);
 
                 // For rental properties, subtract all cash outflows to get net cash flow,
                 // matching IncomeSourceProcessor: operating expenses, mortgage interest,
@@ -126,6 +119,27 @@ final class IncomeProjector {
         }
 
         return result;
+    }
+
+    /**
+     * The source's REAL (today's-dollars) gross amount at {@code steps = yearsInRetirement - 1}: grown
+     * by the source's own inflation, then deflated by scenario inflation over the same steps (COLA
+     * source -> constant real; fixed-nominal source -> eroded). One-time sources pay their face amount
+     * unchanged, matching {@link IncomeYearMath#realAmount}.
+     */
+    private static double realGrossForYear(ProjectionIncomeSourceInput source, int steps,
+                                           double scenarioInflationRate) {
+        double gross = source.annualAmount().doubleValue();
+        if (source.oneTime()) {
+            return gross;
+        }
+        if (source.inflationRate() != null && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
+            gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), steps);
+        }
+        if (scenarioInflationRate > 0 && steps > 0) {
+            gross /= CompoundGrowth.factor(scenarioInflationRate, steps);
+        }
+        return gross;
     }
 
     private static double nullSafe(BigDecimal value) {

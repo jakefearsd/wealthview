@@ -232,7 +232,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         log.info("{} for scenario '{}': {} years, final balance {}",
                 ctx.pool().logTag(), ctx.input().scenarioName(), yearlyData.size(), finalBalance);
 
-        var feasibility = feasibilityAnalyzer.computeFeasibility(yearlyData, ctx.spendingPlan(), ctx.inflationRate());
+        var feasibility = feasibilityAnalyzer.computeFeasibility(yearlyData, ctx.spendingPlan());
         BigDecimal finalNetWorth = yearlyData.isEmpty() ? null : yearlyData.getLast().totalNetWorth();
         return new ProjectionResultResponse(ctx.input().scenarioId(), yearlyData, finalBalance,
                 acc.yearsInRetirement(), feasibility, finalNetWorth);

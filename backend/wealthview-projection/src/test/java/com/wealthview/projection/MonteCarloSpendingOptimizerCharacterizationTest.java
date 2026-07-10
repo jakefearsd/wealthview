@@ -25,11 +25,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * <p>The fixture is a healthy three-phase retirement: a $1.5M all-US-equity (allocation-driven)
  * taxable account whose Monte Carlo returns are drawn per-pool from the shared
- * {@link ProjectionTestFixtures#TEST_CMA_MATRIX} joint bootstrap (Task 15). Spending stays capped
- * at the per-phase targets (well within capacity), so the recommendation values are unchanged; the
- * balance/percentile statistics were regenerated against the new return model and sanity-checked:
- * a 0.1% failure rate at the 90% confidence level, a positive $10.84M median terminal balance, and
- * a non-degenerate fan (10th-percentile terminal $4.49M &lt; median). These assertions are the
+ * {@link ProjectionTestFixtures#TEST_CMA_MATRIX} joint bootstrap (Task 15). The projection now runs
+ * in REAL (today's-dollars) terms: pools grow at real matrix returns and spending is constant real,
+ * so the recommendation equals each phase's target exactly ($70k/$55k/$45k, no inflation
+ * escalation). The balance/percentile statistics are today's-dollars and were regenerated: a 0.2%
+ * failure rate at the 90% confidence level, a positive $4.63M median terminal balance, and a
+ * non-degenerate fan (10th-percentile terminal $1.88M &lt; median). These assertions are the
  * behavior contract the optimizer must preserve.
  */
 class MonteCarloSpendingOptimizerCharacterizationTest {
@@ -60,9 +61,9 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         GuardrailProfileResponse r = optimizer.optimize(goldenInput());
 
         assertThat(r.yearlySpending()).hasSize(28);
-        assertThat(r.medianFinalBalance()).isEqualByComparingTo(new BigDecimal("10842861.2838"));
-        assertThat(r.failureRate()).isEqualByComparingTo(new BigDecimal("0.0010"));
-        assertThat(r.percentile10Final()).isEqualByComparingTo(new BigDecimal("4485983.3902"));
+        assertThat(r.medianFinalBalance()).isEqualByComparingTo(new BigDecimal("4628581.8448"));
+        assertThat(r.failureRate()).isEqualByComparingTo(new BigDecimal("0.0020"));
+        assertThat(r.percentile10Final()).isEqualByComparingTo(new BigDecimal("1875947.1011"));
     }
 
     @Test
@@ -74,11 +75,11 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(first.year()).isEqualTo(2030);
         assertThat(first.age()).isEqualTo(62);
         assertThat(first.phaseName()).isEqualTo("Go-Go");
-        assertThat(first.recommended()).isEqualByComparingTo(new BigDecimal("74391.6379"));
-        assertThat(first.corridorLow()).isEqualByComparingTo(new BigDecimal("74391.6379"));
-        assertThat(first.corridorHigh()).isEqualByComparingTo(new BigDecimal("223174.9138"));
-        assertThat(first.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("74391.6379"));
-        assertThat(first.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("1594208.3621"));
+        assertThat(first.recommended()).isEqualByComparingTo(new BigDecimal("70000.0000"));
+        assertThat(first.corridorLow()).isEqualByComparingTo(new BigDecimal("70000.0000"));
+        assertThat(first.corridorHigh()).isEqualByComparingTo(new BigDecimal("210000.0000"));
+        assertThat(first.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("70000.0000"));
+        assertThat(first.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("1550000.0000"));
     }
 
     @Test
@@ -90,8 +91,8 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(year.year()).isEqualTo(2040);
         assertThat(year.age()).isEqualTo(72);
         assertThat(year.phaseName()).isEqualTo("Slow-Go");
-        assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("76866.3979"));
-        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("2725836.8832"));
+        assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("55000.0000"));
+        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("1947550.9909"));
     }
 
     @Test
@@ -103,8 +104,8 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(year.year()).isEqualTo(2050);
         assertThat(year.age()).isEqualTo(82);
         assertThat(year.phaseName()).isEqualTo("No-Go");
-        assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("82282.2919"));
-        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("5924788.6681"));
+        assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("45000.0000"));
+        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("3124900.2444"));
     }
 
     @Test
@@ -116,8 +117,8 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(last.year()).isEqualTo(2057);
         assertThat(last.age()).isEqualTo(89);
         assertThat(last.phaseName()).isEqualTo("No-Go");
-        assertThat(last.recommended()).isEqualByComparingTo(new BigDecimal("98889.4027"));
-        assertThat(last.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("10842861.2838"));
+        assertThat(last.recommended()).isEqualByComparingTo(new BigDecimal("45000.0000"));
+        assertThat(last.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("4628581.8448"));
     }
 
     @Test

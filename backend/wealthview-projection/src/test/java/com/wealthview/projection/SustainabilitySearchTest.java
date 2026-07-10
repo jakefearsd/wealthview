@@ -5,27 +5,24 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Test;
 
-import com.wealthview.core.common.CompoundGrowth;
-
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SustainabilitySearchTest {
 
     @Test
-    void verifyEssentialFloor_ampleBalance_returnsInflatedFloorEveryYear() {
+    void verifyEssentialFloor_ampleBalance_returnsConstantRealFloorEveryYear() {
         int years = 5;
         int trialCount = 4;
         double essentialFloor = 10_000;
-        double inflationRate = 0.03;
         double[][] paths = flatPaths(trialCount, years, 1_000_000);
         double[] income = new double[years];
 
         double[] floors = SustainabilitySearch.verifyEssentialFloor(
-                paths, income, essentialFloor, 0.90, years, trialCount, inflationRate);
+                paths, income, essentialFloor, 0.90, years, trialCount);
 
+        // Real terms: the essential floor is held constant real (today's dollars) every year.
         for (int y = 0; y < years; y++) {
-            assertThat(floors[y])
-                    .isEqualTo(CompoundGrowth.inflate(essentialFloor, inflationRate, y));
+            assertThat(floors[y]).isEqualTo(essentialFloor);
         }
     }
 
@@ -37,7 +34,7 @@ class SustainabilitySearchTest {
         double[] income = {2_000, 2_000, 2_000};
 
         double[] floors = SustainabilitySearch.verifyEssentialFloor(
-                paths, income, 10_000, 0.90, years, trialCount, 0.0);
+                paths, income, 10_000, 0.90, years, trialCount);
 
         // The 5k portfolio is wiped out by the first 8k net floor withdrawal, so every
         // year's affordable floor collapses to the income-only capacity of 2k.
@@ -50,7 +47,6 @@ class SustainabilitySearchTest {
         int trialCount = 20;
         double essentialFloor = 30_000;
         double confidenceLevel = 0.85;
-        double inflationRate = 0.025;
         var rng = new Random(42);
         double[][] paths = new double[trialCount][years + 1];
         for (int t = 0; t < trialCount; t++) {
@@ -65,10 +61,10 @@ class SustainabilitySearchTest {
         }
 
         double[] floors = SustainabilitySearch.verifyEssentialFloor(
-                paths, income, essentialFloor, confidenceLevel, years, trialCount, inflationRate);
+                paths, income, essentialFloor, confidenceLevel, years, trialCount);
 
         double[] expected = referenceEssentialFloor(
-                paths, income, essentialFloor, confidenceLevel, years, trialCount, inflationRate);
+                paths, income, essentialFloor, confidenceLevel, years, trialCount);
         assertThat(floors).containsExactly(expected);
     }
 
@@ -86,16 +82,17 @@ class SustainabilitySearchTest {
      */
     private static double[] referenceEssentialFloor(double[][] paths, double[] income,
                                                     double essentialFloor, double confidenceLevel,
-                                                    int years, int trialCount, double inflationRate) {
+                                                    int years, int trialCount) {
         double[] floors = new double[years];
         int confidenceIndex = (int) Math.ceil((1 - confidenceLevel) * trialCount) - 1;
         confidenceIndex = Math.max(0, Math.min(confidenceIndex, trialCount - 1));
 
+        // Real terms: the essential floor is constant real across years.
         double[] inflatedFloors = new double[years];
         double[] floorWithdrawals = new double[years];
         for (int y = 0; y < years; y++) {
-            inflatedFloors[y] = CompoundGrowth.inflate(essentialFloor, inflationRate, y);
-            floorWithdrawals[y] = Math.max(0, inflatedFloors[y] - income[y]);
+            inflatedFloors[y] = essentialFloor;
+            floorWithdrawals[y] = Math.max(0, essentialFloor - income[y]);
         }
 
         for (int y = 0; y < years; y++) {

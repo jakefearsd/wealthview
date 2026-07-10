@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
-import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 
 /**
@@ -47,27 +46,27 @@ final class SustainabilitySearch {
             double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns) {}
 
     /**
-     * Verifies the inflation-adjusted essential floor against portfolio capacity at the
-     * required confidence level, returning the affordable floor for each retirement year.
+     * Verifies the essential floor against portfolio capacity at the required confidence level,
+     * returning the affordable floor for each retirement year. Real-terms projection: the floor is
+     * constant real (today's dollars), so it is NOT inflation-escalated across years.
      */
-    // AvoidArrayLoops: PMD sees `floors[y] = inflatedFloors[y]` and assumes a plain array copy,
+    // AvoidArrayLoops: PMD sees `floors[y] = realFloors[y]` and assumes a plain array copy,
     // but the assignment is conditional (the else branch clamps to portfolio capacity), so
     // Arrays.copyOf / System.arraycopy is not an equivalent substitute.
     @SuppressWarnings("PMD.AvoidArrayLoops")
     static double[] verifyEssentialFloor(double[][] paths, double[] income,
                                           double essentialFloor,
-                                          double confidenceLevel, int years, int trialCount,
-                                          double inflationRate) {
+                                          double confidenceLevel, int years, int trialCount) {
         double[] floors = new double[years];
         int confidenceIndex = (int) Math.ceil((1 - confidenceLevel) * trialCount) - 1;
         confidenceIndex = Math.max(0, Math.min(confidenceIndex, trialCount - 1));
 
-        // Pre-compute inflation-adjusted floor withdrawals per year
+        // Constant-real floor withdrawals per year (floor held constant in today's dollars).
         double[] inflatedFloors = new double[years];
         double[] floorWithdrawals = new double[years];
         for (int y = 0; y < years; y++) {
-            inflatedFloors[y] = CompoundGrowth.inflate(essentialFloor, inflationRate, y);
-            floorWithdrawals[y] = Math.max(0, inflatedFloors[y] - income[y]);
+            inflatedFloors[y] = essentialFloor;
+            floorWithdrawals[y] = Math.max(0, essentialFloor - income[y]);
         }
 
         // Simulate year-by-year balances with floor withdrawals and compounded growth,
@@ -178,17 +177,18 @@ final class SustainabilitySearch {
             if (phase.targetSpending() != null
                     && phase.targetSpending().compareTo(BigDecimal.ZERO) > 0) {
                 double avgFloor = 0;
-                double avgInflatedTarget = 0;
+                double avgTarget = 0;
                 int count = 0;
-                double nominalTarget = phase.targetSpending().doubleValue();
+                // Real-terms projection: the per-phase target is constant real (today's dollars).
+                double realTarget = phase.targetSpending().doubleValue();
                 for (int y = phaseStart; y <= phaseEnd; y++) {
                     avgFloor += floors[y];
-                    avgInflatedTarget += CompoundGrowth.inflate(nominalTarget, ctx.inflationRate(), y);
+                    avgTarget += realTarget;
                     count++;
                 }
                 avgFloor = count > 0 ? avgFloor / count : 0;
-                avgInflatedTarget = count > 0 ? avgInflatedTarget / count : nominalTarget;
-                double maxDiscretionary = Math.max(0, avgInflatedTarget - avgFloor);
+                avgTarget = count > 0 ? avgTarget / count : realTarget;
+                double maxDiscretionary = Math.max(0, avgTarget - avgFloor);
                 capped = Math.min(found, maxDiscretionary);
             } else {
                 capped = found;

@@ -33,7 +33,6 @@ final class ConversionSimulator {
 
     // Frequently used config values, unpacked for readability.
     private final double returnMean;
-    private final double inflationRate;
     private final double essentialFloor;
     private final double conversionBracketRate;
     private final double dynamicSequencingBracketRate;
@@ -51,7 +50,6 @@ final class ConversionSimulator {
         this.config = config;
         this.targetTraditionalBalance = targetTraditionalBalance;
         this.returnMean = config.returnMean();
-        this.inflationRate = config.inflationRate();
         this.essentialFloor = config.essentialFloor();
         this.conversionBracketRate = config.conversionBracketRate();
         this.dynamicSequencingBracketRate = config.dynamicSequencingBracketRate();
@@ -116,7 +114,7 @@ final class ConversionSimulator {
 
             // Step 4: Spending withdrawals
             var withdrawal = processSpendingWithdrawal(taxable, traditional, roth,
-                    yearIndex, age, baseOtherIncome, effectiveOtherIncome,
+                    age, baseOtherIncome, effectiveOtherIncome,
                     rmdResult.rmdAmount(), convResult.conversionAmount(), calendarYear);
             taxable = withdrawal.taxable();
             traditional = withdrawal.traditional();
@@ -266,7 +264,7 @@ final class ConversionSimulator {
 
             double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
                     BigDecimal.valueOf(bracketRate), calendarYear, filingStatus,
-                    BigDecimal.valueOf(inflationRate)).doubleValue();
+                    BigDecimal.ZERO).doubleValue();
             double bracketSpace = Math.max(0, bracketCeiling - effectiveOtherIncome
                     - rmdAmount - conversionAmount);
             double tradDraw = Math.min(bracketSpace, Math.min(traditional, remaining));
@@ -349,11 +347,11 @@ final class ConversionSimulator {
 
     private WithdrawalResult processSpendingWithdrawal(
             double taxable, double traditional, double roth,
-            int yearIndex, int age, double baseOtherIncome,
+            int age, double baseOtherIncome,
             double effectiveOtherIncome, double rmdAmount, double conversionAmount,
             int calendarYear) {
 
-        double inflatedSpending = CompoundGrowth.inflate(essentialFloor, inflationRate, yearIndex);
+        double inflatedSpending = essentialFloor;
         double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
 
         if (netSpendingNeed <= 0) {
@@ -373,13 +371,13 @@ final class ConversionSimulator {
      */
     private double constrainConversionByAffordability(
             double maxConversion, double effectiveIncome, double taxable,
-            double baseOtherIncome, int yearIndex, int age, int calendarYear) {
+            double baseOtherIncome, int age, int calendarYear) {
         if (age >= RetirementAges.EARLY_WITHDRAWAL_AGE) {
             return maxConversion;
         }
         double tentativeTax = computeIncrementalTax(
                 maxConversion, effectiveIncome, calendarYear);
-        double inflatedSpending = CompoundGrowth.inflate(essentialFloor, inflationRate, yearIndex);
+        double inflatedSpending = essentialFloor;
         double netSpendingNeed = Math.max(0, inflatedSpending - baseOtherIncome);
         double available = taxable - netSpendingNeed;
         if (available <= 0) {
@@ -421,7 +419,7 @@ final class ConversionSimulator {
             // Compute bracket space and conversion amount
             double bracketCeiling = taxCalculator.computeMaxIncomeForBracket(
                     BigDecimal.valueOf(conversionBracketRate), calendarYear, filingStatus,
-                    BigDecimal.valueOf(inflationRate)).doubleValue();
+                    BigDecimal.ZERO).doubleValue();
             double bracketSpace = Math.max(0, bracketCeiling - effectiveIncome);
             double maxConversion = bracketSpace * conversionFraction;
 
@@ -444,7 +442,7 @@ final class ConversionSimulator {
 
             maxConversion = constrainConversionByAffordability(
                     maxConversion, effectiveIncome, taxable, baseOtherIncome,
-                    yearIndex, age, calendarYear);
+                    age, calendarYear);
 
             double newConversion = Math.min(maxConversion, traditional);
             double newTax = newConversion > 0

@@ -15,9 +15,9 @@ import com.wealthview.projection.PoolReturnModel.AccountReturnSource;
  * capital-market matrix (shared across all pools/accounts so correlation is preserved). Every
  * account's real return for the trial is then resolved from that sequence — a fixed override real
  * return, or its allocation blended against the sampled matrix rows — and each pool's real return
- * is the balance-weighted average of its accounts' returns. Real returns are converted to nominal
- * via the Fisher equation so portfolio growth matches the optimizer's nominal spending/income model
- * (the Monte Carlo stays in the nominal frame this task; a real-terms migration is a later change).
+ * is the balance-weighted average of its accounts' returns. The whole projection runs in REAL
+ * (today's-dollars) terms, so pools grow at these real returns directly — no Fisher conversion to
+ * nominal — matching the optimizer's constant-real spending/income model.
  *
  * <p>This class is stateless. Determinism is the caller's responsibility — the supplied
  * {@link Random} is the single source of randomness and must be seeded by the caller.
@@ -30,11 +30,11 @@ final class PortfolioPathGenerator {
     }
 
     /**
-     * Runs {@code trialCount} bootstrap trials (no withdrawals) and returns per-pool nominal return
-     * sequences plus a blended cumulative total-portfolio balance path.
+     * Runs {@code trialCount} bootstrap trials (no withdrawals) and returns per-pool REAL return
+     * sequences plus a blended cumulative total-portfolio balance path (also real).
      */
     static PortfolioReturnPaths generate(int trialCount, int years, PoolReturnModel model,
-                                         RealReturnMatrix matrix, Random rng, double inflationRate) {
+                                         RealReturnMatrix matrix, Random rng) {
         double[][] taxable = new double[trialCount][];
         double[][] traditional = new double[trialCount][];
         double[][] roth = new double[trialCount][];
@@ -46,28 +46,25 @@ final class PortfolioPathGenerator {
         for (int t = 0; t < trialCount; t++) {
             int[] indexSequence = bootstrap.generateIndexSequence(years, historicalSize);
 
-            double[] portfolioNominal = poolNominalReturns(
-                    model.allAccounts(), model.totalBalance(), indexSequence, matrix, inflationRate, years, null);
-            taxable[t] = poolNominalReturns(
-                    model.taxable(), model.taxableBalance(), indexSequence, matrix, inflationRate, years,
-                    portfolioNominal);
-            traditional[t] = poolNominalReturns(
-                    model.traditional(), model.traditionalBalance(), indexSequence, matrix, inflationRate, years,
-                    portfolioNominal);
-            roth[t] = poolNominalReturns(
-                    model.roth(), model.rothBalance(), indexSequence, matrix, inflationRate, years,
-                    portfolioNominal);
+            double[] portfolioReal = poolRealReturns(
+                    model.allAccounts(), model.totalBalance(), indexSequence, matrix, years, null);
+            taxable[t] = poolRealReturns(
+                    model.taxable(), model.taxableBalance(), indexSequence, matrix, years, portfolioReal);
+            traditional[t] = poolRealReturns(
+                    model.traditional(), model.traditionalBalance(), indexSequence, matrix, years, portfolioReal);
+            roth[t] = poolRealReturns(
+                    model.roth(), model.rothBalance(), indexSequence, matrix, years, portfolioReal);
 
             portfolioPaths[t][0] = model.totalBalance();
             for (int y = 0; y < years; y++) {
-                portfolioPaths[t][y + 1] = portfolioPaths[t][y] * (1 + portfolioNominal[y]);
+                portfolioPaths[t][y + 1] = portfolioPaths[t][y] * (1 + portfolioReal[y]);
             }
         }
         return new PortfolioReturnPaths(taxable, traditional, roth, portfolioPaths);
     }
 
     /**
-     * Balance-weighted nominal return sequence for one pool. An empty pool (no accounts / zero
+     * Balance-weighted REAL return sequence for one pool. An empty pool (no accounts / zero
      * balance) grows at the blended portfolio return {@code fallback} — e.g. a Roth pool that only
      * receives Roth conversions has no starting accounts but must still grow the converted dollars
      * at a sensible rate. For the portfolio blend itself the fallback is {@code null} (never empty
@@ -76,9 +73,9 @@ final class PortfolioPathGenerator {
     // UseVarargs: `fallback` is a per-year return array (or null), not a variable argument list —
     // varargs would change the call contract and invite accidental misuse.
     @SuppressWarnings("PMD.UseVarargs")
-    private static double[] poolNominalReturns(List<AccountReturnSource> accounts, double poolBalance,
-                                               int[] indexSequence, RealReturnMatrix matrix,
-                                               double inflationRate, int years, @Nullable double[] fallback) {
+    private static double[] poolRealReturns(List<AccountReturnSource> accounts, double poolBalance,
+                                            int[] indexSequence, RealReturnMatrix matrix,
+                                            int years, @Nullable double[] fallback) {
         if (poolBalance <= 0 || accounts.isEmpty()) {
             return fallback != null ? fallback : new double[years];
         }
@@ -92,15 +89,6 @@ final class PortfolioPathGenerator {
                 real[y] += weight * accountReal[y];
             }
         }
-        double[] nominal = new double[years];
-        for (int y = 0; y < years; y++) {
-            nominal[y] = toNominal(real[y], inflationRate);
-        }
-        return nominal;
-    }
-
-    /** Converts a real (CPI-adjusted) return to a nominal return via the Fisher equation. */
-    static double toNominal(double realReturn, double inflationRate) {
-        return (1 + realReturn) * (1 + inflationRate) - 1;
+        return real;
     }
 }

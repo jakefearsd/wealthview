@@ -98,11 +98,11 @@ final class JointConversionSearch {
         Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
         PoolReturnModel searchModel = PoolReturnModel.from(input.accounts(), ctx.sim().inflationRate());
         PortfolioReturnPaths searchPaths = PortfolioPathGenerator.generate(
-                searchTrials, ctx.sim().years(), searchModel, matrix, searchRng, ctx.sim().inflationRate());
+                searchTrials, ctx.sim().years(), searchModel, matrix, searchRng);
 
         double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
                 searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),
-                ctx.sim().confidenceLevel(), ctx.sim().years(), searchTrials, ctx.sim().inflationRate());
+                ctx.sim().confidenceLevel(), ctx.sim().years(), searchTrials);
 
         double[] searchMarginalRates = MarginalRateCalculator.compute(taxCalculator,
                 ctx.taxIncome().rentalAwareTaxableIncome(), ctx.sim().retirementYear(), ctx.sim().years(),
