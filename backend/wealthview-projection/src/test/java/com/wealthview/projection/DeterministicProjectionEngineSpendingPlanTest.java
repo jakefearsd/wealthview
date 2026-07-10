@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Stream;
@@ -206,7 +205,8 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
                 """.formatted(LocalDate.now().getYear() - 66),
-                List.of(acct("59995.0000", "0", "0.0000")),
+                // Real terms: 0.025 nominal override → 0% real growth, isolating the sub-$10 shortfall tuning.
+                List.of(acct("59995.0000", "0", "0.0250")),
                 new SpendingProfileInput(bd("20000"), bd("10000"), "[]"));
 
         var result = engine.run(input);
@@ -339,8 +339,9 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.essentialExpenses()).isEqualByComparingTo(bd("96000.0000"));
 
+        // Real terms: tier spending held constant real (no per-tier inflation escalation).
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("98880.0000"));
+        assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("96000.0000"));
     }
 
     @Test
@@ -407,9 +408,9 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         assertThat(year2.essentialExpenses()).isEqualByComparingTo(bd("126000.0000"));
         assertThat(year2.discretionaryExpenses()).isEqualByComparingTo(bd("30000.0000"));
 
-        // Age 63: Go-Go only, 1st full year in tier → 156000 * 1.03^1 = 160680
+        // Age 63: Go-Go only. Real terms: held constant real → 156000 (no 1.03 escalation).
         var year3 = result.yearlyData().get(2);
-        assertThat(year3.essentialExpenses()).isEqualByComparingTo(bd("160680.0000"));
+        assertThat(year3.essentialExpenses()).isEqualByComparingTo(bd("156000.0000"));
     }
 
     // === Spending Tier Edge Cases ===
@@ -613,18 +614,17 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         assertThat(result.yearlyData().get(0).essentialExpenses())
                 .isEqualByComparingTo(bd("100000.0000"));
 
-        // Year 5: age 64, Conservation, 5th year -> $100K * 1.03^4
+        // Year 5: age 64, Conservation. Real terms: constant real -> $100K (no 1.03^4 escalation).
         var year5 = result.yearlyData().get(4);
-        var expected64 = bd("100000").multiply(bd("1.03").pow(4));
-        assertThat(year5.essentialExpenses()).isEqualByComparingTo(expected64.setScale(4, RoundingMode.HALF_UP));
+        assertThat(year5.essentialExpenses()).isEqualByComparingTo(bd("100000.0000"));
 
         // Year 6: age 65, overlap Conservation+Go-Go → blend (150000, 25000), inflation=1.0
         assertThat(result.yearlyData().get(5).essentialExpenses())
                 .isEqualByComparingTo(bd("150000.0000"));
 
-        // Year 7: age 66, Go-Go only, 1st full year → $200K * 1.03^1 = $206K
+        // Year 7: age 66, Go-Go only. Real terms: constant real -> $200K (no escalation).
         assertThat(result.yearlyData().get(6).essentialExpenses())
-                .isEqualByComparingTo(bd("206000.0000"));
+                .isEqualByComparingTo(bd("200000.0000"));
     }
 
     @Test
@@ -760,8 +760,8 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // After 5% growth: balance = 10500, withdrawal capped at 10500
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10500.0000"));
+        // Real terms: after 0.05 nominal override deflated to 2.44% real, balance = 10243.9024; capped there.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10243.9024"));
         assertThat(year1.endBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
@@ -807,8 +807,8 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("70000.0000"));
 
         var year2 = result.yearlyData().get(1);
-        // Year 2: need = 70k * 1.03 = 72100
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("72100.0000"));
+        // Real terms: spending held constant real → withdrawal unchanged year-over-year.
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("70000.0000"));
     }
 
     @Test

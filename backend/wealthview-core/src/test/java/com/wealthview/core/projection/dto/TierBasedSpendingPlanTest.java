@@ -1,7 +1,6 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,6 @@ class TierBasedSpendingPlanTest {
 
 
     private static final BigDecimal INFLATION = new BigDecimal("0.03");
-    private static final int SCALE = 4;
 
     private static TierBasedSpendingPlan.SpendingTierData tier(String name, int startAge, Integer endAge,
                                                                 String essential, String discretionary) {
@@ -44,20 +42,18 @@ class TierBasedSpendingPlanTest {
     }
 
     @Test
-    void resolveYear_noTiers_secondYear_appliesInflation() {
+    void resolveYear_noTiers_secondYear_isConstantReal() {
         var plan = TierBasedSpendingPlan.of(
                 new BigDecimal("40000"), new BigDecimal("20000"), List.of());
 
         var result = plan.resolveYear(2031, 66, 2, INFLATION, BigDecimal.ZERO);
 
-        // yearsInRetirement=2, no tiers → inflation factor = 1.03^1 = 1.03
-        BigDecimal expected = new BigDecimal("60000").multiply(new BigDecimal("1.03"))
-                .setScale(SCALE, RoundingMode.HALF_UP);
-        assertThat(result.totalSpending()).isEqualByComparingTo(expected);
+        // Real terms: spending is constant in today's dollars, no nominal escalation → 60000.
+        assertThat(result.totalSpending()).isEqualByComparingTo(new BigDecimal("60000.0000"));
     }
 
     @Test
-    void resolveYear_singleMatchingTier_usesTierExpenses() {
+    void resolveYear_singleMatchingTier_usesTierExpensesConstantReal() {
         var tiers = List.of(
                 tier("Go-Go", 65, 74, "35000", "25000"));
         var plan = TierBasedSpendingPlan.of(
@@ -65,14 +61,8 @@ class TierBasedSpendingPlanTest {
 
         var result = plan.resolveYear(2030, 67, 3, INFLATION, BigDecimal.ZERO);
 
-        // Tier matches (65 <= 67 <= 74). retirementStartAge = 67-3+1 = 65
-        // effectiveTierStart = max(65, 65) = 65, yearsInTier = 67 - 65 = 2
-        // inflation factor = 1.03^2
-        BigDecimal factor = new BigDecimal("1.03").pow(2);
-        BigDecimal expectedEss = new BigDecimal("35000").multiply(factor).setScale(SCALE, RoundingMode.HALF_UP);
-        BigDecimal expectedDisc = new BigDecimal("25000").multiply(factor).setScale(SCALE, RoundingMode.HALF_UP);
-        BigDecimal expectedTotal = expectedEss.add(expectedDisc);
-
+        // Real terms: tier expenses are today's dollars, held constant real → 35000 + 25000 = 60000.
+        BigDecimal expectedTotal = new BigDecimal("60000.0000");
         assertThat(result.totalSpending()).isEqualByComparingTo(expectedTotal);
         assertThat(result.portfolioWithdrawal()).isEqualByComparingTo(expectedTotal);
     }
@@ -109,24 +99,18 @@ class TierBasedSpendingPlanTest {
     }
 
     @Test
-    void resolveYear_inflationResetsAtTierBoundary() {
+    void resolveYear_laterTier_usesTierExpensesConstantReal() {
         var tiers = List.of(
                 tier("Go-Go", 65, 74, "35000", "25000"),
                 tier("Slow-Go", 75, null, "30000", "15000"));
         var plan = TierBasedSpendingPlan.of(
                 new BigDecimal("40000"), new BigDecimal("20000"), tiers);
 
-        // Age 76, yearsInRetirement = 12 (retired at 65)
-        // retirementStartAge = 76 - 12 + 1 = 65
-        // effectiveTierStart = max(75, 65) = 75
-        // yearsInTier = 76 - 75 = 1 → inflation factor = 1.03^1
+        // Age 76 falls in the Slow-Go tier. Real terms: tier expenses are today's dollars, held
+        // constant real (no escalation from the tier boundary) → 30000 + 15000 = 45000.
         var result = plan.resolveYear(2041, 76, 12, INFLATION, BigDecimal.ZERO);
 
-        BigDecimal factor = new BigDecimal("1.03");
-        BigDecimal expectedEss = new BigDecimal("30000").multiply(factor).setScale(SCALE, RoundingMode.HALF_UP);
-        BigDecimal expectedDisc = new BigDecimal("15000").multiply(factor).setScale(SCALE, RoundingMode.HALF_UP);
-        BigDecimal expectedTotal = expectedEss.add(expectedDisc);
-
+        BigDecimal expectedTotal = new BigDecimal("45000.0000");
         assertThat(result.totalSpending()).isEqualByComparingTo(expectedTotal);
     }
 
@@ -287,15 +271,14 @@ class TierBasedSpendingPlanTest {
     }
 
     @Test
-    void computeInflationFactor_tierStartBeforeRetirement_inflatesFromRetirementStart() {
-        // Tier starts at 50, but retirement begins at 65 → effectiveTierStart = 65
-        // At age 68, yearsInRetirement=4: effective = max(50, 68-4+1=65) = 65, yearsInTier=3
+    void computeInflationFactor_realTerms_isAlwaysOneConstantReal() {
+        // Real-terms projection: tier spending is held constant in today's dollars, so the
+        // escalation factor is 1.0 regardless of age / years-in-retirement / inflation.
         var tiers = List.of(tier("Broad", 50, 90, "30000", "10000"));
         var plan = TierBasedSpendingPlan.of(
                 new BigDecimal("0"), new BigDecimal("0"), tiers);
 
-        var factor = plan.computeInflationFactor(68, 4, INFLATION);
-
-        assertThat(factor).isEqualByComparingTo(new BigDecimal("1.03").pow(3));
+        assertThat(plan.computeInflationFactor(68, 4, INFLATION)).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(plan.computeInflationFactor(80, 16, INFLATION)).isEqualByComparingTo(BigDecimal.ONE);
     }
 }

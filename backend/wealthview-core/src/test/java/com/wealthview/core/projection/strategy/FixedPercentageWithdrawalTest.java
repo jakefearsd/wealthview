@@ -25,7 +25,7 @@ class FixedPercentageWithdrawalTest {
     }
 
     @Test
-    void computeWithdrawal_secondYear_inflationAdjustsPreviousWithdrawal() {
+    void computeWithdrawal_secondYear_holdsPreviousWithdrawalConstantReal() {
         var strategy = new FixedPercentageWithdrawal(new BigDecimal("0.04"));
         var ctx = new WithdrawalContext(
                 new BigDecimal("1050000"),
@@ -37,12 +37,12 @@ class FixedPercentageWithdrawalTest {
 
         var withdrawal = strategy.computeWithdrawal(ctx);
 
-        // 40000 * 1.03 = 41200
-        assertThat(withdrawal).isEqualByComparingTo(new BigDecimal("41200.0000"));
+        // Real terms: constant real, no nominal escalation → previous withdrawal unchanged.
+        assertThat(withdrawal).isEqualByComparingTo(new BigDecimal("40000.0000"));
     }
 
     @Test
-    void computeWithdrawal_thirdYear_compoundsInflation() {
+    void computeWithdrawal_thirdYear_staysConstantRealIgnoringInflation() {
         var strategy = new FixedPercentageWithdrawal(new BigDecimal("0.04"));
         var ctx = new WithdrawalContext(
                 new BigDecimal("1000000"),
@@ -54,7 +54,7 @@ class FixedPercentageWithdrawalTest {
 
         var withdrawal = strategy.computeWithdrawal(ctx);
 
-        // 41200 * 1.03 = 42436
-        assertThat(withdrawal).isEqualByComparingTo(new BigDecimal("42436.0000"));
+        // Real terms: previous withdrawal carried forward unchanged regardless of inflation.
+        assertThat(withdrawal).isEqualByComparingTo(new BigDecimal("41200.0000"));
     }
 }

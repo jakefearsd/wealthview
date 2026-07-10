@@ -32,15 +32,17 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("100000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("10000"));
         assertThat(year1.retired()).isFalse();
-        assertThat(year1.growth()).isEqualByComparingTo(bd("7700.0000"));
-        assertThat(year1.endBalance()).isEqualByComparingTo(bd("117700.0000"));
+        // Real terms: 0.07 nominal override deflated at 2.5% CMA inflation → 1.07/1.025-1 real.
+        // growth = (100000 + 10000) * 0.04390244 = 4829.2684
+        assertThat(year1.growth()).isEqualByComparingTo(bd("4829.2684"));
+        assertThat(year1.endBalance()).isEqualByComparingTo(bd("114829.2684"));
 
         assertThat(result.yearlyData()).hasSizeGreaterThan(30);
         assertThat(result.yearsInRetirement()).isGreaterThan(0);
     }
 
     @Test
-    void run_postRetirement_withdrawsAndAdjustsForInflation() {
+    void run_postRetirement_withdrawsConstantRealNoNominalEscalation() {
         var input = createInput(
                 LocalDate.now().minusYears(1), 90, bd("0.0300"),
                 """
@@ -59,7 +61,8 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
 
         if (result.yearlyData().size() > 1) {
             var year2 = result.yearlyData().get(1);
-            assertThat(year2.withdrawals()).isEqualByComparingTo(bd("41200.0000"));
+            // Real terms: the first-year withdrawal is held constant real, no nominal escalation.
+            assertThat(year2.withdrawals()).isEqualByComparingTo(bd("40000.0000"));
         }
 
         assertThat(result.yearsInRetirement()).isGreaterThan(0);
@@ -145,8 +148,9 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("300000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("8000"));
 
+        // Real terms: 0.08 and 0.04 nominal overrides deflated at 2.5% CMA inflation.
         assertThat(year1.growth().setScale(0, RoundingMode.HALF_UP))
-                .isEqualByComparingTo(bd("20533"));
+                .isEqualByComparingTo(bd("12520"));
     }
 
     @Test
@@ -171,13 +175,15 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
     }
 
     @Test
-    void run_zeroReturn_onlyContributionsAndWithdrawals() {
+    void run_zeroRealReturn_onlyContributionsAndWithdrawals() {
+        // Real terms: a 0% REAL return requires a nominal override equal to CMA inflation (2.5%),
+        // since realReturn = (1+nominal)/(1+inflation) - 1. This isolates the no-growth arithmetic.
         var input = createInput(
                 LocalDate.now().plusYears(10), 70, BigDecimal.ZERO,
                 """
                 {"birth_year": %d}
                 """.formatted(LocalDate.now().getYear() - 30),
-                List.of(acct("50000.0000", "5000.0000", "0")));
+                List.of(acct("50000.0000", "5000.0000", "0.025")));
 
         var result = engine.run(input);
 
@@ -242,9 +248,10 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("10000.0000"));
-        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("5000.0000"));
-        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("2500.0000"));
+        // Real terms: 0.05 nominal override deflated at 2.5% CMA inflation → 1.05/1.025-1 = 0.02439024.
+        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("4878.0480"));
+        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("2439.0240"));
+        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("1219.5120"));
         assertThat(year1.growth()).isEqualByComparingTo(
                 year1.traditionalGrowth().add(year1.rothGrowth()).add(year1.taxableGrowth()));
     }

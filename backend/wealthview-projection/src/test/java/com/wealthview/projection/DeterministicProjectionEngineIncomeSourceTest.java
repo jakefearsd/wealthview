@@ -287,8 +287,9 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
         assertThat(year1.withdrawals()).isEqualByComparingTo(bd("25000.0000"));
 
         var year2 = result.yearlyData().get(1);
-        // Year 2: need=45k*1.03=46350, income=20k (0 inflation), withdrawal=26350
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("26350.0000"));
+        // Real terms: need=45k constant real; fixed-nominal income 20k deflated by 1.03 -> 19417.4757;
+        // withdrawal = 45000 - 19417.4757 = 25582.5243
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("25582.5243"));
     }
 
     @Test

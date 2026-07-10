@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.wealthview.core.common.CompoundGrowth;
-
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
@@ -145,15 +143,12 @@ public final class TierBasedSpendingPlan implements SpendingPlan {
         return -1;
     }
 
+    /**
+     * Real-terms projection: tier spending amounts are expressed in today's dollars and held
+     * constant real, so the escalation factor is always {@code 1.0}. (A future per-tier REAL
+     * escalation could hook in here; no tier defines one today, so the default is no escalation.)
+     */
     public BigDecimal computeInflationFactor(int age, int yearsInRetirement, BigDecimal inflationRate) {
-        int yearsInTier = computeYearsInTier(age, yearsInRetirement);
-        if (yearsInTier >= 0) {
-            return yearsInTier > 0
-                    ? CompoundGrowth.factor(inflationRate, yearsInTier)
-                    : BigDecimal.ONE;
-        }
-        return yearsInRetirement > 1
-                ? CompoundGrowth.factor(inflationRate, yearsInRetirement - 1)
-                : BigDecimal.ONE;
+        return BigDecimal.ONE;
     }
 }

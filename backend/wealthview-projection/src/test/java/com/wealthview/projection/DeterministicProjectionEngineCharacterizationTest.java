@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * a fixed {@code referenceYear} so the projection is reproducible across calendar time,
  * and a withdrawal-rate spending strategy. Every captured value below was produced by
  * the engine itself and sanity-checked for plausibility (positive ending balance,
- * inflation-grown withdrawals, contributions only while working).
+ * constant-real withdrawals, contributions only while working).
  *
  * <p>It exists ahead of the Phase 3 decomposition of this God-class — the assertions
  * here are the behavior contract the decomposition must not break.
@@ -61,7 +61,7 @@ class DeterministicProjectionEngineCharacterizationTest {
 
         assertThat(result.yearlyData()).hasSize(50);
         assertThat(result.yearsInRetirement()).isEqualTo(35);
-        assertThat(result.finalBalance()).isEqualByComparingTo(bd("3147824.5534"));
+        assertThat(result.finalBalance()).isEqualByComparingTo(bd("1133740.5991"));
     }
 
     @Test
@@ -75,10 +75,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year1.retired()).isFalse();
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("450000.0000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("30000.0000"));
-        // Per-pool growth: 265000*.06 + 86000*.07 + 129000*.05 = 15900 + 6020 + 6450 = 28370.
-        assertThat(year1.growth()).isEqualByComparingTo(bd("28370.0000"));
+        // Real terms: per-pool nominal overrides deflated at 2.5% CMA inflation ((1+X)/1.025-1).
+        assertThat(year1.growth()).isEqualByComparingTo(bd("15970.7309"));
         assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year1.endBalance()).isEqualByComparingTo(bd("508370.0000")); // 450000 + 30000 + 28370
+        assertThat(year1.endBalance()).isEqualByComparingTo(bd("495970.7309")); // 450000 + 30000 + 15970.7309
     }
 
     @Test
@@ -92,7 +92,7 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.retired()).isFalse();
         assertThat(year.contributions()).isEqualByComparingTo(bd("30000.0000"));
         assertThat(year.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1804667.1215"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1329484.8757"));
     }
 
     @Test
@@ -105,10 +105,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.age()).isEqualTo(55);
         assertThat(year.retired()).isTrue();
         assertThat(year.contributions()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year.startBalance()).isEqualByComparingTo(bd("1804667.1215"));
-        assertThat(year.growth()).isEqualByComparingTo(bd("107566.6477"));
-        assertThat(year.withdrawals()).isEqualByComparingTo(bd("72186.6849"));
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1840047.0843"));
+        assertThat(year.startBalance()).isEqualByComparingTo(bd("1329484.8757"));
+        assertThat(year.growth()).isEqualByComparingTo(bd("44857.2734"));
+        assertThat(year.withdrawals()).isEqualByComparingTo(bd("53179.3950"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1321162.7541"));
     }
 
     @Test
@@ -120,9 +120,9 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.year()).isEqualTo(2041);
         assertThat(year.age()).isEqualTo(56);
         assertThat(year.retired()).isTrue();
-        // Withdrawal grows year-over-year at ~3% inflation.
-        assertThat(year.withdrawals()).isEqualByComparingTo(bd("74352.2854"));
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1876146.8525"));
+        // Real terms: withdrawal held constant real year-over-year (no nominal escalation).
+        assertThat(year.withdrawals()).isEqualByComparingTo(bd("53179.3950"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1313115.7113"));
     }
 
     @Test
@@ -135,10 +135,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(last.year()).isEqualTo(2074);
         assertThat(last.age()).isEqualTo(89);
         assertThat(last.retired()).isTrue();
-        assertThat(last.startBalance()).isEqualByComparingTo(bd("3126197.8877"));
-        assertThat(last.growth()).isEqualByComparingTo(bd("218833.8521"));
-        assertThat(last.withdrawals()).isEqualByComparingTo(bd("197207.1864"));
-        assertThat(last.endBalance()).isEqualByComparingTo(bd("3147824.5534"));
+        assertThat(last.startBalance()).isEqualByComparingTo(bd("1137002.7970"));
+        assertThat(last.growth()).isEqualByComparingTo(bd("49917.1971"));
+        assertThat(last.withdrawals()).isEqualByComparingTo(bd("53179.3950"));
+        assertThat(last.endBalance()).isEqualByComparingTo(bd("1133740.5991"));
     }
 
     @Test

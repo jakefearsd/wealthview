@@ -52,7 +52,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 Collections.emptyList(), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, suspendedLoss);
+                BigDecimal.ZERO, FilingStatus.SINGLE, suspendedLoss, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -71,7 +71,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 null, 70, 5, 2030,
-                new BigDecimal("50000"), FilingStatus.MARRIED_FILING_JOINTLY, suspendedLoss);
+                new BigDecimal("50000"), FilingStatus.MARRIED_FILING_JOINTLY, suspendedLoss, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -87,7 +87,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 64, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -100,7 +100,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("12000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("12000"));
@@ -113,7 +113,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 69, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("24000"));
@@ -126,7 +126,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 70, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("12000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("12000"));
@@ -139,7 +139,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 71, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -152,7 +152,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 67, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("24000"));
@@ -170,7 +170,7 @@ class IncomeSourceProcessorTest {
         // yearsInRetirement = 4 means 3 years of compounding: 10000 * 1.03^3
         var result = processor.process(
                 List.of(source), 63, 4, 2029,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var expectedNominal = annualAmount
                 .multiply(BigDecimal.ONE.add(inflationRate).pow(3))
@@ -187,7 +187,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 60, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("5000"));
     }
@@ -201,7 +201,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("18000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -215,7 +215,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50000"));
@@ -227,7 +227,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 66, 2, 2027,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -239,7 +239,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(source), 65, 5, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
         assertThat(result.totalTaxableIncome()).isEqualByComparingTo(new BigDecimal("50000"));
@@ -267,7 +267,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental), 67, 3, 2028,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // NET = 24000 - (3600 + 9600 + 5000) = 24000 - 18200 = 5800
         assertThat(result.incomeBySource()).containsKey(rentalId.toString());
@@ -286,7 +286,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(pension), 67, 3, 2028,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.incomeBySource()).containsKey(pensionId.toString());
         assertThat(result.incomeBySource().get(pensionId.toString()))
@@ -315,7 +315,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental, pension), 67, 3, 2028,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.incomeBySource()).hasSize(2);
         // Rental NET = 24000 - 6000 = 18000
@@ -336,7 +336,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(pension), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.incomeBySource()).isEmpty();
     }
@@ -345,7 +345,7 @@ class IncomeSourceProcessorTest {
     void process_emptyList_incomeBySourceIsEmpty() {
         var result = processor.process(
                 Collections.emptyList(), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.incomeBySource()).isEmpty();
     }
@@ -374,7 +374,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental), 67, 8, 2033,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // cashFlow = 96000 - (5500+26000+14000) - 22500 = 28000
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("28000"));
@@ -402,7 +402,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental), 67, 3, 2028,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // principal null treated as 0 — cashFlow = 24000 - 6000 = 18000, no NPE
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("18000"));
@@ -430,7 +430,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental), 70, 6, 2031,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // gross=24000*0.5=12000, expenses=(3600+9600+5000)*0.5=9100, net=2900
         assertThat(result.incomeBySource().get(rentalId.toString()))
@@ -460,7 +460,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // Same math: gross halved, expenses halved
         assertThat(result.incomeBySource().get(rentalId.toString()))
@@ -491,7 +491,7 @@ class IncomeSourceProcessorTest {
         // age=67, mid-range — no transition multiplier
         var result = processor.process(
                 List.of(rental), 67, 3, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.rentalPropertyDetails()).hasSize(1);
         var detail = result.rentalPropertyDetails().get(0);
@@ -524,7 +524,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(rental1, rental2), 65, 6, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.rentalPropertyDetails()).hasSize(2);
         assertThat(result.rentalPropertyDetails().get(0).propertyName()).isEqualTo("Property A");
@@ -542,7 +542,7 @@ class IncomeSourceProcessorTest {
 
         var result = processor.process(
                 List.of(pension), 65, 1, 2026,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         assertThat(result.rentalPropertyDetails()).isEmpty();
     }
@@ -576,7 +576,7 @@ class IncomeSourceProcessorTest {
                 60, null, BigDecimal.ZERO, "self_employment");
 
         var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // SE tax on $50K: 15.3% × ($50K × 0.9235) = $7,064.78 (approx)
         assertThat(result.selfEmploymentTax()).isGreaterThan(new BigDecimal("7000"));
@@ -600,7 +600,7 @@ class IncomeSourceProcessorTest {
                 60, null, BigDecimal.ZERO, "self_employment");
 
         var result = processorWithRealSE.process(List.of(source), 65, 1, 2025,
-                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO);
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO);
 
         // Cash inflow is the full amount (deduction only affects taxable income, not cash)
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));

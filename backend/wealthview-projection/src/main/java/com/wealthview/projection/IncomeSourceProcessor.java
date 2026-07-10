@@ -68,7 +68,8 @@ class IncomeSourceProcessor {
 
     IncomeSourceYearResult process(
             List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
-            int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss) {
+            int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
+            BigDecimal scenarioInflationRate) {
 
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
@@ -99,12 +100,12 @@ class IncomeSourceProcessor {
             }
 
             BigDecimal multiplier = transitionMultiplier(source, age);
-            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
+            BigDecimal amount = computeRealAmount(source, yearsInRetirement, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
             if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY) {
-                ssBenefit = ssBenefit.add(nominal);
+                ssBenefit = ssBenefit.add(amount);
             } else {
-                nonSSIncome = nonSSIncome.add(nominal);
+                nonSSIncome = nonSSIncome.add(amount);
             }
         }
 
@@ -114,15 +115,15 @@ class IncomeSourceProcessor {
             }
 
             BigDecimal multiplier = transitionMultiplier(source, age);
-            BigDecimal nominal = computeNominalAmount(source, yearsInRetirement)
+            BigDecimal amount = computeRealAmount(source, yearsInRetirement, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
 
             String sourceKey = source.id().toString();
             var result = switch (source.incomeType()) {
-                case RENTAL_PROPERTY -> processRentalIncome(source, nominal, taxYear, magi, suspendedLoss, multiplier);
-                case SOCIAL_SECURITY -> processSocialSecurityIncome(nominal, nonSSIncome, magi, filingStatus);
-                case PART_TIME_WORK  -> processEmploymentIncome(source, nominal, taxYear);
-                default              -> processDefaultIncome(source, nominal);
+                case RENTAL_PROPERTY -> processRentalIncome(source, amount, taxYear, magi, suspendedLoss, multiplier);
+                case SOCIAL_SECURITY -> processSocialSecurityIncome(amount, nonSSIncome, magi, filingStatus);
+                case PART_TIME_WORK  -> processEmploymentIncome(source, amount, taxYear);
+                default              -> processDefaultIncome(source, amount);
             };
 
             totalCashInflow = totalCashInflow.add(result.cashInflow());
@@ -130,7 +131,7 @@ class IncomeSourceProcessor {
             incomeBySource.merge(sourceKey, result.cashInflow(), BigDecimal::add);
 
             if (result instanceof RentalResult r) {
-                rentalIncomeGross = rentalIncomeGross.add(nominal);
+                rentalIncomeGross = rentalIncomeGross.add(amount);
                 rentalExpensesTotal = rentalExpensesTotal.add(r.expenses());
                 depreciationTotal = depreciationTotal.add(r.depreciation());
                 rentalLossApplied = rentalLossApplied.add(r.lossApplied());
@@ -266,7 +267,8 @@ class IncomeSourceProcessor {
         return IncomeYearMath.isBoundaryAge(source, age) ? new BigDecimal("0.5") : BigDecimal.ONE;
     }
 
-    BigDecimal computeNominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
-        return IncomeYearMath.nominalAmount(source, yearsInRetirement);
+    BigDecimal computeRealAmount(ProjectionIncomeSourceInput source, int yearsInRetirement,
+                                 BigDecimal scenarioInflationRate) {
+        return IncomeYearMath.realAmount(source, yearsInRetirement, scenarioInflationRate);
     }
 }

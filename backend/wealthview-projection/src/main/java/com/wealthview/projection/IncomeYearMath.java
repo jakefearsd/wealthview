@@ -12,7 +12,7 @@ import static com.wealthview.core.common.Money.SCALE;
  * The per-source, per-year income primitives shared by the deterministic engine
  * ({@link IncomeSourceProcessor}, {@link IncomeContributionCalculator}) and the
  * Monte Carlo projector ({@link IncomeProjector}): the half-year proration at a
- * source's boundary years and its inflation-grown nominal amount. Extracted so
+ * source's boundary years and its real (today's-dollars) amount. Extracted so
  * these rules live in one place rather than being re-derived in each caller.
  *
  * <p>Active-at-age is not duplicated here — callers use the canonical
@@ -36,16 +36,25 @@ final class IncomeYearMath {
     }
 
     /**
-     * The source's nominal annual amount inflated to {@code yearsInRetirement}.
-     * Inflation compounds from the second retirement year (year index 1), so the
-     * first year and any one-time or zero-inflation source pays the base amount.
+     * The source's REAL (today's-dollars) annual amount at {@code yearsInRetirement}. The nominal
+     * amount grows by the source's own inflation rate and is then deflated by the scenario inflation
+     * rate over the same {@code n = yearsInRetirement - 1} compounding steps, i.e.
+     * {@code amount * (1 + sourceInflation)^n / (1 + scenarioInflation)^n}. A COLA source whose rate
+     * matches scenario inflation therefore stays constant real, while a fixed-nominal source (source
+     * inflation 0) loses purchasing power over time. The first year and any one-time source pays the
+     * base amount unchanged.
      */
-    static BigDecimal nominalAmount(ProjectionIncomeSourceInput source, int yearsInRetirement) {
-        if (source.oneTime() || yearsInRetirement <= 1
-                || source.inflationRate().compareTo(BigDecimal.ZERO) == 0) {
+    static BigDecimal realAmount(ProjectionIncomeSourceInput source, int yearsInRetirement,
+                                 BigDecimal scenarioInflationRate) {
+        if (source.oneTime() || yearsInRetirement <= 1) {
             return source.annualAmount();
         }
-        return CompoundGrowth.inflate(source.annualAmount(), source.inflationRate(), yearsInRetirement - 1)
-                .setScale(SCALE, ROUNDING);
+        int steps = yearsInRetirement - 1;
+        BigDecimal grown = CompoundGrowth.inflate(source.annualAmount(), source.inflationRate(), steps);
+        if (scenarioInflationRate.signum() == 0) {
+            return grown.setScale(SCALE, ROUNDING);
+        }
+        BigDecimal deflator = CompoundGrowth.factor(scenarioInflationRate, steps);
+        return grown.divide(deflator, SCALE, ROUNDING);
     }
 }

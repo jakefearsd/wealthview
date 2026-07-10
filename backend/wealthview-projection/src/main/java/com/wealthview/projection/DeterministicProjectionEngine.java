@@ -50,11 +50,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
 
     /**
-     * Inflation rate used to convert nominal expected-return overrides into real returns. It
-     * defaults to zero in this phase (flipping to a non-zero CMA inflation assumption is a
-     * deliberate later task), so an override reproduces the legacy nominal-return growth exactly.
+     * Capital-market inflation assumption used to convert a user's NOMINAL expected-return override
+     * into a REAL return via {@code (1+nominal)/(1+CMA_INFLATION_RATE)-1}. The whole projection runs
+     * in real (today's-dollars) terms, so overrides are deflated at this long-run CMA rate (allocation
+     * accounts already grow at real geometric means and are unaffected by this constant).
      */
-    private static final BigDecimal CMA_INFLATION_RATE = BigDecimal.ZERO;
+    private static final BigDecimal CMA_INFLATION_RATE = new BigDecimal("0.025");
 
     private final ScenarioParamsParser paramsParser = new ScenarioParamsParser();
     private final SpendingFeasibilityAnalyzer feasibilityAnalyzer = new SpendingFeasibilityAnalyzer();
@@ -172,7 +173,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 : DEFAULT_WITHDRAWAL_RATE;
         BigDecimal inflationRate = input.inflationRate() != null
                 ? input.inflationRate()
-                : BigDecimal.ZERO;
+                : new BigDecimal("0.025");
 
         WithdrawalStrategy strategy = WithdrawalStrategyFactory.create(params, withdrawalRate);
         SpendingPlan spendingPlan = null;
@@ -255,7 +256,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         var incomeResult = processIncomeAndConversions(
                 pool, ctx.incomeSources(), age, yearsInRetirement, year, acc.suspendedLoss(),
-                resolveConversionOverride(ctx.spendingPlan(), year));
+                resolveConversionOverride(ctx.spendingPlan(), year), ctx.inflationRate());
         BigDecimal suspendedLoss = incomeResult.suspendedLoss();
         BigDecimal conversionAmount = incomeResult.conversionAmount();
         BigDecimal taxLiability = incomeResult.taxLiability();
@@ -329,7 +330,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private IncomeAndConversionResult processIncomeAndConversions(
             PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
             int age, int yearsInRetirement, int year, BigDecimal suspendedLoss,
-            BigDecimal conversionOverride) {
+            BigDecimal conversionOverride, BigDecimal inflationRate) {
 
         IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
@@ -337,12 +338,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
             incomeSourceResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
-                    year, pool.getMagi(), pool.getFilingStatus(), suspendedLoss);
+                    year, pool.getMagi(), pool.getFilingStatus(), suspendedLoss, inflationRate);
             suspendedLoss = incomeSourceResult.suspendedLossCarryforward();
             totalActiveIncome = incomeSourceResult.totalCashInflow();
             taxableActiveIncome = incomeSourceResult.totalTaxableIncome();
         } else {
-            totalActiveIncome = incomeContributionCalculator.compute(incomeSources, age, yearsInRetirement);
+            totalActiveIncome = incomeContributionCalculator.compute(
+                    incomeSources, age, yearsInRetirement, inflationRate);
             taxableActiveIncome = totalActiveIncome;
         }
 
