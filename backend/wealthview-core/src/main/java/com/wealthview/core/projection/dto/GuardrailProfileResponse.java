@@ -103,6 +103,13 @@ public record GuardrailProfileResponse(
      * Persisted profiles only store {@code failureRate} (no dedicated success-probability
      * column), so the success probability is derived as its complement for wire back-compat.
      * Returns {@code null} when the profile predates result persistence.
+     *
+     * <p>For guardrail profiles persisted before the essential-floor success-rate optimization
+     * work, {@code failureRate} holds the OLD depletion-based value (probability the portfolio
+     * runs out of money), not the current essential-floor-funded definition. The derived
+     * {@code successProbability} therefore reflects that old definition until the profile is
+     * re-optimized — {@code GuardrailProfileService.optimize()} overwrites {@code failureRate}
+     * with the essential-floor value on every re-run.
      */
     private static BigDecimal successProbabilityFrom(BigDecimal failureRate) {
         return failureRate != null ? BigDecimal.ONE.subtract(failureRate) : null;

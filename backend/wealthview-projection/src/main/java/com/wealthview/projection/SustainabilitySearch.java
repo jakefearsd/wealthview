@@ -258,7 +258,7 @@ final class SustainabilitySearch {
      * Terminal target and portfolio floor, when set, are evaluated as additional
      * bequest-style constraints on top of that primary success-rate gate — they no
      * longer drive sustainability on their own. Each trial grows its pools at the
-     * per-pool nominal return sequences carried on the {@link SearchContext}
+     * per-pool real return sequences carried on the {@link SearchContext}
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}).
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable

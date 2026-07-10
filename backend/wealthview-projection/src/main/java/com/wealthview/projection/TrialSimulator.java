@@ -12,7 +12,7 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
  * concern from the optimizer's orchestration, search, and aggregation responsibilities.
  *
  * <p>This class is stateless; a single instance is shared across all trials. Determinism
- * is the caller's responsibility — the simulator consumes pre-computed per-pool nominal-return
+ * is the caller's responsibility — the simulator consumes pre-computed per-pool real-return
  * sequences (on the {@link SimulationConfig}) and never draws random numbers itself.
  */
 final class TrialSimulator {
@@ -31,7 +31,7 @@ final class TrialSimulator {
 
     /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
-     * arrays, cash config) are shared across trials; the three per-pool nominal return sequences
+     * arrays, cash config) are shared across trials; the three per-pool real return sequences
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
      * each pool grows at its own allocation/override-driven sequence.
      */
@@ -103,7 +103,7 @@ final class TrialSimulator {
             double traditionalReturn = traditionalReturns[y];
             double rothReturn = rothReturns[y];
 
-            // Cash-reserve down-year logic keys on the balance-weighted portfolio nominal return
+            // Cash-reserve down-year logic keys on the balance-weighted portfolio real return
             // across the three pools (pre-growth balances). Now that pools grow at distinct rates
             // there is no single "the return" — this weighted figure preserves the original bucket
             // behavior: draw from cash when the portfolio as a whole had a down year.
