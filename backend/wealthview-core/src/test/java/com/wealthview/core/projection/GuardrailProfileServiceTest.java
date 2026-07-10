@@ -458,24 +458,46 @@ class GuardrailProfileServiceTest {
     // ---- confidence / risk tolerance resolution ----
 
     @Test
-    void optimize_riskToleranceConservative_setsConfidence085() {
+    void resolveConfidence_moderateRiskTolerance_returnsNinetyPercent() {
+        var request = new GuardrailOptimizationRequest(
+                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
+                null, null, null, List.of(),
+                null, null, null, "moderate",
+                null, null,
+                null, null, null, null, null, null);
+        assertThat(service.resolveConfidence(request)).isEqualByComparingTo(new BigDecimal("0.90"));
+    }
+
+    @Test
+    void resolveConfidence_explicitConfidence_overridesPreset() {
+        var request = new GuardrailOptimizationRequest(
+                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
+                null, null, new BigDecimal("0.97"), List.of(),
+                null, null, null, "aggressive",
+                null, null,
+                null, null, null, null, null, null);
+        assertThat(service.resolveConfidence(request)).isEqualByComparingTo(new BigDecimal("0.97"));
+    }
+
+    @Test
+    void optimize_riskToleranceConservative_setsConfidence095() {
         var input = captureOptimizationInput(
                 buildRequest(req -> req.withConfidence(null).withRiskTolerance("conservative")));
-        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.85");
+        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.95");
     }
 
     @Test
-    void optimize_riskToleranceModerate_setsConfidence070() {
+    void optimize_riskToleranceModerate_setsConfidence090() {
         var input = captureOptimizationInput(
                 buildRequest(req -> req.withConfidence(null).withRiskTolerance("moderate")));
-        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.70");
+        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.90");
     }
 
     @Test
-    void optimize_riskToleranceAggressive_setsConfidence060() {
+    void optimize_riskToleranceAggressive_setsConfidence080() {
         var input = captureOptimizationInput(
                 buildRequest(req -> req.withConfidence(null).withRiskTolerance("aggressive")));
-        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.60");
+        assertThat(input.confidenceLevel()).isEqualByComparingTo("0.80");
     }
 
     @Test

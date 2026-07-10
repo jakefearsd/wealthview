@@ -326,15 +326,24 @@ public class GuardrailProfileService {
         );
     }
 
-    private BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
+    /**
+     * Resolve the confidence level for guardrail optimization.
+     * If an explicit confidenceLevel is provided in the request, it takes precedence.
+     * Otherwise, maps risk tolerance to target success probabilities (essential floor funded):
+     * - conservative: 0.95 (95% probability)
+     * - moderate: 0.90 (90% probability)
+     * - aggressive: 0.80 (80% probability)
+     * If neither is specified, defaults to 0.95.
+     */
+    BigDecimal resolveConfidence(GuardrailOptimizationRequest request) {
         if (request.confidenceLevel() != null) {
             return request.confidenceLevel();
         }
         if (request.riskTolerance() != null) {
             return switch (request.riskTolerance()) {
-                case "conservative" -> new BigDecimal("0.85");
-                case "moderate" -> new BigDecimal("0.70");
-                case "aggressive" -> new BigDecimal("0.60");
+                case "conservative" -> new BigDecimal("0.95");
+                case "moderate" -> new BigDecimal("0.90");
+                case "aggressive" -> new BigDecimal("0.80");
                 default -> DEFAULT_CONFIDENCE;
             };
         }
