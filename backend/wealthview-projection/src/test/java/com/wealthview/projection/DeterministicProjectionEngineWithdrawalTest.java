@@ -30,10 +30,15 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.retired()).isTrue();
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40975.6096"));
+        // Real terms: 0.05 nominal override deflated at the scenario's own 3% inflation →
+        // 1.05/1.03-1 = 0.01941748 real. Year 1: $1M * 1.01941748 = $1,019,417.48; withdrawal =
+        // 4% of currentBalance = $40,776.6992.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40776.6992"));
 
+        // Year 2: dynamic_percentage recomputes 4% of currentBalance every year (not held constant),
+        // so it compounds down: (1,019,417.48 - 40,776.6992) * 1.01941748 * 0.04 = 39,905.7407.
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("40296.0140"));
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("39905.7407"));
     }
 
     @Test
@@ -47,11 +52,16 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         var result = engine.run(input);
 
+        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly.
+        // Year 1: $1M grows to $1,050,000; withdrawal = 4% = $42,000 (first retirement year: raw,
+        // uncapped).
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40975.6096"));
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("42000.0000"));
 
+        // Year 2: balance $1,050,000 - $42,000 = $1,008,000 grows 5% to $1,058,400; raw = 4% =
+        // $42,336, within [min $40,950, max $44,100] of the prior withdrawal → raw stands.
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("40296.0140"));
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("42336.0000"));
     }
 
     @Test
@@ -95,7 +105,9 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.withdrawals()).isGreaterThan(BigDecimal.ZERO);
         assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("204878.0480"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; taxable-first
+        // leaves traditional untouched at 200000 * 1.05 = 210000.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
     }
 
     @Test
@@ -140,9 +152,10 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var result = engineTax.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // Real terms: pools grow at 1.05/1.025-1 = 0.02439024 real; roth-first leaves taxable/traditional untouched.
-        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("307317.0720"));
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("204878.0480"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; roth-first
+        // leaves taxable/traditional untouched.
+        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("315000.0000"));
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
         assertThat(year1.rothBalance()).isLessThan(bd("105000"));
     }
 
@@ -211,7 +224,9 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("204878.0480"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; taxable-first
+        // leaves traditional untouched at 200000 * 1.05 = 210000.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
     }
 
     @Test
@@ -280,10 +295,10 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
     @Test
     void run_vanguardFloor_severeMarketLoss_floorsWithdrawal() {
         // Vanguard uses currentBalance (after growth), not startOfYearBalance.
-        // Real terms: -0.30 nominal override deflates to (0.70/1.025)-1 = -0.31707317 real.
-        // Year 1: $1M * 0.68292683 = $682,926.83. Raw = * 0.04 = $27,317.0732
+        // Real terms: 0% scenario inflation ⇒ -0.30 nominal override deflates to -30% real exactly.
+        // Year 1: $1M * 0.70 = $700,000. Raw = * 0.04 = $28,000.
         // Year 2 raw collapses far below the floor, so the floor binds:
-        // floor = $27,317.0732 * (1 - 0.025) = $26,634.1464 → withdrawal capped UP to the floor.
+        // floor = $28,000 * (1 - 0.025) = $27,300 → withdrawal capped UP to the floor.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -297,11 +312,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var year1 = result.yearlyData().get(0);
         var year2 = result.yearlyData().get(1);
 
-        // Year 1: raw = currentBalance * 0.04 = $682,926.83 * 0.04 = $27,317.0732
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("27317.0732"));
+        // Year 1: raw = currentBalance * 0.04 = $700,000 * 0.04 = $28,000
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("28000.0000"));
 
-        // Year 2: raw far below floor → capped at floor = 27317.0732 * 0.975 = 26634.1464
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("26634.1464"));
+        // Year 2: raw far below floor → capped at floor = 28000 * 0.975 = 27300
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("27300.0000"));
 
         // Floor prevented a severe drop — withdrawal only dropped 2.5%
         assertThat(year2.withdrawals()).isGreaterThan(year1.withdrawals().multiply(bd("0.95")));
@@ -379,14 +394,14 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var result = engineTax.run(input);
         var year1 = result.yearlyData().getFirst();
 
-        // All traditional should be drawn (< bracket space). Real terms: the 0.00 nominal override
-        // deflates to -2.44% real (1/1.025-1), so the $30K pool grows down to 30000*0.97560976 = 29268.2928.
+        // All traditional should be drawn (< bracket space). Real terms: 0% scenario inflation ⇒ the
+        // 0.00 nominal override deflates to 0% real exactly, so the $30K pool stays flat at $30,000.
         assertThat(year1.withdrawalFromTraditional()).isNotNull();
-        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("29268.2928"));
+        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("30000.0000"));
 
-        // Taxable covers the remainder. Need = 10% of $330K start = $33K; 33000 - 29268.2928 = 3731.7072.
+        // Taxable covers the remainder. Need = 10% of $330K start = $33K; 33000 - 30000 = 3000.
         assertThat(year1.withdrawalFromTaxable()).isNotNull();
-        assertThat(year1.withdrawalFromTaxable()).isEqualByComparingTo(bd("3731.7072"));
+        assertThat(year1.withdrawalFromTaxable()).isEqualByComparingTo(bd("3000.0000"));
 
         // Roth should not be touched
         assertThat(year1.withdrawalFromRoth()).isNull();

@@ -32,10 +32,10 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("100000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("10000"));
         assertThat(year1.retired()).isFalse();
-        // Real terms: 0.07 nominal override deflated at 2.5% CMA inflation → 1.07/1.025-1 real.
-        // growth = (100000 + 10000) * 0.04390244 = 4829.2684
-        assertThat(year1.growth()).isEqualByComparingTo(bd("4829.2684"));
-        assertThat(year1.endBalance()).isEqualByComparingTo(bd("114829.2684"));
+        // Real terms: 0.07 nominal override deflated at the SCENARIO's own 3% inflation → 1.07/1.03-1 real.
+        // growth = (100000 + 10000) * 0.03883495 = 4271.8445
+        assertThat(year1.growth()).isEqualByComparingTo(bd("4271.8445"));
+        assertThat(year1.endBalance()).isEqualByComparingTo(bd("114271.8445"));
 
         assertThat(result.yearlyData()).hasSizeGreaterThan(30);
         assertThat(result.yearsInRetirement()).isGreaterThan(0);
@@ -148,9 +148,9 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("300000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("8000"));
 
-        // Real terms: 0.08 and 0.04 nominal overrides deflated at 2.5% CMA inflation.
+        // Real terms: 0.08 and 0.04 nominal overrides deflated at the SCENARIO's own 2% inflation.
         assertThat(year1.growth().setScale(0, RoundingMode.HALF_UP))
-                .isEqualByComparingTo(bd("12520"));
+                .isEqualByComparingTo(bd("14092"));
     }
 
     @Test
@@ -176,10 +176,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
 
     @Test
     void run_zeroRealReturn_onlyContributionsAndWithdrawals() {
-        // Real terms: a 0% REAL return requires a nominal override equal to CMA inflation (2.5%),
-        // since realReturn = (1+nominal)/(1+inflation) - 1. This isolates the no-growth arithmetic.
+        // Real terms: a 0% REAL return requires a nominal override equal to the SCENARIO's own
+        // inflation rate (2.5% here), since realReturn = (1+nominal)/(1+inflation) - 1. This isolates
+        // the no-growth arithmetic.
         var input = createInput(
-                LocalDate.now().plusYears(10), 70, BigDecimal.ZERO,
+                LocalDate.now().plusYears(10), 70, bd("0.025"),
                 """
                 {"birth_year": %d}
                 """.formatted(LocalDate.now().getYear() - 30),
@@ -248,10 +249,10 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // Real terms: 0.05 nominal override deflated at 2.5% CMA inflation → 1.05/1.025-1 = 0.02439024.
-        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("4878.0480"));
-        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("2439.0240"));
-        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("1219.5120"));
+        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly.
+        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("10000.0000"));
+        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("5000.0000"));
+        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("2500.0000"));
         assertThat(year1.growth()).isEqualByComparingTo(
                 year1.traditionalGrowth().add(year1.rothGrowth()).add(year1.taxableGrowth()));
     }

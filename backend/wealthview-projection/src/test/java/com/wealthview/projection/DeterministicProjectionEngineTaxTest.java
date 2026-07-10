@@ -863,10 +863,11 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         // Conversion = $30K from traditional → traditional = $20K
         // Tax = $3,961.50
-        // Real terms: taxable $100 pool grows at -2.44% real (0.00 nominal) to 97.5610; tax drains it,
-        // remainder 3961.50 - 97.5610 = 3863.9390 from traditional. Roth untouched.
-        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(bd("97.5610"));
-        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(bd("3863.9390"));
+        // Real terms: taxable $100 pool grows at 0% real (0.00 nominal deflated at the scenario's
+        // own 0% inflation) so it stays flat at 100; tax drains it, remainder 3961.50 - 100 = 3861.50
+        // from traditional. Roth untouched.
+        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(bd("100.0000"));
+        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(bd("3861.5000"));
 
         // All balances >= 0
         assertThat(year1.taxableBalance()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -968,10 +969,11 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         // Conversion tax = tax($50K) = $3,961.50
         assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3961.5000"));
 
-        // Real terms: taxable $500 pool grows at -2.44% real to 487.8049; tax drains it,
-        // remainder 3961.50 - 487.8049 = 3473.6951 from traditional.
-        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(bd("487.8049"));
-        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(bd("3473.6951"));
+        // Real terms: taxable $500 pool grows at 0% real (0.00 nominal deflated at the scenario's own
+        // 0% inflation) so it stays flat at 500; tax drains it, remainder 3961.50 - 500 = 3461.50 from
+        // traditional.
+        assertThat(year1.taxPaidFromTaxable()).isEqualByComparingTo(bd("500.0000"));
+        assertThat(year1.taxPaidFromTraditional()).isEqualByComparingTo(bd("3461.5000"));
         assertThat(year1.taxPaidFromRoth()).isNull();
 
         // Taxable fully drained

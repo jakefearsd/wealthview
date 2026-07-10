@@ -760,8 +760,9 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // Real terms: after 0.05 nominal override deflated to 2.44% real, balance = 10243.9024; capped there.
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10243.9024"));
+        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly,
+        // balance = 10500.0000; capped there.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10500.0000"));
         assertThat(year1.endBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 

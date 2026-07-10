@@ -50,10 +50,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
 
     /**
-     * Capital-market inflation assumption used to convert a user's NOMINAL expected-return override
-     * into a REAL return via {@code (1+nominal)/(1+CMA_INFLATION_RATE)-1}. The whole projection runs
-     * in real (today's-dollars) terms, so overrides are deflated at this long-run CMA rate (allocation
-     * accounts already grow at real geometric means and are unaffected by this constant).
+     * Fallback inflation assumption used to convert a user's NOMINAL expected-return override into a
+     * REAL return via {@code (1+nominal)/(1+inflationRate)-1} when the scenario itself has no
+     * inflation rate. The whole projection runs in real (today's-dollars) terms, and overrides must be
+     * deflated at the SAME rate as income/Social Security/spending — the scenario's own inflation rate
+     * — so that all cash flows share one real-dollar frame. {@link #resolveProjectionParams} already
+     * defaults a missing scenario rate to this same value, so in practice this constant is only ever
+     * used as that upstream default flowing through, never as an independent override (allocation
+     * accounts already grow at real geometric means and are unaffected by this constant either way).
      */
     private static final BigDecimal CMA_INFLATION_RATE = new BigDecimal("0.025");
 
@@ -146,7 +150,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         var resolved = resolveProjectionParams(input, params);
         var taxStrategy = taxStrategyFactory.buildTaxStrategy(params);
-        var pool = buildPoolStrategy(accounts, params, taxStrategy);
+        var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate());
 
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
@@ -193,10 +197,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts,
                                               ScenarioParams params,
-                                              TaxCalculationStrategy taxStrategy) {
+                                              TaxCalculationStrategy taxStrategy,
+                                              BigDecimal scenarioInflationRate) {
         Map<AssetClass, Double> geoMeans = capitalMarketAssumptions != null
                 ? capitalMarketAssumptions.geometricMeans()
                 : Map.of();
+        // Override accounts must deflate at the SAME inflation rate income/SS/spending use — the
+        // scenario's own rate — not a fixed CMA constant, or a nominal-override account would compound
+        // in a different real-dollar frame than the rest of the projection. Fall back to the CMA
+        // constant only if the scenario itself has no rate (resolveProjectionParams already defaults
+        // it, so this fallback is effectively unreachable in practice).
+        BigDecimal inflationRate = scenarioInflationRate != null ? scenarioInflationRate : CMA_INFLATION_RATE;
         var config = new PoolStrategy.PoolConfig(
                 params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
@@ -204,7 +215,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 params.rothConversionStrategy(), params.targetBracketRate(),
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate(),
-                geoMeans, CMA_INFLATION_RATE);
+                geoMeans, inflationRate);
         return PoolStrategy.create(accounts, config);
     }
 
