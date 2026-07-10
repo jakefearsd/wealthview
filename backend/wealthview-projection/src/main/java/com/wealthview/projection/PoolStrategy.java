@@ -34,6 +34,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     BigDecimal getTotal();
 
+    /** The traditional (pre-tax) pool balance; zero for strategies with no traditional/Roth split. */
+    BigDecimal getTraditional();
+
     BigDecimal getWeightedReturn();
 
     BigDecimal applyContributions();
@@ -279,6 +282,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
+        public BigDecimal getTraditional() {
+            return BigDecimal.ZERO;
+        }
+
+        @Override
         public BigDecimal getWeightedReturn() {
             return weightedReturn;
         }
@@ -444,6 +452,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
+        public BigDecimal getTraditional() {
+            return traditional;
+        }
+
+        @Override
         public BigDecimal getWeightedReturn() {
             return weightedReturn;
         }
@@ -498,9 +511,22 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             traditional = traditional.subtract(fromTraditional);
             roth = roth.subtract(fromRoth);
 
+            // If the RMD exceeds what the spend draw already pulled from traditional, force the
+            // excess out physically: it's a real, legally-required distribution even when the
+            // retiree doesn't need the cash. The gross excess is reinvested to taxable, and the
+            // tax on the full distribution flows through the deductFromPools cascade below, which
+            // draws from taxable first -- i.e. from the RMD proceeds just deposited there.
+            BigDecimal rmdExtra = BigDecimal.ZERO;
+            if (rmdAmount != null && rmdAmount.compareTo(fromTraditional) > 0) {
+                rmdExtra = rmdAmount.subtract(fromTraditional).min(traditional).max(BigDecimal.ZERO);
+                traditional = traditional.subtract(rmdExtra);
+                taxable = taxable.add(rmdExtra);
+            }
+            BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdExtra);
+
             TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
-            BigDecimal taxableIncome = fromTraditional.add(effectiveOtherIncome).add(conversionAmount);
+            BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
             if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
                 var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
 
@@ -521,7 +547,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             return new WithdrawalTaxResult(
                     fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax,
-                    fromTaxable, fromTraditional, fromRoth, withdrawalTaxSource);
+                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource);
         }
 
         @Override

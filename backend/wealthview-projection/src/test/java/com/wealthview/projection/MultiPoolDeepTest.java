@@ -10,11 +10,17 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
+import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 /**
  * Deep coverage of PoolStrategy.MultiPool — Roth conversions, dynamic sequencing,
@@ -59,6 +65,26 @@ class MultiPoolDeepTest {
                 FilingStatus.SINGLE, ZERO, bd(annualConv), rothStrategy,
                 targetRate != null ? bd(targetRate) : null,
                 startYear, WithdrawalOrder.TAXABLE_FIRST, taxCalc, null);
+        return new PoolStrategy.MultiPool(
+                grouped(taxable, traditional, roth, "0", "0", "0"),
+                ZERO, config);
+    }
+
+    /**
+     * Builds a MultiPool wired with a real FederalTaxCalculator (single filer, 2025 bracket
+     * fixtures) rather than a flat-rate fake, for tests that need genuine progressive tax math.
+     */
+    private PoolStrategy.MultiPool poolWithRealTax(String taxable, String traditional, String roth,
+                                                     WithdrawalOrder order) {
+        var taxBracketRepository = mock(TaxBracketRepository.class);
+        var standardDeductionRepository = mock(StandardDeductionRepository.class);
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        TaxCalculationStrategy realTaxCalc = new FederalOnlyTaxStrategy(
+                new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository));
+
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                order, realTaxCalc, null);
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
                 ZERO, config);
@@ -181,6 +207,31 @@ class MultiPoolDeepTest {
         var r = p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
         assertThat(r.totalWithdrawn()).isEqualByComparingTo(ZERO);
+    }
+
+    // ---- RMD forcing ----
+
+    @Test
+    void executeWithdrawals_rmdExceedsSpendDraw_forcesExtraFromTraditionalIntoTaxable() {
+        var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TAXABLE_FIRST);
+
+        // Spend draw is small and taxable-first, so it comes entirely from taxable → fromTraditional ~= 0.
+        // The RMD (20000) must still be forced out of traditional and reinvested (gross) to taxable.
+        var result = pool.executeWithdrawals(bd("10000"), 2025, ZERO, ZERO, bd("20000"), 75);
+
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("480000"));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("20000"));
+        assertThat(result.taxLiability()).isGreaterThan(ZERO);
+    }
+
+    @Test
+    void executeWithdrawals_spendDrawExceedsRmd_noForcedExtra() {
+        var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TRADITIONAL_FIRST);
+
+        // Traditional-first spend draw (60000) already exceeds the RMD (20000) → no extra forced.
+        var result = pool.executeWithdrawals(bd("60000"), 2025, ZERO, ZERO, bd("20000"), 75);
+
+        assertThat(result.fromTraditional()).isGreaterThanOrEqualTo(bd("20000"));
     }
 
     @Test
