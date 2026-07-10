@@ -5,6 +5,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
@@ -23,6 +25,27 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 public final class ProjectionTestFixtures {
 
     private ProjectionTestFixtures() {}
+
+    /**
+     * A small hand-built capital-market {@link RealReturnMatrix} for Monte Carlo unit tests:
+     * 8 synthetic years x 4 asset classes of real returns with realistic dispersion (US stocks
+     * range -20% to +30%, positive long-run mean; bonds/cash muted). Shared across MC tests so a
+     * single fixture drives the block-bootstrap fan. Columns follow {@link AssetClass#values()}
+     * order: US_STOCK, INTL_STOCK, BOND, CASH.
+     */
+    public static final RealReturnMatrix TEST_CMA_MATRIX = new RealReturnMatrix(
+            new int[]{1, 2, 3, 4, 5, 6, 7, 8},
+            AssetClass.values(),
+            new double[][]{
+                    { 0.18,  0.15,  0.03,  0.005},
+                    {-0.12, -0.15,  0.06,  0.010},
+                    { 0.25,  0.20,  0.01, -0.005},
+                    { 0.08,  0.05,  0.04,  0.008},
+                    {-0.20, -0.18, -0.02,  0.002},
+                    { 0.15,  0.12,  0.05,  0.006},
+                    { 0.30,  0.25,  0.00, -0.010},
+                    { 0.02, -0.03,  0.07,  0.012},
+            });
 
     public static HypotheticalAccountInput acct(String balance, String contribution, String expectedReturn) {
         return new HypotheticalAccountInput(bd(balance), bd(contribution), bd(expectedReturn), "taxable");

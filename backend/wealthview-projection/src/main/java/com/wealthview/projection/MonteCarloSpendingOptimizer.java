@@ -3,6 +3,7 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Objects;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.SpendingOptimizer;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
@@ -36,24 +39,54 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private final FederalTaxCalculator taxCalculator;
     @Nullable
     private final MeterRegistry meterRegistry;
+    @Nullable
+    private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
+    @Nullable
+    private final RealReturnMatrix presetMatrix;
     private final TrialSimulator trialSimulator = new TrialSimulator();
     private final SustainabilitySearch sustainabilitySearch = new SustainabilitySearch(trialSimulator);
     private final GuardrailResponseBuilder responseBuilder = new GuardrailResponseBuilder(trialSimulator);
     private final JointConversionSearch jointConversionSearch;
     private final OptimizationContextBuilder contextBuilder;
 
-    /** Test-friendly constructor that omits the optional meter registry. */
-    public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator) {
-        this(taxCalculator, null);
+    /**
+     * Test-friendly constructor: supplies the capital-market {@link RealReturnMatrix} directly so
+     * unit tests need no Spring context or database. Production uses the {@link Autowired}
+     * constructor and resolves the matrix lazily from the injected provider.
+     */
+    public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
+                                        RealReturnMatrix matrix) {
+        this(taxCalculator, null, matrix, null);
     }
 
     @Autowired
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
+                                        CapitalMarketAssumptionsProvider capitalMarketAssumptions,
+                                        @Nullable MeterRegistry meterRegistry) {
+        this(taxCalculator, capitalMarketAssumptions, null, meterRegistry);
+    }
+
+    private MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
+                                        @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
+                                        @Nullable RealReturnMatrix presetMatrix,
                                         @Nullable MeterRegistry meterRegistry) {
         this.taxCalculator = taxCalculator;
+        this.capitalMarketAssumptions = capitalMarketAssumptions;
+        this.presetMatrix = presetMatrix;
         this.meterRegistry = meterRegistry;
         this.jointConversionSearch = new JointConversionSearch(taxCalculator, sustainabilitySearch);
         this.contextBuilder = new OptimizationContextBuilder(taxCalculator);
+    }
+
+    /** Resolves the capital-market matrix — a preset (tests) or the provider's cached matrix (prod). */
+    private RealReturnMatrix matrix() {
+        if (presetMatrix != null) {
+            return presetMatrix;
+        }
+        // Exactly one of presetMatrix / capitalMarketAssumptions is non-null by construction; the
+        // provider path (production) requires the capital-market assumptions to be wired.
+        return Objects.requireNonNull(capitalMarketAssumptions,
+                "capitalMarketAssumptions required when no preset matrix is supplied").matrix();
     }
 
     @Timed(value = "wealthview.mc.optimize", histogram = true)
@@ -67,12 +100,13 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
         }
         try {
-            var ctx = contextBuilder.build(input);
+            RealReturnMatrix matrix = matrix();
+            var ctx = contextBuilder.build(input, matrix);
             if (ctx.sim().years() <= 0) {
                 return emptyResult(input);
             }
 
-            var conv = jointConversionSearch.optimize(ctx, input);
+            var conv = jointConversionSearch.optimize(ctx, input, matrix);
             var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
             return responseBuilder.build(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
                     conv.schedule());
@@ -121,15 +155,14 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                         SustainabilitySearch.SearchContext searchContext,
                                         OptimizationSetup ctx) {
         double[] floors = ctx.taxIncome().adjustedFloors();
-        double[][] returns = SustainabilitySearch.nominalReturns(searchContext);
-        if (sustainabilitySearch.isSustainable(searchContext, returns, floors, discretionaryByYear)) {
+        if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
             return;
         }
         for (int i = 0; i < 10; i++) {
             for (int y = 0; y < ctx.sim().years(); y++) {
                 discretionaryByYear[y] *= SUSTAINABILITY_REDUCTION_FACTOR;
             }
-            if (sustainabilitySearch.isSustainable(searchContext, returns, floors, discretionaryByYear)) {
+            if (sustainabilitySearch.isSustainable(searchContext, floors, discretionaryByYear)) {
                 return;
             }
         }
@@ -152,7 +185,8 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
                 ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                 ctx.sim().inflationRate(), ctx.taxIncome().taxCtx(),
-                conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear());
+                conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear(),
+                ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns());
     }
 
     /**

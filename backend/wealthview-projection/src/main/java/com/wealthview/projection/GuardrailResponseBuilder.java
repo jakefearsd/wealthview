@@ -5,7 +5,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,23 +68,23 @@ final class GuardrailResponseBuilder {
         String order = simPools && ctx.portfolio().withdrawalOrder() != null
                 ? ctx.portfolio().withdrawalOrder() : "taxable_first";
 
-        // marginalRateByYear is null — buildResponse does not model withdrawal tax
-        var simConfig = new TrialSimulator.SimulationConfig(
-                initTaxable, initTraditional, initRoth, order, null,
-                conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                ctx.taxIncome().dsBracketCeilingByYear(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true);
-
-        double[] historicalReturns = HistoricalReturns.getReturns();
-        var rng2 = input.seed() != null ? new Random(input.seed()) : new Random();
+        double[][] taxableReturns = ctx.sim().taxableReturns();
+        double[][] traditionalReturns = ctx.sim().traditionalReturns();
+        double[][] rothReturns = ctx.sim().rothReturns();
         double[][] yearBalances = new double[ctx.sim().years()][ctx.sim().trialCount()];
         double[] finalBalances = new double[ctx.sim().trialCount()];
         int tradExhaustedCount = 0;
         for (int t = 0; t < ctx.sim().trialCount(); t++) {
-            double[] nominalReturns = PortfolioPathGenerator.generateNominalReturns(
-                    ctx.sim().years(), historicalReturns, rng2, ctx.sim().inflationRate());
+            // marginalRateByYear is null — the terminal response sim does not model withdrawal tax.
+            // Each trial reuses the per-pool nominal return sequences generated for the run.
+            var simConfig = new TrialSimulator.SimulationConfig(
+                    initTaxable, initTraditional, initRoth, order, null,
+                    conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
+                    ctx.taxIncome().dsBracketCeilingByYear(),
+                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
+                    taxableReturns[t], traditionalReturns[t], rothReturns[t]);
 
-            var result = trialSimulator.simulateTrial(nominalReturns,
+            var result = trialSimulator.simulateTrial(
                     ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
                     ctx.taxIncome().adjustedFloors(), discretionaryByYear,
                     ctx.sim().years(), simConfig);

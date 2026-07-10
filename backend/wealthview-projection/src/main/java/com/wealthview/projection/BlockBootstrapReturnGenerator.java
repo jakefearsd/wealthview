@@ -29,6 +29,15 @@ public class BlockBootstrapReturnGenerator {
     }
 
     /**
+     * Index-only constructor for callers that draw {@link #generateIndexSequence} against an
+     * externally sized series (e.g. the multi-asset capital-market matrix) and never call
+     * {@link #generateReturnSequence}. No historical return array is needed.
+     */
+    public BlockBootstrapReturnGenerator(double expectedBlockLength, Random rng) {
+        this(new double[0], expectedBlockLength, rng);
+    }
+
+    /**
      * Generates an array of indices into the historical series using the block-bootstrap algorithm.
      *
      * @param years the number of indices to generate

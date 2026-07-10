@@ -1,14 +1,23 @@
 package com.wealthview.projection;
 
+import java.util.List;
 import java.util.Random;
 
+import org.springframework.lang.Nullable;
+
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
+import com.wealthview.projection.PoolReturnModel.AccountReturnSource;
+
 /**
- * Generates Monte Carlo portfolio trajectories for the spending optimizer using
- * block-bootstrap resampling of historical real returns.
+ * Generates Monte Carlo return trajectories for the spending optimizer.
  *
- * <p>Extracted from {@code MonteCarloSpendingOptimizer} during the Phase 3 decomposition.
- * Bootstrap returns are real (CPI-adjusted); they are converted to nominal via the Fisher
- * equation so portfolio growth matches the optimizer's nominal spending/income model.
+ * <p>Each trial draws ONE block-bootstrap {@code int[]} index sequence into the multi-asset
+ * capital-market matrix (shared across all pools/accounts so correlation is preserved). Every
+ * account's real return for the trial is then resolved from that sequence — a fixed override real
+ * return, or its allocation blended against the sampled matrix rows — and each pool's real return
+ * is the balance-weighted average of its accounts' returns. Real returns are converted to nominal
+ * via the Fisher equation so portfolio growth matches the optimizer's nominal spending/income model
+ * (the Monte Carlo stays in the nominal frame this task; a real-terms migration is a later change).
  *
  * <p>This class is stateless. Determinism is the caller's responsibility — the supplied
  * {@link Random} is the single source of randomness and must be seeded by the caller.
@@ -21,40 +30,73 @@ final class PortfolioPathGenerator {
     }
 
     /**
-     * Runs {@code trialCount} bootstrap trials (no withdrawals) and returns a
-     * {@code [trialCount][years + 1]} array of cumulative portfolio balances —
-     * column 0 is the initial portfolio, column {@code y + 1} is the balance after year {@code y}.
+     * Runs {@code trialCount} bootstrap trials (no withdrawals) and returns per-pool nominal return
+     * sequences plus a blended cumulative total-portfolio balance path.
      */
-    static double[][] generatePaths(int trialCount, int years, double initialPortfolio,
-                                     double[] historicalReturns, Random rng,
-                                     double inflationRate) {
-        double[][] paths = new double[trialCount][years + 1];
+    static PortfolioReturnPaths generate(int trialCount, int years, PoolReturnModel model,
+                                         RealReturnMatrix matrix, Random rng, double inflationRate) {
+        double[][] taxable = new double[trialCount][];
+        double[][] traditional = new double[trialCount][];
+        double[][] roth = new double[trialCount][];
+        double[][] portfolioPaths = new double[trialCount][years + 1];
+
+        var bootstrap = new BlockBootstrapReturnGenerator(DEFAULT_BLOCK_LENGTH, rng);
+        int historicalSize = matrix.years().length;
+
         for (int t = 0; t < trialCount; t++) {
-            var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng);
-            double[] returnSequence = generator.generateReturnSequence(years);
-            paths[t][0] = initialPortfolio;
+            int[] indexSequence = bootstrap.generateIndexSequence(years, historicalSize);
+
+            double[] portfolioNominal = poolNominalReturns(
+                    model.allAccounts(), model.totalBalance(), indexSequence, matrix, inflationRate, years, null);
+            taxable[t] = poolNominalReturns(
+                    model.taxable(), model.taxableBalance(), indexSequence, matrix, inflationRate, years,
+                    portfolioNominal);
+            traditional[t] = poolNominalReturns(
+                    model.traditional(), model.traditionalBalance(), indexSequence, matrix, inflationRate, years,
+                    portfolioNominal);
+            roth[t] = poolNominalReturns(
+                    model.roth(), model.rothBalance(), indexSequence, matrix, inflationRate, years,
+                    portfolioNominal);
+
+            portfolioPaths[t][0] = model.totalBalance();
             for (int y = 0; y < years; y++) {
-                double nominalReturn = toNominal(returnSequence[y], inflationRate);
-                double growthFactor = 1 + nominalReturn;
-                paths[t][y + 1] = paths[t][y] * growthFactor;
+                portfolioPaths[t][y + 1] = portfolioPaths[t][y] * (1 + portfolioNominal[y]);
             }
         }
-        return paths;
+        return new PortfolioReturnPaths(taxable, traditional, roth, portfolioPaths);
     }
 
     /**
-     * Draws a single bootstrap return sequence of length {@code years} and converts it to
-     * nominal returns. Advances {@code rng} exactly as one trial of {@link #generatePaths} would.
+     * Balance-weighted nominal return sequence for one pool. An empty pool (no accounts / zero
+     * balance) grows at the blended portfolio return {@code fallback} — e.g. a Roth pool that only
+     * receives Roth conversions has no starting accounts but must still grow the converted dollars
+     * at a sensible rate. For the portfolio blend itself the fallback is {@code null} (never empty
+     * when the run has any balance).
      */
-    static double[] generateNominalReturns(int years, double[] historicalReturns,
-                                            Random rng, double inflationRate) {
-        var generator = new BlockBootstrapReturnGenerator(historicalReturns, DEFAULT_BLOCK_LENGTH, rng);
-        double[] returnSequence = generator.generateReturnSequence(years);
-        double[] nominalReturns = new double[years];
-        for (int y = 0; y < years; y++) {
-            nominalReturns[y] = toNominal(returnSequence[y], inflationRate);
+    // UseVarargs: `fallback` is a per-year return array (or null), not a variable argument list —
+    // varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private static double[] poolNominalReturns(List<AccountReturnSource> accounts, double poolBalance,
+                                               int[] indexSequence, RealReturnMatrix matrix,
+                                               double inflationRate, int years, @Nullable double[] fallback) {
+        if (poolBalance <= 0 || accounts.isEmpty()) {
+            return fallback != null ? fallback : new double[years];
         }
-        return nominalReturns;
+        double[] real = new double[years];
+        for (var account : accounts) {
+            double[] accountReal = account.overrideBased()
+                    ? PortfolioReturnResolver.fixed(years, account.overrideReal())
+                    : PortfolioReturnResolver.resolveReal(indexSequence, account.allocation(), matrix);
+            double weight = account.balance() / poolBalance;
+            for (int y = 0; y < years; y++) {
+                real[y] += weight * accountReal[y];
+            }
+        }
+        double[] nominal = new double[years];
+        for (int y = 0; y < years; y++) {
+            nominal[y] = toNominal(real[y], inflationRate);
+        }
+        return nominal;
     }
 
     /** Converts a real (CPI-adjusted) return to a nominal return via the Fisher equation. */

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -35,7 +36,8 @@ final class JointConversionSearch {
         this.sustainabilitySearch = sustainabilitySearch;
     }
 
-    ConversionResult optimize(OptimizationSetup ctx, GuardrailOptimizationInput input) {
+    ConversionResult optimize(OptimizationSetup ctx, GuardrailOptimizationInput input,
+                              RealReturnMatrix matrix) {
         if (!input.optimizeConversions() || ctx.portfolio().initTraditional() <= 0 || taxCalculator == null) {
             return new ConversionResult(null, null, null);
         }
@@ -80,7 +82,7 @@ final class JointConversionSearch {
             log.info("DS mode: using Phase 1 conversion schedule (fraction={})",
                     convSchedule.conversionFraction());
         } else {
-            convSchedule = jointSearch(ctx, input, convOptimizer);
+            convSchedule = jointSearch(ctx, input, convOptimizer, matrix);
         }
 
         return new ConversionResult(
@@ -89,18 +91,17 @@ final class JointConversionSearch {
 
     private RothConversionOptimizer.RothConversionSchedule jointSearch(
             OptimizationSetup ctx, GuardrailOptimizationInput input,
-            RothConversionOptimizer convOptimizer) {
+            RothConversionOptimizer convOptimizer, RealReturnMatrix matrix) {
         // Joint optimization: search conversion fractions by sustainable spending.
         // Each fraction is scored by how much the MC optimizer can sustain.
         int searchTrials = Math.min(JOINT_SEARCH_TRIALS, ctx.sim().trialCount());
         Random searchRng = input.seed() != null ? new Random(input.seed() + 1) : new Random();
-        double[] historicalReturns = HistoricalReturns.getReturns();
-        double[][] searchPaths = PortfolioPathGenerator.generatePaths(
-                searchTrials, ctx.sim().years(), ctx.portfolio().initialPortfolio(), historicalReturns,
-                searchRng, ctx.sim().inflationRate());
+        PoolReturnModel searchModel = PoolReturnModel.from(input.accounts(), ctx.sim().inflationRate());
+        PortfolioReturnPaths searchPaths = PortfolioPathGenerator.generate(
+                searchTrials, ctx.sim().years(), searchModel, matrix, searchRng, ctx.sim().inflationRate());
 
         double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
-                searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),
+                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),
                 ctx.sim().confidenceLevel(), ctx.sim().years(), searchTrials, ctx.sim().inflationRate());
 
         double[] searchMarginalRates = MarginalRateCalculator.compute(taxCalculator,
@@ -177,16 +178,17 @@ final class JointConversionSearch {
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
     @SuppressWarnings("PMD.UseVarargs")
-    private double evalSearchSpending(double[][] searchPaths, OptimizationSetup ctx,
+    private double evalSearchSpending(PortfolioReturnPaths searchPaths, OptimizationSetup ctx,
                                       double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
                                       double[] conversionByYear, double[] conversionTaxByYear) {
         var searchContext = new SustainabilitySearch.SearchContext(
-                searchPaths, ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
+                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
                 ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
                 searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
                 ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
                 ctx.sim().inflationRate(), searchTaxCtx, conversionByYear, conversionTaxByYear,
-                ctx.taxIncome().dsBracketCeilingByYear());
+                ctx.taxIncome().dsBracketCeilingByYear(),
+                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

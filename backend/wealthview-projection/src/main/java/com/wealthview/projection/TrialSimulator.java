@@ -12,8 +12,8 @@ import com.wealthview.core.projection.strategy.WithdrawalOrder;
  * concern from the optimizer's orchestration, search, and aggregation responsibilities.
  *
  * <p>This class is stateless; a single instance is shared across all trials. Determinism
- * is the caller's responsibility — the simulator consumes a pre-computed nominal-return
- * sequence and never draws random numbers itself.
+ * is the caller's responsibility — the simulator consumes pre-computed per-pool nominal-return
+ * sequences (on the {@link SimulationConfig}) and never draws random numbers itself.
  */
 final class TrialSimulator {
 
@@ -28,7 +28,12 @@ final class TrialSimulator {
             boolean traditionalExhausted
     ) {}
 
-    /** Configuration shared across all trials in a simulation run. */
+    /**
+     * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
+     * arrays, cash config) are shared across trials; the three per-pool nominal return sequences
+     * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
+     * each pool grows at its own allocation/override-driven sequence.
+     */
     record SimulationConfig(
             double initTaxable, double initTraditional, double initRoth,
             String withdrawalOrder, double[] marginalRateByYear,
@@ -36,7 +41,8 @@ final class TrialSimulator {
             int retirementAge,
             double[] dsBracketCeilingByYear,
             int cashReserveYears, double cashReturnRate,
-            boolean trackYearBalances
+            boolean trackYearBalances,
+            double[] taxableReturns, double[] traditionalReturns, double[] rothReturns
     ) {}
 
     /**
@@ -55,13 +61,15 @@ final class TrialSimulator {
     // branch is a small guarded block, so the method is far simpler than its NPath number.
     @SuppressWarnings("PMD.NPathComplexity")
     TrialResult simulateTrial(
-            double[] nominalReturns,
             double[] income, double[] surplusTax,
             double[] floors, double[] discretionary,
             int years, SimulationConfig config) {
 
         boolean hasConversions = config.conversionByYear() != null;
         boolean hasPools = config.marginalRateByYear() != null;
+        double[] taxableReturns = config.taxableReturns();
+        double[] traditionalReturns = config.traditionalReturns();
+        double[] rothReturns = config.rothReturns();
 
         // pools[0] = taxable, pools[1] = traditional, pools[2] = roth
         double[] pools = { config.initTaxable(), config.initTraditional(), config.initRoth() };
@@ -89,12 +97,23 @@ final class TrialSimulator {
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
 
         for (int y = 0; y < years; y++) {
-            double nominalReturn = nominalReturns[y];
-            double growthFactor = 1 + nominalReturn;
+            double taxableReturn = taxableReturns[y];
+            double traditionalReturn = traditionalReturns[y];
+            double rothReturn = rothReturns[y];
 
-            pools[0] *= growthFactor;
-            pools[1] *= growthFactor;
-            pools[2] *= growthFactor;
+            // Cash-reserve down-year logic keys on the balance-weighted portfolio nominal return
+            // across the three pools (pre-growth balances). Now that pools grow at distinct rates
+            // there is no single "the return" — this weighted figure preserves the original bucket
+            // behavior: draw from cash when the portfolio as a whole had a down year.
+            double preGrowthTotal = pools[0] + pools[1] + pools[2];
+            double portfolioReturn = preGrowthTotal > 0
+                    ? (pools[0] * taxableReturn + pools[1] * traditionalReturn + pools[2] * rothReturn)
+                            / preGrowthTotal
+                    : 0.0;
+
+            pools[0] *= (1 + taxableReturn);
+            pools[1] *= (1 + traditionalReturn);
+            pools[2] *= (1 + rothReturn);
             cashBalance *= (1 + config.cashReturnRate());
 
             int age = config.retirementAge() + y;
@@ -124,7 +143,7 @@ final class TrialSimulator {
 
             // Withdraw from pools + handle cash reserve
             cashBalance = applyTrialWithdrawals(pools, cashBalance, drawn, withdrawalTax,
-                    withdrawal, spending, hasPools, config.cashReserveYears(), nominalReturn);
+                    withdrawal, spending, hasPools, config.cashReserveYears(), portfolioReturn);
 
             // Surplus: income exceeds spending — deposit after-tax surplus to taxable
             if (income[y] > spending) {
@@ -194,9 +213,9 @@ final class TrialSimulator {
                                                  PoolWithdrawal drawn, double withdrawalTax,
                                                  double withdrawal, double spending,
                                                  boolean hasPools, int cashReserveYears,
-                                                 double nominalReturn) {
+                                                 double portfolioReturn) {
         if (cashReserveYears > 0) {
-            if (nominalReturn < 0) {
+            if (portfolioReturn < 0) {
                 if (hasPools) {
                     // sustainability path: tax-aware cash reserve draw
                     double totalDraw = withdrawal + withdrawalTax;

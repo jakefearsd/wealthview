@@ -16,6 +16,7 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.projection.testutil.ProjectionTestFixtures;
 import com.wealthview.core.projection.tax.FilingStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -27,7 +28,8 @@ import static org.mockito.Mockito.when;
 
 class MonteCarloSpendingOptimizerTest {
 
-    private final MonteCarloSpendingOptimizer optimizer = new MonteCarloSpendingOptimizer(null);
+    private final MonteCarloSpendingOptimizer optimizer =
+            new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
     private GuardrailOptimizationInput buildInput(BigDecimal portfolio,
                                                    BigDecimal essentialFloor,
@@ -73,7 +75,7 @@ class MonteCarloSpendingOptimizerTest {
                 90,
                 new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
-                        portfolio, BigDecimal.ZERO, new BigDecimal("0.07"), "taxable")),
+                        portfolio, BigDecimal.ZERO, null, "taxable")),
                 incomeSources != null ? incomeSources : List.of(),
                 essentialFloor,
                 terminalTarget,
@@ -791,7 +793,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -804,7 +806,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -1441,7 +1443,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -1479,7 +1481,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("1000000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(),
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1648,7 +1650,7 @@ class MonteCarloSpendingOptimizerTest {
         when(taxCalc.computeMaxIncomeForBracket(
                 any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
-        return new MonteCarloSpendingOptimizer(taxCalc);
+        return new MonteCarloSpendingOptimizer(taxCalc, ProjectionTestFixtures.TEST_CMA_MATRIX);
     }
 
     @Test
@@ -1662,7 +1664,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "roth")),
+                        null, "roth")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -1676,7 +1678,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "traditional")),
+                        null, "traditional")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -1709,9 +1711,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("800000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1752,9 +1754,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1975, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("300000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("700000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1776,7 +1778,7 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -1796,9 +1798,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1821,9 +1823,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("400000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("100000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1870,7 +1872,7 @@ class MonteCarloSpendingOptimizerTest {
         when(taxCalc.computeMaxIncomeForBracket(
                 any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
-        return new MonteCarloSpendingOptimizer(taxCalc);
+        return new MonteCarloSpendingOptimizer(taxCalc, ProjectionTestFixtures.TEST_CMA_MATRIX);
     }
 
     @Test
@@ -1885,9 +1887,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("800000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1920,9 +1922,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("800000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("30000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -1949,9 +1951,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("50000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -2060,9 +2062,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("300000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("700000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2084,9 +2086,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("300000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("700000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2108,11 +2110,11 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("600000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                        BigDecimal.ZERO, null, "traditional"),
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                        BigDecimal.ZERO, null, "roth")),
                 List.of(),
                 new BigDecimal("20000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2141,11 +2143,11 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("600000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                        BigDecimal.ZERO, null, "traditional"),
                     new HypotheticalAccountInput(new BigDecimal("200000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                        BigDecimal.ZERO, null, "roth")),
                 List.of(),
                 new BigDecimal("20000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2184,9 +2186,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("300000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("700000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("50000"),
                 new BigDecimal("0.10"),
@@ -2209,7 +2211,7 @@ class MonteCarloSpendingOptimizerTest {
         var allTaxableInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(new BigDecimal("1000000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable")),
+                        BigDecimal.ZERO, null, "taxable")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("50000"),
                 new BigDecimal("0.10"),
@@ -2236,9 +2238,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("10000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("990000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("10000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -2273,7 +2275,7 @@ class MonteCarloSpendingOptimizerTest {
         var rothInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                        BigDecimal.ZERO, null, "roth")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2285,7 +2287,7 @@ class MonteCarloSpendingOptimizerTest {
         var tradInput = new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("10000"), new BigDecimal("100000"),
                 new BigDecimal("0.10"),
@@ -2392,9 +2394,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -2417,9 +2419,9 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional")),
+                        BigDecimal.ZERO, null, "traditional")),
                 List.of(),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),
@@ -2453,11 +2455,11 @@ class MonteCarloSpendingOptimizerTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                        BigDecimal.ZERO, null, "taxable"),
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "traditional"),
+                        BigDecimal.ZERO, null, "traditional"),
                     new HypotheticalAccountInput(new BigDecimal("500000"),
-                        BigDecimal.ZERO, new BigDecimal("0.07"), "roth")),
+                        BigDecimal.ZERO, null, "roth")),
                 List.of(highIncomeSource),
                 new BigDecimal("20000"), BigDecimal.ZERO,
                 new BigDecimal("0.10"),

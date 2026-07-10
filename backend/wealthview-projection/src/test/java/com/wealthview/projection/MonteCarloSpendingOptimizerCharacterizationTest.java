@@ -11,6 +11,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,11 +23,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * (see {@code MonteCarloSpendingOptimizer} lines 188 / 341 / 526), so a fixed seed pins
  * the entire simulation. No production seam was needed — the seed hook already exists.
  *
- * <p>The fixture is a healthy three-phase retirement (target spending well within the
- * portfolio's capacity): an 8.4% failure rate at the 90% confidence level and a positive,
- * plausible $9.46M median terminal balance. Every value below was produced by the optimizer
- * and sanity-checked. These assertions are the behavior contract the Phase 3 decomposition
- * of this God-class must preserve.
+ * <p>The fixture is a healthy three-phase retirement: a $1.5M all-US-equity (allocation-driven)
+ * taxable account whose Monte Carlo returns are drawn per-pool from the shared
+ * {@link ProjectionTestFixtures#TEST_CMA_MATRIX} joint bootstrap (Task 15). Spending stays capped
+ * at the per-phase targets (well within capacity), so the recommendation values are unchanged; the
+ * balance/percentile statistics were regenerated against the new return model and sanity-checked:
+ * a 0.1% failure rate at the 90% confidence level, a positive $10.84M median terminal balance, and
+ * a non-degenerate fan (10th-percentile terminal $4.49M &lt; median). These assertions are the
+ * behavior contract the optimizer must preserve.
  */
 class MonteCarloSpendingOptimizerCharacterizationTest {
 
@@ -42,7 +46,7 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
                         new BigDecimal("1500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
+                        null, "taxable")),
                 List.of(), new BigDecimal("40000"), BigDecimal.ZERO,
                 new BigDecimal("0.06"), 1000, new BigDecimal("0.90"),
                 phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
@@ -51,19 +55,19 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
 
     @Test
     void optimize_seededThreePhaseScenario_pinsAggregateStatistics() {
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailProfileResponse r = optimizer.optimize(goldenInput());
 
         assertThat(r.yearlySpending()).hasSize(28);
-        assertThat(r.medianFinalBalance()).isEqualByComparingTo(new BigDecimal("9461468.4563"));
-        assertThat(r.failureRate()).isEqualByComparingTo(new BigDecimal("0.0840"));
-        assertThat(r.percentile10Final()).isEqualByComparingTo(new BigDecimal("405515.1143"));
+        assertThat(r.medianFinalBalance()).isEqualByComparingTo(new BigDecimal("10842861.2838"));
+        assertThat(r.failureRate()).isEqualByComparingTo(new BigDecimal("0.0010"));
+        assertThat(r.percentile10Final()).isEqualByComparingTo(new BigDecimal("4485983.3902"));
     }
 
     @Test
     void optimize_seededThreePhaseScenario_pinsFirstYearSpending() {
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailYearlySpending first = optimizer.optimize(goldenInput()).yearlySpending().getFirst();
 
@@ -74,12 +78,12 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(first.corridorLow()).isEqualByComparingTo(new BigDecimal("74391.6379"));
         assertThat(first.corridorHigh()).isEqualByComparingTo(new BigDecimal("223174.9138"));
         assertThat(first.portfolioWithdrawal()).isEqualByComparingTo(new BigDecimal("74391.6379"));
-        assertThat(first.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("1582157.3621"));
+        assertThat(first.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("1594208.3621"));
     }
 
     @Test
     void optimize_seededThreePhaseScenario_pinsSlowGoPhaseYear() {
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailYearlySpending year = optimizer.optimize(goldenInput()).yearlySpending().get(10);
 
@@ -87,12 +91,12 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(year.age()).isEqualTo(72);
         assertThat(year.phaseName()).isEqualTo("Slow-Go");
         assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("76866.3979"));
-        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("2738225.8049"));
+        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("2725836.8832"));
     }
 
     @Test
     void optimize_seededThreePhaseScenario_pinsNoGoPhaseYear() {
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailYearlySpending year = optimizer.optimize(goldenInput()).yearlySpending().get(20);
 
@@ -100,12 +104,12 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(year.age()).isEqualTo(82);
         assertThat(year.phaseName()).isEqualTo("No-Go");
         assertThat(year.recommended()).isEqualByComparingTo(new BigDecimal("82282.2919"));
-        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("5147287.9565"));
+        assertThat(year.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("5924788.6681"));
     }
 
     @Test
     void optimize_seededThreePhaseScenario_pinsFinalYear() {
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailYearlySpending last = optimizer.optimize(goldenInput()).yearlySpending().getLast();
 
@@ -113,7 +117,7 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         assertThat(last.age()).isEqualTo(89);
         assertThat(last.phaseName()).isEqualTo("No-Go");
         assertThat(last.recommended()).isEqualByComparingTo(new BigDecimal("98889.4027"));
-        assertThat(last.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("9461468.4563"));
+        assertThat(last.portfolioBalanceMedian()).isEqualByComparingTo(new BigDecimal("10842861.2838"));
     }
 
     @Test
@@ -121,7 +125,7 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
         // Determinism guarantee: the fixed seed makes the whole Monte Carlo run
         // reproducible, which is what makes this characterization test a valid
         // refactor gate.
-        var optimizer = new MonteCarloSpendingOptimizer(null);
+        var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailProfileResponse a = optimizer.optimize(goldenInput());
         GuardrailProfileResponse b = optimizer.optimize(goldenInput());

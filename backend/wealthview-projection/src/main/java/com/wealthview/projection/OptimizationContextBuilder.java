@@ -6,6 +6,7 @@ import java.util.Random;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -31,7 +32,7 @@ final class OptimizationContextBuilder {
     private record IncomeArrays(double[] incomeByYear, double[] taxableIncomeByYear,
                                 double[] surplusTaxByYear) {}
 
-    OptimizationSetup build(GuardrailOptimizationInput input) {
+    OptimizationSetup build(GuardrailOptimizationInput input, RealReturnMatrix matrix) {
         int retirementYear = input.retirementDate().getYear();
         int retirementAge = retirementYear - input.birthYear();
         int endAge = input.endAge();
@@ -40,7 +41,8 @@ final class OptimizationContextBuilder {
         if (years <= 0) {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0),
-                    new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0, null),
+                    new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
+                            null, null, null, null),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null));
         }
 
@@ -60,16 +62,18 @@ final class OptimizationContextBuilder {
 
         Random rng = input.seed() != null ? new Random(input.seed()) : new Random();
 
-        double[] historicalReturns = HistoricalReturns.getReturns();
-
         double inflationRate = input.inflationRate() != null
                 ? input.inflationRate().doubleValue() : 0.0;
 
-        // Run MC trials (no withdrawals) to get portfolio trajectories using bootstrap.
-        // Bootstrap returns are real (CPI-adjusted); convert to nominal via Fisher equation
-        // so portfolio growth matches the nominal spending/income model.
-        double[][] portfolioPaths = PortfolioPathGenerator.generatePaths(
-                trialCount, years, initialPortfolio, historicalReturns, rng, inflationRate);
+        // Run MC trials (no withdrawals) to get per-pool return sequences plus the blended
+        // total-portfolio path. Each account's real return comes from a fixed override or its
+        // allocation blended against the capital-market matrix (shared index sequence per trial);
+        // per-pool returns are balance-weighted and converted to nominal (Fisher) so growth matches
+        // the nominal spending/income model.
+        PoolReturnModel returnModel = PoolReturnModel.from(input.accounts(), inflationRate);
+        PortfolioReturnPaths returnPaths = PortfolioPathGenerator.generate(
+                trialCount, years, returnModel, matrix, rng, inflationRate);
+        double[][] portfolioPaths = returnPaths.portfolioPaths();
 
         // Compute deterministic income for each year
         IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(
@@ -111,7 +115,9 @@ final class OptimizationContextBuilder {
                         initialPortfolio, withdrawalOrder, cashReserveYears, cashReturnRate,
                         terminalTarget, portfolioFloor),
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
-                        trialCount, confidenceLevel, inflationRate, portfolioPaths),
+                        trialCount, confidenceLevel, inflationRate, portfolioPaths,
+                        returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
+                        returnPaths.rothReturns()),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
