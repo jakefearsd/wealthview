@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.wealthview.persistence.entity.LtcgBracketEntity;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 
@@ -95,5 +96,16 @@ public final class TaxBracketFixtures {
                 .thenReturn(mfj2025Brackets());
         lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
                 .thenReturn(Optional.of(mfjDeduction2025()));
+    }
+
+    public static void stubSingle2025Ltcg(LtcgBracketRepository ltcgBracketRepo) {
+        lenient().when(ltcgBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025LtcgBrackets());
+    }
+
+    public static void stubMfj2025Ltcg(LtcgBracketRepository ltcgBracketRepo) {
+        lenient().when(ltcgBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(),
+                        eq("married_filing_jointly")))
+                .thenReturn(mfj2025LtcgBrackets());
     }
 }

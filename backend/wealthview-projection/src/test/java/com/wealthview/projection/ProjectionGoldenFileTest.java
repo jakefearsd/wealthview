@@ -21,7 +21,9 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import tools.jackson.databind.JsonNode;
@@ -30,6 +32,7 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static org.mockito.Mockito.mock;
 
 class ProjectionGoldenFileTest {
@@ -53,9 +56,12 @@ class ProjectionGoldenFileTest {
         var taxBracketRepo = mock(TaxBracketRepository.class);
         var deductionRepo = mock(StandardDeductionRepository.class);
         stubSingle2025(taxBracketRepo, deductionRepo);
+        var ltcgBracketRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgBracketRepo);
 
         var engine = new DeterministicProjectionEngine(
-                new FederalTaxCalculator(taxBracketRepo, deductionRepo), null);
+                new FederalTaxCalculator(taxBracketRepo, deductionRepo), null,
+                new CapitalGainsTaxCalculator(ltcgBracketRepo));
         var result = engine.run(input);
 
         var actualJson = MAPPER.writeValueAsString(result);

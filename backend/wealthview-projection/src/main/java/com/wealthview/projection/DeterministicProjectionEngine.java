@@ -26,6 +26,7 @@ import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingPlan;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
@@ -70,22 +71,33 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final IncomeSourceProcessor incomeSourceProcessor;
     private final IncomeContributionCalculator incomeContributionCalculator;
     @Nullable
+    private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
+    @Nullable
     private final MeterRegistry meterRegistry;
     @Nullable
     private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
 
-    /** Test-friendly constructor that omits the optional meter registry and CMA provider. */
+    /** Test-friendly constructor that omits capital-gains taxation, the meter registry and CMA. */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory) {
-        this(taxCalculator, stateTaxCalculatorFactory, null, null);
+        this(taxCalculator, stateTaxCalculatorFactory, null, null, null);
+    }
+
+    /** Test-friendly constructor that wires capital-gains taxation but omits meter registry and CMA. */
+    public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
+                                          @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
+        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, null, null);
     }
 
     @Autowired
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
                                           @Nullable MeterRegistry meterRegistry,
                                           @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
+        this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
         this.meterRegistry = meterRegistry;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
         var rentalLossCalculator = new RentalLossCalculator();
@@ -151,7 +163,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         var resolved = resolveProjectionParams(input, params);
         var taxStrategy = taxStrategyFactory.buildTaxStrategy(params);
-        var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate());
+        var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate(),
+                resolved.currentYear());
 
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
@@ -199,7 +212,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts,
                                               ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy,
-                                              BigDecimal scenarioInflationRate) {
+                                              BigDecimal scenarioInflationRate,
+                                              int baseYear) {
         Map<AssetClass, Double> geoMeans = capitalMarketAssumptions != null
                 ? capitalMarketAssumptions.geometricMeans()
                 : Map.of();
@@ -216,7 +230,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 params.rothConversionStrategy(), params.targetBracketRate(),
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate(),
-                geoMeans, inflationRate);
+                geoMeans, inflationRate,
+                capitalGainsTaxCalculator, paramsParser.dividendYield(params), baseYear);
         return PoolStrategy.create(accounts, config);
     }
 

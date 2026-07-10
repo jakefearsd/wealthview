@@ -11,6 +11,7 @@ import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
@@ -145,12 +146,17 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             TaxCalculationStrategy taxCalculator,
             BigDecimal dynamicSequencingBracketRate,
             Map<AssetClass, Double> geoMeans,
-            BigDecimal inflationRate) {
+            BigDecimal inflationRate,
+            CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+            BigDecimal dividendYield,
+            int baseYear) {
 
         /**
          * Back-compat constructor for callers that predate allocation-driven returns: uses an
          * empty capital-market map and zero inflation, so returns come solely from per-account
-         * overrides (the legacy {@code expectedReturn} path).
+         * overrides (the legacy {@code expectedReturn} path). No capital-gains calculator and a
+         * zero dividend yield, so the taxable pool tracks cost basis but realizes no LTCG tax and
+         * no dividend drag — the pre-lots scalar behavior, bit-for-bit.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -158,7 +164,21 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                    TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    Map.of(), BigDecimal.ZERO);
+                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, 0);
+        }
+
+        /**
+         * Back-compat constructor for allocation-driven callers that predate capital-gains taxation:
+         * supplies capital-market means and inflation but no LTCG calculator / dividend yield.
+         */
+        PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
+                   String rothConversionStrategy, BigDecimal targetBracketRate,
+                   Integer rothConversionStartYear, WithdrawalOrder withdrawalOrder,
+                   TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate,
+                   Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
+            this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
+                    rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
+                    geoMeans, inflationRate, null, BigDecimal.ZERO, 0);
         }
     }
 
@@ -375,10 +395,22 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     // --- MultiPool ---
 
     final class MultiPool implements PoolStrategy {
-        private BigDecimal taxable;
+        /**
+         * The taxable pool, tracked as FIFO cost-basis lots so withdrawals can realize long-term
+         * capital gains. Replaces the pre-lots scalar {@code taxable} balance; its {@code totalValue()}
+         * is the taxable balance everywhere the scalar was read.
+         */
+        private final TaxableLotsBd lots;
         private BigDecimal traditional;
         private BigDecimal roth;
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
+        /**
+         * The current year's qualified-dividend income (value × dividend yield), booked in
+         * {@link #applyGrowth()} and consumed as LTCG income in {@link #executeWithdrawals}. Reset
+         * each {@code applyGrowth}; during accumulation it is never consumed (the model has no wage
+         * income to stack it on) so only retirement-year dividends are taxed.
+         */
+        private BigDecimal qualifiedDividendIncome = BigDecimal.ZERO;
 
         private final BigDecimal tradContrib;
         private final BigDecimal rothContrib;
@@ -398,6 +430,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final TaxCalculationStrategy taxCalculator;
         private final BigDecimal dynamicSequencingBracketRate;
 
+        // Capital-gains taxation collaborators (null calculator ⇒ taxable pool stays untaxed,
+        // preserving pre-lots behavior for callers that don't wire capital gains).
+        private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
+        private final BigDecimal dividendYield;
+        private final BigDecimal inflationRate;
+        private final int baseYear;
+
         /**
          * Legacy uniform-return constructor: all three pools grow at the same {@code weightedReturn}.
          * Retained so existing direct-construction callers (and tests) keep their behavior.
@@ -412,7 +451,12 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                   BigDecimal taxableReturn, BigDecimal traditionalReturn, BigDecimal rothReturn,
                   BigDecimal weightedReturn,
                   PoolConfig config) {
-            this.taxable = sumBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()));
+            // Seed one FIFO lot per taxable account: basis = its cost basis, value = its balance,
+            // so any embedded (unrealized) gain is carried into the projection.
+            this.lots = new TaxableLotsBd();
+            for (var acct : grouped.getOrDefault(POOL_TAXABLE, List.of())) {
+                lots.addLot(acct.costBasis(), acct.initialBalance());
+            }
             this.traditional = sumBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
             this.roth = sumBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
 
@@ -433,6 +477,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             this.withdrawalOrder = config.withdrawalOrder();
             this.taxCalculator = config.taxCalculator();
             this.dynamicSequencingBracketRate = config.dynamicSequencingBracketRate();
+            this.capitalGainsTaxCalculator = config.capitalGainsTaxCalculator();
+            this.dividendYield = config.dividendYield();
+            this.inflationRate = config.inflationRate();
+            this.baseYear = config.baseYear();
         }
 
         private static BigDecimal sumBalances(List<ProjectionAccountInput> accounts) {
@@ -449,7 +497,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public BigDecimal getTotal() {
-            return taxable.add(traditional).add(roth);
+            return lots.totalValue().add(traditional).add(roth);
         }
 
         @Override
@@ -466,7 +514,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public BigDecimal applyContributions() {
             traditional = traditional.add(tradContrib);
             roth = roth.add(rothContrib);
-            taxable = taxable.add(taxableContrib);
+            lots.addLot(taxableContrib);   // new contributions enter at cost (basis = value)
             return tradContrib.add(rothContrib).add(taxableContrib);
         }
 
@@ -474,10 +522,23 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public GrowthResult applyGrowth() {
             BigDecimal tradGrowth = traditional.multiply(traditionalReturn).setScale(SCALE, ROUNDING);
             BigDecimal rothGrowth = roth.multiply(rothReturn).setScale(SCALE, ROUNDING);
-            BigDecimal taxableGrowth = taxable.multiply(taxableReturn).setScale(SCALE, ROUNDING);
+
+            // Split the taxable return: existing lots appreciate at (r − dividendYield); the
+            // dividend (≈ value × dividendYield) is reinvested as a fresh at-cost lot. The dividend
+            // is booked as the residual to the exact target total, so the taxable pool still grows
+            // at precisely r (bit-identical to the pre-lots scalar path when dividendYield is 0).
+            // The dividend becomes this year's qualifiedDividendIncome and is TAXED only at
+            // withdrawal time (retirement); during accumulation it resets each year unconsumed.
+            BigDecimal taxableBefore = lots.totalValue();
+            BigDecimal taxableGrowth = taxableBefore.multiply(taxableReturn).setScale(SCALE, ROUNDING);
+            BigDecimal targetTotal = taxableBefore.add(taxableGrowth);
+            lots.grow(taxableReturn.subtract(dividendYield));
+            BigDecimal dividend = targetTotal.subtract(lots.totalValue());
+            lots.addLot(dividend);
+            qualifiedDividendIncome = dividend.max(BigDecimal.ZERO);
+
             traditional = traditional.add(tradGrowth);
             roth = roth.add(rothGrowth);
-            taxable = taxable.add(taxableGrowth);
             return new GrowthResult(tradGrowth.add(rothGrowth).add(taxableGrowth),
                     taxableGrowth, tradGrowth, rothGrowth);
         }
@@ -498,7 +559,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     withdrawalOrder, dynamicSequencingBracketRate, taxCalculator, filingStatus,
                     withdrawalContext);
 
-            WithdrawalOrderStrategy.Result allocation = strategy.execute(totalNeed, taxable, traditional, roth);
+            WithdrawalOrderStrategy.Result allocation =
+                    strategy.execute(totalNeed, lots.totalValue(), traditional, roth);
             if (allocation == null) {
                 return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
                         BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
@@ -508,24 +570,24 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal fromTraditional = allocation.fromTraditional();
             BigDecimal fromRoth = allocation.fromRoth();
 
-            taxable = taxable.subtract(fromTaxable);
+            // Selling the taxable draw FIFO realizes a long-term capital gain (oldest lots first).
+            BigDecimal realizedGain = lots.sellFifo(fromTaxable);
             traditional = traditional.subtract(fromTraditional);
             roth = roth.subtract(fromRoth);
 
             // If the RMD exceeds what the spend draw already pulled from traditional, force the
             // excess out physically: it's a real, legally-required distribution even when the
-            // retiree doesn't need the cash. The gross excess is reinvested to taxable, and the
-            // tax on the full distribution flows through the deductFromPools cascade below, which
-            // draws from taxable first -- i.e. from the RMD proceeds just deposited there.
+            // retiree doesn't need the cash. The gross excess is reinvested to taxable (a fresh
+            // at-cost lot), and the tax on the full distribution flows through the deductFromPools
+            // cascade below, which draws from taxable first -- i.e. from the RMD proceeds just added.
             BigDecimal rmdExtra = BigDecimal.ZERO;
             if (rmdAmount != null && rmdAmount.compareTo(fromTraditional) > 0) {
                 rmdExtra = rmdAmount.subtract(fromTraditional).min(traditional).max(BigDecimal.ZERO);
                 traditional = traditional.subtract(rmdExtra);
-                taxable = taxable.add(rmdExtra);
+                lots.addLot(rmdExtra);
             }
             BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdExtra);
 
-            TaxSourceResult withdrawalTaxSource = TaxSourceResult.ZERO;
             BigDecimal withdrawalTax = BigDecimal.ZERO;
             BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
             if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
@@ -543,12 +605,41 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 }
 
                 lastTaxBreakdown = Optional.of(detailed);
-                withdrawalTaxSource = deductFromPools(withdrawalTax);
             }
 
+            // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
+            // stacked on ordinary income against the 0/15/20 LTCG brackets (+ deflated NIIT). This runs
+            // only in retirement (executeWithdrawals is only called when retired). It is intentionally
+            // kept OUT of the ordinary-tax breakdown (lastTaxBreakdown / federalTax) -- like the ordinary
+            // withdrawal tax it folds into taxLiability and drains the pools via the same cascade.
+            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year);
+
+            BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax);
+            TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
+                    ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
+
             return new WithdrawalTaxResult(
-                    fromTaxable.add(fromTraditional).add(fromRoth), withdrawalTax,
+                    fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax,
                     fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource);
+        }
+
+        /**
+         * LTCG tax on {@code realizedGain + qualifiedDividendIncome}, stacked on the year's ordinary
+         * taxable income. Returns zero when no capital-gains calculator is wired or the net LTCG income
+         * is non-positive (a realized loss nets against the dividend). {@code magi ≈ ordinary + LTCG},
+         * reusing the same effective-income figure the ordinary withdrawal tax is computed on.
+         */
+        private BigDecimal computeLtcgTax(BigDecimal realizedGain, BigDecimal ordinaryTaxableIncome, int year) {
+            if (capitalGainsTaxCalculator == null) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal ltcgIncome = realizedGain.add(qualifiedDividendIncome);
+            if (ltcgIncome.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal magi = ordinaryTaxableIncome.add(ltcgIncome);
+            return capitalGainsTaxCalculator.computeLtcgTax(ordinaryTaxableIncome, ltcgIncome, year,
+                    filingStatus, year - baseYear, inflationRate, magi);
         }
 
         @Override
@@ -615,7 +706,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public void floorAtZero() {
-            taxable = taxable.max(BigDecimal.ZERO);
+            // The taxable lots can never go negative (sellFifo caps every draw at the current total);
+            // only the scalar traditional/roth pools can be driven below zero by the tax cascade.
             traditional = traditional.max(BigDecimal.ZERO);
             roth = roth.max(BigDecimal.ZERO);
         }
@@ -627,7 +719,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public void depositToTaxable(BigDecimal amount) {
-            taxable = taxable.add(amount);
+            lots.addLot(amount);   // reinvested surplus enters at cost (basis = value)
         }
 
         @Override
@@ -637,7 +729,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     ctx.withdrawals(), ctx.retired(),
                     ctx.conversionAmount(), ctx.taxLiability(), ctx.growthResult(),
                     ctx.withdrawalFromTaxable(), ctx.withdrawalFromTraditional(), ctx.withdrawalFromRoth(),
-                    ctx.combinedTaxSource(), getTotal(), taxable, traditional, roth);
+                    ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional, roth);
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
             CombinedTaxResult breakdown = lastTaxBreakdown.orElse(null);
@@ -681,8 +773,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             }
             BigDecimal remaining = amount;
 
-            BigDecimal fromTax = remaining.min(taxable);
-            taxable = taxable.subtract(fromTax);
+            // Pay from taxable first, selling lots FIFO. The gain realized by this tax-payment sale
+            // is deliberately not itself taxed (a second-order effect out of scope for this model).
+            BigDecimal fromTax = remaining.min(lots.totalValue());
+            lots.sellFifo(fromTax);
             remaining = remaining.subtract(fromTax);
 
             BigDecimal fromTrad = remaining.min(traditional);
