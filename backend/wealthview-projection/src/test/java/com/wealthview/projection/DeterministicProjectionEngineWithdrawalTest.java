@@ -7,6 +7,8 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
+
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
@@ -473,5 +475,66 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(year1.withdrawalFromTaxable()).isGreaterThan(BigDecimal.ZERO);
         assertThat(year1.withdrawalFromTraditional()).isNull();
         assertThat(year1.withdrawalFromRoth()).isNull();
+    }
+
+    // === RMD forcing (main projection) ===
+
+    @Test
+    void run_traditionalHeavyRetireeAtRmdAge_forcesRmdAndTaxesIt() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int rmdStartAge = 73; // SECURE 2.0 start age for birth years well before 1960
+        int currentYear = LocalDate.now().getYear();
+
+        // Traditional-heavy retiree, already retired, taxable-first order and 0% returns so the
+        // small spend need is fully covered by taxable and every figure is exact -- isolating the
+        // RMD's effect from both growth and the withdrawal-order mechanics.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("1000000.0000", "0", "0.0000", "traditional"),
+                acct("500000.0000", "0", "0.0000", "taxable"));
+
+        var rmdInput = createInput(
+                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
+                """.formatted(currentYear - rmdStartAge),
+                accounts);
+        // Same scenario one birth-year younger: age is one below the RMD start age, so rmdAmount
+        // stays zero and this run isolates what the year would have looked like without the RMD.
+        var noRmdInput = createInput(
+                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
+                """.formatted(currentYear - (rmdStartAge - 1)),
+                accounts);
+
+        var rmdYear = engineTax.run(rmdInput).yearlyData().getFirst();
+        var noRmdYear = engineTax.run(noRmdInput).yearlyData().getFirst();
+
+        assertThat(rmdYear.age()).isEqualTo(rmdStartAge);
+        assertThat(noRmdYear.age()).isEqualTo(rmdStartAge - 1);
+
+        // Spend need (1% of $1.5M start balance = $15,000) is fully covered by taxable, so absent
+        // an RMD, traditional stays untouched -- confirmed by the one-year-younger comparison run.
+        // taxLiability is nulled by the DTO builder's "positive value or null" convention when zero.
+        assertThat(noRmdYear.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000"));
+        assertThat(noRmdYear.taxLiability()).isNull();
+
+        // RMD = priorYearEndTraditional (1,000,000) / distributionPeriod(73)=26.5 = 37,735.8491,
+        // forced out of traditional on top of the (fully taxable-covered) spend draw.
+        BigDecimal expectedRmd = bd("37735.8491");
+        assertThat(rmdYear.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000").subtract(expectedRmd));
+
+        BigDecimal tradDrop = noRmdYear.traditionalBalance().subtract(rmdYear.traditionalBalance());
+        assertThat(tradDrop).isEqualByComparingTo(expectedRmd);
+
+        // The gross RMD excess is reinvested to taxable: taxable grows beyond the post-spend base
+        // ($500,000 - $15,000 = $485,000) by the RMD, net of the tax paid on it from that same pool.
+        assertThat(rmdYear.taxableBalance()).isGreaterThan(bd("485000.0000"));
+        assertThat(rmdYear.taxableBalance()).isLessThan(bd("485000.0000").add(expectedRmd));
+
+        // RMD income is real ordinary income, taxed unlike the no-RMD comparison year (null == $0).
+        assertThat(rmdYear.taxLiability()).isGreaterThan(BigDecimal.ZERO);
     }
 }

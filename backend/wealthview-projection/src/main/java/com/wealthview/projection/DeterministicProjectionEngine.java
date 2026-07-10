@@ -1,6 +1,7 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -262,12 +263,24 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             contributions = pool.applyContributions();
         }
 
+        // Snapshot BEFORE applyGrowth(): the RMD for this year is computed off the prior year-end
+        // traditional balance (IRS Pub. 590-B), not this year's growth.
+        BigDecimal priorYearEndTraditional = pool.getTraditional();
         var growthResult = pool.applyGrowth();
         BigDecimal totalGrowth = growthResult.total();
 
+        BigDecimal rmdAmount = BigDecimal.ZERO;
+        if (retired && age >= RmdCalculator.rmdStartAge(ctx.birthYear())) {
+            double divisor = RmdCalculator.distributionPeriod(age);
+            if (divisor > 0) {
+                rmdAmount = priorYearEndTraditional.divide(BigDecimal.valueOf(divisor), 4, RoundingMode.HALF_UP);
+            }
+        }
+
         var incomeResult = processIncomeAndConversions(
                 pool, ctx.incomeSources(), age, yearsInRetirement, year, acc.suspendedLoss(),
-                resolveConversionOverride(ctx.spendingPlan(), year), ctx.inflationRate(), ctx.currentYear());
+                resolveConversionOverride(ctx.spendingPlan(), year), ctx.inflationRate(), ctx.currentYear(),
+                rmdAmount);
         BigDecimal suspendedLoss = incomeResult.suspendedLoss();
         BigDecimal conversionAmount = incomeResult.conversionAmount();
         BigDecimal taxLiability = incomeResult.taxLiability();
@@ -283,7 +296,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                     pool, ctx.strategy(), ctx.spendingPlan(), age, yearsInRetirement, year,
                     ctx.inflationRate(), incomeResult.totalActiveIncome(), startBalance,
                     previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                    incomeResult.isResult(), ctx.taxStrategy());
+                    incomeResult.isResult(), ctx.taxStrategy(), rmdAmount);
             var retirementResult = retirementWithdrawalProcessor.process(rwCtx);
             withdrawals = retirementResult.withdrawals();
             taxLiability = taxLiability.add(retirementResult.taxLiability());
@@ -341,7 +354,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private IncomeAndConversionResult processIncomeAndConversions(
             PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
             int age, int yearsInRetirement, int year, BigDecimal suspendedLoss,
-            BigDecimal conversionOverride, BigDecimal inflationRate, int baseYear) {
+            BigDecimal conversionOverride, BigDecimal inflationRate, int baseYear, BigDecimal rmdAmount) {
 
         IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
@@ -363,13 +376,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
         PoolStrategy.ConversionResult conversion;
         if (conversionOverride != null && conversionOverride.compareTo(BigDecimal.ZERO) > 0) {
-            conversion = pool.executeRothConversionOverride(year, effectiveOtherIncome, conversionOverride);
+            conversion = pool.executeRothConversionOverride(
+                    year, effectiveOtherIncome, conversionOverride, rmdAmount);
         } else if (conversionOverride != null) {
             // Override is present but zero → no conversion this year
             conversion = new PoolStrategy.ConversionResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, PoolStrategy.TaxSourceResult.ZERO);
         } else {
-            conversion = pool.executeRothConversion(year, effectiveOtherIncome);
+            conversion = pool.executeRothConversion(year, effectiveOtherIncome, rmdAmount);
         }
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,

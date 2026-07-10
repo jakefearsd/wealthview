@@ -33,7 +33,8 @@ final class RetirementWithdrawalProcessor {
             BigDecimal effectiveOtherIncome,
             BigDecimal conversionAmount,
             @Nullable IncomeSourceProcessor.IncomeSourceYearResult isResult,
-            @Nullable TaxCalculationStrategy taxStrategy) {
+            @Nullable TaxCalculationStrategy taxStrategy,
+            BigDecimal rmdAmount) {
     }
 
     record RetirementWithdrawalResult(
@@ -113,7 +114,7 @@ final class RetirementWithdrawalProcessor {
         }
 
         var withdrawalResult = pool.executeWithdrawals(
-                portfolioNeed, year, effectiveOtherIncome, conversionAmount, BigDecimal.ZERO, age);
+                portfolioNeed, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age);
         BigDecimal taxLiability = withdrawalResult.taxLiability().add(surplusTax);
 
         if (pool.tracksSETax() && isResult != null

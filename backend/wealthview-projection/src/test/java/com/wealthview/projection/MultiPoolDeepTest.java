@@ -357,10 +357,22 @@ class MultiPoolDeepTest {
         var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
 
         // bracketCeiling = 100000; effectiveOtherIncome = 20000; space = 80000; traditional min = 500000
-        var r = p.executeRothConversion(YEAR, bd("20000"));
+        var r = p.executeRothConversion(YEAR, bd("20000"), ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(bd("80000"));
         assertThat(r.taxLiability()).isEqualByComparingTo(bd("20000")); // (80000 + 20000) * 0.20
+    }
+
+    @Test
+    void executeRothConversion_fillBracket_rmdReducesBracketHeadroom() {
+        var tax = flatTaxCalc("0.20");
+        var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
+
+        // bracketCeiling = 100000; effectiveOtherIncome = 20000; rmdAmount = 30000 already claims
+        // part of the target bracket -> space = 100000 - 20000 - 30000 = 50000.
+        var r = p.executeRothConversion(YEAR, bd("20000"), bd("30000"));
+
+        assertThat(r.amountConverted()).isEqualByComparingTo(bd("50000"));
     }
 
     @Test
@@ -368,7 +380,7 @@ class MultiPoolDeepTest {
         var tax = flatTaxCalc("0.20");
         var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
 
-        var r = p.executeRothConversion(YEAR, bd("150000"));
+        var r = p.executeRothConversion(YEAR, bd("150000"), ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
     }
@@ -378,7 +390,7 @@ class MultiPoolDeepTest {
         var tax = flatTaxCalc("0.20");
         var p = poolWithConversion("0", "30", "0", "100", "fixed", null, null, tax);
 
-        var r = p.executeRothConversion(YEAR, ZERO);
+        var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(bd("30")); // capped by traditional balance
     }
@@ -387,7 +399,7 @@ class MultiPoolDeepTest {
     void executeRothConversion_beforeStartYear_returnsZero() {
         var p = poolWithConversion("0", "500000", "0", "5000", "fixed", null, 2040, flatTaxCalc("0.20"));
 
-        var r = p.executeRothConversion(YEAR, ZERO);
+        var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
         assertThat(r.taxLiability()).isEqualByComparingTo(ZERO);
@@ -397,7 +409,7 @@ class MultiPoolDeepTest {
     void executeRothConversion_emptyTraditional_returnsZero() {
         var p = poolWithConversion("0", "0", "0", "5000", "fixed", null, null, flatTaxCalc("0.20"));
 
-        var r = p.executeRothConversion(YEAR, ZERO);
+        var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
     }
@@ -406,7 +418,7 @@ class MultiPoolDeepTest {
     void executeRothConversion_noTaxCalculator_zeroTax() {
         var p = poolWithConversion("0", "100", "0", "50", "fixed", null, null, null);
 
-        var r = p.executeRothConversion(YEAR, ZERO);
+        var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(bd("50"));
         assertThat(r.taxLiability()).isEqualByComparingTo(ZERO);
@@ -418,7 +430,7 @@ class MultiPoolDeepTest {
     void executeRothConversionOverride_positiveAmount_appliesOverride() {
         var p = poolWithConversion("0", "200", "10", "5000", "fixed", null, null, flatTaxCalc("0.10"));
 
-        var r = p.executeRothConversionOverride(YEAR, ZERO, bd("120"));
+        var r = p.executeRothConversionOverride(YEAR, ZERO, bd("120"), ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(bd("120"));
         assertThat(r.taxLiability()).isEqualByComparingTo(bd("12"));
@@ -428,7 +440,7 @@ class MultiPoolDeepTest {
     void executeRothConversionOverride_zeroAmount_returnsZero() {
         var p = poolWithConversion("0", "200", "0", "5000", "fixed", null, null, flatTaxCalc("0.20"));
 
-        var r = p.executeRothConversionOverride(YEAR, ZERO, ZERO);
+        var r = p.executeRothConversionOverride(YEAR, ZERO, ZERO, ZERO);
 
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
     }
@@ -442,7 +454,7 @@ class MultiPoolDeepTest {
                         new HypotheticalAccountInput(bd("100000"), ZERO, ZERO, "taxable")),
                 config);
 
-        var r = single.executeRothConversionOverride(YEAR, ZERO, bd("1000"));
+        var r = single.executeRothConversionOverride(YEAR, ZERO, bd("1000"), ZERO);
 
         // SinglePool.executeRothConversion returns ZERO → default delegates to same
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
@@ -659,6 +671,6 @@ class MultiPoolDeepTest {
                         new HypotheticalAccountInput(bd("100"), ZERO, ZERO, "taxable")),
                 config);
 
-        assertThat(sp.executeRothConversion(YEAR, ZERO).amountConverted()).isEqualByComparingTo(ZERO);
+        assertThat(sp.executeRothConversion(YEAR, ZERO, ZERO).amountConverted()).isEqualByComparingTo(ZERO);
     }
 }

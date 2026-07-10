@@ -46,7 +46,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount, BigDecimal rmdAmount, int age);
 
-    ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome);
+    ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome, BigDecimal rmdAmount);
 
     /**
      * Everything the engine knows about a projection year when it asks the
@@ -63,8 +63,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                           TaxSourceResult combinedTaxSource) {}
 
     default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
-                                                            BigDecimal overrideAmount) {
-        return executeRothConversion(year, effectiveOtherIncome);
+                                                            BigDecimal overrideAmount, BigDecimal rmdAmount) {
+        return executeRothConversion(year, effectiveOtherIncome, rmdAmount);
     }
 
     void floorAtZero();
@@ -317,7 +317,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome) {
+        public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
+                                                       BigDecimal rmdAmount) {
             // No-op for single pool
             return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
         }
@@ -551,7 +552,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         }
 
         @Override
-        public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome) {
+        public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
+                                                       BigDecimal rmdAmount) {
             if (rothConversionStartYear != null && year < rothConversionStartYear) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
@@ -560,7 +562,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if ("fill_bracket".equals(rothConversionStrategy) && targetBracketRate != null && taxCalculator != null) {
                 BigDecimal bracketCeiling = taxCalculator.computeMaxIncomeForTargetRate(
                         targetBracketRate, year, filingStatus);
-                BigDecimal space = bracketCeiling.subtract(effectiveOtherIncome).max(BigDecimal.ZERO);
+                // RMD income already claims part of the target bracket, so it leaves less room for
+                // conversions -- mirrors WithdrawalOrderStrategy.DynamicSequencingOrder's bracketSpace.
+                BigDecimal space = bracketCeiling.subtract(effectiveOtherIncome).subtract(rmdAmount)
+                        .max(BigDecimal.ZERO);
                 effectiveLimit = space;
             } else {
                 effectiveLimit = annualRothConversion;
@@ -575,7 +580,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
-                                                                BigDecimal overrideAmount) {
+                                                                BigDecimal overrideAmount, BigDecimal rmdAmount) {
+            // overrideAmount is an explicit, optimizer-scheduled dollar figure -- like the pre-existing
+            // bracket-headroom check it bypasses, it does not respect RMD-consumed headroom either.
             if (overrideAmount.compareTo(BigDecimal.ZERO) <= 0
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
