@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import com.wealthview.persistence.entity.LtcgBracketEntity;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
@@ -52,6 +53,20 @@ public final class TaxBracketFixtures {
                 new TaxBracketEntity(2022, "single", bd("170050"), bd("215950"), bd("0.3200")),
                 new TaxBracketEntity(2022, "single", bd("215950"), bd("539900"), bd("0.3500")),
                 new TaxBracketEntity(2022, "single", bd("539900"), null, bd("0.3700")));
+    }
+
+    public static List<LtcgBracketEntity> single2025LtcgBrackets() {
+        return List.of(
+                new LtcgBracketEntity(2025, "single", bd("0"), bd("48350"), bd("0.0000")),
+                new LtcgBracketEntity(2025, "single", bd("48350"), bd("533400"), bd("0.1500")),
+                new LtcgBracketEntity(2025, "single", bd("533400"), null, bd("0.2000")));
+    }
+
+    public static List<LtcgBracketEntity> mfj2025LtcgBrackets() {
+        return List.of(
+                new LtcgBracketEntity(2025, "married_filing_jointly", bd("0"), bd("96700"), bd("0.0000")),
+                new LtcgBracketEntity(2025, "married_filing_jointly", bd("96700"), bd("600050"), bd("0.1500")),
+                new LtcgBracketEntity(2025, "married_filing_jointly", bd("600050"), null, bd("0.2000")));
     }
 
     public static StandardDeductionEntity singleDeduction2025() {
