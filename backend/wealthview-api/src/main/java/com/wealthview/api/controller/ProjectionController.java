@@ -18,12 +18,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.wealthview.api.dto.ProjectionRunResponse;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.projection.ProjectionService;
 import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
-import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 
@@ -89,9 +89,10 @@ public class ProjectionController {
     }
 
     @GetMapping("/{id}/run")
-    public ResponseEntity<ProjectionResultResponse> run(
+    public ResponseEntity<ProjectionRunResponse> run(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
-        return ResponseEntity.ok(projectionService.runProjection(principal.tenantId(), id));
+        var runResult = projectionService.runProjection(principal.tenantId(), id);
+        return ResponseEntity.ok(ProjectionRunResponse.from(runResult));
     }
 }

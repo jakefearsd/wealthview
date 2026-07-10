@@ -649,6 +649,102 @@ class ProjectionInputBuilderTest {
                 .isEqualByComparingTo(new BigDecimal("184462.1212"));
     }
 
+    // ── Unclassified Symbol Collection Tests ──
+
+    @Test
+    void buildWithMetadata_linkedAccountWithUnknownSymbol_returnsNonEmptyUnclassifiedSymbols() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(projAcct);
+
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("50000"));
+        when(classificationService.deriveAllocation(eq(tenantId), any()))
+                .thenReturn(new AllocationResult(AssetAllocation.ALL_US, Set.of("ZZZZ")));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.unclassifiedSymbols()).containsExactly("ZZZZ");
+        assertThat(result.input().accounts()).hasSize(1);
+    }
+
+    @Test
+    void buildWithMetadata_allSymbolsClassified_returnsEmptyUnclassifiedSymbols() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(projAcct);
+
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("50000"));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.unclassifiedSymbols()).isEmpty();
+    }
+
+    @Test
+    void buildWithMetadata_multipleLinkedAccounts_unionsAndDedupesUnclassifiedSymbols() {
+        var linkedAccount1 = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var linkedAccount2 = new AccountEntity(tenant, "IRA", "ira", "Vanguard");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct1 = new ProjectionAccountEntity(
+                scenario, linkedAccount1, null,
+                new BigDecimal("0"), null, "taxable");
+        var projAcct2 = new ProjectionAccountEntity(
+                scenario, linkedAccount2, null,
+                new BigDecimal("0"), null, "traditional");
+        scenario.addAccount(projAcct1);
+        scenario.addAccount(projAcct2);
+
+        when(accountService.computeBalance(linkedAccount1, tenantId))
+                .thenReturn(new BigDecimal("50000"));
+        when(accountService.computeBalance(linkedAccount2, tenantId))
+                .thenReturn(new BigDecimal("25000"));
+        // Accounts are un-persisted (id == null for both) so distinguish calls by invocation
+        // order rather than by id: resolveAccounts() visits account1 then account2, in the order
+        // they were added to the scenario.
+        when(classificationService.deriveAllocation(eq(tenantId), any()))
+                .thenReturn(new AllocationResult(AssetAllocation.ALL_US, Set.of("ZZZZ", "WEIRDX")))
+                .thenReturn(new AllocationResult(AssetAllocation.ALL_US, Set.of("ZZZZ")));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.buildWithMetadata(scenario, tenantId);
+
+        assertThat(result.unclassifiedSymbols()).containsExactlyInAnyOrder("ZZZZ", "WEIRDX");
+    }
+
+    @Test
+    void build_delegatesToWithMetadata_returnsSameInput() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var viaBuild = builder.build(scenario, tenantId);
+        var viaMetadata = builder.buildWithMetadata(scenario, tenantId).input();
+
+        assertThat(viaBuild).isEqualTo(viaMetadata);
+    }
+
     @Test
     void build_withMalformedGuardrailJson_returnsNullGuardrailSpending() {
         var scenario = new ProjectionScenarioEntity(

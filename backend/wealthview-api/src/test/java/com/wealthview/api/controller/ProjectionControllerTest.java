@@ -26,6 +26,7 @@ import com.wealthview.core.projection.ScenarioCrudService;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ProjectionRunResult;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import tools.jackson.databind.ObjectMapper;
@@ -243,13 +244,37 @@ class ProjectionControllerTest {
                         new BigDecimal("117700"), false)),
                 new BigDecimal("117700"), 0, null);
         when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
-                .thenReturn(result);
+                .thenReturn(new ProjectionRunResult(result, List.of()));
 
         mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
                         .with(authenticatedAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.scenario_id").value(SCENARIO_ID.toString()))
                 .andExpect(jsonPath("$.yearly_data[0].year").value(2026))
-                .andExpect(jsonPath("$.final_balance").value(117700));
+                .andExpect(jsonPath("$.final_balance").value(117700))
+                .andExpect(jsonPath("$.unclassified_symbols").isArray())
+                .andExpect(jsonPath("$.unclassified_symbols").isEmpty());
+    }
+
+    @Test
+    void run_withUnclassifiedSymbols_includesFieldInResponse() throws Exception {
+        var result = new ProjectionResultResponse(
+                SCENARIO_ID,
+                List.of(ProjectionYearDto.simple(2026, 36,
+                        new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("7700"), BigDecimal.ZERO,
+                        new BigDecimal("117700"), false)),
+                new BigDecimal("117700"), 0, null);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of("ZZZZ", "WEIRDX")));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.scenario_id").value(SCENARIO_ID.toString()))
+                .andExpect(jsonPath("$.unclassified_symbols").isArray())
+                .andExpect(jsonPath("$.unclassified_symbols.length()").value(2))
+                .andExpect(jsonPath("$.unclassified_symbols[0]").value("ZZZZ"))
+                .andExpect(jsonPath("$.unclassified_symbols[1]").value("WEIRDX"));
     }
 }

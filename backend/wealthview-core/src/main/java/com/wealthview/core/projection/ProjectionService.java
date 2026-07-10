@@ -12,6 +12,7 @@ import com.wealthview.core.common.Entities;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
+import com.wealthview.core.projection.dto.ProjectionRunResult;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
 
 @Service
@@ -44,10 +45,12 @@ public class ProjectionService {
     }
 
     @Transactional(readOnly = true)
-    public ProjectionResultResponse runProjection(UUID tenantId, UUID scenarioId) {
+    public ProjectionRunResult runProjection(UUID tenantId, UUID scenarioId) {
         log.info("Running projection for scenario {} tenant {}", scenarioId, tenantId);
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
-        return projectionEngine.run(projectionInputBuilder.build(scenario, tenantId));
+        var inputResult = projectionInputBuilder.buildWithMetadata(scenario, tenantId);
+        var result = projectionEngine.run(inputResult.input());
+        return new ProjectionRunResult(result, inputResult.unclassifiedSymbols());
     }
 }

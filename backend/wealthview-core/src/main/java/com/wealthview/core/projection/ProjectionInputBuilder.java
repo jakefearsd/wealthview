@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -26,6 +28,7 @@ import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
@@ -72,15 +75,26 @@ public class ProjectionInputBuilder {
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {
-        var accounts        = resolveAccounts(scenario, tenantId);
+        return buildWithMetadata(scenario, tenantId).input();
+    }
+
+    /**
+     * Builds the {@link ProjectionInput} plus the distinct union of holding symbols (across every
+     * linked account) that fell back to a default classification for lack of a tenant override or
+     * seed entry. See {@link SecurityClassificationService#deriveAllocation}.
+     */
+    public ProjectionInputResult buildWithMetadata(ProjectionScenarioEntity scenario, UUID tenantId) {
+        var unclassifiedSymbols = new TreeSet<String>();
+        var accounts        = resolveAccounts(scenario, tenantId, unclassifiedSymbols);
         var spendingProfile = resolveSpendingProfile(scenario);
         var incomeSources   = resolveIncomeSources(scenario.getId());
         var guardrailSpending = resolveGuardrailSpending(scenario);
         var properties      = resolveProperties(tenantId);
-        return new ProjectionInput(
+        var input = new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
                 accounts, spendingProfile, null, incomeSources, guardrailSpending, properties);
+        return new ProjectionInputResult(input, List.copyOf(unclassifiedSymbols));
     }
 
     private SpendingProfileInput resolveSpendingProfile(ProjectionScenarioEntity scenario) {
@@ -149,22 +163,28 @@ public class ProjectionInputBuilder {
         }
     }
 
-    private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {
+    private List<ProjectionAccountInput> resolveAccounts(ProjectionScenarioEntity scenario, UUID tenantId,
+                                                          Set<String> unclassifiedCollector) {
         return scenario.getAccounts().stream()
-                .map(entity -> toAccountInput(entity, tenantId))
+                .map(entity -> toAccountInput(entity, tenantId, unclassifiedCollector))
                 .toList();
     }
 
-    private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId) {
+    private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId,
+                                                   Set<String> unclassifiedCollector) {
         Optional<BigDecimal> override = Optional.ofNullable(entity.getExpectedReturn());
         if (entity.getLinkedAccount() != null) {
             var nativeBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
             var liveBalance = exchangeRateService.convertToUsd(
                     nativeBalance, entity.getLinkedAccount().getCurrency(), tenantId);
-            AssetAllocation allocation = entity.getAllocation() != null
-                    ? parseAllocation(entity.getAllocation())
-                    : classificationService.deriveAllocation(tenantId, entity.getLinkedAccount().getId())
-                            .allocation();
+            AssetAllocation allocation;
+            if (entity.getAllocation() != null) {
+                allocation = parseAllocation(entity.getAllocation());
+            } else {
+                var derived = classificationService.deriveAllocation(tenantId, entity.getLinkedAccount().getId());
+                allocation = derived.allocation();
+                unclassifiedCollector.addAll(derived.unclassifiedSymbols());
+            }
             return new LinkedAccountInput(
                     entity.getLinkedAccount().getId(), liveBalance,
                     entity.getAnnualContribution(), allocation, override,

@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -105,7 +106,8 @@ class ProjectionServiceTest {
 
         var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
                 90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(input);
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(
                 scenarioId,
@@ -117,7 +119,8 @@ class ProjectionServiceTest {
 
         var result = service.runProjection(tenantId, scenarioId);
 
-        assertThat(result).isEqualTo(engineResult);
+        assertThat(result.result()).isEqualTo(engineResult);
+        assertThat(result.unclassifiedSymbols()).isEmpty();
         verify(projectionEngine).run(input);
     }
 
@@ -131,14 +134,36 @@ class ProjectionServiceTest {
 
         var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
                 90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
-        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(input);
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
 
         var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
         when(projectionEngine.run(input)).thenReturn(engineResult);
 
         service.runProjection(tenantId, scenarioId);
 
-        verify(projectionInputBuilder).build(scenario, tenantId);
+        verify(projectionInputBuilder).buildWithMetadata(scenario, tenantId);
         verify(projectionEngine).run(input);
+    }
+
+    @Test
+    void runProjection_unclassifiedSymbolsFromBuilder_surfacedInResult() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of("ZZZZ")));
+
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.unclassifiedSymbols()).containsExactly("ZZZZ");
     }
 }
