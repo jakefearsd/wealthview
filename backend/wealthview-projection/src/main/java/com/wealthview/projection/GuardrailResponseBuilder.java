@@ -74,11 +74,15 @@ final class GuardrailResponseBuilder {
         double[][] yearBalances = new double[ctx.sim().years()][ctx.sim().trialCount()];
         double[] finalBalances = new double[ctx.sim().trialCount()];
         int tradExhaustedCount = 0;
+        int successCount = 0;
         for (int t = 0; t < ctx.sim().trialCount(); t++) {
-            // marginalRateByYear is null — the terminal response sim does not model withdrawal tax.
-            // Each trial reuses the per-pool nominal return sequences generated for the run.
+            // marginalRateByYear mirrors the search: real withdrawal tax is deducted whenever
+            // pools (traditional/roth) are in play, so reported balances match what the
+            // optimizer actually modeled. Each trial reuses the per-pool nominal return
+            // sequences generated for the run.
             var simConfig = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order, null,
+                    initTaxable, initTraditional, initRoth, order,
+                    simPools ? ctx.taxIncome().marginalRates() : null,
                     conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
                     ctx.taxIncome().dsBracketCeilingByYear(),
                     ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
@@ -94,6 +98,9 @@ final class GuardrailResponseBuilder {
             finalBalances[t] = result.finalBalance();
             if (result.traditionalExhausted()) {
                 tradExhaustedCount++;
+            }
+            if (result.success()) {
+                successCount++;
             }
         }
         double mcExhaustionPct = conversionByYear != null
@@ -112,8 +119,11 @@ final class GuardrailResponseBuilder {
         Arrays.sort(finalBalances);
         double medianFinal = percentile(finalBalances, 0.50);
         double p10Final = percentile(finalBalances, 0.10);
-        long failures = Arrays.stream(finalBalances).filter(b -> b <= 0).count();
-        double failureRate = (double) failures / ctx.sim().trialCount();
+        // successProbability uses the same essential-floor-funded definition as the optimizer's
+        // sustainability search (TrialResult.success()), not final-balance depletion, so the
+        // reported failure rate is consistent with what the optimizer actually optimized for.
+        double successProbability = (double) successCount / ctx.sim().trialCount();
+        double failureRate = 1.0 - successProbability;
 
         var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
                 medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
@@ -130,7 +140,7 @@ final class GuardrailResponseBuilder {
                 input.returnMean(),
                 ctx.sim().trialCount(), input.confidenceLevel(),
                 input.phases(), yearlySpending,
-                toBD(medianFinal), toBD(failureRate),
+                toBD(medianFinal), toBD(failureRate), toBD(successProbability),
                 toBD(p10Final),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),

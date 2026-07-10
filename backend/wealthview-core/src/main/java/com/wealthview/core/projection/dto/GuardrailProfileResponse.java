@@ -23,6 +23,7 @@ public record GuardrailProfileResponse(
         List<GuardrailYearlySpending> yearlySpending,
         BigDecimal medianFinalBalance,
         BigDecimal failureRate,
+        BigDecimal successProbability,
         BigDecimal percentile10Final,
         boolean stale,
         OffsetDateTime createdAt,
@@ -78,6 +79,7 @@ public record GuardrailProfileResponse(
                 yearlySpending,
                 entity.getMedianFinalBalance(),
                 entity.getFailureRate(),
+                successProbabilityFrom(entity.getFailureRate()),
                 entity.getPercentile10Final(),
                 entity.isStale() || isOlderThan24Hours(entity),
                 entity.getCreatedAt(),
@@ -95,5 +97,14 @@ public record GuardrailProfileResponse(
     static boolean isOlderThan24Hours(GuardrailSpendingProfileEntity entity) {
         var updated = entity.getUpdatedAt();
         return updated != null && Duration.between(updated, OffsetDateTime.now()).toHours() >= 24;
+    }
+
+    /**
+     * Persisted profiles only store {@code failureRate} (no dedicated success-probability
+     * column), so the success probability is derived as its complement for wire back-compat.
+     * Returns {@code null} when the profile predates result persistence.
+     */
+    private static BigDecimal successProbabilityFrom(BigDecimal failureRate) {
+        return failureRate != null ? BigDecimal.ONE.subtract(failureRate) : null;
     }
 }

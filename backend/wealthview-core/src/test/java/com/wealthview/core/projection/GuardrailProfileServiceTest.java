@@ -97,7 +97,7 @@ class GuardrailProfileServiceTest {
                         new BigDecimal("91000"), new BigDecimal("30000"),
                         new BigDecimal("45000"), new BigDecimal("12000"),
                         new BigDecimal("63000"), "Early")),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -142,7 +142,7 @@ class GuardrailProfileServiceTest {
                 null, scenarioId, null, BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("0.10"), 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"), false,
                 OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -207,7 +207,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -340,7 +340,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -398,7 +398,7 @@ class GuardrailProfileServiceTest {
                 5000, new BigDecimal("0.95"),
                 List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
                 List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -761,7 +761,7 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0.10"),
                 5000, new BigDecimal("0.95"),
                 List.of(), List.of(),
-                new BigDecimal("250000"), new BigDecimal("0.05"),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
@@ -773,7 +773,8 @@ class GuardrailProfileServiceTest {
                 base.id(), base.scenarioId(), base.name(), base.essentialFloor(),
                 base.terminalBalanceTarget(), base.returnMean(),
                 base.trialCount(), base.confidenceLevel(), base.phases(), base.yearlySpending(),
-                base.medianFinalBalance(), base.failureRate(), base.percentile10Final(),
+                base.medianFinalBalance(), base.failureRate(), base.successProbability(),
+                base.percentile10Final(),
                 base.stale(), base.createdAt(), base.updatedAt(),
                 base.portfolioFloor(), base.maxAnnualAdjustmentRate(),
                 base.phaseBlendYears(), base.riskTolerance(),

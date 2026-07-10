@@ -1705,6 +1705,65 @@ class MonteCarloSpendingOptimizerTest {
     }
 
     @Test
+    void optimize_poolScenario_reportedSuccessProbabilityIsTaxAware() {
+        // Pool scenario: traditional balance present, so the reporting sim's withdrawal-tax
+        // deduction applies. Mirrors optimize_allTraditional_lowerSpendingThanAllRoth's
+        // tradInput for setup + seed.
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+        var input = new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        null, "traditional")),
+                List.of(),
+                new BigDecimal("10000"), new BigDecimal("100000"),
+                new BigDecimal("0.10"),
+                500, new BigDecimal("0.95"), phases, 42L,
+                BigDecimal.ZERO, null, 0,
+                0, BigDecimal.ZERO, "single", "taxable_first",
+                false, null, null, 5, null, null);
+
+        var taxedResult = taxAwareOptimizer().optimize(input);
+
+        // successProbability is present, bounded, and the exact complement of failureRate —
+        // the same essential-floor-funded definition the optimizer's sustainability search uses.
+        assertThat(taxedResult.successProbability()).isNotNull();
+        assertThat(taxedResult.successProbability().doubleValue()).isBetween(0.0, 1.0);
+        assertThat(taxedResult.successProbability().doubleValue())
+                .isCloseTo(1.0 - taxedResult.failureRate().doubleValue(),
+                        org.assertj.core.data.Offset.offset(1e-9));
+
+        // Tax-awareness, isolated from the (pre-existing) tax-aware search: build the run
+        // context twice from the identical seed — once with a real marginal tax rate, once
+        // with none — then feed the SAME discretionary spending schedule through
+        // GuardrailResponseBuilder both times. Same portfolio return paths, same withdrawals
+        // requested; only the terminal sim's withdrawal-tax deduction differs. Comparing full
+        // optimize() runs instead would confound this with the search's own (already tax-aware)
+        // spending choice, which can move final balance in the opposite direction and mask
+        // the fix (verified empirically while writing this test).
+        var taxCalc = mock(FederalTaxCalculator.class);
+        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(inv -> {
+                    BigDecimal income = inv.getArgument(0);
+                    return income.compareTo(BigDecimal.ZERO) <= 0
+                            ? BigDecimal.ZERO
+                            : income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
+                });
+        var matrix = ProjectionTestFixtures.TEST_CMA_MATRIX;
+        var ctxTaxed = new OptimizationContextBuilder(taxCalc).build(input, matrix);
+        var ctxNoTax = new OptimizationContextBuilder(null).build(input, matrix);
+        double[] fixedDiscretionary = new double[ctxTaxed.sim().years()];
+        java.util.Arrays.fill(fixedDiscretionary, 20000);
+        var isolatedResponseBuilder = new GuardrailResponseBuilder(new TrialSimulator());
+
+        var taxedIsolated = isolatedResponseBuilder.build(ctxTaxed, input, fixedDiscretionary, null, null, null);
+        var noTaxIsolated = isolatedResponseBuilder.build(ctxNoTax, input, fixedDiscretionary, null, null, null);
+
+        assertThat(taxedIsolated.medianFinalBalance())
+                .isLessThanOrEqualTo(noTaxIsolated.medianFinalBalance());
+    }
+
+    @Test
     void optimize_withConversionSchedule_producesConversionScheduleResponse() {
         // With progressive brackets, conversions in lower brackets save tax vs
         // future RMD withdrawals in higher brackets — joint optimizer picks a

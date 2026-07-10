@@ -209,7 +209,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 input.returnMean(),
                 input.trialCount(), input.confidenceLevel(),
                 input.phases(), List.of(),
-                BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ONE,
                 BigDecimal.ZERO,
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
