@@ -17,8 +17,8 @@ All classes in this module are `@Component` beans or package-private helpers.
 | `IncomeSourceProcessor` | Plain class | Processes SS, pension, rental, self-employment per year |
 | `IncomeContributionCalculator` | Plain class | Applies pre-retirement contributions |
 | `RmdCalculator` | Plain class | IRS Uniform Lifetime Table RMD computation |
-| `BlockBootstrapReturnGenerator` | Plain class | Samples return sequences for MC simulation |
-| `HistoricalReturns` | Data class | Historical annual return data sets (equities, bonds, mixed) |
+| `BlockBootstrapReturnGenerator` | Plain class | Block-bootstraps index sequences into the multi-asset return matrix for MC simulation |
+| `PortfolioPathGenerator` | Plain class | Draws per-trial return trajectories, blended per account by allocation |
 
 ---
 
@@ -107,15 +107,22 @@ lifetime tax with vs. without conversions, port balance trajectories, RMD projec
 
 ## BlockBootstrapReturnGenerator
 
-Implements **block bootstrap** return sampling for the MC simulator. Rather than sampling
+Implements **block bootstrap** index sampling for the MC simulator. Rather than sampling
 individual years independently (which would destroy return autocorrelation), it:
 
-1. Splits the historical return series into overlapping 5-year blocks
+1. Splits the row indices of the multi-asset real-return matrix into overlapping 5-year blocks
 2. Randomly selects blocks end-to-end until the required projection length is filled
-3. Returns the complete annual return sequence for one simulation trial
+3. Returns the complete index sequence for one simulation trial
 
-This preserves sequence-of-returns risk patterns (prolonged bear markets, recovery periods)
-that are critical for realistic retirement income simulation.
+The real-return matrix itself — annual real (inflation-adjusted) returns for four asset classes
+(US stock, Intl stock, bond, cash) — is loaded from the `asset_class_returns` table and cached by
+`CapitalMarketAssumptionsProvider` (`wealthview-core`). `PortfolioPathGenerator` draws one
+bootstrap index sequence per trial and reuses it across every pool/account so cross-asset
+correlation is preserved; each account's return is then its allocation blended against the
+sampled matrix rows (or a fixed expected-return override), and each pool grows at the
+balance-weighted average of its accounts' returns. This preserves sequence-of-returns risk
+patterns (prolonged bear markets, recovery periods) that are critical for realistic retirement
+income simulation.
 
 ---
 

@@ -121,10 +121,16 @@ dynamic sequencing bracket ceiling per year.
 
 **Stage 2 — Portfolio path generation (`generatePortfolioPaths`)**
 
-`BlockBootstrapReturnGenerator` samples 5-year blocks from historical return data
-(`HistoricalReturns`) and strings them together to form full-length return sequences. This
-preserves autocorrelation (return momentum / mean reversion) that a simple i.i.d. draw would
-destroy.
+Real (inflation-adjusted) historical annual returns for four asset classes — US stock, Intl
+stock, bond, cash — are loaded from the `asset_class_returns` table via
+`CapitalMarketAssumptionsProvider` into a dense year × asset-class matrix. For each trial,
+`BlockBootstrapReturnGenerator` draws one 5-year-block bootstrap index sequence into that matrix
+(shared across all pools/accounts so cross-asset correlation is preserved) and strings blocks
+together to form a full-length sequence. This preserves autocorrelation (return momentum / mean
+reversion) that a simple i.i.d. draw would destroy. Each account's real return for the trial is
+then resolved from that shared index sequence — a fixed expected-return override, or its
+per-account allocation blended against the sampled matrix rows — and each pool (taxable /
+traditional / Roth) grows at the balance-weighted average of its accounts' returns.
 
 **Stage 3 — Joint grid search for spending + conversion (`runJointGridSearch`)**
 
