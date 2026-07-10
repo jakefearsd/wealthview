@@ -21,9 +21,9 @@ class SecurityClassificationRepositoriesIntegrationTest extends AbstractIntegrat
 
     @Test
     void findBySymbol_returnsSeededClass() {
-        seedRepo.save(new SecurityAssetClassEntity("BND", "bond"));
+        seedRepo.save(new SecurityAssetClassEntity("TEST_SYM", "bond"));
 
-        assertThat(seedRepo.findBySymbol("BND")).get()
+        assertThat(seedRepo.findBySymbol("TEST_SYM")).get()
                 .extracting(SecurityAssetClassEntity::getAssetClass).isEqualTo("bond");
     }
 
