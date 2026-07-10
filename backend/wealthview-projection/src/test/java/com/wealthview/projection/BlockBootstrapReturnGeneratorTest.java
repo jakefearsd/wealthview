@@ -11,7 +11,21 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class BlockBootstrapReturnGeneratorTest {
 
-    private final double[] historicalReturns = HistoricalReturns.getReturns();
+    /**
+     * Small local fixture of representative, distinct annual returns. This test only needs
+     * realistic-looking sample data to exercise the block-bootstrap sampling algorithm (index
+     * selection, wrapping, block-length statistics) — not real market history, so it no longer
+     * depends on the (now-deleted) {@code HistoricalReturns} S&amp;P 500 loader.
+     */
+    private static final double[] HISTORICAL_RETURNS = {
+            0.1046, -0.0847, 0.2489, 0.0641, -0.3655,
+            0.2594, 0.1454, 0.0211, 0.1579, -0.0473,
+            0.2168, 0.2249, 0.0649, -0.3849, 0.2337,
+            0.1478, 0.0139, 0.1341, -0.0180, 0.2861,
+            0.0331, -0.1863, 0.2831, 0.1049,
+    };
+
+    private final double[] historicalReturns = HISTORICAL_RETURNS;
 
     @Test
     void generateReturnSequence_correctLength() {
