@@ -1,6 +1,7 @@
 package com.wealthview.persistence.entity;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
@@ -12,6 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "projection_accounts")
@@ -35,8 +38,12 @@ public class ProjectionAccountEntity extends Auditable {
     @Column(name = "annual_contribution", nullable = false, precision = 19, scale = 4)
     private BigDecimal annualContribution = BigDecimal.ZERO;
 
-    @Column(name = "expected_return", nullable = false, precision = 5, scale = 4)
-    private BigDecimal expectedReturn = new BigDecimal("0.0700");
+    @Column(name = "expected_return", precision = 5, scale = 4)
+    private BigDecimal expectedReturn;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "allocation")
+    private Map<String, BigDecimal> allocation;
 
     @Column(name = "account_type", nullable = false)
     private String accountType = "taxable";
@@ -99,6 +106,14 @@ public class ProjectionAccountEntity extends Auditable {
 
     public void setExpectedReturn(BigDecimal expectedReturn) {
         this.expectedReturn = expectedReturn;
+    }
+
+    public Map<String, BigDecimal> getAllocation() {
+        return allocation;
+    }
+
+    public void setAllocation(Map<String, BigDecimal> allocation) {
+        this.allocation = allocation;
     }
 
     public String getAccountType() {
