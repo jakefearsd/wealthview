@@ -61,7 +61,7 @@ class DeterministicProjectionEngineCharacterizationTest {
 
         assertThat(result.yearlyData()).hasSize(50);
         assertThat(result.yearsInRetirement()).isEqualTo(35);
-        assertThat(result.finalBalance()).isEqualByComparingTo(bd("1933805.2738"));
+        assertThat(result.finalBalance()).isEqualByComparingTo(bd("3147824.5534"));
     }
 
     @Test
@@ -75,9 +75,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year1.retired()).isFalse();
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("450000.0000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("30000.0000"));
-        assertThat(year1.growth()).isEqualByComparingTo(bd("28373.3329"));
+        // Per-pool growth: 265000*.06 + 86000*.07 + 129000*.05 = 15900 + 6020 + 6450 = 28370.
+        assertThat(year1.growth()).isEqualByComparingTo(bd("28370.0000"));
         assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year1.endBalance()).isEqualByComparingTo(bd("508373.3329"));
+        assertThat(year1.endBalance()).isEqualByComparingTo(bd("508370.0000")); // 450000 + 30000 + 28370
     }
 
     @Test
@@ -91,7 +92,7 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.retired()).isFalse();
         assertThat(year.contributions()).isEqualByComparingTo(bd("30000.0000"));
         assertThat(year.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1799532.4199"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1804667.1215"));
     }
 
     @Test
@@ -104,10 +105,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.age()).isEqualTo(55);
         assertThat(year.retired()).isTrue();
         assertThat(year.contributions()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(year.startBalance()).isEqualByComparingTo(bd("1799532.4199"));
-        assertThat(year.growth()).isEqualByComparingTo(bd("106372.3588"));
-        assertThat(year.withdrawals()).isEqualByComparingTo(bd("71981.2968"));
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1833923.4819"));
+        assertThat(year.startBalance()).isEqualByComparingTo(bd("1804667.1215"));
+        assertThat(year.growth()).isEqualByComparingTo(bd("107566.6477"));
+        assertThat(year.withdrawals()).isEqualByComparingTo(bd("72186.6849"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1840047.0843"));
     }
 
     @Test
@@ -119,9 +120,9 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(year.year()).isEqualTo(2041);
         assertThat(year.age()).isEqualTo(56);
         assertThat(year.retired()).isTrue();
-        // Withdrawal grows year-over-year; 71981.2968 -> 74140.7357 is ~3% inflation.
-        assertThat(year.withdrawals()).isEqualByComparingTo(bd("74140.7357"));
-        assertThat(year.endBalance()).isEqualByComparingTo(bd("1868187.9989"));
+        // Withdrawal grows year-over-year at ~3% inflation.
+        assertThat(year.withdrawals()).isEqualByComparingTo(bd("74352.2854"));
+        assertThat(year.endBalance()).isEqualByComparingTo(bd("1876146.8525"));
     }
 
     @Test
@@ -134,10 +135,10 @@ class DeterministicProjectionEngineCharacterizationTest {
         assertThat(last.year()).isEqualTo(2074);
         assertThat(last.age()).isEqualTo(89);
         assertThat(last.retired()).isTrue();
-        assertThat(last.startBalance()).isEqualByComparingTo(bd("2011546.6070"));
-        assertThat(last.growth()).isEqualByComparingTo(bd("118904.7528"));
-        assertThat(last.withdrawals()).isEqualByComparingTo(bd("196646.0860"));
-        assertThat(last.endBalance()).isEqualByComparingTo(bd("1933805.2738"));
+        assertThat(last.startBalance()).isEqualByComparingTo(bd("3126197.8877"));
+        assertThat(last.growth()).isEqualByComparingTo(bd("218833.8521"));
+        assertThat(last.withdrawals()).isEqualByComparingTo(bd("197207.1864"));
+        assertThat(last.endBalance()).isEqualByComparingTo(bd("3147824.5534"));
     }
 
     @Test

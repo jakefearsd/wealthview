@@ -2,9 +2,11 @@ package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -14,6 +16,8 @@ import org.springframework.stereotype.Service;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.exchangerate.ExchangeRateService;
+import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
@@ -49,19 +53,22 @@ public class ProjectionInputBuilder {
     private final DepreciationCalculator depreciationCalculator;
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final PropertyRepository propertyRepository;
+    private final SecurityClassificationService classificationService;
 
     public ProjectionInputBuilder(AccountService accountService,
                                   ExchangeRateService exchangeRateService,
                                   ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                   DepreciationCalculator depreciationCalculator,
                                   GuardrailSpendingProfileRepository guardrailRepository,
-                                  PropertyRepository propertyRepository) {
+                                  PropertyRepository propertyRepository,
+                                  SecurityClassificationService classificationService) {
         this.accountService = accountService;
         this.exchangeRateService = exchangeRateService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.depreciationCalculator = depreciationCalculator;
         this.guardrailRepository = guardrailRepository;
         this.propertyRepository = propertyRepository;
+        this.classificationService = classificationService;
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {
@@ -149,19 +156,33 @@ public class ProjectionInputBuilder {
     }
 
     private ProjectionAccountInput toAccountInput(ProjectionAccountEntity entity, UUID tenantId) {
+        Optional<BigDecimal> override = Optional.ofNullable(entity.getExpectedReturn());
         if (entity.getLinkedAccount() != null) {
             var nativeBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
             var liveBalance = exchangeRateService.convertToUsd(
                     nativeBalance, entity.getLinkedAccount().getCurrency(), tenantId);
+            AssetAllocation allocation = entity.getAllocation() != null
+                    ? parseAllocation(entity.getAllocation())
+                    : classificationService.deriveAllocation(tenantId, entity.getLinkedAccount().getId())
+                            .allocation();
             return new LinkedAccountInput(
                     entity.getLinkedAccount().getId(), liveBalance,
-                    entity.getAnnualContribution(), entity.getExpectedReturn(),
+                    entity.getAnnualContribution(), allocation, override,
                     entity.getAccountType());
         }
+        AssetAllocation allocation = entity.getAllocation() != null
+                ? parseAllocation(entity.getAllocation())
+                : AssetAllocation.ALL_US;
         return new HypotheticalAccountInput(
                 entity.getInitialBalance(),
-                entity.getAnnualContribution(), entity.getExpectedReturn(),
+                entity.getAnnualContribution(), allocation, override,
                 entity.getAccountType());
+    }
+
+    private static AssetAllocation parseAllocation(Map<String, BigDecimal> raw) {
+        var weights = new EnumMap<AssetClass, BigDecimal>(AssetClass.class);
+        raw.forEach((k, v) -> weights.put(AssetClass.fromKey(k), v));
+        return new AssetAllocation(weights);
     }
 
     private List<ProjectionIncomeSourceInput> resolveIncomeSources(UUID scenarioId) {

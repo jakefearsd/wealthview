@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.ProjectionEngine;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -46,6 +49,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
 
+    /**
+     * Inflation rate used to convert nominal expected-return overrides into real returns. It
+     * defaults to zero in this phase (flipping to a non-zero CMA inflation assumption is a
+     * deliberate later task), so an override reproduces the legacy nominal-return growth exactly.
+     */
+    private static final BigDecimal CMA_INFLATION_RATE = BigDecimal.ZERO;
+
     private final ScenarioParamsParser paramsParser = new ScenarioParamsParser();
     private final SpendingFeasibilityAnalyzer feasibilityAnalyzer = new SpendingFeasibilityAnalyzer();
     private final RetirementWithdrawalProcessor retirementWithdrawalProcessor = new RetirementWithdrawalProcessor();
@@ -55,19 +65,23 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final IncomeContributionCalculator incomeContributionCalculator;
     @Nullable
     private final MeterRegistry meterRegistry;
+    @Nullable
+    private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
 
-    /** Test-friendly constructor that omits the optional meter registry. */
+    /** Test-friendly constructor that omits the optional meter registry and CMA provider. */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory) {
-        this(taxCalculator, stateTaxCalculatorFactory, null);
+        this(taxCalculator, stateTaxCalculatorFactory, null, null);
     }
 
     @Autowired
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
-                                          @Nullable MeterRegistry meterRegistry) {
+                                          @Nullable MeterRegistry meterRegistry,
+                                          @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
         this.meterRegistry = meterRegistry;
+        this.capitalMarketAssumptions = capitalMarketAssumptions;
         var rentalLossCalculator = new RentalLossCalculator();
         var ssTaxCalculator = new SocialSecurityTaxCalculator();
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
@@ -179,13 +193,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private PoolStrategy buildPoolStrategy(List<ProjectionAccountInput> accounts,
                                               ScenarioParams params,
                                               TaxCalculationStrategy taxStrategy) {
+        Map<AssetClass, Double> geoMeans = capitalMarketAssumptions != null
+                ? capitalMarketAssumptions.geometricMeans()
+                : Map.of();
         var config = new PoolStrategy.PoolConfig(
                 params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
                 params.annualRothConversion() != null ? params.annualRothConversion() : BigDecimal.ZERO,
                 params.rothConversionStrategy(), params.targetBracketRate(),
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
-                params.dynamicSequencingBracketRate());
+                params.dynamicSequencingBracketRate(),
+                geoMeans, CMA_INFLATION_RATE);
         return PoolStrategy.create(accounts, config);
     }
 

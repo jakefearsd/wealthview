@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +18,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exchangerate.ExchangeRateService;
+import com.wealthview.core.projection.SecurityClassificationService.AllocationResult;
+import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -61,6 +65,9 @@ class ProjectionInputBuilderTest {
     @Mock
     private PropertyRepository propertyRepository;
 
+    @Mock
+    private SecurityClassificationService classificationService;
+
     @InjectMocks
     private ProjectionInputBuilder builder;
 
@@ -75,6 +82,8 @@ class ProjectionInputBuilderTest {
                 .thenReturn(Map.of());
         lenient().when(exchangeRateService.convertToUsd(any(BigDecimal.class), eq("USD"), any(UUID.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(classificationService.deriveAllocation(any(UUID.class), any()))
+                .thenReturn(new AllocationResult(AssetAllocation.ALL_US, Set.of()));
     }
 
     @Test
@@ -121,6 +130,77 @@ class ProjectionInputBuilderTest {
         assertThat(result.accounts().getFirst()).isInstanceOf(LinkedAccountInput.class);
         assertThat(result.accounts().getFirst().initialBalance())
                 .isEqualByComparingTo(currentBalance);
+    }
+
+    @Test
+    void toAccountInput_linkedNoStoredAllocation_derivesFromHoldings() {
+        var linkedAccount = new AccountEntity(tenant, "Bond Fund", "brokerage", "Vanguard");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "traditional");
+        scenario.addAccount(projAcct);
+
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("50000"));
+        when(classificationService.deriveAllocation(eq(tenantId), any()))
+                .thenReturn(new AllocationResult(
+                        AssetAllocation.fromDoubles(Map.of(AssetClass.BOND, 1.0)), Set.of()));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account).isInstanceOf(LinkedAccountInput.class);
+        assertThat(account.allocation().weights().get(AssetClass.BOND))
+                .isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(account.expectedReturnOverride()).isEmpty();
+    }
+
+    @Test
+    void toAccountInput_expectedReturnPresent_setsOverride() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account.expectedReturnOverride()).contains(new BigDecimal("0.07"));
+        assertThat(account.allocation()).isEqualTo(AssetAllocation.ALL_US);
+    }
+
+    @Test
+    void toAccountInput_hypotheticalWithStoredAllocation_parsesAllocation() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        projAcct.setAllocation(Map.of(
+                AssetClass.US_STOCK.key(), new BigDecimal("0.6"),
+                AssetClass.BOND.key(), new BigDecimal("0.4")));
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account.allocation().weights().get(AssetClass.US_STOCK))
+                .isEqualByComparingTo(new BigDecimal("0.60"));
+        assertThat(account.allocation().weights().get(AssetClass.BOND))
+                .isEqualByComparingTo(new BigDecimal("0.40"));
+        assertThat(account.expectedReturnOverride()).isEmpty();
     }
 
     @Test

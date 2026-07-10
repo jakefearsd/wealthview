@@ -108,11 +108,12 @@ class PoolStrategyCharacterizationTest {
         PoolStrategy.GrowthResult growth = pool.applyGrowth();
 
         assertThat(contributions).isEqualByComparingTo(bd("22000"));
-        assertThat(growth.total()).isEqualByComparingTo(bd("33800.0006"));
-        assertThat(growth.taxable()).isEqualByComparingTo(bd("9159.0911"));
-        assertThat(growth.traditional()).isEqualByComparingTo(bd("18318.1821"));
-        assertThat(growth.roth()).isEqualByComparingTo(bd("6322.7274"));
-        assertThat(pool.getTotal()).isEqualByComparingTo(bd("605800.0006"));
+        // Per-pool real returns: taxable 150k@.05, traditional 300k@.06, roth 100k@.07 (inflation 0).
+        assertThat(growth.total()).isEqualByComparingTo(bd("33840.0000"));
+        assertThat(growth.taxable()).isEqualByComparingTo(bd("7750.0000"));       // 155000 * 0.05
+        assertThat(growth.traditional()).isEqualByComparingTo(bd("18600.0000"));  // 310000 * 0.06
+        assertThat(growth.roth()).isEqualByComparingTo(bd("7490.0000"));          // 107000 * 0.07
+        assertThat(pool.getTotal()).isEqualByComparingTo(bd("605840.0000"));
     }
 
     @Test
@@ -125,10 +126,11 @@ class PoolStrategyCharacterizationTest {
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
 
         assertThat(result.totalWithdrawn()).isEqualByComparingTo(bd("200000.0000"));
-        assertThat(result.fromTaxable()).isEqualByComparingTo(bd("164159.0911"));
-        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("35840.9089"));
+        // After growth taxable = 162750; taxable-first draws it fully then 37250 from traditional.
+        assertThat(result.fromTaxable()).isEqualByComparingTo(bd("162750.0000"));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("37250.0000"));
         assertThat(result.fromRoth()).isEqualByComparingTo(bd("0.0000"));
-        assertThat(pool.getTotal()).isEqualByComparingTo(bd("405800.0006"));
+        assertThat(pool.getTotal()).isEqualByComparingTo(bd("405840.0000"));
     }
 
     @Test
@@ -145,9 +147,9 @@ class PoolStrategyCharacterizationTest {
                 withdrawal.fromTaxable(), withdrawal.fromTraditional(), withdrawal.fromRoth(),
                 PoolStrategy.TaxSourceResult.ZERO));
 
-        assertThat(dto.endBalance()).isEqualByComparingTo(bd("405800.0006"));
-        assertThat(dto.traditionalBalance()).isEqualByComparingTo(bd("292477.2732"));
-        assertThat(dto.rothBalance()).isEqualByComparingTo(bd("113322.7274"));
+        assertThat(dto.endBalance()).isEqualByComparingTo(bd("405840.0000"));
+        assertThat(dto.traditionalBalance()).isEqualByComparingTo(bd("291350.0000")); // 328600 - 37250
+        assertThat(dto.rothBalance()).isEqualByComparingTo(bd("114490.0000"));        // 107000 + 7490
         assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("0.0000"));
     }
 

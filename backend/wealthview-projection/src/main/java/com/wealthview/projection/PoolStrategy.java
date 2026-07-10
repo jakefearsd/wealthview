@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
@@ -139,13 +140,56 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             Integer rothConversionStartYear,
             WithdrawalOrder withdrawalOrder,
             TaxCalculationStrategy taxCalculator,
-            BigDecimal dynamicSequencingBracketRate) {}
+            BigDecimal dynamicSequencingBracketRate,
+            Map<AssetClass, Double> geoMeans,
+            BigDecimal inflationRate) {
+
+        /**
+         * Back-compat constructor for callers that predate allocation-driven returns: uses an
+         * empty capital-market map and zero inflation, so returns come solely from per-account
+         * overrides (the legacy {@code expectedReturn} path).
+         */
+        PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
+                   String rothConversionStrategy, BigDecimal targetBracketRate,
+                   Integer rothConversionStartYear, WithdrawalOrder withdrawalOrder,
+                   TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
+            this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
+                    rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
+                    Map.of(), BigDecimal.ZERO);
+        }
+    }
+
+    /**
+     * Computes the real (inflation-adjusted) return for a single account. When a nominal
+     * expected-return override is present it is converted to real via
+     * {@code (1+nominal)/(1+inflation) - 1}; otherwise the account's allocation is blended
+     * against the supplied capital-market geometric means (already real).
+     */
+    static BigDecimal realReturnFor(ProjectionAccountInput acct,
+                                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
+        if (acct.expectedReturnOverride().isPresent()) {
+            BigDecimal nominal = acct.expectedReturnOverride().get();
+            return BigDecimal.ONE.add(nominal)
+                    .divide(BigDecimal.ONE.add(inflationRate), SCALE + 4, ROUNDING)
+                    .subtract(BigDecimal.ONE);
+        }
+        double blended = 0.0;
+        for (var e : acct.allocation().weights().entrySet()) {
+            Double g = geoMeans.get(e.getKey());
+            if (g != null) {
+                blended += e.getValue().doubleValue() * g;
+            }
+        }
+        return BigDecimal.valueOf(blended).setScale(SCALE + 4, ROUNDING);
+    }
 
     /**
      * Factory method that decides whether to create a SinglePool or MultiPool based on the
      * account types present, and encapsulates all construction details.
      */
     static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
+        Map<AssetClass, Double> geoMeans = config.geoMeans();
+        BigDecimal inflationRate = config.inflationRate();
         if (hasMultipleAccountTypes(accounts)) {
             Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
                     .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
@@ -155,12 +199,15 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
 
             return new MultiPool(grouped,
-                    computeWeightedReturn(accounts, totalBalance),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate),
+                    computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate),
                     config);
         } else {
             BigDecimal balance = sumInitialBalances(accounts);
             return new SinglePool(balance, sumContributions(accounts),
-                    computeWeightedReturn(accounts, balance));
+                    computeWeightedReturn(accounts, balance, geoMeans, inflationRate));
         }
     }
 
@@ -186,17 +233,31 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
+    /**
+     * The balance-weighted real return across the given accounts. Each account's real return is
+     * resolved via {@link #realReturnFor}; the result is the aggregate the pool grows at (or, for
+     * a single account-type group, that pool's own return).
+     */
     private static BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts,
-                                                     BigDecimal totalBalance) {
+                                                     BigDecimal totalBalance,
+                                                     Map<AssetClass, Double> geoMeans,
+                                                     BigDecimal inflationRate) {
         if (totalBalance.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
         BigDecimal weightedSum = BigDecimal.ZERO;
         for (var account : accounts) {
             weightedSum = weightedSum.add(
-                    account.initialBalance().multiply(account.expectedReturn()));
+                    account.initialBalance().multiply(realReturnFor(account, geoMeans, inflationRate)));
         }
         return weightedSum.divide(totalBalance, SCALE + 4, ROUNDING);
+    }
+
+    /** Balance-weighted real return for a single account-type pool. */
+    private static BigDecimal poolWeightedReturn(List<ProjectionAccountInput> accounts,
+                                                  Map<AssetClass, Double> geoMeans,
+                                                  BigDecimal inflationRate) {
+        return computeWeightedReturn(accounts, sumInitialBalances(accounts), geoMeans, inflationRate);
     }
 
     // --- SinglePool ---
@@ -313,6 +374,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final BigDecimal tradContrib;
         private final BigDecimal rothContrib;
         private final BigDecimal taxableContrib;
+        private final BigDecimal taxableReturn;
+        private final BigDecimal traditionalReturn;
+        private final BigDecimal rothReturn;
         private final BigDecimal weightedReturn;
 
         private final FilingStatus filingStatus;
@@ -325,7 +389,18 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final TaxCalculationStrategy taxCalculator;
         private final BigDecimal dynamicSequencingBracketRate;
 
+        /**
+         * Legacy uniform-return constructor: all three pools grow at the same {@code weightedReturn}.
+         * Retained so existing direct-construction callers (and tests) keep their behavior.
+         */
         MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
+                  BigDecimal weightedReturn,
+                  PoolConfig config) {
+            this(grouped, weightedReturn, weightedReturn, weightedReturn, weightedReturn, config);
+        }
+
+        MultiPool(Map<String, List<ProjectionAccountInput>> grouped,
+                  BigDecimal taxableReturn, BigDecimal traditionalReturn, BigDecimal rothReturn,
                   BigDecimal weightedReturn,
                   PoolConfig config) {
             this.taxable = sumBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()));
@@ -336,6 +411,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             this.rothContrib = sumContribs(grouped.getOrDefault(POOL_ROTH, List.of()));
             this.taxableContrib = sumContribs(grouped.getOrDefault(POOL_TAXABLE, List.of()));
 
+            this.taxableReturn = taxableReturn;
+            this.traditionalReturn = traditionalReturn;
+            this.rothReturn = rothReturn;
             this.weightedReturn = weightedReturn;
             this.filingStatus = config.filingStatus();
             this.otherIncome = config.otherIncome();
@@ -380,9 +458,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public GrowthResult applyGrowth() {
-            BigDecimal tradGrowth = traditional.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            BigDecimal rothGrowth = roth.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            BigDecimal taxableGrowth = taxable.multiply(weightedReturn).setScale(SCALE, ROUNDING);
+            BigDecimal tradGrowth = traditional.multiply(traditionalReturn).setScale(SCALE, ROUNDING);
+            BigDecimal rothGrowth = roth.multiply(rothReturn).setScale(SCALE, ROUNDING);
+            BigDecimal taxableGrowth = taxable.multiply(taxableReturn).setScale(SCALE, ROUNDING);
             traditional = traditional.add(tradGrowth);
             roth = roth.add(rothGrowth);
             taxable = taxable.add(taxableGrowth);
