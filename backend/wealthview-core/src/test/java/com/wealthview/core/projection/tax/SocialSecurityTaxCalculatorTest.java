@@ -112,6 +112,32 @@ class SocialSecurityTaxCalculatorTest {
         assertThat(result).isEqualByComparingTo("0");
     }
 
+    // --- Tier-1 min fix (both-tiers branch) ---
+
+    @Test
+    void computeTaxableAmount_lowBenefitHighOtherIncome_usesMinOfHalfBenefits() {
+        // MFJ, benefit 8000, other income 40001 → provisional = 40001 + 4000 = 44001 → both tiers.
+        // Corrected tier1 = min(0.5*8000=4000, 0.5*(44000-32000)=6000) = 4000.
+        // tier2 = 0.85*(44001-44000) = 0.8500 → taxable = 4000.85; cap 0.85*8000=6800 → 4000.85.
+        BigDecimal taxable = calculator.computeTaxableAmount(
+                new BigDecimal("8000"), new BigDecimal("40001"),
+                "married_filing_jointly", 0, new BigDecimal("0.025"));
+
+        assertThat(taxable).isEqualByComparingTo(new BigDecimal("4000.8500"));
+    }
+
+    @Test
+    void computeTaxableAmount_futureYear_deflatesThresholds() {
+        // Thresholds are statutorily fixed nominal, so in real terms they erode: 20 years out,
+        // the same real income makes MORE of the benefit taxable.
+        BigDecimal y0 = calculator.computeTaxableAmount(new BigDecimal("30000"), new BigDecimal("30000"),
+                "married_filing_jointly", 0, new BigDecimal("0.025"));
+        BigDecimal y20 = calculator.computeTaxableAmount(new BigDecimal("30000"), new BigDecimal("30000"),
+                "married_filing_jointly", 20, new BigDecimal("0.025"));
+
+        assertThat(y20).isGreaterThan(y0);
+    }
+
     @Test
     void single_justAboveFirstThreshold_smallTaxableAmount() {
         // Other income = $24k, SS = $4k

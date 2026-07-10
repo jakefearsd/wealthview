@@ -69,7 +69,7 @@ class IncomeSourceProcessor {
     IncomeSourceYearResult process(
             List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
-            BigDecimal scenarioInflationRate) {
+            BigDecimal scenarioInflationRate, int baseYear) {
 
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
@@ -121,7 +121,8 @@ class IncomeSourceProcessor {
             String sourceKey = source.id().toString();
             var result = switch (source.incomeType()) {
                 case RENTAL_PROPERTY -> processRentalIncome(source, amount, taxYear, magi, suspendedLoss, multiplier);
-                case SOCIAL_SECURITY -> processSocialSecurityIncome(amount, nonSSIncome, magi, filingStatus);
+                case SOCIAL_SECURITY -> processSocialSecurityIncome(amount, nonSSIncome, magi, filingStatus,
+                        taxYear - baseYear, scenarioInflationRate);
                 case PART_TIME_WORK  -> processEmploymentIncome(source, amount, taxYear);
                 default              -> processDefaultIncome(source, amount);
             };
@@ -229,14 +230,17 @@ class IncomeSourceProcessor {
     }
 
     private SocialSecurityResult processSocialSecurityIncome(
-            BigDecimal nominal,
-            BigDecimal nonSSIncome, BigDecimal magi, FilingStatus filingStatus) {
+            BigDecimal benefit,
+            BigDecimal nonSSIncome, BigDecimal magi, FilingStatus filingStatus,
+            int yearsFromBase, BigDecimal scenarioInflationRate) {
 
         var taxableAmount = ssTaxCalculator.computeTaxableAmount(
-                nominal,
+                benefit,
                 nonSSIncome.add(magi),
-                filingStatus.value());
-        return new SocialSecurityResult(nominal, taxableAmount, taxableAmount);
+                filingStatus.value(),
+                Math.max(0, yearsFromBase),
+                scenarioInflationRate);
+        return new SocialSecurityResult(benefit, taxableAmount, taxableAmount);
     }
 
     private EmploymentResult processEmploymentIncome(

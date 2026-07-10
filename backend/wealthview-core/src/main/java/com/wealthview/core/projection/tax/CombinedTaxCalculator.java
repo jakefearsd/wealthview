@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 
 public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
+    // Real-terms note: the $10k SALT cap is statutorily fixed nominal, so in today's-dollars terms it
+    // erodes over the projection horizon. Unlike the SS thresholds it is NOT deflated here — doing so
+    // would require threading yearsFromBase/inflation through the whole TaxCalculationStrategy interface
+    // for a second-order effect. It is held constant nominal (a documented, minor simplification).
     private static final BigDecimal SALT_CAP = new BigDecimal("10000");
 
     private final FederalTaxCalculator federal;
