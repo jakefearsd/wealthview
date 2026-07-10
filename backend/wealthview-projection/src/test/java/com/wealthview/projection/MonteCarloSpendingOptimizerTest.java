@@ -1759,8 +1759,11 @@ class MonteCarloSpendingOptimizerTest {
         var taxedIsolated = isolatedResponseBuilder.build(ctxTaxed, input, fixedDiscretionary, null, null, null);
         var noTaxIsolated = isolatedResponseBuilder.build(ctxNoTax, input, fixedDiscretionary, null, null, null);
 
+        // isLessThan (not isLessThanOrEqualTo): a wiring revert that dropped the tax calculator
+        // (taxedIsolated == noTaxIsolated) must fail this test, not silently pass it. The real
+        // separation is material — taxed 430894 vs untaxed 935080 — so equality is never expected.
         assertThat(taxedIsolated.medianFinalBalance())
-                .isLessThanOrEqualTo(noTaxIsolated.medianFinalBalance());
+                .isLessThan(noTaxIsolated.medianFinalBalance());
     }
 
     @Test
