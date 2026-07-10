@@ -41,6 +41,9 @@ public class ProjectionAccountEntity extends Auditable {
     @Column(name = "expected_return", precision = 5, scale = 4)
     private BigDecimal expectedReturn;
 
+    @Column(name = "cost_basis", precision = 19, scale = 4)
+    private BigDecimal costBasis;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "allocation")
     private Map<String, BigDecimal> allocation;
@@ -106,6 +109,14 @@ public class ProjectionAccountEntity extends Auditable {
 
     public void setExpectedReturn(BigDecimal expectedReturn) {
         this.expectedReturn = expectedReturn;
+    }
+
+    public BigDecimal getCostBasis() {
+        return costBasis;
+    }
+
+    public void setCostBasis(BigDecimal costBasis) {
+        this.costBasis = costBasis;
     }
 
     public Map<String, BigDecimal> getAllocation() {

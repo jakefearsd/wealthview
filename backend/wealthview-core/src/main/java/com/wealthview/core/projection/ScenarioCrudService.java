@@ -247,6 +247,9 @@ public class ScenarioCrudService {
                     acctReq.annualContribution(),
                     acctReq.expectedReturn(),
                     acctReq.accountType());
+            // Linked accounts always derive cost basis live from holdings (ProjectionInputBuilder);
+            // the stored field is only meaningful for hypothetical accounts.
+            projAcct.setCostBasis(linkedAccount != null ? null : acctReq.costBasis());
             scenario.addAccount(projAcct);
         }
     }

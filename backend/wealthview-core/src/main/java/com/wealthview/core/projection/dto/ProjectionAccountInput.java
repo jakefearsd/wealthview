@@ -20,5 +20,12 @@ public sealed interface ProjectionAccountInput
      */
     Optional<BigDecimal> expectedReturnOverride();
 
+    /**
+     * The taxable pool's initial cost basis, used to seed per-lot FIFO capital-gains tracking.
+     * Linked accounts derive this from the sum of their holdings' cost basis; hypothetical
+     * accounts default it to {@link #initialBalance()} (no embedded gain) unless explicitly set.
+     */
+    BigDecimal costBasis();
+
     String accountType();
 }

@@ -20,7 +20,7 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null);
+                null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -46,11 +46,39 @@ class ScenarioParamsTest {
                 new BigDecimal("1.05"), new BigDecimal("0.95"), "single",
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
-                "CA", new BigDecimal("9000"), new BigDecimal("14000"));
+                "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"));
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
         assertThat(parsed).isEqualTo(original);
+    }
+
+    @Test
+    void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, new BigDecimal("0.021"));
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("dividend_yield").decimalValue()).isEqualByComparingTo("0.021");
+    }
+
+    @Test
+    void from_scenarioRequest_dividendYieldNotSourced_staysNull() {
+        // ScenarioRequest has no dividend_yield field yet (not user-configurable this pass);
+        // from() must always default it to null so ScenarioParamsParser applies 0.018.
+        var request = new ScenarioRequest(
+                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, null);
+
+        var params = ScenarioParams.from(request);
+
+        assertThat(params.dividendYield()).isNull();
+        assertThat(params.birthYear()).isEqualTo(1970);
     }
 
     @Test

@@ -23,6 +23,9 @@ final class ScenarioParamsParser {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParamsParser.class);
 
+    /** Annual qualified-dividend yield assumed for the taxable pool when a scenario doesn't set one. */
+    static final BigDecimal DEFAULT_DIVIDEND_YIELD = new BigDecimal("0.018");
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     ScenarioParams parseParams(@Nullable String paramsJson) {
@@ -31,6 +34,11 @@ final class ScenarioParamsParser {
 
     ScenarioParams defaultParams() {
         return ScenarioParams.EMPTY;
+    }
+
+    /** Resolves the effective dividend yield, defaulting to {@link #DEFAULT_DIVIDEND_YIELD} when unset. */
+    BigDecimal dividendYield(ScenarioParams params) {
+        return params.dividendYield() != null ? params.dividendYield() : DEFAULT_DIVIDEND_YIELD;
     }
 
     @Nullable

@@ -44,12 +44,13 @@ public record ScenarioParams(
         Integer rothConversionStartYear,
         String state,
         BigDecimal primaryResidencePropertyTax,
-        BigDecimal primaryResidenceMortgageInterest) {
+        BigDecimal primaryResidenceMortgageInterest,
+        BigDecimal dividendYield) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
 
     public static ScenarioParams from(ScenarioParamsSource source) {
         return new ScenarioParams(
@@ -58,7 +59,11 @@ public record ScenarioParams(
                 source.otherIncome(), source.annualRothConversion(), source.withdrawalOrder(),
                 source.dynamicSequencingBracketRate(), source.rothConversionStrategy(),
                 source.targetBracketRate(), source.rothConversionStartYear(), source.state(),
-                source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest());
+                source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest(),
+                // dividendYield is not (yet) a user-configurable scenario request field — it is a
+                // global engine assumption. ScenarioParamsParser.dividendYield() supplies the
+                // default (0.018) when this is null; direct params_json can still set it manually.
+                null);
     }
 
     /**

@@ -160,6 +160,69 @@ class ProjectionInputBuilderTest {
     }
 
     @Test
+    void toAccountInput_linked_costBasisSumsHoldingsCostBasis() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("10000"), null, "taxable");
+        scenario.addAccount(projAcct);
+
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("150000"));
+        when(accountService.computeCostBasis(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("95000"));
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account).isInstanceOf(LinkedAccountInput.class);
+        assertThat(account.costBasis()).isEqualByComparingTo(new BigDecimal("95000"));
+    }
+
+    @Test
+    void toAccountInput_hypothetical_noStoredCostBasis_defaultsToInitialBalance() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
+        // No cost basis set on the entity.
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account).isInstanceOf(HypotheticalAccountInput.class);
+        assertThat(account.costBasis()).isEqualByComparingTo(new BigDecimal("100000"));
+    }
+
+    @Test
+    void toAccountInput_hypothetical_storedCostBasis_usesStoredValue() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
+        projAcct.setCostBasis(new BigDecimal("40000"));
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account.costBasis()).isEqualByComparingTo(new BigDecimal("40000"));
+    }
+
+    @Test
     void toAccountInput_expectedReturnPresent_setsOverride() {
         var scenario = new ProjectionScenarioEntity(
                 tenant, "Plan", LocalDate.of(2055, 1, 1), 90,

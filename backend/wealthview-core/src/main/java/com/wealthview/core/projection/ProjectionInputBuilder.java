@@ -177,6 +177,9 @@ public class ProjectionInputBuilder {
             var nativeBalance = accountService.computeBalance(entity.getLinkedAccount(), tenantId);
             var liveBalance = exchangeRateService.convertToUsd(
                     nativeBalance, entity.getLinkedAccount().getCurrency(), tenantId);
+            var nativeCostBasis = accountService.computeCostBasis(entity.getLinkedAccount(), tenantId);
+            var liveCostBasis = exchangeRateService.convertToUsd(
+                    nativeCostBasis, entity.getLinkedAccount().getCurrency(), tenantId);
             AssetAllocation allocation;
             if (entity.getAllocation() != null) {
                 allocation = parseAllocation(entity.getAllocation());
@@ -188,15 +191,16 @@ public class ProjectionInputBuilder {
             return new LinkedAccountInput(
                     entity.getLinkedAccount().getId(), liveBalance,
                     entity.getAnnualContribution(), allocation, override,
-                    entity.getAccountType());
+                    liveCostBasis, entity.getAccountType());
         }
         AssetAllocation allocation = entity.getAllocation() != null
                 ? parseAllocation(entity.getAllocation())
                 : AssetAllocation.ALL_US;
+        var costBasis = entity.getCostBasis() != null ? entity.getCostBasis() : entity.getInitialBalance();
         return new HypotheticalAccountInput(
                 entity.getInitialBalance(),
                 entity.getAnnualContribution(), allocation, override,
-                entity.getAccountType());
+                costBasis, entity.getAccountType());
     }
 
     private static AssetAllocation parseAllocation(Map<String, BigDecimal> raw) {

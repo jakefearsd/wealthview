@@ -203,6 +203,72 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
+    void createScenario_hypotheticalAccountWithCostBasis_persistsCostBasis() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+
+        var request = new ScenarioRequest(
+                "Taxable Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
+                null, null, null);
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        assertThat(saved.getAccounts().get(0).getCostBasis()).isEqualByComparingTo("62000");
+    }
+
+    @Test
+    void createScenario_linkedAccountWithCostBasis_ignoresRequestCostBasis() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        var linkedAccountId = UUID.randomUUID();
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        when(accountRepository.findByTenant_IdAndId(tenantId, linkedAccountId))
+                .thenReturn(Optional.of(linkedAccount));
+
+        var request = new ScenarioRequest(
+                "Linked Plan",
+                LocalDate.of(2055, 1, 1),
+                90,
+                new BigDecimal("0.0300"),
+                1990,
+                new BigDecimal("0.04"),
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                List.of(new CreateProjectionAccountRequest(
+                        linkedAccountId, new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
+                null, null, null);
+
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.createScenario(tenantId, request);
+
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        var saved = captor.getValue();
+        // Linked accounts derive cost basis live from holdings; the entity field stays null
+        // regardless of what the request carried.
+        assertThat(saved.getAccounts().get(0).getCostBasis()).isNull();
+    }
+
+    @Test
     void createScenario_withWithdrawalOrder_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 

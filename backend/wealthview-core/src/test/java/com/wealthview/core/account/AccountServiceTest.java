@@ -391,6 +391,45 @@ class AccountServiceTest {
     }
 
     @Test
+    void computeCostBasis_investmentAccount_sumsHoldingsCostBasis() {
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var holdingAapl = new HoldingEntity(account, tenant, "AAPL",
+                new BigDecimal("10"), new BigDecimal("1500.00"));
+        var holdingGoog = new HoldingEntity(account, tenant, "GOOG",
+                new BigDecimal("5"), new BigDecimal("900.00"));
+        when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
+                .thenReturn(List.of(holdingAapl, holdingGoog));
+
+        var result = accountService.computeCostBasis(account, tenantId);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("2400.00"));
+    }
+
+    @Test
+    void computeCostBasis_investmentAccountNoHoldings_returnsZero() {
+        var account = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
+                .thenReturn(List.of());
+
+        var result = accountService.computeCostBasis(account, tenantId);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void computeCostBasis_bankAccount_returnsTransactionBalance() {
+        var account = new AccountEntity(tenant, "Checking", "bank", "Chase");
+        when(transactionRepository.computeBalance(account.getId(), tenantId))
+                .thenReturn(new BigDecimal("3500.00"));
+
+        var result = accountService.computeCostBasis(account, tenantId);
+
+        // Cash has no capital-gains character: basis == balance, no embedded gain.
+        assertThat(result).isEqualByComparingTo(new BigDecimal("3500.00"));
+        verify(holdingRepository, never()).findByAccount_IdAndTenant_Id(any(), any());
+    }
+
+    @Test
     void computeAllBalances_noAccounts_returnsEmptyMap() {
         when(accountRepository.findByTenant_Id(tenantId))
                 .thenReturn(List.of());

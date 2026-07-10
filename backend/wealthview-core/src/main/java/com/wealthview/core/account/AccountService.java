@@ -176,6 +176,23 @@ public class AccountService {
         return computeInvestmentValue(account, tenantId);
     }
 
+    /**
+     * Sums the account's holdings' cost basis (native currency, un-converted — mirrors
+     * {@link #computeBalance}, whose caller applies the USD conversion). Cash has no capital-gains
+     * character, so a bank account's basis is its balance (no embedded gain).
+     */
+    public BigDecimal computeCostBasis(AccountEntity account, UUID tenantId) {
+        if ("bank".equals(account.getType())) {
+            return computeBankBalance(account, tenantId);
+        }
+        var holdings = holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId);
+        var basis = BigDecimal.ZERO;
+        for (var holding : holdings) {
+            basis = basis.add(holding.getCostBasis());
+        }
+        return basis;
+    }
+
     private BigDecimal computeBankBalance(AccountEntity account, UUID tenantId) {
         return transactionRepository.computeBalance(account.getId(), tenantId);
     }
