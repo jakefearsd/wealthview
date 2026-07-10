@@ -96,6 +96,20 @@ class BlockBootstrapReturnGeneratorTest {
         }
     }
 
+    @Test
+    void generateIndexSequence_seeded_isReproducibleAndInRange() {
+        var gen1 = new BlockBootstrapReturnGenerator(new double[]{0.1, -0.2, 0.05}, 5.0, new Random(7L));
+        var gen2 = new BlockBootstrapReturnGenerator(new double[]{0.1, -0.2, 0.05}, 5.0, new Random(7L));
+
+        int[] a = gen1.generateIndexSequence(30, 3);
+        int[] b = gen2.generateIndexSequence(30, 3);
+
+        assertThat(a).containsExactly(b);
+        for (int idx : a) {
+            assertThat(idx).isBetween(0, 2);
+        }
+    }
+
     private int findIndex(double[] array, double value) {
         for (int i = 0; i < array.length; i++) {
             if (array[i] == value) {

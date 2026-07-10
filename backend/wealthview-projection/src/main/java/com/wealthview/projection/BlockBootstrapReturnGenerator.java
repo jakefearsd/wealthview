@@ -28,26 +28,35 @@ public class BlockBootstrapReturnGenerator {
         this.rng = rng;
     }
 
-    public double[] generateReturnSequence(int years) {
-        double[] sequence = new double[years];
-        int historicalReturnCount = historicalReturns.length;
-
-        // Probability of ending the current block and jumping to a new random start position.
-        // Geometric distribution: expected block length = 1 / blockTerminationProbability.
+    /**
+     * Generates an array of indices into the historical series using the block-bootstrap algorithm.
+     *
+     * @param years the number of indices to generate
+     * @param historicalSize the size of the historical data (max index will be historicalSize - 1)
+     * @return an array of indices sampled with block-bootstrap logic
+     */
+    public int[] generateIndexSequence(int years, int historicalSize) {
+        int[] indices = new int[years];
         double blockTerminationProbability = 1.0 / expectedBlockLength;
-
-        int currentIndex = rng.nextInt(historicalReturnCount);
+        int currentIndex = rng.nextInt(historicalSize);
 
         for (int y = 0; y < years; y++) {
             if (y > 0 && rng.nextDouble() < blockTerminationProbability) {
-                // Start a new block at a uniformly random position in the historical series.
-                currentIndex = rng.nextInt(historicalReturnCount);
+                currentIndex = rng.nextInt(historicalSize);
             }
-            sequence[y] = historicalReturns[currentIndex];
-            // Advance sequentially within the current block, wrapping at the end of the series.
-            currentIndex = (currentIndex + 1) % historicalReturnCount;
+            indices[y] = currentIndex;
+            currentIndex = (currentIndex + 1) % historicalSize;
         }
 
+        return indices;
+    }
+
+    public double[] generateReturnSequence(int years) {
+        int[] idx = generateIndexSequence(years, historicalReturns.length);
+        double[] sequence = new double[years];
+        for (int y = 0; y < years; y++) {
+            sequence[y] = historicalReturns[idx[y]];
+        }
         return sequence;
     }
 }
