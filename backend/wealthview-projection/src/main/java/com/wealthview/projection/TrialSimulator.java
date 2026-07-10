@@ -25,7 +25,8 @@ final class TrialSimulator {
             double finalBalance,
             double minBalance,
             double[] yearBalances,       // null when trackYearBalances is false
-            boolean traditionalExhausted
+            boolean traditionalExhausted,
+            boolean success
     ) {}
 
     /**
@@ -95,6 +96,7 @@ final class TrialSimulator {
 
         double minBalance = pools[0] + pools[1] + pools[2] + cashBalance;
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
+        boolean essentialFloorMet = true;
 
         for (int y = 0; y < years; y++) {
             double taxableReturn = taxableReturns[y];
@@ -142,8 +144,14 @@ final class TrialSimulator {
             }
 
             // Withdraw from pools + handle cash reserve
+            double cashBeforeWithdrawals = cashBalance;
             cashBalance = applyTrialWithdrawals(pools, cashBalance, drawn, withdrawalTax,
                     withdrawal, spending, hasPools, config.cashReserveYears(), portfolioReturn);
+            double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
+            double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
+            if (resourcesForSpending < floors[y] - 1e-6) {
+                essentialFloorMet = false;
+            }
 
             // Surplus: income exceeds spending — deposit after-tax surplus to taxable
             if (income[y] > spending) {
@@ -166,7 +174,7 @@ final class TrialSimulator {
         double finalBalance = Math.max(0, pools[0] + pools[1] + pools[2] + cashBalance);
         boolean traditionalExhausted = config.conversionByYear() != null && pools[1] <= 0;
 
-        return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted);
+        return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet);
     }
 
     /**

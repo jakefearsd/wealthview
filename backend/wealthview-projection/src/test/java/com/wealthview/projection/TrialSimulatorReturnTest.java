@@ -66,4 +66,41 @@ class TrialSimulatorReturnTest {
         // taxable: (100 - 10 seeded) * 1.10 = 99 ; traditional: 100 * 0.70 = 70 ; cash: 10 - 10 spent = 0.
         assertThat(result.finalBalance()).isEqualTo(99.0 + 70.0, within(1e-6));
     }
+
+    @Test
+    void simulateTrial_essentialFloorUnfundableInAYear_marksNotSuccess() {
+        var sim = new TrialSimulator();
+        // Tiny portfolio, no income, a floor larger than the portfolio can ever supply → shortfall.
+        double[] flatNoReturn = {0.0, 0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                100.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 60, null, 0, 0.0, false,
+                flatNoReturn, flatNoReturn, flatNoReturn);
+        double[] income = {0.0, 0.0};
+        double[] zero = {0.0, 0.0};
+        double[] floors = {80.0, 80.0};        // year 2 floor (80) unfundable: only ~20 left
+        double[] discretionary = {0.0, 0.0};
+
+        var result = sim.simulateTrial(income, zero, floors, discretionary, 2, config);
+
+        assertThat(result.success()).isFalse();
+    }
+
+    @Test
+    void simulateTrial_floorFundedEveryYear_marksSuccess() {
+        var sim = new TrialSimulator();
+        double[] flatNoReturn = {0.0, 0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                1000.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 60, null, 0, 0.0, false,
+                flatNoReturn, flatNoReturn, flatNoReturn);
+        double[] income = {0.0, 0.0};
+        double[] zero = {0.0, 0.0};
+        double[] floors = {50.0, 50.0};
+        double[] discretionary = {0.0, 0.0};
+
+        var result = sim.simulateTrial(income, zero, floors, discretionary, 2, config);
+
+        assertThat(result.success()).isTrue();
+    }
 }
