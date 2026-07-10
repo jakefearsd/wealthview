@@ -252,6 +252,21 @@ public class GuardrailProfileService {
     }
 
     public static String computeScenarioHash(ProjectionScenarioEntity scenario) {
+        try {
+            var digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(scenarioSignature(scenario).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
+    }
+
+    /**
+     * Builds the scenario-identifying signature string shared by the cache-key hash
+     * ({@link #computeScenarioHash}) and the deterministic optimizer seed
+     * ({@link #deriveSeed}), so both stay in lockstep with the same set of identifying fields.
+     */
+    private static String scenarioSignature(ProjectionScenarioEntity scenario) {
         var sb = new StringBuilder();
         sb.append(scenario.getRetirementDate())
                 .append('|').append(scenario.getEndAge())
@@ -270,12 +285,25 @@ public class GuardrailProfileService {
                     .append(':').append(acct.getExpectedReturn());
         }
 
+        return sb.toString();
+    }
+
+    /**
+     * Derives a stable {@code long} RNG seed from the scenario's identifying signature, so an
+     * unchanged scenario reproduces the same Monte Carlo optimization run-to-run and a changed
+     * one (different accounts, inflation, birth year, etc.) gets a different seed.
+     */
+    private static long deriveSeed(String scenarioSignature) {
         try {
-            var digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(sb.toString().getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(scenarioSignature.getBytes(StandardCharsets.UTF_8));
+            long seed = 0L;
+            for (int i = 0; i < Long.BYTES; i++) {
+                seed = (seed << 8) | (hash[i] & 0xffL);
+            }
+            return seed;
         } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 not available", e);
+            throw new IllegalStateException("SHA-256 unavailable", e); // never happens on a standard JRE
         }
     }
 
@@ -303,7 +331,7 @@ public class GuardrailProfileService {
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
                 confidence,
                 request.phases() != null ? request.phases() : List.of(),
-                null,
+                deriveSeed(scenarioSignature(scenario)),
                 request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
                 request.maxAnnualAdjustmentRate() != null
                         ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,

@@ -701,6 +701,28 @@ class GuardrailProfileServiceTest {
         assertThat(hash).isNotBlank();
     }
 
+    // ---- deterministic seed derivation ----
+
+    @Test
+    void optimize_sameScenario_producesStableNonNullSeed() {
+        var seedA = captureOptimizationInput(buildRequest(req -> req)).seed();
+        var seedB = captureOptimizationInput(buildRequest(req -> req)).seed();
+
+        assertThat(seedA).isNotNull().isEqualTo(seedB);
+    }
+
+    @Test
+    void optimize_differentScenarioInflation_producesDifferentSeed() {
+        var scenarioOtherInflation = new ProjectionScenarioEntity(
+                tenant, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
+                new BigDecimal("0.04"), "{\"birth_year\":1968}");
+
+        var seedA = captureOptimizationInput(buildRequest(req -> req), scenario).seed();
+        var seedB = captureOptimizationInput(buildRequest(req -> req), scenarioOtherInflation).seed();
+
+        assertThat(seedA).isNotEqualTo(seedB);
+    }
+
     // ---- helpers ----
 
     private GuardrailOptimizationInput captureOptimizationInput(GuardrailOptimizationRequest request) {
