@@ -253,10 +253,13 @@ final class SustainabilitySearch {
     }
 
     /**
-     * Returns true when the given discretionary plan keeps the portfolio above the
-     * terminal target (and portfolio floor, if set) at the required confidence level.
-     * Each trial grows its pools at the per-pool nominal return sequences carried on the
-     * {@link SearchContext} ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}).
+     * Returns true when the given discretionary plan funds the essential floor in at
+     * least {@code ctx.confidenceLevel()} of trials (the target success probability).
+     * Terminal target and portfolio floor, when set, are evaluated as additional
+     * bequest-style constraints on top of that primary success-rate gate — they no
+     * longer drive sustainability on their own. Each trial grows its pools at the
+     * per-pool nominal return sequences carried on the {@link SearchContext}
+     * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}).
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
@@ -271,6 +274,7 @@ final class SustainabilitySearch {
 
         double[] finalBalances = new double[trialCount];
         double[] minBalances = new double[trialCount];
+        boolean[] successFlags = new boolean[trialCount];
 
         boolean hasPools = taxCtx != null
                 && (taxCtx.initTraditional() > 0 || taxCtx.initRoth() > 0);
@@ -293,13 +297,31 @@ final class SustainabilitySearch {
                     floors, discretionary, years, trialConfig);
             finalBalances[t] = result.finalBalance();
             minBalances[t] = result.minBalance();
+            successFlags[t] = result.success();
         }
 
-        Arrays.sort(finalBalances);
-        double balanceAtConfidence =
-                PercentileCalculator.percentile(finalBalances, 1.0 - ctx.confidenceLevel());
-        if (balanceAtConfidence < ctx.terminalTarget()) {
+        // Primary gate: the fraction of trials that fund the essential floor every year
+        // must meet the target confidence (success probability).
+        int successCount = 0;
+        for (boolean success : successFlags) {
+            if (success) {
+                successCount++;
+            }
+        }
+        double successRate = (double) successCount / trialCount;
+        if (successRate < ctx.confidenceLevel()) {
             return false;
+        }
+
+        // Optional bequest constraints, layered on top of the success gate — only
+        // enforced when the caller explicitly set a positive target/floor.
+        if (ctx.terminalTarget() > 0) {
+            Arrays.sort(finalBalances);
+            double balanceAtConfidence =
+                    PercentileCalculator.percentile(finalBalances, 1.0 - ctx.confidenceLevel());
+            if (balanceAtConfidence < ctx.terminalTarget()) {
+                return false;
+            }
         }
 
         if (ctx.portfolioFloor() > 0) {

@@ -9,6 +9,70 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SustainabilitySearchTest {
 
+    /**
+     * A deterministic (zero-volatility) SearchContext with 10 trials: 2 "bad" trials
+     * start with just enough balance to fund the essential floor alone (no discretionary
+     * headroom), 8 "good" trials start with ample balance. At discretionary=0 all 10
+     * trials fund the floor every year (successRate=1.0); at any positive discretionary
+     * up to 5,000/year the 2 bad trials fail to fund the floor in the final year while
+     * the 8 good trials still succeed (successRate=0.8). This brackets a target
+     * confidenceLevel of 0.90.
+     */
+    private static SustainabilitySearch.SearchContext bracketingContext() {
+        int years = 3;
+        int trialCount = 10;
+
+        // Flat (zero-growth) return arrays isolate the effect of spending on depletion.
+        double[][] paths = new double[trialCount][years + 1];
+        double[][] taxableReturns = new double[trialCount][years];
+        double[][] traditionalReturns = new double[trialCount][years];
+        double[][] rothReturns = new double[trialCount][years];
+        for (int t = 0; t < trialCount; t++) {
+            double startingBalance = t < 2 ? 30_000 : 1_000_000;
+            Arrays.fill(paths[t], startingBalance);
+        }
+
+        double[] income = new double[years];
+        double[] surplusTax = new double[years];
+
+        return new SustainabilitySearch.SearchContext(
+                paths, income, surplusTax,
+                0.0, 65, years, trialCount,
+                0.90, 0.0,
+                0, 0.0, 0.0,
+                null, null, null,
+                null,
+                taxableReturns, traditionalReturns, rothReturns);
+    }
+
+    private static double[] bracketingFloors() {
+        return new double[] { 10_000, 10_000, 10_000 };
+    }
+
+    @Test
+    void isSustainable_successRateBelowTarget_returnsFalse() {
+        var search = new SustainabilitySearch(new TrialSimulator());
+        var ctx = bracketingContext();
+        double[] floors = bracketingFloors();
+        // Discretionary of 1,000/year exhausts the 2 "bad" trials' floor funding in the
+        // final year (successRate drops to 8/10 = 0.80), below the 0.90 target.
+        double[] tooHighDiscretionary = { 1_000, 1_000, 1_000 };
+
+        assertThat(search.isSustainable(ctx, floors, tooHighDiscretionary)).isFalse();
+    }
+
+    @Test
+    void isSustainable_successRateMeetsTarget_returnsTrue() {
+        var search = new SustainabilitySearch(new TrialSimulator());
+        var ctx = bracketingContext();
+        double[] floors = bracketingFloors();
+        // Zero discretionary lets even the 2 "bad" trials exactly fund the floor every
+        // year (successRate = 10/10 = 1.0), meeting the 0.90 target.
+        double[] safeDiscretionary = { 0, 0, 0 };
+
+        assertThat(search.isSustainable(ctx, floors, safeDiscretionary)).isTrue();
+    }
+
     @Test
     void verifyEssentialFloor_ampleBalance_returnsConstantRealFloorEveryYear() {
         int years = 5;
