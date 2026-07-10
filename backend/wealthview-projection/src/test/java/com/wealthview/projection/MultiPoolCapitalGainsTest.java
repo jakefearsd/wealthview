@@ -12,10 +12,14 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -36,6 +40,19 @@ class MultiPoolCapitalGainsTest {
         var repo = mock(LtcgBracketRepository.class);
         stubSingle2025Ltcg(repo);
         return new CapitalGainsTaxCalculator(repo);
+    }
+
+    /**
+     * A real {@link FederalTaxCalculator} backed by single-filer 2025 fixtures ($15,000 standard
+     * deduction), wired ONLY to net the LTCG stacking floor down to the same base the ordinary tax
+     * would use -- {@code taxCalculator} itself stays {@code null} in these tests so {@code
+     * r.taxLiability()} isolates the LTCG tax alone (no ordinary-tax component to add in).
+     */
+    private static FederalTaxCalculator federalTaxCalc() {
+        var taxBracketRepo = mock(TaxBracketRepository.class);
+        var deductionRepo = mock(StandardDeductionRepository.class);
+        stubSingle2025(taxBracketRepo, deductionRepo);
+        return new FederalTaxCalculator(taxBracketRepo, deductionRepo);
     }
 
     /** A taxable account carrying an explicit cost basis (may be below its balance = embedded gain). */
@@ -59,9 +76,16 @@ class MultiPoolCapitalGainsTest {
 
     private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
                                                    CapitalGainsTaxCalculator cg) {
+        return config(dividendYield, order, cg, null);
+    }
+
+    /** Overload that also threads a standard-deduction source for the LTCG-floor netting fix. */
+    private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
+                                                   CapitalGainsTaxCalculator cg,
+                                                   FederalTaxCalculator federalTaxCalculator) {
         return new PoolStrategy.PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, order,
-                null, null, Map.of(), ZERO, cg, bd(dividendYield), BASE_YEAR);
+                null, null, Map.of(), ZERO, cg, bd(dividendYield), BASE_YEAR, federalTaxCalculator);
     }
 
     /** Per-pool returns: taxable grows at {@code taxableReturn}; traditional/roth flat. */
@@ -70,27 +94,41 @@ class MultiPoolCapitalGainsTest {
                                                 HypotheticalAccountInput roth,
                                                 String taxableReturn, String dividendYield,
                                                 WithdrawalOrder order, CapitalGainsTaxCalculator cg) {
+        return pool(taxable, traditional, roth, taxableReturn, dividendYield, order, cg, null);
+    }
+
+    /** Overload that also threads a standard-deduction source for the LTCG-floor netting fix. */
+    private static PoolStrategy.MultiPool pool(HypotheticalAccountInput taxable,
+                                                HypotheticalAccountInput traditional,
+                                                HypotheticalAccountInput roth,
+                                                String taxableReturn, String dividendYield,
+                                                WithdrawalOrder order, CapitalGainsTaxCalculator cg,
+                                                FederalTaxCalculator federalTaxCalculator) {
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth),
                 bd(taxableReturn), ZERO, ZERO, bd(taxableReturn),
-                config(dividendYield, order, cg));
+                config(dividendYield, order, cg, federalTaxCalculator));
     }
 
     // ---- (a) embedded-gain taxable withdrawal now pays LTCG tax (was zero) ----
 
     @Test
     void executeWithdrawals_taxableDrawWithEmbeddedGain_paysLtcgTaxStackedOnOrdinaryIncome() {
-        // Taxable $500k with $300k basis → $200k embedded gain. Ordinary income $60k pushes the
-        // realized gain fully into the 15% LTCG bracket ($48,350 ceiling already exceeded).
+        // Taxable $500k with $300k basis → $200k embedded gain. Ordinary income $60k, netted by the
+        // single-filer 2025 standard deduction ($15k) to the SAME $45k base the ordinary tax would
+        // stack on -- pushes only part of the realized gain past the $48,350 0% LTCG ceiling.
         var pool = pool(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth"),
-                "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc());
+                "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc(), federalTaxCalc());
 
         // Draw $100k taxable-first. FIFO gain = 100000 × (500000-300000)/500000 = 40000.
-        // Stacked on $60k ordinary → 40000 × 15% = 6000 LTCG tax. MAGI $100k < $200k → no NIIT.
+        // Stacking floor = 60000 − 15000 (deduction) = 45000, NOT gross 60000. Gain fills the
+        // remaining $3,350 of the 0% bracket (48350 − 45000) then spills into 15%:
+        //   3350 × 0% + (40000 − 3350) × 15% = 36650 × 0.15 = 5497.50
+        // MAGI stays gross (100000, unaffected by the deduction) < $200k NIIT threshold → no NIIT.
         var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
 
         assertThat(r.fromTaxable()).isEqualByComparingTo(bd("100000"));
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("6000"));
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("5497.50"));
     }
 
     @Test

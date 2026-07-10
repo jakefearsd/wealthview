@@ -70,6 +70,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final TaxStrategyFactory taxStrategyFactory;
     private final IncomeSourceProcessor incomeSourceProcessor;
     private final IncomeContributionCalculator incomeContributionCalculator;
+    /**
+     * Retained separately from {@link #taxStrategyFactory} (which wraps the same instance inside a
+     * {@code TaxCalculationStrategy}) so {@link #buildPoolStrategy} can thread the raw standard-
+     * deduction source into {@code PoolConfig} for the LTCG stacking-floor fix -- MultiPool needs the
+     * federal standard deduction even when isolating LTCG computation from the ordinary tax strategy.
+     */
+    @Nullable
+    private final FederalTaxCalculator federalTaxCalculator;
     @Nullable
     private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
     @Nullable
@@ -97,6 +105,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                           @Nullable MeterRegistry meterRegistry,
                                           @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
+        this.federalTaxCalculator = taxCalculator;
         this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
         this.meterRegistry = meterRegistry;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
@@ -231,7 +240,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate(),
                 geoMeans, inflationRate,
-                capitalGainsTaxCalculator, paramsParser.dividendYield(params), baseYear);
+                capitalGainsTaxCalculator, paramsParser.dividendYield(params), baseYear,
+                federalTaxCalculator);
         return PoolStrategy.create(accounts, config);
     }
 

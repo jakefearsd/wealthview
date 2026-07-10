@@ -133,7 +133,13 @@ public class FederalTaxCalculator {
         deductionCache.clear();
     }
 
-    BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
+    /**
+     * The federal standard deduction for (taxYear, status), falling back to the latest seeded year
+     * when the exact year isn't present. Public so collaborators outside this package (e.g. the
+     * projection module's LTCG stacking-floor netting) can reuse the SAME deduction the ordinary tax
+     * path nets internally, rather than re-deriving or omitting it.
+     */
+    public BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
         String key = taxYear + ":" + status.value();
         return deductionCache.computeIfAbsent(key, k -> {
             var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());

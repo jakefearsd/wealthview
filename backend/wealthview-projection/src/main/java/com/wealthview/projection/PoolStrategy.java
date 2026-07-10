@@ -13,6 +13,7 @@ import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
@@ -149,7 +150,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal inflationRate,
             CapitalGainsTaxCalculator capitalGainsTaxCalculator,
             BigDecimal dividendYield,
-            int baseYear) {
+            int baseYear,
+            FederalTaxCalculator federalTaxCalculator) {
 
         /**
          * Back-compat constructor for callers that predate allocation-driven returns: uses an
@@ -164,12 +166,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                    TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, 0);
+                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, 0, null);
         }
 
         /**
          * Back-compat constructor for allocation-driven callers that predate capital-gains taxation:
-         * supplies capital-market means and inflation but no LTCG calculator / dividend yield.
+         * supplies capital-market means and inflation but no LTCG calculator / dividend yield / federal
+         * standard-deduction source.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -178,7 +181,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    geoMeans, inflationRate, null, BigDecimal.ZERO, 0);
+                    geoMeans, inflationRate, null, BigDecimal.ZERO, 0, null);
         }
     }
 
@@ -436,6 +439,12 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         private final BigDecimal dividendYield;
         private final BigDecimal inflationRate;
         private final int baseYear;
+        /**
+         * Source of the federal standard deduction, used ONLY to net the LTCG stacking floor down
+         * to the same base the ordinary tax computed on (see {@link #resolveOrdinaryDeduction}). Null
+         * for callers that don't wire it, in which case the floor stays gross (pre-fix behavior).
+         */
+        private final FederalTaxCalculator federalTaxCalculator;
 
         /**
          * Legacy uniform-return constructor: all three pools grow at the same {@code weightedReturn}.
@@ -481,6 +490,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             this.dividendYield = config.dividendYield();
             this.inflationRate = config.inflationRate();
             this.baseYear = config.baseYear();
+            this.federalTaxCalculator = config.federalTaxCalculator();
         }
 
         private static BigDecimal sumBalances(List<ProjectionAccountInput> accounts) {
@@ -590,8 +600,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             BigDecimal withdrawalTax = BigDecimal.ZERO;
             BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
+            CombinedTaxResult detailed = null;
             if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
+                detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
 
                 if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
                     // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
@@ -612,7 +623,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // only in retirement (executeWithdrawals is only called when retired). It is intentionally
             // kept OUT of the ordinary-tax breakdown (lastTaxBreakdown / federalTax) -- like the ordinary
             // withdrawal tax it folds into taxLiability and drains the pools via the same cascade.
-            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year);
+            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
 
             BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax);
             TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
@@ -626,10 +637,15 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         /**
          * LTCG tax on {@code realizedGain + qualifiedDividendIncome}, stacked on the year's ordinary
          * taxable income. Returns zero when no capital-gains calculator is wired or the net LTCG income
-         * is non-positive (a realized loss nets against the dividend). {@code magi ≈ ordinary + LTCG},
-         * reusing the same effective-income figure the ordinary withdrawal tax is computed on.
+         * is non-positive (a realized loss nets against the dividend). {@code magi ≈ gross ordinary +
+         * LTCG} (MAGI is NOT deduction-reduced), but the STACKING FLOOR is netted by
+         * {@link #resolveOrdinaryDeduction} down to the same base {@code ordinaryTaxDetail} (the
+         * ordinary-tax result already computed on {@code ordinaryTaxableIncome}, if any) used --
+         * otherwise the deduction dollars would be treated as below-the-line for the ordinary tax AND
+         * above-the-line for the LTCG floor, overstating LTCG tax.
          */
-        private BigDecimal computeLtcgTax(BigDecimal realizedGain, BigDecimal ordinaryTaxableIncome, int year) {
+        private BigDecimal computeLtcgTax(BigDecimal realizedGain, BigDecimal ordinaryTaxableIncome, int year,
+                                           CombinedTaxResult ordinaryTaxDetail) {
             if (capitalGainsTaxCalculator == null) {
                 return BigDecimal.ZERO;
             }
@@ -638,8 +654,28 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 return BigDecimal.ZERO;
             }
             BigDecimal magi = ordinaryTaxableIncome.add(ltcgIncome);
-            return capitalGainsTaxCalculator.computeLtcgTax(ordinaryTaxableIncome, ltcgIncome, year,
+            BigDecimal deduction = resolveOrdinaryDeduction(ordinaryTaxDetail, year);
+            BigDecimal ordinaryForLtcg = ordinaryTaxableIncome.subtract(deduction).max(BigDecimal.ZERO);
+            return capitalGainsTaxCalculator.computeLtcgTax(ordinaryForLtcg, ltcgIncome, year,
                     filingStatus, year - baseYear, inflationRate, magi);
+        }
+
+        /**
+         * The deduction the ordinary tax actually used, for netting the LTCG stacking floor onto the
+         * same base. Prefers the itemized figure when {@code ordinaryTaxDetail} shows itemizing won
+         * (mirrors {@code CombinedTaxCalculator.computeTax}'s own itemized-vs-standard choice);
+         * otherwise falls back to the federal standard deduction for (year, filingStatus). Returns ZERO
+         * -- i.e. the floor stays gross, pre-fix -- when neither is available (no ordinary-tax result
+         * AND no standard-deduction source wired).
+         */
+        private BigDecimal resolveOrdinaryDeduction(CombinedTaxResult ordinaryTaxDetail, int year) {
+            if (ordinaryTaxDetail != null && ordinaryTaxDetail.usedItemized()) {
+                return ordinaryTaxDetail.itemizedDeductions();
+            }
+            if (federalTaxCalculator != null) {
+                return federalTaxCalculator.loadStandardDeduction(year, filingStatus);
+            }
+            return BigDecimal.ZERO;
         }
 
         @Override
