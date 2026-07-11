@@ -105,6 +105,8 @@ export interface ProjectionYear {
     salt_deduction: number | null;
     used_itemized_deduction: boolean | null;
     irmaa_warning?: boolean;
+    rmd_amount: number | null;
+    capital_gains_tax: number | null;
 }
 
 export interface SpendingFeasibility {

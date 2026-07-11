@@ -19,6 +19,7 @@ interface ChartDataPoint {
     federal_tax: number;
     state_tax: number;
     self_employment_tax: number;
+    capital_gains_tax: number;
     effective_rate: number;
     tax_liability: number;
     salt_deduction: number | null;
@@ -30,12 +31,17 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
     const retiredYears = data.filter(y => y.retired);
 
     const hasSETax = retiredYears.some(y => y.self_employment_tax != null && y.self_employment_tax > 0);
+    const hasCapGains = retiredYears.some(y => y.capital_gains_tax != null && y.capital_gains_tax > 0);
 
     const chartData: ChartDataPoint[] = retiredYears.map(y => {
         const federal = y.federal_tax ?? y.tax_liability ?? 0;
         const state = y.state_tax ?? 0;
         const se = y.self_employment_tax ?? 0;
         const total = y.tax_liability ?? 0;
+        // capital_gains_tax is a display breakout of an amount already included in federal_tax
+        // (and thus in tax_liability) — it must be subtracted out of the federal bar below, not
+        // added on top, or the stack total would overstate total tax.
+        const capGains = y.capital_gains_tax ?? 0;
 
         const taxableIncome = (y.income_streams_total ?? 0)
             + (y.roth_conversion_amount ?? 0)
@@ -45,9 +51,10 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
         return {
             year: y.year,
             age: y.age,
-            federal_tax: hasStateTax ? federal : total - se,
+            federal_tax: (hasStateTax ? federal : total - se) - capGains,
             state_tax: state,
             self_employment_tax: se,
+            capital_gains_tax: capGains,
             effective_rate: Math.round(effectiveRate * 10) / 10,
             tax_liability: total,
             salt_deduction: y.salt_deduction,
@@ -74,8 +81,13 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
                                     {label} (age {d.age})
                                 </div>
                                 <div style={{ color: '#d32f2f' }}>
-                                    Federal Tax: {formatCurrency(d.federal_tax)}
+                                    Federal Tax (Ordinary): {formatCurrency(d.federal_tax)}
                                 </div>
+                                {d.capital_gains_tax > 0 && (
+                                    <div style={{ color: '#6a1b9a' }}>
+                                        Cap-Gains Tax: {formatCurrency(d.capital_gains_tax)}
+                                    </div>
+                                )}
                                 {hasStateTax && d.state_tax > 0 && (
                                     <div style={{ color: '#e65100' }}>
                                         State Tax: {formatCurrency(d.state_tax)}
@@ -114,7 +126,8 @@ export default function TaxBreakdownChart({ data, retirementYear, hasStateTax }:
                 } />
                 <Legend />
                 {retirementYear && <ReferenceLine yAxisId="dollars" x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
-                <Bar yAxisId="dollars" dataKey="federal_tax" stackId="tax" fill="#d32f2f" name="Federal Tax" />
+                <Bar yAxisId="dollars" dataKey="federal_tax" stackId="tax" fill="#d32f2f" name="Federal (Ordinary)" />
+                <Bar yAxisId="dollars" dataKey="capital_gains_tax" stackId="tax" fill="#6a1b9a" name="Cap-Gains Tax" hide={!hasCapGains} />
                 <Bar yAxisId="dollars" dataKey="state_tax" stackId="tax" fill="#e65100" name="State Tax" hide={!hasStateTax} />
                 <Bar yAxisId="dollars" dataKey="self_employment_tax" stackId="tax" fill="#795548" name="SE Tax" hide={!hasSETax} />
                 <Line

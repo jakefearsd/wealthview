@@ -3,13 +3,16 @@ import { describe, it, expect, vi } from 'vitest';
 import TaxBreakdownChart from './TaxBreakdownChart';
 import type { ProjectionYear } from '../types/projection';
 
+let capturedChartData: Array<Record<string, unknown>> = [];
+
 vi.mock('recharts', () => ({
     ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
         <div data-testid="responsive-container">{children}</div>
     ),
-    ComposedChart: ({ children }: { children: React.ReactNode }) => (
-        <div data-testid="composed-chart">{children}</div>
-    ),
+    ComposedChart: ({ children, data }: { children: React.ReactNode; data: Array<Record<string, unknown>> }) => {
+        capturedChartData = data;
+        return <div data-testid="composed-chart">{children}</div>;
+    },
     Bar: ({ name, hide }: { name: string; hide?: boolean }) => hide ? null : <div>{name}</div>,
     Line: ({ name }: { name: string }) => <div>{name}</div>,
     XAxis: () => null,
@@ -64,6 +67,8 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number; age: numb
         state_tax: null,
         salt_deduction: null,
         used_itemized_deduction: null,
+        rmd_amount: null,
+        capital_gains_tax: null,
         ...overrides,
     };
 }
@@ -77,7 +82,7 @@ describe('TaxBreakdownChart', () => {
 
         render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={false} />);
         expect(screen.getByTestId('responsive-container')).toBeDefined();
-        expect(screen.getByText('Federal Tax')).toBeDefined();
+        expect(screen.getByText('Federal (Ordinary)')).toBeDefined();
         expect(screen.getByText('Effective Rate')).toBeDefined();
         expect(screen.queryByText('State Tax')).toBeNull();
     });
@@ -92,7 +97,7 @@ describe('TaxBreakdownChart', () => {
         ];
 
         render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={true} />);
-        expect(screen.getByText('Federal Tax')).toBeDefined();
+        expect(screen.getByText('Federal (Ordinary)')).toBeDefined();
         expect(screen.getByText('State Tax')).toBeDefined();
     });
 
@@ -116,5 +121,36 @@ describe('TaxBreakdownChart', () => {
 
         render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={false} />);
         expect(screen.getByText('SE Tax')).toBeDefined();
+    });
+
+    it('shows the Cap-Gains Tax bar and splits it out of the federal bar without double-counting', () => {
+        const data = [
+            makeYear({
+                year: 2040, age: 72,
+                tax_liability: 10000, federal_tax: 8000, state_tax: 0, capital_gains_tax: 1500,
+            }),
+        ];
+
+        render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={true} />);
+
+        expect(screen.getByText('Cap-Gains Tax')).toBeDefined();
+        expect(screen.getByText('Federal (Ordinary)')).toBeDefined();
+
+        const point = capturedChartData[0] as { federal_tax: number; capital_gains_tax: number; state_tax: number };
+        expect(point.capital_gains_tax).toBe(1500);
+        expect(point.federal_tax).toBe(8000 - 1500);
+        // Stack total (federal + cap-gains + state) must still equal the original federal_tax,
+        // since capital_gains_tax is a breakout already included inside federal_tax, not additive.
+        expect(point.federal_tax + point.capital_gains_tax + point.state_tax).toBe(8000);
+    });
+
+    it('hides the Cap-Gains Tax bar when no retired year has capital-gains tax', () => {
+        const data = [
+            makeYear({ year: 2040, age: 65, tax_liability: 8000, federal_tax: 8000 }),
+        ];
+
+        render(<TaxBreakdownChart data={data} retirementYear={2040} hasStateTax={false} />);
+
+        expect(screen.queryByText('Cap-Gains Tax')).toBeNull();
     });
 });

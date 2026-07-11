@@ -64,4 +64,31 @@ describe('DataTableTab', () => {
         fireEvent.click(screen.getByText('Download CSV'));
         expect(onDownloadCsv).toHaveBeenCalled();
     });
+
+    it('renders RMD and Cap-Gains Tax columns with formatted values when Pool Details is shown', () => {
+        const yearWithRmdAndCapGains = { ...baseYear, rmd_amount: 12000, capital_gains_tax: 1500 };
+        render(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <DataTableTab yearlyData={[yearWithRmdAndCapGains] as any} {...commonProps} hasPoolData={true} />
+        );
+
+        fireEvent.click(screen.getByText('Show Pool Details'));
+
+        expect(screen.getByText('RMD')).toBeInTheDocument();
+        expect(screen.getByText('Cap-Gains Tax')).toBeInTheDocument();
+        expect(screen.getByText('$12,000')).toBeInTheDocument();
+        expect(screen.getByText('$1,500')).toBeInTheDocument();
+    });
+
+    it('hides RMD and Cap-Gains Tax columns when no year has values', () => {
+        render(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            <DataTableTab yearlyData={[baseYear] as any} {...commonProps} hasPoolData={true} />
+        );
+
+        fireEvent.click(screen.getByText('Show Pool Details'));
+
+        expect(screen.queryByText('RMD')).not.toBeInTheDocument();
+        expect(screen.queryByText('Cap-Gains Tax')).not.toBeInTheDocument();
+    });
 });

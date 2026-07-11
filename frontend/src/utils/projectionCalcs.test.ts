@@ -56,6 +56,8 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         state_tax: null,
         salt_deduction: null,
         used_itemized_deduction: null,
+        rmd_amount: null,
+        capital_gains_tax: null,
         ...overrides,
     };
 }

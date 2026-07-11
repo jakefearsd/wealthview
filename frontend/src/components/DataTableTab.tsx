@@ -30,6 +30,8 @@ export default function DataTableTab({
     onDownloadCsv,
 }: DataTableTabProps) {
     const [showPoolDetails, setShowPoolDetails] = useState(false);
+    const hasRmd = yearlyData.some(y => y.rmd_amount != null);
+    const hasCapGains = yearlyData.some(y => y.capital_gains_tax != null);
 
     return (
         <>
@@ -91,6 +93,8 @@ export default function DataTableTab({
                                     <th style={stickyTh}>Tax from Taxable</th>
                                     <th style={stickyTh}>Tax from Trad</th>
                                     <th style={stickyTh}>Tax from Roth</th>
+                                    {hasRmd && <th style={stickyTh}>RMD</th>}
+                                    {hasCapGains && <th style={stickyTh}>Cap-Gains Tax</th>}
                                     <th style={stickyTh}>WD from Taxable</th>
                                     <th style={stickyTh}>WD from Trad</th>
                                     <th style={stickyTh}>WD from Roth</th>
@@ -160,6 +164,8 @@ export default function DataTableTab({
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_taxable != null ? formatCurrency(y.tax_paid_from_taxable) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_traditional != null ? formatCurrency(y.tax_paid_from_traditional) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.tax_paid_from_roth != null ? formatCurrency(y.tax_paid_from_roth) : '-'}</td>
+                                            {hasRmd && <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.rmd_amount != null ? formatCurrency(y.rmd_amount) : '-'}</td>}
+                                            {hasCapGains && <td style={{ padding: '0.5rem', textAlign: 'right' }}>{y.capital_gains_tax != null ? formatCurrency(y.capital_gains_tax) : '-'}</td>}
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_taxable != null ? formatCurrency(y.withdrawal_from_taxable) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_traditional != null ? formatCurrency(y.withdrawal_from_traditional) : '-'}</td>
                                             <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>{y.withdrawal_from_roth != null ? formatCurrency(y.withdrawal_from_roth) : '-'}</td>

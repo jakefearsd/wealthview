@@ -18,6 +18,8 @@ export default function IncomeTaxTab({
     onToggleTaxYear,
 }: IncomeTaxTabProps) {
     const hasStateTax = yearlyData.some(y => y.state_tax != null);
+    const hasRmd = yearlyData.some(y => y.rmd_amount != null);
+    const hasCapGains = yearlyData.some(y => y.capital_gains_tax != null);
     const stickyTh: React.CSSProperties = {
         textAlign: 'right',
         padding: '0.5rem',
@@ -25,7 +27,7 @@ export default function IncomeTaxTab({
         top: 0,
         background: '#fff',
     };
-    const detailColSpan = hasStateTax ? 7 : 3;
+    const detailColSpan = (hasStateTax ? 7 : 3) + (hasRmd ? 1 : 0) + (hasCapGains ? 1 : 0);
 
     return (
         <div>
@@ -55,6 +57,8 @@ export default function IncomeTaxTab({
                             {hasStateTax && <th style={stickyTh}>State Tax</th>}
                             {hasStateTax && <th style={stickyTh}>SALT</th>}
                             {hasStateTax && <th style={stickyTh}>Deduction</th>}
+                            {hasRmd && <th style={stickyTh}>RMD</th>}
+                            {hasCapGains && <th style={stickyTh}>Cap-Gains Tax</th>}
                             <th style={stickyTh}>Tax Liability</th>
                         </tr>
                     </thead>
@@ -125,6 +129,16 @@ export default function IncomeTaxTab({
                                                         {y.used_itemized_deduction ? 'Itemized' : 'Standard'}
                                                     </span>
                                                 ) : '-'}
+                                            </td>
+                                        )}
+                                        {hasRmd && (
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                {y.rmd_amount != null ? formatCurrency(y.rmd_amount) : '-'}
+                                            </td>
+                                        )}
+                                        {hasCapGains && (
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                {y.capital_gains_tax != null ? formatCurrency(y.capital_gains_tax) : '-'}
                                             </td>
                                         )}
                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>
