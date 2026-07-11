@@ -4,14 +4,19 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
@@ -22,6 +27,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -724,5 +730,161 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         // Dividend on the $50,000 taxable pool is still taxed even though nothing forced a draw.
         assertThat(year1.capitalGainsTax()).isNotNull();
         assertThat(year1.capitalGainsTax()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    // === Audit A4: tax on outside income must be a FUNDED outflow ===
+
+    @Test
+    void run_surplusYearTaxExceedsSurplus_fundsRemainderFromPoolsAndBalanceIdentityHolds() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int referenceYear = 2025;
+        int birthYear = 1955; // age 70 -- below RMD start age (73), isolates the A4 fix
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // Pension exactly equals spending -> grossSurplus = 0, so ANY positive tax on the pension
+        // exceeds the (zero) surplus -- the "tax > surplus" case from audit A4. Traditional-only
+        // pool (no taxable, no roth) isolates the fix: the tax must come entirely out of
+        // `traditional`, which was untouched pre-fix (the tax simply vanished).
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("300000.0000", "0", "0.0000", "traditional"));
+        var spending = new SpendingProfileInput(bd("30000"), bd("15000"), null); // 45,000 total
+        var pension = incomeSource("Pension", "45000", 60, null, "0");
+
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                accounts, spending, referenceYear, List.of(pension));
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(70);
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // income covers spending
+        assertThat(year1.surplusReinvested()).isNull(); // nothing left over to reinvest
+
+        // Same $45,000-pension-vs-$45,000-spending tax figure pinned by
+        // run_incomeExactlyEqualsSpending_taxStillComputed in DeterministicProjectionEngineSpendingPlanTest.
+        var refCalc = referenceFederalCalc();
+        BigDecimal expectedTax = refCalc.computeTax(bd("45000"), referenceYear, FilingStatus.SINGLE);
+        assertThat(expectedTax).isEqualByComparingTo(bd("3361.5000"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+
+        // A4: the tax must actually leave the pool -- traditional (the only pool) is debited
+        // exactly, not left untouched the way it was pre-fix.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("300000.0000").subtract(expectedTax));
+
+        // Balance identity: start + contrib + growth - withdrawals - taxLiability == end.
+        BigDecimal expectedEnd = year1.startBalance().add(year1.contributions()).add(year1.growth())
+                .subtract(year1.withdrawals()).subtract(year1.taxLiability());
+        assertThat(year1.endBalance()).isEqualByComparingTo(expectedEnd);
+    }
+
+    @Test
+    void run_guardrailSpendingPlanWithLiveIncomeMismatch_chargesExactBaseIncomeTaxNoGapNoOverlap() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int referenceYear = 2025;
+        int birthYear = 1955; // age 70 -- below RMD start age, isolates the base-income-tax gap
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // T2 gap: GuardrailSpendingInput#resolveYear ignores live income, so its precomputed
+        // portfolioWithdrawal (here 0 -- the MC optimizer assumed the pension alone would cover
+        // spending) can diverge from what the ENGINE's own live income actually covers. Here the
+        // pension ($60,000) does NOT cover the guardrail's own recommended spending ($100,000), so
+        // this is a genuine deficit year (grossSurplus < 0) even though portfolioWithdrawal == 0 --
+        // exactly the scenario the old totalNeed<=0 ("noSpendDraw") proxy got backwards: it would
+        // have incorrectly netted the base tax away as "already charged", charging $0 on the
+        // pension (mirroring the audit's MC "$60k-pension retiree ... pays $0 tax" bug).
+        var guardrailYear = new GuardrailYearlySpending(referenceYear, 70, bd("100000"),
+                bd("80000"), bd("120000"), bd("70000"), bd("30000"), bd("60000"),
+                BigDecimal.ZERO, "Test");
+        var guardrailInput = new GuardrailSpendingInput(List.of(guardrailYear));
+
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("500000.0000", "0", "0.0000", "traditional"),
+                acct("100000.0000", "0", "0.0000", "roth"));
+        var pension = incomeSource("Pension", "60000", 60, null, "0");
+
+        var input = new ProjectionInput(UUID.randomUUID(), "Guardrail T2 Gap Test",
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                accounts, null, referenceYear, List.of(pension), guardrailInput);
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(70);
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // guardrail said 0
+
+        // Independent oracle: tax owed on the $60,000 pension alone -- no RMD at 70, no spend
+        // draw, no conversion, so the pension is the ONLY taxable income this year.
+        BigDecimal expectedTax = referenceFederalCalc().computeTax(bd("60000"), referenceYear, FilingStatus.SINGLE);
+        assertThat(expectedTax).isGreaterThan(BigDecimal.ZERO); // sanity: the oracle itself is nonzero
+
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+
+        // And it must actually leave the pools (no vanishing, no gap): taxable-first cascade with
+        // no taxable pool here means traditional funds it in full.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("500000.0000").subtract(expectedTax));
+        assertThat(year1.rothBalance()).isEqualByComparingTo(bd("100000.0000")); // untouched
+    }
+
+    @Test
+    void run_selfEmploymentDeficitYear_seTaxFundedFromPoolsNotJustReported() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int referenceYear = 2025;
+        int birthYear = 1955; // age 70 -- below RMD start age, isolates the SE-tax fix
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // $50,000 self-employment income against $80,000 spending is a genuine deficit
+        // (grossSurplus = 50,000 - 80,000 = -30,000 < 0): the spending-plan surplus branch never
+        // fires, so pre-fix the SE tax was added to the reported taxLiability with ZERO pool
+        // effect (audit A4's "same pattern" bug). Traditional-only pool isolates the fix.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("500000.0000", "0", "0.0000", "traditional"));
+        var spending = new SpendingProfileInput(bd("80000"), bd("0"), null);
+        var consulting = selfEmploymentSource("Consulting", "50000", 60, null);
+
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                accounts, spending, referenceYear, List.of(consulting));
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(70);
+        // Independent SE-tax oracle (same no-arg calculator the engine wires internally).
+        var seCalc = new SelfEmploymentTaxCalculator();
+        BigDecimal expectedSeTax = seCalc.computeSETax(bd("50000"), referenceYear);
+        assertThat(year1.selfEmploymentTax()).isEqualByComparingTo(expectedSeTax);
+
+        // Ordinary tax on (spend draw $30,000 [80,000 spend - 50,000 SE cash] + SE taxable income
+        // net of the 50%-deductible SE tax): the SE deduction reduces the ordinary base, so derive
+        // it via the same SelfEmploymentTaxCalculator the engine uses rather than hand-rounding.
+        BigDecimal seDeduction = seCalc.deductibleAmount(expectedSeTax);
+        BigDecimal ordinaryTaxableIncome = bd("30000").add(bd("50000").subtract(seDeduction));
+        BigDecimal expectedOrdinaryTax = referenceFederalCalc()
+                .computeTax(ordinaryTaxableIncome, referenceYear, FilingStatus.SINGLE);
+        BigDecimal expectedTotalTax = expectedOrdinaryTax.add(expectedSeTax);
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTotalTax);
+
+        // A4: SE tax must actually leave the pool -- traditional funds the $30,000 spend draw AND
+        // the full (ordinary + SE) tax, not just the ordinary portion the way it did pre-fix.
+        assertThat(year1.traditionalBalance())
+                .isEqualByComparingTo(bd("500000.0000").subtract(bd("30000")).subtract(expectedTotalTax));
+
+        // Balance identity: start + contrib + growth - withdrawals - taxLiability == end.
+        BigDecimal expectedEnd = year1.startBalance().add(year1.contributions()).add(year1.growth())
+                .subtract(year1.withdrawals()).subtract(year1.taxLiability());
+        assertThat(year1.endBalance()).isEqualByComparingTo(expectedEnd);
     }
 }

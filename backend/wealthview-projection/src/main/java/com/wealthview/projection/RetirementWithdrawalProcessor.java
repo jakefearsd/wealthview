@@ -73,7 +73,21 @@ final class RetirementWithdrawalProcessor {
         BigDecimal aggBalance = pool.getTotal();
         BigDecimal portfolioNeed;
         BigDecimal surplusReinvested = null;
-        BigDecimal surplusTax = BigDecimal.ZERO;
+
+        // Self-employment tax has no tax bundle of its own anywhere else this year -- it always
+        // needs either the year's cash surplus or an explicit pool-cascade draw to actually leave
+        // the portfolio (audit A4: it used to be added to the reported taxLiability with ZERO pool
+        // effect in deficit years). Default to "fully unfunded"; the surplus branch below reduces
+        // this when it can cover some or all of it from the year's cash surplus.
+        BigDecimal seTax = (pool.tracksSETax() && isResult != null)
+                ? isResult.selfEmploymentTax() : BigDecimal.ZERO;
+        // Explicit signal threaded into executeWithdrawals -- see PoolStrategy#executeWithdrawals
+        // javadoc. Zero unless the surplus branch below actually charges base-income tax this year.
+        BigDecimal alreadyChargedBaseTax = BigDecimal.ZERO;
+        // Tax this method has computed but could not fund from the year's cash surplus; must be
+        // pulled from the pools via the same cascade that funds the withdrawal-tax bundle (audit
+        // A4: this used to vanish at the old `.max(ZERO)` floor on the surplus deposit).
+        BigDecimal extraPoolFundedTax = seTax;
 
         if (spendingPlan != null) {
             var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement,
@@ -101,14 +115,19 @@ final class RetirementWithdrawalProcessor {
                         tax = fullTax;
                     }
                 }
-                // Also subtract self-employment tax from the surplus deposit
-                BigDecimal seTax = (pool.tracksSETax() && isResult != null)
-                        ? isResult.selfEmploymentTax() : BigDecimal.ZERO;
-                surplusTax = tax;
-                BigDecimal afterTaxSurplus = grossSurplus.subtract(tax).subtract(seTax).max(BigDecimal.ZERO);
+                alreadyChargedBaseTax = tax;
+
+                // A4: fund (tax + SE tax) from the surplus first; route any unfunded remainder
+                // through the pool cascade (extraPoolFundedTax, threaded into executeWithdrawals
+                // below) instead of letting it vanish at a `.max(ZERO)` floor.
+                BigDecimal totalObligation = tax.add(seTax);
+                BigDecimal afterTaxSurplus = grossSurplus.subtract(totalObligation);
                 if (afterTaxSurplus.compareTo(BigDecimal.ZERO) > 0) {
                     pool.depositToTaxable(afterTaxSurplus);
                     surplusReinvested = afterTaxSurplus;
+                    extraPoolFundedTax = BigDecimal.ZERO;
+                } else {
+                    extraPoolFundedTax = afterTaxSurplus.negate();
                 }
             }
         } else {
@@ -120,13 +139,15 @@ final class RetirementWithdrawalProcessor {
         }
 
         var withdrawalResult = pool.executeWithdrawals(
-                portfolioNeed, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age);
-        BigDecimal taxLiability = withdrawalResult.taxLiability().add(surplusTax);
+                portfolioNeed, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age,
+                alreadyChargedBaseTax, extraPoolFundedTax);
 
-        if (pool.tracksSETax() && isResult != null
-                && isResult.selfEmploymentTax().compareTo(BigDecimal.ZERO) > 0) {
-            taxLiability = taxLiability.add(isResult.selfEmploymentTax());
-        }
+        // withdrawalResult.taxLiability() already includes extraPoolFundedTax (now pool-funded).
+        // Add back exactly the portion funded from this year's cash surplus instead (zero in
+        // deficit/no-plan years, where extraPoolFundedTax already equals the full obligation) so
+        // (tax + seTax) is reported exactly once, regardless of how it was funded.
+        BigDecimal fundedFromSurplus = alreadyChargedBaseTax.add(seTax).subtract(extraPoolFundedTax);
+        BigDecimal taxLiability = withdrawalResult.taxLiability().add(fundedFromSurplus);
 
         return new RetirementWithdrawalResult(withdrawalResult.totalWithdrawn(), taxLiability,
                 previousWithdrawal, surplusReinvested,

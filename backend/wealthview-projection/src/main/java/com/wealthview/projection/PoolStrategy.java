@@ -45,8 +45,44 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     GrowthResult applyGrowth();
 
+    /**
+     * Back-compat overload: no explicit signal that this year's base-income tax was already
+     * charged elsewhere, and no additional tax obligation to fund from the pool cascade. Callers
+     * that don't participate in {@link RetirementWithdrawalProcessor}'s surplus-tax bookkeeping
+     * (audit A4) keep their exact pre-fix behavior via this overload -- see the 8-arg method's
+     * javadoc for the full contract.
+     */
+    default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
+                                                    BigDecimal conversionAmount, BigDecimal rmdAmount, int age) {
+        return executeWithdrawals(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    /**
+     * Executes the year's withdrawal/RMD/tax cascade.
+     *
+     * @param alreadyChargedBaseTax the dollar amount of ordinary tax on {@code (effectiveOtherIncome
+     *     + conversionAmount)} that {@link RetirementWithdrawalProcessor}'s spending-plan surplus
+     *     branch has ALREADY charged this year (whether funded from surplus cash or left for
+     *     {@code extraPoolFundedTax} below) -- an EXPLICIT signal that replaces the old
+     *     {@code totalNeed <= 0} ("noSpendDraw") proxy (audit A4 / T2 review). The old proxy
+     *     assumed {@code totalNeed<=0 ⟺ the surplus branch charged tax}, which holds for
+     *     {@code TierBasedSpendingPlan} (its resolved {@code portfolioWithdrawal} is derived from
+     *     the SAME {@code spendingNeed - activeIncome} quantities that decide the surplus branch)
+     *     but NOT for {@code GuardrailSpendingInput}, whose {@code resolveYear} returns a
+     *     pre-computed {@code portfolioWithdrawal} that ignores live income entirely -- so its
+     *     sign can disagree with whether the surplus branch actually ran. Zero when no such
+     *     charge exists (deficit years, no spending plan, or the Guardrail-mismatch case): the
+     *     caller has NOT pre-charged anything, so the bundle below must charge it in full.
+     * @param extraPoolFundedTax additional tax obligation (the surplus branch's tax remainder once
+     *     the year's surplus was insufficient to cover it, and/or self-employment tax, which has
+     *     no bundle of its own anywhere else this year) that must be funded from the SAME pool
+     *     cascade as the withdrawal-tax bundle, on top of it -- audit A4's "route the unfunded
+     *     remainder through deductFromPools" fix. Zero when nothing is outstanding.
+     */
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
-                                           BigDecimal conversionAmount, BigDecimal rmdAmount, int age);
+                                           BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
+                                           BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax);
 
     ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome, BigDecimal rmdAmount);
 
@@ -337,11 +373,20 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year,
                                                       BigDecimal effectiveOtherIncome,
                                                       BigDecimal conversionAmount,
-                                                      BigDecimal rmdAmount, int age) {
-            // Simple path: withdrawal is just min(need, balance), no tax tracking
+                                                      BigDecimal rmdAmount, int age,
+                                                      BigDecimal alreadyChargedBaseTax,
+                                                      BigDecimal extraPoolFundedTax) {
+            // Simple path: withdrawal is just min(need, balance); SinglePool tracks no ordinary-tax
+            // bundle to net alreadyChargedBaseTax against (see interface javadoc). extraPoolFundedTax
+            // (audit A4: SE tax / an unfunded surplus-tax remainder) still has to leave the balance,
+            // otherwise it would vanish here exactly as it used to for MultiPool.
             BigDecimal withdrawn = need.min(balance);
             balance = balance.subtract(withdrawn);
-            return new WithdrawalTaxResult(withdrawn, BigDecimal.ZERO,
+            BigDecimal tax = extraPoolFundedTax.max(BigDecimal.ZERO);
+            if (tax.compareTo(BigDecimal.ZERO) > 0) {
+                balance = balance.subtract(tax);
+            }
+            return new WithdrawalTaxResult(withdrawn, tax,
                     BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
         }
 
@@ -563,7 +608,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
         public WithdrawalTaxResult executeWithdrawals(BigDecimal totalNeed, int year,
                                                       BigDecimal effectiveOtherIncome,
                                                       BigDecimal conversionAmount,
-                                                      BigDecimal rmdAmount, int age) {
+                                                      BigDecimal rmdAmount, int age,
+                                                      BigDecimal alreadyChargedBaseTax,
+                                                      BigDecimal extraPoolFundedTax) {
             // A fully income-covered year (totalNeed <= 0, e.g. pension/rental/SS covers spending)
             // still owes the RMD force-out and this year's dividend/LTCG tax below -- required
             // distributions and portfolio income are due regardless of whether the retiree needed
@@ -615,22 +662,28 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
                 detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
 
-                // Net against tax on (conversionAmount + effectiveOtherIncome) whenever that base is
-                // ALSO taxed elsewhere this year, to avoid double-counting it through separate
-                // progressive-bracket calculations:
+                // Net out tax that was ALREADY charged elsewhere this year, to avoid double-counting
+                // it through separate progressive-bracket calculations:
                 //  - conversionAmount > 0: its tax was already computed and paid by
-                //    executeConversionWithAmount (called earlier in the year).
-                //  - noSpendDraw: RetirementWithdrawalProcessor's surplus branch (see
-                //    RetirementWithdrawalProcessor#process) separately taxes
-                //    (effectiveOtherIncome + conversionAmount) to net the reinvested cash surplus --
-                //    this call must contribute only the MARGINAL tax caused by the forced RMD on top
-                //    of that base, not the base again.
-                // Otherwise (positive spend draw, no conversion) this is the year's first and only
-                // ordinary-tax computation, so the full bundle is correct as-is.
-                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0 || noSpendDraw) {
+                //    executeConversionWithAmount (called earlier in the year) -- recompute the base
+                //    tax fresh (bracket-accurate marginal subtraction) since that call's own paid
+                //    amount isn't threaded through here.
+                //  - alreadyChargedBaseTax > 0: RetirementWithdrawalProcessor's surplus branch (see
+                //    RetirementWithdrawalProcessor#process) already charged exactly this dollar
+                //    amount against (effectiveOtherIncome + conversionAmount), whether funded from
+                //    the year's cash surplus or left in extraPoolFundedTax below -- subtract the
+                //    EXPLICIT figure directly (audit A4 / T2 review: replaces the old
+                //    totalNeed<=0 "noSpendDraw" proxy, which mis-fires for GuardrailSpendingInput --
+                //    see the interface javadoc). This call then contributes only the marginal tax
+                //    caused by the forced RMD/spend draw on top of that base.
+                // Otherwise (positive spend draw, no conversion, nothing pre-charged) this is the
+                // year's first and only ordinary-tax computation, so the full bundle is correct as-is.
+                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
                     var baseTax = taxCalculator.computeDetailedTax(
                             conversionAmount.add(effectiveOtherIncome), year, filingStatus);
                     withdrawalTax = detailed.totalTax().subtract(baseTax.totalTax()).max(BigDecimal.ZERO);
+                } else if (alreadyChargedBaseTax.compareTo(BigDecimal.ZERO) > 0) {
+                    withdrawalTax = detailed.totalTax().subtract(alreadyChargedBaseTax).max(BigDecimal.ZERO);
                 } else {
                     withdrawalTax = detailed.totalTax();
                 }
@@ -649,7 +702,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
             BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
 
-            BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax);
+            // A4: fold in any additional tax obligation the caller couldn't fund from this year's
+            // cash surplus (or, for self-employment tax, had no other funding path at all) so it
+            // drains the SAME pool cascade as the rest of this year's tax instead of vanishing --
+            // see the interface javadoc for what extraPoolFundedTax represents.
+            BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
             TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
                     ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
 
