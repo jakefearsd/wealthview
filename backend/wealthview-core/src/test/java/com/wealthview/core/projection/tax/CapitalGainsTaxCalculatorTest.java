@@ -137,4 +137,53 @@ class CapitalGainsTaxCalculatorTest {
 
         assertThat(tax).isEqualByComparingTo("1747.5000");
     }
+
+    // === loadLtcgBrackets / niitThresholdReal (audit C5): expose raw bracket + threshold data ===
+
+    @Test
+    void loadLtcgBrackets_seededYear_returnsBracketsInFloorAscendingOrderUnchanged() {
+        var brackets = calculator.loadLtcgBrackets(2025, FilingStatus.SINGLE);
+
+        assertThat(brackets).hasSize(3);
+        assertThat(brackets.get(0).floor()).isEqualByComparingTo(bd("0"));
+        assertThat(brackets.get(0).ceiling()).isEqualByComparingTo(bd("48350"));
+        assertThat(brackets.get(0).rate()).isEqualByComparingTo(bd("0.0000"));
+        assertThat(brackets.get(2).floor()).isEqualByComparingTo(bd("533400"));
+        assertThat(brackets.get(2).ceiling()).isNull();
+        assertThat(brackets.get(2).rate()).isEqualByComparingTo(bd("0.2000"));
+    }
+
+    @Test
+    void loadLtcgBrackets_unseededYear_fallsBackToLatestSeededYear() {
+        when(ltcgBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2040, "single"))
+                .thenReturn(List.of());
+        when(ltcgBracketRepository.findMaxTaxYear()).thenReturn(2025);
+
+        var brackets = calculator.loadLtcgBrackets(2040, FilingStatus.SINGLE);
+
+        assertThat(brackets).hasSize(3);
+        assertThat(brackets.get(0).ceiling()).isEqualByComparingTo(bd("48350"));
+    }
+
+    @Test
+    void niitThresholdReal_zeroYearsFromBase_returnsNominalThreshold() {
+        assertThat(calculator.niitThresholdReal(FilingStatus.SINGLE, 0, bd("0.025")))
+                .isEqualByComparingTo(bd("200000"));
+        assertThat(calculator.niitThresholdReal(FilingStatus.MARRIED_FILING_JOINTLY, 0, bd("0.025")))
+                .isEqualByComparingTo(bd("250000"));
+    }
+
+    @Test
+    void niitThresholdReal_erodesOverHorizon_matchesComputeLtcgTaxDeflation() {
+        // Cross-check against computeLtcgTax's OWN internal deflation (same test shape as
+        // computeLtcgTax_niitThresholdDeflatesOverHorizon_taxesMoreLater above): at y20/2.5%
+        // inflation the $200k threshold erodes to ~122,060 -- reproduce that exact figure via the
+        // now-public accessor instead of only inferring it indirectly through a tax delta.
+        var y0 = calculator.niitThresholdReal(FilingStatus.SINGLE, 0, bd("0.025"));
+        var y20 = calculator.niitThresholdReal(FilingStatus.SINGLE, 20, bd("0.025"));
+
+        assertThat(y0).isEqualByComparingTo(bd("200000"));
+        assertThat(y20).isLessThan(y0);
+        assertThat(y20).isCloseTo(bd("122060"), org.assertj.core.data.Offset.offset(bd("50")));
+    }
 }

@@ -155,6 +155,22 @@ public class FederalTaxCalculator {
     }
 
     /**
+     * Returns the ordinary federal tax brackets for {@code (taxYear, status)}, floor-ascending,
+     * using the SAME year-fallback {@link #computeTax} applies internally
+     * ({@link #loadBracketsWithFallback}). A {@code null} ceiling on the last entry is the top,
+     * uncapped bracket.
+     *
+     * <p>Exposed for the Monte Carlo engine's per-year exact-tax precompute (audit C5), which
+     * builds an allocation-free primitive-array lookup table from this raw data instead of
+     * repeating BigDecimal {@link #computeTax} calls inside the hot trial loop.
+     */
+    public List<BracketPoint> loadOrdinaryBrackets(int taxYear, FilingStatus status) {
+        return loadBracketsWithFallback(taxYear, status).stream()
+                .map(b -> new BracketPoint(b.getBracketFloor(), b.getBracketCeiling(), b.getRate()))
+                .toList();
+    }
+
+    /**
      * The federal standard deduction for (taxYear, status), falling back to the latest seeded year
      * when the exact year isn't present. Public so collaborators outside this package (e.g. the
      * projection module's LTCG stacking-floor netting) can reuse the SAME deduction the ordinary tax

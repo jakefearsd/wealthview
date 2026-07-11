@@ -454,4 +454,50 @@ class FederalTaxCalculatorTest {
 
         assertThat(tax).isEqualByComparingTo(bd("3961.5000"));
     }
+
+    // === loadOrdinaryBrackets (audit C5): exposes raw bracket data for the MC hot-loop table ===
+
+    @Test
+    void loadOrdinaryBrackets_seededYear_returnsBracketsInFloorAscendingOrderUnchanged() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var brackets = calculator.loadOrdinaryBrackets(2025, FilingStatus.SINGLE);
+
+        assertThat(brackets).hasSize(7);
+        assertThat(brackets.get(0).floor()).isEqualByComparingTo(bd("0"));
+        assertThat(brackets.get(0).ceiling()).isEqualByComparingTo(bd("11925"));
+        assertThat(brackets.get(0).rate()).isEqualByComparingTo(bd("0.1000"));
+        // Top bracket is uncapped: ceiling null is preserved (sentinel for "no ceiling").
+        assertThat(brackets.get(6).floor()).isEqualByComparingTo(bd("626350"));
+        assertThat(brackets.get(6).ceiling()).isNull();
+        assertThat(brackets.get(6).rate()).isEqualByComparingTo(bd("0.3700"));
+    }
+
+    @Test
+    void loadOrdinaryBrackets_unseededYear_fallsBackToLatestSeededYear_sameAsComputeTax() {
+        // computeTax's own fallback (loadBracketsWithFallback) must be reused verbatim: this proves
+        // loadOrdinaryBrackets and computeTax agree on which bracket set an unseeded year resolves to.
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2040, "single"))
+                .thenReturn(List.of());
+        when(taxBracketRepository.findMaxTaxYear()).thenReturn(2025);
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+
+        var brackets = calculator.loadOrdinaryBrackets(2040, FilingStatus.SINGLE);
+
+        assertThat(brackets).hasSize(7);
+        assertThat(brackets.get(0).ceiling()).isEqualByComparingTo(bd("11925"));
+    }
+
+    @Test
+    void loadOrdinaryBrackets_noBracketDataAnywhere_returnsEmptyList() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2040, "single"))
+                .thenReturn(List.of());
+        when(taxBracketRepository.findMaxTaxYear()).thenReturn(null);
+
+        var brackets = calculator.loadOrdinaryBrackets(2040, FilingStatus.SINGLE);
+
+        assertThat(brackets).isEmpty();
+    }
 }

@@ -72,6 +72,39 @@ public class CapitalGainsTaxCalculator {
     }
 
     /**
+     * Returns the LTCG brackets for {@code (taxYear, status)}, floor-ascending, using the SAME
+     * year-fallback {@link #computeLtcgTax} applies internally ({@link #loadBracketsWithFallback}).
+     * A {@code null} ceiling on the last entry is the top, uncapped bracket.
+     *
+     * <p>Exposed for the Monte Carlo engine's per-year exact-tax precompute (audit C5), which
+     * builds an allocation-free primitive-array lookup table from this raw data instead of
+     * repeating BigDecimal {@link #computeLtcgTax} calls inside the hot trial loop.
+     */
+    public List<BracketPoint> loadLtcgBrackets(int taxYear, FilingStatus status) {
+        return loadBracketsWithFallback(taxYear, status).stream()
+                .map(b -> new BracketPoint(b.getBracketFloor(), b.getBracketCeiling(), b.getRate()))
+                .toList();
+    }
+
+    /**
+     * Deflates the fixed-nominal NIIT threshold for {@code status} onto the projection's
+     * real-terms clock -- the SAME deflation {@link #computeLtcgTax} applies internally via
+     * {@link #thresholdDeflator}.
+     *
+     * <p>Exposed for the Monte Carlo engine's per-year exact-tax precompute (audit C5), which
+     * needs the deflated threshold once per year (outside the hot loop) to evaluate NIIT with
+     * primitive arithmetic instead of repeating BigDecimal {@link #computeLtcgTax} calls.
+     */
+    public BigDecimal niitThresholdReal(FilingStatus status, int yearsFromBase, BigDecimal inflationRate) {
+        BigDecimal threshold = status == FilingStatus.MARRIED_FILING_JOINTLY
+                ? NIIT_THRESHOLD_MFJ : NIIT_THRESHOLD_SINGLE;
+        BigDecimal deflator = thresholdDeflator(yearsFromBase, inflationRate);
+        return deflator.compareTo(BigDecimal.ONE) != 0
+                ? threshold.multiply(deflator).setScale(SCALE, ROUNDING)
+                : threshold;
+    }
+
+    /**
      * Walks the floor-ascending LTCG brackets, taxing the overlap of
      * {@code [max(bracketFloor, ordinary + gainTaxedSoFar), bracketCeiling]} with the remaining gain
      * at each bracket's rate — i.e. the LTCG amount stacks on top of ordinary income.
