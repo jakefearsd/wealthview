@@ -147,6 +147,30 @@ class GuardrailProfileResponseTest {
     }
 
     @Test
+    void from_singleArgOverload_leavesFixedReturnShareNull() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.fixedReturnShare()).isNull();
+    }
+
+    @Test
+    void from_withFixedReturnShare_attachesItToResponse() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity, new BigDecimal("0.6000"));
+
+        assertThat(response.fixedReturnShare()).isEqualByComparingTo("0.6000");
+    }
+
+    @Test
     void isOlderThan24Hours_withRecentUpdate_returnsFalse() {
         var entity = mock(GuardrailSpendingProfileEntity.class);
         when(entity.getUpdatedAt()).thenReturn(OffsetDateTime.now().minusHours(3));

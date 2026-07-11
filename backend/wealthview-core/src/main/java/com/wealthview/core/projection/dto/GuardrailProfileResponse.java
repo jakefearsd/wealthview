@@ -34,16 +34,66 @@ public record GuardrailProfileResponse(
         String riskTolerance,
         int cashReserveYears,
         BigDecimal cashReturnRate,
-        RothConversionScheduleResponse conversionSchedule
+        RothConversionScheduleResponse conversionSchedule,
+        BigDecimal fixedReturnShare
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    // UseDiamondOperator: the anonymous TypeReference subclasses below MUST keep explicit type
-    // arguments — Jackson captures the generic type via the anonymous class's superclass at
-    // runtime, and a diamond would erase List<...> to a raw type.
-    @SuppressWarnings("PMD.UseDiamondOperator")
+    /**
+     * Back-compat convenience for callers that predate the {@link #fixedReturnShare} disclosure
+     * field (A3: legacy fixed-return-override MC dispersion warning). Defaults it to {@code
+     * null} — "not computed for this response" — rather than forcing every existing positional
+     * call site (optimizer builders, tests) to learn about a field they have no account data to
+     * compute.
+     */
+    // ExcessiveParameterList: this constructor deliberately mirrors the record's own 24-field
+    // canonical constructor (pre-fixedReturnShare shape) so existing positional call sites keep
+    // compiling unchanged; it isn't new incidental complexity, just a back-compat delegate.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailProfileResponse(
+            UUID id,
+            UUID scenarioId,
+            String name,
+            BigDecimal essentialFloor,
+            BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean,
+            int trialCount,
+            BigDecimal confidenceLevel,
+            List<GuardrailPhaseInput> phases,
+            List<GuardrailYearlySpending> yearlySpending,
+            BigDecimal medianFinalBalance,
+            BigDecimal failureRate,
+            BigDecimal successProbability,
+            BigDecimal percentile10Final,
+            boolean stale,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            BigDecimal portfolioFloor,
+            BigDecimal maxAnnualAdjustmentRate,
+            int phaseBlendYears,
+            String riskTolerance,
+            int cashReserveYears,
+            BigDecimal cashReturnRate,
+            RothConversionScheduleResponse conversionSchedule) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
+                stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, null);
+    }
+
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
+        return from(entity, null);
+    }
+
+    /**
+     * Same as {@link #from(GuardrailSpendingProfileEntity)}, but also attaches a freshly
+     * computed {@code fixedReturnShare} (only available right after {@code optimize()} runs,
+     * where live account inputs are on hand — {@link #from(GuardrailSpendingProfileEntity)}
+     * alone always reports {@code null} since a persisted profile does not store this value).
+     */
+    @SuppressWarnings("PMD.UseDiamondOperator")
+    public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity, BigDecimal fixedReturnShare) {
         List<GuardrailPhaseInput> phases;
         List<GuardrailYearlySpending> yearlySpending;
         try {
@@ -90,7 +140,8 @@ public record GuardrailProfileResponse(
                 entity.getRiskTolerance(),
                 entity.getCashReserveYears(),
                 entity.getCashReturnRate(),
-                conversionSchedule
+                conversionSchedule,
+                fixedReturnShare
         );
     }
 

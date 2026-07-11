@@ -1,0 +1,21 @@
+-- V073: backfill the legacy V009 expected_return default to NULL.
+--
+-- V009 created projection_accounts.expected_return as `numeric(5,4) NOT NULL DEFAULT 0.07`.
+-- V069 dropped NOT NULL and redefined the column as an optional override (null => derive the
+-- account's expected return from its allocation, restoring per-year Monte Carlo dispersion via
+-- the allocation-blended capital-market matrix). V070 dropped the stale DEFAULT so new rows no
+-- longer pick it up silently. But nobody backfilled the rows written before V069/V070: every
+-- pre-V069 account still carries the literal 0.0700 that Hibernate wrote as an explicit value
+-- (not a deliberate user override), so it still takes the fixed-return, zero-volatility path
+-- (PortfolioReturnResolver.fixed). A scenario built entirely from such legacy accounts produces
+-- a Monte Carlo run with zero return variance, so its confidence gate is vacuous ("95%
+-- confidence" collapses to the deterministic max-spending answer).
+--
+-- Nulling expected_return where it still equals the historical 0.07 default restores the
+-- allocation-derived, variance-carrying return path for every legacy account. A user who
+-- genuinely wants a fixed 7% nominal return can re-enter it in the UI, which now treats the
+-- field as an explicit override rather than a database default.
+--
+-- Numeric equality in PostgreSQL compares value, not display scale, so this matches the stored
+-- 0.0700 regardless of how the literal below is rendered.
+UPDATE projection_accounts SET expected_return = NULL WHERE expected_return = 0.07;

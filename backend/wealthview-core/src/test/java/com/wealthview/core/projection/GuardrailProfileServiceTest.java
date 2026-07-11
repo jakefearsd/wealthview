@@ -243,6 +243,9 @@ class GuardrailProfileServiceTest {
 
         assertThat(result.name()).isEqualTo("Test Plan");
         assertThat(result.essentialFloor()).isEqualByComparingTo(new BigDecimal("30000"));
+        // A3: a persisted profile fetched without live account data can't recompute the
+        // fixed-return override share, so it stays undisclosed (null) rather than lying with 0.
+        assertThat(result.fixedReturnShare()).isNull();
     }
 
     @Test
@@ -699,6 +702,100 @@ class GuardrailProfileServiceTest {
         var hash = GuardrailProfileService.computeScenarioHash(scenarioBadJson);
 
         assertThat(hash).isNotBlank();
+    }
+
+    // ---- A3: fixedReturnShare disclosure ----
+
+    @Test
+    void computeFixedReturnShare_allAccountsOverride_returnsOne() {
+        List<com.wealthview.core.projection.dto.ProjectionAccountInput> accounts = List.of(
+                new HypotheticalAccountInput(
+                        new BigDecimal("300000"), BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                new HypotheticalAccountInput(
+                        new BigDecimal("200000"), BigDecimal.ZERO, new BigDecimal("0.06"), "traditional"));
+
+        var share = GuardrailProfileService.computeFixedReturnShare(accounts);
+
+        assertThat(share).isEqualByComparingTo("1.0000");
+    }
+
+    @Test
+    void computeFixedReturnShare_noAccountsOverride_returnsZero() {
+        List<com.wealthview.core.projection.dto.ProjectionAccountInput> accounts = List.of(
+                new HypotheticalAccountInput(
+                        new BigDecimal("300000"), BigDecimal.ZERO, null, "taxable"),
+                new HypotheticalAccountInput(
+                        new BigDecimal("200000"), BigDecimal.ZERO, null, "traditional"));
+
+        var share = GuardrailProfileService.computeFixedReturnShare(accounts);
+
+        assertThat(share).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void computeFixedReturnShare_mixed60_40ByBalance_returnsWeightedShare() {
+        List<com.wealthview.core.projection.dto.ProjectionAccountInput> accounts = List.of(
+                new HypotheticalAccountInput(
+                        new BigDecimal("600000"), BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"),
+                new HypotheticalAccountInput(
+                        new BigDecimal("400000"), BigDecimal.ZERO, null, "traditional"));
+
+        var share = GuardrailProfileService.computeFixedReturnShare(accounts);
+
+        assertThat(share).isEqualByComparingTo("0.6000");
+    }
+
+    @Test
+    void computeFixedReturnShare_zeroTotalBalance_returnsZeroWithoutDivideByZero() {
+        List<com.wealthview.core.projection.dto.ProjectionAccountInput> accounts = List.of(
+                new HypotheticalAccountInput(
+                        BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("0.07"), "taxable"));
+
+        var share = GuardrailProfileService.computeFixedReturnShare(accounts);
+
+        assertThat(share).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void computeFixedReturnShare_noAccounts_returnsZero() {
+        var share = GuardrailProfileService.computeFixedReturnShare(List.of());
+
+        assertThat(share).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void optimize_mixedOverrideAccounts_setsFixedReturnShareOnResponse() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId))
+                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
+                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
+                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
+                        List.of(
+                                new HypotheticalAccountInput(
+                                        new BigDecimal("600000"), BigDecimal.ZERO,
+                                        new BigDecimal("0.07"), "taxable"),
+                                new HypotheticalAccountInput(
+                                        new BigDecimal("400000"), BigDecimal.ZERO,
+                                        null, "traditional")),
+                        null));
+        when(guardrailRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.empty());
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new GuardrailOptimizationRequest(
+                scenarioId, "Plan", new BigDecimal("30000"), BigDecimal.ZERO,
+                null, null, null, List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        var result = service.optimize(tenantId, scenarioId, request);
+
+        assertThat(result.fixedReturnShare()).isEqualByComparingTo("0.6000");
     }
 
     // ---- deterministic seed derivation ----

@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -19,6 +20,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -91,6 +93,7 @@ public class GuardrailProfileService {
                     birthYear, confidence, filingStatus, withdrawalOrder);
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
+            var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
 
             deleteExistingProfile(scenario, scenarioId);
 
@@ -108,7 +111,7 @@ public class GuardrailProfileService {
             scenarioRepository.save(scenario);
 
             log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
-            return GuardrailProfileResponse.from(saved);
+            return GuardrailProfileResponse.from(saved, fixedReturnShare);
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioId");
@@ -249,6 +252,33 @@ public class GuardrailProfileService {
                 null);
 
         return optimize(tenantId, scenarioId, request);
+    }
+
+    /**
+     * A3 disclosure: the fraction of total initial balance held in accounts carrying an explicit
+     * {@code expected_return} override (fixed nominal return, zero Monte Carlo dispersion —
+     * {@code PortfolioReturnResolver.fixed}) rather than an allocation-derived, variance-carrying
+     * return. Lets the UI warn e.g. "60% of your portfolio uses a fixed return and shows no
+     * market variability." Scale 4, zero when there are no overrides or the accounts have no
+     * balance to weight by (an all-zero-balance scenario has no meaningful share to report).
+     */
+    static BigDecimal computeFixedReturnShare(List<ProjectionAccountInput> accounts) {
+        BigDecimal totalBalance = BigDecimal.ZERO;
+        BigDecimal overrideBalance = BigDecimal.ZERO;
+        for (var account : accounts) {
+            BigDecimal balance = account.initialBalance();
+            if (balance == null) {
+                continue;
+            }
+            totalBalance = totalBalance.add(balance);
+            if (account.expectedReturnOverride().isPresent()) {
+                overrideBalance = overrideBalance.add(balance);
+            }
+        }
+        if (totalBalance.signum() <= 0) {
+            return BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP);
+        }
+        return overrideBalance.divide(totalBalance, 4, RoundingMode.HALF_UP);
     }
 
     public static String computeScenarioHash(ProjectionScenarioEntity scenario) {
