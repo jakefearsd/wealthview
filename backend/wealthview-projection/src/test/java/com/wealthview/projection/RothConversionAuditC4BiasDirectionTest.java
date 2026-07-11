@@ -22,14 +22,26 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
- * Audit C4 direction check: the combined frame fix ({@link JointConversionSearch#resolveReturnMean})
- * plus the RMD-proceeds credit ({@link ConversionSimulator}'s {@code applyRmds}) must bias the
- * Roth-conversion optimizer LESS aggressively toward conversion, not more.
+ * Audit C4 direction check: the frame fix ({@link OptimizationContextBuilder#resolveReturnMean})
+ * must bias the Roth-conversion optimizer LESS aggressively toward conversion, not more.
  *
  * <p>The fixture is DS-mode (dynamic sequencing) so {@link JointConversionSearch} takes the
  * deterministic Phase-1 path ({@code RothConversionOptimizer.optimize()} -- pure lifetime-tax
  * minimization, no Monte Carlo search noise), making the before/after comparison a clean,
  * reproducible A/B rather than a search-driven approximation.
+ *
+ * <p><strong>Attribution — this fixture's movement is 100% the FRAME fix; the RMD-proceeds credit
+ * contributes $0 here, structurally.</strong> In DS mode the credit CANNOT affect any asserted
+ * value: (1) credits only occur at/after RMD age, when conversions have already ceased ({@code age
+ * >= rmdStartAge} blocks them), so conversion amounts/taxes are untouched; (2) the DS withdrawal
+ * strategy sizes its taxed traditional draw from bracket space alone -- BEFORE consulting the
+ * taxable balance -- and taxable/Roth draws are untaxed, so a bigger credited taxable pool changes
+ * neither the traditional trajectory (and hence rmdTax) nor withdrawalTax; lifetime tax in both
+ * arms is therefore independent of the credit. Verified empirically by the T11 reviewer at commit
+ * dd43b65 (frame fix alone reproduces the exact post-fix figures below). The credit's own effect
+ * is pinned where it IS live -- ordered-withdrawal fixtures -- by
+ * {@code RothConversionOptimizerCharacterizationTest} (whose explicit real {@code returnMean}
+ * conversely bypasses the frame fix, giving each fix exactly one isolating pin).
  *
  * <p>The "before" figures below were captured by running this exact fixture against the pre-fix
  * code (default {@code returnMean = 0.10} hardcoded in {@code JointConversionSearch}, RMD proceeds
@@ -109,20 +121,23 @@ class RothConversionAuditC4BiasDirectionTest {
                 .mapToDouble(y -> y.conversionAmount().doubleValue())
                 .sum();
 
-        // Direction: BOTH fixes push toward LESS aggressive conversion (lower real growth -> less
-        // projected future RMD pressure; RMD credit -> the without-conversion arm keeps its
-        // proceeds instead of being artificially penalized).
+        // Direction: the FRAME fix pushes toward LESS aggressive conversion (lower real growth ->
+        // less projected future traditional balance -> less RMD-bracket pressure -> smaller
+        // target-balance excess to convert, and lower tax in BOTH arms from slower growth). The
+        // RMD credit contributes $0 to every asserted figure in this DS fixture -- see the class
+        // Javadoc's attribution note.
         assertThat(totalConversion)
                 .as("post-fix total conversion must be smaller than the pre-fix baseline")
                 .isLessThan(PRE_FIX_TOTAL_CONVERSION);
         assertThat(schedule.lifetimeTaxWithout().doubleValue())
-                .as("post-fix lifetimeTaxWithout must drop -- the without-conversion arm now keeps its RMD proceeds")
+                .as("post-fix lifetimeTaxWithout must drop -- slower (real, fee-adjusted) growth means"
+                        + " smaller RMDs and withdrawals to tax in the baseline arm")
                 .isLessThan(PRE_FIX_LIFETIME_TAX_WITHOUT);
         assertThat(schedule.lifetimeTaxWithConversions().doubleValue())
-                .as("post-fix lifetimeTaxWith must also drop (same RMD-credit mechanism applies to the with-conversion arm)")
+                .as("post-fix lifetimeTaxWith must also drop (same slower-growth mechanism in the with-conversion arm)")
                 .isLessThan(PRE_FIX_LIFETIME_TAX_WITH);
         assertThat(schedule.taxSavings().doubleValue())
-                .as("claimed tax_savings must shrink, not grow, once both biases are corrected")
+                .as("claimed tax_savings must shrink, not grow, once the pro-conversion frame bias is corrected")
                 .isLessThan(PRE_FIX_TAX_SAVINGS);
 
         // Pin the exact post-fix values so this test also serves as a regression pin, not just a

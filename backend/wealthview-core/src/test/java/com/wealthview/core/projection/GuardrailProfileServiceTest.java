@@ -540,7 +540,12 @@ class GuardrailProfileServiceTest {
                 .withCashReturnRate(null).withTerminalBalanceTarget(null)
                 .withPhases(null)));
 
-        assertThat(input.returnMean()).isEqualByComparingTo("0.10");
+        // Audit C4: an omitted return_mean must flow through as NULL so the projection engine
+        // derives the scenario's fee-adjusted, allocation-blended real return
+        // (OptimizationContextBuilder.resolveReturnMean). Pre-filling 0.10 nominal here made the
+        // engine's default branch dead code for all production traffic (the frontend never sends
+        // return_mean) and re-introduced the frame mismatch the engine fix removed.
+        assertThat(input.returnMean()).isNull();
         assertThat(input.trialCount()).isEqualTo(5000);
         assertThat(input.portfolioFloor()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.maxAnnualAdjustmentRate()).isEqualByComparingTo("0.05");
@@ -550,6 +555,84 @@ class GuardrailProfileServiceTest {
         assertThat(input.cashReturnRate()).isEqualByComparingTo("0.015");
         assertThat(input.terminalBalanceTarget()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.phases()).isEmpty();
+    }
+
+    @Test
+    void optimize_explicitReturnMean_passesThroughUnchanged() {
+        // Explicit API-supplied return_mean keeps its wire contract: NOMINAL, forwarded verbatim;
+        // the engine Fisher-converts it exactly once (resolveReturnMean's override branch).
+        var input = captureOptimizationInput(
+                buildRequest(req -> req.withReturnMean(new BigDecimal("0.08"))));
+
+        assertThat(input.returnMean()).isEqualByComparingTo("0.08");
+    }
+
+    @Test
+    void optimize_returnMeanOmitted_persistsOptimizerResolvedRate() {
+        // Audit C4: the persisted return_mean column (and thus the response on reload) must carry
+        // the RESOLVED effective REAL rate the optimizer actually used — echoed back on
+        // GuardrailProfileResponse.returnMean — not the raw (null) request value and not a
+        // hardcoded 0.10 default.
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+
+        var resolvedReal = new BigDecimal("0.0658");
+        var optimizerResponse = new GuardrailProfileResponse(
+                null, scenarioId, "Plan",
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                resolvedReal,
+                5000, new BigDecimal("0.95"),
+                List.of(), List.of(),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
+                new BigDecimal("100000"),
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(optimizerResponse);
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.optimize(tenantId, scenarioId, buildRequest(req -> req.withReturnMean(null)));
+
+        assertThat(savedCaptor.getValue().getReturnMean()).isEqualByComparingTo(resolvedReal);
+    }
+
+    @Test
+    void reoptimize_storedResolvedReturnMean_notEchoedBackAsNominalRequest() {
+        // Audit C4 double-Fisher trap: the persisted return_mean is the RESOLVED REAL rate. Feeding
+        // it back into the request (whose returnMean contract is NOMINAL) would Fisher-convert an
+        // already-real rate a second time. reoptimize must pass null so the engine re-derives the
+        // rate from the scenario's CURRENT allocation — which also picks up allocation edits, the
+        // whole point of reoptimizing a stale profile.
+        var entity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Existing Plan", new BigDecimal("30000"));
+        entity.setPhases("[]");
+        entity.setYearlySpending("[]");
+        entity.setScenarioHash("old-hash");
+        entity.setReturnMean(new BigDecimal("0.0658")); // resolved REAL rate from the prior run
+        entity.setTrialCount(5000);
+        entity.setConfidenceLevel(new BigDecimal("0.95"));
+        entity.setTerminalBalanceTarget(BigDecimal.ZERO);
+
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
+                .thenReturn(Optional.of(entity));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().returnMean())
+                .as("stored resolved-real return_mean must NOT round-trip as a nominal request value")
+                .isNull();
     }
 
     @Test

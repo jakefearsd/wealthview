@@ -29,9 +29,9 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * ceiling with no annual indexing. {@code returnMean} MUST therefore already be a real, fee-adjusted
  * rate before it reaches this class; {@link RothConversionOptimizer.Builder#assumptions} takes it
  * as-is with no further conversion. The one production caller, {@code JointConversionSearch},
- * resolves that rate — see {@code JointConversionSearch#resolveReturnMean} — from the scenario's own
- * fee-adjusted, allocation-blended real return by default, or Fisher-converts an explicit (nominal)
- * override minus the scenario fee. Passing a nominal rate here (e.g. a raw CMA nominal mean) inflates
+ * consumes the rate resolved ONCE per run by {@code OptimizationContextBuilder#resolveReturnMean} —
+ * the scenario's fee-adjusted, allocation-blended real return by default, or an explicit (nominal)
+ * override Fisher-converted minus the scenario fee. Passing a nominal rate here (e.g. a raw CMA nominal mean) inflates
  * pool growth relative to the flat bracket ceilings, overstates projected RMD pressure, and biases
  * conversion recommendations upward.
  */

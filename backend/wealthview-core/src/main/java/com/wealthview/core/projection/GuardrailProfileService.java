@@ -46,7 +46,6 @@ public class GuardrailProfileService {
     private static final Logger log = LoggerFactory.getLogger(GuardrailProfileService.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private static final BigDecimal DEFAULT_RETURN_MEAN = new BigDecimal("0.10");
     private static final int DEFAULT_TRIAL_COUNT = 5000;
     private static final BigDecimal DEFAULT_CONFIDENCE = new BigDecimal("0.95");
     private static final BigDecimal DEFAULT_MAX_ADJUSTMENT_RATE = new BigDecimal("0.05");
@@ -157,7 +156,14 @@ public class GuardrailProfileService {
                                           GuardrailOptimizationInput optimizationInput,
                                           GuardrailProfileResponse optimizerResult) {
         entity.setTerminalBalanceTarget(optimizationInput.terminalBalanceTarget());
-        entity.setReturnMean(optimizationInput.returnMean());
+        // Audit C4: persist the RESOLVED effective REAL growth rate the optimizer echoed back
+        // (GuardrailProfileResponse.returnMean), not the raw request value — the input's
+        // returnMean is null whenever the request omitted it (the normal case; the frontend
+        // never sends return_mean), and users reloading the profile should see the rate that
+        // was actually used. ZERO fallback only for the degenerate zero-year run, whose
+        // emptyResult echoes the raw (possibly null) input against a NOT NULL column.
+        entity.setReturnMean(optimizerResult.returnMean() != null
+                ? optimizerResult.returnMean() : BigDecimal.ZERO);
         entity.setTrialCount(optimizationInput.trialCount());
         entity.setConfidenceLevel(optimizationInput.confidenceLevel());
         var incomeSourceSignatures = toIncomeSourceSignatures(optimizationInput.incomeSources());
@@ -242,7 +248,14 @@ public class GuardrailProfileService {
                 existing.getName(),
                 existing.getEssentialFloor(),
                 existing.getTerminalBalanceTarget(),
-                existing.getReturnMean(),
+                // Audit C4: the stored return_mean is the RESOLVED REAL rate from the prior run;
+                // the request field's contract is NOMINAL (the engine Fisher-converts non-null
+                // values), so echoing it back would deflate an already-real rate a second time.
+                // Passing null re-derives the rate from the scenario's CURRENT allocation — which
+                // also picks up allocation edits, the point of reoptimizing a stale profile. An
+                // API-supplied explicit nominal override is therefore not preserved across
+                // reoptimize; it must be re-sent on a fresh optimize call.
+                null,
                 existing.getTrialCount(),
                 existing.getConfidenceLevel(),
                 phases,
@@ -420,7 +433,12 @@ public class GuardrailProfileService {
                 projectionInput.incomeSources(),
                 request.essentialFloor() != null ? request.essentialFloor() : BigDecimal.ZERO,
                 request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
-                request.returnMean() != null ? request.returnMean() : DEFAULT_RETURN_MEAN,
+                // Audit C4: NO default here — an omitted return_mean flows through as null so the
+                // engine derives the scenario's fee-adjusted, allocation-blended REAL return
+                // (OptimizationContextBuilder.resolveReturnMean). Pre-filling a nominal constant
+                // would make that default branch dead code (the frontend never sends return_mean)
+                // and reintroduce the nominal-vs-constant-real-bracket frame mismatch.
+                request.returnMean(),
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
                 confidence,
                 request.phases() != null ? request.phases() : List.of(),

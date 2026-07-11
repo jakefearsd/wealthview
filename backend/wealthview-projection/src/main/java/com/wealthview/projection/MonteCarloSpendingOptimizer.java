@@ -212,6 +212,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         return new GuardrailProfileResponse(
                 null, null, "Optimized",
                 input.essentialFloor(), input.terminalBalanceTarget(),
+                // Degenerate zero-year run: nothing was simulated, so there is no resolved
+                // effective rate to echo — pass the raw request value (null when omitted, the
+                // normal case). GuardrailProfileService falls back to ZERO for the NOT NULL column.
                 input.returnMean(),
                 input.trialCount(), input.confidenceLevel(),
                 input.phases(), List.of(),

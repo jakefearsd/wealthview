@@ -9,6 +9,12 @@ package com.wealthview.projection;
  * the account owner's birth year via {@link RmdCalculator#rmdStartAge}) is carried here so both
  * {@link SustainabilitySearch} and {@link GuardrailResponseBuilder} build every
  * {@link TrialSimulator.SimulationConfig} from the same value.
+ *
+ * <p>{@code returnMean} is the RESOLVED effective growth assumption for the Roth-conversion
+ * simulator — a real, fee-adjusted rate produced once by
+ * {@link OptimizationContextBuilder#resolveReturnMean} (audit C4) and consumed by both
+ * {@link JointConversionSearch} (drives the {@code ConversionSimulator}) and
+ * {@link GuardrailResponseBuilder} (echoed on the response so users see the rate actually used).
  */
 record SimulationParameters(
         int retirementYear, int retirementAge, int endAge, int years,
@@ -17,5 +23,6 @@ record SimulationParameters(
         double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
         int rmdStartAge,
         double dividendYield,
-        double feeRate
+        double feeRate,
+        double returnMean
 ) {}

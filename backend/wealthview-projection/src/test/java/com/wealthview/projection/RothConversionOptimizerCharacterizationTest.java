@@ -31,11 +31,15 @@ import static org.mockito.Mockito.when;
  * tax falls from $339,016 to $293,276 — while the slower, constant-real drawdown leaves a small
  * traditional balance at the end age. These assertions are the contract the decomposition must preserve.
  *
- * <p><strong>Audit C4 golden regen (2026-07-12):</strong> this golden moved when {@code
- * ConversionSimulator.applyRmds} started crediting the after-tax RMD remainder to the taxable pool
- * instead of letting it vanish (the {@code returnMean} FRAME fix does not touch this fixture --
- * {@code .assumptions(0.06, ...)} is an explicit real rate passed directly to the builder,
- * bypassing {@code JointConversionSearch#resolveReturnMean} entirely). The RMD credit swells the
+ * <p><strong>Audit C4 golden regen (2026-07-12) — attribution: this fixture's movement is 100% the
+ * RMD-proceeds CREDIT; the frame fix contributes nothing here.</strong> The golden moved when
+ * {@code ConversionSimulator.applyRmds} started crediting the after-tax RMD remainder to the
+ * taxable pool instead of letting it vanish; the {@code returnMean} FRAME fix does not touch this
+ * fixture — {@code .assumptions(0.06, ...)} is an explicit real rate passed directly to the
+ * builder, bypassing {@code OptimizationContextBuilder#resolveReturnMean} entirely. (The mirror
+ * pin — frame fix isolated, credit structurally $0 — is
+ * {@code RothConversionAuditC4BiasDirectionTest}; together they give each C4 fix exactly one
+ * isolating regression pin.) The RMD credit swells the
  * baseline (no-conversion) arm's spendable taxable balance from RMD age onward, which lowers
  * {@code lifetimeTaxWithout} — so the tax-minimizing search now finds a SMALLER optimal conversion
  * fraction (1.0 -&gt; 0.6898) than before: converting is worth less when the alternative

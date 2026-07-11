@@ -7,6 +7,14 @@ import java.util.List;
 /**
  * All inputs the guardrail/Monte-Carlo spending optimizer needs for one run.
  *
+ * @param returnMean the request's OPTIONAL explicit growth-assumption override for the
+ *         Roth-conversion simulator, in NOMINAL terms (legacy wire contract), or {@code null} when
+ *         the request omits it — the normal case; the frontend never sends {@code return_mean}.
+ *         Audit C4: do NOT pre-fill a default here. The engine resolves the effective rate once
+ *         per run ({@code OptimizationContextBuilder.resolveReturnMean}): {@code null} derives the
+ *         scenario's fee-adjusted, allocation-blended REAL return; non-null is Fisher-converted to
+ *         real minus the scenario fee. Passing an already-real rate in this field would get
+ *         deflated a second time.
  * @param dividendYield the scenario's configured taxable-pool dividend yield
  *         ({@code params_json.dividend_yield}), or {@code null} when the scenario doesn't set one.
  *         The MC engine falls back to the same default the deterministic engine uses (see

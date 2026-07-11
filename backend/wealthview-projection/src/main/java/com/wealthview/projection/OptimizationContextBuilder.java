@@ -6,6 +6,7 @@ import java.util.Random;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -57,7 +58,7 @@ final class OptimizationContextBuilder {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0, 0),
+                            null, null, null, null, rmdStartAge, 0, 0, 0),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null));
         }
 
@@ -143,6 +144,7 @@ final class OptimizationContextBuilder {
                 capitalGainsTaxCalculator, taxCalculator, rentalAwareTaxableIncome, retirementYear, years,
                 filingStatus, inflationRate, input.birthYear());
         double dividendYield = resolveDividendYield(input);
+        double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
 
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
@@ -151,7 +153,7 @@ final class OptimizationContextBuilder {
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
-                        returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate),
+                        returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
@@ -254,6 +256,45 @@ final class OptimizationContextBuilder {
     private static double resolveFeeRate(GuardrailOptimizationInput input) {
         return input.feeRate() != null
                 ? input.feeRate().doubleValue() : ScenarioParamsParser.DEFAULT_FEE_RATE.doubleValue();
+    }
+
+    /**
+     * Resolves the growth assumption fed to {@code ConversionSimulator} (audit C4 — frame mismatch).
+     * Resolved HERE, once per run, so every consumer — {@link JointConversionSearch} (both the
+     * DS-mode Phase-1 schedule and the joint-search arm build their optimizer from it) and
+     * {@link GuardrailResponseBuilder} (response echo / persistence) — sees the identical value and
+     * no consumer can accidentally re-convert it (double-Fisher).
+     *
+     * <p>{@code ConversionSimulator} grows its three pools at this rate every year (see {@code
+     * traditional *= (1 + returnMean)}) while pricing conversion/RMD-target brackets in
+     * CONSTANT-REAL terms ({@code computeMaxIncomeForBracket(..., ZERO)} — no inflation indexing
+     * applied to the bracket ceilings). Those two numbers MUST live in the same frame: a real,
+     * fee-adjusted rate. Feeding it a nominal rate (or a real rate that ignores fees) overstates
+     * future traditional-balance growth relative to the flat bracket ceilings the simulator prices
+     * against, which overstates projected RMD pressure and biases the optimizer toward
+     * over-aggressive conversions.
+     *
+     * <p><strong>Default</strong> (the request's {@code returnMean} is absent — the normal case;
+     * the frontend never sends {@code return_mean}): the scenario's own fee-adjusted,
+     * allocation-blended REAL return — {@link PoolStrategy#blendedRealReturn}, the same
+     * balance-weighted quantity the deterministic engine resolves as its default growth
+     * assumption, computed here from this run's accounts and capital-market matrix so both
+     * engines' notion of "the scenario's expected return" stay in lockstep.
+     *
+     * <p><strong>Explicit</strong> {@code returnMean} (wire contract: NOMINAL, the DTO's legacy
+     * meaning): Fisher-converted to real via {@code (1+returnMean)/(1+inflation)-1}, then the
+     * scenario fee is subtracted — mirroring {@link PoolStrategy#realReturnFor}'s override-account
+     * handling, so an explicit override and the allocation-derived default land in the same frame.
+     */
+    static double resolveReturnMean(GuardrailOptimizationInput input, double inflationRate,
+                                    double feeRate, RealReturnMatrix matrix) {
+        if (input.returnMean() != null) {
+            double nominal = input.returnMean().doubleValue();
+            return (1 + nominal) / (1 + inflationRate) - 1 - feeRate;
+        }
+        var geoMeans = CapitalMarketAssumptionsProvider.geometricMeansOf(matrix);
+        return PoolStrategy.blendedRealReturn(input.accounts(), geoMeans,
+                BigDecimal.valueOf(inflationRate), BigDecimal.valueOf(feeRate)).doubleValue();
     }
 
     private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {

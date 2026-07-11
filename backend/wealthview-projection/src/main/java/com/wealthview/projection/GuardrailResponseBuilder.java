@@ -140,7 +140,11 @@ final class GuardrailResponseBuilder {
         return new GuardrailProfileResponse(
                 null, null, "Optimized",
                 input.essentialFloor(), input.terminalBalanceTarget(),
-                input.returnMean(),
+                // Audit C4: echo the RESOLVED effective REAL, fee-adjusted growth rate the
+                // conversion simulator actually used (OptimizationContextBuilder.resolveReturnMean)
+                // — not the raw request value, which is null for all frontend traffic and NOMINAL
+                // when explicitly supplied. Display-only wire field; also what gets persisted.
+                toBD(ctx.sim().returnMean()),
                 ctx.sim().trialCount(), input.confidenceLevel(),
                 input.phases(), yearlySpending,
                 toBD(medianFinal), toBD(failureRate), toBD(successProbability),

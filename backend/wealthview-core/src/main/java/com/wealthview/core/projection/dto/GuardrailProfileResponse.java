@@ -10,6 +10,17 @@ import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * Guardrail/MC optimization result returned to the API layer and persisted on the profile entity.
+ *
+ * @param returnMean the RESOLVED effective growth rate the Roth-conversion simulator actually used
+ *         — a REAL, fee-adjusted rate (audit C4; see
+ *         {@code OptimizationContextBuilder.resolveReturnMean}), NOT the request's nominal
+ *         {@code return_mean}. Display-only wire field ({@code return_mean}); deliberately echoed
+ *         in real terms so users see the rate that actually drove the schedule. Because the stored
+ *         value is real, it is never fed back into a request (whose contract is nominal) — see
+ *         {@code GuardrailProfileService.reoptimize}.
+ */
 public record GuardrailProfileResponse(
         UUID id,
         UUID scenarioId,
