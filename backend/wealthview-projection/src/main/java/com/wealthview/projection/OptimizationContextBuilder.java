@@ -128,7 +128,7 @@ final class OptimizationContextBuilder {
         //  - dividendYield is a global engine assumption (the guardrail request carries no field).
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
         double[] ltcgRateByYear = LtcgRateCalculator.compute(
-                capitalGainsTaxCalculator, rentalAwareTaxableIncome, retirementYear, years,
+                capitalGainsTaxCalculator, taxCalculator, rentalAwareTaxableIncome, retirementYear, years,
                 filingStatus, inflationRate);
         double dividendYield = ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD.doubleValue();
 

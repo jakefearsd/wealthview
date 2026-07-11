@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 
 /**
@@ -16,6 +17,13 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * <p>Real-terms projection: the LTCG brackets are constant real (IRS-indexed) and the NIIT threshold
  * is fixed-nominal, deflated by {@code (1+inflationRate)^yearsFromBase} inside the calculator — the
  * same treatment the deterministic {@code PoolStrategy.MultiPool} path uses.
+ *
+ * <p>The STACKING FLOOR passed to {@link CapitalGainsTaxCalculator#computeLtcgTax} is netted by the
+ * year's standard deduction (via {@link FederalTaxCalculator#loadStandardDeduction}) before the probe
+ * gain is stacked on it, mirroring {@code PoolStrategy.MultiPool}'s {@code computeLtcgTax} /
+ * {@code resolveOrdinaryDeduction} fix -- {@code ordinaryIncomeByYear} here is gross (pre-deduction)
+ * taxable income, and stacking the probe on the gross figure overstates the marginal LTCG rate by one
+ * full standard deduction at bracket boundaries. MAGI stays GROSS (MAGI is not deduction-reduced).
  */
 final class LtcgRateCalculator {
 
@@ -26,6 +34,7 @@ final class LtcgRateCalculator {
     }
 
     static double[] compute(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                            @Nullable FederalTaxCalculator federalTaxCalculator,
                             double[] ordinaryIncomeByYear, int retirementYear, int years,
                             FilingStatus filingStatus, double inflationRate) {
         double[] rates = new double[years];
@@ -37,11 +46,13 @@ final class LtcgRateCalculator {
         for (int y = 0; y < years; y++) {
             int taxYear = retirementYear + y;
             double ordinary = Math.max(0, ordinaryIncomeByYear[y]);
-            BigDecimal ordinaryBd = BigDecimal.valueOf(ordinary);
-            // MAGI ≈ ordinary + the probe gain, for the NIIT threshold comparison.
+            // MAGI ≈ ordinary + the probe gain, for the NIIT threshold comparison (NOT deduction-netted).
             BigDecimal magi = BigDecimal.valueOf(ordinary + PROBE_GAIN);
+            double deduction = federalTaxCalculator != null
+                    ? federalTaxCalculator.loadStandardDeduction(taxYear, filingStatus).doubleValue() : 0.0;
+            BigDecimal ordinaryForLtcg = BigDecimal.valueOf(Math.max(0, ordinary - deduction));
             double tax = capitalGainsTaxCalculator.computeLtcgTax(
-                    ordinaryBd, probe, taxYear, filingStatus, y, inflation, magi).doubleValue();
+                    ordinaryForLtcg, probe, taxYear, filingStatus, y, inflation, magi).doubleValue();
             rates[y] = tax / PROBE_GAIN;
         }
         return rates;
