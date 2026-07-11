@@ -17,6 +17,7 @@ import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealRetur
 import com.wealthview.core.projection.SpendingOptimizer;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -56,26 +57,28 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      */
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         RealReturnMatrix matrix) {
-        this(taxCalculator, null, matrix, null);
+        this(taxCalculator, null, matrix, null, null);
     }
 
     @Autowired
     public MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         CapitalMarketAssumptionsProvider capitalMarketAssumptions,
-                                        @Nullable MeterRegistry meterRegistry) {
-        this(taxCalculator, capitalMarketAssumptions, null, meterRegistry);
+                                        @Nullable MeterRegistry meterRegistry,
+                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
+        this(taxCalculator, capitalMarketAssumptions, null, meterRegistry, capitalGainsTaxCalculator);
     }
 
     private MonteCarloSpendingOptimizer(@Nullable FederalTaxCalculator taxCalculator,
                                         @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions,
                                         @Nullable RealReturnMatrix presetMatrix,
-                                        @Nullable MeterRegistry meterRegistry) {
+                                        @Nullable MeterRegistry meterRegistry,
+                                        @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
         this.taxCalculator = taxCalculator;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
         this.presetMatrix = presetMatrix;
         this.meterRegistry = meterRegistry;
         this.jointConversionSearch = new JointConversionSearch(taxCalculator, sustainabilitySearch);
-        this.contextBuilder = new OptimizationContextBuilder(taxCalculator);
+        this.contextBuilder = new OptimizationContextBuilder(taxCalculator, capitalGainsTaxCalculator);
     }
 
     /** Resolves the capital-market matrix — a preset (tests) or the provider's cached matrix (prod). */
@@ -187,7 +190,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ctx.sim().inflationRate(), ctx.taxIncome().taxCtx(),
                 conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear(),
                 ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
-                ctx.sim().rmdStartAge());
+                ctx.sim().rmdStartAge(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                ctx.sim().dividendYield());
     }
 
     /**

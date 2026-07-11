@@ -8,9 +8,17 @@ final class TaxableLots {
 
     private final Deque<double[]> lots = new ArrayDeque<>();
 
+    /** Adds a lot purchased at cost — basis equals value, so it carries no embedded gain. */
     void addLot(double amount) {
         if (amount > 0) {
             lots.addLast(new double[]{amount, amount});
+        }
+    }
+
+    /** Seeds a lot with an explicit basis and value; {@code value} may carry an embedded gain. */
+    void addLot(double basis, double value) {
+        if (value > 0) {
+            lots.addLast(new double[]{Math.max(0, basis), value});
         }
     }
 

@@ -9,6 +9,7 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 
@@ -23,9 +24,18 @@ final class OptimizationContextBuilder {
 
     @Nullable
     private final FederalTaxCalculator taxCalculator;
+    @Nullable
+    private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
 
+    /** Convenience constructor without a capital-gains calculator (taxable pool realizes no LTCG tax). */
     OptimizationContextBuilder(@Nullable FederalTaxCalculator taxCalculator) {
+        this(taxCalculator, null);
+    }
+
+    OptimizationContextBuilder(@Nullable FederalTaxCalculator taxCalculator,
+                               @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
         this.taxCalculator = taxCalculator;
+        this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
     }
 
     /** Pre-computed per-year income and tax arrays for the optimization run. */
@@ -41,10 +51,10 @@ final class OptimizationContextBuilder {
 
         if (years <= 0) {
             return new OptimizationSetup(
-                    new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0),
+                    new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge),
-                    new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null));
+                            null, null, null, null, rmdStartAge, 0),
+                    new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null));
         }
 
         int trialCount = input.trialCount();
@@ -112,19 +122,29 @@ final class OptimizationContextBuilder {
         double portfolioFloor = input.portfolioFloor() != null
                 ? input.portfolioFloor().doubleValue() : 0.0;
 
+        // Capital-gains taxation inputs for the taxable pool's FIFO lots (Task 6):
+        //  - initTaxableBasis seeds the initial lot's cost basis (embedded gain = balance - basis);
+        //  - ltcgRateByYear is the per-year marginal LTCG rate probed from the year's ordinary income;
+        //  - dividendYield is a global engine assumption (the guardrail request carries no field).
+        double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
+        double[] ltcgRateByYear = LtcgRateCalculator.compute(
+                capitalGainsTaxCalculator, rentalAwareTaxableIncome, retirementYear, years,
+                filingStatus, inflationRate);
+        double dividendYield = ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD.doubleValue();
+
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
                         initialPortfolio, withdrawalOrder, cashReserveYears, cashReturnRate,
-                        terminalTarget, portfolioFloor),
+                        terminalTarget, portfolioFloor, initTaxableBasis),
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
-                        returnPaths.rothReturns(), rmdStartAge),
+                        returnPaths.rothReturns(), rmdStartAge, dividendYield),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, marginalRates,
-                        taxCtx, dsBracketCeilingByYear));
+                        taxCtx, dsBracketCeilingByYear, ltcgRateByYear));
     }
 
     private IncomeArrays computeIncomeArrays(IncomeYearData[] incomeData, int years,
@@ -167,6 +187,13 @@ final class OptimizationContextBuilder {
         return accounts.stream()
                 .filter(a -> type.equals(a.accountType()))
                 .mapToDouble(a -> a.initialBalance().doubleValue())
+                .sum();
+    }
+
+    private static double sumBasisByType(List<? extends ProjectionAccountInput> accounts, String type) {
+        return accounts.stream()
+                .filter(a -> type.equals(a.accountType()))
+                .mapToDouble(a -> a.costBasis().doubleValue())
                 .sum();
     }
 

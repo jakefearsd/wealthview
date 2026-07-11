@@ -5,5 +5,6 @@ record PortfolioSetup(
         double initTaxable, double initTraditional, double initRoth,
         double initialPortfolio, String withdrawalOrder,
         int cashReserveYears, double cashReturnRate,
-        double terminalTarget, double portfolioFloor
+        double terminalTarget, double portfolioFloor,
+        double initTaxableBasis
 ) {}

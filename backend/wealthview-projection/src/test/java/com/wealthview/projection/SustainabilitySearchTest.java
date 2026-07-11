@@ -42,7 +42,8 @@ class SustainabilitySearchTest {
                 0, 0.0, 0.0,
                 null, null, null,
                 null,
-                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE);
+                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
+                0.0, null, 0.0);
     }
 
     private static double[] bracketingFloors() {

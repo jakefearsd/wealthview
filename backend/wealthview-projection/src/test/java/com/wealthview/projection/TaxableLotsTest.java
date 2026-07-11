@@ -31,6 +31,17 @@ class TaxableLotsTest {
     }
 
     @Test
+    void addLot_withExplicitBasisAndValue_carriesEmbeddedGain() {
+        var lots = new TaxableLots();
+        lots.addLot(600, 1000);   // seed a lot worth 1000 with a 600 cost basis (400 embedded gain)
+
+        assertThat(lots.totalValue()).isEqualTo(1000.0, within(1e-9));
+        assertThat(lots.totalBasis()).isEqualTo(600.0, within(1e-9));
+        // Selling the whole lot realizes exactly the embedded gain.
+        assertThat(lots.sellFifo(1000)).isEqualTo(400.0, within(1e-9));
+    }
+
+    @Test
     void grow_appreciatesValueNotBasis() {
         var lots = new TaxableLots();
         lots.addLot(1000);

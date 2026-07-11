@@ -189,7 +189,9 @@ final class JointConversionSearch {
                 ctx.sim().inflationRate(), searchTaxCtx, conversionByYear, conversionTaxByYear,
                 ctx.taxIncome().dsBracketCeilingByYear(),
                 searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
-                ctx.sim().rmdStartAge());
+                ctx.sim().rmdStartAge(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                ctx.sim().dividendYield());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

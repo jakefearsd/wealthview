@@ -22,7 +22,8 @@ class TrialSimulatorReturnTest {
                 initTaxable, initTraditional, initRoth,
                 "taxable_first", null, null, null, 62, null,
                 cashReserveYears, 0.0, false,
-                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE);
+                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
+                initTaxable, null, 0.0);
     }
 
     @Test
@@ -75,7 +76,8 @@ class TrialSimulatorReturnTest {
         var config = new TrialSimulator.SimulationConfig(
                 100.0, 0.0, 0.0, "taxable_first", null,
                 null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE);
+                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
+                100.0, null, 0.0);
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {80.0, 80.0};        // year 2 floor (80) unfundable: only ~20 left
@@ -93,7 +95,8 @@ class TrialSimulatorReturnTest {
         var config = new TrialSimulator.SimulationConfig(
                 1000.0, 0.0, 0.0, "taxable_first", null,
                 null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE);
+                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
+                1000.0, null, 0.0);
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {50.0, 50.0};
@@ -102,6 +105,42 @@ class TrialSimulatorReturnTest {
         var result = sim.simulateTrial(income, zero, floors, discretionary, 2, config);
 
         assertThat(result.success()).isTrue();
+    }
+
+    @Test
+    void simulateTrial_taxableWithdrawalWithEmbeddedGain_realizesLtcgTax() {
+        // 1 year, no growth, no cash reserve, no income. Taxable pool worth 1000 with a 600 basis
+        // (40% embedded gain). Spend 500 -> a FIFO half-lot sale realizes gain 500 - 600*(500/1000)
+        // = 200. LTCG rate 0.15 -> tax 30, paid taxable-first. Final = (1000 - 500) - 30 = 470
+        // (vs 500 with no LTCG tax: the 30 is exactly the extra cash the capital-gains tax removes).
+        double[] flatNoReturn = {0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                1000.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 62, null, 0, 0.0, false,
+                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
+                600.0, new double[]{0.15}, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{500}, new double[]{0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(470.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_dividendYield_drainsQualifiedDividendTax() {
+        // 1 year, taxable +10%, dividend yield 2%, no withdrawal. The pool still grows to 1100
+        // (dividend booked as residual), but the 2% dividend (20) is qualified-dividend income taxed
+        // at the 0.15 LTCG rate -> 3 leaves the portfolio. Final = 1100 - 3 = 1097 (dividend drag).
+        var config = new TrialSimulator.SimulationConfig(
+                1000.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 62, null, 0, 0.0, false,
+                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                1000.0, new double[]{0.15}, 0.02);
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(1097.0, within(1e-6));
     }
 
     @Test
@@ -117,7 +156,8 @@ class TrialSimulatorReturnTest {
         var config = new TrialSimulator.SimulationConfig(
                 0.0, 100_000.0, 0.0, "taxable_first", new double[]{0.20},
                 null, null, 75, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, 75);
+                flatNoReturn, flatNoReturn, flatNoReturn, 75,
+                0.0, null, 0.0);
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);

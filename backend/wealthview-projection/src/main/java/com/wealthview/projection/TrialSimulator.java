@@ -44,7 +44,8 @@ final class TrialSimulator {
             int cashReserveYears, double cashReturnRate,
             boolean trackYearBalances,
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-            int rmdStartAge
+            int rmdStartAge,
+            double initTaxableBasis, double[] ltcgRateByYear, double dividendYield
     ) {}
 
     /**
@@ -75,25 +76,18 @@ final class TrialSimulator {
 
         // pools[0] = taxable, pools[1] = traditional, pools[2] = roth
         double[] pools = { config.initTaxable(), config.initTraditional(), config.initRoth() };
+        // Basis-aware taxable pool (Task 6): a parallel FIFO-lot view kept in lock-step with the
+        // pools[0] scalar (invariant lots.totalValue() == pools[0]). The scalar remains the value
+        // source-of-truth for the intricate cash-reserve/min/final arithmetic; the lots supply only
+        // the dividend split and the realized FIFO gain that drive the annual LTCG tax outflow. The
+        // initial lot carries the taxable pool's embedded (unrealized) gain: value − basis.
+        TaxableLots lots = new TaxableLots();
+        lots.addLot(config.initTaxableBasis(), config.initTaxable());
         // Resolve the withdrawal order once per trial (constant for the run) so the
         // per-year splitWithdrawal calls do no String.equals work.
         WithdrawalOrder order = WithdrawalOrder.fromString(config.withdrawalOrder());
 
-        double cashBalance = 0;
-        if (config.cashReserveYears() > 0) {
-            double annualSpending = floors[0] + discretionary[0];
-            cashBalance = annualSpending * config.cashReserveYears();
-            double cashFromTaxable = Math.min(cashBalance, pools[0]);
-            pools[0] -= cashFromTaxable;
-            double remaining = cashBalance - cashFromTaxable;
-            if (remaining > 0) {
-                double fromTrad = Math.min(remaining, pools[1]);
-                pools[1] -= fromTrad;
-                remaining -= fromTrad;
-                pools[2] -= remaining;
-                pools[2] = Math.max(0, pools[2]);
-            }
-        }
+        double cashBalance = seedCashReserve(pools, lots, floors, discretionary, config);
 
         double minBalance = pools[0] + pools[1] + pools[2] + cashBalance;
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
@@ -118,7 +112,8 @@ final class TrialSimulator {
             // before this year's growth is applied.
             double pools1PreGrowth = pools[1];
 
-            pools[0] *= (1 + taxableReturn);
+            double dividendIncome = growTaxableWithDividend(
+                    pools, lots, taxableReturn, config.dividendYield());
             pools[1] *= (1 + traditionalReturn);
             pools[2] *= (1 + rothReturn);
             cashBalance *= (1 + config.cashReturnRate());
@@ -127,7 +122,7 @@ final class TrialSimulator {
             double rmd = computeYearRmd(pools1PreGrowth, age, config.rmdStartAge());
 
             // Roth conversion execution
-            applyTrialConversion(pools, config.conversionByYear(), config.conversionTaxByYear(), y, age);
+            applyTrialConversion(pools, lots, config.conversionByYear(), config.conversionTaxByYear(), y, age);
 
             double spending = floors[y] + discretionary[y];
             double withdrawal = Math.max(0, spending - income[y]);
@@ -149,28 +144,38 @@ final class TrialSimulator {
                         drawn.traditional(), config.marginalRateByYear()[y]);
             }
 
-            // Withdraw from pools + handle cash reserve
+            // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
+            // long-term gain (accumulated into realizedGainOut[0]); secondary taxable sales — the
+            // withdrawal-tax payment and cash-reserve replenishment — sell FIFO to keep the lots in
+            // sync but their gain is deliberately discarded (untaxed), matching the deterministic
+            // MultiPool's second-order exclusion.
             double cashBeforeWithdrawals = cashBalance;
-            cashBalance = applyTrialWithdrawals(pools, cashBalance, drawn, withdrawalTax,
-                    withdrawal, spending, hasPools, config.cashReserveYears(), portfolioReturn);
+            double[] realizedGainOut = {0.0};
+            cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, cashBalance, drawn,
+                    withdrawalTax, withdrawal, spending, hasPools, config.cashReserveYears(),
+                    portfolioReturn);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
             // If the RMD exceeds what the spend withdrawal already drew from traditional, force
             // the excess out physically -- it's a real, legally-required distribution even when
             // the retiree doesn't need the cash. The after-tax remainder is reinvested to taxable.
             double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
-            forceRmdExcess(pools, rmd, drawn.traditional(), marginalRate);
+            forceRmdExcess(pools, lots, rmd, drawn.traditional(), marginalRate);
 
             double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
             if (resourcesForSpending < floors[y] - 1e-6) {
                 essentialFloorMet = false;
             }
 
-            // Surplus: income exceeds spending — deposit after-tax surplus to taxable
+            // Surplus: income exceeds spending — deposit after-tax surplus to taxable (at cost).
             if (income[y] > spending) {
                 double grossSurplus = income[y] - spending;
-                pools[0] += Math.max(0, grossSurplus - surplusTax[y]);
+                double netSurplus = Math.max(0, grossSurplus - surplusTax[y]);
+                pools[0] += netSurplus;
+                lots.addLot(netSurplus);
             }
+
+            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, config.ltcgRateByYear(), y);
 
             pools[0] = Math.max(0, pools[0]);
             pools[1] = Math.max(0, pools[1]);
@@ -194,14 +199,78 @@ final class TrialSimulator {
      * Deducts a tax amount from pools in order: taxable, traditional, roth.
      * Mutates the pools array in place via the shared {@link PoolTaxCascade}.
      */
-    // UseVarargs: `pools` is a fixed-length [taxable, traditional, roth] index array mutated in
-    // place, not a variable argument list — varargs would obscure the positional contract.
-    @SuppressWarnings("PMD.UseVarargs")
-    private static void deductTaxFromPools(double tax, double[] pools) {
+    private static void deductTaxFromPools(double tax, double[] pools, TaxableLots lots) {
+        double taxableBefore = pools[0];
         double[] after = PoolTaxCascade.deduct(tax, pools[0], pools[1], pools[2]);
         pools[0] = after[0];
         pools[1] = after[1];
         pools[2] = after[2];
+        // Mirror the taxable-first tax sale on the lots to preserve the value invariant; the gain it
+        // realizes is a second-order tax-payment sale, deliberately left untaxed (no tax-on-tax).
+        double taxableSold = taxableBefore - after[0];
+        if (taxableSold > 0) {
+            lots.sellFifo(taxableSold);
+        }
+    }
+
+    /**
+     * Seeds the cash-reserve bucket from the first year's spending, drawing it out of the pools in
+     * order (taxable, traditional, roth). The taxable draw is mirrored on the lots to keep the value
+     * invariant; its gain is a pre-retirement carve-out left untaxed. Returns the initial cash
+     * balance (0 when no cash reserve is configured).
+     */
+    private static double seedCashReserve(double[] pools, TaxableLots lots,
+                                           double[] floors, double[] discretionary,
+                                           SimulationConfig config) {
+        if (config.cashReserveYears() <= 0) {
+            return 0;
+        }
+        double annualSpending = floors[0] + discretionary[0];
+        double cashBalance = annualSpending * config.cashReserveYears();
+        double cashFromTaxable = Math.min(cashBalance, pools[0]);
+        pools[0] -= cashFromTaxable;
+        lots.sellFifo(cashFromTaxable);
+        double remaining = cashBalance - cashFromTaxable;
+        if (remaining > 0) {
+            double fromTrad = Math.min(remaining, pools[1]);
+            pools[1] -= fromTrad;
+            remaining -= fromTrad;
+            pools[2] -= remaining;
+            pools[2] = Math.max(0, pools[2]);
+        }
+        return cashBalance;
+    }
+
+    /**
+     * Grows the taxable pool by {@code taxableReturn}: the existing lots appreciate at
+     * {@code (taxableReturn − dividendYield)} and the dividend is reinvested as a fresh at-cost lot,
+     * booked as the residual to the exact post-growth scalar so {@code pools[0]} still grows at
+     * precisely {@code taxableReturn} (bit-identical to the pre-lots path when the yield is 0).
+     * Returns this year's qualified-dividend income (taxed as LTCG in {@link #applyLtcgTax}).
+     */
+    private static double growTaxableWithDividend(double[] pools, TaxableLots lots,
+                                                   double taxableReturn, double dividendYield) {
+        pools[0] *= (1 + taxableReturn);
+        lots.grow(taxableReturn - dividendYield);
+        double dividendIncome = Math.max(0, pools[0] - lots.totalValue());
+        lots.addLot(dividendIncome);
+        return dividendIncome;
+    }
+
+    /**
+     * Applies the long-term capital-gains tax on this year's realized spending gain plus qualified
+     * dividend, at the pre-computed marginal LTCG rate for the year. Like the RMD/withdrawal tax it
+     * is an additional outflow drained taxable-first from the pools (retirement-scoped; the MC path
+     * is retirement-only). A {@code null} rate array (no capital-gains calculator wired) or a
+     * non-positive net LTCG income leaves the pools untouched.
+     */
+    private static void applyLtcgTax(double[] pools, TaxableLots lots, double realizedGain,
+                                      double dividendIncome, double[] ltcgRateByYear, int y) {
+        double ltcgRate = ltcgRateByYear != null ? ltcgRateByYear[y] : 0.0;
+        double ltcgIncome = realizedGain + dividendIncome;
+        if (ltcgRate > 0 && ltcgIncome > 0) {
+            deductTaxFromPools(ltcgIncome * ltcgRate, pools, lots);
+        }
     }
 
     /**
@@ -224,8 +293,8 @@ final class TrialSimulator {
      * doesn't need the cash for spending. The after-tax remainder is reinvested to taxable; the
      * tax on the forced distribution leaves the portfolio entirely (it is not itself reinvested).
      */
-    private static void forceRmdExcess(double[] pools, double rmd, double traditionalDrawnForSpending,
-                                        double marginalRate) {
+    private static void forceRmdExcess(double[] pools, TaxableLots lots, double rmd,
+                                        double traditionalDrawnForSpending, double marginalRate) {
         if (rmd <= 0) {
             return;
         }
@@ -234,7 +303,9 @@ final class TrialSimulator {
         if (extra > 0) {
             pools[1] -= extra;
             double taxExtra = extra * marginalRate;
-            pools[0] += extra - taxExtra;
+            double reinvested = extra - taxExtra;
+            pools[0] += reinvested;
+            lots.addLot(reinvested);   // after-tax RMD reinvested to taxable at cost
         }
     }
 
@@ -242,7 +313,7 @@ final class TrialSimulator {
      * Executes a Roth conversion for this trial year: transfers from traditional to roth,
      * then deducts conversion tax from pools.
      */
-    private static void applyTrialConversion(double[] pools, double[] conversionByYear,
+    private static void applyTrialConversion(double[] pools, TaxableLots lots, double[] conversionByYear,
                                               double[] conversionTaxByYear, int y, int age) {
         if (conversionByYear == null || conversionByYear[y] <= 0 || pools[1] <= 0) {
             return;
@@ -254,9 +325,11 @@ final class TrialSimulator {
                 ? conversionTaxByYear[y] * (actualConv / conversionByYear[y])
                 : conversionTaxByYear[y];
         if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
-            pools[0] -= Math.min(actualTax, Math.max(0, pools[0]));
+            double taxPaid = Math.min(actualTax, Math.max(0, pools[0]));
+            pools[0] -= taxPaid;
+            lots.sellFifo(taxPaid);   // conversion-tax sale synced; gain untaxed (second-order)
         } else {
-            deductTaxFromPools(actualTax, pools);
+            deductTaxFromPools(actualTax, pools, lots);
         }
     }
 
@@ -264,7 +337,8 @@ final class TrialSimulator {
      * Deducts withdrawals and tax from pools, handling cash reserve logic.
      * Returns updated cash balance.
      */
-    private static double applyTrialWithdrawals(double[] pools, double cashBalance,
+    private static double applyTrialWithdrawals(double[] pools, TaxableLots lots, double[] realizedGainOut,
+                                                 double cashBalance,
                                                  PoolWithdrawal drawn, double withdrawalTax,
                                                  double withdrawal, double spending,
                                                  boolean hasPools, int cashReserveYears,
@@ -279,13 +353,20 @@ final class TrialSimulator {
                     double drawnTotal = drawn.total();
                     if (drawnTotal > 0 && equityDraw > 0) {
                         double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                        pools[0] -= drawn.taxable() * scale
-                                + withdrawalTax * Math.min(pools[0], withdrawalTax)
+                        // The scaled equity draw bundles a taxable SPENDING sale and a taxable
+                        // TAX-payment sale in one scalar subtraction; only the spending part realizes
+                        // taxed gain, the tax part is synced but its gain discarded (second-order).
+                        double spendingSale = drawn.taxable() * scale;
+                        double taxSale = withdrawalTax * Math.min(pools[0], withdrawalTax)
                                 / Math.max(1, pools[0] + pools[1] + pools[2]);
+                        pools[0] -= spendingSale + taxSale;
+                        realizedGainOut[0] += lots.sellFifo(spendingSale);
+                        lots.sellFifo(taxSale);
                     } else {
                         pools[0] -= drawn.taxable();
                         pools[1] -= drawn.traditional();
                         pools[2] -= drawn.roth();
+                        realizedGainOut[0] += lots.sellFifo(drawn.taxable());
                     }
                     return cashBalance - cashDraw;
                 } else {
@@ -295,19 +376,22 @@ final class TrialSimulator {
                     double drawnTotal = drawn.total();
                     if (drawnTotal > 0 && equityDraw > 0) {
                         double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                        pools[0] -= drawn.taxable() * scale;
+                        double spendingSale = drawn.taxable() * scale;
+                        pools[0] -= spendingSale;
                         pools[1] -= drawn.traditional() * scale;
                         pools[2] -= drawn.roth() * scale;
+                        realizedGainOut[0] += lots.sellFifo(spendingSale);
                     }
                     return cashBalance - cashDraw;
                 }
             } else {
                 // Up market: normal withdrawal + replenish cash
                 pools[0] -= drawn.taxable();
+                realizedGainOut[0] += lots.sellFifo(drawn.taxable());
                 pools[1] -= drawn.traditional();
                 pools[2] -= drawn.roth();
                 if (hasPools) {
-                    deductTaxFromPools(withdrawalTax, pools);
+                    deductTaxFromPools(withdrawalTax, pools, lots);
                 }
                 double targetCash = spending * cashReserveYears;
                 double replenishment = Math.min(
@@ -315,6 +399,7 @@ final class TrialSimulator {
                         Math.max(0, pools[0] + pools[1] + pools[2])
                                 * CASH_REPLENISHMENT_RATE);
                 pools[0] -= replenishment;
+                lots.sellFifo(replenishment);   // taxable→cash reserve churn; gain untaxed (second-order)
                 if (pools[0] < 0) {
                     pools[1] += pools[0];
                     pools[0] = 0;
@@ -324,10 +409,11 @@ final class TrialSimulator {
         } else {
             // No cash reserve
             pools[0] -= drawn.taxable();
+            realizedGainOut[0] += lots.sellFifo(drawn.taxable());
             pools[1] -= drawn.traditional();
             pools[2] -= drawn.roth();
             if (hasPools) {
-                deductTaxFromPools(withdrawalTax, pools);
+                deductTaxFromPools(withdrawalTax, pools, lots);
             }
             return cashBalance;
         }

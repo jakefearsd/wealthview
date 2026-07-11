@@ -87,7 +87,9 @@ final class GuardrailResponseBuilder {
                     ctx.taxIncome().dsBracketCeilingByYear(),
                     ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
                     taxableReturns[t], traditionalReturns[t], rothReturns[t],
-                    ctx.sim().rmdStartAge());
+                    ctx.sim().rmdStartAge(),
+                    ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                    ctx.sim().dividendYield());
 
             var result = trialSimulator.simulateTrial(
                     ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),

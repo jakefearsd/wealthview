@@ -8,5 +8,6 @@ record TaxIncomeContext(
         double[] incomeByYear, double[] taxableIncomeByYear, double[] surplusTaxByYear,
         IncomeYearData[] incomeData, double[] rentalAwareTaxableIncome,
         double[] adjustedFloors, double[] marginalRates, TaxContext taxCtx,
-        double[] dsBracketCeilingByYear
+        double[] dsBracketCeilingByYear,
+        double[] ltcgRateByYear
 ) {}
