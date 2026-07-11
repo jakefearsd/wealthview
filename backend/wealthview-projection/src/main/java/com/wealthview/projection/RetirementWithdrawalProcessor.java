@@ -51,7 +51,8 @@ final class RetirementWithdrawalProcessor {
             BigDecimal withdrawalFromTraditional,
             BigDecimal withdrawalFromRoth,
             PoolStrategy.TaxSourceResult withdrawalTaxSource,
-            BigDecimal ltcgTax) {
+            BigDecimal ltcgTax,
+            BigDecimal realizedLtcgIncome) {
     }
 
     RetirementWithdrawalResult process(RetirementWithdrawalContext rwCtx) {
@@ -152,6 +153,7 @@ final class RetirementWithdrawalProcessor {
         return new RetirementWithdrawalResult(withdrawalResult.totalWithdrawn(), taxLiability,
                 previousWithdrawal, surplusReinvested,
                 withdrawalResult.fromTaxable(), withdrawalResult.fromTraditional(),
-                withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax());
+                withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax(),
+                withdrawalResult.realizedLtcgIncome());
     }
 }

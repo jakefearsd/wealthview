@@ -70,6 +70,26 @@ class IncomeSourceProcessor {
             List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
             BigDecimal scenarioInflationRate, int baseYear) {
+        return process(sources, age, yearsInRetirement, taxYear, magi, filingStatus,
+                priorSuspendedLoss, scenarioInflationRate, baseYear, BigDecimal.ZERO);
+    }
+
+    /**
+     * Processes income sources for one projection year.
+     *
+     * @param additionalProvisionalIncome ordinary income realized elsewhere this year (traditional
+     *     withdrawals + RMD excess + Roth conversion + realized LTCG/dividends) that belongs in the
+     *     Social Security provisional-income base (audit B2). The deterministic engine converges this
+     *     to the actual realized portfolio income across a two-pass fixed-point loop; callers that
+     *     don't participate pass {@link BigDecimal#ZERO} (the 9-arg overload), preserving prior
+     *     behavior. All Social Security sources are aggregated into ONE combined provisional-income
+     *     computation, so MFJ spousal half-benefits are summed rather than evaluated per source
+     *     (audit T3-1).
+     */
+    IncomeSourceYearResult process(
+            List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
+            int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
+            BigDecimal scenarioInflationRate, int baseYear, BigDecimal additionalProvisionalIncome) {
 
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
@@ -109,6 +129,20 @@ class IncomeSourceProcessor {
             }
         }
 
+        // Combined Social Security taxability (audit B2 / T3-1): ALL Social Security sources share
+        // ONE provisional-income computation. Provisional = non-SS income + static other income +
+        // portfolio ordinary income realized this year (additionalProvisionalIncome) + 50% of the
+        // AGGREGATED benefit -- so MFJ spousal benefits combine and portfolio withdrawals/RMDs/
+        // conversions/gains drag SS into taxation.
+        BigDecimal combinedSsTaxable = ssBenefit.compareTo(BigDecimal.ZERO) > 0
+                ? ssTaxCalculator.computeTaxableAmount(
+                        ssBenefit,
+                        nonSSIncome.add(magi).add(additionalProvisionalIncome),
+                        filingStatus.value(),
+                        Math.max(0, taxYear - baseYear),
+                        scenarioInflationRate)
+                : BigDecimal.ZERO;
+
         for (var source : sources) {
             if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                 continue;
@@ -121,8 +155,7 @@ class IncomeSourceProcessor {
             String sourceKey = source.id().toString();
             var result = switch (source.incomeType()) {
                 case RENTAL_PROPERTY -> processRentalIncome(source, amount, taxYear, magi, suspendedLoss, multiplier);
-                case SOCIAL_SECURITY -> processSocialSecurityIncome(amount, nonSSIncome, magi, filingStatus,
-                        taxYear - baseYear, scenarioInflationRate);
+                case SOCIAL_SECURITY -> processSocialSecurityIncome(amount);
                 case PART_TIME_WORK  -> processEmploymentIncome(source, amount, taxYear);
                 default              -> processDefaultIncome(source, amount);
             };
@@ -145,12 +178,15 @@ class IncomeSourceProcessor {
                         r.lossApplied(), r.newSuspendedLoss(),
                         r.newSuspendedLoss(),
                         r.cashInflow()));
-            } else if (result instanceof SocialSecurityResult r) {
-                ssTaxable = ssTaxable.add(r.ssTaxable());
             } else if (result instanceof EmploymentResult r) {
                 seTax = seTax.add(r.seTax());
             }
         }
+
+        // Social Security taxable income is the single combined figure, added once (its per-source
+        // cash inflow was already folded into totalCashInflow / incomeBySource in the loop above).
+        totalTaxableIncome = totalTaxableIncome.add(combinedSsTaxable);
+        ssTaxable = combinedSsTaxable;
 
         return new IncomeSourceYearResult(
                 totalCashInflow, totalTaxableIncome,
@@ -170,7 +206,7 @@ class IncomeSourceProcessor {
     }
 
     private record SocialSecurityResult(
-            BigDecimal cashInflow, BigDecimal taxableIncome, BigDecimal ssTaxable)
+            BigDecimal cashInflow, BigDecimal taxableIncome)
             implements IncomeTypeResult {
     }
 
@@ -229,18 +265,13 @@ class IncomeSourceProcessor {
                 nominal, scaledMortInt, scaledPropTax, scaledOpExp);
     }
 
-    private SocialSecurityResult processSocialSecurityIncome(
-            BigDecimal benefit,
-            BigDecimal nonSSIncome, BigDecimal magi, FilingStatus filingStatus,
-            int yearsFromBase, BigDecimal scenarioInflationRate) {
-
-        var taxableAmount = ssTaxCalculator.computeTaxableAmount(
-                benefit,
-                nonSSIncome.add(magi),
-                filingStatus.value(),
-                Math.max(0, yearsFromBase),
-                scenarioInflationRate);
-        return new SocialSecurityResult(benefit, taxableAmount, taxableAmount);
+    /**
+     * A Social Security source contributes its benefit as CASH inflow only; the taxable portion is
+     * computed once for all Social Security sources combined (see {@code process}), so per-source
+     * taxable income is zero here to avoid double-counting.
+     */
+    private SocialSecurityResult processSocialSecurityIncome(BigDecimal benefit) {
+        return new SocialSecurityResult(benefit, BigDecimal.ZERO);
     }
 
     private EmploymentResult processEmploymentIncome(

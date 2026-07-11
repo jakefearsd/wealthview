@@ -639,14 +639,17 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         int retireAge = 66;
         int birthYear = LocalDate.now().getYear() - retireAge;
 
-        // SS $40K + other_income $30K → provisional = $30K + $20K(50% SS) = $50K > $34K
-        // Both tiers: tier1 = ($34K-$25K)*0.5 = $4,500, tier2 = ($50K-$34K)*0.85 = $13,600
-        // SS taxable = $18,100 (< 85% cap of $34K)
-        // effectiveOtherIncome = $30K (other_income) + $18,100 (SS taxable) = $48,100
+        // SS $40K + other_income $30K. The $100K taxable pool books a qualified dividend this year of
+        // 100,000 * 0.018 (default dividend yield) = $1,800 (audit B2: dividends are AGI, so they enter
+        // Social Security provisional income). Provisional = $30K other + $1,800 dividend + $20K(50% SS)
+        // = $51,800 > $34K.
+        // Both tiers: tier1 = ($34K-$25K)*0.5 = $4,500, tier2 = ($51,800-$34K)*0.85 = $15,130
+        // SS taxable = $19,630 (< 85% cap of $34K)
+        // effectiveOtherIncome = $30K (other_income) + $19,630 (SS taxable) = $49,630
         // Spending $20K < cash $40K → surplus = $20K
-        // Tax on $48,100: taxable = $48,100 - $15K = $33,100
-        // 10%: $1,192.50, 12%: $2,541.00 = $3,733.50
-        // afterTaxSurplus = $20,000 - $3,733.50 = $16,266.50
+        // Tax on $49,630: taxable = $49,630 - $15K = $34,630
+        // 10%: $1,192.50, 12%: $2,724.60 = $3,917.10
+        // afterTaxSurplus = $20,000 - $3,917.10 = $16,082.90
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -663,7 +666,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         assertThat(year1.incomeStreamsTotal()).isEqualByComparingTo(bd("40000"));
         assertThat(year1.surplusReinvested()).isNotNull();
-        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("16266.5000"));
+        assertThat(year1.surplusReinvested()).isEqualByComparingTo(bd("16082.9000"));
     }
 
     @Test

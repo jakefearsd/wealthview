@@ -170,10 +170,28 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      * {@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero for
      * {@link SinglePool}, which tracks no cost basis). It is broken out separately so the engine
      * can fold it into the year's federal-tax breakdown -- see {@link RetirementTaxAnnotator}.
+     *
+     * <p>{@code realizedLtcgIncome} is the year's realized long-term capital-gains + qualified-
+     * dividend INCOME (not tax), floored at zero. The Social Security provisional-income convergence
+     * (audit B2) folds it into AGI-ex-SS alongside {@code fromTraditional} and the Roth conversion.
      */
     record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
                                BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
-                               TaxSourceResult taxSource, BigDecimal ltcgTax) {}
+                               TaxSourceResult taxSource, BigDecimal ltcgTax, BigDecimal realizedLtcgIncome) {}
+
+    /**
+     * Opaque, per-implementation snapshot of a pool's mutable state, taken AFTER the year's growth
+     * and BEFORE income/conversion/withdrawal, so the deterministic engine's Social Security
+     * provisional-income fixed-point loop (audit B2) can re-run those steps from an identical
+     * starting state each iteration.
+     */
+    sealed interface Memento permits SinglePool.SinglePoolMemento, MultiPool.MultiPoolMemento {}
+
+    /** Captures the pool's mutable state for later {@link #restore(Memento)}. */
+    Memento snapshot();
+
+    /** Restores mutable state captured by a prior {@link #snapshot()} from THIS pool instance. */
+    void restore(Memento memento);
 
     // --- PoolConfig + Factory Method ---
 
@@ -402,7 +420,23 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 balance = balance.subtract(tax);
             }
             return new WithdrawalTaxResult(withdrawn, tax,
-                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO,
+                    BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+
+        /** SinglePool holds a single scalar balance, so its memento is just that value. */
+        record SinglePoolMemento(BigDecimal balance) implements Memento {}
+
+        @Override
+        public Memento snapshot() {
+            return new SinglePoolMemento(balance);
+        }
+
+        @Override
+        public void restore(Memento memento) {
+            if (memento instanceof SinglePoolMemento m) {
+                this.balance = m.balance();
+            }
         }
 
         @Override
@@ -717,6 +751,11 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
             BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
 
+            // Realized LTCG + qualified-dividend INCOME entering AGI-ex-SS for the Social Security
+            // provisional-income convergence (audit B2), floored at zero (a net realized loss's
+            // small AGI offset is out of scope for this model).
+            BigDecimal realizedLtcgIncome = realizedGain.add(qualifiedDividendIncome).max(BigDecimal.ZERO);
+
             // A4: fold in any additional tax obligation the caller couldn't fund from this year's
             // cash surplus (or, for self-employment tax, had no other funding path at all) so it
             // drains the SAME pool cascade as the rest of this year's tax instead of vanishing --
@@ -727,7 +766,34 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             return new WithdrawalTaxResult(
                     fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax,
-                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax);
+                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
+                    realizedLtcgIncome);
+        }
+
+        /**
+         * Snapshot of MultiPool's mutable state: a deep copy of the taxable FIFO lots plus the
+         * scalar traditional/roth balances, this year's booked qualified dividend, and the last tax
+         * breakdown. Restoring returns the pool to its exact post-growth, pre-withdrawal state.
+         */
+        record MultiPoolMemento(java.util.List<BigDecimal[]> lots, BigDecimal traditional,
+                                BigDecimal roth, BigDecimal qualifiedDividendIncome,
+                                Optional<CombinedTaxResult> lastTaxBreakdown) implements Memento {}
+
+        @Override
+        public Memento snapshot() {
+            return new MultiPoolMemento(lots.snapshot(), traditional, roth,
+                    qualifiedDividendIncome, lastTaxBreakdown);
+        }
+
+        @Override
+        public void restore(Memento memento) {
+            if (memento instanceof MultiPoolMemento m) {
+                lots.restore(m.lots());
+                this.traditional = m.traditional();
+                this.roth = m.roth();
+                this.qualifiedDividendIncome = m.qualifiedDividendIncome();
+                this.lastTaxBreakdown = m.lastTaxBreakdown();
+            }
         }
 
         /**

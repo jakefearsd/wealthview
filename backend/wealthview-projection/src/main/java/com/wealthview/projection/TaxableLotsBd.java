@@ -62,6 +62,23 @@ final class TaxableLotsBd {
         return b;
     }
 
+    /** Deep-copies the lots into a detached list for later {@link #restore(java.util.List)}. */
+    java.util.List<BigDecimal[]> snapshot() {
+        var copy = new java.util.ArrayList<BigDecimal[]>(lots.size());
+        for (BigDecimal[] lot : lots) {
+            copy.add(new BigDecimal[]{lot[0], lot[1]});
+        }
+        return copy;
+    }
+
+    /** Replaces the current lots with a deep copy of a prior {@link #snapshot()}. */
+    void restore(java.util.List<BigDecimal[]> snapshot) {
+        lots.clear();
+        for (BigDecimal[] lot : snapshot) {
+            lots.addLast(new BigDecimal[]{lot[0], lot[1]});
+        }
+    }
+
     /** Sells {@code amount} of value oldest-first (capped at the total); returns the realized gain. */
     BigDecimal sellFifo(BigDecimal amount) {
         BigDecimal remaining = amount.min(totalValue()).max(BigDecimal.ZERO);
