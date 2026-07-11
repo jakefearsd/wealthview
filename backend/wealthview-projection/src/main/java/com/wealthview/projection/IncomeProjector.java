@@ -73,6 +73,37 @@ final class IncomeProjector {
     }
 
     /**
+     * The per-year Social Security benefit (real terms), mirroring {@link #computeDeterministic}'s
+     * per-source amount logic — inflation growth, scenario deflation, and boundary-year (0.5)
+     * proration — but restricted to {@link IncomeSourceType#SOCIAL_SECURITY} sources. Used by the MC
+     * to split the taxable Social Security SHARE out of the naive 100%-taxable figure (audit B2).
+     */
+    static double[] socialSecurityBenefitByYear(List<ProjectionIncomeSourceInput> sources,
+                                                int retirementAge, int years, double scenarioInflationRate) {
+        double[] result = new double[years];
+        if (sources == null || sources.isEmpty()) {
+            return result;
+        }
+        for (int y = 0; y < years; y++) {
+            int age = retirementAge + y;
+            double benefit = 0;
+            for (var source : sources) {
+                if (source.incomeType() != IncomeSourceType.SOCIAL_SECURITY
+                        || !ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+                    continue;
+                }
+                double amount = realGrossForYear(source, y, scenarioInflationRate);
+                if (IncomeYearMath.isBoundaryAge(source, age)) {
+                    amount *= 0.5;
+                }
+                benefit += amount;
+            }
+            result[y] = benefit;
+        }
+        return result;
+    }
+
+    /**
      * Enhances taxableIncomeByYear with rental property effects: depreciation deductions, passive
      * loss rules, and suspended loss carryforward, giving the MC trial withdrawal-tax estimates a
      * more accurate baseline income.

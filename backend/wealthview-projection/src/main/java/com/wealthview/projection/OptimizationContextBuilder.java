@@ -9,9 +9,11 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 
 /**
  * Builds the {@link OptimizationSetup} for a guardrail run from the raw
@@ -94,6 +96,12 @@ final class OptimizationContextBuilder {
         FilingStatus filingStatus = input.filingStatus() != null
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
+        // Audit B2 (MC alignment): computeDeterministic treats Social Security as 100% taxable; replace
+        // that with the IRS two-tier taxable SHARE so the MC's income base matches the deterministic
+        // engine's direction rather than over-taxing Social Security.
+        incomeData = applySocialSecurityTaxableShare(incomeData, input.incomeSources(),
+                retirementAge, years, essentialFloor, filingStatus, inflationRate);
+
         var incomeArrays = computeIncomeArrays(incomeData, years, retirementYear, filingStatus);
 
         // Compute rental-aware taxable income for marginal rate pre-computation.
@@ -147,6 +155,48 @@ final class OptimizationContextBuilder {
                         incomeArrays.surplusTaxByYear(),
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, marginalRates,
                         taxCtx, dsBracketCeilingByYear, ltcgRateByYear));
+    }
+
+    private static final SocialSecurityTaxCalculator SS_TAX_CALCULATOR = new SocialSecurityTaxCalculator();
+
+    /**
+     * Replaces the 100%-taxable Social Security figure baked into {@code incomeData} by
+     * {@link IncomeProjector#computeDeterministic} with the IRS two-tier taxable SHARE (audit B2).
+     *
+     * <p>For each year the Social Security provisional income uses non-SS taxable income plus the
+     * year's EXPECTED portfolio draw (essential floor − total income, floored at 0) as the ordinary
+     * base. This is a single-pass approximation: unlike the deterministic engine's fixed-point loop,
+     * the expected draw is a fixed deterministic quantity that does not depend on how much Social
+     * Security is taxable, so no iteration is needed. The whole draw is treated as ordinary income
+     * (an upper-bound approximation — some of it would come from Roth/taxable pools), and the
+     * fixed-nominal thresholds are deflated on the retirement-anchored clock the MC already uses for
+     * income and bracket ceilings. Years with no Social Security benefit are returned unchanged, so
+     * the hot loop and non-SS scenarios are untouched.
+     */
+    private IncomeYearData[] applySocialSecurityTaxableShare(
+            IncomeYearData[] incomeData, List<ProjectionIncomeSourceInput> sources,
+            int retirementAge, int years, double essentialFloor, FilingStatus filingStatus,
+            double inflationRate) {
+        double[] ssBenefitByYear = IncomeProjector.socialSecurityBenefitByYear(
+                sources, retirementAge, years, inflationRate);
+        BigDecimal inflationBd = BigDecimal.valueOf(inflationRate);
+        IncomeYearData[] adjusted = new IncomeYearData[years];
+        for (int y = 0; y < years; y++) {
+            double ssBenefit = ssBenefitByYear[y];
+            if (ssBenefit <= 0) {
+                adjusted[y] = incomeData[y];
+                continue;
+            }
+            double total = incomeData[y].totalIncome();
+            double nonSsTaxable = Math.max(0, incomeData[y].taxableIncome() - ssBenefit);
+            double expectedDraw = Math.max(0, essentialFloor - total);
+            double provisionalOther = nonSsTaxable + expectedDraw;
+            double ssTaxable = SS_TAX_CALCULATOR.computeTaxableAmount(
+                    BigDecimal.valueOf(ssBenefit), BigDecimal.valueOf(provisionalOther),
+                    filingStatus.value(), y, inflationBd).doubleValue();
+            adjusted[y] = new IncomeYearData(total, nonSsTaxable + ssTaxable);
+        }
+        return adjusted;
     }
 
     private IncomeArrays computeIncomeArrays(IncomeYearData[] incomeData, int years,
