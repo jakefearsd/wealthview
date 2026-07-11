@@ -65,20 +65,28 @@ class ScenarioParamsTest {
     }
 
     @Test
-    void from_scenarioRequest_dividendYieldNotSourced_staysNull() {
-        // ScenarioRequest has no dividend_yield field yet (not user-configurable this pass);
-        // from() must always default it to null so ScenarioParamsParser applies 0.018.
-        var request = new ScenarioRequest(
+    void from_dividendYieldPresent_passesThrough() {
+        var request = scenarioRequestWith(new BigDecimal("0.021"));
+
+        var params = ScenarioParams.from(request);
+
+        assertThat(params.dividendYield()).isEqualByComparingTo("0.021");
+    }
+
+    @Test
+    void from_dividendYieldNull_staysNullForDefault() {
+        var request = scenarioRequestWith(null);
+
+        assertThat(ScenarioParams.from(request).dividendYield()).isNull();
+    }
+
+    private ScenarioRequest scenarioRequestWith(BigDecimal dividendYield) {
+        return new ScenarioRequest(
                 "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                null, null, null, null);
-
-        var params = ScenarioParams.from(request);
-
-        assertThat(params.dividendYield()).isNull();
-        assertThat(params.birthYear()).isEqualTo(1970);
+                dividendYield, null, null, null, null);
     }
 
     @Test

@@ -60,10 +60,7 @@ public record ScenarioParams(
                 source.dynamicSequencingBracketRate(), source.rothConversionStrategy(),
                 source.targetBracketRate(), source.rothConversionStartYear(), source.state(),
                 source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest(),
-                // dividendYield is not (yet) a user-configurable scenario request field — it is a
-                // global engine assumption. ScenarioParamsParser.dividendYield() supplies the
-                // default (0.018) when this is null; direct params_json can still set it manually.
-                null);
+                source.dividendYield());
     }
 
     /**

@@ -31,6 +31,7 @@ public record ScenarioRequest(
         String state,
         BigDecimal primaryResidencePropertyTax,
         BigDecimal primaryResidenceMortgageInterest,
+        BigDecimal dividendYield,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,

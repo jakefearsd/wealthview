@@ -39,4 +39,6 @@ public interface ScenarioParamsSource {
     BigDecimal primaryResidencePropertyTax();
 
     BigDecimal primaryResidenceMortgageInterest();
+
+    BigDecimal dividendYield();
 }

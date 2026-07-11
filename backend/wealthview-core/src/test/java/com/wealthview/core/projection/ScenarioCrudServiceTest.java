@@ -104,7 +104,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                accounts, null, null, null);
+                null, accounts, null, null, null);
     }
 
     private ProjectionScenarioEntity captureSavedScenario() {
@@ -127,7 +127,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
@@ -168,7 +168,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("-0.025"),
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
@@ -203,7 +203,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(
+                null, List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
@@ -238,7 +238,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"), new BigDecimal("10000"),
                         new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
                 null, null, null);
@@ -274,7 +274,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"), new BigDecimal("10000"),
                         new BigDecimal("0.07"), new BigDecimal("62000"), "taxable")),
                 null, null, null);
@@ -524,7 +524,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 "traditional_first", null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("100000"),
                         new BigDecimal("10000"),
@@ -558,7 +558,7 @@ class ScenarioCrudServiceTest {
                 "single", null, null, null,
                 null, "fill_bracket", new BigDecimal("0.12"), null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null,
                         new BigDecimal("200000"),
                         new BigDecimal("10000"),
@@ -598,7 +598,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         linkedAccountId, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
                 null, null, null);
@@ -705,7 +705,7 @@ class ScenarioCrudServiceTest {
                 "dynamic_percentage",
                 null, null, null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("200000"),
                         new BigDecimal("15000"), new BigDecimal("0.08"), "traditional")),
                 null, null, null);
@@ -734,7 +734,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"),
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null, null, List.of(), null, null, null);
+                null, null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -750,7 +750,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"),
                 null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null, null, List.of(), null, null, null);
+                null, null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -763,7 +763,7 @@ class ScenarioCrudServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 200,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null, null, List.of(), null, null, null);
+                null, null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -779,7 +779,7 @@ class ScenarioCrudServiceTest {
                 "Plan", LocalDate.of(2055, 1, 1), 90,
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
-                null, null, null, List.of(), null, null, null);
+                null, null, null, null, List.of(), null, null, null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -805,7 +805,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(
+                null, List.of(
                         new CreateProjectionAccountRequest(null, new BigDecimal("200000"),
                                 new BigDecimal("10000"), new BigDecimal("0.07"), "traditional"),
                         new CreateProjectionAccountRequest(null, new BigDecimal("100000"),
@@ -889,7 +889,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), 1990, new BigDecimal("0.04"),
                 null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(new CreateProjectionAccountRequest(
+                null, List.of(new CreateProjectionAccountRequest(
                         null, new BigDecimal("100000"),
                         new BigDecimal("10000"), new BigDecimal("0.07"), "taxable")),
                 null, null,
@@ -919,7 +919,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null,
+                null, List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(badId, null)));
 
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
@@ -952,7 +952,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null,
+                null, List.of(), null, null,
                 List.of(new ScenarioIncomeSourceInput(incomeSourceId, null)));
 
         service.updateScenario(tenantId, scenarioId, request);
@@ -1017,7 +1017,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null, null);
+                null, List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1051,7 +1051,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), 1990, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null, null);
+                null, List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1086,7 +1086,7 @@ class ScenarioCrudServiceTest {
                 "vanguard_dynamic_spending", null, null,
                 "married_filing_jointly", null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null, null);
+                null, List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
@@ -1143,7 +1143,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.02"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                List.of(), null, null, null);
+                null, List.of(), null, null, null);
 
         service.updateScenario(tenantId, scenarioId, request);
 
