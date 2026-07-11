@@ -8,14 +8,22 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.persistence.repository.LtcgBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectionEngineTestSupport {
 
@@ -544,5 +552,177 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         // RMD income is real ordinary income, taxed unlike the no-RMD comparison year (null == $0).
         assertThat(rmdYear.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+    }
+
+    // === Audit A2: income-covered years must still force RMDs and tax dividends ===
+
+    /**
+     * A real {@link FederalTaxCalculator} backed by the SAME mocked brackets/deduction repos the
+     * scenario's engine uses, so tests can compute an authoritative expected tax figure by calling
+     * the production tax class directly instead of hand-deriving bracket arithmetic. With no state
+     * calculator wired (the {@code engineWithTax}/no-state-factory path), {@code
+     * CombinedTaxCalculator.computeTax(...).totalTax()} reduces exactly to
+     * {@code FederalTaxCalculator.computeTax(...)} (state tax 0, standard deduction always wins over
+     * a $0 itemized total) -- so this is a faithful stand-in, not an approximation.
+     */
+    private FederalTaxCalculator referenceFederalCalc() {
+        return new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+    }
+
+    @Test
+    void run_incomeCoveredRetireeAtRmdAge_forcesRmdAndTaxesItWithoutDoubleCountingPensionTax() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Pinned rather than derived from LocalDate.now() -- see the identical rationale on
+        // run_traditionalHeavyRetireeAtRmdAge_forcesRmdAndTaxesIt above.
+        int referenceYear = 2025;
+        int rmdBirthYear = 1952;    // age 73 at referenceYear -- exactly rmdStartAge
+        int noRmdBirthYear = 1953;  // age 72 at referenceYear -- one below rmdStartAge
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1); // comfortably before referenceYear
+
+        // Pension income ($80,000) fully covers spending ($40,000): the SpendingPlan surplus branch
+        // resolves portfolioNeed to zero (see RetirementWithdrawalProcessor#process), which used to
+        // make MultiPool.executeWithdrawals early-return before ever forcing the RMD or taxing it.
+        // Taxable starts at $0 so this year's income-covered surplus deposit and the RMD's own
+        // reinvestment are the only two things that can land in it -- isolating the RMD's effect.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("1000000.0000", "0", "0.0000", "traditional"),
+                acct("0.0000", "0", "0.0000", "taxable"));
+        var spending = new SpendingProfileInput(bd("30000"), bd("10000"), null);
+        var pension = incomeSource("Pension", "80000", 60, null, "0");
+
+        var rmdInput = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(rmdBirthYear),
+                accounts, spending, referenceYear, List.of(pension));
+        // Same scenario one birth-year younger: age is one below the RMD start age, so rmdAmount
+        // stays zero and this run isolates what the year would have looked like without the RMD
+        // (income/spending/surplus mechanics are otherwise identical).
+        var noRmdInput = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(noRmdBirthYear),
+                accounts, spending, referenceYear, List.of(pension));
+
+        var rmdYear = engineTax.run(rmdInput).yearlyData().getFirst();
+        var noRmdYear = engineTax.run(noRmdInput).yearlyData().getFirst();
+
+        assertThat(rmdYear.age()).isEqualTo(73);
+        assertThat(noRmdYear.age()).isEqualTo(72);
+        assertThat(rmdYear.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // no spending draw
+        assertThat(noRmdYear.rmdAmount()).isNull();
+
+        // RMD = priorYearEndTraditional (1,000,000) / distributionPeriod(73)=26.5 = 37,735.8491,
+        // forced out of traditional even though the pension alone covers spending.
+        BigDecimal expectedRmd = bd("37735.8491");
+        assertThat(rmdYear.rmdAmount()).isEqualByComparingTo(expectedRmd);
+        assertThat(rmdYear.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000").subtract(expectedRmd));
+
+        // taxLiability must equal the FULL combined tax on (RMD + pension) -- not that plus a
+        // second, redundant tax on the pension alone (the double-count this fix must avoid).
+        var refCalc = referenceFederalCalc();
+        BigDecimal pensionTaxAlone = refCalc.computeTax(bd("80000"), referenceYear, FilingStatus.SINGLE);
+        BigDecimal combinedTax = refCalc.computeTax(bd("80000").add(expectedRmd), referenceYear, FilingStatus.SINGLE);
+
+        assertThat(noRmdYear.taxLiability()).isEqualByComparingTo(pensionTaxAlone);
+        assertThat(rmdYear.taxLiability()).isEqualByComparingTo(combinedTax);
+        // Sanity: the RMD really did add incremental tax on top of the pension-alone baseline.
+        assertThat(combinedTax).isGreaterThan(pensionTaxAlone);
+
+        // The RMD's gross proceeds land in taxable and its tax is paid out of that same pool, so the
+        // taxable-balance DELTA between the two runs (surplus-deposit mechanics are identical in
+        // both) is exactly the after-tax RMD remainder.
+        BigDecimal marginalRmdTax = combinedTax.subtract(pensionTaxAlone);
+        BigDecimal expectedAfterTaxRmd = expectedRmd.subtract(marginalRmdTax);
+        BigDecimal taxableDelta = rmdYear.taxableBalance().subtract(noRmdYear.taxableBalance());
+        assertThat(taxableDelta).isEqualByComparingTo(expectedAfterTaxRmd);
+        assertThat(taxableDelta).isPositive();
+        assertThat(taxableDelta).isLessThan(expectedRmd);
+    }
+
+    @Test
+    void run_incomeCoveredRetireeWithTaxableDividends_paysCapitalGainsTaxOnZeroSpendDraw() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var ltcgBracketRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgBracketRepo);
+        var engineTax = new DeterministicProjectionEngine(
+                referenceFederalCalc(), null, new CapitalGainsTaxCalculator(ltcgBracketRepo));
+
+        int referenceYear = 2025;
+        int birthYear = 1955; // age 70 -- retired, no traditional pool at all so RMD is a non-factor
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // No traditional account: taxable + roth only. Pension covers spending (zero portfolio
+        // need), so the only ordinary income this year is the pension -- comfortably above the
+        // $48,350 single 0% LTCG ceiling once netted by the $15,000 standard deduction, so the
+        // taxable pool's qualified dividend (default 1.8% yield -> $50,000 x 0.018 = $900) stacks
+        // entirely into the 15% LTCG bracket instead of the 0% one.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("50000.0000", "0", "0.0000", "taxable"),
+                acct("50000.0000", "0", "0.0000", "roth"));
+        var spending = new SpendingProfileInput(bd("30000"), bd("10000"), null);
+        var pension = incomeSource("Pension", "80000", 60, null, "0");
+
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                accounts, spending, referenceYear, List.of(pension));
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // zero spend draw
+        assertThat(year1.rmdAmount()).isNull(); // no traditional pool
+        assertThat(year1.capitalGainsTax()).isNotNull();
+        assertThat(year1.capitalGainsTax()).isGreaterThan(BigDecimal.ZERO);
+
+        // No double-counting: taxLiability is exactly the pension's ordinary tax plus the LTCG tax
+        // the DTO reports, not some larger or smaller figure.
+        BigDecimal pensionTaxAlone = referenceFederalCalc().computeTax(bd("80000"), referenceYear, FilingStatus.SINGLE);
+        assertThat(year1.taxLiability()).isEqualByComparingTo(pensionTaxAlone.add(year1.capitalGainsTax()));
+    }
+
+    @Test
+    void run_incomeCoveredRetireeBelowRmdAge_noRmdButDividendStillTaxed() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var ltcgBracketRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgBracketRepo);
+        var engineTax = new DeterministicProjectionEngine(
+                referenceFederalCalc(), null, new CapitalGainsTaxCalculator(ltcgBracketRepo));
+
+        int referenceYear = 2025;
+        int noRmdBirthYear = 1953; // age 72 -- one year below rmdStartAge 73
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // Traditional pool present (so an RMD would fire if age qualified) plus a taxable pool for
+        // the dividend, pension covering spending exactly as in the sibling tests above.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("1000000.0000", "0", "0.0000", "traditional"),
+                acct("50000.0000", "0", "0.0000", "taxable"));
+        var spending = new SpendingProfileInput(bd("30000"), bd("10000"), null);
+        var pension = incomeSource("Pension", "80000", 60, null, "0");
+
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(noRmdBirthYear),
+                accounts, spending, referenceYear, List.of(pension));
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(72);
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+        // No RMD: below rmdStartAge, and the traditional balance is untouched.
+        assertThat(year1.rmdAmount()).isNull();
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000"));
+        // Dividend on the $50,000 taxable pool is still taxed even though nothing forced a draw.
+        assertThat(year1.capitalGainsTax()).isNotNull();
+        assertThat(year1.capitalGainsTax()).isGreaterThan(BigDecimal.ZERO);
     }
 }

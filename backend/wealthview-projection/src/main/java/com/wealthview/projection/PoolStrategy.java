@@ -564,27 +564,32 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                       BigDecimal effectiveOtherIncome,
                                                       BigDecimal conversionAmount,
                                                       BigDecimal rmdAmount, int age) {
-            if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
-                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
+            // A fully income-covered year (totalNeed <= 0, e.g. pension/rental/SS covers spending)
+            // still owes the RMD force-out and this year's dividend/LTCG tax below -- required
+            // distributions and portfolio income are due regardless of whether the retiree needed
+            // the cash (audit A2). Only the pool allocation for the spending draw itself is skipped
+            // here; RMD forcing and taxation always run past this guard.
+            boolean noSpendDraw = totalNeed.compareTo(BigDecimal.ZERO) <= 0;
+
+            BigDecimal fromTaxable = BigDecimal.ZERO;
+            BigDecimal fromTraditional = BigDecimal.ZERO;
+            BigDecimal fromRoth = BigDecimal.ZERO;
+
+            if (!noSpendDraw) {
+                var withdrawalContext = new WithdrawalOrderStrategy.WithdrawalContext(
+                        effectiveOtherIncome, conversionAmount, rmdAmount, age, year);
+                WithdrawalOrderStrategy strategy = WithdrawalOrderStrategy.forOrder(
+                        withdrawalOrder, dynamicSequencingBracketRate, taxCalculator, filingStatus,
+                        withdrawalContext);
+
+                WithdrawalOrderStrategy.Result allocation =
+                        strategy.execute(totalNeed, lots.totalValue(), traditional, roth);
+                if (allocation != null) {
+                    fromTaxable = allocation.fromTaxable();
+                    fromTraditional = allocation.fromTraditional();
+                    fromRoth = allocation.fromRoth();
+                }
             }
-
-            var withdrawalContext = new WithdrawalOrderStrategy.WithdrawalContext(
-                    effectiveOtherIncome, conversionAmount, rmdAmount, age, year);
-            WithdrawalOrderStrategy strategy = WithdrawalOrderStrategy.forOrder(
-                    withdrawalOrder, dynamicSequencingBracketRate, taxCalculator, filingStatus,
-                    withdrawalContext);
-
-            WithdrawalOrderStrategy.Result allocation =
-                    strategy.execute(totalNeed, lots.totalValue(), traditional, roth);
-            if (allocation == null) {
-                return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
-            }
-
-            BigDecimal fromTaxable = allocation.fromTaxable();
-            BigDecimal fromTraditional = allocation.fromTraditional();
-            BigDecimal fromRoth = allocation.fromRoth();
 
             // Selling the taxable draw FIFO realizes a long-term capital gain (oldest lots first).
             BigDecimal realizedGain = lots.sellFifo(fromTaxable);
@@ -610,10 +615,19 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
                 detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
 
-                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
-                    // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
-                    // Compute only the marginal tax caused by the traditional withdrawal to avoid
-                    // double-counting the base income through separate progressive-bracket calculations.
+                // Net against tax on (conversionAmount + effectiveOtherIncome) whenever that base is
+                // ALSO taxed elsewhere this year, to avoid double-counting it through separate
+                // progressive-bracket calculations:
+                //  - conversionAmount > 0: its tax was already computed and paid by
+                //    executeConversionWithAmount (called earlier in the year).
+                //  - noSpendDraw: RetirementWithdrawalProcessor's surplus branch (see
+                //    RetirementWithdrawalProcessor#process) separately taxes
+                //    (effectiveOtherIncome + conversionAmount) to net the reinvested cash surplus --
+                //    this call must contribute only the MARGINAL tax caused by the forced RMD on top
+                //    of that base, not the base again.
+                // Otherwise (positive spend draw, no conversion) this is the year's first and only
+                // ordinary-tax computation, so the full bundle is correct as-is.
+                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0 || noSpendDraw) {
                     var baseTax = taxCalculator.computeDetailedTax(
                             conversionAmount.add(effectiveOtherIncome), year, filingStatus);
                     withdrawalTax = detailed.totalTax().subtract(baseTax.totalTax()).max(BigDecimal.ZERO);
