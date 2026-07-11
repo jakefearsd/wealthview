@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
@@ -49,13 +51,26 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      * Back-compat overload: no explicit signal that this year's base-income tax was already
      * charged elsewhere, and no additional tax obligation to fund from the pool cascade. Callers
      * that don't participate in {@link RetirementWithdrawalProcessor}'s surplus-tax bookkeeping
-     * (audit A4) keep their exact pre-fix behavior via this overload -- see the 8-arg method's
+     * (audit A4) keep their exact pre-fix behavior via this overload -- see the 9-arg method's
      * javadoc for the full contract.
      */
     default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                                     BigDecimal conversionAmount, BigDecimal rmdAmount, int age) {
         return executeWithdrawals(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
                 BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    /**
+     * Back-compat overload predating the audit-C3 state-base adjustment: no federally-taxed Social
+     * Security amount to exempt from the state base (zero -- behavior identical to pre-C3 for every
+     * caller that doesn't thread it).
+     */
+    default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
+                                                    BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
+                                                    BigDecimal alreadyChargedBaseTax,
+                                                    BigDecimal extraPoolFundedTax) {
+        return executeWithdrawals(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                alreadyChargedBaseTax, extraPoolFundedTax, BigDecimal.ZERO);
     }
 
     /**
@@ -74,17 +89,40 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      *     sign can disagree with whether the surplus branch actually ran. Zero when no such
      *     charge exists (deficit years, no spending plan, or the Guardrail-mismatch case): the
      *     caller has NOT pre-charged anything, so the bundle below must charge it in full.
+     *     IMPORTANT (audit C3): when non-zero, the caller must have computed it with the SAME
+     *     state-base adjustments this method applies (same {@code federallyTaxedSocialSecurity},
+     *     zero LTCG income) so the marginal subtraction below nets exactly and stays monotone.
      * @param extraPoolFundedTax additional tax obligation (the surplus branch's tax remainder once
      *     the year's surplus was insufficient to cover it, and/or self-employment tax, which has
      *     no bundle of its own anywhere else this year) that must be funded from the SAME pool
      *     cascade as the withdrawal-tax bundle, on top of it -- audit A4's "route the unfunded
      *     remainder through deductFromPools" fix. Zero when nothing is outstanding.
+     * @param federallyTaxedSocialSecurity the year's converged federally-taxable Social Security
+     *     amount (audit B2's fixed point), threaded into the ordinary-tax bundle's state-base
+     *     computation so states that exempt Social Security don't tax it (audit C3). The realized
+     *     LTCG/dividend state addition needs no parameter -- it is computed internally from the
+     *     FIFO sale and the year's booked dividend. Zero when no Social Security is taxable.
      */
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
-                                           BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax);
+                                           BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax,
+                                           BigDecimal federallyTaxedSocialSecurity);
 
-    ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome, BigDecimal rmdAmount);
+    /** Back-compat overload predating the audit-C3 state-base adjustment (zero taxable SS). */
+    default ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
+                                                    BigDecimal rmdAmount) {
+        return executeRothConversion(year, effectiveOtherIncome, rmdAmount, BigDecimal.ZERO);
+    }
+
+    /**
+     * Executes the year's Roth conversion. {@code federallyTaxedSocialSecurity} is the year's
+     * converged federally-taxable Social Security amount, threaded into the conversion-tax bundle's
+     * state-base computation (audit C3) exactly as in {@link #executeWithdrawals}; the conversion
+     * bundle adds NO LTCG income to the state base -- the year's realized LTCG/dividends belong to
+     * the withdrawal bundle, which taxes them once.
+     */
+    ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome, BigDecimal rmdAmount,
+                                           BigDecimal federallyTaxedSocialSecurity);
 
     /**
      * Everything the engine knows about a projection year when it asks the
@@ -101,9 +139,17 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                           TaxSourceResult combinedTaxSource,
                           BigDecimal rmdAmount, BigDecimal ltcgTax) {}
 
+    /** Back-compat overload predating the audit-C3 state-base adjustment (zero taxable SS). */
     default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
                                                             BigDecimal overrideAmount, BigDecimal rmdAmount) {
-        return executeRothConversion(year, effectiveOtherIncome, rmdAmount);
+        return executeRothConversionOverride(year, effectiveOtherIncome, overrideAmount, rmdAmount,
+                BigDecimal.ZERO);
+    }
+
+    default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
+                                                            BigDecimal overrideAmount, BigDecimal rmdAmount,
+                                                            BigDecimal federallyTaxedSocialSecurity) {
+        return executeRothConversion(year, effectiveOtherIncome, rmdAmount, federallyTaxedSocialSecurity);
     }
 
     void floorAtZero();
@@ -408,11 +454,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                       BigDecimal conversionAmount,
                                                       BigDecimal rmdAmount, int age,
                                                       BigDecimal alreadyChargedBaseTax,
-                                                      BigDecimal extraPoolFundedTax) {
+                                                      BigDecimal extraPoolFundedTax,
+                                                      BigDecimal federallyTaxedSocialSecurity) {
             // Simple path: withdrawal is just min(need, balance); SinglePool tracks no ordinary-tax
-            // bundle to net alreadyChargedBaseTax against (see interface javadoc). extraPoolFundedTax
-            // (audit A4: SE tax / an unfunded surplus-tax remainder) still has to leave the balance,
-            // otherwise it would vanish here exactly as it used to for MultiPool.
+            // bundle to net alreadyChargedBaseTax against (see interface javadoc), and computes no
+            // tax at all -- so the audit-C3 federallyTaxedSocialSecurity state adjustment is ignored
+            // here too (untaxed passthrough). extraPoolFundedTax (audit A4: SE tax / an unfunded
+            // surplus-tax remainder) still has to leave the balance, otherwise it would vanish here
+            // exactly as it used to for MultiPool.
             BigDecimal withdrawn = need.min(balance);
             balance = balance.subtract(withdrawn);
             BigDecimal tax = extraPoolFundedTax.max(BigDecimal.ZERO);
@@ -441,7 +490,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
-                                                       BigDecimal rmdAmount) {
+                                                       BigDecimal rmdAmount,
+                                                       BigDecimal federallyTaxedSocialSecurity) {
             // No-op for single pool
             return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
         }
@@ -659,7 +709,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                       BigDecimal conversionAmount,
                                                       BigDecimal rmdAmount, int age,
                                                       BigDecimal alreadyChargedBaseTax,
-                                                      BigDecimal extraPoolFundedTax) {
+                                                      BigDecimal extraPoolFundedTax,
+                                                      BigDecimal federallyTaxedSocialSecurity) {
             // A fully income-covered year (totalNeed <= 0, e.g. pension/rental/SS covers spending)
             // still owes the RMD force-out and this year's dividend/LTCG tax below -- required
             // distributions and portfolio income are due regardless of whether the retiree needed
@@ -705,40 +756,18 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             }
             BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdExtra);
 
-            BigDecimal withdrawalTax = BigDecimal.ZERO;
+            // Realized LTCG + qualified-dividend INCOME, floored at zero (a net realized loss's
+            // small AGI offset is out of scope for this model). Computed BEFORE the ordinary-tax
+            // bundle because it feeds two places: the state base of that bundle for states that tax
+            // capital gains as ordinary income (audit C3), and AGI-ex-SS for the Social Security
+            // provisional-income convergence (audit B2).
+            BigDecimal realizedLtcgIncome = realizedGain.add(qualifiedDividendIncome).max(BigDecimal.ZERO);
+
             BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
-            CombinedTaxResult detailed = null;
-            if (taxableIncome.compareTo(BigDecimal.ZERO) > 0 && taxCalculator != null) {
-                detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
-
-                // Net out tax that was ALREADY charged elsewhere this year, to avoid double-counting
-                // it through separate progressive-bracket calculations:
-                //  - conversionAmount > 0: its tax was already computed and paid by
-                //    executeConversionWithAmount (called earlier in the year) -- recompute the base
-                //    tax fresh (bracket-accurate marginal subtraction) since that call's own paid
-                //    amount isn't threaded through here.
-                //  - alreadyChargedBaseTax > 0: RetirementWithdrawalProcessor's surplus branch (see
-                //    RetirementWithdrawalProcessor#process) already charged exactly this dollar
-                //    amount against (effectiveOtherIncome + conversionAmount), whether funded from
-                //    the year's cash surplus or left in extraPoolFundedTax below -- subtract the
-                //    EXPLICIT figure directly (audit A4 / T2 review: replaces the old
-                //    totalNeed<=0 "noSpendDraw" proxy, which mis-fires for GuardrailSpendingInput --
-                //    see the interface javadoc). This call then contributes only the marginal tax
-                //    caused by the forced RMD/spend draw on top of that base.
-                // Otherwise (positive spend draw, no conversion, nothing pre-charged) this is the
-                // year's first and only ordinary-tax computation, so the full bundle is correct as-is.
-                if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
-                    var baseTax = taxCalculator.computeDetailedTax(
-                            conversionAmount.add(effectiveOtherIncome), year, filingStatus);
-                    withdrawalTax = detailed.totalTax().subtract(baseTax.totalTax()).max(BigDecimal.ZERO);
-                } else if (alreadyChargedBaseTax.compareTo(BigDecimal.ZERO) > 0) {
-                    withdrawalTax = detailed.totalTax().subtract(alreadyChargedBaseTax).max(BigDecimal.ZERO);
-                } else {
-                    withdrawalTax = detailed.totalTax();
-                }
-
-                lastTaxBreakdown = Optional.of(detailed);
-            }
+            var ordinaryTax = computeOrdinaryTax(taxableIncome, year, effectiveOtherIncome,
+                    conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
+            BigDecimal withdrawalTax = ordinaryTax.tax();
+            CombinedTaxResult detailed = ordinaryTax.detailed();
 
             // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
             // stacked on ordinary income against the 0/15/20 LTCG brackets (+ deflated NIIT). This runs
@@ -750,11 +779,6 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // overwrites) the DTO's federal/state breakdown from scratch downstream of this call, so
             // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
             BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
-
-            // Realized LTCG + qualified-dividend INCOME entering AGI-ex-SS for the Social Security
-            // provisional-income convergence (audit B2), floored at zero (a net realized loss's
-            // small AGI offset is out of scope for this model).
-            BigDecimal realizedLtcgIncome = realizedGain.add(qualifiedDividendIncome).max(BigDecimal.ZERO);
 
             // A4: fold in any additional tax obligation the caller couldn't fund from this year's
             // cash surplus (or, for self-employment tax, had no other funding path at all) so it
@@ -768,6 +792,82 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax,
                     fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
                     realizedLtcgIncome);
+        }
+
+        /** The year's ordinary-income tax bundle: the net pool-funded tax plus the detailed result. */
+        private record OrdinaryTax(BigDecimal tax, @Nullable CombinedTaxResult detailed) {
+            static final OrdinaryTax NONE = new OrdinaryTax(BigDecimal.ZERO, null);
+        }
+
+        /**
+         * Computes the withdrawal cycle's ordinary-income tax bundle and records it in
+         * {@code lastTaxBreakdown}. The state base of this bundle adds the year's realized
+         * LTCG/dividend income (for states taxing capital gains as ordinary income) and exempts the
+         * federally-taxed Social Security amount (for states that exempt it) -- audit C3; the
+         * DISPLAYED breakdown ({@code RetirementTaxAnnotator}) recomputes with the SAME inputs, so
+         * display and pool funding agree.
+         *
+         * <p>The {@code realizedLtcgIncome > 0} guard leg covers a retiree with ZERO ordinary income
+         * but realized gains/dividends: a state that taxes capital gains as ordinary income still
+         * owes state tax on them. For every other strategy that extra computation is all-zero and
+         * {@code lastTaxBreakdown} stays empty (see the recording condition below), preserving
+         * pre-C3 behavior byte-for-byte.
+         *
+         * <p>Tax already charged elsewhere this year is netted out to avoid double-counting through
+         * separate progressive-bracket calculations:
+         * <ul>
+         *   <li>{@code conversionAmount > 0}: its tax was already computed and paid by
+         *       {@code executeConversionWithAmount} (called earlier in the year) -- recompute the
+         *       base tax fresh (bracket-accurate marginal subtraction) since that call's own paid
+         *       amount isn't threaded through here. The recompute MUST use the same state-base
+         *       adjustments the conversion bundle used (same SS exemption, no LTCG income -- the
+         *       LTCG state addition belongs to THIS bundle only) so the subtraction nets exactly
+         *       and full-bundle &ge; base-bundle stays monotone (audit C3).</li>
+         *   <li>{@code alreadyChargedBaseTax > 0}: {@code RetirementWithdrawalProcessor}'s surplus
+         *       branch already charged exactly this dollar amount against
+         *       {@code (effectiveOtherIncome + conversionAmount)}, whether funded from the year's
+         *       cash surplus or left in {@code extraPoolFundedTax} -- subtract the EXPLICIT figure
+         *       directly (audit A4 / T2 review: replaces the old {@code totalNeed<=0} "noSpendDraw"
+         *       proxy, which mis-fires for {@code GuardrailSpendingInput} -- see the interface
+         *       javadoc). This bundle then contributes only the marginal tax caused by the forced
+         *       RMD/spend draw on top of that base.</li>
+         *   <li>Otherwise (positive spend draw, no conversion, nothing pre-charged) this is the
+         *       year's first and only ordinary-tax computation, so the full bundle stands as-is.</li>
+         * </ul>
+         */
+        private OrdinaryTax computeOrdinaryTax(BigDecimal taxableIncome, int year,
+                                                BigDecimal effectiveOtherIncome, BigDecimal conversionAmount,
+                                                BigDecimal alreadyChargedBaseTax, BigDecimal realizedLtcgIncome,
+                                                BigDecimal federallyTaxedSocialSecurity) {
+            if (taxCalculator == null
+                    || (taxableIncome.compareTo(BigDecimal.ZERO) <= 0
+                        && realizedLtcgIncome.compareTo(BigDecimal.ZERO) <= 0)) {
+                return OrdinaryTax.NONE;
+            }
+
+            var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus,
+                    realizedLtcgIncome, federallyTaxedSocialSecurity);
+
+            BigDecimal tax;
+            if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
+                var baseTax = taxCalculator.computeDetailedTax(
+                        conversionAmount.add(effectiveOtherIncome), year, filingStatus,
+                        BigDecimal.ZERO, federallyTaxedSocialSecurity);
+                tax = detailed.totalTax().subtract(baseTax.totalTax()).max(BigDecimal.ZERO);
+            } else if (alreadyChargedBaseTax.compareTo(BigDecimal.ZERO) > 0) {
+                tax = detailed.totalTax().subtract(alreadyChargedBaseTax).max(BigDecimal.ZERO);
+            } else {
+                tax = detailed.totalTax();
+            }
+
+            // Record whenever ordinary income exists (pre-C3 behavior), or when the new
+            // zero-ordinary-income leg actually produced state tax; an all-zero result on that new
+            // leg leaves the breakdown empty exactly as before.
+            if (taxableIncome.compareTo(BigDecimal.ZERO) > 0
+                    || detailed.totalTax().compareTo(BigDecimal.ZERO) > 0) {
+                lastTaxBreakdown = Optional.of(detailed);
+            }
+            return new OrdinaryTax(tax, detailed);
         }
 
         /**
@@ -842,7 +942,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
         @Override
         public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
-                                                       BigDecimal rmdAmount) {
+                                                       BigDecimal rmdAmount,
+                                                       BigDecimal federallyTaxedSocialSecurity) {
             if (rothConversionStartYear != null && year < rothConversionStartYear) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
@@ -864,36 +965,44 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
-            return executeConversionWithAmount(effectiveLimit, year, effectiveOtherIncome);
+            return executeConversionWithAmount(effectiveLimit, year, effectiveOtherIncome,
+                    federallyTaxedSocialSecurity);
         }
 
         @Override
         public ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
-                                                                BigDecimal overrideAmount, BigDecimal rmdAmount) {
+                                                                BigDecimal overrideAmount, BigDecimal rmdAmount,
+                                                                BigDecimal federallyTaxedSocialSecurity) {
             // overrideAmount is an explicit, optimizer-scheduled dollar figure -- like the pre-existing
             // bracket-headroom check it bypasses, it does not respect RMD-consumed headroom either.
             if (overrideAmount.compareTo(BigDecimal.ZERO) <= 0
                     || traditional.compareTo(BigDecimal.ZERO) <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
-            return executeConversionWithAmount(overrideAmount, year, effectiveOtherIncome);
+            return executeConversionWithAmount(overrideAmount, year, effectiveOtherIncome,
+                    federallyTaxedSocialSecurity);
         }
 
         /**
          * Executes a Roth conversion of the given amount: transfers from traditional to Roth,
          * computes tax on the conversion, and deducts tax from pools. Shared by both
          * executeRothConversion (bracket/fixed amount) and executeRothConversionOverride
-         * (optimizer-scheduled amount).
+         * (optimizer-scheduled amount). The state base exempts the federally-taxed Social Security
+         * amount (audit C3) but adds no LTCG income -- the year's realized LTCG/dividends are taxed
+         * once, in {@link #executeWithdrawals}'s bundle; the marginal subtraction there recomputes
+         * THIS base with identical arguments so the netting is exact.
          */
         private ConversionResult executeConversionWithAmount(BigDecimal conversionLimit, int year,
-                                                               BigDecimal effectiveOtherIncome) {
+                                                               BigDecimal effectiveOtherIncome,
+                                                               BigDecimal federallyTaxedSocialSecurity) {
             BigDecimal actual = conversionLimit.min(traditional);
             traditional = traditional.subtract(actual);
             roth = roth.add(actual);
 
             if (taxCalculator != null) {
                 BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
-                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus);
+                var detailed = taxCalculator.computeDetailedTax(taxableIncome, year, filingStatus,
+                        BigDecimal.ZERO, federallyTaxedSocialSecurity);
                 BigDecimal tax = detailed.totalTax();
                 lastTaxBreakdown = Optional.of(detailed);
                 TaxSourceResult taxSource = deductFromPools(tax);

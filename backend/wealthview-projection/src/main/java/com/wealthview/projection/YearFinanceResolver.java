@@ -225,16 +225,22 @@ final class YearFinanceResolver {
         BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(taxableActiveIncome, BigDecimal.ZERO);
         BigDecimal conversionOverride = resolveConversionOverride(yc.spendingPlan(), year);
 
+        // This iteration's federally-taxable Social Security amount (already resolved above; the
+        // audit-B2 fixed point re-runs this whole method until it is self-consistent), threaded into
+        // the conversion-tax bundle's state-base computation (audit C3).
+        BigDecimal ssTaxable = incomeSourceResult != null
+                ? incomeSourceResult.socialSecurityTaxable() : BigDecimal.ZERO;
+
         PoolStrategy.ConversionResult conversion;
         if (conversionOverride != null && conversionOverride.compareTo(BigDecimal.ZERO) > 0) {
             conversion = pool.executeRothConversionOverride(
-                    year, effectiveOtherIncome, conversionOverride, yc.rmdAmount());
+                    year, effectiveOtherIncome, conversionOverride, yc.rmdAmount(), ssTaxable);
         } else if (conversionOverride != null) {
             // Override is present but zero → no conversion this year
             conversion = new PoolStrategy.ConversionResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, PoolStrategy.TaxSourceResult.ZERO);
         } else {
-            conversion = pool.executeRothConversion(year, effectiveOtherIncome, yc.rmdAmount());
+            conversion = pool.executeRothConversion(year, effectiveOtherIncome, yc.rmdAmount(), ssTaxable);
         }
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,

@@ -82,6 +82,12 @@ final class RetirementWithdrawalProcessor {
         // this when it can cover some or all of it from the year's cash surplus.
         BigDecimal seTax = (pool.tracksSETax() && isResult != null)
                 ? isResult.selfEmploymentTax() : BigDecimal.ZERO;
+        // The year's converged federally-taxable Social Security amount (audit B2), threaded into
+        // EVERY tax bundle this method charges or triggers so states that exempt Social Security
+        // don't tax it (audit C3). Consistency matters: the surplus-branch base tax below and
+        // executeWithdrawals' full bundle must subtract the SAME amount, or the marginal netting
+        // there loses its full>=base monotonicity and the .max(ZERO) floor silently over-charges.
+        BigDecimal ssTaxable = isResult != null ? isResult.socialSecurityTaxable() : BigDecimal.ZERO;
         // Explicit signal threaded into executeWithdrawals -- see PoolStrategy#executeWithdrawals
         // javadoc. Zero unless the surplus branch below actually charges base-income tax this year.
         BigDecimal alreadyChargedBaseTax = BigDecimal.ZERO;
@@ -104,13 +110,17 @@ final class RetirementWithdrawalProcessor {
                 if (taxStrategy != null) {
                     BigDecimal surplusTaxableIncome = effectiveOtherIncome.add(conversionAmount);
                     FilingStatus filingStatus = pool.getFilingStatus();
-                    BigDecimal fullTax = taxStrategy.computeTotalTax(surplusTaxableIncome, year, filingStatus);
+                    // 5-arg detailed form (audit C3): exempt the federally-taxed SS amount from the
+                    // state base; no LTCG income here (that belongs to executeWithdrawals' bundle).
+                    BigDecimal fullTax = taxStrategy.computeDetailedTax(surplusTaxableIncome, year,
+                            filingStatus, BigDecimal.ZERO, ssTaxable).totalTax();
 
                     if (conversionAmount.compareTo(BigDecimal.ZERO) > 0) {
                         // Roth conversion tax was already computed on (conversionAmount + effectiveOtherIncome).
                         // Only add the marginal tax not yet accounted for to avoid double-counting.
-                        BigDecimal baseTax = taxStrategy.computeTotalTax(
-                                conversionAmount.add(effectiveOtherIncome), year, filingStatus);
+                        BigDecimal baseTax = taxStrategy.computeDetailedTax(
+                                conversionAmount.add(effectiveOtherIncome), year, filingStatus,
+                                BigDecimal.ZERO, ssTaxable).totalTax();
                         tax = fullTax.subtract(baseTax).max(BigDecimal.ZERO);
                     } else {
                         tax = fullTax;
@@ -141,7 +151,7 @@ final class RetirementWithdrawalProcessor {
 
         var withdrawalResult = pool.executeWithdrawals(
                 portfolioNeed, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age,
-                alreadyChargedBaseTax, extraPoolFundedTax);
+                alreadyChargedBaseTax, extraPoolFundedTax, ssTaxable);
 
         // withdrawalResult.taxLiability() already includes extraPoolFundedTax (now pool-funded).
         // Add back exactly the portion funded from this year's cash surplus instead (zero in

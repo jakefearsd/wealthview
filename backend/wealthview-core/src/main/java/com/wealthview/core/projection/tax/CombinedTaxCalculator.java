@@ -43,17 +43,15 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
      * either figure -- both remain the pre-existing federal treatment (LTCG taxed separately; SS
      * taxed via the federal worksheet's own inclusion, already baked into {@code grossIncome}).
      *
-     * <p><b>Scope boundary (documented, minor simplification):</b> this 5-arg overload is called
-     * ONLY from {@code RetirementTaxAnnotator}, which recomputes the year's DISPLAYED federal/state
-     * breakdown from scratch after the pool cascade has already run. The pool-funded withdrawal tax
-     * computed earlier in {@code PoolStrategy.MultiPool#executeWithdrawals} still calls the 3-arg
-     * overload (ordinary income only) -- it does not know the year's LTCG/SS state adjustment. So for
-     * a state that taxes LTCG as ordinary income or exempts Social Security, the DISPLAYED {@code
-     * stateTax} (and thus {@code federalTax + stateTax}) can diverge slightly from the year's actual
-     * {@code taxLiability} (the dollars really drained from the pools) by the incremental state tax
-     * on that LTCG/SS adjustment. Reconciling the two would mean threading this same seam into the
-     * pool-funding cascade itself -- a larger, separate change; audit C3 scopes the fix to this
-     * display seam only.
+     * <p><b>Callers:</b> both the pool-FUNDING computations ({@code PoolStrategy.MultiPool}'s
+     * withdrawal/conversion tax bundles and {@code RetirementWithdrawalProcessor}'s surplus branch)
+     * and the DISPLAYED breakdown recompute ({@code RetirementTaxAnnotator}) call this overload with
+     * the same per-year figures, so the state adjustment both drains the pools and shows in the
+     * federal/state breakdown -- {@code federalTax + stateTax} reconciles with {@code taxLiability}.
+     * Convention: the year's realized LTCG/dividend income enters exactly ONE bundle (the withdrawal
+     * bundle, and the annotator's whole-year recompute); conversion/surplus base bundles pass zero
+     * LTCG so the marginal base-tax subtractions net exactly and stay monotone (full bundle income
+     * is a superset of every base bundle's, with an identical SS subtraction).
      */
     public CombinedTaxResult computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status,
                                          BigDecimal ltcgIncome, BigDecimal federallyTaxedSocialSecurity) {

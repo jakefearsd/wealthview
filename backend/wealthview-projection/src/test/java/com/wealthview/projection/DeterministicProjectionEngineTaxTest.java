@@ -345,24 +345,17 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineState = engineWithStateTax("CA");
 
-        // dividend_yield: 0 -- this test targets the conversion + traditional-withdrawal
-        // reconciliation, not taxable-pool income; without it the default 1.8% dividend yield
-        // (ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD) books passive qualified-dividend income on
-        // the $300K taxable account every year, regardless of withdrawal order. Since CA taxes
-        // capital gains as ordinary income (audit C3), RetirementTaxAnnotator's recomputed
-        // DISPLAYED state tax now legitimately includes that dividend income -- but the ACTUAL
-        // withdrawal-tax cascade in PoolStrategy.MultiPool#executeWithdrawals still computes its
-        // pool-funded tax on ordinary income only (audit C3 threads LTCG/SS into the annotator's
-        // display seam, not that separate funding computation), so taxLiability would no longer
-        // equal federalTax + stateTax once dividends are in play. That split is a known, orthogonal
-        // scope boundary (see CombinedTaxCalculator's javadoc) this test isn't about; zeroing the
-        // yield removes the incidental income so it stays focused on its original intent.
+        // The default 1.8% dividend yield books qualified-dividend income on the $300K taxable
+        // account, and this CA-like state calculator taxes capital gains as ordinary income
+        // (audit C3). The invariant below must hold WITH that realized capital income in play:
+        // the pool-funded withdrawal-tax bundle and the annotator's displayed breakdown both apply
+        // the SAME state-base adjustment, so taxLiability still reconciles exactly.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
-                 "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
+                 "withdrawal_order": "traditional_first", "state": "CA"}
                 """.formatted(LocalDate.now().getYear() - 66),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
@@ -395,24 +388,23 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         var federal = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
         BigDecimal rate = bd("0.06");
 
-        // dividend_yield: 0 isolates this test to the SS seam -- see the comment on
-        // run_conversionAndTraditionalWithdrawal_withState_taxMatchesBreakdown for why the default
-        // dividend yield would otherwise also realize (unrelated) LTCG/dividend income here.
+        // Traditional-only portfolio: no taxable pool, so no dividend/LTCG income muddies the
+        // SS-exemption delta being pinned.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
-                 "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
+                 "withdrawal_order": "traditional_first", "state": "CA"}
                 """.formatted(LocalDate.now().getYear() - 66),
                 List.of(acct("500000", "0", "0.00", "traditional")),
                 null, List.of(socialSecuritySource("30000", 62)));
 
         var exemptEngine = new DeterministicProjectionEngine(
-                federal, mockStateFactory("CA", rate, true));
+                federal, mockStateFactory("CA", rate, false, true));
         var year1Exempt = exemptEngine.run(input).yearlyData().getFirst();
 
         var taxedEngine = new DeterministicProjectionEngine(
-                federal, mockStateFactory("CA", rate, false));
+                federal, mockStateFactory("CA", rate, false, false));
         var year1Taxed = taxedEngine.run(input).yearlyData().getFirst();
 
         // Same underlying federal SS-taxability computation regardless of the state's own treatment.
@@ -424,15 +416,91 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         assertThat(year1Taxed.stateTax().subtract(year1Exempt.stateTax()))
                 .isEqualByComparingTo(expectedDelta);
         assertThat(year1Exempt.federalTax()).isEqualByComparingTo(year1Taxed.federalTax());
+        // The exemption is FUNDED, not just displayed: the year's pool-debited taxLiability moves by
+        // the same amount (T8 review: the state adjustment must reach the pool cascade).
+        assertThat(year1Taxed.taxLiability().subtract(year1Exempt.taxLiability()))
+                .isEqualByComparingTo(expectedDelta);
+    }
+
+    /**
+     * Pins the audit-C3 DOLLAR effect end-to-end: a CA-like retiree with qualified dividends
+     * (realized capital income), taxable Social Security, and a traditional draw pays MORE pool-
+     * debited tax than the identical scenario without state tax -- by exactly the state tax on the
+     * ADJUSTED base (ordinary + LTCG/dividends - federally-taxed SS), and the year-end balance is
+     * lower by the same amount. Proves the state adjustment reaches the funding cascade
+     * (T8 review), not just the displayed breakdown.
+     *
+     * <p>Hand-computed fixture (returns 0.00, inflation 0, no conversion, no RMD at 66):
+     * <ul>
+     *   <li>draw = 4% x $800K = $32,000, all traditional (traditional_first; taxable untouched)</li>
+     *   <li>dividend = $300K x 1.8% default yield = $5,400 = the year's realized LTCG income
+     *       (no taxable sale, so no FIFO gain on top)</li>
+     *   <li>V = converged federally-taxable SS (read from the DTO; identical in both runs since
+     *       provisional income is independent of tax amounts)</li>
+     *   <li>state base = (32,000 + V) + 5,400 - V = $37,400; at 6%: $2,244 exactly --
+     *       V cancels, so the pin is exact without hard-coding V</li>
+     * </ul>
+     */
+    @Test
+    void run_caRetireeWithDividendsAndSs_poolDebitedTaxCarriesNetStateAdjustment() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var federal = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+        BigDecimal rate = bd("0.06");
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "traditional_first", "state": "CA"}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("300000", "0", "0.00", "taxable")),
+                null, List.of(socialSecuritySource("30000", 62)));
+
+        // CA-like state: taxes capital gains as ordinary income AND exempts Social Security.
+        var caEngine = new DeterministicProjectionEngine(
+                federal, mockStateFactory("CA", rate, true, true));
+        var year1Ca = caEngine.run(input).yearlyData().getFirst();
+
+        // Identical scenario, no state-tax factory -> FederalOnlyTaxStrategy (state modeled $0).
+        var fedOnlyEngine = new DeterministicProjectionEngine(federal, null);
+        var year1Fed = fedOnlyEngine.run(input).yearlyData().getFirst();
+
+        // Same federal frame in both runs: identical converged SS taxability and federal tax.
+        BigDecimal ssTaxable = year1Ca.socialSecurityTaxable();
+        assertThat(ssTaxable).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1Fed.socialSecurityTaxable()).isEqualByComparingTo(ssTaxable);
+        assertThat(year1Ca.federalTax()).isEqualByComparingTo(year1Fed.federalTax());
+
+        // The net state adjustment: 6% x ($32,000 draw + $5,400 dividends; SS exempted).
+        BigDecimal expectedStateTax = bd("2244.0000");
+        assertThat(year1Ca.stateTax()).isEqualByComparingTo(expectedStateTax);
+        // Direction checks: LTCG addition RAISED it above the ordinary-only base (6% x $32,000 =
+        // $1,920 after the SS exemption cancels V), while the SS exemption LOWERED it below the
+        // pre-C3 unadjusted base of 6% x ($32,000 + V).
+        assertThat(year1Ca.stateTax()).isGreaterThan(bd("1920.0000"));
+        BigDecimal preC3StateTax = bd("32000").add(ssTaxable).multiply(rate);
+        assertThat(year1Ca.stateTax()).isLessThan(preC3StateTax);
+
+        // The DOLLAR effect (T8 review): the state tax is pool-DEBITED, not just displayed --
+        // taxLiability is higher and the year-end balance lower by exactly the state tax.
+        assertThat(year1Ca.taxLiability().subtract(year1Fed.taxLiability()))
+                .isEqualByComparingTo(expectedStateTax);
+        assertThat(year1Fed.endBalance().subtract(year1Ca.endBalance()))
+                .isEqualByComparingTo(expectedStateTax);
+        // And the displayed breakdown reconciles with the funded liability.
+        assertThat(year1Ca.federalTax().add(year1Ca.stateTax()))
+                .isEqualByComparingTo(year1Ca.taxLiability());
     }
 
     /**
      * A mocked {@link StateTaxCalculatorFactory} resolving {@code stateCode} to a proportional
-     * ({@code grossIncome * rate}) calculator with a configurable {@code exemptsSocialSecurity} flag
-     * and {@code taxesCapitalGainsAsOrdinaryIncome} always false (unused by the SS-focused test
-     * above).
+     * ({@code grossIncome * rate}) calculator with configurable audit-C3 flags
+     * ({@code taxesCapitalGainsAsOrdinaryIncome}, {@code exemptsSocialSecurity}).
      */
     private StateTaxCalculatorFactory mockStateFactory(String stateCode, BigDecimal rate,
+                                                         boolean taxesCapitalGainsAsOrdinaryIncome,
                                                          boolean exemptsSocialSecurity) {
         var factory = mock(StateTaxCalculatorFactory.class);
         StateTaxCalculator proportional = new StateTaxCalculator() {
@@ -455,7 +523,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
             @Override
             public boolean taxesCapitalGainsAsOrdinaryIncome() {
-                return false;
+                return taxesCapitalGainsAsOrdinaryIncome;
             }
 
             @Override
