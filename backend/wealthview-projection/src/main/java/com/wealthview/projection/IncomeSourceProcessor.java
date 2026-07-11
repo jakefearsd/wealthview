@@ -105,7 +105,6 @@ class IncomeSourceProcessor {
         BigDecimal depreciationTotal = BigDecimal.ZERO;
         BigDecimal rentalLossApplied = BigDecimal.ZERO;
         BigDecimal suspendedLoss = priorSuspendedLoss;
-        BigDecimal ssTaxable = BigDecimal.ZERO;
         BigDecimal seTax = BigDecimal.ZERO;
         Map<String, BigDecimal> incomeBySource = new HashMap<>();
         List<RentalPropertyYearDetail> rentalDetails = new ArrayList<>();
@@ -186,12 +185,11 @@ class IncomeSourceProcessor {
         // Social Security taxable income is the single combined figure, added once (its per-source
         // cash inflow was already folded into totalCashInflow / incomeBySource in the loop above).
         totalTaxableIncome = totalTaxableIncome.add(combinedSsTaxable);
-        ssTaxable = combinedSsTaxable;
 
         return new IncomeSourceYearResult(
                 totalCashInflow, totalTaxableIncome,
                 rentalIncomeGross, rentalExpensesTotal, depreciationTotal,
-                rentalLossApplied, suspendedLoss, ssTaxable, seTax,
+                rentalLossApplied, suspendedLoss, combinedSsTaxable, seTax,
                 Map.copyOf(incomeBySource), List.copyOf(rentalDetails));
     }
 

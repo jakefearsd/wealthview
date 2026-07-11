@@ -24,6 +24,8 @@ import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
  */
 final class OptimizationContextBuilder {
 
+    private static final SocialSecurityTaxCalculator SS_TAX_CALCULATOR = new SocialSecurityTaxCalculator();
+
     @Nullable
     private final FederalTaxCalculator taxCalculator;
     @Nullable
@@ -156,8 +158,6 @@ final class OptimizationContextBuilder {
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, marginalRates,
                         taxCtx, dsBracketCeilingByYear, ltcgRateByYear));
     }
-
-    private static final SocialSecurityTaxCalculator SS_TAX_CALCULATOR = new SocialSecurityTaxCalculator();
 
     /**
      * Replaces the 100%-taxable Social Security figure baked into {@code incomeData} by

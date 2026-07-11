@@ -17,7 +17,6 @@ import org.springframework.stereotype.Component;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.ProjectionEngine;
 import com.wealthview.core.projection.dto.AssetClass;
-import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -66,11 +65,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private final ScenarioParamsParser paramsParser = new ScenarioParamsParser();
     private final SpendingFeasibilityAnalyzer feasibilityAnalyzer = new SpendingFeasibilityAnalyzer();
-    private final RetirementWithdrawalProcessor retirementWithdrawalProcessor = new RetirementWithdrawalProcessor();
     private final RetirementTaxAnnotator retirementTaxAnnotator = new RetirementTaxAnnotator();
     private final TaxStrategyFactory taxStrategyFactory;
-    private final IncomeSourceProcessor incomeSourceProcessor;
-    private final IncomeContributionCalculator incomeContributionCalculator;
+    private final YearFinanceResolver yearFinanceResolver;
     /**
      * Retained separately from {@link #taxStrategyFactory} (which wraps the same instance inside a
      * {@code TaxCalculationStrategy}) so {@link #buildPoolStrategy} can thread the raw standard-
@@ -113,9 +110,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var rentalLossCalculator = new RentalLossCalculator();
         var ssTaxCalculator = new SocialSecurityTaxCalculator();
         var seTaxCalculator = new SelfEmploymentTaxCalculator();
-        this.incomeSourceProcessor = new IncomeSourceProcessor(
+        var incomeSourceProcessor = new IncomeSourceProcessor(
                 rentalLossCalculator, ssTaxCalculator, seTaxCalculator);
-        this.incomeContributionCalculator = new IncomeContributionCalculator();
+        this.yearFinanceResolver = new YearFinanceResolver(
+                incomeSourceProcessor, new IncomeContributionCalculator(),
+                new RetirementWithdrawalProcessor());
     }
 
     @Timed("wealthview.projection.run")
@@ -302,7 +301,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
         }
 
-        var comp = resolveYearFinances(ctx, year, age, retired, yearsInRetirement, startBalance, acc, rmdAmount);
+        var comp = yearFinanceResolver.resolve(new YearFinanceResolver.YearContext(
+                pool, ctx.incomeSources(), ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
+                ctx.inflationRate(), year, age, retired, yearsInRetirement, startBalance,
+                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdAmount));
 
         BigDecimal suspendedLoss = comp.suspendedLoss();
         BigDecimal conversionAmount = comp.conversionAmount();
@@ -337,201 +339,6 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
         return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss));
-    }
-
-    /** Maximum fixed-point passes over the year's Social Security provisional-income convergence. */
-    private static final int MAX_SS_CONVERGENCE_ITERATIONS = 4;
-    /** Convergence tolerance (dollars) for the Social Security provisional-income fixed point. */
-    private static final BigDecimal SS_CONVERGENCE_TOLERANCE = BigDecimal.ONE;
-
-    /**
-     * Resolves the year's income, Roth conversion, and retirement withdrawal — the pool-mutating
-     * core of a projection year — with the audit-B2 Social Security provisional-income convergence.
-     *
-     * <p>Taxable Social Security depends on the year's realized ORDINARY income (traditional
-     * withdrawals + RMD excess + Roth conversion + realized LTCG/dividends), but those are only known
-     * AFTER the conversion/withdrawal steps run, and they in turn can depend (under bracket-fill
-     * conversion and dynamic-sequencing withdrawal) on how much Social Security is taxable. The loop
-     * resolves this circular dependency as a fixed point: it snapshots the post-growth pool, runs the
-     * year with an estimate of the realized ordinary income folded into the Social Security
-     * provisional base, then re-runs from the snapshot with the actual realized figure until the two
-     * agree within {@link #SS_CONVERGENCE_TOLERANCE} or {@link #MAX_SS_CONVERGENCE_ITERATIONS} passes.
-     * Taxable Social Security is monotone piecewise-linear in ordinary income and capped at 85%, and
-     * the withdrawal-feedback map is a contraction (|slope| ≤ 0.85), so it converges quickly; in the
-     * common ordered-withdrawal case the realized ordinary income is independent of Social Security
-     * taxability, giving the exact fixed point in a single re-run.
-     *
-     * <p>When no Social Security source is active this year the loop is skipped entirely, so the
-     * behavior is byte-identical to a single pass with zero extra provisional income.
-     */
-    private YearComputation resolveYearFinances(ProjectionRunContext ctx, int year, int age, boolean retired,
-                                                int yearsInRetirement, BigDecimal startBalance,
-                                                YearAccumulator acc, BigDecimal rmdAmount) {
-        var pool = ctx.pool();
-        boolean converge = hasActiveSocialSecurity(ctx.incomeSources(), age);
-        PoolStrategy.Memento snapshot = converge ? pool.snapshot() : null;
-
-        BigDecimal additionalProvisional = BigDecimal.ZERO;
-        var comp = computeIncomeConversionWithdrawal(
-                ctx, year, age, retired, yearsInRetirement, startBalance, acc, rmdAmount, additionalProvisional);
-
-        if (converge) {
-            int iterations = 1;
-            while (comp.realizedPortfolioTaxable().subtract(additionalProvisional).abs()
-                            .compareTo(SS_CONVERGENCE_TOLERANCE) >= 0
-                    && iterations < MAX_SS_CONVERGENCE_ITERATIONS) {
-                iterations++;
-                additionalProvisional = comp.realizedPortfolioTaxable();
-                pool.restore(snapshot);
-                comp = computeIncomeConversionWithdrawal(
-                        ctx, year, age, retired, yearsInRetirement, startBalance, acc, rmdAmount,
-                        additionalProvisional);
-            }
-        }
-        return comp;
-    }
-
-    private boolean hasActiveSocialSecurity(List<ProjectionIncomeSourceInput> incomeSources, int age) {
-        for (var source : incomeSources) {
-            if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY
-                    && ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Everything a resolved projection year yields, plus the realized ordinary income for convergence. */
-    private record YearComputation(
-            IncomeSourceProcessor.IncomeSourceYearResult isResult,
-            BigDecimal totalActiveIncome,
-            BigDecimal effectiveOtherIncome,
-            BigDecimal conversionAmount,
-            BigDecimal taxLiability,
-            BigDecimal suspendedLoss,
-            BigDecimal withdrawals,
-            BigDecimal previousWithdrawal,
-            BigDecimal surplusReinvested,
-            BigDecimal wdFromTaxable,
-            BigDecimal wdFromTraditional,
-            BigDecimal wdFromRoth,
-            BigDecimal ltcgTax,
-            PoolStrategy.TaxSourceResult combinedTaxSource,
-            BigDecimal realizedPortfolioTaxable) {
-    }
-
-    private YearComputation computeIncomeConversionWithdrawal(
-            ProjectionRunContext ctx, int year, int age, boolean retired, int yearsInRetirement,
-            BigDecimal startBalance, YearAccumulator acc, BigDecimal rmdAmount,
-            BigDecimal additionalProvisionalIncome) {
-        var pool = ctx.pool();
-        var incomeResult = processIncomeAndConversions(
-                pool, ctx.incomeSources(), age, yearsInRetirement, year, acc.suspendedLoss(),
-                resolveConversionOverride(ctx.spendingPlan(), year), ctx.inflationRate(), ctx.currentYear(),
-                rmdAmount, additionalProvisionalIncome);
-        BigDecimal suspendedLoss = incomeResult.suspendedLoss();
-        BigDecimal conversionAmount = incomeResult.conversionAmount();
-        BigDecimal taxLiability = incomeResult.taxLiability();
-
-        BigDecimal withdrawals = BigDecimal.ZERO;
-        BigDecimal surplusReinvested = null;
-        BigDecimal wdFromTaxable = BigDecimal.ZERO;
-        BigDecimal wdFromTraditional = BigDecimal.ZERO;
-        BigDecimal wdFromRoth = BigDecimal.ZERO;
-        BigDecimal previousWithdrawal = acc.previousWithdrawal();
-        PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
-        BigDecimal ltcgTax = BigDecimal.ZERO;
-        BigDecimal realizedLtcgIncome = BigDecimal.ZERO;
-        if (retired) {
-            var rwCtx = new RetirementWithdrawalProcessor.RetirementWithdrawalContext(
-                    pool, ctx.strategy(), ctx.spendingPlan(), age, yearsInRetirement, year,
-                    ctx.inflationRate(), incomeResult.totalActiveIncome(), startBalance,
-                    previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                    incomeResult.isResult(), ctx.taxStrategy(), rmdAmount);
-            var retirementResult = retirementWithdrawalProcessor.process(rwCtx);
-            withdrawals = retirementResult.withdrawals();
-            taxLiability = taxLiability.add(retirementResult.taxLiability());
-            previousWithdrawal = retirementResult.previousWithdrawal();
-            surplusReinvested = retirementResult.surplusReinvested();
-            wdFromTaxable = retirementResult.withdrawalFromTaxable();
-            wdFromTraditional = retirementResult.withdrawalFromTraditional();
-            wdFromRoth = retirementResult.withdrawalFromRoth();
-            withdrawalTaxSource = retirementResult.withdrawalTaxSource();
-            ltcgTax = retirementResult.ltcgTax();
-            realizedLtcgIncome = retirementResult.realizedLtcgIncome();
-        }
-
-        var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
-
-        // Realized ordinary income for the Social Security provisional-income fixed point: taxable
-        // traditional distributions (spend draw + RMD force-out) + Roth conversion + realized
-        // LTCG/dividend income. Matches the IRS worksheet's AGI-ex-SS additions.
-        BigDecimal realizedPortfolioTaxable = wdFromTraditional.add(conversionAmount).add(realizedLtcgIncome);
-
-        return new YearComputation(incomeResult.isResult(), incomeResult.totalActiveIncome(),
-                incomeResult.effectiveOtherIncome(), conversionAmount, taxLiability, suspendedLoss,
-                withdrawals, previousWithdrawal, surplusReinvested, wdFromTaxable, wdFromTraditional,
-                wdFromRoth, ltcgTax, combinedTaxSource, realizedPortfolioTaxable);
-    }
-
-    private BigDecimal resolveConversionOverride(SpendingPlan spendingPlan, int year) {
-        if (spendingPlan == null) {
-            return null;
-        }
-        return spendingPlan.conversionSchedule()
-                .map(schedule -> schedule.getOrDefault(year, BigDecimal.ZERO))
-                .orElse(null);
-    }
-
-    private record IncomeAndConversionResult(
-            IncomeSourceProcessor.IncomeSourceYearResult isResult,
-            BigDecimal totalActiveIncome,
-            BigDecimal effectiveOtherIncome,
-            BigDecimal conversionAmount,
-            BigDecimal taxLiability,
-            BigDecimal suspendedLoss,
-            PoolStrategy.TaxSourceResult conversionTaxSource) {
-    }
-
-    private IncomeAndConversionResult processIncomeAndConversions(
-            PoolStrategy pool, List<ProjectionIncomeSourceInput> incomeSources,
-            int age, int yearsInRetirement, int year, BigDecimal suspendedLoss,
-            BigDecimal conversionOverride, BigDecimal inflationRate, int baseYear, BigDecimal rmdAmount,
-            BigDecimal additionalProvisionalIncome) {
-
-        IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
-        BigDecimal totalActiveIncome;
-        BigDecimal taxableActiveIncome;
-
-        if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
-            incomeSourceResult = incomeSourceProcessor.process(incomeSources, age, yearsInRetirement,
-                    year, pool.getMagi(), pool.getFilingStatus(), suspendedLoss, inflationRate, baseYear,
-                    additionalProvisionalIncome);
-            suspendedLoss = incomeSourceResult.suspendedLossCarryforward();
-            totalActiveIncome = incomeSourceResult.totalCashInflow();
-            taxableActiveIncome = incomeSourceResult.totalTaxableIncome();
-        } else {
-            totalActiveIncome = incomeContributionCalculator.compute(
-                    incomeSources, age, yearsInRetirement, inflationRate);
-            taxableActiveIncome = totalActiveIncome;
-        }
-
-        BigDecimal effectiveOtherIncome = pool.computeEffectiveOtherIncome(taxableActiveIncome, BigDecimal.ZERO);
-
-        PoolStrategy.ConversionResult conversion;
-        if (conversionOverride != null && conversionOverride.compareTo(BigDecimal.ZERO) > 0) {
-            conversion = pool.executeRothConversionOverride(
-                    year, effectiveOtherIncome, conversionOverride, rmdAmount);
-        } else if (conversionOverride != null) {
-            // Override is present but zero → no conversion this year
-            conversion = new PoolStrategy.ConversionResult(
-                    BigDecimal.ZERO, BigDecimal.ZERO, PoolStrategy.TaxSourceResult.ZERO);
-        } else {
-            conversion = pool.executeRothConversion(year, effectiveOtherIncome, rmdAmount);
-        }
-
-        return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,
-                conversion.amountConverted(), conversion.taxLiability(), suspendedLoss, conversion.taxSource());
     }
 
 }

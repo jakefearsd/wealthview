@@ -775,7 +775,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
          * scalar traditional/roth balances, this year's booked qualified dividend, and the last tax
          * breakdown. Restoring returns the pool to its exact post-growth, pre-withdrawal state.
          */
-        record MultiPoolMemento(java.util.List<BigDecimal[]> lots, BigDecimal traditional,
+        record MultiPoolMemento(List<BigDecimal[]> lots, BigDecimal traditional,
                                 BigDecimal roth, BigDecimal qualifiedDividendIncome,
                                 Optional<CombinedTaxResult> lastTaxBreakdown) implements Memento {}
 
