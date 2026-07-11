@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +17,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.projection.dto.AllocationDto;
+import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
@@ -73,6 +76,9 @@ class ScenarioCrudServiceTest {
     @Mock
     private GuardrailSpendingProfileRepository guardrailProfileRepository;
 
+    @Mock
+    private SecurityClassificationService classificationService;
+
     private ScenarioCrudService service;
     private SimpleMeterRegistry meterRegistry;
 
@@ -88,7 +94,22 @@ class ScenarioCrudServiceTest {
         meterRegistry = new SimpleMeterRegistry();
         service = new ScenarioCrudService(scenarioRepository, tenantLookup, accountRepository,
                 spendingProfileRepository, accountService, scenarioIncomeSourceRepository,
-                incomeSourceRepository, guardrailProfileRepository, meterRegistry);
+                incomeSourceRepository, guardrailProfileRepository, classificationService, meterRegistry);
+    }
+
+    private ScenarioRequest scenarioRequestWithAccounts(List<CreateProjectionAccountRequest> accounts) {
+        return new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                accounts, null, null, null);
+    }
+
+    private ProjectionScenarioEntity captureSavedScenario() {
+        var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
+        verify(scenarioRepository).save(captor.capture());
+        return captor.getValue();
     }
 
     @Test
@@ -239,6 +260,8 @@ class ScenarioCrudServiceTest {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
         when(accountRepository.findByTenant_IdAndId(tenantId, linkedAccountId))
                 .thenReturn(Optional.of(linkedAccount));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
 
         var request = new ScenarioRequest(
                 "Linked Plan",
@@ -266,6 +289,38 @@ class ScenarioCrudServiceTest {
         // Linked accounts derive cost basis live from holdings; the entity field stays null
         // regardless of what the request carried.
         assertThat(saved.getAccounts().get(0).getCostBasis()).isNull();
+    }
+
+    @Test
+    void createScenario_manualAccountWithAllocation_persistsWeightMap() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var alloc = new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
+                new BigDecimal("15"), new BigDecimal("5"));
+        var request = scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
+                null, new BigDecimal("100000"), new BigDecimal("0"), null, new BigDecimal("90000"),
+                alloc, "taxable")));
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getAccounts().get(0).getAllocation())
+                .containsEntry("us_stock", new BigDecimal("60"))
+                .containsEntry("cash", new BigDecimal("5"));
+    }
+
+    @Test
+    void createScenario_allocationSumNot100_throws() {
+        var bad = new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
+                new BigDecimal("15"), new BigDecimal("10"));
+        var request = scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
+                null, new BigDecimal("100000"), new BigDecimal("0"), null, null, bad, "taxable")));
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("100");
     }
 
     @Test
@@ -347,6 +402,8 @@ class ScenarioCrudServiceTest {
                 .thenReturn(Optional.of(linkedAccount));
         when(accountService.computeBalance(linkedAccount, tenantId))
                 .thenReturn(new BigDecimal("150000.00"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
         when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
@@ -591,6 +648,8 @@ class ScenarioCrudServiceTest {
 
         when(accountService.computeBalance(linkedAccount, tenantId))
                 .thenReturn(new BigDecimal("250000.00"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
 
         var result = service.getScenario(tenantId, scenarioId);
 
@@ -615,6 +674,8 @@ class ScenarioCrudServiceTest {
 
         when(accountService.computeBalance(linkedAccount, tenantId))
                 .thenReturn(new BigDecimal("75000.00"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
 
         var result = service.listScenarios(tenantId);
 

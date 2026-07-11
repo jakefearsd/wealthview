@@ -12,14 +12,20 @@ public record ProjectionAccountResponse(
         BigDecimal initialBalance,
         BigDecimal annualContribution,
         BigDecimal expectedReturn,
+        BigDecimal costBasis,
+        AllocationDto allocation,
         String accountType) {
 
     /**
-     * Builds a response for a projection account. Balance is computed by the service layer
-     * (either the live linked-account balance or the hypothetical initial balance) since it
-     * depends on per-tenant account data outside this record's visibility.
+     * Builds a response for a projection account. Balance, effective allocation, and cost basis
+     * are computed by the service layer (they depend on per-tenant account/holdings data outside
+     * this record's visibility): balance is the live linked-account balance or the hypothetical
+     * initial balance; allocation is the user override, else holdings-derived, else
+     * {@link AssetAllocation#ALL_US}; cost basis is the live holdings sum or the hypothetical
+     * stored value.
      */
-    public static ProjectionAccountResponse from(ProjectionAccountEntity entity, BigDecimal balance) {
+    public static ProjectionAccountResponse from(ProjectionAccountEntity entity, BigDecimal balance,
+                                                 AllocationDto allocation, BigDecimal costBasis) {
         var linked = entity.getLinkedAccount();
         return new ProjectionAccountResponse(
                 entity.getId(),
@@ -28,6 +34,8 @@ public record ProjectionAccountResponse(
                 balance,
                 entity.getAnnualContribution(),
                 entity.getExpectedReturn(),
+                costBasis,
+                allocation,
                 entity.getAccountType());
     }
 }

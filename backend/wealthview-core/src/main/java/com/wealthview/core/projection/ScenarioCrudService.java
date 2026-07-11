@@ -2,6 +2,7 @@ package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,6 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.wealthview.core.account.AccountService;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
+import com.wealthview.core.projection.dto.AllocationDto;
+import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.GuardrailProfileSummary;
 import com.wealthview.core.projection.dto.ProjectionAccountResponse;
@@ -53,6 +57,7 @@ public class ScenarioCrudService {
     private final ScenarioIncomeSourceRepository scenarioIncomeSourceRepository;
     private final IncomeSourceRepository incomeSourceRepository;
     private final GuardrailSpendingProfileRepository guardrailProfileRepository;
+    private final SecurityClassificationService classificationService;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -64,6 +69,7 @@ public class ScenarioCrudService {
                                ScenarioIncomeSourceRepository scenarioIncomeSourceRepository,
                                IncomeSourceRepository incomeSourceRepository,
                                GuardrailSpendingProfileRepository guardrailProfileRepository,
+                               SecurityClassificationService classificationService,
                                MeterRegistry meterRegistry) {
         this.scenarioRepository = scenarioRepository;
         this.tenantLookup = tenantLookup;
@@ -73,6 +79,7 @@ public class ScenarioCrudService {
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
         this.incomeSourceRepository = incomeSourceRepository;
         this.guardrailProfileRepository = guardrailProfileRepository;
+        this.classificationService = classificationService;
         this.meterRegistry = meterRegistry;
     }
 
@@ -190,12 +197,30 @@ public class ScenarioCrudService {
     private List<ProjectionAccountResponse> mapAccounts(ProjectionScenarioEntity scenario, UUID tenantId) {
         return scenario.getAccounts().stream()
                 .map(acct -> {
-                    var balance = acct.getLinkedAccount() != null
-                            ? accountService.computeBalance(acct.getLinkedAccount(), tenantId)
+                    var linked = acct.getLinkedAccount();
+                    var balance = linked != null
+                            ? accountService.computeBalance(linked, tenantId)
                             : acct.getInitialBalance();
-                    return ProjectionAccountResponse.from(acct, balance);
+                    var allocation = effectiveAllocation(acct, tenantId);
+                    var costBasis = linked != null
+                            ? accountService.computeCostBasis(linked, tenantId)
+                            : acct.getCostBasis() != null ? acct.getCostBasis() : acct.getInitialBalance();
+                    return ProjectionAccountResponse.from(acct, balance, allocation, costBasis);
                 })
                 .toList();
+    }
+
+    private AllocationDto effectiveAllocation(ProjectionAccountEntity acct, UUID tenantId) {
+        if (acct.getAllocation() != null) {
+            var weights = new EnumMap<AssetClass, BigDecimal>(AssetClass.class);
+            acct.getAllocation().forEach((k, v) -> weights.put(AssetClass.fromKey(k), v));
+            return AllocationDto.fromAllocation(new AssetAllocation(weights));
+        }
+        if (acct.getLinkedAccount() != null) {
+            return AllocationDto.fromAllocation(
+                    classificationService.deriveAllocation(tenantId, acct.getLinkedAccount().getId()).allocation());
+        }
+        return AllocationDto.fromAllocation(AssetAllocation.ALL_US);
     }
 
     private GuardrailProfileSummary mapGuardrailProfile(ProjectionScenarioEntity scenario) {
@@ -250,6 +275,10 @@ public class ScenarioCrudService {
             // Linked accounts always derive cost basis live from holdings (ProjectionInputBuilder);
             // the stored field is only meaningful for hypothetical accounts.
             projAcct.setCostBasis(linkedAccount != null ? null : acctReq.costBasis());
+            if (acctReq.allocation() != null) {
+                acctReq.allocation().validate();
+                projAcct.setAllocation(acctReq.allocation().toWeightMap());
+            }
             scenario.addAccount(projAcct);
         }
     }

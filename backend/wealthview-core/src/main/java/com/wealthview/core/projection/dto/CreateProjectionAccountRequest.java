@@ -9,16 +9,20 @@ public record CreateProjectionAccountRequest(
         BigDecimal annualContribution,
         BigDecimal expectedReturn,
         BigDecimal costBasis,
+        AllocationDto allocation,
         String accountType) {
 
-    /**
-     * Back-compat convenience for the many existing call sites (mostly tests) that predate
-     * the {@code cost_basis} field: defaults it to null, matching the "unset" wire shape —
-     * {@code ProjectionInputBuilder} falls back to {@code initialBalance} downstream.
-     */
+    /** Back-compat for call sites predating cost_basis + allocation (defaults both to null). */
     public CreateProjectionAccountRequest(UUID linkedAccountId, BigDecimal initialBalance,
                                           BigDecimal annualContribution, BigDecimal expectedReturn,
                                           String accountType) {
-        this(linkedAccountId, initialBalance, annualContribution, expectedReturn, null, accountType);
+        this(linkedAccountId, initialBalance, annualContribution, expectedReturn, null, null, accountType);
+    }
+
+    /** Back-compat for call sites that set cost_basis but predate allocation. */
+    public CreateProjectionAccountRequest(UUID linkedAccountId, BigDecimal initialBalance,
+                                          BigDecimal annualContribution, BigDecimal expectedReturn,
+                                          BigDecimal costBasis, String accountType) {
+        this(linkedAccountId, initialBalance, annualContribution, expectedReturn, costBasis, null, accountType);
     }
 }
