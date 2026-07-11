@@ -28,8 +28,23 @@ import static org.mockito.Mockito.when;
  * (matching the sibling {@code RothConversionOptimizerTest} stub). The projection runs in REAL
  * (today's-dollars) terms: the portfolio grows at the real return assumption and spending is
  * constant real, so the captured schedule still shows a genuine Roth-conversion benefit — lifetime
- * tax falls from $405,160 to $337,312 — while the slower, constant-real drawdown leaves a small
+ * tax falls from $339,016 to $293,276 — while the slower, constant-real drawdown leaves a small
  * traditional balance at the end age. These assertions are the contract the decomposition must preserve.
+ *
+ * <p><strong>Audit C4 golden regen (2026-07-12):</strong> this golden moved when {@code
+ * ConversionSimulator.applyRmds} started crediting the after-tax RMD remainder to the taxable pool
+ * instead of letting it vanish (the {@code returnMean} FRAME fix does not touch this fixture --
+ * {@code .assumptions(0.06, ...)} is an explicit real rate passed directly to the builder,
+ * bypassing {@code JointConversionSearch#resolveReturnMean} entirely). The RMD credit swells the
+ * baseline (no-conversion) arm's spendable taxable balance from RMD age onward, which lowers
+ * {@code lifetimeTaxWithout} — so the tax-minimizing search now finds a SMALLER optimal conversion
+ * fraction (1.0 -&gt; 0.6898) than before: converting is worth less when the alternative
+ * (letting RMDs happen and keeping the proceeds) got cheaper. Every changed literal below was
+ * independently reconciled by hand: e.g. year 0, {@code traditionalBalance = 900000*1.06 -
+ * conversionByYear[0]}; {@code taxableBalance = 150000*1.06 - conversionTaxByYear[0] -
+ * essentialFloor(40000)}; {@code rothBalance = 50000*1.06 + conversionByYear[0]} -- all match the
+ * dumped figures to the cent. {@code targetTraditionalBalance} is untouched (a pure function of the
+ * static RMD-target-bracket config, independent of both the frame and the RMD credit).
  */
 class RothConversionOptimizerCharacterizationTest {
 
@@ -81,12 +96,12 @@ class RothConversionOptimizerCharacterizationTest {
         var schedule = goldenOptimizer().optimize();
 
         assertThat(schedule.conversionByYear()).hasSize(28);
-        assertThat(schedule.conversionFraction()).isEqualTo(1.0, offset(TOL));
-        assertThat(schedule.lifetimeTaxWith()).isEqualTo(337311.70943966054, offset(1e-3));
-        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(405159.95124977175, offset(1e-3));
+        assertThat(schedule.conversionFraction()).isEqualTo(0.6897513152348189, offset(TOL));
+        assertThat(schedule.lifetimeTaxWith()).isEqualTo(293275.59829058056, offset(1e-3));
+        assertThat(schedule.lifetimeTaxWithout()).isEqualTo(339016.0299771314, offset(1e-3));
         assertThat(schedule.exhaustionAge()).isEqualTo(90);
         // Real terms: constant-real (lower) spending draws down traditional more slowly, so it is not
-        // fully exhausted to the target by the end age (see pinsFinalYear: $46,131 remains).
+        // fully exhausted to the target by the end age (see pinsFinalYear: $664,264 remains).
         assertThat(schedule.exhaustionTargetMet()).isFalse();
         assertThat(schedule.targetTraditionalBalance()).isEqualTo(1217700.0, offset(1e-3));
     }
@@ -103,11 +118,11 @@ class RothConversionOptimizerCharacterizationTest {
     void optimize_largeTraditionalIraScenario_pinsFirstConversionYear() {
         var schedule = goldenOptimizer().optimize();
 
-        assertThat(schedule.conversionByYear()[0]).isEqualTo(100000.0, offset(1e-3));
-        assertThat(schedule.conversionTaxByYear()[0]).isEqualTo(20000.0, offset(1e-3));
-        assertThat(schedule.traditionalBalance()[0]).isEqualTo(854000.0, offset(1e-3));
-        assertThat(schedule.rothBalance()[0]).isEqualTo(153000.0, offset(1e-3));
-        assertThat(schedule.taxableBalance()[0]).isEqualTo(99000.0, offset(1e-3));
+        assertThat(schedule.conversionByYear()[0]).isEqualTo(68975.13152348189, offset(1e-3));
+        assertThat(schedule.conversionTaxByYear()[0]).isEqualTo(13795.026304696377, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[0]).isEqualTo(885024.8684765181, offset(1e-3));
+        assertThat(schedule.rothBalance()[0]).isEqualTo(121975.13152348189, offset(1e-3));
+        assertThat(schedule.taxableBalance()[0]).isEqualTo(105204.97369530363, offset(1e-3));
         assertThat(schedule.projectedRmd()[0]).isEqualTo(0.0, offset(TOL));
     }
 
@@ -115,10 +130,10 @@ class RothConversionOptimizerCharacterizationTest {
     void optimize_largeTraditionalIraScenario_pinsSecondConversionYear() {
         var schedule = goldenOptimizer().optimize();
 
-        assertThat(schedule.conversionByYear()[1]).isEqualTo(100000.0, offset(1e-3));
-        assertThat(schedule.traditionalBalance()[1]).isEqualTo(805240.0, offset(1e-3));
-        assertThat(schedule.rothBalance()[1]).isEqualTo(262180.0, offset(1e-3));
-        assertThat(schedule.taxableBalance()[1]).isEqualTo(44940.0, offset(1e-3));
+        assertThat(schedule.conversionByYear()[1]).isEqualTo(68975.13152348189, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[1]).isEqualTo(869151.2290616273, offset(1e-3));
+        assertThat(schedule.rothBalance()[1]).isEqualTo(198268.7709383727, offset(1e-3));
+        assertThat(schedule.taxableBalance()[1]).isEqualTo(57722.24581232548, offset(1e-3));
     }
 
     @Test
@@ -127,9 +142,9 @@ class RothConversionOptimizerCharacterizationTest {
 
         // Index 13 = age 75, first year an RMD applies for a 1963 birth year.
         assertThat(schedule.conversionByYear()[13]).isEqualTo(0.0, offset(TOL));
-        assertThat(schedule.traditionalBalance()[13]).isEqualTo(568949.8286769011, offset(1e-3));
-        assertThat(schedule.rothBalance()[13]).isEqualTo(896472.2964736733, offset(1e-3));
-        assertThat(schedule.projectedRmd()[13]).isEqualTo(24284.169272487674, offset(1e-3));
+        assertThat(schedule.traditionalBalance()[13]).isEqualTo(739042.8755032691, offset(1e-3));
+        assertThat(schedule.rothBalance()[13]).isEqualTo(769947.1029003205, offset(1e-3));
+        assertThat(schedule.projectedRmd()[13]).isEqualTo(30106.773670709117, offset(1e-3));
     }
 
     @Test
@@ -137,9 +152,9 @@ class RothConversionOptimizerCharacterizationTest {
         var schedule = goldenOptimizer().optimize();
 
         assertThat(schedule.conversionByYear()[27]).isEqualTo(0.0, offset(TOL));
-        assertThat(schedule.traditionalBalance()[27]).isEqualTo(46131.06304972322, offset(1e-3));
-        assertThat(schedule.rothBalance()[27]).isEqualTo(2026837.7613215828, offset(1e-3));
-        assertThat(schedule.taxableBalance()[27]).isEqualTo(0.0, offset(TOL));
+        assertThat(schedule.traditionalBalance()[27]).isEqualTo(664263.804110728, offset(1e-3));
+        assertThat(schedule.rothBalance()[27]).isEqualTo(1740776.4506689948, offset(1e-3));
+        assertThat(schedule.taxableBalance()[27]).isEqualTo(1929.7811737717057, offset(1e-3));
     }
 
     @Test

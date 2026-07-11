@@ -20,6 +20,20 @@ import com.wealthview.core.projection.tax.FilingStatus;
  *
  * <p>Pure: no RNG, no shared mutable state across {@link #simulateForFraction}
  * calls. The same inputs always yield the same {@link SimResult}.
+ *
+ * <p><strong>Frame (audit C4):</strong> every dollar figure this class produces — pool balances,
+ * bracket comparisons, the target-traditional-balance projection — is in CONSTANT-REAL terms.
+ * {@link #returnMean} grows the three pools ({@code traditional/roth/taxable *= (1 + returnMean)});
+ * conversion and RMD-target bracket ceilings are priced via {@code
+ * taxCalculator.computeMaxIncomeForBracket(..., ZERO)} — {@code ZERO} inflation, i.e. a FLAT real
+ * ceiling with no annual indexing. {@code returnMean} MUST therefore already be a real, fee-adjusted
+ * rate before it reaches this class; {@link RothConversionOptimizer.Builder#assumptions} takes it
+ * as-is with no further conversion. The one production caller, {@code JointConversionSearch},
+ * resolves that rate — see {@code JointConversionSearch#resolveReturnMean} — from the scenario's own
+ * fee-adjusted, allocation-blended real return by default, or Fisher-converts an explicit (nominal)
+ * override minus the scenario fee. Passing a nominal rate here (e.g. a raw CMA nominal mean) inflates
+ * pool growth relative to the flat bracket ceilings, overstates projected RMD pressure, and biases
+ * conversion recommendations upward.
  */
 final class ConversionSimulator {
 
@@ -107,10 +121,11 @@ final class ConversionSimulator {
                         : rentalAdjustmentCalculator.adjustmentForYear(yearIndex,
                             baseOtherIncome + convResult.conversionAmount(),
                             new HashMap<>(suspendedLosses)));
-            var rmdResult = applyRmds(traditional, priorYearEndTraditional, age,
+            var rmdResult = applyRmds(traditional, taxable, priorYearEndTraditional, age,
                     calendarYear, yearIndex, baseOtherIncome, effectiveOtherIncome,
                     convResult.conversionAmount(), suspendedLosses);
             traditional = rmdResult.traditional();
+            taxable = rmdResult.taxable();
 
             // Step 4: Spending withdrawals
             var withdrawal = processSpendingWithdrawal(taxable, traditional, roth,
@@ -182,7 +197,7 @@ final class ConversionSimulator {
     }
 
     private RmdStepResult applyRmds(
-            double traditional, double priorYearEndTraditional,
+            double traditional, double taxable, double priorYearEndTraditional,
             int age, int calendarYear, int yearIndex,
             double baseOtherIncome, double effectiveOtherIncome,
             double conversionAmount,
@@ -197,6 +212,13 @@ final class ConversionSimulator {
             traditional -= rmdAmount;
             rmdTax = computeIncrementalTax(rmdAmount, effectiveOtherIncome, calendarYear);
 
+            // A forced RMD doesn't vanish: the after-tax remainder is proceeds the account owner
+            // actually receives and (absent an offsetting spending need) holds/reinvests in the
+            // taxable account. Crediting it here keeps traditional -= RMD, RMD == tax + credited
+            // remainder, and stops the without-conversion arm from being artificially penalized by
+            // proceeds that disappeared from the simulation (audit C4).
+            taxable += Math.max(0, rmdAmount - rmdTax);
+
             // Non-conversion RMD year: track rental loss carryforward
             if (conversionAmount == 0 && !rentalAdjustmentCalculator.isEmpty()) {
                 rentalAdjustmentCalculator.adjustmentForYear(yearIndex,
@@ -204,7 +226,7 @@ final class ConversionSimulator {
             }
         }
 
-        return new RmdStepResult(traditional, rmdAmount, rmdTax);
+        return new RmdStepResult(traditional, taxable, rmdAmount, rmdTax);
     }
 
     private record ConvergenceResult(double conversionAmount, double conversionTax) {}
@@ -212,7 +234,7 @@ final class ConversionSimulator {
     private record ConversionStepResult(double traditional, double roth, double taxable,
                                         double conversionAmount, double conversionTax) {}
 
-    private record RmdStepResult(double traditional, double rmdAmount, double rmdTax) {}
+    private record RmdStepResult(double traditional, double taxable, double rmdAmount, double rmdTax) {}
 
     private record WithdrawalResult(double taxable, double traditional, double roth,
                                     double withdrawalTax) {}

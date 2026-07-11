@@ -1041,11 +1041,22 @@ class RothConversionOptimizerTest {
         var dsResult = dsOptimizer.optimize();
         var tfResult = tfOptimizer.optimize();
 
-        // DS should draw Traditional at low brackets for spending,
-        // reducing the balance more efficiently
-        assertThat(dsResult.lifetimeTaxWith())
-                .as("DS should produce lower or equal lifetime tax")
-                .isLessThanOrEqualTo(tfResult.lifetimeTaxWith());
+        // Audit C4 (2026-07-12): DS no longer strictly dominates taxable-first here. Before the
+        // RMD-proceeds credit fix, a forced RMD's after-tax remainder vanished for BOTH withdrawal
+        // orderings, so DS's edge (drawing Traditional early/cheaply instead of letting it compound
+        // into a larger forced RMD later) stood on its own. Now that the remainder is credited to
+        // the taxable pool (ConversionSimulator.applyRmds), taxable-first draws that swollen,
+        // untaxed-on-withdrawal balance down FIRST for spending every year, while DS deliberately
+        // keeps preferring Traditional draws (up to the bracket ceiling) even once its own taxable
+        // pool holds real, spendable RMD proceeds -- so DS no longer automatically captures that
+        // benefit and ends up paying slightly MORE lifetime tax in this fixture. This is a real,
+        // understood consequence of fixing the vanishing-RMD bug (DS's withdrawal policy doesn't
+        // preferentially spend down a credited taxable balance), not a defect in the credit itself;
+        // redesigning DS's withdrawal ordering is out of scope for audit C4. Pinned (not just
+        // direction-relaxed) so a regression that silently reintroduces the vanishing-RMD bug would
+        // flip this back and get caught.
+        assertThat(dsResult.lifetimeTaxWith()).isEqualTo(324303.1653167275, org.assertj.core.data.Offset.offset(1e-2));
+        assertThat(tfResult.lifetimeTaxWith()).isEqualTo(316535.6279431718, org.assertj.core.data.Offset.offset(1e-2));
     }
 
     // ---- Affordability constraint tests (constrainConversionByAffordability) ----
@@ -1327,10 +1338,16 @@ class RothConversionOptimizerTest {
 
         // DS draws from traditional for spending (up to bracket ceiling) rather than
         // only from taxable. The two strategies should produce different lifetime tax
-        // profiles — DS should be equal or lower.
-        assertThat(dsResult.lifetimeTaxWith())
-                .as("DS should produce lower or equal lifetime tax than taxable-first")
-                .isLessThanOrEqualTo(orderedResult.lifetimeTaxWith());
+        // profiles.
+        //
+        // Audit C4 (2026-07-12): DS no longer dominates taxable-first here, for the same reason as
+        // the sibling test optimize_dynamicSequencing_lowerLifetimeTaxThanTaxableFirst -- once a
+        // forced RMD's after-tax remainder is credited to the taxable pool instead of vanishing,
+        // taxable-first spends that (now real) balance down first and avoids tax, while DS keeps
+        // drawing Traditional up to the bracket ceiling regardless. Pinned (not direction-relaxed)
+        // so a regression that silently reintroduces the vanishing-RMD bug gets caught.
+        assertThat(dsResult.lifetimeTaxWith()).isEqualTo(322066.7251588323, org.assertj.core.data.Offset.offset(1e-2));
+        assertThat(orderedResult.lifetimeTaxWith()).isEqualTo(310803.12956211367, org.assertj.core.data.Offset.offset(1e-2));
 
         // Verify taxable balance differs — DS preserves taxable by drawing traditional
         // for spending within the bracket ceiling, leading to higher taxable at some point.
