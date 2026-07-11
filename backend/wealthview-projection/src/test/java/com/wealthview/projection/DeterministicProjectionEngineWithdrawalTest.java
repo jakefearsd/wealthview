@@ -485,7 +485,15 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         int rmdStartAge = 73; // SECURE 2.0 start age for birth years well before 1960
-        int currentYear = LocalDate.now().getYear();
+        // Pinned rather than derived from LocalDate.now(): a wall-clock-relative birth year
+        // (currentYear - rmdStartAge) crosses the SECURE-2.0 threshold in 2033, at which point
+        // birthYear would land on/after 1960 and rmdStartAge would silently become 75, breaking
+        // this test's assumptions. A fixed referenceYear + a birth year well before 1960 keeps the
+        // age arithmetic and the rmdStartAge=73 assumption stable regardless of the wall clock.
+        int referenceYear = 2025;
+        int rmdBirthYear = 1952;         // age 73 at referenceYear -- exactly rmdStartAge
+        int noRmdBirthYear = 1953;       // age 72 at referenceYear -- one below rmdStartAge
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1); // comfortably before referenceYear
 
         // Traditional-heavy retiree, already retired, taxable-first order and 0% returns so the
         // small spend need is fully covered by taxable and every figure is exact -- isolating the
@@ -495,19 +503,19 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
                 acct("500000.0000", "0", "0.0000", "taxable"));
 
         var rmdInput = createInput(
-                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO,
+                retirementDate, 95, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
-                """.formatted(currentYear - rmdStartAge),
-                accounts);
+                """.formatted(rmdBirthYear),
+                accounts, null, referenceYear, List.of());
         // Same scenario one birth-year younger: age is one below the RMD start age, so rmdAmount
         // stays zero and this run isolates what the year would have looked like without the RMD.
         var noRmdInput = createInput(
-                LocalDate.now().minusYears(1), 95, BigDecimal.ZERO,
+                retirementDate, 95, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
-                """.formatted(currentYear - (rmdStartAge - 1)),
-                accounts);
+                """.formatted(noRmdBirthYear),
+                accounts, null, referenceYear, List.of());
 
         var rmdYear = engineTax.run(rmdInput).yearlyData().getFirst();
         var noRmdYear = engineTax.run(noRmdInput).yearlyData().getFirst();
