@@ -14,7 +14,10 @@ const mockScenario: Scenario = {
     inflation_rate: 0.03,
     params_json: null,
     accounts: [
-        { id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000, annual_contribution: 10000, expected_return: 0.07, account_type: 'taxable' },
+        {
+            id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000, annual_contribution: 10000,
+            expected_return: 0.07, account_type: 'taxable', cost_basis: null, allocation: null, allocation_is_override: false,
+        },
     ],
     spending_profile: null,
     guardrail_profile: null,

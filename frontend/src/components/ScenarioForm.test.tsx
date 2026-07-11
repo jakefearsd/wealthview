@@ -16,7 +16,7 @@ vi.mock('../utils/format', () => ({
     parseCurrencyInput: (v: string) => v.replace(/,/g, ''),
 }));
 
-vi.mock('../utils/styles', () => ({ inputStyle: {} }));
+vi.mock('../utils/styles', () => ({ inputStyle: {}, labelStyle: {}, inputFieldStyle: {} }));
 
 vi.mock('./WithdrawalStrategySection', () => ({
     default: () => <div data-testid="withdrawal-strategy" />,
@@ -96,5 +96,39 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.name).toBe('My Plan');
+    });
+
+    it('customizes an account allocation and submits it as an override', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.click(screen.getByText(/customize allocation/i));
+        fireEvent.change(screen.getByLabelText(/US Stocks/i), { target: { value: '70' } });
+        fireEvent.change(screen.getByLabelText(/Intl Stocks/i), { target: { value: '20' } });
+        fireEvent.change(screen.getByLabelText(/Bonds/i), { target: { value: '5' } });
+        fireEvent.change(screen.getByLabelText(/Cash/i), { target: { value: '5' } });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].allocation).toEqual({ us_stock: 70, intl_stock: 20, bond: 5, cash: 5 });
+    });
+
+    it('sends allocation null for an account left in the derived state', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].allocation).toBeNull();
     });
 });

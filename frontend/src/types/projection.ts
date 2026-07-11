@@ -1,3 +1,10 @@
+export interface AllocationInput {
+    us_stock: number;
+    intl_stock: number;
+    bond: number;
+    cash: number;
+}
+
 export interface ProjectionAccount {
     id: string;
     linked_account_id: string | null;
@@ -6,6 +13,9 @@ export interface ProjectionAccount {
     annual_contribution: number;
     expected_return: number;
     account_type: string;
+    cost_basis: number | null;
+    allocation: AllocationInput | null;
+    allocation_is_override: boolean;
 }
 
 export interface ScenarioIncomeSourceInput {
@@ -121,8 +131,10 @@ export interface ScenarioAccountInput {
     linked_account_id: string | null;
     initial_balance: number;
     annual_contribution: number;
-    expected_return: number;
+    expected_return?: number;
     account_type?: string;
+    cost_basis?: number | null;
+    allocation?: AllocationInput | null;
 }
 
 export interface CreateScenarioRequest {

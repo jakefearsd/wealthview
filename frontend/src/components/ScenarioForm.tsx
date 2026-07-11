@@ -8,10 +8,24 @@ import CurrencyInput from './CurrencyInput';
 import FormField from './FormField';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
+import AllocationEditor, { isAllocationValid } from './AllocationEditor';
 import type { Account } from '../types/account';
-import type { Scenario, CreateScenarioRequest, ScenarioAccountInput, ScenarioIncomeSourceInput } from '../types/projection';
+import type {
+    Scenario,
+    CreateScenarioRequest,
+    ScenarioAccountInput,
+    ScenarioIncomeSourceInput,
+    AllocationInput,
+} from '../types/projection';
 import { inputStyle } from '../utils/styles';
 import Button from './Button';
+
+/** Neutral starting point when a user opts into a custom allocation with no prior mix to seed from. */
+const DEFAULT_ALL_US_ALLOCATION: AllocationInput = { us_stock: 100, intl_stock: 0, bond: 0, cash: 0 };
+
+function formatAllocationSummary(a: AllocationInput): string {
+    return `${a.us_stock.toFixed(1)}% US / ${a.intl_stock.toFixed(1)}% Intl / ${a.bond.toFixed(1)}% Bond / ${a.cash.toFixed(1)}% Cash`;
+}
 
 const ACCOUNT_TYPE_HELP: Record<string, string> = {
     taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
@@ -56,6 +70,8 @@ function defaultAccount(): ScenarioAccountInput {
         annual_contribution: 10000,
         expected_return: 7,
         account_type: 'taxable',
+        cost_basis: null,
+        allocation: null,
     };
 }
 
@@ -116,7 +132,19 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             annual_contribution: a.annual_contribution,
             expected_return: toPercent(a.expected_return),
             account_type: a.account_type || 'taxable',
+            cost_basis: a.cost_basis ?? null,
+            // Only seed the editor with the response allocation when it's a real user override;
+            // a derived/auto mix is shown as a read-only summary instead (see derivedAllocations)
+            // so re-saving without touching it keeps sending null (auto-derive) rather than
+            // freezing a snapshot of the derived mix as a permanent override.
+            allocation: a.allocation_is_override ? (a.allocation ?? null) : null,
         })) ?? [defaultAccount()]
+    );
+    // Parallel-indexed with `accounts`: the effective (derived-or-override) mix the backend last
+    // reported per account, used to render the "Derived from holdings" summary and to seed the
+    // editor with a sensible starting point when the user opts into customizing.
+    const [derivedAllocations, setDerivedAllocations] = useState<(AllocationInput | null)[]>(
+        initialValues?.accounts?.map(a => a.allocation ?? null) ?? [null]
     );
     const [selectedIncomeSources, setSelectedIncomeSources] = useState<ScenarioIncomeSourceInput[]>(
         initialValues?.income_sources?.map(is => ({
@@ -125,6 +153,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         })) ?? []
     );
     const [saving, setSaving] = useState(false);
+    const hasInvalidAllocation = accounts.some(a => a.allocation != null && !isAllocationValid(a.allocation));
 
     const {
         name, retirementDate, endAge, inflationRate, birthYear, withdrawalRate,
@@ -135,12 +164,18 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         spendingPlanSelection,
     } = fields;
 
-    function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null) {
+    function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null | AllocationInput) {
         setAccounts(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
+    }
+
+    function customizeAllocation(index: number) {
+        const seed = derivedAllocations[index] ?? DEFAULT_ALL_US_ALLOCATION;
+        updateAccount(index, 'allocation', seed);
     }
 
     function addAccount() {
         setAccounts(prev => [...prev, defaultAccount()]);
+        setDerivedAllocations(prev => [...prev, null]);
     }
 
     function linkAccount(index: number, accountId: string) {
@@ -156,11 +191,15 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 initial_balance: acct.balance,
                 account_type: mapAccountType(acct.type),
             } : a));
+            // Newly linked account: we don't have a fetched derived mix for it yet (that
+            // requires a projection run), so drop any stale summary from a previous selection.
+            setDerivedAllocations(prev => prev.map((d, i) => i === index ? null : d));
         }
     }
 
     function removeAccount(index: number) {
         setAccounts(prev => prev.filter((_, i) => i !== index));
+        setDerivedAllocations(prev => prev.filter((_, i) => i !== index));
     }
 
     async function handleSubmit() {
@@ -191,7 +230,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 primary_residence_mortgage_interest: state ? primaryResidenceMortgageInterest : null,
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
-                accounts: accounts.map(a => ({ ...a, expected_return: a.expected_return / 100 })),
+                accounts: accounts.map(a => ({
+                    ...a,
+                    // expected_return is an optional override: only send it when the user set a
+                    // non-blank value, so a blank field defers to the allocation-derived return.
+                    expected_return: a.expected_return ? a.expected_return / 100 : undefined,
+                    cost_basis: a.cost_basis ?? null,
+                    allocation: a.allocation ?? null,
+                })),
                 income_sources: selectedIncomeSources,
             };
             await onSubmit(request);
@@ -423,8 +469,54 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         <FormField label="Annual Contribution">
                             <CurrencyInput style={inputStyle} value={acct.annual_contribution || ''} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
                         </FormField>
-                        <FormField label="Expected Return (%)">
+                        <FormField label="Override Return (%)" helpText="Blank uses the allocation-derived return.">
                             <input style={inputStyle} type="number" step="0.1" value={acct.expected_return || ''} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
+                        </FormField>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '1rem', marginTop: '0.75rem', alignItems: 'start' }}>
+                        <FormField
+                            label="Cost Basis"
+                            helpText={acct.linked_account_id
+                                ? 'Derived from the linked account\'s holdings.'
+                                : 'Total dollars invested, used for capital-gains tax calculations.'}
+                        >
+                            {!acct.linked_account_id ? (
+                                <CurrencyInput
+                                    style={inputStyle}
+                                    value={acct.cost_basis ?? ''}
+                                    onChange={v => updateAccount(idx, 'cost_basis', v ? Number(v) : null)}
+                                />
+                            ) : (
+                                <div style={{ ...inputStyle, background: '#f5f5f5' }}>
+                                    {acct.cost_basis != null ? formatCurrency(acct.cost_basis) : 'Available after first run'}
+                                </div>
+                            )}
+                        </FormField>
+                        <FormField
+                            label="Allocation"
+                            helpText="US/Intl stocks, bonds, and cash drive the account's projected return. Leave derived to use the linked holdings' actual mix."
+                        >
+                            {acct.allocation == null ? (
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.4rem' }}>
+                                        Derived from holdings
+                                        {derivedAllocations[idx] && ` (${formatAllocationSummary(derivedAllocations[idx] as AllocationInput)})`}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => customizeAllocation(idx)}
+                                        style={{ padding: '0.25rem 0.6rem', background: 'none', border: '1px solid #1976d2', color: '#1976d2', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                    >
+                                        Customize allocation
+                                    </button>
+                                </div>
+                            ) : (
+                                <AllocationEditor
+                                    value={acct.allocation}
+                                    onChange={a => updateAccount(idx, 'allocation', a)}
+                                    onReset={() => updateAccount(idx, 'allocation', null)}
+                                />
+                            )}
                         </FormField>
                     </div>
                 </div>
@@ -432,11 +524,16 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
             <Button
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={saving || hasInvalidAllocation}
                 style={{ marginTop: '0.5rem' }}
             >
                 {saving ? 'Saving...' : submitLabel}
             </Button>
+            {hasInvalidAllocation && (
+                <div style={{ fontSize: '0.8rem', color: '#d32f2f', marginTop: '0.4rem' }}>
+                    One or more account allocations must sum to 100% before saving.
+                </div>
+            )}
         </div>
     );
 }
