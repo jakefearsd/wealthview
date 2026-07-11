@@ -1,5 +1,7 @@
 import { useState } from 'react';
+import toast from 'react-hot-toast';
 import { setClassification } from '../api/securities';
+import { extractErrorMessage } from '../utils/errorMessage';
 import { selectStyle } from '../utils/styles';
 
 interface Props {
@@ -25,19 +27,27 @@ const ASSET_CLASS_OPTIONS: { value: string; label: string }[] = [
 export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: Props) {
     const [selections, setSelections] = useState<Record<string, string>>({});
     const [applying, setApplying] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const chosenSymbols = symbols.filter(symbol => selections[symbol]);
+    const canApply = !applying && chosenSymbols.length > 0;
 
     const handleSelect = (symbol: string, assetClass: string) => {
         setSelections(prev => ({ ...prev, [symbol]: assetClass }));
     };
 
     const handleApply = async () => {
-        const chosen = symbols.filter(symbol => selections[symbol]);
-        if (chosen.length === 0) return;
+        if (chosenSymbols.length === 0) return;
 
         setApplying(true);
+        setError(null);
         try {
-            await Promise.all(chosen.map(symbol => setClassification(symbol, selections[symbol])));
+            await Promise.all(chosenSymbols.map(symbol => setClassification(symbol, selections[symbol])));
             onReclassified();
+        } catch (err) {
+            const message = extractErrorMessage(err);
+            setError(message);
+            toast.error(message);
         } finally {
             setApplying(false);
         }
@@ -67,14 +77,19 @@ export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: P
                     </div>
                 ))}
             </div>
+            {error && (
+                <div role="alert" style={{ marginTop: '0.75rem', color: '#c62828', fontSize: '0.85rem' }}>
+                    {error}
+                </div>
+            )}
             <button
                 type="button"
                 onClick={() => void handleApply()}
-                disabled={applying}
+                disabled={!canApply}
                 style={{
                     marginTop: '0.75rem', padding: '0.5rem 1rem', borderRadius: '4px', border: 'none',
                     background: '#e65100', color: '#fff', fontWeight: 600,
-                    cursor: applying ? 'not-allowed' : 'pointer', opacity: applying ? 0.6 : 1,
+                    cursor: canApply ? 'pointer' : 'not-allowed', opacity: canApply ? 1 : 0.6,
                 }}
             >
                 {applying ? 'Applying...' : 'Apply & re-run'}
