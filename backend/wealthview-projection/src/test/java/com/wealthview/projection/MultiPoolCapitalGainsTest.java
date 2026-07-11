@@ -85,7 +85,7 @@ class MultiPoolCapitalGainsTest {
                                                    FederalTaxCalculator federalTaxCalculator) {
         return new PoolStrategy.PoolConfig(
                 FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, order,
-                null, null, Map.of(), ZERO, cg, bd(dividendYield), BASE_YEAR, federalTaxCalculator);
+                null, null, Map.of(), ZERO, cg, bd(dividendYield), ZERO, BASE_YEAR, federalTaxCalculator);
     }
 
     /** Per-pool returns: taxable grows at {@code taxableReturn}; traditional/roth flat. */

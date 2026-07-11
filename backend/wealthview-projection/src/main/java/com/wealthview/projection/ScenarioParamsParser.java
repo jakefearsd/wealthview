@@ -26,6 +26,15 @@ final class ScenarioParamsParser {
     /** Annual qualified-dividend yield assumed for the taxable pool when a scenario doesn't set one. */
     static final BigDecimal DEFAULT_DIVIDEND_YIELD = new BigDecimal("0.018");
 
+    /**
+     * Annual all-in investment fee/expense-ratio drag (expense ratios + advisory) assumed when a
+     * scenario doesn't set one — audit B1: no fee concept existed anywhere, so CMA returns were
+     * gross index returns; at typical 0.3-0.8% blended cost, 30-year sustainable spending was
+     * overstated ~4-10%. Subtracted uniformly from every pool's per-year REAL return in both
+     * engines (allocation-derived and fixed-override returns alike).
+     */
+    static final BigDecimal DEFAULT_FEE_RATE = new BigDecimal("0.0025");
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     ScenarioParams parseParams(@Nullable String paramsJson) {
@@ -39,6 +48,11 @@ final class ScenarioParamsParser {
     /** Resolves the effective dividend yield, defaulting to {@link #DEFAULT_DIVIDEND_YIELD} when unset. */
     BigDecimal dividendYield(ScenarioParams params) {
         return params.dividendYield() != null ? params.dividendYield() : DEFAULT_DIVIDEND_YIELD;
+    }
+
+    /** Resolves the effective fee rate, defaulting to {@link #DEFAULT_FEE_RATE} when unset. */
+    BigDecimal feeRate(ScenarioParams params) {
+        return params.feeRate() != null ? params.feeRate() : DEFAULT_FEE_RATE;
     }
 
     @Nullable

@@ -35,4 +35,30 @@ class ScenarioParamsParserTest {
 
         assertThat(parser.dividendYield(params)).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    // B1 (2026-07-11 audit): investment fees -- mirrors the dividendYield tests above exactly.
+
+    @Test
+    void feeRate_absentFromParams_defaultsToPoint0025() {
+        assertThat(parser.feeRate(ScenarioParams.EMPTY)).isEqualByComparingTo("0.0025");
+    }
+
+    @Test
+    void feeRate_presentInParsedParams_returnsParsedValue() {
+        var params = parser.parseParams("""
+                {"fee_rate": 0.008}
+                """);
+
+        assertThat(params.feeRate()).isEqualByComparingTo("0.008");
+        assertThat(parser.feeRate(params)).isEqualByComparingTo("0.008");
+    }
+
+    @Test
+    void feeRate_explicitZero_isNotTreatedAsAbsent() {
+        var params = parser.parseParams("""
+                {"fee_rate": 0}
+                """);
+
+        assertThat(parser.feeRate(params)).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

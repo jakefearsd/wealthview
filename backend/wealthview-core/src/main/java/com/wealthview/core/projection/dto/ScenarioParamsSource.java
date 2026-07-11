@@ -41,4 +41,6 @@ public interface ScenarioParamsSource {
     BigDecimal primaryResidenceMortgageInterest();
 
     BigDecimal dividendYield();
+
+    BigDecimal feeRate();
 }

@@ -16,5 +16,6 @@ record SimulationParameters(
         double[][] portfolioPaths,
         double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
         int rmdStartAge,
-        double dividendYield
+        double dividendYield,
+        double feeRate
 ) {}

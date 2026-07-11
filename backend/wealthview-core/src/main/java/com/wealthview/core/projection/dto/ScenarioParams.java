@@ -45,12 +45,14 @@ public record ScenarioParams(
         String state,
         BigDecimal primaryResidencePropertyTax,
         BigDecimal primaryResidenceMortgageInterest,
-        BigDecimal dividendYield) {
+        BigDecimal dividendYield,
+        BigDecimal feeRate) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
+            null);
 
     public static ScenarioParams from(ScenarioParamsSource source) {
         return new ScenarioParams(
@@ -60,7 +62,7 @@ public record ScenarioParams(
                 source.dynamicSequencingBracketRate(), source.rothConversionStrategy(),
                 source.targetBracketRate(), source.rothConversionStartYear(), source.state(),
                 source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest(),
-                source.dividendYield());
+                source.dividendYield(), source.feeRate());
     }
 
     /**

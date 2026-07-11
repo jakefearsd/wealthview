@@ -594,6 +594,24 @@ class GuardrailProfileServiceTest {
         assertThat(input.dividendYield()).isNull();
     }
 
+    // B1 (2026-07-11 audit): the scenario's fee_rate param must reach the MC's
+    // GuardrailOptimizationInput the same way dividend_yield does. Absent ⇒ null passed through --
+    // OptimizationContextBuilder applies the 0.0025 default (see OptimizationContextBuilderTest).
+    @Test
+    void optimize_paramsJsonWithFeeRate_propagatesToInput() {
+        var scenarioWithFee = new ProjectionScenarioEntity(
+                tenant, "Fee", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"fee_rate\":0.008}");
+        var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithFee);
+        assertThat(input.feeRate()).isEqualByComparingTo("0.008");
+    }
+
+    @Test
+    void optimize_paramsJsonWithoutFeeRate_propagatesNull() {
+        var input = captureOptimizationInput(buildRequest(req -> req), scenario);
+        assertThat(input.feeRate()).isNull();
+    }
+
     @Test
     void optimize_paramsJsonNull_birthYearDefaultsFromCurrentYear() {
         var scenarioSansParams = new ProjectionScenarioEntity(
@@ -765,6 +783,23 @@ class GuardrailProfileServiceTest {
         var scenarioB = new ProjectionScenarioEntity(
                 tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
                 "{\"birth_year\":1968,\"dividend_yield\":0.03}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    // B1 (2026-07-11 audit): fee_rate is a realism-v2 MC input (feeds PortfolioPathGenerator.generate)
+    // that must stale-out an existing guardrail profile on edit, exactly like dividend_yield.
+    @Test
+    void computeScenarioHash_feeRateChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"fee_rate\":0.0025}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"fee_rate\":0.01}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());

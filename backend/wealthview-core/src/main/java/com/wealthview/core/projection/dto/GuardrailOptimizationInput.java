@@ -11,6 +11,10 @@ import java.util.List;
  *         ({@code params_json.dividend_yield}), or {@code null} when the scenario doesn't set one.
  *         The MC engine falls back to the same default the deterministic engine uses (see
  *         {@code ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD}).
+ * @param feeRate the scenario's configured annual all-in investment fee/expense-ratio drag
+ *         ({@code params_json.fee_rate}), or {@code null} when the scenario doesn't set one. The
+ *         MC engine falls back to the same default the deterministic engine uses (see
+ *         {@code ScenarioParamsParser.DEFAULT_FEE_RATE}).
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -39,5 +43,6 @@ public record GuardrailOptimizationInput(
         int traditionalExhaustionBuffer,
         BigDecimal rmdBracketHeadroom,
         BigDecimal dynamicSequencingBracketRate,
-        BigDecimal dividendYield
+        BigDecimal dividendYield,
+        BigDecimal feeRate
 ) {}

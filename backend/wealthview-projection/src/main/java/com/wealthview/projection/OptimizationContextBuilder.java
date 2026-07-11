@@ -53,7 +53,7 @@ final class OptimizationContextBuilder {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0),
+                            null, null, null, null, rmdStartAge, 0, 0),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null));
         }
 
@@ -83,8 +83,9 @@ final class OptimizationContextBuilder {
         // these real returns directly (no Fisher conversion), matching the constant-real
         // spending/income model.
         PoolReturnModel returnModel = PoolReturnModel.from(input.accounts(), inflationRate);
+        double feeRate = resolveFeeRate(input);
         PortfolioReturnPaths returnPaths = PortfolioPathGenerator.generate(
-                trialCount, years, returnModel, matrix, rng);
+                trialCount, years, returnModel, matrix, rng, feeRate);
         double[][] portfolioPaths = returnPaths.portfolioPaths();
 
         // Compute deterministic income for each year (real terms: deflated by scenario inflation)
@@ -140,7 +141,7 @@ final class OptimizationContextBuilder {
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
-                        returnPaths.rothReturns(), rmdStartAge, dividendYield),
+                        returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
@@ -193,6 +194,16 @@ final class OptimizationContextBuilder {
     private static double resolveDividendYield(GuardrailOptimizationInput input) {
         return input.dividendYield() != null
                 ? input.dividendYield().doubleValue() : ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD.doubleValue();
+    }
+
+    /**
+     * Resolves the scenario's fee rate for the MC engine, falling back to the same default the
+     * deterministic engine uses (see {@link ScenarioParamsParser#DEFAULT_FEE_RATE}) when the
+     * scenario's {@code params_json} doesn't set one (audit B1).
+     */
+    private static double resolveFeeRate(GuardrailOptimizationInput input) {
+        return input.feeRate() != null
+                ? input.feeRate().doubleValue() : ScenarioParamsParser.DEFAULT_FEE_RATE.doubleValue();
     }
 
     private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {

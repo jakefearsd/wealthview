@@ -845,12 +845,14 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        // Tiny taxable ($100) + tiny traditional ($1000)
+        // Tiny taxable ($100) + tiny traditional ($1000). fee_rate pinned to 0 (audit B1) so the
+        // 0%-real taxable pool stays EXACTLY flat -- this test isolates the tax-cascade dollar
+        // math, not fee drag.
         // Conversion tax $3,961.50 exceeds both → remainder from Roth
         var input = createInput(
                 LocalDate.now().plusYears(10), 90, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single",
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0,
                  "other_income": 20000, "annual_roth_conversion": 30000}
                 """.formatted(LocalDate.now().getYear() - 35),
                 List.of(
@@ -951,11 +953,13 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        // Tiny taxable ($500), conversion tax $3,961.50 exceeds it
+        // Tiny taxable ($500), conversion tax $3,961.50 exceeds it. fee_rate pinned to 0 (audit B1)
+        // so the 0%-real taxable pool stays EXACTLY flat -- this test isolates the tax-cascade
+        // dollar math, not fee drag.
         var input = createInput(
                 LocalDate.now().plusYears(10), 90, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single",
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0,
                  "other_income": 20000, "annual_roth_conversion": 30000}
                 """.formatted(LocalDate.now().getYear() - 35),
                 List.of(

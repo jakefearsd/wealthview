@@ -192,6 +192,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal inflationRate,
             CapitalGainsTaxCalculator capitalGainsTaxCalculator,
             BigDecimal dividendYield,
+            BigDecimal feeRate,
             int baseYear,
             FederalTaxCalculator federalTaxCalculator) {
 
@@ -200,7 +201,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
          * empty capital-market map and zero inflation, so returns come solely from per-account
          * overrides (the legacy {@code expectedReturn} path). No capital-gains calculator and a
          * zero dividend yield, so the taxable pool tracks cost basis but realizes no LTCG tax and
-         * no dividend drag — the pre-lots scalar behavior, bit-for-bit.
+         * no dividend drag — the pre-lots scalar behavior, bit-for-bit. Zero fee rate for the same
+         * reason (audit B1) — these legacy callers stay fee-free.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -208,13 +210,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                    TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, 0, null);
+                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
         }
 
         /**
          * Back-compat constructor for allocation-driven callers that predate capital-gains taxation:
-         * supplies capital-market means and inflation but no LTCG calculator / dividend yield / federal
-         * standard-deduction source.
+         * supplies capital-market means and inflation but no LTCG calculator / dividend yield / fee
+         * rate / federal standard-deduction source.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -223,32 +225,39 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    geoMeans, inflationRate, null, BigDecimal.ZERO, 0, null);
+                    geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
         }
     }
 
     /**
-     * Computes the real (inflation-adjusted) return for a single account. When a nominal
-     * expected-return override is present it is converted to real via
-     * {@code (1+nominal)/(1+inflation) - 1}; otherwise the account's allocation is blended
-     * against the supplied capital-market geometric means (already real).
+     * Computes the real (inflation-adjusted), fee-adjusted return for a single account. When a
+     * nominal expected-return override is present it is converted to real via
+     * {@code (1+nominal)/(1+inflation) - 1}; otherwise the account's allocation is blended against
+     * the supplied capital-market geometric means (already real). The scenario's annual all-in
+     * fee/expense-ratio drag (audit B1) is then subtracted uniformly — a fee is a fee, whether the
+     * account's return is allocation-derived or a fixed override — so both paths converge through
+     * this single choke point before returning.
      */
     static BigDecimal realReturnFor(ProjectionAccountInput acct,
-                                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
+                                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate,
+                                    BigDecimal feeRate) {
+        BigDecimal grossReal;
         if (acct.expectedReturnOverride().isPresent()) {
             BigDecimal nominal = acct.expectedReturnOverride().get();
-            return BigDecimal.ONE.add(nominal)
+            grossReal = BigDecimal.ONE.add(nominal)
                     .divide(BigDecimal.ONE.add(inflationRate), SCALE + 4, ROUNDING)
                     .subtract(BigDecimal.ONE);
-        }
-        double blended = 0.0;
-        for (var e : acct.allocation().weights().entrySet()) {
-            Double g = geoMeans.get(e.getKey());
-            if (g != null) {
-                blended += e.getValue().doubleValue() * g;
+        } else {
+            double blended = 0.0;
+            for (var e : acct.allocation().weights().entrySet()) {
+                Double g = geoMeans.get(e.getKey());
+                if (g != null) {
+                    blended += e.getValue().doubleValue() * g;
+                }
             }
+            grossReal = BigDecimal.valueOf(blended).setScale(SCALE + 4, ROUNDING);
         }
-        return BigDecimal.valueOf(blended).setScale(SCALE + 4, ROUNDING);
+        return grossReal.subtract(feeRate);
     }
 
     /**
@@ -258,6 +267,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
         Map<AssetClass, Double> geoMeans = config.geoMeans();
         BigDecimal inflationRate = config.inflationRate();
+        BigDecimal feeRate = config.feeRate();
         if (hasMultipleAccountTypes(accounts)) {
             Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
                     .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
@@ -267,15 +277,18 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
 
             return new MultiPool(grouped,
-                    poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate),
-                    poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate),
-                    poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate),
-                    computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate,
+                            feeRate),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate,
+                            feeRate),
+                    poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate,
+                            feeRate),
+                    computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate, feeRate),
                     config);
         } else {
             BigDecimal balance = sumInitialBalances(accounts);
             return new SinglePool(balance, sumContributions(accounts),
-                    computeWeightedReturn(accounts, balance, geoMeans, inflationRate));
+                    computeWeightedReturn(accounts, balance, geoMeans, inflationRate, feeRate));
         }
     }
 
@@ -309,14 +322,15 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     private static BigDecimal computeWeightedReturn(List<ProjectionAccountInput> accounts,
                                                      BigDecimal totalBalance,
                                                      Map<AssetClass, Double> geoMeans,
-                                                     BigDecimal inflationRate) {
+                                                     BigDecimal inflationRate,
+                                                     BigDecimal feeRate) {
         if (totalBalance.compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
         BigDecimal weightedSum = BigDecimal.ZERO;
         for (var account : accounts) {
             weightedSum = weightedSum.add(
-                    account.initialBalance().multiply(realReturnFor(account, geoMeans, inflationRate)));
+                    account.initialBalance().multiply(realReturnFor(account, geoMeans, inflationRate, feeRate)));
         }
         return weightedSum.divide(totalBalance, SCALE + 4, ROUNDING);
     }
@@ -324,8 +338,9 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     /** Balance-weighted real return for a single account-type pool. */
     private static BigDecimal poolWeightedReturn(List<ProjectionAccountInput> accounts,
                                                   Map<AssetClass, Double> geoMeans,
-                                                  BigDecimal inflationRate) {
-        return computeWeightedReturn(accounts, sumInitialBalances(accounts), geoMeans, inflationRate);
+                                                  BigDecimal inflationRate,
+                                                  BigDecimal feeRate) {
+        return computeWeightedReturn(accounts, sumInitialBalances(accounts), geoMeans, inflationRate, feeRate);
     }
 
     // --- SinglePool ---

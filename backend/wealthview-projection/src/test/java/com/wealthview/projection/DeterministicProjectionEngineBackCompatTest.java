@@ -44,24 +44,28 @@ class DeterministicProjectionEngineBackCompatTest extends DeterministicProjectio
 
         var result = engine.run(input);
 
-        // Real-terms conversion, mirroring PoolStrategy.realReturnFor: (1+X)/(1+i) - 1, computed
-        // independently here (not by calling production code) so this is a true pinning check.
+        // Real-terms conversion, mirroring PoolStrategy.realReturnFor: (1+X)/(1+i) - 1 minus the
+        // scenario's fee rate (audit B1; unset here, so the ScenarioParamsParser default 0.25%
+        // applies), computed independently here (not by calling production code) so this is a
+        // true pinning check.
         BigDecimal realReturn = BigDecimal.ONE.add(nominalOverride)
                 .divide(BigDecimal.ONE.add(scenarioInflation), 8, RoundingMode.HALF_UP)
-                .subtract(BigDecimal.ONE);
+                .subtract(BigDecimal.ONE)
+                .subtract(ScenarioParamsParser.DEFAULT_FEE_RATE);
         BigDecimal expectedYear1Growth = startBalance.multiply(realReturn).setScale(4, RoundingMode.HALF_UP);
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.retired()).isTrue();
         assertThat(year1.startBalance()).isEqualByComparingTo(startBalance);
         assertThat(year1.contributions()).isEqualByComparingTo(BigDecimal.ZERO);
-        // year-1 growth = startBalance x ((1+0.06)/(1+0.03) - 1) = 500000 x 0.02912621 = 14563.1050
+        // year-1 growth = startBalance x (((1+0.06)/(1+0.03) - 1) - 0.0025)
+        //               = 500000 x (0.02912621 - 0.0025) = 500000 x 0.02662621 = 13313.1050
         assertThat(year1.growth()).isEqualByComparingTo(expectedYear1Growth);
-        assertThat(expectedYear1Growth).isEqualByComparingTo(bd("14563.1050"));
+        assertThat(expectedYear1Growth).isEqualByComparingTo(bd("13313.1050"));
 
         // Explicitly NOT the old pre-realism nominal number: growth used to be startBalance x
-        // 0.06 = 30000.0000 exactly (nominal override applied with no inflation deflation). That
-        // changed BY DESIGN under the real-terms frame, so it must no longer hold.
+        // 0.06 = 30000.0000 exactly (nominal override applied with no inflation deflation, no fee
+        // drag). That changed BY DESIGN under the real-terms frame, so it must no longer hold.
         assertThat(year1.growth()).isNotEqualByComparingTo(bd("30000.0000"));
 
         // The projection must complete for every year with no exception and a sensible outcome:

@@ -41,6 +41,13 @@ import com.wealthview.persistence.repository.SpendingProfileRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import tools.jackson.databind.ObjectMapper;
 
+// GodClass: this service is the single orchestration point for scenario CRUD -- request
+// validation, params_json assembly, account/income-source wiring, and response mapping are all
+// tightly coupled to that one lifecycle (mirrors the identical, identically-justified suppression
+// on GuardrailProfileService). Adding validateFeeRate (audit B1) pushed WMC just over PMD's
+// default GodClass threshold; splitting it would scatter cohesive validation logic, not fix a
+// design smell.
+@SuppressWarnings("PMD.GodClass")
 @Service
 public class ScenarioCrudService {
 
@@ -49,6 +56,7 @@ public class ScenarioCrudService {
     private static final int MIN_END_AGE = 50;
     private static final int MAX_END_AGE = 120;
     private static final BigDecimal MAX_DIVIDEND_YIELD = new BigDecimal("0.10");
+    private static final BigDecimal MAX_FEE_RATE = new BigDecimal("0.03");
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -88,6 +96,7 @@ public class ScenarioCrudService {
     public ScenarioResponse createScenario(UUID tenantId, ScenarioRequest request) {
         validateEndAge(request.endAge());
         validateDividendYield(request.dividendYield());
+        validateFeeRate(request.feeRate());
         var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
@@ -132,6 +141,7 @@ public class ScenarioCrudService {
     public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, ScenarioRequest request) {
         validateEndAge(request.endAge());
         validateDividendYield(request.dividendYield());
+        validateFeeRate(request.feeRate());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
 
@@ -320,6 +330,15 @@ public class ScenarioCrudService {
         }
         if (dividendYield.signum() < 0 || dividendYield.compareTo(MAX_DIVIDEND_YIELD) > 0) {
             throw new IllegalArgumentException("dividend_yield must be between 0 and 0.10");
+        }
+    }
+
+    private static void validateFeeRate(BigDecimal feeRate) {
+        if (feeRate == null) {
+            return;
+        }
+        if (feeRate.signum() < 0 || feeRate.compareTo(MAX_FEE_RATE) > 0) {
+            throw new IllegalArgumentException("fee_rate must be between 0 and 0.03");
         }
     }
 

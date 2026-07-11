@@ -43,7 +43,45 @@ class OptimizationContextBuilderTest {
         assertThat(setup.sim().dividendYield()).isEqualTo(0.018);
     }
 
+    // B1 (2026-07-11 audit): fee_rate must thread into SimulationParameters.feeRate() the same way
+    // dividend_yield does -- resolveFeeRate falls back to ScenarioParamsParser.DEFAULT_FEE_RATE
+    // (0.0025) when the scenario's params_json doesn't set one.
+    @Test
+    void build_scenarioFeeRateSet_flowsIntoSimulationConfig() {
+        var input = inputWithFeeRate(new BigDecimal("0.01"));
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().feeRate()).isEqualTo(0.01);
+    }
+
+    @Test
+    void build_scenarioFeeRateAbsent_defaultsToPoint0025() {
+        var input = inputWithFeeRate(null);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().feeRate()).isEqualTo(0.0025);
+    }
+
+    @Test
+    void build_scenarioFeeRateExplicitZero_isNotTreatedAsAbsent() {
+        var input = inputWithFeeRate(BigDecimal.ZERO);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().feeRate()).isEqualTo(0.0);
+    }
+
     private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {
+        return inputWith(dividendYield, null);
+    }
+
+    private GuardrailOptimizationInput inputWithFeeRate(BigDecimal feeRate) {
+        return inputWith(null, feeRate);
+    }
+
+    private GuardrailOptimizationInput inputWith(BigDecimal dividendYield, BigDecimal feeRate) {
         return new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
                 List.of(new HypotheticalAccountInput(
@@ -56,6 +94,6 @@ class OptimizationContextBuilderTest {
                 BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 null, null,
                 false, null, null, 5, null, null,
-                dividendYield);
+                dividendYield, feeRate);
     }
 }

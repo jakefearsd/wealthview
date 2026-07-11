@@ -761,8 +761,9 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
 
         var year1 = result.yearlyData().getFirst();
         // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly,
-        // balance = 10500.0000; capped there.
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10500.0000"));
+        // minus the default 0.25% fee rate (audit B1; unset here) ⇒ 4.75% net real,
+        // balance = 10475.0000; capped there.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("10475.0000"));
         assertThat(year1.endBalance()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 

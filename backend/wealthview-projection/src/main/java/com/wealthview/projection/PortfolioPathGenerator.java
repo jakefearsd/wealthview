@@ -31,10 +31,13 @@ final class PortfolioPathGenerator {
 
     /**
      * Runs {@code trialCount} bootstrap trials (no withdrawals) and returns per-pool REAL return
-     * sequences plus a blended cumulative total-portfolio balance path (also real).
+     * sequences plus a blended cumulative total-portfolio balance path (also real). {@code feeRate}
+     * is the scenario's annual all-in investment fee/expense-ratio drag (audit B1) — subtracted
+     * uniformly from every pool's per-year real return in {@link #poolRealReturns}, the single
+     * choke point covering both allocation-derived and fixed-override accounts.
      */
     static PortfolioReturnPaths generate(int trialCount, int years, PoolReturnModel model,
-                                         RealReturnMatrix matrix, Random rng) {
+                                         RealReturnMatrix matrix, Random rng, double feeRate) {
         double[][] taxable = new double[trialCount][];
         double[][] traditional = new double[trialCount][];
         double[][] roth = new double[trialCount][];
@@ -47,13 +50,14 @@ final class PortfolioPathGenerator {
             int[] indexSequence = bootstrap.generateIndexSequence(years, historicalSize);
 
             double[] portfolioReal = poolRealReturns(
-                    model.allAccounts(), model.totalBalance(), indexSequence, matrix, years, null);
+                    model.allAccounts(), model.totalBalance(), indexSequence, matrix, years, null, feeRate);
             taxable[t] = poolRealReturns(
-                    model.taxable(), model.taxableBalance(), indexSequence, matrix, years, portfolioReal);
+                    model.taxable(), model.taxableBalance(), indexSequence, matrix, years, portfolioReal, feeRate);
             traditional[t] = poolRealReturns(
-                    model.traditional(), model.traditionalBalance(), indexSequence, matrix, years, portfolioReal);
+                    model.traditional(), model.traditionalBalance(), indexSequence, matrix, years, portfolioReal,
+                    feeRate);
             roth[t] = poolRealReturns(
-                    model.roth(), model.rothBalance(), indexSequence, matrix, years, portfolioReal);
+                    model.roth(), model.rothBalance(), indexSequence, matrix, years, portfolioReal, feeRate);
 
             portfolioPaths[t][0] = model.totalBalance();
             for (int y = 0; y < years; y++) {
@@ -68,14 +72,13 @@ final class PortfolioPathGenerator {
      * balance) grows at the blended portfolio return {@code fallback} — e.g. a Roth pool that only
      * receives Roth conversions has no starting accounts but must still grow the converted dollars
      * at a sensible rate. For the portfolio blend itself the fallback is {@code null} (never empty
-     * when the run has any balance).
+     * when the run has any balance). {@code fallback} already carries {@code feeRate} (it is itself
+     * the output of a prior call to this method), so only the non-fallback branch subtracts it —
+     * once per pool, uniformly across override-based and allocation-based accounts alike (audit B1).
      */
-    // UseVarargs: `fallback` is a per-year return array (or null), not a variable argument list —
-    // varargs would change the call contract and invite accidental misuse.
-    @SuppressWarnings("PMD.UseVarargs")
     private static double[] poolRealReturns(List<AccountReturnSource> accounts, double poolBalance,
                                             int[] indexSequence, RealReturnMatrix matrix,
-                                            int years, @Nullable double[] fallback) {
+                                            int years, @Nullable double[] fallback, double feeRate) {
         if (poolBalance <= 0 || accounts.isEmpty()) {
             return fallback != null ? fallback : new double[years];
         }
@@ -88,6 +91,9 @@ final class PortfolioPathGenerator {
             for (int y = 0; y < years; y++) {
                 real[y] += weight * accountReal[y];
             }
+        }
+        for (int y = 0; y < years; y++) {
+            real[y] -= feeRate;
         }
         return real;
     }

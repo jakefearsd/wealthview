@@ -240,8 +240,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate(),
                 geoMeans, inflationRate,
-                capitalGainsTaxCalculator, paramsParser.dividendYield(params), baseYear,
-                federalTaxCalculator);
+                capitalGainsTaxCalculator, paramsParser.dividendYield(params), paramsParser.feeRate(params),
+                baseYear, federalTaxCalculator);
         return PoolStrategy.create(accounts, config);
     }
 

@@ -47,14 +47,15 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.retired()).isTrue();
         // Real terms: 0.05 nominal override deflated at the scenario's own 3% inflation →
-        // 1.05/1.03-1 = 0.01941748 real. Year 1: $1M * 1.01941748 = $1,019,417.48; withdrawal =
-        // 4% of currentBalance = $40,776.6992.
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40776.6992"));
+        // 1.05/1.03-1 = 0.01941748 real, minus the default 0.25% fee rate (audit B1; unset here) =
+        // 0.01691748 net real. Year 1: $1M * 1.01691748 = $1,016,917.48; withdrawal = 4% of
+        // currentBalance = $40,676.6992.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("40676.6992"));
 
         // Year 2: dynamic_percentage recomputes 4% of currentBalance every year (not held constant),
-        // so it compounds down: (1,019,417.48 - 40,776.6992) * 1.01941748 * 0.04 = 39,905.7407.
+        // so it compounds down at the same net real rate.
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("39905.7407"));
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("39710.2526"));
     }
 
     @Test
@@ -68,16 +69,17 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         var result = engine.run(input);
 
-        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly.
-        // Year 1: $1M grows to $1,050,000; withdrawal = 4% = $42,000 (first retirement year: raw,
+        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly,
+        // minus the default 0.25% fee rate (audit B1; unset here) ⇒ 4.75% net real.
+        // Year 1: $1M grows to $1,047,500; withdrawal = 4% = $41,900 (first retirement year: raw,
         // uncapped).
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("42000.0000"));
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("41900.0000"));
 
-        // Year 2: balance $1,050,000 - $42,000 = $1,008,000 grows 5% to $1,058,400; raw = 4% =
-        // $42,336, within [min $40,950, max $44,100] of the prior withdrawal → raw stands.
+        // Year 2: balance $1,047,500 - $41,900 = $1,005,600 grows 4.75% to $1,053,366; raw = 4% =
+        // $42,134.64, within [min $40,852.50, max $43,995] of the prior withdrawal → raw stands.
         var year2 = result.yearlyData().get(1);
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("42336.0000"));
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("42134.6400"));
     }
 
     @Test
@@ -121,9 +123,10 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.withdrawals()).isGreaterThan(BigDecimal.ZERO);
         assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
-        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; taxable-first
-        // leaves traditional untouched at 200000 * 1.05 = 210000.
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly, minus the
+        // default 0.25% fee rate (audit B1; unset here); taxable-first leaves traditional untouched
+        // at 200000 * (1.05 - 0.0025) = 209500.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("209500.0000"));
     }
 
     @Test
@@ -168,10 +171,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var result = engineTax.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; roth-first
-        // leaves taxable/traditional untouched.
-        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("315000.0000"));
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly, minus the
+        // default 0.25% fee rate (audit B1; unset here); roth-first leaves taxable/traditional
+        // untouched at 300000 * (1.05 - 0.0025) = 314250 and 200000 * (1.05 - 0.0025) = 209500.
+        assertThat(year1.taxableBalance()).isEqualByComparingTo(bd("314250.0000"));
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("209500.0000"));
         assertThat(year1.rothBalance()).isLessThan(bd("105000"));
     }
 
@@ -240,9 +244,10 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         var year1 = result.yearlyData().getFirst();
         assertThat(year1.taxableBalance()).isLessThan(bd("315000"));
-        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly; taxable-first
-        // leaves traditional untouched at 200000 * 1.05 = 210000.
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("210000.0000"));
+        // Real terms: 0% scenario inflation ⇒ pools grow at the nominal 5% exactly, minus the
+        // default 0.25% fee rate (audit B1; unset here); taxable-first leaves traditional untouched
+        // at 200000 * (1.05 - 0.0025) = 209500.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("209500.0000"));
     }
 
     @Test
@@ -311,10 +316,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
     @Test
     void run_vanguardFloor_severeMarketLoss_floorsWithdrawal() {
         // Vanguard uses currentBalance (after growth), not startOfYearBalance.
-        // Real terms: 0% scenario inflation ⇒ -0.30 nominal override deflates to -30% real exactly.
-        // Year 1: $1M * 0.70 = $700,000. Raw = * 0.04 = $28,000.
+        // Real terms: 0% scenario inflation ⇒ -0.30 nominal override deflates to -30% real, minus
+        // the default 0.25% fee rate (audit B1; unset here) ⇒ -30.25% net real.
+        // Year 1: $1M * 0.6975 = $697,500. Raw = * 0.04 = $27,900.
         // Year 2 raw collapses far below the floor, so the floor binds:
-        // floor = $28,000 * (1 - 0.025) = $27,300 → withdrawal capped UP to the floor.
+        // floor = $27,900 * (1 - 0.025) = $27,202.50 → withdrawal capped UP to the floor.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -328,11 +334,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var year1 = result.yearlyData().get(0);
         var year2 = result.yearlyData().get(1);
 
-        // Year 1: raw = currentBalance * 0.04 = $700,000 * 0.04 = $28,000
-        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("28000.0000"));
+        // Year 1: raw = currentBalance * 0.04 = $697,500 * 0.04 = $27,900
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("27900.0000"));
 
-        // Year 2: raw far below floor → capped at floor = 28000 * 0.975 = 27300
-        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("27300.0000"));
+        // Year 2: raw far below floor → capped at floor = 27900 * 0.975 = 27202.50
+        assertThat(year2.withdrawals()).isEqualByComparingTo(bd("27202.5000"));
 
         // Floor prevented a severe drop — withdrawal only dropped 2.5%
         assertThat(year2.withdrawals()).isGreaterThan(year1.withdrawals().multiply(bd("0.95")));
@@ -397,10 +403,14 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         // remaining = $33K - $30K = $3K
         // fromTaxable = min($3K, $200K) = $3K
         // fromRoth = $0
+        // fee_rate pinned to 0 (audit B1) -- otherwise the default 0.25% drag would shrink the
+        // "flat at 0% return" traditional pool this test relies on to isolate the dynamic-sequencing
+        // bracket-space arithmetic from growth.
         var input = createRetiredInput(
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.10, "filing_status": "single",
-                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12}
+                 "withdrawal_order": "dynamic_sequencing", "dynamic_sequencing_bracket_rate": 0.12,
+                 "fee_rate": 0}
                 """.formatted(birthYear),
                 List.of(
                         acct("30000", "0", "0.00", "traditional"),
@@ -516,10 +526,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
                 acct("1000000.0000", "0", "0.0000", "traditional"),
                 acct("500000.0000", "0", "0.0000", "taxable"));
 
+        // fee_rate pinned to 0 (audit B1) on both runs -- otherwise the default 0.25% drag would
+        // shrink the "flat at 0% return" pools this test relies on to isolate the RMD math.
         var rmdInput = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first", "fee_rate": 0}
                 """.formatted(rmdBirthYear),
                 accounts, null, referenceYear, List.of());
         // Same scenario one birth-year younger: age is one below the RMD start age, so rmdAmount
@@ -527,7 +539,7 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var noRmdInput = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first"}
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single", "withdrawal_order": "taxable_first", "fee_rate": 0}
                 """.formatted(noRmdBirthYear),
                 accounts, null, referenceYear, List.of());
 
@@ -598,10 +610,13 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var spending = new SpendingProfileInput(bd("30000"), bd("10000"), null);
         var pension = incomeSource("Pension", "80000", 60, null, "0");
 
+        // fee_rate pinned to 0 (audit B1) on both runs -- otherwise the default 0.25% drag would
+        // shrink the "flat at 0% return" traditional pool this test relies on to isolate the RMD
+        // math from growth.
         var rmdInput = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(rmdBirthYear),
                 accounts, spending, referenceYear, List.of(pension));
         // Same scenario one birth-year younger: age is one below the RMD start age, so rmdAmount
@@ -610,7 +625,7 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var noRmdInput = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(noRmdBirthYear),
                 accounts, spending, referenceYear, List.of(pension));
 
@@ -713,10 +728,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var spending = new SpendingProfileInput(bd("30000"), bd("10000"), null);
         var pension = incomeSource("Pension", "80000", 60, null, "0");
 
+        // fee_rate pinned to 0 (audit B1) -- otherwise the default 0.25% drag would shrink the
+        // "flat at 0% return, untouched" traditional pool this test asserts against.
         var input = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(noRmdBirthYear),
                 accounts, spending, referenceYear, List.of(pension));
 
@@ -752,10 +769,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var spending = new SpendingProfileInput(bd("30000"), bd("15000"), null); // 45,000 total
         var pension = incomeSource("Pension", "45000", 60, null, "0");
 
+        // fee_rate pinned to 0 (audit B1) -- otherwise the default 0.25% drag would break the
+        // "flat at 0% return" assumption baked into this test's balance-identity arithmetic below.
         var input = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(birthYear),
                 accounts, spending, referenceYear, List.of(pension));
 
@@ -809,10 +828,13 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
                 acct("100000.0000", "0", "0.0000", "roth"));
         var pension = incomeSource("Pension", "60000", 60, null, "0");
 
+        // fee_rate pinned to 0 (audit B1) -- otherwise the default 0.25% drag would break the
+        // "flat at 0% return" assumption baked into the exact traditional/roth balance assertions
+        // below.
         var input = new ProjectionInput(UUID.randomUUID(), "Guardrail T2 Gap Test",
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(birthYear),
                 accounts, null, referenceYear, List.of(pension), guardrailInput);
 
@@ -852,10 +874,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var spending = new SpendingProfileInput(bd("80000"), bd("0"), null);
         var consulting = selfEmploymentSource("Consulting", "50000", 60, null);
 
+        // fee_rate pinned to 0 (audit B1) -- otherwise the default 0.25% drag would break the
+        // "flat at 0% return" assumption baked into this test's balance-identity arithmetic below.
         var input = createInput(
                 retirementDate, 95, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single"}
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
                 """.formatted(birthYear),
                 accounts, spending, referenceYear, List.of(consulting));
 

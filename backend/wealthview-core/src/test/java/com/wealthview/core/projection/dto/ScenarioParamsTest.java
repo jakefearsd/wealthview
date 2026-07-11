@@ -20,7 +20,7 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -46,7 +46,8 @@ class ScenarioParamsTest {
                 new BigDecimal("1.05"), new BigDecimal("0.95"), "single",
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
-                "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"));
+                "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"),
+                new BigDecimal("0.003"));
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
@@ -57,7 +58,7 @@ class ScenarioParamsTest {
     void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new BigDecimal("0.021"));
+                null, null, null, new BigDecimal("0.021"), null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -66,7 +67,7 @@ class ScenarioParamsTest {
 
     @Test
     void from_dividendYieldPresent_passesThrough() {
-        var request = scenarioRequestWith(new BigDecimal("0.021"));
+        var request = scenarioRequestWith(new BigDecimal("0.021"), null);
 
         var params = ScenarioParams.from(request);
 
@@ -75,18 +76,45 @@ class ScenarioParamsTest {
 
     @Test
     void from_dividendYieldNull_staysNullForDefault() {
-        var request = scenarioRequestWith(null);
+        var request = scenarioRequestWith(null, null);
 
         assertThat(ScenarioParams.from(request).dividendYield()).isNull();
     }
 
-    private ScenarioRequest scenarioRequestWith(BigDecimal dividendYield) {
+    @Test
+    void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, new BigDecimal("0.003"));
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("fee_rate").decimalValue()).isEqualByComparingTo("0.003");
+    }
+
+    @Test
+    void from_feeRatePresent_passesThrough() {
+        var request = scenarioRequestWith(null, new BigDecimal("0.003"));
+
+        var params = ScenarioParams.from(request);
+
+        assertThat(params.feeRate()).isEqualByComparingTo("0.003");
+    }
+
+    @Test
+    void from_feeRateNull_staysNullForDefault() {
+        var request = scenarioRequestWith(null, null);
+
+        assertThat(ScenarioParams.from(request).feeRate()).isNull();
+    }
+
+    private ScenarioRequest scenarioRequestWith(BigDecimal dividendYield, BigDecimal feeRate) {
         return new ScenarioRequest(
                 "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                dividendYield, null, null, null, null);
+                dividendYield, feeRate, null, null, null, null);
     }
 
     @Test

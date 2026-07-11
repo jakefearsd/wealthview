@@ -32,10 +32,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("100000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("10000"));
         assertThat(year1.retired()).isFalse();
-        // Real terms: 0.07 nominal override deflated at the SCENARIO's own 3% inflation → 1.07/1.03-1 real.
-        // growth = (100000 + 10000) * 0.03883495 = 4271.8445
-        assertThat(year1.growth()).isEqualByComparingTo(bd("4271.8445"));
-        assertThat(year1.endBalance()).isEqualByComparingTo(bd("114271.8445"));
+        // Real terms: 0.07 nominal override deflated at the SCENARIO's own 3% inflation → 1.07/1.03-1
+        // real, minus the default 0.25% fee rate (audit B1; unset here).
+        // growth = (100000 + 10000) * (0.03883495 - 0.0025) = 110000 * 0.03633495 = 3996.8445
+        assertThat(year1.growth()).isEqualByComparingTo(bd("3996.8445"));
+        assertThat(year1.endBalance()).isEqualByComparingTo(bd("113996.8445"));
 
         assertThat(result.yearlyData()).hasSizeGreaterThan(30);
         assertThat(result.yearsInRetirement()).isGreaterThan(0);
@@ -148,9 +149,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         assertThat(year1.startBalance()).isEqualByComparingTo(bd("300000"));
         assertThat(year1.contributions()).isEqualByComparingTo(bd("8000"));
 
-        // Real terms: 0.08 and 0.04 nominal overrides deflated at the SCENARIO's own 2% inflation.
+        // Real terms: 0.08 and 0.04 nominal overrides deflated at the SCENARIO's own 2% inflation,
+        // minus the default 0.25% fee rate (audit B1; unset here) on each account's real return
+        // before balance-weighting.
         assertThat(year1.growth().setScale(0, RoundingMode.HALF_UP))
-                .isEqualByComparingTo(bd("14092"));
+                .isEqualByComparingTo(bd("13322"));
     }
 
     @Test
@@ -178,11 +181,13 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
     void run_zeroRealReturn_onlyContributionsAndWithdrawals() {
         // Real terms: a 0% REAL return requires a nominal override equal to the SCENARIO's own
         // inflation rate (2.5% here), since realReturn = (1+nominal)/(1+inflation) - 1. This isolates
-        // the no-growth arithmetic.
+        // the no-growth arithmetic. fee_rate is pinned to 0 explicitly (audit B1) -- otherwise the
+        // default 0.25% drag would make even a 0%-real-return account grow negative, which is
+        // correct engine behavior but is not what THIS test is isolating.
         var input = createInput(
                 LocalDate.now().plusYears(10), 70, bd("0.025"),
                 """
-                {"birth_year": %d}
+                {"birth_year": %d, "fee_rate": 0}
                 """.formatted(LocalDate.now().getYear() - 30),
                 List.of(acct("50000.0000", "5000.0000", "0.025")));
 
@@ -249,10 +254,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly.
-        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("10000.0000"));
-        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("5000.0000"));
-        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("2500.0000"));
+        // Real terms: 0% scenario inflation ⇒ 0.05 nominal override deflates to 5% real exactly,
+        // minus the default 0.25% fee rate (audit B1; unset here) ⇒ 4.75% net real.
+        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(bd("9500.0000"));
+        assertThat(year1.rothGrowth()).isEqualByComparingTo(bd("4750.0000"));
+        assertThat(year1.taxableGrowth()).isEqualByComparingTo(bd("2375.0000"));
         assertThat(year1.growth()).isEqualByComparingTo(
                 year1.traditionalGrowth().add(year1.rothGrowth()).add(year1.taxableGrowth()));
     }
