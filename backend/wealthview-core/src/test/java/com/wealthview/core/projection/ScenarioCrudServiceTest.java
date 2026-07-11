@@ -107,6 +107,15 @@ class ScenarioCrudServiceTest {
                 null, accounts, null, null, null);
     }
 
+    private ScenarioRequest scenarioRequestWithDividendYield(BigDecimal dividendYield) {
+        return new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                dividendYield, List.of(), null, null, null);
+    }
+
     private ProjectionScenarioEntity captureSavedScenario() {
         var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
         verify(scenarioRepository).save(captor.capture());
@@ -768,6 +777,50 @@ class ScenarioCrudServiceTest {
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("end_age");
+    }
+
+    @Test
+    void createScenario_dividendYieldAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithDividendYield(new BigDecimal("0.15"));
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0.10");
+    }
+
+    @Test
+    void createScenario_dividendYieldWithinRange_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithDividendYield(new BigDecimal("0.05"));
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void createScenario_dividendYieldNull_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithDividendYield(null);
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void updateScenario_dividendYieldAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithDividendYield(new BigDecimal("0.15"));
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0.10");
     }
 
     @Test

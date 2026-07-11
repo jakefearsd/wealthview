@@ -48,6 +48,7 @@ public class ScenarioCrudService {
 
     private static final int MIN_END_AGE = 50;
     private static final int MAX_END_AGE = 120;
+    private static final BigDecimal MAX_DIVIDEND_YIELD = new BigDecimal("0.10");
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -86,6 +87,7 @@ public class ScenarioCrudService {
     @Transactional
     public ScenarioResponse createScenario(UUID tenantId, ScenarioRequest request) {
         validateEndAge(request.endAge());
+        validateDividendYield(request.dividendYield());
         var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
@@ -129,6 +131,7 @@ public class ScenarioCrudService {
     @Transactional
     public ScenarioResponse updateScenario(UUID tenantId, UUID scenarioId, ScenarioRequest request) {
         validateEndAge(request.endAge());
+        validateDividendYield(request.dividendYield());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
 
@@ -291,6 +294,15 @@ public class ScenarioCrudService {
         if (endAge < MIN_END_AGE || endAge > MAX_END_AGE) {
             throw new IllegalArgumentException(
                     "end_age must be between " + MIN_END_AGE + " and " + MAX_END_AGE);
+        }
+    }
+
+    private static void validateDividendYield(BigDecimal dividendYield) {
+        if (dividendYield == null) {
+            return;
+        }
+        if (dividendYield.signum() < 0 || dividendYield.compareTo(MAX_DIVIDEND_YIELD) > 0) {
+            throw new IllegalArgumentException("dividend_yield must be between 0 and 0.10");
         }
     }
 
