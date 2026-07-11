@@ -158,6 +158,7 @@ export interface CreateScenarioRequest {
     state?: string | null;
     primary_residence_property_tax?: number | null;
     primary_residence_mortgage_interest?: number | null;
+    dividend_yield?: number | null;
     spending_profile_id?: string | null;
     use_guardrail_profile?: boolean | null;
     accounts: ScenarioAccountInput[];

@@ -90,6 +90,15 @@ function overrideReturnInput(): HTMLInputElement {
     return input as HTMLInputElement;
 }
 
+function dividendYieldInput(): HTMLInputElement {
+    const label = screen.getByText('Dividend Yield (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Dividend Yield input not found');
+    }
+    return input as HTMLInputElement;
+}
+
 describe('ScenarioForm', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -179,6 +188,36 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.accounts[0].expected_return).toBeUndefined();
+    });
+
+    it('submits dividend_yield converted from percent to decimal', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(dividendYieldInput(), { target: { value: '2.1' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.dividend_yield).toBeCloseTo(0.021);
+    });
+
+    it('omits dividend_yield when the field is cleared to blank', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(dividendYieldInput(), { target: { value: '' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.dividend_yield).toBeUndefined();
     });
 
     it('round-trips a genuine 0% expected_return override as 0, not dropped', async () => {
