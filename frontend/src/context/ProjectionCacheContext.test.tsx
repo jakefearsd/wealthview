@@ -12,6 +12,7 @@ function makeResult(id: string): ProjectionResult {
         final_balance: 1_000_000,
         years_in_retirement: 0,
         spending_feasibility: null,
+        unclassified_symbols: null,
     };
 }
 

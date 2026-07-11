@@ -47,6 +47,7 @@ const RESULT = {
     final_balance: 1000000,
     years_in_retirement: 25,
     spending_feasibility: null,
+    unclassified_symbols: null,
 } as ProjectionResult;
 const COMPARE = { results: [RESULT] } as CompareResponse;
 const GUARDRAIL = { id: 'g1', scenario_id: 's1' } as unknown as GuardrailProfileResponse;

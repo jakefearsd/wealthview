@@ -15,6 +15,7 @@ import {
 } from '../utils/projectionCalcs';
 import { buildProjectionCsv } from '../utils/projectionCsv';
 import SummaryCard from '../components/SummaryCard';
+import UnclassifiedSymbolsNotice from '../components/UnclassifiedSymbolsNotice';
 import ProjectionChart from '../components/ProjectionChart';
 import MilestoneStrip from '../components/MilestoneStrip';
 import ScenarioForm from '../components/ScenarioForm';
@@ -268,6 +269,10 @@ export default function ProjectionDetailPage() {
 
             {result && (
                 <>
+                    {result.unclassified_symbols?.length ? (
+                        <UnclassifiedSymbolsNotice symbols={result.unclassified_symbols} onReclassified={handleRun} />
+                    ) : null}
+
                     {feasibility && !feasibility.spending_feasible && (
                         <div style={{
                             background: '#fff3e0', borderLeft: '4px solid #e65100', padding: '1rem',

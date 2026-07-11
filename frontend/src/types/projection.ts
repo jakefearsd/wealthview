@@ -121,6 +121,7 @@ export interface ProjectionResult {
     final_balance: number;
     years_in_retirement: number;
     spending_feasibility: SpendingFeasibility | null;
+    unclassified_symbols: string[] | null;
 }
 
 export interface CompareResponse {
