@@ -19,6 +19,7 @@ import com.wealthview.core.account.AccountService;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.AllocationDto;
 import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
@@ -321,6 +322,144 @@ class ScenarioCrudServiceTest {
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("100");
+    }
+
+    @Test
+    void getScenario_manualAccountWithAllocationOverride_responseExposesOverridePercentages() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        acct.setAllocation(new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
+                new BigDecimal("15"), new BigDecimal("5")).toWeightMap());
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        var allocation = result.accounts().getFirst().allocation();
+        assertThat(allocation.usStock()).isEqualByComparingTo("60");
+        assertThat(allocation.intlStock()).isEqualByComparingTo("20");
+        assertThat(allocation.bond()).isEqualByComparingTo("15");
+        assertThat(allocation.cash()).isEqualByComparingTo("5");
+    }
+
+    @Test
+    void getScenario_manualAccountNoOverride_responseAllocationIsAllUsStock() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        var allocation = result.accounts().getFirst().allocation();
+        assertThat(allocation.usStock()).isEqualByComparingTo("100");
+        assertThat(allocation.intlStock()).isEqualByComparingTo("0");
+        assertThat(allocation.bond()).isEqualByComparingTo("0");
+        assertThat(allocation.cash()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void getScenario_linkedAccountNoOverride_responseAllocationFromDerivedMix() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("150000"));
+        when(accountService.computeCostBasis(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("120000"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(
+                        AssetAllocation.fromDoubles(java.util.Map.of(
+                                AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)), Set.of()));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        var allocation = result.accounts().getFirst().allocation();
+        assertThat(allocation.usStock()).isEqualByComparingTo("50");
+        assertThat(allocation.bond()).isEqualByComparingTo("50");
+        assertThat(allocation.intlStock()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void getScenario_linkedAccount_responseCostBasisFromComputeCostBasis() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("150000"));
+        when(accountService.computeCostBasis(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("120000"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(AssetAllocation.ALL_US, Set.of()));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().costBasis()).isEqualByComparingTo("120000");
+    }
+
+    @Test
+    void getScenario_manualAccountWithStoredCostBasis_responseUsesStoredCostBasis() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        acct.setCostBasis(new BigDecimal("62000"));
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().costBasis()).isEqualByComparingTo("62000");
+    }
+
+    @Test
+    void getScenario_manualAccountNullCostBasis_responseFallsBackToInitialBalance() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().costBasis()).isEqualByComparingTo("100000");
     }
 
     @Test
