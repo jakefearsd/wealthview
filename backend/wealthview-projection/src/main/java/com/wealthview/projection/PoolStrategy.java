@@ -76,6 +76,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     /**
      * Executes the year's withdrawal/RMD/tax cascade.
      *
+     * <p>MultiPool grosses up any traditional slice of the resulting tax bill (audit C2): once the
+     * taxable pool can no longer fund the bill, the traditional distribution that pays it is ITSELF
+     * ordinary income, so it must fund its own tax too. That extra draw is debited from traditional
+     * like any other distribution, folded into the returned ordinary-income reporting (so the
+     * Social Security provisional-income convergence and the tax-liability/DTO breakdown all agree),
+     * and counts toward RMD satisfaction. See {@code PoolStrategy.MultiPool#growTraditionalGrossUp}
+     * for the fixed-point search. SinglePool computes no tax at all, so this is a no-op there.
+     *
      * @param alreadyChargedBaseTax the dollar amount of ordinary tax on {@code (effectiveOtherIncome
      *     + conversionAmount)} that {@link RetirementWithdrawalProcessor}'s spending-plan surplus
      *     branch has ALREADY charged this year (whether funded from surplus cash or left for
@@ -554,6 +562,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
          * is the taxable balance everywhere the scalar was read.
          */
         private final TaxableLotsBd lots;
+        /** Maximum fixed-point passes for the audit-C2 traditional-tax gross-up (see {@link
+         * #growTraditionalGrossUp}). */
+        private static final int MAX_GROSS_UP_ITERATIONS = 5;
+        /**
+         * Convergence tolerance (dollars) for the audit-C2 gross-up fixed point -- the same $1
+         * tolerance {@code YearFinanceResolver} uses for its Social Security fixed point.
+         */
+        private static final BigDecimal GROSS_UP_TOLERANCE = BigDecimal.ONE;
         private BigDecimal traditional;
         private BigDecimal roth;
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
@@ -766,7 +782,6 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
             var ordinaryTax = computeOrdinaryTax(taxableIncome, year, effectiveOtherIncome,
                     conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
-            BigDecimal withdrawalTax = ordinaryTax.tax();
             CombinedTaxResult detailed = ordinaryTax.detailed();
 
             // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
@@ -780,11 +795,30 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
             BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
 
-            // A4: fold in any additional tax obligation the caller couldn't fund from this year's
-            // cash surplus (or, for self-employment tax, had no other funding path at all) so it
-            // drains the SAME pool cascade as the rest of this year's tax instead of vanishing --
-            // see the interface javadoc for what extraPoolFundedTax represents.
-            BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
+            // C2: a tax payment sourced from the traditional pool is ITSELF an ordinary-income
+            // distribution once withdrawn -- converge the traditional-funded slice of the bill to
+            // a fixed point (see growTraditionalGrossUp) BEFORE physically draining the pools, so
+            // the extra draw is debited, taxed, and reported as ordinary income all in one pass.
+            // taxableAvail/traditionalAvail are frozen here (post spend-draw, post RMD force-out,
+            // pre-tax-cascade) -- the fixed-point search below never mutates the pools.
+            // NOTE: growTraditionalGrossUp's internal recomputes call computeOrdinaryTax, which
+            // ALREADY updates lastTaxBreakdown as a side effect (with its own conditional-recording
+            // logic -- see that method's javadoc) on every call it makes, including the LAST one when
+            // the loop actually iterates. Nothing further needs to happen here: when the loop doesn't
+            // iterate (no traditional slice to gross up), lastTaxBreakdown is untouched by this method
+            // and stays exactly what the pre-loop computeOrdinaryTax call above already left it as --
+            // byte-identical to pre-C2 behavior.
+            var grossUp = growTraditionalGrossUp(taxableIncome, year, effectiveOtherIncome, conversionAmount,
+                    alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity, ltcgTax,
+                    extraPoolFundedTax, ordinaryTax, lots.totalValue(), traditional);
+            BigDecimal totalWithdrawalTax = grossUp.tax();
+            // The converged gross-up draw is itself a traditional distribution: fold it into the
+            // reported ordinary income so it (a) feeds the audit-B2 Social Security provisional-
+            // income loop the same way the spend draw/RMD excess already do (see
+            // YearFinanceResolver#realizedPortfolioTaxable, fed by this field) and (b) makes
+            // RetirementTaxAnnotator's independent federal/state recompute agree with taxLiability.
+            traditionalOrdinaryIncome = traditionalOrdinaryIncome.add(grossUp.traditionalGrossUp());
+
             TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
                     ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
 
@@ -868,6 +902,77 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 lastTaxBreakdown = Optional.of(detailed);
             }
             return new OrdinaryTax(tax, detailed);
+        }
+
+        /**
+         * The converged audit-C2 gross-up: how much EXTRA traditional income the fixed point below
+         * settled on, and the resulting total bill. {@code lastTaxBreakdown} is NOT threaded through
+         * here -- {@code computeOrdinaryTax} already updates it as a side effect on every call it
+         * makes (including the search's last one), with its own conditional-recording logic, so the
+         * field is left exactly as that method's last call set it.
+         */
+        private record GrossUpResult(BigDecimal traditionalGrossUp, BigDecimal tax) {}
+
+        /**
+         * Audit C2: a tax payment sourced from the traditional pool is ITSELF an ordinary-income
+         * distribution once withdrawn -- it must fund its own tax, which (once the taxable pool is
+         * exhausted) again comes from traditional, and so on: an infinite geometric series that
+         * converges because the marginal tax rate is always &lt;1. This method finds that fixed
+         * point: {@code bill = TaxBill(baseTaxableIncome + traditionalSlice(bill))}.
+         *
+         * <p>Each pass "peeks" the traditional slice of the CURRENT bill via {@link
+         * #peekTraditionalSlice} -- a pure function of the FROZEN {@code taxableAvail} /
+         * {@code traditionalAvail} snapshots taken just before the tax cascade runs, so no pool is
+         * touched during the search -- and recomputes the bill with that slice folded into ordinary
+         * income. The loop stops when the peeked slice moves by less than {@link
+         * #GROSS_UP_TOLERANCE} (a genuine fixed point) or after {@link #MAX_GROSS_UP_ITERATIONS}
+         * passes (whichever first), taking the best estimate reached either way -- mirrors {@code
+         * YearFinanceResolver}'s Social Security convergence loop in both shape and tolerance.
+         *
+         * <p>Only the ORDINARY tax bundle is re-stacked each pass; {@code ltcgTax} and {@code
+         * extraPoolFundedTax} are added on top unchanged (re-stacking LTCG against a higher ordinary
+         * floor as the gross-up grows is a documented, out-of-scope second-order effect, the same
+         * category as the taxable-slice realized-gain discard in {@link #deductFromPools}). The Roth
+         * slice of a tax payment is never grossed up (Roth withdrawals are tax-free) and the taxable
+         * slice keeps its existing untaxed-sale treatment -- this method only ever grows the
+         * TRADITIONAL slice.
+         *
+         * <p>The physical drain happens once, afterward, via the caller's own {@link
+         * #deductFromPools} call on the returned {@code tax} -- this method never mutates a pool.
+         */
+        private GrossUpResult growTraditionalGrossUp(BigDecimal baseTaxableIncome, int year,
+                BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, BigDecimal alreadyChargedBaseTax,
+                BigDecimal realizedLtcgIncome, BigDecimal federallyTaxedSocialSecurity,
+                BigDecimal ltcgTax, BigDecimal extraPoolFundedTax, OrdinaryTax initialOrdinary,
+                BigDecimal taxableAvail, BigDecimal traditionalAvail) {
+
+            BigDecimal bill = initialOrdinary.tax().add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
+            BigDecimal slice = BigDecimal.ZERO;
+
+            for (int i = 0; i < MAX_GROSS_UP_ITERATIONS; i++) {
+                BigDecimal impliedSlice = peekTraditionalSlice(bill, taxableAvail, traditionalAvail);
+                if (impliedSlice.subtract(slice).abs().compareTo(GROSS_UP_TOLERANCE) < 0) {
+                    break;
+                }
+                slice = impliedSlice;
+                var recomputed = computeOrdinaryTax(baseTaxableIncome.add(slice), year, effectiveOtherIncome,
+                        conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
+                bill = recomputed.tax().add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
+            }
+            return new GrossUpResult(slice, bill);
+        }
+
+        /**
+         * The traditional-sourced dollars of a hypothetical {@code tax} payment cascading
+         * taxable-first against FROZEN (pre-drain) pool balances -- mirrors {@link
+         * #deductFromPools}'s cascade order without mutating anything, so {@link
+         * #growTraditionalGrossUp}'s fixed-point search can explore candidate bills before the real
+         * drain happens.
+         */
+        private static BigDecimal peekTraditionalSlice(BigDecimal tax, BigDecimal taxableAvail,
+                                                        BigDecimal traditionalAvail) {
+            BigDecimal afterTaxable = tax.subtract(taxableAvail).max(BigDecimal.ZERO);
+            return afterTaxable.min(traditionalAvail).max(BigDecimal.ZERO);
         }
 
         /**
@@ -1075,6 +1180,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             return "Projection with pools";
         }
 
+        /**
+         * Physically drains {@code amount} taxable-first, then traditional, then Roth. Callers that
+         * fund an ordinary/LTCG tax bill run {@link #growTraditionalGrossUp} FIRST so the traditional
+         * slice this cascade is about to drain has already been grossed up and folded into the
+         * year's reported ordinary income (audit C2) -- by the time {@code amount} reaches here it is
+         * the FINAL, already-grossed-up bill; this method itself stays a plain three-pool drain.
+         */
         private TaxSourceResult deductFromPools(BigDecimal amount) {
             if (amount.compareTo(BigDecimal.ZERO) <= 0) {
                 return TaxSourceResult.ZERO;

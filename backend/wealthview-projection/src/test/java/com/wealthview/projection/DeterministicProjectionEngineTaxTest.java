@@ -103,9 +103,16 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         // overload -- not a hand-derived approximation.
         var refCalc = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
         BigDecimal expectedTax = refCalc.computeTax(bd("60000"), referenceYear, FilingStatus.SINGLE, 66);
-        // Taxable = 60,000 - (15,750 + 2,000) = 42,250 -> 1,192.50 + 30,325*0.12 = 4,831.50
+        // Taxable = 60,000 - (15,750 + 2,000) = 42,250 -> 1,192.50 + 30,325*0.12 = 4,831.50. This is
+        // the pre-C2 base tax; portfolioNeed is $0 (pension exactly covers spending) and there is no
+        // taxable account in this fixture, so the whole $4,831.50 is unfunded-from-surplus and must
+        // drain from traditional -- audit C2 grosses it up. 5-pass fixed point (base=60,000,
+        // taxableAvail=0): 4,831.50 -> 5,411.28 -> 5,480.8536 -> 5,489.202432 -> 5,490.204290 (implied
+        // 5,490.324515 on the would-be 6th pass is within <$1 of the 5th, but the loop is capped at 5)
+        // -> converged/capped at 5,490.3245 -- independently reproduced against the SAME age-65-boosted
+        // deduction and single-2025 brackets, matching the engine's own output to the cent.
         assertThat(expectedTax).isEqualByComparingTo(bd("4831.5000"));
-        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("5490.3245"));
 
         // Direction: strictly less tax than the age-unaware (OBBBA-base-only) deduction would have
         // produced -- the conservative direction of this fix.
@@ -444,15 +451,21 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         var federal = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
         BigDecimal rate = bd("0.06");
 
-        // Traditional-only portfolio: no taxable pool, so no dividend/LTCG income muddies the
-        // SS-exemption delta being pinned.
+        // Traditional-only draw with a zero-yield taxable BUFFER (dividend_yield explicitly 0, so it
+        // generates no dividend/LTCG income of its own -- it exists purely to fund this year's tax
+        // bill in both branches). Audit C2: once the tax bill drains traditional (which it would with
+        // no taxable pool at all), that draw is itself grossed up as ordinary income -- and since the
+        // two branches below owe DIFFERENT total tax (the state-exemption flag under test), they'd be
+        // grossed up by different amounts too, breaking the "delta is EXACTLY rate * ssTaxable"
+        // invariant this test pins. A taxable buffer large enough to fund the tax bill in both
+        // branches keeps this test isolated to the C3/T8 SS-exemption wiring it's actually about.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
-                 "withdrawal_order": "traditional_first", "state": "CA"}
+                 "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
                 """.formatted(LocalDate.now().getYear() - 66),
-                List.of(acct("500000", "0", "0.00", "traditional")),
+                List.of(acct("500000", "0", "0.00", "traditional"), acct("100000", "0", "0.00", "taxable")),
                 null, List.of(socialSecuritySource("30000", 62)));
 
         var exemptEngine = new DeterministicProjectionEngine(

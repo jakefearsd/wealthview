@@ -784,16 +784,21 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // income covers spending
         assertThat(year1.surplusReinvested()).isNull(); // nothing left over to reinvest
 
-        // Same $45,000-pension-vs-$45,000-spending tax figure pinned by
+        // Same $45,000-pension-vs-$45,000-spending BASE tax figure pinned by
         // run_incomeExactlyEqualsSpending_taxStillComputed in DeterministicProjectionEngineSpendingPlanTest.
+        // Audit C2: with no taxable pool (traditional-only fixture), that $3,361.50 base bill must
+        // itself drain from traditional and gets grossed up -- same 5-pass fixed point (base=45,000,
+        // taxableAvail=0) as that sibling test, converging to 3,819.7913.
         var refCalc = referenceFederalCalc();
         BigDecimal expectedTax = refCalc.computeTax(bd("45000"), referenceYear, FilingStatus.SINGLE);
         assertThat(expectedTax).isEqualByComparingTo(bd("3361.5000"));
-        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+        BigDecimal expectedGrossedTax = bd("3819.7913");
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTax);
 
-        // A4: the tax must actually leave the pool -- traditional (the only pool) is debited
-        // exactly, not left untouched the way it was pre-fix.
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("300000.0000").subtract(expectedTax));
+        // A4 + C2: the (grossed-up) tax must actually leave the pool -- traditional (the only pool)
+        // is debited exactly, not left untouched the way it was pre-A4, and not just the pre-C2 base
+        // amount either.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("300000.0000").subtract(expectedGrossedTax));
 
         // Balance identity: start + contrib + growth - withdrawals - taxLiability == end.
         BigDecimal expectedEnd = year1.startBalance().add(year1.contributions()).add(year1.growth())
@@ -843,16 +848,22 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(year1.age()).isEqualTo(70);
         assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // guardrail said 0
 
-        // Independent oracle: tax owed on the $60,000 pension alone -- no RMD at 70, no spend
-        // draw, no conversion, so the pension is the ONLY taxable income this year.
+        // Independent oracle: base tax owed on the $60,000 pension alone -- no RMD at 70, no spend
+        // draw, no conversion, so the pension is the ONLY taxable income this year (pre-C2 figure).
         BigDecimal expectedTax = referenceFederalCalc().computeTax(bd("60000"), referenceYear, FilingStatus.SINGLE);
         assertThat(expectedTax).isGreaterThan(BigDecimal.ZERO); // sanity: the oracle itself is nonzero
 
-        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+        // Audit C2: no taxable pool in this fixture, so the base $5,161.50 bill itself drains from
+        // traditional and grosses up -- 5-pass fixed point (base=60,000, taxableAvail=0), crossing
+        // the 12%/22% bracket boundary partway through, converges to 6,171.2742 -- independently
+        // reproduced against the SAME single-2025 brackets/deduction, matching the engine's own
+        // output to the cent.
+        BigDecimal expectedGrossedTax = bd("6171.2742");
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTax);
 
         // And it must actually leave the pools (no vanishing, no gap): taxable-first cascade with
-        // no taxable pool here means traditional funds it in full.
-        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("500000.0000").subtract(expectedTax));
+        // no taxable pool here means traditional funds it (base + gross-up) in full.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("500000.0000").subtract(expectedGrossedTax));
         assertThat(year1.rothBalance()).isEqualByComparingTo(bd("100000.0000")); // untouched
     }
 
@@ -894,17 +905,29 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         // Ordinary tax on (spend draw $30,000 [80,000 spend - 50,000 SE cash] + SE taxable income
         // net of the 50%-deductible SE tax): the SE deduction reduces the ordinary base, so derive
         // it via the same SelfEmploymentTaxCalculator the engine uses rather than hand-rounding.
+        // This is the PRE-C2 base bill (15,501.6498, still the correct A4 "SE tax must be funded"
+        // figure on its own).
         BigDecimal seDeduction = seCalc.deductibleAmount(expectedSeTax);
         BigDecimal ordinaryTaxableIncome = bd("30000").add(bd("50000").subtract(seDeduction));
         BigDecimal expectedOrdinaryTax = referenceFederalCalc()
                 .computeTax(ordinaryTaxableIncome, referenceYear, FilingStatus.SINGLE);
         BigDecimal expectedTotalTax = expectedOrdinaryTax.add(expectedSeTax);
-        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTotalTax);
+        assertThat(expectedTotalTax).isEqualByComparingTo(bd("15501.6498"));
 
-        // A4: SE tax must actually leave the pool -- traditional funds the $30,000 spend draw AND
-        // the full (ordinary + SE) tax, not just the ordinary portion the way it did pre-fix.
+        // Audit C2: no taxable pool in this fixture, so that base bill itself drains from
+        // traditional (on top of the $30,000 spend draw) and grosses up -- 5-pass fixed point
+        // (base=ordinaryTaxableIncome, taxableAvail=0, the SE tax constant re-added each pass)
+        // converges to 19,871.6566 -- independently reproduced against the SAME
+        // SelfEmploymentTaxCalculator + single-2025 brackets/deduction, matching the engine's own
+        // output to the cent.
+        BigDecimal expectedGrossedTotalTax = bd("19871.6566");
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTotalTax);
+
+        // A4 + C2: SE tax (and its gross-up) must actually leave the pool -- traditional funds the
+        // $30,000 spend draw AND the full (grossed-up ordinary + SE) tax, not just the ordinary
+        // portion the way it did pre-A4, and not just the pre-C2 base amount either.
         assertThat(year1.traditionalBalance())
-                .isEqualByComparingTo(bd("500000.0000").subtract(bd("30000")).subtract(expectedTotalTax));
+                .isEqualByComparingTo(bd("500000.0000").subtract(bd("30000")).subtract(expectedGrossedTotalTax));
 
         // Balance identity: start + contrib + growth - withdrawals - taxLiability == end.
         BigDecimal expectedEnd = year1.startBalance().add(year1.contributions()).add(year1.growth())

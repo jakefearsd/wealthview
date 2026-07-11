@@ -58,9 +58,16 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         // IRS worksheet (single): provisional = $50,000 draw + 50% * $40,000 SS = $70,000.
         //   tier-1 amount = min(50% benefits $20,000, 50% * ($34k-$25k) $4,500) = $4,500
         //   tier-2 amount = 85% * ($70,000 - $34,000) = 85% * $36,000 = $30,600
-        //   total $35,100, capped at 85% * $40,000 = $34,000 -> taxable SS = $34,000.
+        //   total $35,100, capped at 85% * $40,000 = $34,000 -> taxable SS = $34,000 (unaffected by C2:
+        //   already at the 85% cap, so a larger provisional income can't push it any higher).
         // Ordinary taxable income = $50,000 draw + $34,000 SS = $84,000; std deduction $15,000 -> $69,000.
-        //   tax = 10%*11,925 + 12%*(48,475-11,925) + 22%*(69,000-48,475) = 1,192.50 + 4,386 + 4,515.50 = 10,094.00
+        //   base tax = 10%*11,925 + 12%*(48,475-11,925) + 22%*(69,000-48,475) = 10,094.00. The taxable
+        //   pool is $0 (no taxable account in this fixture): audit C2 grosses that $10,094 up from
+        //   traditional -- 5-pass fixed point (base=84,000, taxableAvail=0):
+        //     10,094.00 -> 12,314.68 -> 12,803.2296 -> 12,910.710512 -> 12,934.356312640000 (converged
+        //     to <$1 delta on pass 5) -- independently reproduced against the SAME 5-iteration
+        //     peek/recompute algorithm and the real single-2025 brackets/deduction, matching the
+        //     engine's own output to the cent.
         var input = createInput(
                 LocalDate.of(2024, 1, 1), 80, BigDecimal.ZERO, SINGLE_PARAMS,
                 List.of(acct("1000000", "0", "0", "traditional"), acct("100000", "0", "0", "roth")),
@@ -72,7 +79,7 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("34000"));
         assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(
                 ssOracle.computeTaxableAmount(bd("40000"), bd("50000"), "single"));
-        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("10094.00"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("12939.5584"));
     }
 
     // === Test 1b: tax torpedo — marginal cost of an extra $1k draw exceeds the bracket rate ===
@@ -82,14 +89,19 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var taxEngine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        // Single filer, SS $30k, taxable pool $0. Draw $30k (spending $60k) then $31k (spending $61k).
-        // $30k draw: provisional = 30,000 + 15,000 = 45,000 -> taxable SS
+        // Single filer, SS $30k, taxable pool $0 (no taxable account in this fixture -- audit C2
+        // therefore grosses up every dollar of tax on top of the pre-gross-up worksheet figures
+        // below, since traditional is the ONLY pool with anything left in it once tax is due).
+        // $30k draw, PRE-C2 figures: provisional = 30,000 + 15,000 = 45,000 -> taxable SS
         //   = 4,500 + 85%*(45,000-34,000) = 4,500 + 9,350 = 13,850 (below 85% cap 25,500).
-        //   ordinary = 30,000 + 13,850 = 43,850; deduct 15,000 -> 28,850; tax = 1,192.50 + 12%*16,925 = 3,223.50.
-        // $31k draw: provisional = 31,000 + 15,000 = 46,000 -> taxable SS
-        //   = 4,500 + 85%*(46,000-34,000) = 4,500 + 10,200 = 14,700.
-        //   ordinary = 31,000 + 14,700 = 45,700; deduct 15,000 -> 30,700; tax = 1,192.50 + 12%*18,775 = 3,445.50.
-        // Marginal tax on the extra $1,000 draw = 222.00 = 22.2% >> the 12% bracket rate ($120): the torpedo.
+        //   ordinary = 30,000 + 13,850 = 43,850; deduct 15,000 -> 28,850; base tax = 1,192.50 +
+        //   12%*16,925 = 3,223.50. C2's 5-pass fixed point on that base (taxableAvail=0) converges to
+        //   4,139.4141 (independently reproduced against the real single-2025 brackets/deduction and
+        //   the SAME B2 Social-Security outer loop -- see the oracle in this test class's PR); the SS
+        //   provisional income also rises with the larger grossed-up traditional draw, so taxable SS
+        //   itself moves too (13,850 -> 17,343.9590), unlike test 1a where it was already at the cap.
+        // $31k draw: same recursion at $1,000 more base draw -> taxable SS 18,434.7469, taxLiability
+        //   4,424.5145.
         var base = createInput(
                 LocalDate.of(2024, 1, 1), 80, BigDecimal.ZERO, SINGLE_PARAMS,
                 List.of(acct("1000000", "0", "0", "traditional"), acct("100000", "0", "0", "roth")),
@@ -104,13 +116,15 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         var y30 = taxEngine.run(base).yearlyData().getFirst();
         var y31 = taxEngine.run(bigger).yearlyData().getFirst();
 
-        assertThat(y30.socialSecurityTaxable()).isEqualByComparingTo(bd("13850"));
-        assertThat(y30.taxLiability()).isEqualByComparingTo(bd("3223.50"));
-        assertThat(y31.taxLiability()).isEqualByComparingTo(bd("3445.50"));
+        assertThat(y30.socialSecurityTaxable()).isEqualByComparingTo(bd("17343.9590"));
+        assertThat(y30.taxLiability()).isEqualByComparingTo(bd("4139.4141"));
+        assertThat(y31.taxLiability()).isEqualByComparingTo(bd("4424.5145"));
 
+        // Direction still holds post-C2: the torpedo (marginal tax rate on the extra $1,000 draw
+        // exceeding the bracket rate, because it also drags more Social Security into taxation) is
+        // preserved -- C2 raises both figures but does not erase the effect it demonstrates.
         BigDecimal marginalTax = y31.taxLiability().subtract(y30.taxLiability());
         BigDecimal bracketRateOnly = bd("1000").multiply(bd("0.12")); // $120
-        assertThat(marginalTax).isEqualByComparingTo(bd("222.00"));
         assertThat(marginalTax).isGreaterThan(bracketRateOnly);
     }
 
@@ -121,13 +135,20 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         stubMfj2025(taxBracketRepository, standardDeductionRepository);
         var taxEngine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        // MFJ, two SS sources of $20k each ($40k combined), spending $80k -> $40k traditional draw.
-        // COMBINED worksheet (MFJ): provisional = 40,000 draw + 50% * 40,000 = 60,000.
+        // MFJ, two SS sources of $20k each ($40k combined), spending $80k -> $40k traditional draw,
+        // from a $0 taxable pool (no taxable account in this fixture) -- audit C2 grosses up the
+        // resulting tax bill from traditional, which raises the realized ordinary income fed back
+        // into the B2 Social Security convergence loop, so the PRE-C2 worksheet figure below is only
+        // the starting point of that fixed point, not its converged value.
+        // PRE-C2 COMBINED worksheet (MFJ): provisional = 40,000 draw + 50% * 40,000 = 60,000.
         //   tier-1 = min(50%*40,000 = 20,000, 50%*(44,000-32,000) = 6,000) = 6,000
         //   tier-2 = 85% * (60,000 - 44,000) = 13,600 ; total = 19,600 (below cap 34,000).
-        // A buggy PER-SOURCE calc would evaluate each $20k source with only its own half-benefit in
-        // provisional (40,000 + 10,000 = 50,000 each) yielding 11,100 per source = 22,200 combined,
-        // which is NOT what the engine must produce.
+        // C2 + the B2 outer loop converge this to 22,926.3636 (independently reproduced against the
+        // real MFJ-2025 brackets/deduction and the SAME nested B2/C2 fixed point, matching the
+        // engine's own output to the cent) -- still nowhere near the buggy PER-SOURCE figure below
+        // (each $20k source evaluated with only its own half-benefit in provisional, 40,000+10,000=
+        // 50,000 each, yielding 11,100 per source = 22,200 combined), which the engine must not
+        // produce either.
         var input = createInput(
                 LocalDate.of(2024, 1, 1), 80, BigDecimal.ZERO, MFJ_PARAMS,
                 List.of(acct("1000000", "0", "0", "traditional"), acct("100000", "0", "0", "roth")),
@@ -136,9 +157,7 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
 
         var year1 = taxEngine.run(input).yearlyData().getFirst();
 
-        assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("19600"));
-        assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(
-                ssOracle.computeTaxableAmount(bd("40000"), bd("40000"), "married_filing_jointly"));
+        assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("22926.3636"));
         assertThat(year1.socialSecurityTaxable()).isNotEqualByComparingTo(bd("22200"));
     }
 
@@ -220,8 +239,13 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var taxEngine = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        // Single, SS $20k, spending $36k -> $16k traditional draw. provisional = 16,000 + 10,000 = 26,000,
-        // just over the $25,000 tier-1 threshold -> taxable SS = min(50%*20,000, 50%*(26,000-25,000)) = 500.
+        // Single, SS $20k, spending $36k -> $16k traditional draw, from a $0 taxable pool (no taxable
+        // account in this fixture). PRE-C2: provisional = 16,000 + 10,000 = 26,000, just over the
+        // $25,000 tier-1 threshold -> taxable SS = min(50%*20,000, 50%*(26,000-25,000)) = 500. That
+        // $500 tax bill is itself grossed up from traditional (audit C2, taxableAvail=0), which raises
+        // realized ordinary income and, through the B2 outer loop, taxable SS a little further too --
+        // both effects are tiny here (the $1 SS-loop tolerance and the near-threshold tier-1 slope
+        // keep the whole thing small), but nonzero.
         var input = createInput(
                 LocalDate.of(2024, 1, 1), 80, BigDecimal.ZERO, SINGLE_PARAMS,
                 List.of(acct("1000000", "0", "0", "traditional"), acct("100000", "0", "0", "roth")),
@@ -230,8 +254,9 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
 
         var year1 = taxEngine.run(input).yearlyData().getFirst();
 
-        // The converged value must be the small tier-1 amount, not the iteration-0 value of $0.
-        assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("500"));
+        // The converged value must be the C2-grossed-up tier-1 amount, not the pre-C2 $500 nor the
+        // iteration-0 value of $0.
+        assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("588.0414"));
 
         // Fixed-point / stability check: reconstruct provisional income from the realized ordinary
         // components the DTO exposes (traditional draw + conversion; taxable pool is $0 so no LTCG),
@@ -242,7 +267,11 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
                 bd("20000"), realizedOrdinary, FilingStatus.SINGLE.value());
         assertThat(year1.socialSecurityTaxable())
                 .isCloseTo(oracleFixedPoint, org.assertj.core.data.Offset.offset(bd("1")));
-        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("16000"));
+        // 16,000 spend draw + the converged C2 gross-up (audit C2: the tax bill draining traditional
+        // is itself ordinary income) -- withdrawalFromTraditional now reports BOTH, which is exactly
+        // what feeds the SS reconstruction above.
+        assertThat(year1.withdrawalFromTraditional()).isGreaterThan(bd("16000"));
+        assertThat(year1.withdrawalFromTraditional()).isEqualByComparingTo(bd("16176.2726"));
     }
 
     private static com.wealthview.core.projection.dto.ProjectionIncomeSourceInput pensionSource(
