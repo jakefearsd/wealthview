@@ -343,6 +343,105 @@ class FederalTaxCalculatorTest {
         assertThat(mismatches).hasValue(0);
     }
 
+    // === Age-65+ additional standard deduction (audit D, Tier-3) ===
+    // Uses locally-scoped OBBBA (2025) figures rather than the shared singleDeduction2025()/
+    // mfjDeduction2025() fixtures above -- those fixtures intentionally stay frozen at their
+    // original pre-OBBBA numbers because ~20 unrelated test files pin exact tax amounts derived
+    // from them; this suite verifies the NEW age-aware seam against the real IRS/OBBBA figures
+    // independently, without perturbing that shared fixture.
+
+    @Test
+    void loadStandardDeduction_2025Single_obbbaBaseAmount() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE);
+
+        assertThat(deduction).isEqualByComparingTo(bd("15750"));
+    }
+
+    @Test
+    void loadStandardDeduction_2025Mfj_obbbaBaseAmount() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.MARRIED_FILING_JOINTLY);
+
+        assertThat(deduction).isEqualByComparingTo(bd("31500"));
+    }
+
+    @Test
+    void loadStandardDeduction_age65Single2025_addsAdditionalAge65Amount() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE, 65);
+
+        // 15,750 base + 2,000 age-65 addition = 17,750
+        assertThat(deduction).isEqualByComparingTo(bd("17750"));
+    }
+
+    @Test
+    void loadStandardDeduction_age64_returnsBaseAmountOnly() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE, 64);
+
+        assertThat(deduction).isEqualByComparingTo(bd("15750"));
+    }
+
+    @Test
+    void loadStandardDeduction_noAgeSupplied_behavesIdenticallyToAgeUnder65() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var ageless = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE);
+        var age40 = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE, 40);
+
+        assertThat(ageless).isEqualByComparingTo(age40).isEqualByComparingTo(bd("15750"));
+    }
+
+    @Test
+    void loadStandardDeduction_ageAware_yearFallback_appliesFallbackYearsAdditionalAmount() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2040, "single"))
+                .thenReturn(Optional.empty());
+        when(standardDeductionRepository.findMaxTaxYear()).thenReturn(2025);
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var deduction = calculator.loadStandardDeduction(2040, FilingStatus.SINGLE, 66);
+
+        assertThat(deduction).isEqualByComparingTo(bd("17750"));
+    }
+
+    @Test
+    void computeTax_age65_usesBoostedDeduction() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        // Taxable = 60,000 - 17,750 = 42,250 -> 10% on 11,925 = 1,192.50; 12% on 30,325 = 3,639.00
+        var tax = calculator.computeTax(bd("60000"), 2025, FilingStatus.SINGLE, 66);
+
+        assertThat(tax).isEqualByComparingTo(bd("4831.5000"));
+    }
+
+    @Test
+    void computeTax_age65_lowerThanAgeUnaware() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))
+                .thenReturn(single2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var ageAwareTax = calculator.computeTax(bd("60000"), 2025, FilingStatus.SINGLE, 66);
+        var agelessTax = calculator.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(ageAwareTax).isLessThan(agelessTax);
+    }
+
     @Test
     void computeTax_afterClearCache_stillComputes() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))

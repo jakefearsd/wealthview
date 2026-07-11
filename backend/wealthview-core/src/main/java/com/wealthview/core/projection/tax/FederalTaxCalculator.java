@@ -3,6 +3,7 @@ package com.wealthview.core.projection.tax;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.stereotype.Component;
@@ -18,6 +19,17 @@ import static com.wealthview.core.common.Money.SCALE;
 @Component
 public class FederalTaxCalculator {
 
+    /**
+     * Sentinel passed to the age-aware overloads by the age-less ones (via the 3-arg
+     * {@link #loadStandardDeduction(int, FilingStatus)} / {@link #computeTax(BigDecimal, int,
+     * FilingStatus)}): guaranteed below {@link #AGE_65}, so it reproduces the exact pre-age65-
+     * feature behavior (base deduction only, no addition) for every caller that doesn't track age.
+     */
+    private static final int AGE_UNKNOWN = -1;
+
+    /** IRS age threshold (Pub. 501) for the additional standard deduction. */
+    private static final int AGE_65 = 65;
+
     private final TaxBracketRepository taxBracketRepository;
     private final StandardDeductionRepository standardDeductionRepository;
     // ConcurrentHashMap: this singleton is shared by concurrent projection requests, which
@@ -32,10 +44,19 @@ public class FederalTaxCalculator {
     }
 
     public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+        return computeTax(grossIncome, taxYear, status, AGE_UNKNOWN);
+    }
+
+    /**
+     * Like {@link #computeTax(BigDecimal, int, FilingStatus)} but applies the IRS age-65+
+     * additional standard deduction (Pub. 501) when {@code age >= 65} for the given tax year, via
+     * {@link #loadStandardDeduction(int, FilingStatus, int)}.
+     */
+    public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status, int age) {
         if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        BigDecimal deduction = loadStandardDeduction(taxYear, status);
+        BigDecimal deduction = loadStandardDeduction(taxYear, status, age);
         BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
         if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -138,22 +159,43 @@ public class FederalTaxCalculator {
      * when the exact year isn't present. Public so collaborators outside this package (e.g. the
      * projection module's LTCG stacking-floor netting) can reuse the SAME deduction the ordinary tax
      * path nets internally, rather than re-deriving or omitting it.
+     *
+     * <p>Age-unaware: equivalent to {@link #loadStandardDeduction(int, FilingStatus, int)} with
+     * {@link #AGE_UNKNOWN}, i.e. never applies the age-65+ addition. Existing callers that don't
+     * track age keep exactly their pre-age65-feature behavior.
      */
     public BigDecimal loadStandardDeduction(int taxYear, FilingStatus status) {
-        String key = taxYear + ":" + status.value();
-        return deductionCache.computeIfAbsent(key, k -> {
-            var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());
-            if (entity.isPresent()) {
-                return entity.get().getAmount();
-            }
+        return loadStandardDeduction(taxYear, status, AGE_UNKNOWN);
+    }
+
+    /**
+     * Age-aware standard deduction (Tier-3 audit item D): adds the IRS age-65+ additional standard
+     * deduction (Pub. 501, {@code StandardDeductionEntity#getAdditionalAge65()}) on top of the base
+     * amount when {@code age >= 65} for {@code taxYear}, with the same latest-seeded-year fallback
+     * as the base amount. Per {@code StandardDeductionEntity}'s Javadoc, the seeded amount is per
+     * QUALIFYING PERSON (for MFJ, technically per spouse aged 65+) -- this engine only tracks the
+     * PRIMARY filer's age, so callers apply at most ONE adder even for an MFJ couple where both
+     * spouses are 65+. That's a documented, conservative simplification (understates the true
+     * deduction, i.e. slightly overstates tax) rather than a correctness bug.
+     */
+    public BigDecimal loadStandardDeduction(int taxYear, FilingStatus status, int age) {
+        String key = taxYear + ":" + status.value() + ":" + (age >= AGE_65);
+        return deductionCache.computeIfAbsent(key, k -> resolveStandardDeduction(taxYear, status, age));
+    }
+
+    private BigDecimal resolveStandardDeduction(int taxYear, FilingStatus status, int age) {
+        var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());
+        if (entity.isEmpty()) {
             Integer maxYear = standardDeductionRepository.findMaxTaxYear();
-            if (maxYear != null) {
-                return standardDeductionRepository.findByTaxYearAndFilingStatus(maxYear, status.value())
-                        .map(StandardDeductionEntity::getAmount)
-                        .orElse(BigDecimal.ZERO);
-            }
-            return BigDecimal.ZERO;
-        });
+            entity = maxYear != null
+                    ? standardDeductionRepository.findByTaxYearAndFilingStatus(maxYear, status.value())
+                    : Optional.empty();
+        }
+        return entity.map(e -> applyAge65Addition(e, age)).orElse(BigDecimal.ZERO);
+    }
+
+    private static BigDecimal applyAge65Addition(StandardDeductionEntity entity, int age) {
+        return age >= AGE_65 ? entity.getAmount().add(entity.getAdditionalAge65()) : entity.getAmount();
     }
 
     private List<TaxBracketEntity> loadBrackets(int taxYear, FilingStatus status) {
