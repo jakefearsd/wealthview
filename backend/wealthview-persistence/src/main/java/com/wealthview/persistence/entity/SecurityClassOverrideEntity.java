@@ -50,4 +50,8 @@ public class SecurityClassOverrideEntity extends Auditable {
     public String getAssetClass() {
         return assetClass;
     }
+
+    public void setAssetClass(String assetClass) {
+        this.assetClass = assetClass;
+    }
 }

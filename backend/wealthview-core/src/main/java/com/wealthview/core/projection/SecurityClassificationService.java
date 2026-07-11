@@ -19,6 +19,7 @@ import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.PriceEntity;
+import com.wealthview.persistence.entity.SecurityClassOverrideEntity;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.SecurityAssetClassRepository;
@@ -58,6 +59,27 @@ public class SecurityClassificationService {
         Objects.requireNonNull(symbol, "symbol must not be null");
 
         return resolveExplicitClass(tenantId, symbol).orElse(AssetClass.US_STOCK);
+    }
+
+    /**
+     * Upserts the tenant-scoped manual override for a symbol: creates a new
+     * {@link SecurityClassOverrideEntity} if none exists, otherwise updates the existing row
+     * in place. Returns the stored class.
+     */
+    // LinguisticNaming: named "setOverride" for the upsert-an-override domain action, not as a
+    // plain field setter; it deliberately returns the resolved AssetClass so callers (and the
+    // controller) don't need a second read to report what was persisted.
+    @SuppressWarnings("PMD.LinguisticNaming")
+    @Transactional
+    public AssetClass setOverride(UUID tenantId, String symbol, AssetClass assetClass) {
+        Objects.requireNonNull(tenantId, "tenantId must not be null");
+        Objects.requireNonNull(symbol, "symbol must not be null");
+        Objects.requireNonNull(assetClass, "assetClass must not be null");
+        var existing = overrideRepository.findByTenantIdAndSymbol(tenantId, symbol);
+        var entity = existing.orElseGet(() -> new SecurityClassOverrideEntity(tenantId, symbol, assetClass.key()));
+        entity.setAssetClass(assetClass.key());
+        overrideRepository.save(entity);
+        return assetClass;
     }
 
     /**

@@ -35,4 +35,22 @@ class SecurityClassificationRepositoriesIntegrationTest extends AbstractIntegrat
         assertThat(overrideRepo.findByTenantIdAndSymbol(tenant, "XYZ")).get()
                 .extracting(SecurityClassOverrideEntity::getAssetClass).isEqualTo("intl_stock");
     }
+
+    @Test
+    void upsert_existingRow_updatesInPlaceAndLeavesOtherTenantUntouched() {
+        var tenant = UUID.randomUUID();
+        var otherTenant = UUID.randomUUID();
+        overrideRepo.save(new SecurityClassOverrideEntity(tenant, "SPAXX", "us_stock"));
+        overrideRepo.save(new SecurityClassOverrideEntity(otherTenant, "SPAXX", "us_stock"));
+
+        // Simulate SecurityClassificationService#setOverride: find-then-mutate-then-save.
+        var existing = overrideRepo.findByTenantIdAndSymbol(tenant, "SPAXX").orElseThrow();
+        existing.setAssetClass("cash");
+        overrideRepo.save(existing);
+
+        assertThat(overrideRepo.findByTenantIdAndSymbol(tenant, "SPAXX")).get()
+                .extracting(SecurityClassOverrideEntity::getAssetClass).isEqualTo("cash");
+        assertThat(overrideRepo.findByTenantIdAndSymbol(otherTenant, "SPAXX")).get()
+                .extracting(SecurityClassOverrideEntity::getAssetClass).isEqualTo("us_stock");
+    }
 }

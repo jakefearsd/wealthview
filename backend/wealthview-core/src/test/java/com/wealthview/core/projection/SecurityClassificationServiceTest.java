@@ -26,6 +26,7 @@ import com.wealthview.persistence.repository.SecurityClassOverrideRepository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -34,6 +35,8 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SecurityClassificationServiceTest {
+
+    private static final UUID TENANT = UUID.randomUUID();
 
     @Mock
     private SecurityAssetClassRepository seedRepository;
@@ -57,6 +60,28 @@ class SecurityClassificationServiceTest {
     void setUp() {
         tenantId = UUID.randomUUID();
         accountId = UUID.randomUUID();
+    }
+
+    @Test
+    void setOverride_newSymbol_persistsUpperCaseClass() {
+        when(overrideRepository.findByTenantIdAndSymbol(TENANT, "SPAXX")).thenReturn(Optional.empty());
+
+        var result = service.setOverride(TENANT, "SPAXX", AssetClass.CASH);
+
+        assertThat(result).isEqualTo(AssetClass.CASH);
+        verify(overrideRepository).save(argThat(e ->
+                e.getSymbol().equals("SPAXX") && e.getAssetClass().equals("cash") && e.getTenantId().equals(TENANT)));
+    }
+
+    @Test
+    void setOverride_existingSymbol_updatesInPlace() {
+        var existing = new SecurityClassOverrideEntity(TENANT, "SPAXX", "us_stock");
+        when(overrideRepository.findByTenantIdAndSymbol(TENANT, "SPAXX")).thenReturn(Optional.of(existing));
+
+        service.setOverride(TENANT, "SPAXX", AssetClass.CASH);
+
+        assertThat(existing.getAssetClass()).isEqualTo("cash");
+        verify(overrideRepository).save(existing);
     }
 
     @Test
