@@ -151,16 +151,20 @@ final class TrialSimulator {
             // MultiPool's second-order exclusion.
             double cashBeforeWithdrawals = cashBalance;
             double[] realizedGainOut = {0.0};
-            cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, cashBalance, drawn,
-                    withdrawalTax, withdrawal, spending, hasPools, config.cashReserveYears(),
-                    portfolioReturn);
+            double[] traditionalDrawnOut = {0.0};
+            cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, traditionalDrawnOut,
+                    cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
+                    config.cashReserveYears(), portfolioReturn);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
-            // If the RMD exceeds what the spend withdrawal already drew from traditional, force
-            // the excess out physically -- it's a real, legally-required distribution even when
-            // the retiree doesn't need the cash. The after-tax remainder is reinvested to taxable.
+            // If the RMD exceeds what the spend withdrawal ACTUALLY drew from traditional this
+            // year (traditionalDrawnOut[0] -- not the raw pool-split target drawn.traditional(),
+            // since a cash-reserve down year may have funded spending from cash instead, leaving
+            // traditional untouched), force the excess out physically -- it's a real,
+            // legally-required distribution even when the retiree doesn't need the cash. The
+            // after-tax remainder is reinvested to taxable.
             double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
-            forceRmdExcess(pools, lots, rmd, drawn.traditional(), marginalRate);
+            forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], marginalRate);
 
             double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
             if (resourcesForSpending < floors[y] - 1e-6) {
@@ -341,62 +345,55 @@ final class TrialSimulator {
     }
 
     /**
-     * Deducts withdrawals and tax from pools, handling cash reserve logic.
-     * Returns updated cash balance.
+     * Deducts withdrawals and tax from pools, handling cash reserve logic. Returns updated cash
+     * balance. {@code traditionalDrawnOut[0]} is set to the dollar amount actually debited from
+     * {@code pools[1]} for this year's spending draw. Package-private (mirrors
+     * {@link #splitWithdrawal}) so the cash-reserve down-year branches can be unit tested
+     * directly instead of only through the full {@link #simulateTrial} pipeline.
      */
-    private static double applyTrialWithdrawals(double[] pools, TaxableLots lots, double[] realizedGainOut,
-                                                 double cashBalance,
-                                                 PoolWithdrawal drawn, double withdrawalTax,
-                                                 double withdrawal, double spending,
-                                                 boolean hasPools, int cashReserveYears,
-                                                 double portfolioReturn) {
+    static double applyTrialWithdrawals(double[] pools, TaxableLots lots, double[] realizedGainOut,
+                                         double[] traditionalDrawnOut, double cashBalance,
+                                         PoolWithdrawal drawn, double withdrawalTax,
+                                         double withdrawal, double spending,
+                                         boolean hasPools, int cashReserveYears,
+                                         double portfolioReturn) {
         if (cashReserveYears > 0) {
             if (portfolioReturn < 0) {
-                if (hasPools) {
-                    // sustainability path: tax-aware cash reserve draw
-                    double totalDraw = withdrawal + withdrawalTax;
-                    double cashDraw = Math.min(totalDraw, cashBalance);
-                    double equityDraw = totalDraw - cashDraw;
-                    double drawnTotal = drawn.total();
-                    if (drawnTotal > 0 && equityDraw > 0) {
-                        double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                        // The scaled equity draw bundles a taxable SPENDING sale and a taxable
-                        // TAX-payment sale in one scalar subtraction; only the spending part realizes
-                        // taxed gain, the tax part is synced but its gain discarded (second-order).
-                        double spendingSale = drawn.taxable() * scale;
-                        double taxSale = withdrawalTax * Math.min(pools[0], withdrawalTax)
-                                / Math.max(1, pools[0] + pools[1] + pools[2]);
-                        pools[0] -= spendingSale + taxSale;
-                        realizedGainOut[0] += lots.sellFifo(spendingSale);
-                        lots.sellFifo(taxSale);
-                    } else {
-                        pools[0] -= drawn.taxable();
-                        pools[1] -= drawn.traditional();
-                        pools[2] -= drawn.roth();
-                        realizedGainOut[0] += lots.sellFifo(drawn.taxable());
-                    }
-                    return cashBalance - cashDraw;
-                } else {
-                    // final-response path: simple cash reserve draw (no withdrawal tax)
-                    double cashDraw = Math.min(withdrawal, cashBalance);
-                    double equityDraw = withdrawal - cashDraw;
-                    double drawnTotal = drawn.total();
-                    if (drawnTotal > 0 && equityDraw > 0) {
-                        double scale = equityDraw / Math.max(drawnTotal, equityDraw);
-                        double spendingSale = drawn.taxable() * scale;
-                        pools[0] -= spendingSale;
-                        pools[1] -= drawn.traditional() * scale;
-                        pools[2] -= drawn.roth() * scale;
-                        realizedGainOut[0] += lots.sellFifo(spendingSale);
-                    }
-                    return cashBalance - cashDraw;
+                // Down-year cash reserve draw: cash covers as much of the spending withdrawal as
+                // it can; the equity pools fund only the remainder, scaled pro-rata across all
+                // three pools -- identical semantics whether or not withdrawal tax is estimated
+                // (hasPools). When cash fully covers the withdrawal the equity pools are debited
+                // NOTHING for the spending draw; that is the entire point of the reserve (see
+                // TrialSimulatorReturnTest's pinned non-pool test).
+                double cashDraw = Math.min(withdrawal, cashBalance);
+                double equityDraw = withdrawal - cashDraw;
+                double drawnTotal = drawn.total();
+                if (drawnTotal > 0 && equityDraw > 0) {
+                    double scale = equityDraw / Math.max(drawnTotal, equityDraw);
+                    double spendingSale = drawn.taxable() * scale;
+                    double tradDrawn = drawn.traditional() * scale;
+                    pools[0] -= spendingSale;
+                    pools[1] -= tradDrawn;
+                    pools[2] -= drawn.roth() * scale;
+                    realizedGainOut[0] += lots.sellFifo(spendingSale);
+                    traditionalDrawnOut[0] = tradDrawn;
                 }
+                // The withdrawal tax is a separate, full-amount outflow paid straight from the
+                // pools via the shared cascade -- the cash reserve funds spending only, never
+                // tax, matching the up-market and no-reserve branches below. (Replaces the old
+                // dimensionally-wrong tax^2/portfolio partial deduction, and the old double debit
+                // when cash fully covered the draw.)
+                if (hasPools) {
+                    deductTaxFromPools(withdrawalTax, pools, lots);
+                }
+                return cashBalance - cashDraw;
             } else {
                 // Up market: normal withdrawal + replenish cash
                 pools[0] -= drawn.taxable();
                 realizedGainOut[0] += lots.sellFifo(drawn.taxable());
                 pools[1] -= drawn.traditional();
                 pools[2] -= drawn.roth();
+                traditionalDrawnOut[0] = drawn.traditional();
                 if (hasPools) {
                     deductTaxFromPools(withdrawalTax, pools, lots);
                 }
@@ -419,6 +416,7 @@ final class TrialSimulator {
             realizedGainOut[0] += lots.sellFifo(drawn.taxable());
             pools[1] -= drawn.traditional();
             pools[2] -= drawn.roth();
+            traditionalDrawnOut[0] = drawn.traditional();
             if (hasPools) {
                 deductTaxFromPools(withdrawalTax, pools, lots);
             }
