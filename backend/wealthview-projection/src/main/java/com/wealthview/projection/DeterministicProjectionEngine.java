@@ -345,7 +345,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var yearDto = pool.buildYearDto(new PoolStrategy.YearDtoContext(
                 year, age, startBalance, contributions,
                 totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
-                growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource));
+                growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource,
+                rmdAmount, ltcgTax));
         yearDto = PropertyEquityCalculator.apply(yearDto, propertyEquity);
         yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
                 ctx.inflationRate(), incomeResult.totalActiveIncome());

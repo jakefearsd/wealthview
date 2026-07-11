@@ -580,7 +580,7 @@ class MultiPoolDeepTest {
                 bd("100"), true, ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 ZERO, bd("100"), ZERO,
-                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO)));
+                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO), ZERO, ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("15"));
         assertThat(dto.stateTax()).isEqualByComparingTo(bd("5"));
@@ -596,7 +596,7 @@ class MultiPoolDeepTest {
                 bd("50"), true, ZERO, ZERO,
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 bd("50"), ZERO, ZERO,
-                PoolStrategy.TaxSourceResult.ZERO));
+                PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isNull();
         assertThat(dto.stateTax()).isNull();
@@ -615,7 +615,7 @@ class MultiPoolDeepTest {
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
                 ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
-                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO));
+                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("20"));
         assertThat(dto.stateTax()).isNull();

@@ -43,6 +43,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -89,6 +91,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -135,6 +139,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -181,6 +187,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -227,6 +235,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -273,6 +283,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -319,6 +331,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -365,6 +379,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -411,6 +427,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -457,6 +475,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -503,6 +523,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -549,6 +571,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -595,6 +619,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -641,6 +667,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -687,6 +715,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -733,6 +763,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -779,6 +811,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -825,6 +859,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -871,6 +907,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -917,6 +955,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -963,6 +1003,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1009,6 +1051,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1055,6 +1099,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1101,6 +1147,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1147,6 +1195,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1193,6 +1243,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1239,6 +1291,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1285,6 +1339,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1331,6 +1387,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1377,6 +1435,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1423,6 +1483,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : 5308.2164,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1469,6 +1531,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : false,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : 1964.6018,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1515,6 +1579,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1561,6 +1627,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1607,6 +1675,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1653,6 +1723,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1699,6 +1771,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1745,6 +1819,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1791,6 +1867,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1837,6 +1915,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1883,6 +1963,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1929,6 +2011,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1975,6 +2059,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2021,6 +2107,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2067,6 +2155,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2113,6 +2203,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2159,6 +2251,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2205,6 +2299,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2251,6 +2347,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2297,6 +2395,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2343,6 +2443,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2389,6 +2491,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2435,6 +2539,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2481,6 +2587,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2527,6 +2635,8 @@
     "saltDeduction" : null,
     "usedItemizedDeduction" : null,
     "irmaaWarning" : null,
+    "rmdAmount" : null,
+    "capitalGainsTax" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null

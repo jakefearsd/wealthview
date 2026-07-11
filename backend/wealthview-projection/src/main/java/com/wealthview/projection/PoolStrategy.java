@@ -62,7 +62,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                           GrowthResult growthResult,
                           BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
                           BigDecimal withdrawalFromRoth,
-                          TaxSourceResult combinedTaxSource) {}
+                          TaxSourceResult combinedTaxSource,
+                          BigDecimal rmdAmount, BigDecimal ltcgTax) {}
 
     default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
                                                             BigDecimal overrideAmount, BigDecimal rmdAmount) {
@@ -774,7 +775,8 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     ctx.withdrawals(), ctx.retired(),
                     ctx.conversionAmount(), ctx.taxLiability(), ctx.growthResult(),
                     ctx.withdrawalFromTaxable(), ctx.withdrawalFromTraditional(), ctx.withdrawalFromRoth(),
-                    ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional, roth);
+                    ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional, roth,
+                    ctx.rmdAmount(), ctx.ltcgTax());
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
             CombinedTaxResult breakdown = lastTaxBreakdown.orElse(null);

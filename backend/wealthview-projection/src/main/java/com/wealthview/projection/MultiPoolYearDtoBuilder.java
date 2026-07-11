@@ -31,7 +31,8 @@ final class MultiPoolYearDtoBuilder {
                          BigDecimal withdrawalFromRoth,
                          PoolStrategy.TaxSourceResult combinedTaxSource,
                          BigDecimal endBalance, BigDecimal endingTaxable,
-                         BigDecimal endingTraditional, BigDecimal endingRoth) {}
+                         BigDecimal endingTraditional, BigDecimal endingRoth,
+                         BigDecimal rmdAmount, BigDecimal ltcgTax) {}
 
     private MultiPoolYearDtoBuilder() {
     }
@@ -72,6 +73,8 @@ final class MultiPoolYearDtoBuilder {
                 .withdrawalFromRoth(positiveOrNull(in.withdrawalFromRoth()))
                 .federalTax(fedTax).stateTax(stTax).saltDeduction(saltDed)
                 .usedItemizedDeduction(usedItemized)
+                .rmdAmount(positiveOrNull(in.rmdAmount()))
+                .capitalGainsTax(positiveOrNull(in.ltcgTax()))
                 .build();
     }
 

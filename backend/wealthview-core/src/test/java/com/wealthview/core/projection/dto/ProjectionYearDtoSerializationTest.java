@@ -45,7 +45,8 @@ class ProjectionYearDtoSerializationTest {
             "totalNetWorth", "surplusReinvested", "taxableGrowth", "traditionalGrowth", "rothGrowth",
             "taxPaidFromTaxable", "taxPaidFromTraditional", "taxPaidFromRoth", "withdrawalFromTaxable",
             "withdrawalFromTraditional", "withdrawalFromRoth", "rentalPropertyDetails", "federalTax",
-            "stateTax", "saltDeduction", "usedItemizedDeduction", "irmaaWarning");
+            "stateTax", "saltDeduction", "usedItemizedDeduction", "irmaaWarning", "rmdAmount",
+            "capitalGainsTax");
 
     private static final Set<String> SNAKE_KEYS = Set.of(
             "year", "age", "start_balance", "contributions", "growth", "withdrawals", "end_balance",
@@ -58,7 +59,8 @@ class ProjectionYearDtoSerializationTest {
             "taxable_growth", "traditional_growth", "roth_growth", "tax_paid_from_taxable",
             "tax_paid_from_traditional", "tax_paid_from_roth", "withdrawal_from_taxable",
             "withdrawal_from_traditional", "withdrawal_from_roth", "rental_property_details",
-            "federal_tax", "state_tax", "salt_deduction", "used_itemized_deduction", "irmaa_warning");
+            "federal_tax", "state_tax", "salt_deduction", "used_itemized_deduction", "irmaa_warning",
+            "rmd_amount", "capital_gains_tax");
 
     /** A year with every field populated to a distinct value, so a swapped field is detectable. */
     private ProjectionYearDto fullyPopulated() {
@@ -91,6 +93,7 @@ class ProjectionYearDtoSerializationTest {
                 .rentalPropertyDetails(List.of(detail)).federalTax(new BigDecimal("1500"))
                 .stateTax(new BigDecimal("700")).saltDeduction(new BigDecimal("10000"))
                 .usedItemizedDeduction(true).irmaaWarning(false)
+                .rmdAmount(new BigDecimal("6000")).capitalGainsTax(new BigDecimal("900"))
                 .build();
     }
 
@@ -127,6 +130,8 @@ class ProjectionYearDtoSerializationTest {
         assertThat(t.get("total_net_worth").decimalValue()).isEqualByComparingTo("860000");     // net worth
         assertThat(t.get("used_itemized_deduction").booleanValue()).isTrue();
         assertThat(t.get("irmaa_warning").booleanValue()).isFalse();
+        assertThat(t.get("rmd_amount").decimalValue()).isEqualByComparingTo("6000");            // tax breakdown
+        assertThat(t.get("capital_gains_tax").decimalValue()).isEqualByComparingTo("900");       // tax breakdown
     }
 
     @Test

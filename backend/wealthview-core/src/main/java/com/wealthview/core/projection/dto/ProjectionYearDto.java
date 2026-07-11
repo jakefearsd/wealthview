@@ -107,12 +107,19 @@ public record ProjectionYearDto(
         }
     }
 
-    /** Tax outputs for the year: conversion amount, total liability, and the itemized breakdown. */
+    /**
+     * Tax outputs for the year: conversion amount, total liability, and the itemized breakdown.
+     * {@code rmdAmount} and {@code capitalGainsTax} are display breakouts of values already folded
+     * into {@code taxLiability} / {@code federalTax} (the required-minimum-distribution amount and
+     * the long-term capital-gains tax component, respectively) -- surfacing them here does NOT add
+     * to {@code taxLiability}.
+     */
     public record TaxBreakdown(BigDecimal rothConversionAmount, BigDecimal taxLiability,
                                BigDecimal federalTax, BigDecimal stateTax, BigDecimal saltDeduction,
-                               Boolean usedItemizedDeduction, Boolean irmaaWarning) {
+                               Boolean usedItemizedDeduction, Boolean irmaaWarning,
+                               BigDecimal rmdAmount, BigDecimal capitalGainsTax) {
         static TaxBreakdown empty() {
-            return new TaxBreakdown(null, null, null, null, null, null, null);
+            return new TaxBreakdown(null, null, null, null, null, null, null, null, null);
         }
     }
 
@@ -282,6 +289,14 @@ public record ProjectionYearDto(
         return tax.irmaaWarning();
     }
 
+    public BigDecimal rmdAmount() {
+        return tax.rmdAmount();
+    }
+
+    public BigDecimal capitalGainsTax() {
+        return tax.capitalGainsTax();
+    }
+
     public BigDecimal propertyEquity() {
         return netWorth.propertyEquity();
     }
@@ -432,6 +447,8 @@ public record ProjectionYearDto(
         private BigDecimal saltDeduction;
         private Boolean usedItemizedDeduction;
         private Boolean irmaaWarning;
+        private BigDecimal rmdAmount;
+        private BigDecimal capitalGainsTax;
 
         private Builder() {}
 
@@ -482,6 +499,8 @@ public record ProjectionYearDto(
             b.saltDeduction = dto.saltDeduction();
             b.usedItemizedDeduction = dto.usedItemizedDeduction();
             b.irmaaWarning = dto.irmaaWarning();
+            b.rmdAmount = dto.rmdAmount();
+            b.capitalGainsTax = dto.capitalGainsTax();
             return b;
         }
 
@@ -710,6 +729,16 @@ public record ProjectionYearDto(
             return this;
         }
 
+        public Builder rmdAmount(BigDecimal rmdAmount) {
+            this.rmdAmount = rmdAmount;
+            return this;
+        }
+
+        public Builder capitalGainsTax(BigDecimal capitalGainsTax) {
+            this.capitalGainsTax = capitalGainsTax;
+            return this;
+        }
+
         public ProjectionYearDto build() {
             return new ProjectionYearDto(
                     year, age, retired,
@@ -724,7 +753,8 @@ public record ProjectionYearDto(
                             rentalLossApplied, suspendedLossCarryforward, socialSecurityTaxable,
                             selfEmploymentTax, incomeBySource, rentalPropertyDetails),
                     new TaxBreakdown(rothConversionAmount, taxLiability, federalTax, stateTax,
-                            saltDeduction, usedItemizedDeduction, irmaaWarning),
+                            saltDeduction, usedItemizedDeduction, irmaaWarning,
+                            rmdAmount, capitalGainsTax),
                     new NetWorth(propertyEquity, totalNetWorth, surplusReinvested));
         }
     }

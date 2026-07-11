@@ -145,7 +145,7 @@ class PoolStrategyCharacterizationTest {
                 contributions, growth.total(), withdrawal.totalWithdrawn(), true,
                 BigDecimal.ZERO, BigDecimal.ZERO, growth,
                 withdrawal.fromTaxable(), withdrawal.fromTraditional(), withdrawal.fromRoth(),
-                PoolStrategy.TaxSourceResult.ZERO));
+                PoolStrategy.TaxSourceResult.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
 
         assertThat(dto.endBalance()).isEqualByComparingTo(bd("405840.0000"));
         assertThat(dto.traditionalBalance()).isEqualByComparingTo(bd("291350.0000")); // 328600 - 37250
@@ -166,7 +166,7 @@ class PoolStrategyCharacterizationTest {
                 contributions, growth.total(), withdrawal.totalWithdrawn(), true,
                 BigDecimal.ZERO, BigDecimal.ZERO, growth,
                 withdrawal.fromTaxable(), withdrawal.fromTraditional(), withdrawal.fromRoth(),
-                PoolStrategy.TaxSourceResult.ZERO));
+                PoolStrategy.TaxSourceResult.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
 
         BigDecimal sumOfPools = dto.traditionalBalance()
                 .add(dto.rothBalance())
