@@ -137,6 +137,7 @@ describe('ProjectionDetailPage', () => {
             years_in_retirement: 0,
             spending_feasibility: null,
             unclassified_symbols: null,
+            final_net_worth: null,
         });
 
         await userEvent.click(screen.getByRole('button', { name: /run projection/i }));

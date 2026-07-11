@@ -69,6 +69,7 @@ const mockProfile: GuardrailProfileResponse = {
     ],
     median_final_balance: 250000,
     failure_rate: 0.05,
+    success_probability: 0.9,
     percentile10_final: 100000,
     stale: false,
     created_at: '2024-01-01T00:00:00Z',
@@ -121,6 +122,18 @@ describe('SpendingOptimizerPage', () => {
         expect(screen.getByRole('button', { name: /conservative/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /moderate/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /aggressive/i })).toBeInTheDocument();
+    });
+
+    it('shows the correct confidence percentage in the conservative risk tolerance help text', async () => {
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByText('Risk Tolerance')).toBeInTheDocument();
+        });
+        // Conservative is the default preset only when selected; the page defaults to
+        // 'moderate', so select 'conservative' to check its help text.
+        await userEvent.click(screen.getByRole('button', { name: /conservative/i }));
+        expect(screen.getByText(/95% confidence/)).toBeInTheDocument();
     });
 
     it('shows portfolio safety net and spending flexibility inputs', async () => {

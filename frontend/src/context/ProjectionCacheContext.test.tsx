@@ -13,6 +13,7 @@ function makeResult(id: string): ProjectionResult {
         years_in_retirement: 0,
         spending_feasibility: null,
         unclassified_symbols: null,
+        final_net_worth: null,
     };
 }
 

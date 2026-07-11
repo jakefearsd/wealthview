@@ -290,12 +290,20 @@ export default function ProjectionDetailPage() {
                         </div>
                     )}
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
+                    <div style={{ color: '#888', fontSize: '0.75rem', marginBottom: '0.5rem' }}>
+                        All values in today&apos;s dollars.
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1rem' }}>
                         <SummaryCard
                             label="Final Balance"
                             value={formatCurrency(result.final_balance)}
                             valueColor={result.final_balance > 0 ? '#2e7d32' : '#d32f2f'}
                             description="Portfolio value at the end of your projection period."
+                        />
+                        <SummaryCard
+                            label="Net Worth"
+                            value={result.final_net_worth != null ? formatCurrency(result.final_net_worth) : '—'}
+                            description="Portfolio balance plus property equity at the end of your projection period."
                         />
                         <SummaryCard
                             label="Years in Retirement"

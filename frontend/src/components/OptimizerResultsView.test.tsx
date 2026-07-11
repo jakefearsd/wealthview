@@ -32,6 +32,7 @@ const baseResult = {
     name: 'Opt 1',
     stale: false,
     failure_rate: 0.05,
+    success_probability: 0.91,
     percentile10_final: 500000,
     phases: [],
     yearly_spending: [
@@ -51,6 +52,19 @@ describe('OptimizerResultsView', () => {
         );
         expect(screen.getByTestId('failure-rate-card')).toBeInTheDocument();
         expect(screen.getByText('5.0%')).toBeInTheDocument();
+    });
+
+    it('renders success probability card with formatted value', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={baseResult as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('success-probability-card')).toBeInTheDocument();
+        expect(screen.getByText('91%')).toBeInTheDocument();
     });
 
     it('shows stale banner with re-optimize button when profile is stale', () => {

@@ -36,6 +36,7 @@ function makeProfile(overrides: Partial<GuardrailProfileResponse> = {}): Guardra
         yearly_spending: [],
         median_final_balance: 1000000,
         failure_rate: 0.05,
+        success_probability: 0.9,
         percentile10_final: 400000,
         stale: false,
         created_at: '2026-01-01T00:00:00Z',

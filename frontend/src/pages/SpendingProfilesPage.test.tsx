@@ -46,6 +46,7 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
     ],
     median_final_balance: 250000,
     failure_rate: 0.05,
+    success_probability: 0.95,
     percentile10_final: 100000,
     stale: false,
     created_at: '2024-01-01T00:00:00Z',

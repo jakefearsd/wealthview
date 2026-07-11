@@ -44,6 +44,7 @@ function result(scenarioId: string, years: ProjectionYear[], final: number): Pro
         years_in_retirement: 20,
         spending_feasibility: null,
         unclassified_symbols: null,
+        final_net_worth: null,
     };
 }
 

@@ -61,7 +61,14 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+                <div data-testid="success-probability-card" style={{
+                    ...cardStyle, textAlign: 'center',
+                    background: '#e8f5e9', border: '1px solid #a5d6a7',
+                }}>
+                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Success Probability</div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.success_probability, 0)}</div>
+                </div>
                 <div data-testid="failure-rate-card" style={{
                     ...cardStyle, textAlign: 'center',
                     background: failureRateColors[diagnostics.failureRateSeverity],

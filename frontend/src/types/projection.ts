@@ -122,6 +122,7 @@ export interface ProjectionResult {
     years_in_retirement: number;
     spending_feasibility: SpendingFeasibility | null;
     unclassified_symbols: string[] | null;
+    final_net_worth: number | null;
 }
 
 export interface CompareResponse {
@@ -285,6 +286,7 @@ export interface GuardrailProfileResponse {
     yearly_spending: GuardrailYearlySpending[];
     median_final_balance: number;
     failure_rate: number;
+    success_probability: number;
     percentile10_final: number;
     stale: boolean;
     created_at: string;
@@ -362,4 +364,5 @@ export interface GuardrailOptimizationRequest {
     rmd_target_bracket_rate?: number;
     traditional_exhaustion_buffer?: number;
     rmd_bracket_headroom?: number;
+    dynamic_sequencing_bracket_rate?: number;
 }

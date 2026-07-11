@@ -190,6 +190,7 @@ export default function SpendingOptimizerPage() {
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [trialCount, setTrialCount] = useState(5000);
     const [confidenceLevel, setConfidenceLevel] = useState<number | null>(null);
+    const [dynSeqBracketRate, setDynSeqBracketRate] = useState<number | null>(null);
 
     const [phases, setPhases] = useState<GuardrailPhase[]>([
         { name: 'Early retirement', start_age: 62, end_age: 72, priority_weight: 3, target_spending: 80000 },
@@ -284,6 +285,7 @@ export default function SpendingOptimizerPage() {
             phase_blend_years: phaseBlendYears,
             risk_tolerance: riskTolerance,
             ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
+            ...(dynSeqBracketRate != null ? { dynamic_sequencing_bracket_rate: dynSeqBracketRate / 100 } : {}),
             ...(optimizeConversions ? {
                 optimize_conversions: true,
                 conversion_bracket_rate: conversionBracketRate,
@@ -427,9 +429,9 @@ export default function SpendingOptimizerPage() {
                                 </div>
                             </FormField>
                             <FormField label="Risk Tolerance" helpText={
-                                riskTolerance === 'conservative' ? '85% confidence \u2014 Very likely sustainable without adjustments'
-                                : riskTolerance === 'moderate' ? '70% confidence \u2014 Sustainable with occasional adjustments in bad markets'
-                                : '60% confidence \u2014 Expected spending, requires active management in downturns'
+                                riskTolerance === 'conservative' ? '95% confidence \u2014 Very likely sustainable without adjustments'
+                                : riskTolerance === 'moderate' ? '90% confidence \u2014 Sustainable with occasional adjustments in bad markets'
+                                : '80% confidence \u2014 Expected spending, requires active management in downturns'
                             }>
                                 <div style={pillContainerStyle}>
                                     {(['conservative', 'moderate', 'aggressive'] as RiskTolerance[]).map(level => (
@@ -470,7 +472,7 @@ export default function SpendingOptimizerPage() {
                                 {' '}Advanced Settings
                             </button>
                             {showAdvanced && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginTop: '0.75rem' }}>
                                     <FormField label="Cash Reserve" helpText="Years of spending held in cash to avoid selling during downturns">
                                         <select style={selectStyle} value={cashReserveYears}
                                             onChange={e => setCashReserveYears(Number(e.target.value))}>
@@ -502,6 +504,15 @@ export default function SpendingOptimizerPage() {
                                                 value={confidenceLevel ?? ''}
                                                 placeholder="Uses risk tolerance"
                                                 onChange={e => setConfidenceLevel(e.target.value ? Number(e.target.value) : null)} />
+                                            <span style={adornmentSuffixStyle}>%</span>
+                                        </div>
+                                    </FormField>
+                                    <FormField label="Dynamic-Sequencing Bracket Rate (%)" helpText="Target tax bracket for dynamic withdrawal sequencing">
+                                        <div style={adornmentWrapStyle}>
+                                            <input style={adornedInputStyle} type="number" step="1" min="0" max="37"
+                                                value={dynSeqBracketRate ?? ''}
+                                                placeholder="Off"
+                                                onChange={e => setDynSeqBracketRate(e.target.value ? Number(e.target.value) : null)} />
                                             <span style={adornmentSuffixStyle}>%</span>
                                         </div>
                                     </FormField>
