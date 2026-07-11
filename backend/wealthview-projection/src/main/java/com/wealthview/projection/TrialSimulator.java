@@ -126,17 +126,19 @@ final class TrialSimulator {
 
             double spending = floors[y] + discretionary[y];
             // A4: tax on this year's base (outside) income is a real obligation every year, not
-            // just when income exceeds spending -- fund it from any surplus first, then route the
-            // unfunded remainder through the normal withdrawal need so it draws from the pools and
-            // (when the draw comes from traditional) picks up its own marginal withdrawal tax
-            // below, exactly like any other traditional draw. surplusTax[y] is the precomputed
-            // full-year tax on this year's taxable base income -- see
-            // OptimizationContextBuilder#computeSurplusTax.
+            // just when income exceeds spending -- fund it from any surplus first; the unfunded
+            // remainder drains straight from the pools via the shared tax cascade below
+            // (deductTaxFromPools), deliberately NOT folded into the spending withdrawal: it must
+            // neither draw from the cash reserve nor generate its own marginal withdrawal tax
+            // (zero gross-up), matching the deterministic engine's extraPoolFundedTax treatment.
+            // (Grossing up tax-funding draws is audit item C2, deliberately open for BOTH
+            // engines.) surplusTax[y] is the precomputed full-year tax on this year's taxable
+            // base income -- see OptimizationContextBuilder#computeSurplusTax.
             double grossSurplus = income[y] - spending;
             double baseIncomeTax = surplusTax[y];
             double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
             double unfundedBaseTax = baseIncomeTax - fundedFromSurplus;
-            double withdrawal = Math.max(0, spending - income[y]) + unfundedBaseTax;
+            double withdrawal = Math.max(0, spending - income[y]);
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60)
             boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
@@ -177,24 +179,15 @@ final class TrialSimulator {
             double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
             forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], marginalRate);
 
-            // Exclude the base-income-tax funding drawn above (unfundedBaseTax) from the
-            // essential-floor resource check -- it was never available for spending, mirroring how
-            // the ordinary withdrawalTax deduction is likewise excluded (audit A4: keeps this
-            // success metric measuring spending resources, not spending-plus-tax-funding).
-            double resourcesForSpending = income[y] + drawn.total() + cashDrawn - unfundedBaseTax;
+            // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
+            // deductTaxFromPools below, like withdrawalTax), so this metric already measures
+            // spending resources only -- identical to its pre-A4 shape.
+            double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
             if (resourcesForSpending < floors[y] - 1e-6) {
                 essentialFloorMet = false;
             }
 
-            // Surplus: deposit whatever's left after funding this year's base income tax (computed
-            // above) to taxable (at cost).
-            if (grossSurplus > 0) {
-                double netSurplus = grossSurplus - fundedFromSurplus;
-                if (netSurplus > 0) {
-                    pools[0] += netSurplus;
-                    lots.addLot(netSurplus);
-                }
-            }
+            settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax);
 
             applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, config.ltcgRateByYear(), y);
 
@@ -267,6 +260,31 @@ final class TrialSimulator {
             pools[2] = Math.max(0, pools[2]);
         }
         return cashBalance;
+    }
+
+    /**
+     * Settles the year's base-income-tax obligation and surplus deposit (audit A4).
+     * Deposits whatever surplus remains after funding the year's base income tax to taxable
+     * (at cost), then drains the unfunded remainder straight from the pools via the shared
+     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never
+     * funded from the cash reserve, never part of the spending draw, and with no marginal-tax
+     * gross-up on the funding itself (cross-engine parity with the deterministic engine's
+     * {@code extraPoolFundedTax}; grossing up tax-funding draws is audit item C2, deliberately
+     * open for both engines).
+     */
+    private static void settleBaseIncomeTaxAndSurplus(double[] pools, TaxableLots lots,
+                                                       double grossSurplus, double fundedFromSurplus,
+                                                       double unfundedBaseTax) {
+        if (grossSurplus > 0) {
+            double netSurplus = grossSurplus - fundedFromSurplus;
+            if (netSurplus > 0) {
+                pools[0] += netSurplus;
+                lots.addLot(netSurplus);
+            }
+        }
+        if (unfundedBaseTax > 0) {
+            deductTaxFromPools(unfundedBaseTax, pools, lots);
+        }
     }
 
     /**

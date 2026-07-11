@@ -299,9 +299,11 @@ class TrialSimulatorReturnTest {
         // surplusTax[y] was. 2 years, no growth, taxable-only portfolio isolates the fix cleanly
         // (no traditional-withdrawal marginal tax to conflate with it). Pension $20,000/yr against
         // $30,000/yr spending is a deficit every year (grossSurplus = -10,000 < 0), so pre-fix this
-        // pension's $3,000/yr tax was NEVER charged. Post-fix: withdrawal = spendingGap(10,000) +
-        // unfundedBaseTax(3,000, no surplus to fund it from) = 13,000/yr; with 0% growth (nothing
-        // to compound), 2 years is a flat $6,000 lower final balance than the pre-fix $80,000.
+        // pension's $3,000/yr tax was NEVER charged. Post-fix: the spending withdrawal stays
+        // 10,000/yr and the unfunded base tax (3,000/yr, no surplus to fund it from) drains
+        // separately via the deductTaxFromPools cascade -- 13,000/yr total outflow; with 0% growth
+        // (nothing to compound), 2 years is a flat $6,000 lower final balance than the pre-fix
+        // $80,000.
         double[] flatZero = {0.0, 0.0};
         var config = new TrialSimulator.SimulationConfig(
                 100_000.0, 0.0, 0.0, "taxable_first", null,
@@ -338,5 +340,39 @@ class TrialSimulatorReturnTest {
                 new double[]{30_000.0}, new double[]{0.0}, 1, config);
 
         assertThat(result.finalBalance()).isEqualTo(117_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_unfundedBaseTax_drainsWithoutMarginalGrossUp() {
+        // Cross-engine parity pin: the base-income-tax funding drain must NOT itself generate
+        // marginal withdrawal tax (zero gross-up), matching the deterministic engine's
+        // extraPoolFundedTax treatment (grossing up tax-funding draws is audit item C2,
+        // deliberately open for both engines). Traditional-only portfolio at a 20% marginal rate
+        // makes any gross-up visible: two identical deficit trials (pension $20,000 vs spending
+        // $30,000 -> $10,000 draw from traditional, $2,000 marginal tax) differing ONLY in
+        // surplusTax ($3,000 vs $0). The final-balance difference must be exactly the $3,000 base
+        // tax -- were the remainder folded into the spending withdrawal instead, the $13,000
+        // traditional draw would carry 13,000 x 20% = $2,600 marginal tax and the difference
+        // would be $3,600.
+        double[] flatZero = {0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                0.0, 100_000.0, 0.0, "traditional_first", new double[]{0.20},
+                null, null, 62, null, 0, 0.0, false,
+                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
+                0.0, null, 0.0);
+
+        var withBaseTax = simulator.simulateTrial(
+                new double[]{20_000.0}, new double[]{3_000.0},
+                new double[]{30_000.0}, new double[]{0.0}, 1, config);
+        var withoutBaseTax = simulator.simulateTrial(
+                new double[]{20_000.0}, new double[]{0.0},
+                new double[]{30_000.0}, new double[]{0.0}, 1, config);
+
+        // Exact decomposition: 100,000 - 10,000 (draw) - 2,000 (marginal tax) = 88,000 without
+        // the base tax; exactly 3,000 more leaves with it -- no 20% gross-up on the funding.
+        assertThat(withoutBaseTax.finalBalance()).isEqualTo(88_000.0, within(1e-6));
+        assertThat(withBaseTax.finalBalance()).isEqualTo(85_000.0, within(1e-6));
+        assertThat(withoutBaseTax.finalBalance() - withBaseTax.finalBalance())
+                .isEqualTo(3_000.0, within(1e-6));
     }
 }
