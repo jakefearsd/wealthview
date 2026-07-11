@@ -289,4 +289,54 @@ class TrialSimulatorReturnTest {
 
         assertThat(result.finalBalance()).isEqualTo(93045.12, within(0.01));
     }
+
+    // === A4 fix: tax on outside income must be a funded outflow every year, not just surplus years ===
+
+    @Test
+    void simulateTrial_pensionHeavyDeficitYears_fundsBaseIncomeTaxEveryYearNotJustSurplusYears() {
+        // Pre-fix, surplusTax[y] was only ever applied when income[y] > spending -- a deficit year
+        // (income doesn't cover spending) charged $0 tax on the pension, no matter how large
+        // surplusTax[y] was. 2 years, no growth, taxable-only portfolio isolates the fix cleanly
+        // (no traditional-withdrawal marginal tax to conflate with it). Pension $20,000/yr against
+        // $30,000/yr spending is a deficit every year (grossSurplus = -10,000 < 0), so pre-fix this
+        // pension's $3,000/yr tax was NEVER charged. Post-fix: withdrawal = spendingGap(10,000) +
+        // unfundedBaseTax(3,000, no surplus to fund it from) = 13,000/yr; with 0% growth (nothing
+        // to compound), 2 years is a flat $6,000 lower final balance than the pre-fix $80,000.
+        double[] flatZero = {0.0, 0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                100_000.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 62, null, 0, 0.0, false,
+                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
+                100_000.0, null, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{20_000.0, 20_000.0}, new double[]{3_000.0, 3_000.0},
+                new double[]{30_000.0, 30_000.0}, new double[]{0.0, 0.0}, 2, config);
+
+        // Post-fix pinned value: 100,000 - 2*(10,000 spend gap + 3,000 base tax) = 74,000.
+        // Pre-fix (RED) this simulated to 80,000 -- the $6,000 of pension tax simply vanished.
+        assertThat(result.finalBalance()).isEqualTo(74_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_surplusYearFullyCoversBaseTax_behaviorUnchangedFromPreFix() {
+        // Direction check: when the year's surplus comfortably covers the base income tax, the fix
+        // must reproduce the pre-fix result exactly -- fund the tax from the surplus (same net
+        // deposit as before), no extra pool draw. Income $50,000 vs spending $30,000 -> surplus
+        // $20,000, comfortably covers the $3,000 base tax -> net reinvested = 20,000 - 3,000 =
+        // 17,000, exactly matching what the pre-fix `netSurplus = max(0, grossSurplus - surplusTax)`
+        // formula already produced for this case.
+        double[] flatZero = {0.0};
+        var config = new TrialSimulator.SimulationConfig(
+                100_000.0, 0.0, 0.0, "taxable_first", null,
+                null, null, 62, null, 0, 0.0, false,
+                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
+                100_000.0, null, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{50_000.0}, new double[]{3_000.0},
+                new double[]{30_000.0}, new double[]{0.0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(117_000.0, within(1e-6));
+    }
 }

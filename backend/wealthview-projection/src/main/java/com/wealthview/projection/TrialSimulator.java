@@ -125,7 +125,18 @@ final class TrialSimulator {
             applyTrialConversion(pools, lots, config.conversionByYear(), config.conversionTaxByYear(), y, age);
 
             double spending = floors[y] + discretionary[y];
-            double withdrawal = Math.max(0, spending - income[y]);
+            // A4: tax on this year's base (outside) income is a real obligation every year, not
+            // just when income exceeds spending -- fund it from any surplus first, then route the
+            // unfunded remainder through the normal withdrawal need so it draws from the pools and
+            // (when the draw comes from traditional) picks up its own marginal withdrawal tax
+            // below, exactly like any other traditional draw. surplusTax[y] is the precomputed
+            // full-year tax on this year's taxable base income -- see
+            // OptimizationContextBuilder#computeSurplusTax.
+            double grossSurplus = income[y] - spending;
+            double baseIncomeTax = surplusTax[y];
+            double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
+            double unfundedBaseTax = baseIncomeTax - fundedFromSurplus;
+            double withdrawal = Math.max(0, spending - income[y]) + unfundedBaseTax;
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60)
             boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
@@ -166,17 +177,23 @@ final class TrialSimulator {
             double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
             forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], marginalRate);
 
-            double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
+            // Exclude the base-income-tax funding drawn above (unfundedBaseTax) from the
+            // essential-floor resource check -- it was never available for spending, mirroring how
+            // the ordinary withdrawalTax deduction is likewise excluded (audit A4: keeps this
+            // success metric measuring spending resources, not spending-plus-tax-funding).
+            double resourcesForSpending = income[y] + drawn.total() + cashDrawn - unfundedBaseTax;
             if (resourcesForSpending < floors[y] - 1e-6) {
                 essentialFloorMet = false;
             }
 
-            // Surplus: income exceeds spending — deposit after-tax surplus to taxable (at cost).
-            if (income[y] > spending) {
-                double grossSurplus = income[y] - spending;
-                double netSurplus = Math.max(0, grossSurplus - surplusTax[y]);
-                pools[0] += netSurplus;
-                lots.addLot(netSurplus);
+            // Surplus: deposit whatever's left after funding this year's base income tax (computed
+            // above) to taxable (at cost).
+            if (grossSurplus > 0) {
+                double netSurplus = grossSurplus - fundedFromSurplus;
+                if (netSurplus > 0) {
+                    pools[0] += netSurplus;
+                    lots.addLot(netSurplus);
+                }
             }
 
             applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, config.ltcgRateByYear(), y);
