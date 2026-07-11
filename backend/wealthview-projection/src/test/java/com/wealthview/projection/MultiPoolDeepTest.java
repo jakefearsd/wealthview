@@ -316,15 +316,15 @@ class MultiPoolDeepTest {
                         WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
         // need 100 from traditional; base tax = 100 * 0.20 = 20. Taxable is $0, so that $20 itself
-        // must be paid from traditional -- audit C2 gross-up: bill0=20 -> slice=20,bill=(100+20)*.2=24
-        // -> slice=24,bill=(100+24)*.2=24.8 -> implied 24.8 vs slice 24 is within the $1 tolerance ->
-        // converged at slice=24, bill=24.8 (see MultiPoolDeepTest's dedicated C2 fixed-point test for
-        // the full independently-verified derivation of this exact recursion).
+        // must be paid from traditional -- audit C2 gross-up, warm-started (T10 review): bill0=20;
+        // first pass bill1=(100+20)*.2=24 measures chord m=(24-20)/20=0.20; closed-form jump
+        // 20/(1-0.20)=25; recompute bill(125)=25 -> peek(25)==slice -> converged EXACTLY at the
+        // true fixed point base*m/(1-m) (flat rate, no bracket crossing => the jump is exact).
         var r = p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
-        assertThat(r.fromTraditional()).isEqualByComparingTo(bd("124")); // 100 spend draw + 24 gross-up
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("24.8"));
-        assertThat(r.taxSource().fromTraditional()).isEqualByComparingTo(bd("24.8"));
+        assertThat(r.fromTraditional()).isEqualByComparingTo(bd("125")); // 100 spend draw + 25 gross-up
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("25"));
+        assertThat(r.taxSource().fromTraditional()).isEqualByComparingTo(bd("25"));
     }
 
     @Test
@@ -337,13 +337,12 @@ class MultiPoolDeepTest {
         // Conversion of 50 already taxed. Additional withdrawal 100 from traditional.
         // Base bill: detailed tax on (100+50)=30; base tax on (50)=10; marginal=30-10=20. Taxable is
         // $0, so audit C2 grosses that $20 up from traditional (the conversionAmount/baseTax netting
-        // is unaffected by the gross-up slice, since baseTax is computed on conversionAmount+
-        // effectiveOtherIncome only): bill0=20 -> slice=20, taxableIncome=150+20=170,
-        // detailed=170*.2=34, tax=34-10=24, bill=24 -> slice=24, taxableIncome=174, detailed=34.8,
-        // tax=34.8-10=24.8, bill=24.8 -> implied 24.8 vs slice 24 within $1 tolerance -> converged.
+        // subtracts a CONSTANT, so it shifts the bill but not the chord slope): bill0=20; first pass
+        // bill1=0.2*(150+20)-10=24 measures chord m=0.20; jump 20/0.80=25; bill(175)=0.2*175-10=25
+        // -> converged exactly at the true fixed point 25 (flat rate, no crossing).
         var r = p.executeWithdrawals(bd("100"), YEAR, ZERO, bd("50"), ZERO, AGE_RETIRED);
 
-        assertThat(r.taxLiability()).isEqualByComparingTo(bd("24.8"));
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("25"));
     }
 
     @Test
@@ -571,11 +570,11 @@ class MultiPoolDeepTest {
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
-        // Taxable is $0: audit C2 grosses the $20 base bill up to a converged $24.8 (same recursion
-        // as executeWithdrawals_traditionalOnlyWithTaxCalc_computesTaxAndDeductsFromPools above), and
-        // the breakdown recorded is the FINAL (converged) computeDetailedTax call.
+        // Taxable is $0: audit C2 grosses the $20 base bill up to the exact fixed point $25 (same
+        // warm-started recursion as executeWithdrawals_traditionalOnlyWithTaxCalc_... above), and
+        // the breakdown recorded is the FINAL (converged) computeDetailedTax call: 0.2*(100+25)=25.
         assertThat(p.getLastTaxBreakdown()).isPresent();
-        assertThat(p.getLastTaxBreakdown().get().totalTax()).isEqualByComparingTo(bd("24.8"));
+        assertThat(p.getLastTaxBreakdown().get().totalTax()).isEqualByComparingTo(bd("25"));
     }
 
     // ---- buildYearDto ----
@@ -642,14 +641,14 @@ class MultiPoolDeepTest {
         // The YearDtoContext's own taxLiability (20 below) is a caller-supplied display figure and
         // deliberately NOT re-derived here; federalTax instead comes from the pool's stored
         // lastTaxBreakdown (set by executeWithdrawals above), which -- taxable being $0 -- audit C2
-        // grosses up to a converged 24.8 (same recursion as the sibling tests in this file).
+        // grosses up to the exact fixed point 25 (same warm-started recursion as the sibling tests).
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
                 ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO));
 
-        assertThat(dto.federalTax()).isEqualByComparingTo(bd("24.8"));
+        assertThat(dto.federalTax()).isEqualByComparingTo(bd("25"));
         assertThat(dto.stateTax()).isNull();
         assertThat(dto.saltDeduction()).isNull();
     }
@@ -733,48 +732,32 @@ class MultiPoolDeepTest {
         // BEFORE the tax cascade runs (a real, pre-existing mechanic -- see PoolStrategy's rmdExtra
         // handling), so taxableAvail at gross-up time is $100, not $0. Above that, every extra dollar
         // of tax bill must be paid from traditional -- and that draw is itself ordinary income, which
-        // raises the bill again, which raises the draw again... An "independent iterative oracle"
-        // reproduces the SAME fixed point directly against the flat 10% tax strategy (not MultiPool's
-        // private machinery) to pin the exact converged numbers:
-        //   base ordinary income = 8,000 spend draw + 100 RMD-forced excess = 8,100; bill0 = 810.00
-        //   iter1: implied=peek(810.00)=710.00    -> bill=0.10*(8,100+710.00)   = 881.000000
-        //   iter2: implied=peek(881.00)=781.00    -> bill=0.10*(8,100+781.00)   = 888.100000
-        //   iter3: implied=peek(888.10)=788.10    -> bill=0.10*(8,100+788.10)   = 888.810000
-        //   iter4: implied=peek(888.81)=788.81 vs slice=788.10 -> Δ=0.71 (<$1) -> CONVERGED.
-        // Final: slice=788.100000, bill=888.810000.
-        BigDecimal r = bd("0.10");
-        BigDecimal base = bd("8100"); // 8000 spend draw + 100 forced RMD excess, all from traditional
-        BigDecimal taxableAvail = bd("100"); // the RMD-forced excess, reinvested to taxable at cost
-        BigDecimal traditionalAvail = bd("1000000"); // far more than enough, never caps the slice
-        BigDecimal slice = ZERO;
-        BigDecimal bill = base.multiply(r); // pre-loop bill, no gross-up assumed
-        for (int i = 0; i < 5; i++) {
-            BigDecimal implied = bill.subtract(taxableAvail).max(ZERO).min(traditionalAvail).max(ZERO);
-            if (implied.subtract(slice).abs().compareTo(bd("1")) < 0) {
-                break;
-            }
-            slice = implied;
-            bill = base.add(slice).multiply(r);
-        }
-        assertThat(slice).isEqualByComparingTo(bd("788.100000"));
-        assertThat(bill).isEqualByComparingTo(bd("888.810000"));
+        // raises the bill again, which raises the draw again. An "independent closed-form oracle"
+        // derives the TRUE fixed point directly against the flat 10% strategy (not MultiPool's
+        // private machinery): slice solves s = 0.10*(8,100+s) - 100 => 0.9s = 710 =>
+        // s* = 710/0.9 = 788.88888889 (scale-8 HALF_UP, matching the warm-start jump's division),
+        // bill* = 0.10*(8,100+788.88888889) = 888.888888889. The T10-review warm start lands on this
+        // exactly: bill0=810, implied1=710, chord m=(881-810)/710=0.10, jump=710/0.90 -- a flat rate
+        // has no bracket crossing, so the jump IS the fixed point.
+        BigDecimal slice = bd("710").divide(bd("0.9"), 8, java.math.RoundingMode.HALF_UP);
+        BigDecimal bill = bd("8100").add(slice).multiply(bd("0.10"));
+        assertThat(slice).isEqualByComparingTo(bd("788.88888889"));
+        assertThat(bill).isEqualByComparingTo(bd("888.888888889"));
 
         var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
 
         var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, bd("8100"), AGE_RETIRED,
                 ZERO, ZERO, ZERO);
 
-        // taxLiability matches the oracle's converged bill exactly (same fixed point, same inputs).
+        // taxLiability matches the oracle's true fixed point exactly (flat rate => warm jump exact).
         assertThat(result.taxLiability()).isEqualByComparingTo(bill);
         // Reported ordinary income (feeds the audit-B2 SS convergence loop and RetirementTaxAnnotator)
         // = base + the converged gross-up slice.
-        assertThat(result.fromTraditional()).isEqualByComparingTo(base.add(slice));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("8100").add(slice));
         // Traditional is debited by the spend draw (8,000) + forced RMD excess (100) + the ACTUAL
         // cascade drain funding the converged bill (taxable's $100 reinvested-RMD lot covers the
-        // first $100, the rest -- 888.81-100=788.81 -- comes from traditional) -- NOT the peeked
-        // "slice" above, which is a same-year fixed-point approximation good to the $1 tolerance,
-        // not the literal cascade split.
-        BigDecimal actualTraditionalTaxDrain = bill.subtract(taxableAvail);
+        // first $100, the rest -- 888.8889-100=788.8889 -- comes from traditional).
+        BigDecimal actualTraditionalTaxDrain = bill.subtract(bd("100"));
         assertThat(pool.getTraditional()).isEqualByComparingTo(
                 bd("100000").subtract(bd("8000")).subtract(bd("100")).subtract(actualTraditionalTaxDrain));
     }
@@ -786,21 +769,74 @@ class MultiPoolDeepTest {
         // into ordinary income (that would force MORE than the legally-required RMD out a second
         // time). This scenario forces a small RMD excess (100) on top of an $8,000 traditional spend
         // draw with taxable at $0 -- same numbers as the fixed-point test above, so the reported
-        // ordinary income (8,888.10) comfortably exceeds the RMD (8,100) by exactly the gross-up
-        // (788.10), never by more -- proof no second force-out occurred.
+        // ordinary income (8,888.8889) comfortably exceeds the RMD (8,100) by exactly the converged
+        // gross-up (788.8889 = 710/0.9, the true fixed point), never by more -- proof no second
+        // force-out occurred.
         var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
 
         var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, bd("8100"), AGE_RETIRED,
                 ZERO, ZERO, ZERO);
 
-        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("8888.100000"));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("8888.88888889"));
         // RMD (8,100) satisfied: reported traditional ordinary income exceeds it...
         assertThat(result.fromTraditional()).isGreaterThan(bd("8100"));
-        // ...by precisely the converged gross-up (788.10), not some larger, double-forced amount.
-        assertThat(result.fromTraditional().subtract(bd("8100"))).isEqualByComparingTo(bd("788.100000"));
-        // Total traditional debit = 8,000 (spend) + 100 (RMD excess) + 888.81 (actual tax cascade,
-        // 100% traditional-sourced since taxable is $0) = 8,988.81 -- matches getTraditional() below,
-        // confirming no extra/unexplained draw snuck in via a second RMD force-out.
-        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("91111.190000"));
+        // ...by precisely the converged gross-up, not some larger, double-forced amount.
+        assertThat(result.fromTraditional().subtract(bd("8100"))).isEqualByComparingTo(bd("788.88888889"));
+        // Total traditional debit = 8,000 (spend) + 100 (RMD excess) + 888.888888889 (actual tax
+        // cascade: $100 from the reinvested-RMD taxable lot, the rest traditional) -- matches
+        // getTraditional(), confirming no extra/unexplained draw snuck in via a second force-out.
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("91111.111111111"));
+    }
+
+    // === T10 review: gross-up residual vs the TRUE fixed point must be < $1 ===
+
+    @Test
+    void executeWithdrawals_grossUp22PercentBracket_convergesWithinOneDollarOfClosedForm() {
+        // Residual assertion (T10 review): real single-2025 brackets, $80,000 traditional draw
+        // (taxable income 65,000, mid-22% bracket), taxable pool $0. The whole gross-up range stays
+        // inside the 22% bracket (fixed-point income ~91,813 -> taxable ~76,813 < 103,350), so the
+        // TRUE fixed point has the exact closed form B0/(1-0.22): B0 = computeTax(80,000) = 9,214.00
+        // -> bill* = 9,214/0.78 = 11,812.820513. Pre-fix (cold start, 5 passes) the engine landed
+        // ~$2.9 short of this; the warm-started fixed point must land within $1.
+        var pool = poolWithRealTax("0", "1000000", "0", WithdrawalOrder.TRADITIONAL_FIRST);
+        BigDecimal closedForm = referenceSingle2025Tax(bd("80000"))
+                .divide(bd("0.78"), 8, java.math.RoundingMode.HALF_UP);
+        assertThat(referenceSingle2025Tax(bd("80000"))).isEqualByComparingTo(bd("9214.00"));
+
+        var result = pool.executeWithdrawals(bd("80000"), 2025, ZERO, ZERO, ZERO, AGE_RETIRED,
+                ZERO, ZERO, ZERO);
+
+        assertThat(result.taxLiability().subtract(closedForm).abs()).isLessThan(bd("1"));
+    }
+
+    @Test
+    void executeWithdrawals_grossUp32PercentCrossingInto35_convergesWithinOneDollarOfTrueFixedPoint() {
+        // Residual assertion (T10 review), bracket-crossing stress: $250,000 draw (taxable 235,000,
+        // 32% bracket) -- the ~$79.7k gross-up pushes fixed-point taxable income past 250,525 into
+        // the 35% bracket, so no single-bracket closed form exists. Independent high-precision
+        // oracle: 100 plain fixed-point iterations of bill = computeTax(250,000 + bill) against the
+        // same real FederalTaxCalculator (contraction at 0.35 per pass => converged far below $0.01
+        // by iteration 100). Pre-fix the engine landed >$100 short here; the warm start + polish
+        // must land within $1 of the true fixed point.
+        var pool = poolWithRealTax("0", "1000000", "0", WithdrawalOrder.TRADITIONAL_FIRST);
+        BigDecimal trueBill = BigDecimal.ZERO;
+        for (int i = 0; i < 100; i++) {
+            trueBill = referenceSingle2025Tax(bd("250000").add(trueBill));
+        }
+
+        var result = pool.executeWithdrawals(bd("250000"), 2025, ZERO, ZERO, ZERO, AGE_RETIRED,
+                ZERO, ZERO, ZERO);
+
+        assertThat(result.taxLiability().subtract(trueBill).abs()).isLessThan(bd("1"));
+    }
+
+    /** Independent single-2025 federal tax oracle for the residual tests: a FRESH FederalTaxCalculator
+     * over the same bracket fixtures, called directly (not through MultiPool's machinery). */
+    private BigDecimal referenceSingle2025Tax(BigDecimal grossIncome) {
+        var taxBracketRepository = mock(TaxBracketRepository.class);
+        var standardDeductionRepository = mock(StandardDeductionRepository.class);
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        return new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository)
+                .computeTax(grossIncome, 2025, FilingStatus.SINGLE);
     }
 }

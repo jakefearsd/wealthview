@@ -18,19 +18,24 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
  * orchestration (and its fixed-point loop) from the engine's parameter parsing and DTO assembly.
  *
  * <p>Taxable Social Security depends on the year's realized ORDINARY income (traditional withdrawals
- * + RMD excess + Roth conversion + realized LTCG/dividends), but those are only known AFTER the
- * conversion/withdrawal steps run, and they in turn can depend (under bracket-fill conversion and
- * dynamic-sequencing withdrawal) on how much Social Security is taxable. {@link #resolve} breaks
- * this circular dependency with a fixed point: it snapshots the post-growth pool, runs the year with
- * an estimate of the realized ordinary income folded into the Social Security provisional base, then
- * re-runs from the snapshot with the actual realized figure until the two agree within
- * {@link #SS_CONVERGENCE_TOLERANCE} or after {@link #MAX_SS_CONVERGENCE_ITERATIONS} passes. Taxable
- * Social Security is monotone piecewise-linear in ordinary income and capped at 85%, and the
- * withdrawal-feedback map is a contraction (|slope| &le; 0.85), so it converges quickly; in the
- * common ordered-withdrawal case the realized ordinary income is independent of Social Security
- * taxability, giving the exact fixed point in a single re-run. When no Social Security source is
- * active the loop is skipped, so behavior is byte-identical to a single pass with zero extra
- * provisional income.
+ * + RMD excess + the audit-C2 tax gross-up draw + Roth conversion + realized LTCG/dividends), but
+ * those are only known AFTER the conversion/withdrawal steps run, and they in turn can depend
+ * (under bracket-fill conversion, dynamic-sequencing withdrawal, and the C2 gross-up -- whose
+ * slice grows with the tax bill, which grows with taxable Social Security) on how much Social
+ * Security is taxable. {@link #resolve} breaks this circular dependency with a fixed point: it
+ * snapshots the post-growth pool, runs the year with an estimate of the realized ordinary income
+ * folded into the Social Security provisional base, then re-runs from the snapshot with the actual
+ * realized figure until the two agree within {@link #SS_CONVERGENCE_TOLERANCE} or after
+ * {@link #MAX_SS_CONVERGENCE_ITERATIONS} passes. Taxable Social Security is monotone
+ * piecewise-linear in ordinary income and capped at 85%, and the withdrawal-feedback map is a
+ * contraction (|slope| &le; 0.85; the composed C2 leg adds only a further marginal-rate-scaled
+ * slope, keeping the product below 1), so it converges quickly. Since audit C2, though, the
+ * realized ordinary income is NOT independent of Social Security taxability even in the plain
+ * ordered-withdrawal case (a larger taxable-SS figure raises the tax bill, which raises the
+ * traditional gross-up draw), so the pre-C2 "exact fixed point in a single re-run" property no
+ * longer holds in general -- termination is guaranteed by the hard iteration cap, with the
+ * contraction keeping the residual small. When no Social Security source is active the loop is
+ * skipped, so behavior is byte-identical to a single pass with zero extra provisional income.
  */
 final class YearFinanceResolver {
 

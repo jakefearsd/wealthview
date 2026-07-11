@@ -190,6 +190,13 @@ final class TrialSimulator {
             // legally-required distribution even when the retiree doesn't need the cash. The
             // after-tax remainder is reinvested to taxable. (Not routed through the C2 gross-up: this
             // is its own direct one-shot tax leakage computation, not a deductTaxFromPools drain.)
+            // ORDERING NOTE (pre-existing; T10 review): this reads pools[1] AFTER the withdrawal-tax
+            // drain inside applyTrialWithdrawals above -- which, post-C2, removes MORE from
+            // traditional than before (the gross-up enlarges the drain). In the near-depletion edge
+            // where that drain leaves pools[1] below the remaining RMD excess, the `extra =
+            // min(excess, pools[1])` cap inside forceRmdExcess under-forces the RMD. Pre-existing
+            // behavior, merely enlarged by C2; reordering the RMD force-out ahead of the tax drain
+            // is follow-up-ticket material, not a silent behavior change to make here.
             forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], marginalRate);
 
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via

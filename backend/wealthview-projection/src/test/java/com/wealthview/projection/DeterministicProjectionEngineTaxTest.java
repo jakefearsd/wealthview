@@ -106,13 +106,12 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         // Taxable = 60,000 - (15,750 + 2,000) = 42,250 -> 1,192.50 + 30,325*0.12 = 4,831.50. This is
         // the pre-C2 base tax; portfolioNeed is $0 (pension exactly covers spending) and there is no
         // taxable account in this fixture, so the whole $4,831.50 is unfunded-from-surplus and must
-        // drain from traditional -- audit C2 grosses it up. 5-pass fixed point (base=60,000,
-        // taxableAvail=0): 4,831.50 -> 5,411.28 -> 5,480.8536 -> 5,489.202432 -> 5,490.204290 (implied
-        // 5,490.324515 on the would-be 6th pass is within <$1 of the 5th, but the loop is capped at 5)
-        // -> converged/capped at 5,490.3245 -- independently reproduced against the SAME age-65-boosted
-        // deduction and single-2025 brackets, matching the engine's own output to the cent.
+        // drain from traditional -- audit C2 grosses it up. Warm-started fixed point (T10 review;
+        // base=60,000, taxableAvail=0, whole range inside the 12% bracket so the closed-form jump is
+        // exact): bill* = 4,831.50/(1-0.12) = 5,490.3409 -- independently reproduced against the SAME
+        // age-65-boosted deduction and single-2025 brackets, matching the engine to the cent.
         assertThat(expectedTax).isEqualByComparingTo(bd("4831.5000"));
-        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("5490.3245"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("5490.3409"));
 
         // Direction: strictly less tax than the age-unaware (OBBBA-base-only) deduction would have
         // produced -- the conservative direction of this fix.

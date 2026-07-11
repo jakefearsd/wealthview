@@ -1221,10 +1221,11 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         // But $45K of pension income IS taxable!
         // Base tax on $45K: taxable = $45K - $15K = $30K
         // 10%: $1,192.50, 12%: ($30K - $11,925) * 0.12 = $2,169.00 = $3,361.50. There is no taxable
-        // account in this fixture, so audit C2 grosses that $3,361.50 up from traditional: 5-pass
-        // fixed point (base=45,000, taxableAvail=0) converges to 3,819.7913 -- independently
-        // reproduced against the SAME single-2025 brackets/deduction, matching the engine's own
-        // output to the cent.
+        // account in this fixture, so audit C2 grosses that $3,361.50 up from traditional: the
+        // warm-started fixed point (T10 review; base=45,000, taxableAvail=0, whole range inside the
+        // 12% bracket so the closed-form jump is exact) is bill* = 3,361.50/(1-0.12) = 3,819.8864 --
+        // independently reproduced against the SAME single-2025 brackets/deduction, matching the
+        // engine's own output to the cent.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -1242,7 +1243,7 @@ class DeterministicProjectionEngineSpendingPlanTest extends DeterministicProject
         // Tax on $45K pension MUST be computed even when income exactly equals spending
         assertThat(year1.taxLiability()).isNotNull();
         assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
-        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3819.7913"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(bd("3819.8864"));
     }
 
     // === Coverage gap: Feasibility boundary ===

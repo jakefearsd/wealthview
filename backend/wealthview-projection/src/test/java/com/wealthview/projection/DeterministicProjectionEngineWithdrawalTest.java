@@ -787,12 +787,13 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         // Same $45,000-pension-vs-$45,000-spending BASE tax figure pinned by
         // run_incomeExactlyEqualsSpending_taxStillComputed in DeterministicProjectionEngineSpendingPlanTest.
         // Audit C2: with no taxable pool (traditional-only fixture), that $3,361.50 base bill must
-        // itself drain from traditional and gets grossed up -- same 5-pass fixed point (base=45,000,
-        // taxableAvail=0) as that sibling test, converging to 3,819.7913.
+        // itself drain from traditional and gets grossed up -- same warm-started fixed point
+        // (base=45,000, taxableAvail=0, all-12%-bracket) as that sibling test: 3,361.50/0.88 =
+        // 3,819.8864.
         var refCalc = referenceFederalCalc();
         BigDecimal expectedTax = refCalc.computeTax(bd("45000"), referenceYear, FilingStatus.SINGLE);
         assertThat(expectedTax).isEqualByComparingTo(bd("3361.5000"));
-        BigDecimal expectedGrossedTax = bd("3819.7913");
+        BigDecimal expectedGrossedTax = bd("3819.8864");
         assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTax);
 
         // A4 + C2: the (grossed-up) tax must actually leave the pool -- traditional (the only pool)
@@ -854,11 +855,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(expectedTax).isGreaterThan(BigDecimal.ZERO); // sanity: the oracle itself is nonzero
 
         // Audit C2: no taxable pool in this fixture, so the base $5,161.50 bill itself drains from
-        // traditional and grosses up -- 5-pass fixed point (base=60,000, taxableAvail=0), crossing
-        // the 12%/22% bracket boundary partway through, converges to 6,171.2742 -- independently
-        // reproduced against the SAME single-2025 brackets/deduction, matching the engine's own
-        // output to the cent.
-        BigDecimal expectedGrossedTax = bd("6171.2742");
+        // traditional and grosses up -- warm-started fixed point (T10 review; base=60,000,
+        // taxableAvail=0), crossing the 12%/22% bracket boundary inside the gross-up range (so the
+        // chord jump under-shoots and the polish loop finishes the job), converges to 6,171.6068,
+        // within $0.19 of the true fixed point 6,171.7949 -- independently reproduced against the
+        // SAME single-2025 brackets/deduction, matching the engine's own output to the cent.
+        BigDecimal expectedGrossedTax = bd("6171.6068");
         assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTax);
 
         // And it must actually leave the pools (no vanishing, no gap): taxable-first cascade with
@@ -915,12 +917,12 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(expectedTotalTax).isEqualByComparingTo(bd("15501.6498"));
 
         // Audit C2: no taxable pool in this fixture, so that base bill itself drains from
-        // traditional (on top of the $30,000 spend draw) and grosses up -- 5-pass fixed point
-        // (base=ordinaryTaxableIncome, taxableAvail=0, the SE tax constant re-added each pass)
-        // converges to 19,871.6566 -- independently reproduced against the SAME
-        // SelfEmploymentTaxCalculator + single-2025 brackets/deduction, matching the engine's own
-        // output to the cent.
-        BigDecimal expectedGrossedTotalTax = bd("19871.6566");
+        // traditional (on top of the $30,000 spend draw) and grosses up -- warm-started fixed point
+        // (T10 review; base=ordinaryTaxableIncome, the SE tax as a constant, non-re-stacked addition,
+        // whole range inside the 22% bracket so the closed-form jump is exact) converges to
+        // 19,873.9100 -- independently reproduced against the SAME SelfEmploymentTaxCalculator +
+        // single-2025 brackets/deduction, matching the engine's own output to the cent.
+        BigDecimal expectedGrossedTotalTax = bd("19873.9100");
         assertThat(year1.taxLiability()).isEqualByComparingTo(expectedGrossedTotalTax);
 
         // A4 + C2: SE tax (and its gross-up) must actually leave the pool -- traditional funds the

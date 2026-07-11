@@ -562,14 +562,28 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
          * is the taxable balance everywhere the scalar was read.
          */
         private final TaxableLotsBd lots;
-        /** Maximum fixed-point passes for the audit-C2 traditional-tax gross-up (see {@link
-         * #growTraditionalGrossUp}). */
-        private static final int MAX_GROSS_UP_ITERATIONS = 5;
+        /**
+         * Maximum polish passes for the audit-C2 traditional-tax gross-up AFTER the closed-form
+         * warm start (see {@link #growTraditionalGrossUp}). Raised 5 -> 10 (T10 review): plain
+         * cold-start iteration contracts only at the marginal rate m per pass, leaving multi-dollar
+         * residuals at m >= 0.22 within 5 passes; with the warm start the loop usually breaks on
+         * pass 1, so the higher cap costs nothing in practice (nested B2 x C2 worst case is
+         * 4 x ~12 bracket computations per projection year -- trivial).
+         */
+        private static final int MAX_GROSS_UP_ITERATIONS = 10;
         /**
          * Convergence tolerance (dollars) for the audit-C2 gross-up fixed point -- the same $1
          * tolerance {@code YearFinanceResolver} uses for its Social Security fixed point.
          */
         private static final BigDecimal GROSS_UP_TOLERANCE = BigDecimal.ONE;
+        /**
+         * Defensive cap on the chord marginal rate used for the warm-start jump in
+         * {@link #growTraditionalGrossUp}: a real combined federal+state marginal rate cannot reach
+         * 100% (which would make the {@code implied/(1-m)} closed form diverge); 50% comfortably
+         * covers the worst realistic combination (37% federal + 13.3% CA). The cap only shortens
+         * the JUMP -- the polish loop still converges to the true fixed point afterwards.
+         */
+        private static final BigDecimal GROSS_UP_WARM_START_RATE_CAP = new BigDecimal("0.50");
         private BigDecimal traditional;
         private BigDecimal roth;
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
@@ -920,14 +934,31 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
          * converges because the marginal tax rate is always &lt;1. This method finds that fixed
          * point: {@code bill = TaxBill(baseTaxableIncome + traditionalSlice(bill))}.
          *
-         * <p>Each pass "peeks" the traditional slice of the CURRENT bill via {@link
-         * #peekTraditionalSlice} -- a pure function of the FROZEN {@code taxableAvail} /
+         * <p>Convergence strategy (T10 review -- plain cold-start iteration contracts only at rate m
+         * per pass and left multi-dollar residuals at realistic marginal rates within the old 5-pass
+         * cap):
+         * <ol>
+         *   <li><b>First pass</b>: take the naive slice {@code implied1 = peek(bill0)} and recompute
+         *       the bill at it. If the slice is under the $1 tolerance there is no traditional
+         *       exposure at all -- return immediately, byte-identical to pre-fix behavior.</li>
+         *   <li><b>Closed-form warm jump</b>: the first pass's two bill evaluations give the exact
+         *       chord marginal rate {@code m = (bill1 - bill0) / implied1} over the slice range --
+         *       measured through the SAME 5-arg {@code computeOrdinaryTax} seam, so it captures the
+         *       combined federal+state rate plus every netting leg exactly (a raw federal-bracket
+         *       lookup would understate m whenever state tax is in the bill). Jump straight to the
+         *       affine fixed point {@code implied1 / (1 - m)} (capped at
+         *       {@link #GROSS_UP_WARM_START_RATE_CAP} and {@code traditionalAvail}) and recompute
+         *       there. When no bracket boundary sits inside the jump range this IS the fixed point
+         *       and the polish loop below breaks on its first check.</li>
+         *   <li><b>Polish loop</b>: plain peek/recompute passes (up to
+         *       {@link #MAX_GROSS_UP_ITERATIONS}) correct any bracket-crossing error left by the
+         *       jump, breaking when the peeked slice moves by less than
+         *       {@link #GROSS_UP_TOLERANCE} -- mirrors {@code YearFinanceResolver}'s Social
+         *       Security convergence loop in both shape and tolerance.</li>
+         * </ol>
+         * {@code peekTraditionalSlice} is a pure function of the FROZEN {@code taxableAvail} /
          * {@code traditionalAvail} snapshots taken just before the tax cascade runs, so no pool is
-         * touched during the search -- and recomputes the bill with that slice folded into ordinary
-         * income. The loop stops when the peeked slice moves by less than {@link
-         * #GROSS_UP_TOLERANCE} (a genuine fixed point) or after {@link #MAX_GROSS_UP_ITERATIONS}
-         * passes (whichever first), taking the best estimate reached either way -- mirrors {@code
-         * YearFinanceResolver}'s Social Security convergence loop in both shape and tolerance.
+         * touched during the search.
          *
          * <p>Only the ORDINARY tax bundle is re-stacked each pass; {@code ltcgTax} and {@code
          * extraPoolFundedTax} are added on top unchanged (re-stacking LTCG against a higher ordinary
@@ -946,20 +977,60 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                 BigDecimal ltcgTax, BigDecimal extraPoolFundedTax, OrdinaryTax initialOrdinary,
                 BigDecimal taxableAvail, BigDecimal traditionalAvail) {
 
-            BigDecimal bill = initialOrdinary.tax().add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
-            BigDecimal slice = BigDecimal.ZERO;
+            BigDecimal constantTax = ltcgTax.add(extraPoolFundedTax.max(BigDecimal.ZERO));
+            BigDecimal bill0 = initialOrdinary.tax().add(constantTax);
 
+            // First pass: naive slice off the initial bill. Under-tolerance => taxable (plus Roth
+            // headroom) covers everything reachable -- no gross-up, exact pre-fix behavior.
+            BigDecimal implied1 = peekTraditionalSlice(bill0, taxableAvail, traditionalAvail);
+            if (implied1.compareTo(GROSS_UP_TOLERANCE) < 0) {
+                return new GrossUpResult(BigDecimal.ZERO, bill0);
+            }
+            BigDecimal slice = implied1;
+            BigDecimal bill = recomputeBill(baseTaxableIncome, slice, year, effectiveOtherIncome,
+                    conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity,
+                    constantTax);
+
+            // Closed-form warm jump off the measured chord rate (constantTax cancels in the delta).
+            BigDecimal chordRate = bill.subtract(bill0)
+                    .divide(implied1, SCALE + 4, ROUNDING)
+                    .min(GROSS_UP_WARM_START_RATE_CAP);
+            if (chordRate.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal jump = implied1
+                        .divide(BigDecimal.ONE.subtract(chordRate), SCALE + 4, ROUNDING)
+                        .min(traditionalAvail);
+                if (jump.subtract(slice).abs().compareTo(GROSS_UP_TOLERANCE) >= 0) {
+                    slice = jump;
+                    bill = recomputeBill(baseTaxableIncome, slice, year, effectiveOtherIncome,
+                            conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome,
+                            federallyTaxedSocialSecurity, constantTax);
+                }
+            }
+
+            // Polish: plain fixed-point passes to absorb any bracket crossing inside the jump range.
             for (int i = 0; i < MAX_GROSS_UP_ITERATIONS; i++) {
                 BigDecimal impliedSlice = peekTraditionalSlice(bill, taxableAvail, traditionalAvail);
                 if (impliedSlice.subtract(slice).abs().compareTo(GROSS_UP_TOLERANCE) < 0) {
                     break;
                 }
                 slice = impliedSlice;
-                var recomputed = computeOrdinaryTax(baseTaxableIncome.add(slice), year, effectiveOtherIncome,
-                        conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
-                bill = recomputed.tax().add(ltcgTax).add(extraPoolFundedTax.max(BigDecimal.ZERO));
+                bill = recomputeBill(baseTaxableIncome, slice, year, effectiveOtherIncome,
+                        conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome,
+                        federallyTaxedSocialSecurity, constantTax);
             }
             return new GrossUpResult(slice, bill);
+        }
+
+        /** One gross-up bill evaluation: the ordinary bundle at {@code base + slice} plus the
+         * constant (non-re-stacked) ltcg/extra-pool-funded additions. Also refreshes
+         * {@code lastTaxBreakdown} via {@code computeOrdinaryTax}'s own recording side effect. */
+        private BigDecimal recomputeBill(BigDecimal baseTaxableIncome, BigDecimal slice, int year,
+                BigDecimal effectiveOtherIncome, BigDecimal conversionAmount, BigDecimal alreadyChargedBaseTax,
+                BigDecimal realizedLtcgIncome, BigDecimal federallyTaxedSocialSecurity,
+                BigDecimal constantTax) {
+            var recomputed = computeOrdinaryTax(baseTaxableIncome.add(slice), year, effectiveOtherIncome,
+                    conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
+            return recomputed.tax().add(constantTax);
         }
 
         /**
