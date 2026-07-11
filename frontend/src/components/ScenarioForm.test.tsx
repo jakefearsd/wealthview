@@ -37,10 +37,32 @@ vi.mock('./CurrencyInput', () => ({
 
 import { useApiQuery } from '../hooks/useApiQuery';
 import ScenarioForm from './ScenarioForm';
+import type { Scenario, ProjectionAccount } from '../types/projection';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
 const spendingProfile = { id: 'sp-1', name: 'Base Plan', essential_expenses: 50000, discretionary_expenses: 20000 };
+
+function makeScenario(account: Partial<ProjectionAccount>): Scenario {
+    return {
+        id: 'sc-1',
+        name: 'Existing Plan',
+        retirement_date: '2045-01-01',
+        end_age: 90,
+        inflation_rate: 0.03,
+        params_json: null,
+        accounts: [{
+            id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000,
+            annual_contribution: 10000, expected_return: null, account_type: 'taxable',
+            cost_basis: null, allocation: null, allocation_is_override: false, ...account,
+        }],
+        spending_profile: null,
+        guardrail_profile: null,
+        income_sources: [],
+        created_at: '2024-01-01T00:00:00Z',
+        updated_at: '2024-01-01T00:00:00Z',
+    };
+}
 
 function setupMocks({ profiles = [spendingProfile], accounts = [], incomeSources = [] } = {}) {
     let call = 0;
@@ -55,6 +77,17 @@ function setupMocks({ profiles = [spendingProfile], accounts = [], incomeSources
         return { data: incomeSources, loading: false, error: null, refetch: vi.fn() };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     }) as any;
+}
+
+// The mocked FormField renders its label and children as siblings (no htmlFor), so getByLabelText
+// can't resolve it — locate the Override Return input via its unique label text's wrapper instead.
+function overrideReturnInput(): HTMLInputElement {
+    const label = screen.getByText('Override Return (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Override Return input not found');
+    }
+    return input as HTMLInputElement;
 }
 
 describe('ScenarioForm', () => {
@@ -130,5 +163,38 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.accounts[0].allocation).toBeNull();
+    });
+
+    it('hydrates a null expected_return to a blank override and omits it on submit', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm initialValues={makeScenario({ expected_return: null })} onSubmit={onSubmit} submitLabel="Save" />);
+
+        expect(overrideReturnInput().value).toBe('');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].expected_return).toBeUndefined();
+    });
+
+    it('round-trips a genuine 0% expected_return override as 0, not dropped', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        // expected_return stored as a decimal 0; toPercent(0) = 0, so the field shows "0".
+        render(<ScenarioForm initialValues={makeScenario({ expected_return: 0 })} onSubmit={onSubmit} submitLabel="Save" />);
+
+        expect(overrideReturnInput().value).toBe('0');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].expected_return).toBe(0);
     });
 });

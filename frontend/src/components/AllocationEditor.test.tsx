@@ -40,6 +40,20 @@ describe('AllocationEditor', () => {
         expect(screen.queryByText(/reset to derived/i)).not.toBeInTheDocument();
     });
 
+    it('namespaces input ids with idPrefix so multiple editors do not collide', () => {
+        const { container } = render(
+            <AllocationEditor
+                value={{ us_stock: 60, intl_stock: 20, bond: 15, cash: 5 }}
+                onChange={vi.fn()}
+                idPrefix="acct-1-"
+            />
+        );
+        expect(container.querySelector('#acct-1-allocation-us_stock')).not.toBeNull();
+        expect(container.querySelector('#allocation-us_stock')).toBeNull();
+        // getByLabelText still resolves the label via the prefixed htmlFor/id pair.
+        expect(screen.getByLabelText(/US Stocks/i)).toBe(container.querySelector('#acct-1-allocation-us_stock'));
+    });
+
     describe('isAllocationValid', () => {
         it('treats null as valid (derive from holdings)', () => {
             expect(isAllocationValid(null)).toBe(true);

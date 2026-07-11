@@ -256,7 +256,7 @@ export default function ProjectionDetailPage() {
                                             <td style={{ ...tdStyle, textTransform: 'capitalize' }}>{a.account_type || 'taxable'}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.initial_balance)}</td>
                                             <td style={{ ...tdStyle, textAlign: 'right' }}>{formatCurrency(a.annual_contribution)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{(a.expected_return * 100).toFixed(1)}%</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>{a.expected_return != null ? `${(a.expected_return * 100).toFixed(1)}%` : 'Derived'}</td>
                                         </tr>
                                     ))}
                                 </tbody>

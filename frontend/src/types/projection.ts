@@ -11,7 +11,7 @@ export interface ProjectionAccount {
     name: string;
     initial_balance: number;
     annual_contribution: number;
-    expected_return: number;
+    expected_return: number | null;
     account_type: string;
     cost_basis: number | null;
     allocation: AllocationInput | null;
@@ -131,7 +131,7 @@ export interface ScenarioAccountInput {
     linked_account_id: string | null;
     initial_balance: number;
     annual_contribution: number;
-    expected_return?: number;
+    expected_return?: number | null;
     account_type?: string;
     cost_basis?: number | null;
     allocation?: AllocationInput | null;

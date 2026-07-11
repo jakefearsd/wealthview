@@ -130,7 +130,9 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             linked_account_id: a.linked_account_id,
             initial_balance: a.initial_balance,
             annual_contribution: a.annual_contribution,
-            expected_return: toPercent(a.expected_return),
+            // expected_return is an optional override; preserve null (no override) as blank —
+            // do NOT collapse it to 0, which is a distinct, genuine 0% override on the backend.
+            expected_return: a.expected_return != null ? toPercent(a.expected_return) : undefined,
             account_type: a.account_type || 'taxable',
             cost_basis: a.cost_basis ?? null,
             // Only seed the editor with the response allocation when it's a real user override;
@@ -190,6 +192,11 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 linked_account_id: acct.id,
                 initial_balance: acct.balance,
                 account_type: mapAccountType(acct.type),
+                // Linking derives allocation + cost basis from the account's holdings, so clear any
+                // stale manual override / cost basis carried over from the row's prior state — a
+                // leftover override is NOT link-gated and would wrongly apply to the new account.
+                allocation: null,
+                cost_basis: null,
             } : a));
             // Newly linked account: we don't have a fetched derived mix for it yet (that
             // requires a projection run), so drop any stale summary from a previous selection.
@@ -232,9 +239,11 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({
                     ...a,
-                    // expected_return is an optional override: only send it when the user set a
-                    // non-blank value, so a blank field defers to the allocation-derived return.
-                    expected_return: a.expected_return ? a.expected_return / 100 : undefined,
+                    // expected_return is an optional override: send it only when set (including a
+                    // genuine 0% override), and omit (undefined) when blank/null so the engine uses
+                    // the allocation-derived return. Use != null, NOT a truthy check — a real 0
+                    // must round-trip, not be dropped as falsy.
+                    expected_return: a.expected_return != null ? a.expected_return / 100 : undefined,
                     cost_basis: a.cost_basis ?? null,
                     allocation: a.allocation ?? null,
                 })),
@@ -470,7 +479,13 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             <CurrencyInput style={inputStyle} value={acct.annual_contribution || ''} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
                         </FormField>
                         <FormField label="Override Return (%)" helpText="Blank uses the allocation-derived return.">
-                            <input style={inputStyle} type="number" step="0.1" value={acct.expected_return || ''} onChange={e => updateAccount(idx, 'expected_return', Number(e.target.value))} />
+                            <input
+                                style={inputStyle}
+                                type="number"
+                                step="0.1"
+                                value={acct.expected_return ?? ''}
+                                onChange={e => updateAccount(idx, 'expected_return', e.target.value === '' ? null : Number(e.target.value))}
+                            />
                         </FormField>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '1rem', marginTop: '0.75rem', alignItems: 'start' }}>
@@ -512,6 +527,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 </div>
                             ) : (
                                 <AllocationEditor
+                                    idPrefix={`acct-${idx}-`}
                                     value={acct.allocation}
                                     onChange={a => updateAccount(idx, 'allocation', a)}
                                     onReset={() => updateAccount(idx, 'allocation', null)}

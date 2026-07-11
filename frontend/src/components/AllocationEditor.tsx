@@ -5,6 +5,11 @@ interface AllocationEditorProps {
     value: AllocationInput;
     onChange: (value: AllocationInput) => void;
     onReset?: () => void;
+    /**
+     * Namespaces the input `id`/`htmlFor` pairs so multiple editors on one page (one per account
+     * row) don't emit duplicate DOM ids and mis-associate labels. Defaults to '' for a lone editor.
+     */
+    idPrefix?: string;
 }
 
 const FIELDS: { key: keyof AllocationInput; label: string }[] = [
@@ -56,7 +61,7 @@ const resetButtonStyle: React.CSSProperties = {
     fontSize: '0.8rem',
 };
 
-export default function AllocationEditor({ value, onChange, onReset }: AllocationEditorProps) {
+export default function AllocationEditor({ value, onChange, onReset, idPrefix = '' }: AllocationEditorProps) {
     const sum = allocationSum(value);
     const valid = isAllocationValid(value);
 
@@ -67,19 +72,22 @@ export default function AllocationEditor({ value, onChange, onReset }: Allocatio
     return (
         <div>
             <div style={rowStyle}>
-                {FIELDS.map(({ key, label }) => (
-                    <div key={key}>
-                        <label style={labelStyle} htmlFor={`allocation-${key}`}>{label} (%)</label>
-                        <input
-                            id={`allocation-${key}`}
-                            style={inputFieldStyle}
-                            type="number"
-                            step="0.1"
-                            value={value[key]}
-                            onChange={e => handleFieldChange(key, e.target.value)}
-                        />
-                    </div>
-                ))}
+                {FIELDS.map(({ key, label }) => {
+                    const inputId = `${idPrefix}allocation-${key}`;
+                    return (
+                        <div key={key}>
+                            <label style={labelStyle} htmlFor={inputId}>{label} (%)</label>
+                            <input
+                                id={inputId}
+                                style={inputFieldStyle}
+                                type="number"
+                                step="0.1"
+                                value={value[key]}
+                                onChange={e => handleFieldChange(key, e.target.value)}
+                            />
+                        </div>
+                    );
+                })}
             </div>
             <div style={valid ? totalRowStyle : invalidTotalStyle}>
                 Total: {sum}%
