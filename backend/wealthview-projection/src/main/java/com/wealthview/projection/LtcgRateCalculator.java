@@ -37,6 +37,22 @@ final class LtcgRateCalculator {
                             @Nullable FederalTaxCalculator federalTaxCalculator,
                             double[] ordinaryIncomeByYear, int retirementYear, int years,
                             FilingStatus filingStatus, double inflationRate) {
+        return compute(capitalGainsTaxCalculator, federalTaxCalculator, ordinaryIncomeByYear,
+                retirementYear, years, filingStatus, inflationRate, null);
+    }
+
+    /**
+     * Like {@link #compute(CapitalGainsTaxCalculator, FederalTaxCalculator, double[], int, int,
+     * FilingStatus, double)} but, when {@code birthYear} is known, nets the stacking floor by the
+     * IRS age-65+ additional standard deduction (audit D) for every year the primary filer is 65+
+     * -- keeping this MC precompute consistent with {@link MarginalRateCalculator}'s and the
+     * deterministic engine's age-aware deduction. {@code null} reproduces the age-unaware behavior
+     * above exactly.
+     */
+    static double[] compute(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                            @Nullable FederalTaxCalculator federalTaxCalculator,
+                            double[] ordinaryIncomeByYear, int retirementYear, int years,
+                            FilingStatus filingStatus, double inflationRate, @Nullable Integer birthYear) {
         double[] rates = new double[years];
         if (capitalGainsTaxCalculator == null) {
             return rates;
@@ -48,13 +64,22 @@ final class LtcgRateCalculator {
             double ordinary = Math.max(0, ordinaryIncomeByYear[y]);
             // MAGI ≈ ordinary + the probe gain, for the NIIT threshold comparison (NOT deduction-netted).
             BigDecimal magi = BigDecimal.valueOf(ordinary + PROBE_GAIN);
-            double deduction = federalTaxCalculator != null
-                    ? federalTaxCalculator.loadStandardDeduction(taxYear, filingStatus).doubleValue() : 0.0;
+            double deduction = standardDeduction(federalTaxCalculator, taxYear, filingStatus, birthYear);
             BigDecimal ordinaryForLtcg = BigDecimal.valueOf(Math.max(0, ordinary - deduction));
             double tax = capitalGainsTaxCalculator.computeLtcgTax(
                     ordinaryForLtcg, probe, taxYear, filingStatus, y, inflation, magi).doubleValue();
             rates[y] = tax / PROBE_GAIN;
         }
         return rates;
+    }
+
+    private static double standardDeduction(@Nullable FederalTaxCalculator federalTaxCalculator, int taxYear,
+                                             FilingStatus filingStatus, @Nullable Integer birthYear) {
+        if (federalTaxCalculator == null) {
+            return 0.0;
+        }
+        return (birthYear != null
+                ? federalTaxCalculator.loadStandardDeduction(taxYear, filingStatus, taxYear - birthYear)
+                : federalTaxCalculator.loadStandardDeduction(taxYear, filingStatus)).doubleValue();
     }
 }

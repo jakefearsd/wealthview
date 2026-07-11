@@ -120,7 +120,7 @@ final class OptimizationContextBuilder {
                 confidenceLevel, years, trialCount);
 
         double[] marginalRates = MarginalRateCalculator.compute(
-                taxCalculator, rentalAwareTaxableIncome, retirementYear, years, filingStatus);
+                taxCalculator, rentalAwareTaxableIncome, retirementYear, years, filingStatus, input.birthYear());
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
                         withdrawalOrder, marginalRates)
@@ -141,7 +141,7 @@ final class OptimizationContextBuilder {
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
         double[] ltcgRateByYear = LtcgRateCalculator.compute(
                 capitalGainsTaxCalculator, taxCalculator, rentalAwareTaxableIncome, retirementYear, years,
-                filingStatus, inflationRate);
+                filingStatus, inflationRate, input.birthYear());
         double dividendYield = resolveDividendYield(input);
 
         return new OptimizationSetup(

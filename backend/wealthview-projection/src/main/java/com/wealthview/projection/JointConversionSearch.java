@@ -106,7 +106,7 @@ final class JointConversionSearch {
 
         double[] searchMarginalRates = MarginalRateCalculator.compute(taxCalculator,
                 ctx.taxIncome().rentalAwareTaxableIncome(), ctx.sim().retirementYear(), ctx.sim().years(),
-                ctx.taxIncome().filingStatus());
+                ctx.taxIncome().filingStatus(), input.birthYear());
         TaxContext searchTaxCtx = new TaxContext(ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
                 ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchMarginalRates);
 

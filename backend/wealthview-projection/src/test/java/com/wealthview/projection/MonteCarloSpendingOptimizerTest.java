@@ -1645,8 +1645,16 @@ class MonteCarloSpendingOptimizerTest {
 
     private MonteCarloSpendingOptimizer taxAwareOptimizer() {
         var taxCalc = mock(FederalTaxCalculator.class);
-        // Simple 20% flat tax for test predictability
+        // Simple 20% flat tax for test predictability (both age-unaware and age-aware overloads --
+        // audit D; GuardrailOptimizationInput#birthYear() is always non-null, so
+        // MarginalRateCalculator always calls the 4-arg overload for the guardrail/MC path).
         when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(inv -> {
+                    BigDecimal income = inv.getArgument(0);
+                    if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+                    return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
+                });
+        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class), anyInt()))
                 .thenAnswer(inv -> {
                     BigDecimal income = inv.getArgument(0);
                     if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
@@ -1750,6 +1758,15 @@ class MonteCarloSpendingOptimizerTest {
         // the fix (verified empirically while writing this test).
         var taxCalc = mock(FederalTaxCalculator.class);
         when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
+                .thenAnswer(inv -> {
+                    BigDecimal income = inv.getArgument(0);
+                    return income.compareTo(BigDecimal.ZERO) <= 0
+                            ? BigDecimal.ZERO
+                            : income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
+                });
+        // Age-aware overload too (audit D) -- GuardrailOptimizationInput#birthYear() is always
+        // non-null, so MarginalRateCalculator always calls the 4-arg overload here.
+        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class), anyInt()))
                 .thenAnswer(inv -> {
                     BigDecimal income = inv.getArgument(0);
                     return income.compareTo(BigDecimal.ZERO) <= 0
@@ -1930,20 +1947,25 @@ class MonteCarloSpendingOptimizerTest {
     private MonteCarloSpendingOptimizer progressiveTaxOptimizer() {
         var taxCalc = mock(FederalTaxCalculator.class);
         // Progressive brackets: 10% up to $50K, 22% $50K-$100K, 32% above $100K
+        var progressiveBrackets = (org.mockito.stubbing.Answer<BigDecimal>) inv -> {
+            double income = ((BigDecimal) inv.getArgument(0)).doubleValue();
+            if (income <= 0) return BigDecimal.ZERO;
+            double tax = 0;
+            if (income <= 50_000) {
+                tax = income * 0.10;
+            } else if (income <= 100_000) {
+                tax = 50_000 * 0.10 + (income - 50_000) * 0.22;
+            } else {
+                tax = 50_000 * 0.10 + 50_000 * 0.22 + (income - 100_000) * 0.32;
+            }
+            return BigDecimal.valueOf(tax).setScale(4, java.math.RoundingMode.HALF_UP);
+        };
         when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(inv -> {
-                    double income = ((BigDecimal) inv.getArgument(0)).doubleValue();
-                    if (income <= 0) return BigDecimal.ZERO;
-                    double tax = 0;
-                    if (income <= 50_000) {
-                        tax = income * 0.10;
-                    } else if (income <= 100_000) {
-                        tax = 50_000 * 0.10 + (income - 50_000) * 0.22;
-                    } else {
-                        tax = 50_000 * 0.10 + 50_000 * 0.22 + (income - 100_000) * 0.32;
-                    }
-                    return BigDecimal.valueOf(tax).setScale(4, java.math.RoundingMode.HALF_UP);
-                });
+                .thenAnswer(progressiveBrackets);
+        // Age-aware overload too (audit D) -- GuardrailOptimizationInput#birthYear() is always
+        // non-null, so MarginalRateCalculator always calls the 4-arg overload here.
+        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class), anyInt()))
+                .thenAnswer(progressiveBrackets);
         // Bracket ceiling at 22% = $100K (both 3-arg and 4-arg overloads)
         when(taxCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(new BigDecimal("100000"));

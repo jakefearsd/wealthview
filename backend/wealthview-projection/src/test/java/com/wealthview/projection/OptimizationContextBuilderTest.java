@@ -3,6 +3,7 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -11,11 +12,21 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
+import com.wealthview.persistence.entity.StandardDeductionEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 
 /**
  * A5 (2026-07-11 audit): the guardrail/MC flow hardcoded a 1.8% dividend yield instead of reading
@@ -76,6 +87,57 @@ class OptimizationContextBuilderTest {
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         assertThat(setup.sim().feeRate()).isEqualTo(0.0);
+    }
+
+    // Audit D (2026-07-11 audit, Tier-3): the age-65+ additional standard deduction must reach the
+    // MC's marginal-rate precompute, not just the deterministic engine -- OptimizationContextBuilder
+    // threads GuardrailOptimizationInput#birthYear() into MarginalRateCalculator/LtcgRateCalculator
+    // (both already unit-tested directly; this proves the wiring end-to-end through build()).
+    @Test
+    void build_birthYearMakesRetireeAge65Plus_marginalRateReflectsBoostedDeduction() {
+        var builderWithTax = new OptimizationContextBuilder(federalTaxCalcWithAge65Addition());
+
+        var under65 = inputWithBirthYear(1968); // age 62 at retirement (2030)
+        var over65 = inputWithBirthYear(1959);  // age 71 at retirement (2030)
+
+        var setupUnder65 = builderWithTax.build(under65, ProjectionTestFixtures.TEST_CMA_MATRIX);
+        var setupOver65 = builderWithTax.build(over65, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        // No income sources -> base taxable income is 0 in year 0 for both; only the deduction used
+        // to tax the $50,000 marginal-rate probe differs.
+        // Under 65: deduction 15,750 -> taxable 34,250 -> 1,192.50 + 22,325*0.12 = 3,871.50 -> 0.07743
+        // Age 71: deduction 17,750 -> taxable 32,250 -> 1,192.50 + 20,325*0.12 = 3,631.50 -> 0.07263
+        assertThat(setupUnder65.taxIncome().marginalRates()[0]).isEqualTo(0.07743, within(1e-9));
+        assertThat(setupOver65.taxIncome().marginalRates()[0]).isEqualTo(0.07263, within(1e-9));
+        assertThat(setupOver65.taxIncome().marginalRates()[0])
+                .isLessThan(setupUnder65.taxIncome().marginalRates()[0]);
+    }
+
+    /** Single-filer 2025 fixtures with a deduction carrying a nonzero age-65 addition. */
+    private static FederalTaxCalculator federalTaxCalcWithAge65Addition() {
+        var taxBracketRepo = mock(TaxBracketRepository.class);
+        var deductionRepo = mock(StandardDeductionRepository.class);
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        return new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+    }
+
+    private GuardrailOptimizationInput inputWithBirthYear(int birthYear) {
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), birthYear, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
+                List.of(), 42L,
+                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                "single", null,
+                false, null, null, 5, null, null,
+                null, null);
     }
 
     // B2 (2026-07-11 audit) MC alignment: the MC income base previously treated Social Security as

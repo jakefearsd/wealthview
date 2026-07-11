@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculator;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
+import com.wealthview.persistence.entity.StandardDeductionEntity;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
@@ -55,6 +57,60 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 assertThat(yearData.taxLiability()).isEqualByComparingTo(BigDecimal.ZERO);
             }
         }
+    }
+
+    // Audit D (2026-07-11 audit, Tier-3): the age-65+ additional standard deduction must reach the
+    // deterministic engine's actual computed federal tax, not just FederalTaxCalculator in isolation.
+    @Test
+    void run_age66Retiree_federalTaxUsesAge65BoostedStandardDeduction() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        // Override the shared 2025 fixture's deduction with the real OBBBA base + age-65 addition:
+        // the shared TaxBracketFixtures.singleDeduction2025() intentionally stays frozen at its
+        // original pre-OBBBA numbers (it backs ~20 unrelated pinned-number tests across the suite),
+        // so this test wires its own deduction entity with the real 2025 figures to prove the
+        // age-65 seam end-to-end without perturbing that shared fixture.
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int referenceYear = 2025;
+        int birthYear = 1959; // age 66 at referenceYear -- below the RMD start age (73), isolating
+                               // pure pension income tax from any RMD interaction
+        LocalDate retirementDate = LocalDate.of(2020, 1, 1);
+
+        // Pension $60,000 exactly equals spending $60,000 (essential $40,000 + discretionary
+        // $20,000): portfolioNeed = 0, so withdrawals are 0 and the pension is the ONLY taxable
+        // income this year (mirrors run_incomeExactlyEqualsSpending_taxStillComputed in
+        // DeterministicProjectionEngineSpendingPlanTest).
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("300000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "roth")),
+                new SpendingProfileInput(bd("40000"), bd("20000"), "[]"),
+                referenceYear, List.of(incomeSource("Pension", "60000", 60, null, "0")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(66);
+        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+
+        // Independent oracle: the same production class, called directly via the new age-aware
+        // overload -- not a hand-derived approximation.
+        var refCalc = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+        BigDecimal expectedTax = refCalc.computeTax(bd("60000"), referenceYear, FilingStatus.SINGLE, 66);
+        // Taxable = 60,000 - (15,750 + 2,000) = 42,250 -> 1,192.50 + 30,325*0.12 = 4,831.50
+        assertThat(expectedTax).isEqualByComparingTo(bd("4831.5000"));
+        assertThat(year1.taxLiability()).isEqualByComparingTo(expectedTax);
+
+        // Direction: strictly less tax than the age-unaware (OBBBA-base-only) deduction would have
+        // produced -- the conservative direction of this fix.
+        BigDecimal agelessTax = refCalc.computeTax(bd("60000"), referenceYear, FilingStatus.SINGLE);
+        assertThat(expectedTax).isLessThan(agelessTax);
     }
 
     @Test

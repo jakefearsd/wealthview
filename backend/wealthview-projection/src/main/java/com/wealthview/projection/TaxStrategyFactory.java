@@ -40,10 +40,13 @@ final class TaxStrategyFactory {
                 ? params.primaryResidencePropertyTax() : BigDecimal.ZERO;
         BigDecimal mortgageInterest = params.primaryResidenceMortgageInterest() != null
                 ? params.primaryResidenceMortgageInterest() : BigDecimal.ZERO;
+        // Audit D: threaded through so the age-65+ additional standard deduction applies
+        // automatically once the primary filer turns 65, for every tax year this strategy computes.
+        Integer birthYear = params.birthYear();
 
         if (params.state() != null && !params.state().isBlank() && stateTaxCalculatorFactory != null) {
             var stateCalc = stateTaxCalculatorFactory.forState(params.state());
-            return new CombinedTaxCalculator(taxCalculator, stateCalc, propertyTax, mortgageInterest);
+            return new CombinedTaxCalculator(taxCalculator, stateCalc, propertyTax, mortgageInterest, birthYear);
         }
 
         // Even without state tax, primary residence deductions may exceed the standard
@@ -51,9 +54,9 @@ final class TaxStrategyFactory {
         // NullStateTaxCalculator so itemized vs standard comparison still happens.
         if (propertyTax.compareTo(BigDecimal.ZERO) > 0 || mortgageInterest.compareTo(BigDecimal.ZERO) > 0) {
             return new CombinedTaxCalculator(taxCalculator, new NullStateTaxCalculator(),
-                    propertyTax, mortgageInterest);
+                    propertyTax, mortgageInterest, birthYear);
         }
 
-        return new FederalOnlyTaxStrategy(taxCalculator);
+        return new FederalOnlyTaxStrategy(taxCalculator, birthYear);
     }
 }
