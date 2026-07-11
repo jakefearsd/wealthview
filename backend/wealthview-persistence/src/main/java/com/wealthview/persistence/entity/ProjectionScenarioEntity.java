@@ -16,6 +16,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.Filter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -58,7 +59,12 @@ public class ProjectionScenarioEntity extends Auditable {
     @JoinColumn(name = "guardrail_profile_id")
     private GuardrailSpendingProfileEntity guardrailProfile;
 
+    // Hibernate can't order a @OneToMany bag by a generated UUID at the SQL level in a meaningful
+    // way, but @OrderBy still forces a stable ORDER BY id on every fetch, so iteration order (and
+    // anything derived from it, e.g. GuardrailProfileService's scenario signature) is reproducible
+    // across runs instead of depending on incidental DB/JPA ordering.
     @OneToMany(mappedBy = "scenario", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("id")
     private List<ProjectionAccountEntity> accounts = new ArrayList<>();
 
     protected ProjectionScenarioEntity() {

@@ -3,7 +3,9 @@ package com.wealthview.core.projection;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
@@ -22,6 +25,7 @@ import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
@@ -285,8 +289,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_sameInputs_samHash() {
-        var hash1 = GuardrailProfileService.computeScenarioHash(scenario);
-        var hash2 = GuardrailProfileService.computeScenarioHash(scenario);
+        var hash1 = GuardrailProfileService.computeScenarioHash(scenario, List.of());
+        var hash2 = GuardrailProfileService.computeScenarioHash(scenario, List.of());
 
         assertThat(hash1).isEqualTo(hash2);
         assertThat(hash1).isNotBlank();
@@ -298,8 +302,8 @@ class GuardrailProfileServiceTest {
                 tenant, "Other", LocalDate.of(2032, 1, 1), 95,
                 new BigDecimal("0.02"), "{\"birth_year\":1970}");
 
-        var hash1 = GuardrailProfileService.computeScenarioHash(scenario);
-        var hash2 = GuardrailProfileService.computeScenarioHash(scenario2);
+        var hash1 = GuardrailProfileService.computeScenarioHash(scenario, List.of());
+        var hash2 = GuardrailProfileService.computeScenarioHash(scenario2, List.of());
 
         assertThat(hash1).isNotEqualTo(hash2);
     }
@@ -314,8 +318,8 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0.03"),
                 "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\",\"filing_status\":\"married_filing_jointly\"}");
 
-        var hash1 = GuardrailProfileService.computeScenarioHash(scenarioMinimal);
-        var hash2 = GuardrailProfileService.computeScenarioHash(scenarioWithExtras);
+        var hash1 = GuardrailProfileService.computeScenarioHash(scenarioMinimal, List.of());
+        var hash2 = GuardrailProfileService.computeScenarioHash(scenarioWithExtras, List.of());
 
         assertThat(hash1).isEqualTo(hash2);
     }
@@ -571,6 +575,25 @@ class GuardrailProfileServiceTest {
         assertThat(input.withdrawalOrder()).isEqualTo("traditional_first");
     }
 
+    // A5 (2026-07-11 audit): the scenario's dividend_yield param must reach the MC's
+    // GuardrailOptimizationInput (previously OptimizationContextBuilder hardcoded 1.8% and ignored
+    // it entirely). Absent ⇒ null passed through — OptimizationContextBuilder applies the 0.018
+    // default (see OptimizationContextBuilderTest).
+    @Test
+    void optimize_paramsJsonWithDividendYield_propagatesToInput() {
+        var scenarioWithYield = new ProjectionScenarioEntity(
+                tenant, "Yield", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"dividend_yield\":0.032}");
+        var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithYield);
+        assertThat(input.dividendYield()).isEqualByComparingTo("0.032");
+    }
+
+    @Test
+    void optimize_paramsJsonWithoutDividendYield_propagatesNull() {
+        var input = captureOptimizationInput(buildRequest(req -> req), scenario);
+        assertThat(input.dividendYield()).isNull();
+    }
+
     @Test
     void optimize_paramsJsonNull_birthYearDefaultsFromCurrentYear() {
         var scenarioSansParams = new ProjectionScenarioEntity(
@@ -679,8 +702,8 @@ class GuardrailProfileServiceTest {
                 scenarioWithDifferentAccount, null, new BigDecimal("200000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
 
-        var hashA = GuardrailProfileService.computeScenarioHash(scenarioWithAccount);
-        var hashB = GuardrailProfileService.computeScenarioHash(scenarioWithDifferentAccount);
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioWithAccount, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioWithDifferentAccount, List.of());
 
         assertThat(hashA).isNotEqualTo(hashB);
     }
@@ -699,9 +722,125 @@ class GuardrailProfileServiceTest {
         var scenarioBadJson = new ProjectionScenarioEntity(
                 tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{broken");
 
-        var hash = GuardrailProfileService.computeScenarioHash(scenarioBadJson);
+        var hash = GuardrailProfileService.computeScenarioHash(scenarioBadJson, List.of());
 
         assertThat(hash).isNotBlank();
+    }
+
+    // ---- A5 (2026-07-11 audit): scenarioSignature must cover every realism-v2 MC input ----
+
+    @Test
+    void computeScenarioHash_allocationChanged_hashChanges() {
+        var scenarioA = scenarioWithSingleAccount();
+        scenarioA.getAccounts().getFirst().setAllocation(
+                Map.of("us_stock", new BigDecimal("60"), "bond", new BigDecimal("40")));
+        var scenarioB = scenarioWithSingleAccount();
+        scenarioB.getAccounts().getFirst().setAllocation(
+                Map.of("us_stock", new BigDecimal("80"), "bond", new BigDecimal("20")));
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_costBasisChanged_hashChanges() {
+        var scenarioA = scenarioWithSingleAccount();
+        scenarioA.getAccounts().getFirst().setCostBasis(new BigDecimal("80000"));
+        var scenarioB = scenarioWithSingleAccount();
+        scenarioB.getAccounts().getFirst().setCostBasis(new BigDecimal("95000"));
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_dividendYieldChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"dividend_yield\":0.018}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"dividend_yield\":0.03}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_incomeSourceAdded_hashChanges() {
+        var scenario = scenarioWithSingleAccount();
+        var incomeSourceId = UUID.randomUUID();
+
+        var hashWithout = GuardrailProfileService.computeScenarioHash(scenario, List.of());
+        var hashWith = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(incomeSourceId, new BigDecimal("24000"))));
+
+        assertThat(hashWithout).isNotEqualTo(hashWith);
+    }
+
+    @Test
+    void computeScenarioHash_incomeSourceAmountChanged_hashChanges() {
+        var scenario = scenarioWithSingleAccount();
+        var incomeSourceId = UUID.randomUUID();
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(incomeSourceId, new BigDecimal("24000"))));
+        var hashB = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(incomeSourceId, new BigDecimal("30000"))));
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    // The persisted `accounts` collection is an unordered JPA bag; @OrderBy("id") keeps normal
+    // reads stable, and scenarioSignature also sorts defensively by id, so the signature (and the
+    // seed derived from it) must not depend on collection iteration order.
+    @Test
+    void computeScenarioHash_accountCollectionReordered_hashUnchanged() {
+        var idOne = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var idTwo = UUID.fromString("00000000-0000-0000-0000-000000000002");
+
+        var scenarioForward = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var acctOneForward = accountWithId(scenarioForward, idOne, "100000", "traditional");
+        var acctTwoForward = accountWithId(scenarioForward, idTwo, "200000", "taxable");
+        scenarioForward.addAccount(acctOneForward);
+        scenarioForward.addAccount(acctTwoForward);
+
+        var scenarioReversed = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var acctTwoReversed = accountWithId(scenarioReversed, idTwo, "200000", "taxable");
+        var acctOneReversed = accountWithId(scenarioReversed, idOne, "100000", "traditional");
+        scenarioReversed.addAccount(acctTwoReversed);
+        scenarioReversed.addAccount(acctOneReversed);
+
+        var hashForward = GuardrailProfileService.computeScenarioHash(scenarioForward, List.of());
+        var hashReversed = GuardrailProfileService.computeScenarioHash(scenarioReversed, List.of());
+
+        assertThat(hashForward).isEqualTo(hashReversed);
+    }
+
+    private ProjectionScenarioEntity scenarioWithSingleAccount() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        scenario.addAccount(new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
+        return scenario;
+    }
+
+    private ProjectionAccountEntity accountWithId(
+            ProjectionScenarioEntity scenario, UUID id, String balance, String accountType) {
+        var account = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal(balance),
+                new BigDecimal("5000"), new BigDecimal("0.07"), accountType);
+        ReflectionTestUtils.setField(account, "id", id);
+        return account;
     }
 
     // ---- A3: fixedReturnShare disclosure ----

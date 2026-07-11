@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -1054,7 +1055,7 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), "{\"birth_year\":1990}");
         var guardrailProfile = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
-        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
         guardrailProfile.setStale(false);
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
@@ -1078,6 +1079,54 @@ class ScenarioCrudServiceTest {
         verify(guardrailProfileRepository).save(guardrailProfile);
     }
 
+    // A5 (2026-07-11 audit): allocation is a realism-v2 MC input (PoolReturnModel blends per-pool
+    // real returns from it) that the pre-fix signature omitted entirely, so editing the allocation
+    // UI silently left a stale guardrail profile un-flagged. Everything else about the scenario and
+    // its single account stays identical — only the allocation weights change.
+    @Test
+    void updateScenario_allocationEdited_marksExistingProfileStale() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var existingAccount = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"), BigDecimal.ZERO,
+                new BigDecimal("0.07"), "taxable");
+        existingAccount.setAllocation(Map.of(
+                "us_stock", new BigDecimal("60"), "bond", new BigDecimal("40")));
+        scenario.addAccount(existingAccount);
+
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
+        guardrailProfile.setStale(false);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Same balance/contribution/return/birth-year/dates — only the allocation weights change.
+        var newAllocation = new AllocationDto(
+                new BigDecimal("80"), new BigDecimal("10"), new BigDecimal("10"), BigDecimal.ZERO);
+        var request = new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), 1990, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null,
+                List.of(new CreateProjectionAccountRequest(
+                        null, new BigDecimal("100000"), BigDecimal.ZERO, new BigDecimal("0.07"),
+                        null, newAllocation, "taxable")),
+                null, null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isTrue();
+        verify(guardrailProfileRepository).save(guardrailProfile);
+    }
+
     @Test
     void updateScenario_withGuardrailProfile_doesNotMarkStaleWhenHashUnchanged() {
         var scenario = new ProjectionScenarioEntity(
@@ -1092,7 +1141,7 @@ class ScenarioCrudServiceTest {
                 .thenAnswer(inv -> {
                     var saved = (ProjectionScenarioEntity) inv.getArgument(0);
                     guardrailProfile.setScenarioHash(
-                            GuardrailProfileService.computeScenarioHash(saved));
+                            GuardrailProfileService.computeScenarioHash(saved, List.of()));
                     return saved;
                 });
         when(guardrailProfileRepository.findByScenario_Id(scenarioId))
@@ -1126,7 +1175,7 @@ class ScenarioCrudServiceTest {
                 .thenAnswer(inv -> {
                     var saved = (ProjectionScenarioEntity) inv.getArgument(0);
                     guardrailProfile.setScenarioHash(
-                            GuardrailProfileService.computeScenarioHash(saved));
+                            GuardrailProfileService.computeScenarioHash(saved, List.of()));
                     return saved;
                 });
         when(guardrailProfileRepository.findByScenario_Id(scenarioId))

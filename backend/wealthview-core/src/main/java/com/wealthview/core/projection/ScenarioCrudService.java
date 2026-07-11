@@ -162,7 +162,8 @@ public class ScenarioCrudService {
         var saved = scenarioRepository.save(scenario);
 
         guardrailProfileRepository.findByScenario_Id(scenarioId).ifPresent(profile -> {
-            var newHash = GuardrailProfileService.computeScenarioHash(saved);
+            var newHash = GuardrailProfileService.computeScenarioHash(
+                    saved, currentIncomeSourceSignatures(scenarioId));
             if (!newHash.equals(profile.getScenarioHash())) {
                 profile.setStale(true);
                 guardrailProfileRepository.save(profile);
@@ -243,6 +244,22 @@ public class ScenarioCrudService {
                     var netCashFlow = computeRentalNetCashFlow(src.getIncomeType(),
                             src.getProperty(), effective);
                     return ScenarioIncomeSourceResponse.from(link, effective, netCashFlow);
+                })
+                .toList();
+    }
+
+    /**
+     * Builds the (id, effective-amount) income-source signatures the guardrail staleness check
+     * hashes alongside the scenario (see {@link GuardrailProfileService#computeScenarioHash}), so an
+     * income-source add or amount edit is detected the same way an account edit already is.
+     */
+    private List<GuardrailProfileService.IncomeSourceSignature> currentIncomeSourceSignatures(UUID scenarioId) {
+        return scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenarioId).stream()
+                .map(link -> {
+                    var src = link.getIncomeSource();
+                    var effective = link.getOverrideAnnualAmount() != null
+                            ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
+                    return new GuardrailProfileService.IncomeSourceSignature(src.getId(), effective);
                 })
                 .toList();
     }

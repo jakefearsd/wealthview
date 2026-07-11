@@ -5,13 +5,17 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +25,11 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
+import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
@@ -90,7 +96,7 @@ public class GuardrailProfileService {
             BigDecimal confidence = resolveConfidence(request);
 
             var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
-                    birthYear, confidence, filingStatus, withdrawalOrder);
+                    birthYear, confidence, filingStatus, withdrawalOrder, params.dividendYield());
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
             var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
@@ -153,7 +159,8 @@ public class GuardrailProfileService {
         entity.setReturnMean(optimizationInput.returnMean());
         entity.setTrialCount(optimizationInput.trialCount());
         entity.setConfidenceLevel(optimizationInput.confidenceLevel());
-        entity.setScenarioHash(computeScenarioHash(scenario));
+        var incomeSourceSignatures = toIncomeSourceSignatures(optimizationInput.incomeSources());
+        entity.setScenarioHash(computeScenarioHash(scenario, incomeSourceSignatures));
 
         serializeGuardrailJson(entity, optimizationInput, optimizerResult);
 
@@ -281,10 +288,30 @@ public class GuardrailProfileService {
         return overrideBalance.divide(totalBalance, 4, RoundingMode.HALF_UP);
     }
 
-    public static String computeScenarioHash(ProjectionScenarioEntity scenario) {
+    /**
+     * A minimal (id, effective-amount) projection of a scenario's linked income sources, used only
+     * to feed {@link #scenarioSignature}. Kept independent of {@code ProjectionIncomeSourceInput} so
+     * callers with different income-source representations (a fully-resolved
+     * {@code ProjectionInput}, or raw {@code ScenarioIncomeSourceEntity} rows) can both produce it
+     * without coupling this hash/seed logic to either shape.
+     */
+    public record IncomeSourceSignature(UUID incomeSourceId, BigDecimal effectiveAmount) {}
+
+    /** Builds {@link IncomeSourceSignature}s from the resolved income sources already carried by
+     * a {@link GuardrailOptimizationInput} / {@code ProjectionInput} (id + override-or-base amount). */
+    public static List<IncomeSourceSignature> toIncomeSourceSignatures(
+            List<ProjectionIncomeSourceInput> incomeSources) {
+        return incomeSources.stream()
+                .map(s -> new IncomeSourceSignature(s.id(), s.annualAmount()))
+                .toList();
+    }
+
+    public static String computeScenarioHash(ProjectionScenarioEntity scenario,
+                                              List<IncomeSourceSignature> incomeSources) {
         try {
             var digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(scenarioSignature(scenario).getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(
+                    scenarioSignature(scenario, incomeSources).getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
@@ -295,27 +322,57 @@ public class GuardrailProfileService {
      * Builds the scenario-identifying signature string shared by the cache-key hash
      * ({@link #computeScenarioHash}) and the deterministic optimizer seed
      * ({@link #deriveSeed}), so both stay in lockstep with the same set of identifying fields.
+     *
+     * <p>Covers every realism-v2 input that changes Monte Carlo results: retirement date, end age,
+     * inflation, birth year, each account's type/balance/contribution/expected-return/allocation/cost
+     * basis, the scenario's dividend yield, and linked income sources (id + effective amount).
+     * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
+     * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
+     * scenario always yields the same signature regardless of collection iteration order.
      */
-    private static String scenarioSignature(ProjectionScenarioEntity scenario) {
+    private static String scenarioSignature(ProjectionScenarioEntity scenario,
+                                             List<IncomeSourceSignature> incomeSources) {
         var sb = new StringBuilder();
         sb.append(scenario.getRetirementDate())
                 .append('|').append(scenario.getEndAge())
                 .append('|').append(scenario.getInflationRate());
 
-        // Only birth_year from paramsJson affects guardrail optimization
         var hashParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
         if (hashParams.birthYear() != null) {
             sb.append('|').append(hashParams.birthYear());
         }
+        sb.append('|').append(hashParams.dividendYield());
 
-        for (var acct : scenario.getAccounts()) {
-            sb.append('|').append(acct.getAccountType())
-                    .append(':').append(acct.getInitialBalance())
-                    .append(':').append(acct.getAnnualContribution())
-                    .append(':').append(acct.getExpectedReturn());
-        }
+        scenario.getAccounts().stream()
+                .sorted(Comparator.comparing(ProjectionAccountEntity::getId,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .forEach(acct -> sb.append('|').append(acct.getAccountType())
+                        .append(':').append(acct.getInitialBalance())
+                        .append(':').append(acct.getAnnualContribution())
+                        .append(':').append(acct.getExpectedReturn())
+                        .append(':').append(acct.getCostBasis())
+                        .append(':').append(allocationSignature(acct.getAllocation())));
+
+        incomeSources.stream()
+                .sorted(Comparator.comparing(IncomeSourceSignature::incomeSourceId,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .forEach(src -> sb.append('|').append(src.incomeSourceId())
+                        .append(':').append(src.effectiveAmount()));
 
         return sb.toString();
+    }
+
+    /** Stable (sorted-key) serialization of an account's asset-allocation override, e.g. {@code
+     * "us_stock=0.60,us_bond=0.40"}. Empty/absent allocation (allocation-derived accounts with no
+     * explicit override) serializes to the empty string. */
+    private static String allocationSignature(@Nullable Map<String, BigDecimal> allocation) {
+        if (allocation == null || allocation.isEmpty()) {
+            return "";
+        }
+        return allocation.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(e -> e.getKey() + "=" + e.getValue())
+                .collect(Collectors.joining(","));
     }
 
     /**
@@ -347,7 +404,9 @@ public class GuardrailProfileService {
                                                                int birthYear,
                                                                BigDecimal confidence,
                                                                String filingStatus,
-                                                               String withdrawalOrder) {
+                                                               String withdrawalOrder,
+                                                               BigDecimal dividendYield) {
+        var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
                 birthYear,
@@ -361,7 +420,7 @@ public class GuardrailProfileService {
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
                 confidence,
                 request.phases() != null ? request.phases() : List.of(),
-                deriveSeed(scenarioSignature(scenario)),
+                deriveSeed(scenarioSignature(scenario, incomeSourceSignatures)),
                 request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
                 request.maxAnnualAdjustmentRate() != null
                         ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
@@ -380,7 +439,8 @@ public class GuardrailProfileService {
                         ? request.traditionalExhaustionBuffer() : 5,
                 request.rmdBracketHeadroom() != null
                         ? request.rmdBracketHeadroom() : new BigDecimal("0.10"),
-                request.dynamicSequencingBracketRate()
+                request.dynamicSequencingBracketRate(),
+                dividendYield
         );
     }
 

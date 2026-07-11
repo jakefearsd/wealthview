@@ -125,12 +125,13 @@ final class OptimizationContextBuilder {
         // Capital-gains taxation inputs for the taxable pool's FIFO lots (Task 6):
         //  - initTaxableBasis seeds the initial lot's cost basis (embedded gain = balance - basis);
         //  - ltcgRateByYear is the per-year marginal LTCG rate probed from the year's ordinary income;
-        //  - dividendYield is a global engine assumption (the guardrail request carries no field).
+        //  - dividendYield comes from the scenario's params_json (same field the deterministic engine
+        //    reads via ScenarioParamsParser.dividendYield), falling back to the same default when unset.
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
         double[] ltcgRateByYear = LtcgRateCalculator.compute(
                 capitalGainsTaxCalculator, taxCalculator, rentalAwareTaxableIncome, retirementYear, years,
                 filingStatus, inflationRate);
-        double dividendYield = ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD.doubleValue();
+        double dividendYield = resolveDividendYield(input);
 
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
@@ -181,6 +182,17 @@ final class OptimizationContextBuilder {
                     BigDecimal.ZERO).doubleValue();
         }
         return ceilings;
+    }
+
+    /**
+     * Resolves the scenario's dividend yield for the MC engine, falling back to the same default
+     * the deterministic engine uses (see {@link ScenarioParamsParser#DEFAULT_DIVIDEND_YIELD}) when
+     * the scenario's {@code params_json} doesn't set one. Extracted to its own method (rather than
+     * an inline ternary in {@link #build}) to keep that method's NPath complexity in check.
+     */
+    private static double resolveDividendYield(GuardrailOptimizationInput input) {
+        return input.dividendYield() != null
+                ? input.dividendYield().doubleValue() : ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD.doubleValue();
     }
 
     private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {

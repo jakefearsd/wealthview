@@ -4,6 +4,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * All inputs the guardrail/Monte-Carlo spending optimizer needs for one run.
+ *
+ * @param dividendYield the scenario's configured taxable-pool dividend yield
+ *         ({@code params_json.dividend_yield}), or {@code null} when the scenario doesn't set one.
+ *         The MC engine falls back to the same default the deterministic engine uses (see
+ *         {@code ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD}).
+ */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
         int birthYear,
@@ -30,5 +38,6 @@ public record GuardrailOptimizationInput(
         BigDecimal rmdTargetBracketRate,
         int traditionalExhaustionBuffer,
         BigDecimal rmdBracketHeadroom,
-        BigDecimal dynamicSequencingBracketRate
+        BigDecimal dynamicSequencingBracketRate,
+        BigDecimal dividendYield
 ) {}
