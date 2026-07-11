@@ -69,7 +69,9 @@ function defaultAccount(): ScenarioAccountInput {
         linked_account_id: null,
         initial_balance: 100000,
         annual_contribution: 10000,
-        expected_return: 7,
+        // No override by default — the allocation-derived return (this phase's centerpiece)
+        // drives growth unless the user explicitly enters one.
+        expected_return: null,
         account_type: 'taxable',
         cost_basis: null,
         allocation: null,
@@ -194,11 +196,12 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 linked_account_id: acct.id,
                 initial_balance: acct.balance,
                 account_type: mapAccountType(acct.type),
-                // Linking derives allocation + cost basis from the account's holdings, so clear any
-                // stale manual override / cost basis carried over from the row's prior state — a
+                // Linking derives allocation, cost basis, and return from the account's holdings, so
+                // clear any stale manual override carried over from the row's prior state — a
                 // leftover override is NOT link-gated and would wrongly apply to the new account.
                 allocation: null,
                 cost_basis: null,
+                expected_return: null,
             } : a));
             // Newly linked account: we don't have a fetched derived mix for it yet (that
             // requires a projection run), so drop any stale summary from a previous selection.
@@ -284,6 +287,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         style={inputStyle}
                         type="number"
                         step="0.1"
+                        min="0"
+                        max="10"
                         value={dividendYield ?? ''}
                         onChange={e => setField('dividendYield', e.target.value === '' ? null : Number(e.target.value))}
                     />

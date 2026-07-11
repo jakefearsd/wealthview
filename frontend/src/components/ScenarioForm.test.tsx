@@ -38,6 +38,7 @@ vi.mock('./CurrencyInput', () => ({
 import { useApiQuery } from '../hooks/useApiQuery';
 import ScenarioForm from './ScenarioForm';
 import type { Scenario, ProjectionAccount } from '../types/projection';
+import type { Account } from '../types/account';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
 
@@ -64,14 +65,20 @@ function makeScenario(account: Partial<ProjectionAccount>): Scenario {
     };
 }
 
-function setupMocks({ profiles = [spendingProfile], accounts = [], incomeSources = [] } = {}) {
+function setupMocks({ profiles = [spendingProfile], accounts = [] as Account[], incomeSources = [] } = {}) {
+    // ScenarioForm calls useApiQuery exactly 3 times per render, always in the same order
+    // (profiles, accounts, income sources). Index by position-within-render (call % 3) rather
+    // than a raw incrementing counter, so re-renders triggered by fireEvent (which call the
+    // hooks again) keep returning the right shaped data instead of drifting into the
+    // catch-all branch after the first render.
     let call = 0;
     mockUseApiQuery.mockImplementation(() => {
+        const position = call % 3;
         call++;
-        if (call === 1) {
+        if (position === 0) {
             return { data: profiles, loading: false, error: null, refetch: vi.fn() };
         }
-        if (call === 2) {
+        if (position === 1) {
             return { data: { data: accounts, total: accounts.length, page: 0, page_size: 100 }, loading: false, error: null, refetch: vi.fn() };
         }
         return { data: incomeSources, loading: false, error: null, refetch: vi.fn() };
@@ -172,6 +179,63 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.accounts[0].allocation).toBeNull();
+    });
+
+    it('defaults a brand-new account to no override, omitting expected_return on submit', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        expect(overrideReturnInput().value).toBe('');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].expected_return).toBeUndefined();
+    });
+
+    it('serializes a user-entered override on a new account as a decimal', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(overrideReturnInput(), { target: { value: '5' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].expected_return).toBeCloseTo(0.05);
+    });
+
+    it('resets expected_return override when linking an existing account', async () => {
+        const existingAccount = { id: 'ext-1', name: 'Fidelity 401k', type: '401k', institution: 'Fidelity', currency: 'USD', balance: 200000, created_at: '2024-01-01T00:00:00Z' };
+        setupMocks({ accounts: [existingAccount] });
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(overrideReturnInput(), { target: { value: '9' } });
+        expect(overrideReturnInput().value).toBe('9');
+
+        const linkSelect = screen.getByText('Link Existing Account').parentElement?.querySelector('select');
+        if (!linkSelect) {
+            throw new Error('Link Existing Account select not found');
+        }
+        fireEvent.change(linkSelect, { target: { value: 'ext-1' } });
+
+        expect(overrideReturnInput().value).toBe('');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.accounts[0].expected_return).toBeUndefined();
     });
 
     it('hydrates a null expected_return to a blank override and omits it on submit', async () => {
