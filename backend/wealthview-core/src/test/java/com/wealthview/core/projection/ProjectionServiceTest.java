@@ -19,6 +19,7 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
@@ -39,6 +40,9 @@ class ProjectionServiceTest {
 
     @Mock
     private ProjectionInputBuilder projectionInputBuilder;
+
+    @Mock
+    private StateTaxCalculatorFactory stateTaxCalculatorFactory;
 
     @InjectMocks
     private ProjectionService service;
@@ -165,5 +169,73 @@ class ProjectionServiceTest {
         var result = service.runProjection(tenantId, scenarioId);
 
         assertThat(result.unclassifiedSymbols()).containsExactly("ZZZZ");
+    }
+
+    // --- audit C3: unsupported-state warnings surfaced on the run result ---
+
+    @Test
+    void runProjection_unsupportedState_surfacesWarningOnResult() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"state\": \"NY\"}");
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), scenario.getParamsJson(), List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(stateTaxCalculatorFactory.unsupportedStateWarning("NY"))
+                .thenReturn(Optional.of("State tax for NY is not modeled (treated as $0)"));
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.warnings()).containsExactly("State tax for NY is not modeled (treated as $0)");
+    }
+
+    @Test
+    void runProjection_supportedState_noWarningsOnResult() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"state\": \"CA\"}");
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), scenario.getParamsJson(), List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
+        when(stateTaxCalculatorFactory.unsupportedStateWarning("CA")).thenReturn(Optional.empty());
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.warnings()).isEmpty();
+    }
+
+    @Test
+    void runProjection_noParams_noWarningsOnResult() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var input = new ProjectionInput(scenarioId, "Plan", LocalDate.of(2055, 1, 1),
+                90, new BigDecimal("0.03"), null, List.of(), null, null, List.of());
+        when(projectionInputBuilder.buildWithMetadata(scenario, tenantId))
+                .thenReturn(new ProjectionInputResult(input, List.of()));
+
+        var engineResult = new ProjectionResultResponse(scenarioId, List.of(), BigDecimal.ZERO, 0, null);
+        when(projectionEngine.run(input)).thenReturn(engineResult);
+
+        var result = service.runProjection(tenantId, scenarioId);
+
+        assertThat(result.warnings()).isEmpty();
     }
 }

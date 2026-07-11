@@ -1,6 +1,7 @@
 package com.wealthview.core.projection;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -13,23 +14,31 @@ import com.wealthview.core.projection.dto.CompareRequest;
 import com.wealthview.core.projection.dto.CompareResponse;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionRunResult;
+import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
+import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
+import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class ProjectionService {
 
     private static final Logger log = LoggerFactory.getLogger(ProjectionService.class);
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final ProjectionEngine projectionEngine;
     private final ProjectionInputBuilder projectionInputBuilder;
+    private final StateTaxCalculatorFactory stateTaxCalculatorFactory;
 
     public ProjectionService(ProjectionScenarioRepository scenarioRepository,
                              ProjectionEngine projectionEngine,
-                             ProjectionInputBuilder projectionInputBuilder) {
+                             ProjectionInputBuilder projectionInputBuilder,
+                             StateTaxCalculatorFactory stateTaxCalculatorFactory) {
         this.scenarioRepository = scenarioRepository;
         this.projectionEngine = projectionEngine;
         this.projectionInputBuilder = projectionInputBuilder;
+        this.stateTaxCalculatorFactory = stateTaxCalculatorFactory;
     }
 
     @Transactional(readOnly = true)
@@ -51,6 +60,20 @@ public class ProjectionService {
                 .orElseThrow(Entities.notFound("Scenario"));
         var inputResult = projectionInputBuilder.buildWithMetadata(scenario, tenantId);
         var result = projectionEngine.run(inputResult.input());
-        return new ProjectionRunResult(result, inputResult.unclassifiedSymbols());
+        return new ProjectionRunResult(result, inputResult.unclassifiedSymbols(), resolveWarnings(scenario));
+    }
+
+    /**
+     * Run-level warnings not reflected in the byte-pinned {@link ProjectionResultResponse} (audit
+     * C3): today, just the scenario's filing state having no modeled {@code StateTaxCalculator}. The
+     * engine itself already logs this once per run (see {@code StateTaxCalculatorFactory#forState});
+     * this re-derives the SAME message (a pure lookup, no extra logging) purely to surface it on the
+     * API response.
+     */
+    private List<String> resolveWarnings(ProjectionScenarioEntity scenario) {
+        var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+        return stateTaxCalculatorFactory.unsupportedStateWarning(params.state())
+                .map(List::of)
+                .orElseGet(List::of);
     }
 }

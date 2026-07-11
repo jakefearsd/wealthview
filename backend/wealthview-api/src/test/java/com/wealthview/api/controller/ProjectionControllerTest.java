@@ -277,4 +277,43 @@ class ProjectionControllerTest {
                 .andExpect(jsonPath("$.unclassified_symbols[0]").value("ZZZZ"))
                 .andExpect(jsonPath("$.unclassified_symbols[1]").value("WEIRDX"));
     }
+
+    @Test
+    void run_noWarnings_omitsWarningsField() throws Exception {
+        var result = new ProjectionResultResponse(
+                SCENARIO_ID,
+                List.of(ProjectionYearDto.simple(2026, 36,
+                        new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("7700"), BigDecimal.ZERO,
+                        new BigDecimal("117700"), false)),
+                new BigDecimal("117700"), 0, null);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of()));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings").doesNotExist());
+    }
+
+    @Test
+    void run_unsupportedState_includesWarningsField() throws Exception {
+        var result = new ProjectionResultResponse(
+                SCENARIO_ID,
+                List.of(ProjectionYearDto.simple(2026, 36,
+                        new BigDecimal("100000"), new BigDecimal("10000"),
+                        new BigDecimal("7700"), BigDecimal.ZERO,
+                        new BigDecimal("117700"), false)),
+                new BigDecimal("117700"), 0, null);
+        when(projectionService.runProjection(TENANT_ID, SCENARIO_ID))
+                .thenReturn(new ProjectionRunResult(result, List.of(),
+                        List.of("State tax for NY is not modeled (treated as $0)")));
+
+        mockMvc.perform(get("/api/v1/projections/{id}/run", SCENARIO_ID)
+                        .with(authenticatedAdmin()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.warnings").isArray())
+                .andExpect(jsonPath("$.warnings.length()").value(1))
+                .andExpect(jsonPath("$.warnings[0]").value("State tax for NY is not modeled (treated as $0)"));
+    }
 }
