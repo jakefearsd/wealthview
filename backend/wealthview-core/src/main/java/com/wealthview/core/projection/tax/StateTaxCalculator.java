@@ -11,4 +11,16 @@ public interface StateTaxCalculator {
     String stateCode();
 
     boolean taxesCapitalGainsAsOrdinaryIncome();
+
+    /**
+     * Whether this state fully exempts Social Security benefits from its own taxable base, so the
+     * {@code CombinedTaxCalculator} seam should subtract the year's federally-taxed Social Security
+     * amount from the state base before computing state tax (audit C3). Defaults to {@code true} --
+     * the three currently supported states (CA, AZ, OR) all fully exempt Social Security -- so a
+     * future state that taxes some or all of it (e.g. CO, CT, MN, MT, NE, NM, RI, UT, VT, WV) can
+     * override this to {@code false} without touching the existing trio.
+     */
+    default boolean exemptsSocialSecurity() {
+        return true;
+    }
 }

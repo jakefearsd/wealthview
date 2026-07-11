@@ -335,7 +335,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,
                 wdFromTraditional, conversionAmount, comp.effectiveOtherIncome(),
-                taxLiability, pool, ctx.taxStrategy(), ltcgTax);
+                taxLiability, pool, ctx.taxStrategy(), ltcgTax,
+                comp.realizedLtcgIncome(), comp.socialSecurityTaxable());
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
         return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss));

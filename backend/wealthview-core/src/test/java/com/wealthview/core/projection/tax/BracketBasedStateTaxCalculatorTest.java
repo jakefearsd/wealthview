@@ -70,6 +70,14 @@ class BracketBasedStateTaxCalculatorTest {
         }
 
         @Test
+        void exemptsSocialSecurity_defaultsToTrue() {
+            // AZ fully exempts Social Security (audit C3); no constructor param exists for this flag
+            // (unlike taxesCapitalGainsAsOrdinaryIncome) since the interface default already covers
+            // every currently-supported state -- this pins that the default is actually in effect.
+            assertThat(calculator.exemptsSocialSecurity()).isTrue();
+        }
+
+        @Test
         void computeTax_flatRate_computesCorrectly() {
             // Gross: 75000, deduction: 14600, taxable: 60400
             // Flat 2.5%: 60400 * 0.025 = 1510.00
@@ -129,6 +137,13 @@ class BracketBasedStateTaxCalculatorTest {
         @Test
         void stateCode_returnsOR() {
             assertThat(calculator.stateCode()).isEqualTo("OR");
+        }
+
+        @Test
+        void exemptsSocialSecurity_defaultsToTrue() {
+            // OR fully exempts Social Security (audit C3); see the AZ nested class for why this is
+            // the interface default rather than a constructor param.
+            assertThat(calculator.exemptsSocialSecurity()).isTrue();
         }
 
         @Test

@@ -70,7 +70,13 @@ final class YearFinanceResolver {
             BigDecimal rmdAmount) {
     }
 
-    /** Everything a resolved projection year yields, plus the realized ordinary income for convergence. */
+    /**
+     * Everything a resolved projection year yields, plus the realized ordinary income for
+     * convergence. {@code realizedLtcgIncome} and {@code socialSecurityTaxable} are broken out
+     * separately (rather than only folded into {@code realizedPortfolioTaxable}) so callers can
+     * thread them into the STATE tax base (audit C3: {@code CombinedTaxCalculator}'s LTCG /
+     * Social-Security-exemption seam) without re-deriving them from the SS convergence arithmetic.
+     */
     record YearComputation(
             IncomeSourceProcessor.IncomeSourceYearResult isResult,
             BigDecimal totalActiveIncome,
@@ -86,7 +92,9 @@ final class YearFinanceResolver {
             BigDecimal wdFromRoth,
             BigDecimal ltcgTax,
             PoolStrategy.TaxSourceResult combinedTaxSource,
-            BigDecimal realizedPortfolioTaxable) {
+            BigDecimal realizedPortfolioTaxable,
+            BigDecimal realizedLtcgIncome,
+            BigDecimal socialSecurityTaxable) {
     }
 
     YearComputation resolve(YearContext yc) {
@@ -164,10 +172,18 @@ final class YearFinanceResolver {
         // LTCG/dividend income. Matches the IRS worksheet's AGI-ex-SS additions.
         BigDecimal realizedPortfolioTaxable = wdFromTraditional.add(conversionAmount).add(realizedLtcgIncome);
 
+        // The converged federally-taxable Social Security amount for this year (audit B2's fixed
+        // point has already run by the time this method returns for the final pass) -- zero when no
+        // income sources were processed this year (pre-retirement years that skip income-source
+        // processing entirely; see processIncomeAndConversions).
+        BigDecimal socialSecurityTaxable = incomeResult.isResult() != null
+                ? incomeResult.isResult().socialSecurityTaxable() : BigDecimal.ZERO;
+
         return new YearComputation(incomeResult.isResult(), incomeResult.totalActiveIncome(),
                 incomeResult.effectiveOtherIncome(), conversionAmount, taxLiability, suspendedLoss,
                 withdrawals, previousWithdrawal, surplusReinvested, wdFromTaxable, wdFromTraditional,
-                wdFromRoth, ltcgTax, combinedTaxSource, realizedPortfolioTaxable);
+                wdFromRoth, ltcgTax, combinedTaxSource, realizedPortfolioTaxable, realizedLtcgIncome,
+                socialSecurityTaxable);
     }
 
     private record IncomeAndConversionResult(

@@ -23,4 +23,11 @@ public class NullStateTaxCalculator implements StateTaxCalculator {
     public boolean taxesCapitalGainsAsOrdinaryIncome() {
         return false;
     }
+
+    @Override
+    public boolean exemptsSocialSecurity() {
+        // No state tax exists to exempt anything from; kept explicit (rather than inheriting the
+        // interface default of true) so this null-object's flags are uniformly "off".
+        return false;
+    }
 }

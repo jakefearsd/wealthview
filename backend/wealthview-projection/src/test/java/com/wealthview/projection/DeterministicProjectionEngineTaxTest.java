@@ -345,12 +345,24 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineState = engineWithStateTax("CA");
 
+        // dividend_yield: 0 -- this test targets the conversion + traditional-withdrawal
+        // reconciliation, not taxable-pool income; without it the default 1.8% dividend yield
+        // (ScenarioParamsParser.DEFAULT_DIVIDEND_YIELD) books passive qualified-dividend income on
+        // the $300K taxable account every year, regardless of withdrawal order. Since CA taxes
+        // capital gains as ordinary income (audit C3), RetirementTaxAnnotator's recomputed
+        // DISPLAYED state tax now legitimately includes that dividend income -- but the ACTUAL
+        // withdrawal-tax cascade in PoolStrategy.MultiPool#executeWithdrawals still computes its
+        // pool-funded tax on ordinary income only (audit C3 threads LTCG/SS into the annotator's
+        // display seam, not that separate funding computation), so taxLiability would no longer
+        // equal federalTax + stateTax once dividends are in play. That split is a known, orthogonal
+        // scope boundary (see CombinedTaxCalculator's javadoc) this test isn't about; zeroing the
+        // yield removes the incidental income so it stays focused on its original intent.
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
-                 "withdrawal_order": "traditional_first", "state": "CA"}
+                 "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
                 """.formatted(LocalDate.now().getYear() - 66),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
@@ -365,6 +377,94 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         assertThat(year1.stateTax()).isNotNull();
         BigDecimal breakdownTotal = year1.federalTax().add(year1.stateTax());
         assertThat(year1.taxLiability()).isEqualByComparingTo(breakdownTotal);
+    }
+
+    /**
+     * End-to-end wiring check for audit C3's Social-Security-exemption seam: runs the SAME retiree
+     * (Social Security + traditional withdrawal) through two otherwise-identical state calculators
+     * that differ ONLY in {@code exemptsSocialSecurity()}, and pins the resulting state-tax delta to
+     * exactly {@code rate * year1.socialSecurityTaxable()}. This exercises the REAL path -- {@code
+     * YearFinanceResolver} -> {@code DeterministicProjectionEngine} -> {@code
+     * RetirementTaxAnnotator} -> {@code CombinedTaxCalculator} -- catching wiring bugs (e.g. an
+     * argument-order mistake in the many-BigDecimal {@code AnnotationContext} constructor) that a
+     * pure {@code CombinedTaxCalculatorTest} unit test can't see.
+     */
+    @Test
+    void run_stateExemptsSocialSecurity_reducesStateTaxByExactlyRateTimesSsTaxable() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var federal = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+        BigDecimal rate = bd("0.06");
+
+        // dividend_yield: 0 isolates this test to the SS seam -- see the comment on
+        // run_conversionAndTraditionalWithdrawal_withState_taxMatchesBreakdown for why the default
+        // dividend yield would otherwise also realize (unrelated) LTCG/dividend income here.
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
+                """.formatted(LocalDate.now().getYear() - 66),
+                List.of(acct("500000", "0", "0.00", "traditional")),
+                null, List.of(socialSecuritySource("30000", 62)));
+
+        var exemptEngine = new DeterministicProjectionEngine(
+                federal, mockStateFactory("CA", rate, true));
+        var year1Exempt = exemptEngine.run(input).yearlyData().getFirst();
+
+        var taxedEngine = new DeterministicProjectionEngine(
+                federal, mockStateFactory("CA", rate, false));
+        var year1Taxed = taxedEngine.run(input).yearlyData().getFirst();
+
+        // Same underlying federal SS-taxability computation regardless of the state's own treatment.
+        assertThat(year1Exempt.socialSecurityTaxable()).isEqualByComparingTo(year1Taxed.socialSecurityTaxable());
+        BigDecimal ssTaxable = year1Exempt.socialSecurityTaxable();
+        assertThat(ssTaxable).isGreaterThan(BigDecimal.ZERO);
+
+        BigDecimal expectedDelta = ssTaxable.multiply(rate).setScale(4, RoundingMode.HALF_UP);
+        assertThat(year1Taxed.stateTax().subtract(year1Exempt.stateTax()))
+                .isEqualByComparingTo(expectedDelta);
+        assertThat(year1Exempt.federalTax()).isEqualByComparingTo(year1Taxed.federalTax());
+    }
+
+    /**
+     * A mocked {@link StateTaxCalculatorFactory} resolving {@code stateCode} to a proportional
+     * ({@code grossIncome * rate}) calculator with a configurable {@code exemptsSocialSecurity} flag
+     * and {@code taxesCapitalGainsAsOrdinaryIncome} always false (unused by the SS-focused test
+     * above).
+     */
+    private StateTaxCalculatorFactory mockStateFactory(String stateCode, BigDecimal rate,
+                                                         boolean exemptsSocialSecurity) {
+        var factory = mock(StateTaxCalculatorFactory.class);
+        StateTaxCalculator proportional = new StateTaxCalculator() {
+            @Override
+            public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+                return grossIncome.compareTo(BigDecimal.ZERO) > 0
+                        ? grossIncome.multiply(rate).setScale(4, RoundingMode.HALF_UP)
+                        : BigDecimal.ZERO;
+            }
+
+            @Override
+            public BigDecimal getStandardDeduction(int taxYear, FilingStatus status) {
+                return BigDecimal.ZERO;
+            }
+
+            @Override
+            public String stateCode() {
+                return stateCode;
+            }
+
+            @Override
+            public boolean taxesCapitalGainsAsOrdinaryIncome() {
+                return false;
+            }
+
+            @Override
+            public boolean exemptsSocialSecurity() {
+                return exemptsSocialSecurity;
+            }
+        };
+        when(factory.forState(stateCode)).thenReturn(proportional);
+        return factory;
     }
 
     @Test

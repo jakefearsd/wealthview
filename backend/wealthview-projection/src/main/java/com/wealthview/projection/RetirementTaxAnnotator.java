@@ -20,7 +20,12 @@ final class RetirementTaxAnnotator {
      * Bundles the per-year inputs needed by {@code annotate}. {@code ltcgTax} is the year's
      * long-term capital-gains tax (zero when none was realized) -- LTCG is a federal tax, so it is
      * folded into the recomputed federal-tax breakdown below rather than left as an unattributed
-     * gap between {@code federalTax + stateTax} and {@code taxLiability}.
+     * gap between {@code federalTax + stateTax} and {@code taxLiability}. {@code realizedLtcgIncome}
+     * and {@code federallyTaxedSocialSecurity} feed the STATE side of that same recompute (audit C3):
+     * realized LTCG/dividend income is added to the state base for states that tax capital gains as
+     * ordinary income, and the federally-taxed Social Security amount (already folded into {@code
+     * effectiveOtherIncome} for federal purposes) is subtracted from the state base for states that
+     * fully exempt Social Security.
      */
     record AnnotationContext(
             boolean retired,
@@ -32,7 +37,9 @@ final class RetirementTaxAnnotator {
             BigDecimal taxLiability,
             PoolStrategy pool,
             @Nullable TaxCalculationStrategy taxStrategy,
-            BigDecimal ltcgTax) {
+            BigDecimal ltcgTax,
+            BigDecimal realizedLtcgIncome,
+            BigDecimal federallyTaxedSocialSecurity) {
     }
 
     /**
@@ -50,12 +57,15 @@ final class RetirementTaxAnnotator {
         var pool = annCtx.pool();
         var taxStrategy = annCtx.taxStrategy();
         var ltcgTax = annCtx.ltcgTax();
+        var realizedLtcgIncome = annCtx.realizedLtcgIncome();
+        var federallyTaxedSocialSecurity = annCtx.federallyTaxedSocialSecurity();
 
         if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
             BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
                     .add(effectiveOtherIncome);
             var filingStatus = pool.getFilingStatus();
-            var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
+            var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus,
+                    realizedLtcgIncome, federallyTaxedSocialSecurity);
             // LTCG is a federal tax; fold it into the federal component so federalTax + stateTax
             // reconciles with taxLiability (which already includes it) instead of leaving a gap.
             BigDecimal fedTax = breakdown.federalTax().add(ltcgTax);

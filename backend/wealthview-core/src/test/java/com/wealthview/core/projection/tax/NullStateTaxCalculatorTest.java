@@ -32,4 +32,11 @@ class NullStateTaxCalculatorTest {
     void taxesCapitalGainsAsOrdinaryIncome_returnsFalse() {
         assertThat(calculator.taxesCapitalGainsAsOrdinaryIncome()).isFalse();
     }
+
+    @Test
+    void exemptsSocialSecurity_returnsFalse() {
+        // Explicit override (not the interface's default true) -- no state tax exists to exempt
+        // anything from, so this null-object's flags stay uniformly "off".
+        assertThat(calculator.exemptsSocialSecurity()).isFalse();
+    }
 }

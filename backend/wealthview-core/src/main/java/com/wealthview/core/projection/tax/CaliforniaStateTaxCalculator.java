@@ -36,4 +36,9 @@ public class CaliforniaStateTaxCalculator implements StateTaxCalculator {
     public boolean taxesCapitalGainsAsOrdinaryIncome() {
         return delegate.taxesCapitalGainsAsOrdinaryIncome();
     }
+
+    @Override
+    public boolean exemptsSocialSecurity() {
+        return delegate.exemptsSocialSecurity();
+    }
 }

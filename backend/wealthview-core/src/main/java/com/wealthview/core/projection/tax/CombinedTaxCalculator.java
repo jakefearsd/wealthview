@@ -28,13 +28,43 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
     }
 
     public CombinedTaxResult computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
-        if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
-            return new CombinedTaxResult(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                    BigDecimal.ZERO, BigDecimal.ZERO, false);
+        return computeTax(grossIncome, taxYear, status, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    /**
+     * Like {@link #computeTax(BigDecimal, int, FilingStatus)} but lets the STATE base diverge from
+     * the federal base (audit C3): {@code ltcgIncome} (the year's realized long-term capital gains +
+     * qualified dividends -- LTCG is federal-only elsewhere in this engine, taxed separately via
+     * {@code CapitalGainsTaxCalculator}) is added to the state base when
+     * {@link StateTaxCalculator#taxesCapitalGainsAsOrdinaryIncome()}, and
+     * {@code federallyTaxedSocialSecurity} (the year's federally-taxable Social Security portion,
+     * already folded into {@code grossIncome}) is subtracted from the state base when
+     * {@link StateTaxCalculator#exemptsSocialSecurity()}. The federal computation is untouched by
+     * either figure -- both remain the pre-existing federal treatment (LTCG taxed separately; SS
+     * taxed via the federal worksheet's own inclusion, already baked into {@code grossIncome}).
+     *
+     * <p><b>Scope boundary (documented, minor simplification):</b> this 5-arg overload is called
+     * ONLY from {@code RetirementTaxAnnotator}, which recomputes the year's DISPLAYED federal/state
+     * breakdown from scratch after the pool cascade has already run. The pool-funded withdrawal tax
+     * computed earlier in {@code PoolStrategy.MultiPool#executeWithdrawals} still calls the 3-arg
+     * overload (ordinary income only) -- it does not know the year's LTCG/SS state adjustment. So for
+     * a state that taxes LTCG as ordinary income or exempts Social Security, the DISPLAYED {@code
+     * stateTax} (and thus {@code federalTax + stateTax}) can diverge slightly from the year's actual
+     * {@code taxLiability} (the dollars really drained from the pools) by the incremental state tax
+     * on that LTCG/SS adjustment. Reconciling the two would mean threading this same seam into the
+     * pool-funding cascade itself -- a larger, separate change; audit C3 scopes the fix to this
+     * display seam only.
+     */
+    public CombinedTaxResult computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status,
+                                         BigDecimal ltcgIncome, BigDecimal federallyTaxedSocialSecurity) {
+        BigDecimal stateBase = resolveStateBase(grossIncome, ltcgIncome, federallyTaxedSocialSecurity);
+
+        if (grossIncome.compareTo(BigDecimal.ZERO) <= 0 && stateBase.compareTo(BigDecimal.ZERO) <= 0) {
+            return CombinedTaxResult.ZERO;
         }
 
-        // 1. Compute state tax on gross income (state applies its own deduction internally)
-        BigDecimal stateTax = state.computeTax(grossIncome, taxYear, status);
+        // 1. Compute state tax on the state base (state applies its own deduction internally)
+        BigDecimal stateTax = state.computeTax(stateBase, taxYear, status);
 
         // 2. SALT = min(state_tax + property_tax, $10,000)
         BigDecimal saltUncapped = stateTax.add(primaryResidencePropertyTax);
@@ -48,12 +78,33 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
         boolean useItemized = itemized.compareTo(federalStandardDeduction) > 0;
         BigDecimal chosenDeduction = useItemized ? itemized : federalStandardDeduction;
 
-        // 5. Compute federal tax using chosen deduction
-        BigDecimal federalTax = federal.computeTaxWithDeduction(grossIncome, chosenDeduction, taxYear, status);
+        // 5. Compute federal tax using chosen deduction, on the UNADJUSTED gross income -- LTCG and
+        // Social Security both keep their existing federal treatment regardless of state rules.
+        BigDecimal federalTax = grossIncome.compareTo(BigDecimal.ZERO) > 0
+                ? federal.computeTaxWithDeduction(grossIncome, chosenDeduction, taxYear, status)
+                : BigDecimal.ZERO;
 
         BigDecimal totalTax = federalTax.add(stateTax);
 
         return new CombinedTaxResult(federalTax, stateTax, totalTax, salt, itemized, useItemized);
+    }
+
+    /**
+     * The state's own taxable base: gross ordinary income, plus realized LTCG/dividend income for
+     * states that tax capital gains as ordinary income, minus the federally-taxed Social Security
+     * amount for states that fully exempt Social Security. Floored at zero -- a state base can't go
+     * negative even when the SS exemption exceeds the (gross + LTCG) figure.
+     */
+    private BigDecimal resolveStateBase(BigDecimal grossIncome, BigDecimal ltcgIncome,
+                                         BigDecimal federallyTaxedSocialSecurity) {
+        BigDecimal base = grossIncome;
+        if (state.taxesCapitalGainsAsOrdinaryIncome() && ltcgIncome != null) {
+            base = base.add(ltcgIncome);
+        }
+        if (state.exemptsSocialSecurity() && federallyTaxedSocialSecurity != null) {
+            base = base.subtract(federallyTaxedSocialSecurity);
+        }
+        return base.max(BigDecimal.ZERO);
     }
 
     @Override
@@ -64,6 +115,12 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
     @Override
     public CombinedTaxResult computeDetailedTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
         return computeTax(grossIncome, taxYear, status);
+    }
+
+    @Override
+    public CombinedTaxResult computeDetailedTax(BigDecimal grossIncome, int taxYear, FilingStatus status,
+                                                 BigDecimal ltcgIncome, BigDecimal federallyTaxedSocialSecurity) {
+        return computeTax(grossIncome, taxYear, status, ltcgIncome, federallyTaxedSocialSecurity);
     }
 
     @Override

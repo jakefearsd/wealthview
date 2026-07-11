@@ -1,6 +1,9 @@
 package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -9,11 +12,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.testutil.TaxBracketFixtures;
+import com.wealthview.persistence.entity.StateStandardDeductionEntity;
+import com.wealthview.persistence.entity.StateTaxBracketEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.StateStandardDeductionRepository;
+import com.wealthview.persistence.repository.StateTaxBracketRepository;
+import com.wealthview.persistence.repository.StateTaxSurchargeRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class CombinedTaxCalculatorTest {
@@ -23,6 +34,15 @@ class CombinedTaxCalculatorTest {
 
     @Mock
     private StandardDeductionRepository deductionRepo;
+
+    @Mock
+    private StateTaxBracketRepository stateBracketRepo;
+
+    @Mock
+    private StateStandardDeductionRepository stateDeductionRepo;
+
+    @Mock
+    private StateTaxSurchargeRepository stateSurchargeRepo;
 
     private FederalTaxCalculator federalCalc;
 
@@ -36,6 +56,154 @@ class CombinedTaxCalculatorTest {
                                                  BigDecimal propertyTax,
                                                  BigDecimal mortgageInterest) {
         return new CombinedTaxCalculator(federalCalc, stateCalc, propertyTax, mortgageInterest);
+    }
+
+    /**
+     * A simplified two-bracket CA-like fixture (1% to $10,756, 2% above, $5,722 standard deduction --
+     * CA's real single-filer 2025 first bracket/deduction) that taxes capital gains as ordinary
+     * income. Enough to hand-verify bracket-crossing arithmetic exactly for the LTCG/SS state-base
+     * composition tests below without transcribing CA's full 10-bracket + surcharge table (that
+     * fidelity is already pinned in {@link CaliforniaStateTaxCalculatorTest}) -- these tests are about
+     * {@link CombinedTaxCalculator}'s state-base composition (audit C3), not CA's exact brackets.
+     */
+    private BracketBasedStateTaxCalculator caLikeStateCalculator() {
+        lenient().when(stateBracketRepo.findByStateCodeAndTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        eq("CA"), anyInt(), eq("single")))
+                .thenReturn(List.of(
+                        new StateTaxBracketEntity("CA", 2025, "single", bd("0"), bd("10756"), bd("0.0100")),
+                        new StateTaxBracketEntity("CA", 2025, "single", bd("10756"), null, bd("0.0200"))));
+        lenient().when(stateDeductionRepo.findByStateCodeAndTaxYearAndFilingStatus(eq("CA"), anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StateStandardDeductionEntity("CA", 2025, "single", bd("5722"))));
+        lenient().when(stateSurchargeRepo.findByStateCodeAndTaxYearAndFilingStatus(eq("CA"), anyInt(), eq("single")))
+                .thenReturn(List.of());
+        return new BracketBasedStateTaxCalculator(
+                "CA", true, stateBracketRepo, stateDeductionRepo, stateSurchargeRepo);
+    }
+
+    @Test
+    void computeTax_stateTaxesLtcgAsOrdinaryIncome_addsToStateBase() {
+        var combined = buildCombined(caLikeStateCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        // No LTCG: gross 20000, deduction 5722, taxable 14278 -> 10756@1%=107.56 + 3522@2%=70.44
+        var withoutLtcg = combined.computeTax(bd("20000"), 2025, FilingStatus.SINGLE,
+                BigDecimal.ZERO, BigDecimal.ZERO);
+        assertThat(withoutLtcg.stateTax()).isEqualByComparingTo(bd("178.0000"));
+
+        // $15000 of realized LTCG + qualified dividends added to the STATE base as ordinary income
+        // (audit C3, CA taxes capital gains as ordinary income): stateBase = 35000, taxable = 29278
+        // -> 10756@1%=107.56 + 18522@2%=370.44 = 478.00
+        var withLtcg = combined.computeTax(bd("20000"), 2025, FilingStatus.SINGLE,
+                bd("15000"), BigDecimal.ZERO);
+        assertThat(withLtcg.stateTax()).isEqualByComparingTo(bd("478.0000"));
+
+        // Direction: CA taxable-heavy retirees pay MORE state tax; federal is untouched by LTCG here
+        // (LTCG stays federal-only, taxed separately via CapitalGainsTaxCalculator elsewhere).
+        assertThat(withLtcg.stateTax()).isGreaterThan(withoutLtcg.stateTax());
+        assertThat(withLtcg.federalTax()).isEqualByComparingTo(withoutLtcg.federalTax());
+    }
+
+    @Test
+    void computeTax_stateDoesNotTaxLtcgAsOrdinaryIncome_stateBaseUnchanged() {
+        // Flag off (e.g. a no-income-tax or LTCG-preferential state): LTCG must NOT move the state
+        // base at all.
+        StateTaxCalculator flagOff = new ConfigurableStateTaxCalculator("ZZ", bd("0.05"), false, true);
+        var combined = buildCombined(flagOff, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var withoutLtcg = combined.computeTax(bd("20000"), 2025, FilingStatus.SINGLE,
+                BigDecimal.ZERO, BigDecimal.ZERO);
+        var withLtcg = combined.computeTax(bd("20000"), 2025, FilingStatus.SINGLE,
+                bd("15000"), BigDecimal.ZERO);
+
+        assertThat(withLtcg.stateTax()).isEqualByComparingTo(withoutLtcg.stateTax());
+    }
+
+    @Test
+    void computeTax_zeroOrdinaryIncomeWithLtcg_stateStillTaxesLtcg_federalStaysZero() {
+        // A retiree drawing ONLY from a taxable brokerage (no traditional withdrawal, conversion, or
+        // other ordinary income) still owes CA tax on realized LTCG/dividends (audit C3) even though
+        // the ORDINARY (federal) base is zero -- the old all-or-nothing zero-income guard used to
+        // return an all-zero result whenever grossIncome<=0, silently dropping this case.
+        var combined = buildCombined(caLikeStateCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var result = combined.computeTax(BigDecimal.ZERO, 2025, FilingStatus.SINGLE,
+                bd("20000"), BigDecimal.ZERO);
+
+        // stateBase = 20000, taxable = 14278 -> 107.56 + 3522@2%=70.44 = 178.00
+        assertThat(result.stateTax()).isEqualByComparingTo(bd("178.0000"));
+        assertThat(result.federalTax()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void computeTax_stateExemptsSocialSecurity_subtractsFromStateBase() {
+        var combined = buildCombined(caLikeStateCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        // Pre-fix equivalent (3-arg overload): the $12000 federally-taxed SS portion is already
+        // folded into the $40000 gross (as it is in production -- SS taxable income flows into
+        // effectiveOtherIncome before reaching this seam) and taxed as state income in full.
+        // Gross 40000, deduction 5722, taxable 34278 -> 10756@1%=107.56 + 23522@2%=470.44 = 578.00
+        var preFix = combined.computeTax(bd("40000"), 2025, FilingStatus.SINGLE);
+        assertThat(preFix.stateTax()).isEqualByComparingTo(bd("578.0000"));
+
+        // Post-fix: CA fully exempts Social Security (audit C3) -- subtract the $12000 federally-taxed
+        // SS amount from the state base. stateBase = 28000, taxable = 22278 -> 107.56 + 11522@2%=
+        // 230.44 = 338.00
+        var postFix = combined.computeTax(bd("40000"), 2025, FilingStatus.SINGLE,
+                BigDecimal.ZERO, bd("12000"));
+        assertThat(postFix.stateTax()).isEqualByComparingTo(bd("338.0000"));
+
+        // Direction: state tax DECREASES; federal is untouched by the SS-taxable figure passed here
+        // (it's already baked into the $40000 gross for federal purposes either way).
+        assertThat(postFix.stateTax()).isLessThan(preFix.stateTax());
+        assertThat(postFix.federalTax()).isEqualByComparingTo(preFix.federalTax());
+    }
+
+    @Test
+    void computeTax_stateTaxesLtcgAndExemptsSocialSecurity_bothAdjustmentsCompose() {
+        var combined = buildCombined(caLikeStateCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        // gross 40000 (includes $12000 SS-taxable), + 15000 LTCG, - 12000 SS-exemption
+        // stateBase = 43000, taxable = 37278 -> 10756@1%=107.56 + 26522@2%=530.44 = 638.00
+        var result = combined.computeTax(bd("40000"), 2025, FilingStatus.SINGLE, bd("15000"), bd("12000"));
+
+        assertThat(result.stateTax()).isEqualByComparingTo(bd("638.0000"));
+    }
+
+    /**
+     * Test helper: a StateTaxCalculator with configurable proportional rate and C3 flags, for
+     * exercising the {@code taxesCapitalGainsAsOrdinaryIncome}/{@code exemptsSocialSecurity} = false
+     * paths that the CA-like fixture above (both true) can't reach.
+     */
+    private record ConfigurableStateTaxCalculator(String code, BigDecimal rate,
+                                                   boolean taxesCapitalGainsAsOrdinaryIncome,
+                                                   boolean exemptsSocialSecurity)
+            implements StateTaxCalculator {
+
+        @Override
+        public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
+            return grossIncome.compareTo(BigDecimal.ZERO) > 0
+                    ? grossIncome.multiply(rate).setScale(4, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
+        }
+
+        @Override
+        public BigDecimal getStandardDeduction(int taxYear, FilingStatus status) {
+            return BigDecimal.ZERO;
+        }
+
+        @Override
+        public String stateCode() {
+            return code;
+        }
+
+        @Override
+        public boolean taxesCapitalGainsAsOrdinaryIncome() {
+            return taxesCapitalGainsAsOrdinaryIncome;
+        }
+
+        @Override
+        public boolean exemptsSocialSecurity() {
+            return exemptsSocialSecurity;
+        }
     }
 
     @Test

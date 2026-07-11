@@ -215,4 +215,10 @@ class CaliforniaStateTaxCalculatorTest {
     void taxesCapitalGainsAsOrdinaryIncome_returnsTrue() {
         assertThat(calculator.taxesCapitalGainsAsOrdinaryIncome()).isTrue();
     }
+
+    @Test
+    void exemptsSocialSecurity_returnsTrue() {
+        // CA fully exempts Social Security from state tax (audit C3).
+        assertThat(calculator.exemptsSocialSecurity()).isTrue();
+    }
 }
