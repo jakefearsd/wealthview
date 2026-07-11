@@ -14,6 +14,7 @@ public record ProjectionAccountResponse(
         BigDecimal expectedReturn,
         BigDecimal costBasis,
         AllocationDto allocation,
+        boolean allocationIsOverride,
         String accountType) {
 
     /**
@@ -22,10 +23,13 @@ public record ProjectionAccountResponse(
      * this record's visibility): balance is the live linked-account balance or the hypothetical
      * initial balance; allocation is the user override, else holdings-derived, else
      * {@link AssetAllocation#ALL_US}; cost basis is the live holdings sum or the hypothetical
-     * stored value.
+     * stored value. {@code allocationIsOverride} tells the client whether {@code allocation} is a
+     * user-stored override (true) or an auto-derived / default mix (false), so an edit round-trip
+     * can preserve or clear it correctly.
      */
     public static ProjectionAccountResponse from(ProjectionAccountEntity entity, BigDecimal balance,
-                                                 AllocationDto allocation, BigDecimal costBasis) {
+                                                 AllocationDto allocation, boolean allocationIsOverride,
+                                                 BigDecimal costBasis) {
         var linked = entity.getLinkedAccount();
         return new ProjectionAccountResponse(
                 entity.getId(),
@@ -36,6 +40,7 @@ public record ProjectionAccountResponse(
                 entity.getExpectedReturn(),
                 costBasis,
                 allocation,
+                allocationIsOverride,
                 entity.getAccountType());
     }
 }

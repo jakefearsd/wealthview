@@ -202,10 +202,11 @@ public class ScenarioCrudService {
                             ? accountService.computeBalance(linked, tenantId)
                             : acct.getInitialBalance();
                     var allocation = effectiveAllocation(acct, tenantId);
+                    var allocationIsOverride = acct.getAllocation() != null;
                     var costBasis = linked != null
                             ? accountService.computeCostBasis(linked, tenantId)
                             : acct.getCostBasis() != null ? acct.getCostBasis() : acct.getInitialBalance();
-                    return ProjectionAccountResponse.from(acct, balance, allocation, costBasis);
+                    return ProjectionAccountResponse.from(acct, balance, allocation, allocationIsOverride, costBasis);
                 })
                 .toList();
     }

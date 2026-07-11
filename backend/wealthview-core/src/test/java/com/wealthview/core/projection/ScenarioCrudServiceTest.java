@@ -463,6 +463,53 @@ class ScenarioCrudServiceTest {
     }
 
     @Test
+    void getScenario_accountWithStoredOverride_responseAllocationIsOverrideTrue() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "taxable");
+        acct.setAllocation(new AllocationDto(new BigDecimal("60"), new BigDecimal("20"),
+                new BigDecimal("15"), new BigDecimal("5")).toWeightMap());
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().allocationIsOverride()).isTrue();
+    }
+
+    @Test
+    void getScenario_linkedAccountNoOverride_responseAllocationIsOverrideFalse() {
+        var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, linkedAccount, null,
+                new BigDecimal("0"), null, "taxable");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(accountService.computeBalance(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("150000"));
+        when(accountService.computeCostBasis(linkedAccount, tenantId))
+                .thenReturn(new BigDecimal("120000"));
+        when(classificationService.deriveAllocation(tenantId, linkedAccount.getId()))
+                .thenReturn(new SecurityClassificationService.AllocationResult(
+                        AssetAllocation.fromDoubles(java.util.Map.of(
+                                AssetClass.US_STOCK, 0.5, AssetClass.BOND, 0.5)), Set.of()));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().allocationIsOverride()).isFalse();
+    }
+
+    @Test
     void createScenario_withWithdrawalOrder_persistsInParamsJson() {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
 
