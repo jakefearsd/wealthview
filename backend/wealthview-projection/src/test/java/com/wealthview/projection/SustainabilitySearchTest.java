@@ -39,7 +39,7 @@ class SustainabilitySearchTest {
                 paths, income, surplusTax,
                 0.0, 65, years, trialCount,
                 0.90, 0.0,
-                0, 0.0, 0.0,
+                0, 0.0,
                 null, null, null,
                 null,
                 taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,

@@ -74,7 +74,6 @@ class RothConversionOptimizerTest {
         private double rmdTargetBracketRate = 0.12;
         private double returnMean = 0.06;
         private double essentialFloor = 40_000;
-        private double inflationRate = 0.03;
         private FilingStatus filingStatus = FilingStatus.SINGLE;
         private FederalTaxCalculator calc = taxCalculator;
         private String withdrawalOrder = "taxable,traditional,roth";
@@ -96,7 +95,6 @@ class RothConversionOptimizerTest {
         OptimizerTestBuilder rmdTargetBracketRate(double v) { this.rmdTargetBracketRate = v; return this; }
         OptimizerTestBuilder returnMean(double v) { this.returnMean = v; return this; }
         OptimizerTestBuilder essentialFloor(double v) { this.essentialFloor = v; return this; }
-        OptimizerTestBuilder inflationRate(double v) { this.inflationRate = v; return this; }
         OptimizerTestBuilder filingStatus(FilingStatus v) { this.filingStatus = v; return this; }
         OptimizerTestBuilder calc(FederalTaxCalculator v) { this.calc = v; return this; }
         OptimizerTestBuilder withdrawalOrder(String v) { this.withdrawalOrder = v; return this; }
@@ -119,7 +117,7 @@ class RothConversionOptimizerTest {
                     .demographics(birthYear, retirementAge, endAge)
                     .taxConfig(conversionBracketRate, rmdTargetBracketRate, rmdBracketHeadroom,
                             filingStatus, calc)
-                    .assumptions(returnMean, essentialFloor, inflationRate, exhaustionBuffer,
+                    .assumptions(returnMean, essentialFloor, exhaustionBuffer,
                             withdrawalOrder)
                     .rentals(incomeSources, rentalLossCalculator)
                     .dynamicSequencingBracketRate(dynamicSequencingBracketRate)

@@ -30,7 +30,6 @@ record RothConversionConfig(
         double rmdTargetBracketRate,
         double returnMean,
         double essentialFloor,
-        double inflationRate,
         FilingStatus filingStatus,
         FederalTaxCalculator taxCalculator,
         String withdrawalOrder,

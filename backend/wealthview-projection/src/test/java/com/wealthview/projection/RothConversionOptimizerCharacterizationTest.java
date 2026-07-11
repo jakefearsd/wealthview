@@ -72,7 +72,7 @@ class RothConversionOptimizerCharacterizationTest {
                 .income(new double[28], new double[28])
                 .demographics(1963, 62, 90)
                 .taxConfig(0.22, 0.12, 0.10, FilingStatus.SINGLE, taxCalculator)
-                .assumptions(0.06, 40_000, 0.03, 5, "taxable,traditional,roth")
+                .assumptions(0.06, 40_000, 5, "taxable,traditional,roth")
                 .build();
     }
 

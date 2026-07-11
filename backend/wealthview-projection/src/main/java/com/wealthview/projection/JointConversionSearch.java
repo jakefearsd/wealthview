@@ -61,7 +61,7 @@ final class JointConversionSearch {
                 .assumptions(
                         input.returnMean() != null
                                 ? input.returnMean().doubleValue() : 0.10,
-                        ctx.taxIncome().essentialFloor(), ctx.sim().inflationRate(),
+                        ctx.taxIncome().essentialFloor(),
                         input.traditionalExhaustionBuffer(), ctx.portfolio().withdrawalOrder())
                 .rentals(input.incomeSources(), new RentalLossCalculator())
                 .dynamicSequencingBracketRate(input.dynamicSequencingBracketRate() != null
@@ -186,7 +186,7 @@ final class JointConversionSearch {
                 ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
                 searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
                 ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                ctx.sim().inflationRate(), searchTaxCtx, conversionByYear, conversionTaxByYear,
+                searchTaxCtx, conversionByYear, conversionTaxByYear,
                 ctx.taxIncome().dsBracketCeilingByYear(),
                 searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
                 ctx.sim().rmdStartAge(),

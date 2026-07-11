@@ -60,7 +60,7 @@ final class RothConversionOptimizer {
                             int birthYear, int retirementAge, int endAge,
                             int exhaustionBuffer, double conversionBracketRate,
                             double rmdTargetBracketRate, double returnMean,
-                            double essentialFloor, double inflationRate,
+                            double essentialFloor,
                             FilingStatus filingStatus, FederalTaxCalculator taxCalculator,
                             String withdrawalOrder,
                             List<ProjectionIncomeSourceInput> incomeSources,
@@ -74,7 +74,7 @@ final class RothConversionOptimizer {
                 otherIncomeByYear, taxableIncomeByYear,
                 birthYear, retirementAge, endAge, exhaustionBuffer,
                 conversionBracketRate, rmdTargetBracketRate, returnMean,
-                essentialFloor, inflationRate, filingStatus, taxCalculator,
+                essentialFloor, filingStatus, taxCalculator,
                 withdrawalOrder, rmdBracketHeadroom, dynamicSequencingBracketRate,
                 endAge - retirementAge, RmdCalculator.rmdStartAge(birthYear),
                 rentalAdjustmentCalculator);
@@ -219,7 +219,6 @@ final class RothConversionOptimizer {
         private double rmdTargetBracketRate;
         private double returnMean;
         private double essentialFloor;
-        private double inflationRate;
         private double rmdBracketHeadroom;
         private double dynamicSequencingBracketRate = 0.0;
         private FilingStatus filingStatus;
@@ -262,11 +261,10 @@ final class RothConversionOptimizer {
         }
 
         Builder assumptions(double returnMean, double essentialFloor,
-                            double inflationRate, int exhaustionBuffer,
+                            int exhaustionBuffer,
                             String withdrawalOrder) {
             this.returnMean = returnMean;
             this.essentialFloor = essentialFloor;
-            this.inflationRate = inflationRate;
             this.exhaustionBuffer = exhaustionBuffer;
             this.withdrawalOrder = withdrawalOrder;
             return this;
@@ -290,7 +288,7 @@ final class RothConversionOptimizer {
                     otherIncomeByYear, taxableIncomeByYear,
                     birthYear, retirementAge, endAge, exhaustionBuffer,
                     conversionBracketRate, rmdTargetBracketRate, returnMean,
-                    essentialFloor, inflationRate, filingStatus, taxCalculator,
+                    essentialFloor, filingStatus, taxCalculator,
                     withdrawalOrder, incomeSources, rentalLossCalculator,
                     rmdBracketHeadroom, dynamicSequencingBracketRate);
         }

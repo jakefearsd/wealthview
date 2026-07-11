@@ -40,7 +40,7 @@ final class SustainabilitySearch {
             double[][] paths, double[] income, double[] surplusTax,
             double terminalTarget, int retirementAge, int years, int trialCount,
             double confidenceLevel, double portfolioFloor,
-            int cashReserveYears, double cashReturnRate, double inflationRate,
+            int cashReserveYears, double cashReturnRate,
             TaxContext taxCtx, double[] conversionByYear, double[] conversionTaxByYear,
             double[] dsBracketCeilingByYear,
             double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
