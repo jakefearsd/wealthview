@@ -20,6 +20,11 @@ final class TrialSimulator {
     /** Fraction of equity portfolio used each year to replenish the cash reserve bucket. */
     private static final double CASH_REPLENISHMENT_RATE = 0.10;
 
+    /** Defensive cap on the audit-C2 gross-up rate: a real marginal rate cannot reach 100% (which
+     * would make the T*m/(1-m) closed form diverge), and this model's brackets never approach it --
+     * 50% is a generous ceiling that only ever bites on a corrupt/out-of-range input. */
+    private static final double GROSS_UP_RATE_CAP = 0.50;
+
     /** Per-trial simulation result. */
     record TrialResult(
             double finalBalance,
@@ -121,6 +126,14 @@ final class TrialSimulator {
             int age = config.retirementAge() + y;
             double rmd = computeYearRmd(pools1PreGrowth, age, config.rmdStartAge());
 
+            // This year's precomputed ordinary marginal rate -- used both for the withdrawal-tax
+            // estimate below AND, per audit C2, as the gross-up rate for every tax drain that can
+            // touch traditional this year (withdrawalTax, ltcgTax, unfundedBaseTax): a dollar of tax
+            // paid FROM traditional is itself an ordinary distribution, so it must fund its own tax
+            // too. 0 when hasPools is false (no tax modeling this trial), which also naturally makes
+            // every gross-up a no-op (T*0/(1-0)=0).
+            double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
+
             // Roth conversion execution
             applyTrialConversion(pools, lots, config.conversionByYear(), config.conversionTaxByYear(), y, age);
 
@@ -128,12 +141,13 @@ final class TrialSimulator {
             // A4: tax on this year's base (outside) income is a real obligation every year, not
             // just when income exceeds spending -- fund it from any surplus first; the unfunded
             // remainder drains straight from the pools via the shared tax cascade below
-            // (deductTaxFromPools), deliberately NOT folded into the spending withdrawal: it must
-            // neither draw from the cash reserve nor generate its own marginal withdrawal tax
-            // (zero gross-up), matching the deterministic engine's extraPoolFundedTax treatment.
-            // (Grossing up tax-funding draws is audit item C2, deliberately open for BOTH
-            // engines.) surplusTax[y] is the precomputed full-year tax on this year's taxable
-            // base income -- see OptimizationContextBuilder#computeSurplusTax.
+            // (deductTaxFromPoolsGrossedUp), deliberately NOT folded into the spending withdrawal: it
+            // must neither draw from the cash reserve nor generate marginal withdrawal tax on the
+            // SPENDING side (that would double-count -- this is a separate, already-computed bill).
+            // The funding draw itself IS grossed up when it touches traditional (audit C2) exactly
+            // like the deterministic engine's extraPoolFundedTax now is. surplusTax[y] is the
+            // precomputed full-year tax on this year's taxable base income -- see
+            // OptimizationContextBuilder#computeSurplusTax.
             double grossSurplus = income[y] - spending;
             double baseIncomeTax = surplusTax[y];
             double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
@@ -153,8 +167,7 @@ final class TrialSimulator {
             // Estimate tax on traditional withdrawal using pre-computed marginal rate
             double withdrawalTax = 0;
             if (hasPools && drawn.traditional() > 0) {
-                withdrawalTax = estimateWithdrawalTax(
-                        drawn.traditional(), config.marginalRateByYear()[y]);
+                withdrawalTax = estimateWithdrawalTax(drawn.traditional(), marginalRate);
             }
 
             // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
@@ -167,7 +180,7 @@ final class TrialSimulator {
             double[] traditionalDrawnOut = {0.0};
             cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, traditionalDrawnOut,
                     cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
-                    config.cashReserveYears(), portfolioReturn);
+                    config.cashReserveYears(), portfolioReturn, marginalRate);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
             // If the RMD exceeds what the spend withdrawal ACTUALLY drew from traditional this
@@ -175,21 +188,22 @@ final class TrialSimulator {
             // since a cash-reserve down year may have funded spending from cash instead, leaving
             // traditional untouched), force the excess out physically -- it's a real,
             // legally-required distribution even when the retiree doesn't need the cash. The
-            // after-tax remainder is reinvested to taxable.
-            double marginalRate = hasPools ? config.marginalRateByYear()[y] : 0.0;
+            // after-tax remainder is reinvested to taxable. (Not routed through the C2 gross-up: this
+            // is its own direct one-shot tax leakage computation, not a deductTaxFromPools drain.)
             forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], marginalRate);
 
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
-            // deductTaxFromPools below, like withdrawalTax), so this metric already measures
+            // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
             // spending resources only -- identical to its pre-A4 shape.
             double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
             if (resourcesForSpending < floors[y] - 1e-6) {
                 essentialFloorMet = false;
             }
 
-            settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax);
+            settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax,
+                    marginalRate);
 
-            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, config.ltcgRateByYear(), y);
+            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, config.ltcgRateByYear(), y, marginalRate);
 
             pools[0] = Math.max(0, pools[0]);
             pools[1] = Math.max(0, pools[1]);
@@ -218,7 +232,9 @@ final class TrialSimulator {
 
     /**
      * Deducts a tax amount from pools in order: taxable, traditional, roth.
-     * Mutates the pools array in place via the shared {@link PoolTaxCascade}.
+     * Mutates the pools array in place via the shared {@link PoolTaxCascade}. No gross-up: used only
+     * by the Roth-conversion-tax drain, which stays out of audit C2's scope (see {@link
+     * #applyTrialConversion}).
      */
     private static void deductTaxFromPools(double tax, double[] pools, TaxableLots lots) {
         double taxableBefore = pools[0];
@@ -231,6 +247,30 @@ final class TrialSimulator {
         double taxableSold = taxableBefore - after[0];
         if (taxableSold > 0) {
             lots.sellFifo(taxableSold);
+        }
+    }
+
+    /**
+     * Like {@link #deductTaxFromPools} but additionally grosses up the traditional slice of the
+     * drain (audit C2): a tax payment sourced from the traditional pool is itself an ordinary-income
+     * distribution and must fund its own tax. Closed-form on the geometric series T + Tm + Tm² + ...
+     * = T·m/(1−m) (T = the traditional dollars this drain just pulled, m = the year's precomputed
+     * ordinary marginal rate, capped at {@link #GROSS_UP_RATE_CAP}), applied as a single additional
+     * draw directly against the traditional pool -- the series itself compounds against traditional,
+     * since taxable is by definition already exhausted once the base cascade reaches it. This is a
+     * flat-marginal-rate-chord approximation (matching {@link #estimateWithdrawalTax}'s existing
+     * style), not the deterministic engine's exact per-bracket iterative recompute -- direction
+     * matches, magnitude is approximate. Taxable/Roth slices are never grossed up.
+     */
+    private static void deductTaxFromPoolsGrossedUp(double tax, double[] pools, TaxableLots lots,
+                                                      double marginalRate) {
+        double traditionalBefore = pools[1];
+        deductTaxFromPools(tax, pools, lots);
+        double traditionalDrawn = traditionalBefore - pools[1];
+        if (traditionalDrawn > 0) {
+            double m = Math.min(Math.max(marginalRate, 0.0), GROSS_UP_RATE_CAP);
+            double grossUp = traditionalDrawn * m / (1 - m);
+            pools[1] = Math.max(0, pools[1] - grossUp);
         }
     }
 
@@ -266,15 +306,14 @@ final class TrialSimulator {
      * Settles the year's base-income-tax obligation and surplus deposit (audit A4).
      * Deposits whatever surplus remains after funding the year's base income tax to taxable
      * (at cost), then drains the unfunded remainder straight from the pools via the shared
-     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never
-     * funded from the cash reserve, never part of the spending draw, and with no marginal-tax
-     * gross-up on the funding itself (cross-engine parity with the deterministic engine's
-     * {@code extraPoolFundedTax}; grossing up tax-funding draws is audit item C2, deliberately
-     * open for both engines).
+     * taxable-first cascade -- exactly like the ordinary withdrawal tax and LTCG tax: never funded
+     * from the cash reserve, never part of the spending draw. The funding draw IS grossed up when it
+     * touches traditional (audit C2), cross-engine parity with the deterministic engine's
+     * {@code extraPoolFundedTax} treatment.
      */
     private static void settleBaseIncomeTaxAndSurplus(double[] pools, TaxableLots lots,
                                                        double grossSurplus, double fundedFromSurplus,
-                                                       double unfundedBaseTax) {
+                                                       double unfundedBaseTax, double marginalRate) {
         if (grossSurplus > 0) {
             double netSurplus = grossSurplus - fundedFromSurplus;
             if (netSurplus > 0) {
@@ -283,7 +322,7 @@ final class TrialSimulator {
             }
         }
         if (unfundedBaseTax > 0) {
-            deductTaxFromPools(unfundedBaseTax, pools, lots);
+            deductTaxFromPoolsGrossedUp(unfundedBaseTax, pools, lots, marginalRate);
         }
     }
 
@@ -307,15 +346,19 @@ final class TrialSimulator {
      * Applies the long-term capital-gains tax on this year's realized spending gain plus qualified
      * dividend, at the pre-computed marginal LTCG rate for the year. Like the RMD/withdrawal tax it
      * is an additional outflow drained taxable-first from the pools (retirement-scoped; the MC path
-     * is retirement-only). A {@code null} rate array (no capital-gains calculator wired) or a
-     * non-positive net LTCG income leaves the pools untouched.
+     * is retirement-only), grossed up when it touches traditional (audit C2) -- using the year's
+     * ORDINARY marginal rate for the gross-up, not the LTCG rate: the traditional draw funding this
+     * bill is itself ordinary income once withdrawn, regardless of what kind of tax it is paying. A
+     * {@code null} rate array (no capital-gains calculator wired) or a non-positive net LTCG income
+     * leaves the pools untouched.
      */
     private static void applyLtcgTax(double[] pools, TaxableLots lots, double realizedGain,
-                                      double dividendIncome, double[] ltcgRateByYear, int y) {
+                                      double dividendIncome, double[] ltcgRateByYear, int y,
+                                      double marginalRate) {
         double ltcgRate = ltcgRateByYear != null ? ltcgRateByYear[y] : 0.0;
         double ltcgIncome = realizedGain + dividendIncome;
         if (ltcgRate > 0 && ltcgIncome > 0) {
-            deductTaxFromPools(ltcgIncome * ltcgRate, pools, lots);
+            deductTaxFromPoolsGrossedUp(ltcgIncome * ltcgRate, pools, lots, marginalRate);
         }
     }
 
@@ -391,7 +434,7 @@ final class TrialSimulator {
                                          PoolWithdrawal drawn, double withdrawalTax,
                                          double withdrawal, double spending,
                                          boolean hasPools, int cashReserveYears,
-                                         double portfolioReturn) {
+                                         double portfolioReturn, double marginalRate) {
         if (cashReserveYears > 0) {
             if (portfolioReturn < 0) {
                 // Down-year cash reserve draw: cash covers as much of the spending withdrawal as
@@ -414,12 +457,13 @@ final class TrialSimulator {
                     traditionalDrawnOut[0] = tradDrawn;
                 }
                 // The withdrawal tax is a separate, full-amount outflow paid straight from the
-                // pools via the shared cascade -- the cash reserve funds spending only, never
-                // tax, matching the up-market and no-reserve branches below. (Replaces the old
-                // dimensionally-wrong tax^2/portfolio partial deduction, and the old double debit
-                // when cash fully covered the draw.)
+                // pools via the shared cascade (grossed up when it touches traditional -- audit
+                // C2) -- the cash reserve funds spending only, never tax, matching the up-market
+                // and no-reserve branches below. (Replaces the old dimensionally-wrong
+                // tax^2/portfolio partial deduction, and the old double debit when cash fully
+                // covered the draw.)
                 if (hasPools) {
-                    deductTaxFromPools(withdrawalTax, pools, lots);
+                    deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, marginalRate);
                 }
                 return cashBalance - cashDraw;
             } else {
@@ -430,7 +474,7 @@ final class TrialSimulator {
                 pools[2] -= drawn.roth();
                 traditionalDrawnOut[0] = drawn.traditional();
                 if (hasPools) {
-                    deductTaxFromPools(withdrawalTax, pools, lots);
+                    deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, marginalRate);
                 }
                 double targetCash = spending * cashReserveYears;
                 double replenishment = Math.min(
@@ -453,7 +497,7 @@ final class TrialSimulator {
             pools[2] -= drawn.roth();
             traditionalDrawnOut[0] = drawn.traditional();
             if (hasPools) {
-                deductTaxFromPools(withdrawalTax, pools, lots);
+                deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, marginalRate);
             }
             return cashBalance;
         }

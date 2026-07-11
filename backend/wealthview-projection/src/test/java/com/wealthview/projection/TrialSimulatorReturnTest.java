@@ -182,8 +182,10 @@ class TrialSimulatorReturnTest {
         double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(95.0, 285.0, 220.0);
 
+        // marginalRate=0 isolates the A1 pool-scaling fix from audit C2's gross-up (pinned
+        // separately below in applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM).
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05);
+                traditionalDrawnOut, 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05, 0.0);
 
         // Spending draw: taxable -= 95*(2/3)=63.3333 -> 31.6667; traditional -= 285*(2/3)=190 ->
         // 95; roth -= 220*(2/3)=146.6667 -> 138.3333. Tax (57) then cascades taxable-first:
@@ -210,8 +212,10 @@ class TrialSimulatorReturnTest {
         double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(100.0, 0.0, 0.0);
 
+        // marginalRate=0.20 (nonzero, to prove it's IRRELEVANT here): taxable ($360) fully covers
+        // the $30 tax, so traditional is never touched and there is nothing to gross up (audit C2).
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05);
+                traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05, 0.20);
 
         assertThat(pools[0]).isEqualTo(330.0, within(1e-6));   // 360 - 30 tax only
         assertThat(pools[1]).isEqualTo(180.0, within(1e-6));   // untouched by the spending draw
@@ -220,15 +224,61 @@ class TrialSimulatorReturnTest {
         assertThat(traditionalDrawnOut[0]).isEqualTo(0.0, within(1e-6));
     }
 
+    // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===
+
+    @Test
+    void applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM() {
+        // Taxable is $0, so the $57 withdrawal tax drains entirely from traditional: T=57. At a 20%
+        // marginal rate, the closed-form gross-up is T*m/(1-m) = 57*0.20/0.80 = 14.25, drained as a
+        // SECOND, separate reduction directly against traditional (not re-cascaded through the
+        // taxable-first order) -- total traditional debit for the tax = 57 + 14.25 = 71.25.
+        double[] pools = {0.0, 500.0, 0.0};
+        TaxableLots lots = new TaxableLots();
+        double[] realizedGainOut = {0.0};
+        double[] traditionalDrawnOut = {0.0};
+        var drawn = new PoolWithdrawal(0.0, 0.0, 0.0); // no spending draw this call -- isolates the tax
+
+        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
+                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, 0.20);
+
+        assertThat(pools[0]).isEqualTo(0.0, within(1e-9));
+        assertThat(pools[1]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // = 428.75
+        assertThat(pools[2]).isEqualTo(0.0, within(1e-9));
+        assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
+    }
+
+    @Test
+    void applyTrialWithdrawals_taxFundedFromTaxable_unaffectedByMarginalRate() {
+        // Direction/control pin for the C2 test above: an otherwise-identical trial where taxable
+        // covers the SAME $57 tax bill in full -- the marginal rate must be completely irrelevant
+        // (no gross-up possible when traditional is never touched by the tax).
+        double[] pools = {500.0, 500.0, 0.0};
+        TaxableLots lots = new TaxableLots();
+        lots.addLot(500.0, 500.0);
+        double[] realizedGainOut = {0.0};
+        double[] traditionalDrawnOut = {0.0};
+        var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
+
+        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
+                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, 0.20);
+
+        assertThat(pools[0]).isEqualTo(500.0 - 57.0, within(1e-9)); // = 443.0, taxable-funded, no gross-up
+        assertThat(pools[1]).isEqualTo(500.0, within(1e-9));        // traditional untouched
+        assertThat(pools[2]).isEqualTo(0.0, within(1e-9));
+        assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
+    }
+
     @Test
     void simulateTrial_cashReserveDownYear_partialCoverDebitsAllThreePoolsAndFullWithdrawalTax() {
         // End-to-end version of the direct-call test above: taxable/traditional/roth all start
         // at 300, a 1-year cash reserve seeds $200 out of taxable. A uniform -5% down year plus
         // a deliberately outsized withdrawal need ($600, via a -$400 "other income" against a
         // $200 floor) spills the theoretical draw across all three pools; cash covers $200 of
-        // it, leaving a $400 equity draw at marginal rate 20% ($57 tax). Expected post-draw pool
-        // total = 665 (post-growth) - 400 (equity draw) - 57 (tax) = 208, cash fully drained ->
-        // finalBalance = 208.
+        // it, leaving a $400 equity draw at marginal rate 20% ($57 tax, of which taxable funds
+        // $31.6667 and traditional funds the $25.3333 remainder). Post-draw pool total = 665
+        // (post-growth) - 400 (equity draw) - 57 (tax) = 208 pre-C2; audit C2 grosses up the
+        // $25.3333 traditional slice of the tax by 25.3333*0.20/0.80 = 6.3333 more, so finalBalance
+        // = 208 - 6.3333 = 201.6667, cash fully drained.
         var config = new TrialSimulator.SimulationConfig(
                 300.0, 300.0, 300.0, "taxable_first", new double[]{0.20},
                 null, null, 62, null, 1, 0.0, false,
@@ -238,7 +288,7 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{-400.0}, new double[]{0.0}, new double[]{200.0}, new double[]{0.0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(208.0, within(1e-4));
+        assertThat(result.finalBalance()).isEqualTo(201.666667, within(1e-4));
     }
 
     @Test
@@ -276,7 +326,11 @@ class TrialSimulatorReturnTest {
         // traditional-first split, deducted in full per the fix) -> 94050-200=93850.
         // forceRmdExcess then forces the FULL rmd (traditionalDrawnForSpending=0, so
         // extra=rmd-0=rmd) out of the 93850, reinvesting the after-tax remainder to taxable.
-        // finalBalance = 93850 - rmd*0.20 = 93045.121951...
+        // Pre-C2: finalBalance = 93850 - rmd*0.20 = 93045.121951... Audit C2: the $200 withdrawal
+        // tax itself drains entirely from traditional (taxable is $0), grossing up by
+        // 200*0.20/0.80 = 50 more -> finalBalance = 93045.121951... - 50 = 92995.121951...
+        // (forceRmdExcess's own leakage is untouched -- it's a direct one-shot computation, not a
+        // deductTaxFromPools drain, so it stays out of C2's scope).
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
                 0.0, 100_000.0, 0.0, "traditional_first", new double[]{0.20},
@@ -287,7 +341,7 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{1000.0}, new double[]{0.0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(93045.12, within(0.01));
+        assertThat(result.finalBalance()).isEqualTo(92995.12, within(0.01));
     }
 
     // === A4 fix: tax on outside income must be a funded outflow every year, not just surplus years ===
@@ -343,17 +397,22 @@ class TrialSimulatorReturnTest {
     }
 
     @Test
-    void simulateTrial_unfundedBaseTax_drainsWithoutMarginalGrossUp() {
-        // Cross-engine parity pin: the base-income-tax funding drain must NOT itself generate
-        // marginal withdrawal tax (zero gross-up), matching the deterministic engine's
-        // extraPoolFundedTax treatment (grossing up tax-funding draws is audit item C2,
-        // deliberately open for both engines). Traditional-only portfolio at a 20% marginal rate
-        // makes any gross-up visible: two identical deficit trials (pension $20,000 vs spending
-        // $30,000 -> $10,000 draw from traditional, $2,000 marginal tax) differing ONLY in
-        // surplusTax ($3,000 vs $0). The final-balance difference must be exactly the $3,000 base
-        // tax -- were the remainder folded into the spending withdrawal instead, the $13,000
-        // traditional draw would carry 13,000 x 20% = $2,600 marginal tax and the difference
-        // would be $3,600.
+    void simulateTrial_unfundedBaseTax_drainsWithMarginalGrossUp() {
+        // Cross-engine parity pin, UPDATED for audit C2 (this test's name/pin predate C2, which
+        // closes exactly the gap it used to document -- see git history for the pre-C2 "zero
+        // gross-up" version). Every one of these three tax drains (withdrawalTax, then
+        // unfundedBaseTax) is now grossed up independently wherever it touches traditional -- this
+        // traditional-only portfolio at a 20% marginal rate, with no taxable pool at all, makes
+        // every drain touch traditional. Two identical deficit trials (pension $20,000 vs spending
+        // $30,000 -> $10,000 draw from traditional, $2,000 marginal tax, grossed up by
+        // 2,000*0.20/0.80=500) differing ONLY in surplusTax ($3,000 vs $0):
+        //   withoutBaseTax: 100,000 - 10,000 (draw) - 2,000 (marginal tax) - 500 (its gross-up)
+        //     = 87,500.
+        //   withBaseTax: 87,500 - 3,000 (base tax) - 750 (its OWN independent gross-up,
+        //     3,000*0.20/0.80) = 83,750.
+        // Difference = 3,750 (the $3,000 base tax plus its $750 gross-up) -- MORE than the raw
+        // $3,000 base tax, unlike the pre-C2 pin, because the base-tax funding draw is no longer
+        // tax-free.
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
                 0.0, 100_000.0, 0.0, "traditional_first", new double[]{0.20},
@@ -368,11 +427,9 @@ class TrialSimulatorReturnTest {
                 new double[]{20_000.0}, new double[]{0.0},
                 new double[]{30_000.0}, new double[]{0.0}, 1, config);
 
-        // Exact decomposition: 100,000 - 10,000 (draw) - 2,000 (marginal tax) = 88,000 without
-        // the base tax; exactly 3,000 more leaves with it -- no 20% gross-up on the funding.
-        assertThat(withoutBaseTax.finalBalance()).isEqualTo(88_000.0, within(1e-6));
-        assertThat(withBaseTax.finalBalance()).isEqualTo(85_000.0, within(1e-6));
+        assertThat(withoutBaseTax.finalBalance()).isEqualTo(87_500.0, within(1e-6));
+        assertThat(withBaseTax.finalBalance()).isEqualTo(83_750.0, within(1e-6));
         assertThat(withoutBaseTax.finalBalance() - withBaseTax.finalBalance())
-                .isEqualTo(3_000.0, within(1e-6));
+                .isEqualTo(3_750.0, within(1e-6));
     }
 }
