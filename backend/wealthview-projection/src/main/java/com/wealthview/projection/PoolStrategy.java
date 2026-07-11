@@ -333,6 +333,20 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     }
 
     /**
+     * The balance-weighted real, fee-adjusted return across the WHOLE portfolio (every account,
+     * every pool type) — the same aggregate {@link #create} resolves as the deterministic engine's
+     * default growth assumption via {@link #computeWeightedReturn}. Reused by the Roth-conversion
+     * optimizer's guardrail-flow return resolution (audit C4) so the two engines' notion of "the
+     * scenario's expected real return" stays in lockstep instead of drifting apart.
+     */
+    static BigDecimal blendedRealReturn(List<ProjectionAccountInput> accounts,
+                                        Map<AssetClass, Double> geoMeans, BigDecimal inflationRate,
+                                        BigDecimal feeRate) {
+        BigDecimal totalBalance = sumInitialBalances(accounts);
+        return computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate, feeRate);
+    }
+
+    /**
      * Factory method that decides whether to create a SinglePool or MultiPool based on the
      * account types present, and encapsulates all construction details.
      */

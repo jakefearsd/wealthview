@@ -62,9 +62,20 @@ public class CapitalMarketAssumptionsProvider {
         if (existing != null) {
             return existing;
         }
-        var built = buildGeoMeans(matrix());
+        var built = geometricMeansOf(matrix());
         cachedGeoMeans.set(built);
         return built;
+    }
+
+    /**
+     * Computes per-asset-class geometric-mean real returns from an arbitrary {@link RealReturnMatrix}
+     * — the same algorithm {@link #geometricMeans()} caches for the provider's own matrix, exposed as
+     * a pure function so other callers that already hold a matrix (e.g. the Roth-conversion optimizer's
+     * guardrail-flow return resolution, audit C4) can derive the identical figure without re-deriving
+     * the math or routing through the cache/repository.
+     */
+    public static Map<AssetClass, Double> geometricMeansOf(RealReturnMatrix m) {
+        return buildGeoMeans(m);
     }
 
     void clearCache() {

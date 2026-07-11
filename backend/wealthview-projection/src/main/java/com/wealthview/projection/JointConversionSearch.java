@@ -1,5 +1,6 @@
 package com.wealthview.projection;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -7,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.CapitalMarketAssumptionsProvider;
 import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealReturnMatrix;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -59,8 +61,7 @@ final class JointConversionSearch {
                                 ? input.rmdBracketHeadroom().doubleValue() : 0.10,
                         ctx.taxIncome().filingStatus(), taxCalculator)
                 .assumptions(
-                        input.returnMean() != null
-                                ? input.returnMean().doubleValue() : 0.10,
+                        resolveReturnMean(input, ctx.sim().inflationRate(), ctx.sim().feeRate(), matrix),
                         ctx.taxIncome().essentialFloor(),
                         input.traditionalExhaustionBuffer(), ctx.portfolio().withdrawalOrder())
                 .rentals(input.incomeSources(), new RentalLossCalculator())
@@ -87,6 +88,40 @@ final class JointConversionSearch {
 
         return new ConversionResult(
                 convSchedule.conversionByYear(), convSchedule.conversionTaxByYear(), convSchedule);
+    }
+
+    /**
+     * Resolves the growth assumption fed to {@link ConversionSimulator} (audit C4 — frame mismatch).
+     *
+     * <p>{@code ConversionSimulator} grows its three pools at this rate every year (see {@code
+     * traditional *= (1 + returnMean)}) while pricing conversion/RMD-target brackets in
+     * CONSTANT-REAL terms ({@code computeMaxIncomeForBracket(..., ZERO)} — no inflation indexing
+     * applied to the bracket ceilings). Those two numbers MUST live in the same frame: a real,
+     * fee-adjusted rate. Feeding it a nominal rate (or a real rate that ignores fees) overstates
+     * future traditional-balance growth relative to the flat bracket ceilings the simulator prices
+     * against, which overstates projected RMD pressure and biases the optimizer toward
+     * over-aggressive conversions.
+     *
+     * <p><strong>Default</strong> (the request's {@code returnMean} is absent): the scenario's own
+     * fee-adjusted, allocation-blended REAL return — {@link PoolStrategy#blendedRealReturn}, the
+     * same balance-weighted quantity the deterministic engine resolves as its default growth
+     * assumption, computed here from this run's accounts and capital-market matrix so both engines'
+     * notion of "the scenario's expected return" stay in lockstep.
+     *
+     * <p><strong>Explicit</strong> {@code returnMean} (wire contract: NOMINAL, the DTO's legacy
+     * meaning): Fisher-converted to real via {@code (1+returnMean)/(1+inflation)-1}, then the
+     * scenario fee is subtracted — mirroring {@link PoolStrategy#realReturnFor}'s override-account
+     * handling, so an explicit override and the allocation-derived default land in the same frame.
+     */
+    double resolveReturnMean(GuardrailOptimizationInput input, double inflationRate,
+                             double feeRate, RealReturnMatrix matrix) {
+        if (input.returnMean() != null) {
+            double nominal = input.returnMean().doubleValue();
+            return (1 + nominal) / (1 + inflationRate) - 1 - feeRate;
+        }
+        var geoMeans = CapitalMarketAssumptionsProvider.geometricMeansOf(matrix);
+        return PoolStrategy.blendedRealReturn(input.accounts(), geoMeans,
+                BigDecimal.valueOf(inflationRate), BigDecimal.valueOf(feeRate)).doubleValue();
     }
 
     private RothConversionOptimizer.RothConversionSchedule jointSearch(
