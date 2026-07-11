@@ -187,6 +187,13 @@ final class TrialSimulator {
             if (yearBalances != null) {
                 yearBalances[y] = totalBalance;
             }
+
+            // Perf safety valve for very long horizons: once the year's lot mutations
+            // (growth/dividend/withdrawal/reinvest) are done, merge the oldest lots down to the
+            // cap so FIFO gain-sale doesn't degrade with unbounded lot growth. Preserves total
+            // value and basis exactly (see TaxableLots#consolidateIfNeeded), so it is a no-op at
+            // realistic lot counts (~180 for typical horizons) and never changes trial output.
+            lots.consolidateIfNeeded(200);
         }
 
         double finalBalance = Math.max(0, pools[0] + pools[1] + pools[2] + cashBalance);

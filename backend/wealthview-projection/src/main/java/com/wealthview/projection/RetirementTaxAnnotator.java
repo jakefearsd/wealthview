@@ -16,7 +16,12 @@ final class RetirementTaxAnnotator {
 
     private static final BigDecimal IRMAA_BRACKET_RATE = new BigDecimal("0.22");
 
-    /** Bundles the per-year inputs needed by {@code annotate}. */
+    /**
+     * Bundles the per-year inputs needed by {@code annotate}. {@code ltcgTax} is the year's
+     * long-term capital-gains tax (zero when none was realized) -- LTCG is a federal tax, so it is
+     * folded into the recomputed federal-tax breakdown below rather than left as an unattributed
+     * gap between {@code federalTax + stateTax} and {@code taxLiability}.
+     */
     record AnnotationContext(
             boolean retired,
             int age,
@@ -26,7 +31,8 @@ final class RetirementTaxAnnotator {
             BigDecimal effectiveOtherIncome,
             BigDecimal taxLiability,
             PoolStrategy pool,
-            @Nullable TaxCalculationStrategy taxStrategy) {
+            @Nullable TaxCalculationStrategy taxStrategy,
+            BigDecimal ltcgTax) {
     }
 
     /**
@@ -43,13 +49,16 @@ final class RetirementTaxAnnotator {
         var taxLiability = annCtx.taxLiability();
         var pool = annCtx.pool();
         var taxStrategy = annCtx.taxStrategy();
+        var ltcgTax = annCtx.ltcgTax();
 
         if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
             BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
                     .add(effectiveOtherIncome);
             var filingStatus = pool.getFilingStatus();
             var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus);
-            BigDecimal fedTax = breakdown.federalTax();
+            // LTCG is a federal tax; fold it into the federal component so federalTax + stateTax
+            // reconciles with taxLiability (which already includes it) instead of leaving a gap.
+            BigDecimal fedTax = breakdown.federalTax().add(ltcgTax);
             BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
                     ? breakdown.stateTax() : null;
             BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0

@@ -129,9 +129,14 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
     record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability, TaxSourceResult taxSource) {}
 
+    /**
+     * {@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero for
+     * {@link SinglePool}, which tracks no cost basis). It is broken out separately so the engine
+     * can fold it into the year's federal-tax breakdown -- see {@link RetirementTaxAnnotator}.
+     */
     record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
                                BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
-                               TaxSourceResult taxSource) {}
+                               TaxSourceResult taxSource, BigDecimal ltcgTax) {}
 
     // --- PoolConfig + Factory Method ---
 
@@ -336,7 +341,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
             BigDecimal withdrawn = need.min(balance);
             balance = balance.subtract(withdrawn);
             return new WithdrawalTaxResult(withdrawn, BigDecimal.ZERO,
-                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
         }
 
         @Override
@@ -560,7 +565,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                       BigDecimal rmdAmount, int age) {
             if (totalNeed.compareTo(BigDecimal.ZERO) <= 0) {
                 return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
             }
 
             var withdrawalContext = new WithdrawalOrderStrategy.WithdrawalContext(
@@ -573,7 +578,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                     strategy.execute(totalNeed, lots.totalValue(), traditional, roth);
             if (allocation == null) {
                 return new WithdrawalTaxResult(BigDecimal.ZERO, BigDecimal.ZERO,
-                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO, BigDecimal.ZERO);
             }
 
             BigDecimal fromTaxable = allocation.fromTaxable();
@@ -620,9 +625,13 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
             // stacked on ordinary income against the 0/15/20 LTCG brackets (+ deflated NIIT). This runs
-            // only in retirement (executeWithdrawals is only called when retired). It is intentionally
-            // kept OUT of the ordinary-tax breakdown (lastTaxBreakdown / federalTax) -- like the ordinary
-            // withdrawal tax it folds into taxLiability and drains the pools via the same cascade.
+            // only in retirement (executeWithdrawals is only called when retired). LTCG is a federal
+            // tax, so it belongs in the federal-tax breakdown -- it folds into taxLiability and drains
+            // the pools via the same cascade as the ordinary withdrawal tax, AND is returned separately
+            // (below) so the engine can fold it into the year's federalTax field. It is deliberately NOT
+            // added to lastTaxBreakdown here: for retired years RetirementTaxAnnotator recomputes (and
+            // overwrites) the DTO's federal/state breakdown from scratch downstream of this call, so
+            // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
             BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
 
             BigDecimal totalWithdrawalTax = withdrawalTax.add(ltcgTax);
@@ -631,7 +640,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
 
             return new WithdrawalTaxResult(
                     fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax,
-                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource);
+                    fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax);
         }
 
         /**

@@ -316,6 +316,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal wdFromRoth = BigDecimal.ZERO;
         BigDecimal previousWithdrawal = acc.previousWithdrawal();
         PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
+        BigDecimal ltcgTax = BigDecimal.ZERO;
         if (retired) {
             var rwCtx = new RetirementWithdrawalProcessor.RetirementWithdrawalContext(
                     pool, ctx.strategy(), ctx.spendingPlan(), age, yearsInRetirement, year,
@@ -331,6 +332,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             wdFromTraditional = retirementResult.withdrawalFromTraditional();
             wdFromRoth = retirementResult.withdrawalFromRoth();
             withdrawalTaxSource = retirementResult.withdrawalTaxSource();
+            ltcgTax = retirementResult.ltcgTax();
         }
 
         var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
@@ -351,7 +353,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,
                 wdFromTraditional, conversionAmount, incomeResult.effectiveOtherIncome(),
-                taxLiability, pool, ctx.taxStrategy());
+                taxLiability, pool, ctx.taxStrategy(), ltcgTax);
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
         return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss));

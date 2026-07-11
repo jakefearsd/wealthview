@@ -37,6 +37,11 @@ final class RetirementWithdrawalProcessor {
             BigDecimal rmdAmount) {
     }
 
+    /**
+     * {@code ltcgTax} is the long-term capital-gains slice of {@code taxLiability} (see
+     * {@link PoolStrategy.WithdrawalTaxResult#ltcgTax()}), threaded through so the engine can fold
+     * it into the year's federal-tax breakdown -- see {@link RetirementTaxAnnotator}.
+     */
     record RetirementWithdrawalResult(
             BigDecimal withdrawals,
             BigDecimal taxLiability,
@@ -45,7 +50,8 @@ final class RetirementWithdrawalProcessor {
             BigDecimal withdrawalFromTaxable,
             BigDecimal withdrawalFromTraditional,
             BigDecimal withdrawalFromRoth,
-            PoolStrategy.TaxSourceResult withdrawalTaxSource) {
+            PoolStrategy.TaxSourceResult withdrawalTaxSource,
+            BigDecimal ltcgTax) {
     }
 
     RetirementWithdrawalResult process(RetirementWithdrawalContext rwCtx) {
@@ -125,6 +131,6 @@ final class RetirementWithdrawalProcessor {
         return new RetirementWithdrawalResult(withdrawalResult.totalWithdrawn(), taxLiability,
                 previousWithdrawal, surplusReinvested,
                 withdrawalResult.fromTaxable(), withdrawalResult.fromTraditional(),
-                withdrawalResult.fromRoth(), withdrawalResult.taxSource());
+                withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax());
     }
 }

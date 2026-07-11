@@ -129,6 +129,9 @@ class MultiPoolCapitalGainsTest {
 
         assertThat(r.fromTaxable()).isEqualByComparingTo(bd("100000"));
         assertThat(r.taxLiability()).isEqualByComparingTo(bd("5497.50"));
+        // No ordinary tax calculator wired in this fixture, so taxLiability is LTCG tax alone --
+        // r.ltcgTax() (the field the engine folds into the federalTax breakdown) matches it exactly.
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5497.50"));
     }
 
     @Test
@@ -141,6 +144,7 @@ class MultiPoolCapitalGainsTest {
 
         assertThat(r.fromTaxable()).isEqualByComparingTo(bd("100000"));
         assertThat(r.taxLiability()).isEqualByComparingTo(ZERO);
+        assertThat(r.ltcgTax()).isEqualByComparingTo(ZERO);
     }
 
     // ---- (b) low-income retiree pays 0% on the realized gain ----
