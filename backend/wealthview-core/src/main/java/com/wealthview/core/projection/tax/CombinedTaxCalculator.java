@@ -2,29 +2,80 @@ package com.wealthview.core.projection.tax;
 
 import java.math.BigDecimal;
 
+import org.springframework.lang.Nullable;
+
 public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
-    // Real-terms note: the $10k SALT cap is statutorily fixed nominal, so in today's-dollars terms it
-    // erodes over the projection horizon. Unlike the SS thresholds it is NOT deflated here — doing so
-    // would require threading yearsFromBase/inflation through the whole TaxCalculationStrategy interface
-    // for a second-order effect. It is held constant nominal (a documented, minor simplification).
-    private static final BigDecimal SALT_CAP = new BigDecimal("10000");
+    // Real-terms note: both SALT cap tiers below are statutorily fixed nominal, so in today's-dollars
+    // terms they erode over the projection horizon. Unlike the SS thresholds they are NOT deflated
+    // here — doing so would require threading yearsFromBase/inflation through the whole
+    // TaxCalculationStrategy interface for a second-order effect. They are held constant nominal (a
+    // documented, minor simplification).
+    //
+    // OBBBA (One Big Beautiful Bill Act, H.R. 1, enacted 2025) raised the SALT cap to $40,000 for tax
+    // years 2025-2029 (statutorily reverting to the pre-OBBBA $10,000 cap starting 2030). OBBBA also
+    // indexes the $40,000 figure up ~1%/year for 2026-2029 and phases it down for MAGI above $500k
+    // (fully phased back to $10,000 at $600k) -- both nuances are intentionally NOT modeled here (out
+    // of this fix's scope, per the audit item); the cap is held flat at $40,000 for the whole
+    // 2025-2029 window regardless of income.
+    private static final BigDecimal SALT_CAP_OBBBA = new BigDecimal("40000");
+    private static final BigDecimal SALT_CAP_BASE = new BigDecimal("10000");
+    private static final int OBBBA_SALT_CAP_FIRST_YEAR = 2025;
+    private static final int OBBBA_SALT_CAP_LAST_YEAR = 2029;
 
     private final FederalTaxCalculator federal;
     private final StateTaxCalculator state;
     private final BigDecimal primaryResidencePropertyTax;
     private final BigDecimal primaryResidenceMortgageInterest;
+    /**
+     * The primary filer's birth year, used to derive their age for the year-aware standard
+     * deduction (audit D age-65+ addition). {@code null} when the caller doesn't track it, in which
+     * case this calculator falls back to the age-less {@link FederalTaxCalculator} overloads --
+     * identical to its pre-age65-feature behavior. This engine only tracks the PRIMARY filer's
+     * birth year, so an MFJ household where both spouses are 65+ still gets only ONE age-65 adder;
+     * see {@link FederalTaxCalculator#loadStandardDeduction(int, FilingStatus, int)}.
+     */
+    @Nullable
+    private final Integer birthYear;
 
     public CombinedTaxCalculator(FederalTaxCalculator federal,
                                   StateTaxCalculator state,
                                   BigDecimal primaryResidencePropertyTax,
                                   BigDecimal primaryResidenceMortgageInterest) {
+        this(federal, state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, null);
+    }
+
+    public CombinedTaxCalculator(FederalTaxCalculator federal,
+                                  StateTaxCalculator state,
+                                  BigDecimal primaryResidencePropertyTax,
+                                  BigDecimal primaryResidenceMortgageInterest,
+                                  @Nullable Integer birthYear) {
         this.federal = federal;
         this.state = state;
         this.primaryResidencePropertyTax = primaryResidencePropertyTax != null
                 ? primaryResidencePropertyTax : BigDecimal.ZERO;
         this.primaryResidenceMortgageInterest = primaryResidenceMortgageInterest != null
                 ? primaryResidenceMortgageInterest : BigDecimal.ZERO;
+        this.birthYear = birthYear;
+    }
+
+    /**
+     * The SALT cap for the given tax year (audit D): $40,000 for 2025-2029 (OBBBA), $10,000
+     * otherwise (pre-OBBBA law, and the post-sunset law from 2030 on).
+     */
+    private static BigDecimal saltCap(int taxYear) {
+        return taxYear >= OBBBA_SALT_CAP_FIRST_YEAR && taxYear <= OBBBA_SALT_CAP_LAST_YEAR
+                ? SALT_CAP_OBBBA : SALT_CAP_BASE;
+    }
+
+    /**
+     * The federal standard deduction for (taxYear, status), boosted by the age-65+ addition when
+     * {@link #birthYear} is known and the primary filer turns 65+ in {@code taxYear} (audit D).
+     */
+    private BigDecimal resolveFederalStandardDeduction(int taxYear, FilingStatus status) {
+        return birthYear != null
+                ? federal.loadStandardDeduction(taxYear, status, taxYear - birthYear)
+                : federal.loadStandardDeduction(taxYear, status);
     }
 
     public CombinedTaxResult computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status) {
@@ -64,15 +115,15 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
         // 1. Compute state tax on the state base (state applies its own deduction internally)
         BigDecimal stateTax = state.computeTax(stateBase, taxYear, status);
 
-        // 2. SALT = min(state_tax + property_tax, $10,000)
+        // 2. SALT = min(state_tax + property_tax, year-aware cap -- audit D)
         BigDecimal saltUncapped = stateTax.add(primaryResidencePropertyTax);
-        BigDecimal salt = saltUncapped.min(SALT_CAP);
+        BigDecimal salt = saltUncapped.min(saltCap(taxYear));
 
         // 3. Itemized deductions = SALT + mortgage interest
         BigDecimal itemized = salt.add(primaryResidenceMortgageInterest);
 
         // 4. Compare itemized vs federal standard deduction
-        BigDecimal federalStandardDeduction = federal.loadStandardDeduction(taxYear, status);
+        BigDecimal federalStandardDeduction = resolveFederalStandardDeduction(taxYear, status);
         boolean useItemized = itemized.compareTo(federalStandardDeduction) > 0;
         BigDecimal chosenDeduction = useItemized ? itemized : federalStandardDeduction;
 
@@ -142,7 +193,7 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
         BigDecimal grossEstimate = bracketCeiling.add(standardDeduction);
 
         BigDecimal estStateTax = state.computeTax(grossEstimate, taxYear, status);
-        BigDecimal estSalt = estStateTax.add(primaryResidencePropertyTax).min(SALT_CAP);
+        BigDecimal estSalt = estStateTax.add(primaryResidencePropertyTax).min(saltCap(taxYear));
         BigDecimal estItemized = estSalt.add(primaryResidenceMortgageInterest);
         BigDecimal chosenDeduction = estItemized.compareTo(standardDeduction) > 0
                 ? estItemized : standardDeduction;

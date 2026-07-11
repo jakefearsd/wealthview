@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.testutil.TaxBracketFixtures;
+import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.StateStandardDeductionEntity;
 import com.wealthview.persistence.entity.StateTaxBracketEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
@@ -221,6 +222,8 @@ class CombinedTaxCalculatorTest {
 
     @Test
     void computeTax_withStateTax_computesSALTAndItemized() {
+        // Tax year 2031 -- post-OBBBA-sunset, so the pre-OBBBA $10,000 cap applies (audit D;
+        // see the 2025-2029-window tests below for the OBBBA $40,000 cap).
         // State tax of $8000, property tax $5000 = SALT $10000 (capped)
         // Mortgage interest $8000
         // Itemized = $10000 + $8000 = $18000
@@ -229,7 +232,7 @@ class CombinedTaxCalculatorTest {
         StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("8000"));
         var combined = buildCombined(mockState, bd("5000"), bd("8000"));
 
-        CombinedTaxResult result = combined.computeTax(bd("100000"), 2025, FilingStatus.SINGLE);
+        CombinedTaxResult result = combined.computeTax(bd("100000"), 2031, FilingStatus.SINGLE);
 
         assertThat(result.stateTax()).isEqualByComparingTo(bd("8000"));
         assertThat(result.saltDeduction()).isEqualByComparingTo(bd("10000")); // capped
@@ -241,14 +244,129 @@ class CombinedTaxCalculatorTest {
 
     @Test
     void computeTax_saltCap_at10000() {
+        // Tax year 2031 -- post-OBBBA-sunset $10,000 cap (audit D).
         // State tax $15000, property tax $12000 = SALT uncapped $27000, capped $10000
         StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("15000"));
         var combined = buildCombined(mockState, bd("12000"), BigDecimal.ZERO);
 
-        CombinedTaxResult result = combined.computeTax(bd("200000"), 2025, FilingStatus.SINGLE);
+        CombinedTaxResult result = combined.computeTax(bd("200000"), 2031, FilingStatus.SINGLE);
 
         assertThat(result.saltDeduction()).isEqualByComparingTo(bd("10000"));
         assertThat(result.itemizedDeductions()).isEqualByComparingTo(bd("10000")); // SALT only, no mortgage
+    }
+
+    // === SALT cap year-awareness (audit D: OBBBA $40,000 cap for 2025-2029) ===
+
+    @Test
+    void computeTax_saltCap_2027_uses40000ObbbaCap() {
+        // Same $27,000 uncapped SALT as computeTax_saltCap_at10000, but at a tax year INSIDE the
+        // OBBBA window: $27,000 stays under the $40,000 cap, so it is NOT capped at all here.
+        StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("15000"));
+        var combined = buildCombined(mockState, bd("12000"), BigDecimal.ZERO);
+
+        CombinedTaxResult result = combined.computeTax(bd("200000"), 2027, FilingStatus.SINGLE);
+
+        assertThat(result.saltDeduction()).isEqualByComparingTo(bd("27000"));
+    }
+
+    @Test
+    void computeTax_saltCap_2027_exceeds40000Cap_stillCapped() {
+        // Uncapped SALT ($55,000) exceeds even the OBBBA $40,000 cap.
+        StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("45000"));
+        var combined = buildCombined(mockState, bd("10000"), BigDecimal.ZERO);
+
+        CombinedTaxResult result = combined.computeTax(bd("300000"), 2027, FilingStatus.SINGLE);
+
+        assertThat(result.saltDeduction()).isEqualByComparingTo(bd("40000"));
+    }
+
+    @Test
+    void computeTax_saltCap_yearBoundary_2029UsesObbbaCap_2030RevertsToBaseCap() {
+        // $27,000 uncapped SALT: under the $40,000 OBBBA cap (2029, last OBBBA year) but over the
+        // $10,000 base cap that resumes the very next year (2030, the statutory sunset).
+        StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("15000"));
+        var combined = buildCombined(mockState, bd("12000"), BigDecimal.ZERO);
+
+        var result2029 = combined.computeTax(bd("200000"), 2029, FilingStatus.SINGLE);
+        var result2030 = combined.computeTax(bd("200000"), 2030, FilingStatus.SINGLE);
+
+        assertThat(result2029.saltDeduction()).isEqualByComparingTo(bd("27000"));
+        assertThat(result2030.saltDeduction()).isEqualByComparingTo(bd("10000"));
+    }
+
+    @Test
+    void computeTax_saltCap_2024_preObbba_uses10000Cap() {
+        // A year before OBBBA's 2025 effective date must also use the pre-OBBBA $10,000 cap.
+        StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("15000"));
+        var combined = buildCombined(mockState, bd("12000"), BigDecimal.ZERO);
+
+        CombinedTaxResult result = combined.computeTax(bd("200000"), 2024, FilingStatus.SINGLE);
+
+        assertThat(result.saltDeduction()).isEqualByComparingTo(bd("10000"));
+    }
+
+    @Test
+    void computeTax_saltCap_itemizeDecisionFlips_acrossSunsetBoundary() {
+        // State tax $25,000 + property $8,000 = $33,000 uncapped SALT, no mortgage interest.
+        // At 2027 (OBBBA $40,000 cap): SALT stays uncapped at $33,000 > $15,000 standard -> itemized.
+        // At 2031 (post-sunset $10,000 cap): SALT capped to $10,000 < $15,000 standard -> standard.
+        // The itemize/standard DECISION itself flips purely from the year-aware cap, and federal tax
+        // is strictly lower in 2027 (bigger deduction) -- the conservative direction of this fix.
+        StateTaxCalculator mockState = new FixedStateTaxCalculator("CA", bd("25000"));
+        var combined = buildCombined(mockState, bd("8000"), BigDecimal.ZERO);
+
+        CombinedTaxResult result2027 = combined.computeTax(bd("200000"), 2027, FilingStatus.SINGLE);
+        CombinedTaxResult result2031 = combined.computeTax(bd("200000"), 2031, FilingStatus.SINGLE);
+
+        assertThat(result2027.saltDeduction()).isEqualByComparingTo(bd("33000"));
+        assertThat(result2027.itemizedDeductions()).isEqualByComparingTo(bd("33000"));
+        assertThat(result2027.usedItemized()).isTrue();
+
+        assertThat(result2031.saltDeduction()).isEqualByComparingTo(bd("10000"));
+        assertThat(result2031.itemizedDeductions()).isEqualByComparingTo(bd("10000"));
+        assertThat(result2031.usedItemized()).isFalse();
+
+        // Taxable = 200,000 - 33,000 = 167,000 -> 1,192.50 + 4,386.00 + 12,072.50 + 15,276.00
+        assertThat(result2027.federalTax()).isEqualByComparingTo(bd("32927.0000"));
+        // Taxable = 200,000 - 15,000 = 185,000 -> 1,192.50 + 4,386.00 + 12,072.50 + 19,596.00
+        assertThat(result2031.federalTax()).isEqualByComparingTo(bd("37247.0000"));
+        assertThat(result2027.federalTax()).isLessThan(result2031.federalTax());
+    }
+
+    // === Age-65+ additional standard deduction threading (audit D) ===
+
+    @Test
+    void computeTax_birthYearAge66_boostsFederalDeductionAndLowersTax() {
+        // Override the shared 2025 fixture with a nonzero age-65 addition for this test only
+        // (the shared singleDeduction2025() fixture intentionally stays at additionalAge65=0).
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15000"), bd("2000"))));
+        var combinedNoBirthYear = buildCombined(new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+        var combinedAge66 = new CombinedTaxCalculator(federalCalc, new NullStateTaxCalculator(),
+                BigDecimal.ZERO, BigDecimal.ZERO, 1959); // age 66 at tax year 2025
+
+        var resultNoBirthYear = combinedNoBirthYear.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
+        var resultAge66 = combinedAge66.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
+
+        // No birth year: deduction 15,000, taxable 45,000 -> 1,192.50 + 33,075*0.12 = 5,161.50
+        assertThat(resultNoBirthYear.federalTax()).isEqualByComparingTo(bd("5161.5000"));
+        // Age 66: deduction 15,000+2,000=17,000, taxable 43,000 -> 1,192.50 + 31,075*0.12 = 4,921.50
+        assertThat(resultAge66.federalTax()).isEqualByComparingTo(bd("4921.5000"));
+        assertThat(resultAge66.federalTax()).isLessThan(resultNoBirthYear.federalTax());
+    }
+
+    @Test
+    void computeTax_birthYearAge64_noBoostYet() {
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15000"), bd("2000"))));
+        var combinedNoBirthYear = buildCombined(new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+        var combinedAge64 = new CombinedTaxCalculator(federalCalc, new NullStateTaxCalculator(),
+                BigDecimal.ZERO, BigDecimal.ZERO, 1961); // age 64 at tax year 2025 -- one below the threshold
+
+        var resultNoBirthYear = combinedNoBirthYear.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
+        var resultAge64 = combinedAge64.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
+
+        assertThat(resultAge64.federalTax()).isEqualByComparingTo(resultNoBirthYear.federalTax());
     }
 
     @Test
