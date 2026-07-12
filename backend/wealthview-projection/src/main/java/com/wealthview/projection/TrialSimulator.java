@@ -365,23 +365,32 @@ final class TrialSimulator {
      * TOTAL spending the trial should attempt this year, adapting the planned schedule toward the
      * displayed corridor based on the trial's actual portfolio state.
      *
-     * <p><b>Corridor coupling.</b> The rule reuses the very corridor the response displays. It
-     * forms the portfolio-implied spending capacity signal the corridor is built from —
-     * {@code impliedSpending = plannedSpending * (trialStartBalance / expectedMedianStart[y])} —
-     * i.e. the planned total spending scaled by how the trial's portfolio is doing relative to the
-     * no-adaptation median. When that implied capacity falls below the displayed lower guardrail
-     * ({@code corridorLow[y]}) the trial CUTS discretionary toward it; otherwise it RECOVERS toward
-     * the planned schedule (the upper guardrail {@code corridorHigh[y]} is the ceiling of that
-     * recovery, but the no-ratchet cap at {@code plannedSpending <= corridorHigh[y]} always binds
-     * first — see constraint 2, so the upper band is display-only in-simulation).
+     * <p><b>Corridor coupling — precise semantics.</b> The trigger signal is a portfolio-ratio
+     * PROXY — {@code impliedSpending = plannedSpending * (trialStartBalance /
+     * expectedMedianStart[y])} — GATED BY the displayed corridor thresholds; it is NOT derived the
+     * way the corridor itself was ({@link SpendingCorridorCalculator} builds the band from
+     * cross-trial percentile dispersion of sustainable capacity, whereas this signal is a simple
+     * ratio scaling of the plan by the trial's portfolio state relative to the no-adaptation
+     * median). When the proxy falls below the displayed lower guardrail ({@code corridorLow[y]})
+     * the trial CUTS discretionary toward the proxy ITSELF — so simulated spending CAN fall below
+     * {@code corridorLow[y]}, bounded only by the floor and the year-over-year rate cap. Otherwise
+     * it RECOVERS toward the planned schedule (the upper guardrail {@code corridorHigh[y]} is the
+     * ceiling of that recovery, but the no-ratchet cap at {@code plannedSpending <=
+     * corridorHigh[y]} always binds first — see constraint 2, so the upper band is display-only
+     * in-simulation). The with-rules success rate therefore measures "success when following this
+     * specific ratio-cut rule", not "spending always kept inside the shown corridor".
      *
      * <p><b>Bounds.</b> The year-over-year change is capped at {@code maxAnnualAdjustmentRate}
      * relative to the prior year's spending (the same relative form the pre-optimization
      * {@link SpendingSmoother#applyYearOverYearSmoothing} uses). Result is then capped at
-     * {@code plannedSpending} (never exceed the plan — recovering cuts, never an unbounded prosperity
-     * ratchet, so with-rules spending is always {@code <=} the no-rules schedule and can therefore
-     * never REDUCE floor-funding success) and floored at {@code floor} (the essential floor is
-     * inviolate — cuts never take spending below it).
+     * {@code plannedSpending} (never exceed the plan — recovering cuts, never an unbounded
+     * prosperity ratchet) and floored at {@code floor} (the essential floor is inviolate — cuts
+     * never take spending below it). Because floors are never cut, the adaptation cannot cause a
+     * floor shortfall within its own year; across cumulative multi-year tax paths (RMD force-outs,
+     * gross-ups, LTCG interactions) with-rules-&gt;=-no-rules success monotonicity is NOT formally
+     * proven — it is empirically pinned by the integration tests (including the RMD/tax-dynamics
+     * pairwise pins) and a 60,000-trial-pair adversarial probe that found zero floor or
+     * final-balance regressions.
      *
      * <p>Pure, allocation-free, no branching on trial identity — safe for the hot loop.
      */

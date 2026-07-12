@@ -246,10 +246,15 @@ final class GuardrailResponseBuilder {
      * spending adaptation switched on -- so both success rates are directly comparable. Reporting
      * only: nothing here feeds back into the optimizer's gate/objective.
      *
-     * <p>The rule couples to the DISPLAYED corridor: each trial-year forms
-     * {@code plannedSpending * (trialStart / expectedStartBalance[y])} and, when that implied
-     * capacity breaches the lower band, cuts discretionary toward it (bounded by
-     * {@code maxAdjRate}); otherwise recovers toward plan (floor inviolate, never above plan). The
+     * <p>Corridor coupling, precisely: each trial-year forms the portfolio-ratio PROXY
+     * {@code plannedSpending * (trialStart / expectedStartBalance[y])} and GATES it by the
+     * DISPLAYED corridor thresholds -- the proxy is not derived the way the corridor itself was
+     * (the corridor comes from cross-trial percentile dispersion in
+     * {@link SpendingCorridorCalculator}). When the proxy breaches the lower band the rule cuts
+     * discretionary toward the PROXY (bounded by {@code maxAdjRate}) -- so simulated spending CAN
+     * fall below {@code corridor_low}, floor-bounded; otherwise it recovers toward plan (never
+     * above plan). The reported rate therefore measures "success when following this specific
+     * ratio-cut rule", not "spending always kept inside the shown corridor". The
      * expected-start-balance reference is the no-adaptation median trajectory: year 0 is the initial
      * portfolio, year {@code y>0} is the prior year's median end-of-year balance
      * ({@code medianBalanceByYear[y-1]}) from the headline pass -- a start-of-year proxy.

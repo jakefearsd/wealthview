@@ -18,10 +18,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  * End-to-end tests for the SIMULATED guardrail spending rule reported through
  * {@code success_probability_with_rules} (audit C9). Re-running the optimizer's own seeded trials
  * with the in-simulation adaptation active never lowers -- and on a stressed fixture strictly
- * raises -- the essential-floor success rate, deterministically. Because with-rules spending is
- * never above the planned schedule, the adaptation can only preserve portfolio and help floor
- * funding, so {@code successProbabilityWithRules >= successProbability} holds by construction; these
- * tests pin both rates on two fixtures and confirm reproducibility.
+ * raises -- the essential-floor success rate, deterministically. With-rules spending never exceeds
+ * the planned schedule and floors are never cut, so within any single year the adaptation cannot
+ * cause its own floor shortfall; the {@code successProbabilityWithRules >= successProbability}
+ * monotonicity across full multi-year tax paths is an EMPIRICAL pin (these fixtures plus
+ * {@link GuardrailRulesTaxDynamicsMonotonicityTest}'s RMD/tax pairwise pins and a 60,000-trial-pair
+ * adversarial probe with zero regressions), not a formal proof.
+ *
+ * <p>NOTE: these fixtures are single-taxable-account (simPools=false), so the RMD/withdrawal-tax/
+ * gross-up machinery never fires here -- {@link GuardrailRulesTaxDynamicsMonotonicityTest} covers
+ * exactly that multi-pool regime.
  */
 class GuardrailSimulatedRulesIntegrationTest {
 

@@ -33,13 +33,21 @@ import tools.jackson.databind.ObjectMapper;
  *         user's floor in that case — or when this response predates the disclosure.
  * @param successProbabilityWithRules audit C9: the essential-floor success rate when the SIMULATED
  *         guardrail adaptation rule is active — the SAME trials/paths as {@link #successProbability}
- *         re-run with in-simulation spending adaptation toward the displayed corridor (cut
- *         discretionary in down markets, recover toward plan otherwise; floor inviolate, never above
- *         plan). Reporting-only this pass: the optimizer's gate/objective still use the no-adaptation
- *         {@link #successProbability}, whose semantics and the sustainable-spending recommendations
- *         are unchanged. Always {@code >=} {@link #successProbability} by construction (with-rules
- *         spending is never above the plan, so it can only preserve portfolio and help floor
- *         funding). {@code null} when no guardrail adaptation applies (no positive
+ *         re-run with the in-simulation spending rule switched on. The rule's trigger is a
+ *         portfolio-ratio PROXY (planned spending scaled by the trial's portfolio relative to the
+ *         no-adaptation median) GATED BY the displayed corridor thresholds — it is not derived the
+ *         way the corridor itself was; when the proxy breaches the lower band, discretionary is cut
+ *         toward the proxy, so simulated spending CAN fall below {@code corridor_low}
+ *         (floor-bounded); recovery is toward, never above, the planned schedule. This field
+ *         therefore measures "success when following this specific ratio-cut rule", not "spending
+ *         always kept inside the shown corridor". Reporting-only this pass: the optimizer's
+ *         gate/objective still use the no-adaptation {@link #successProbability}, whose semantics
+ *         and the sustainable-spending recommendations are unchanged. Expected {@code >=}
+ *         {@link #successProbability}: floors are never cut (no single-year self-inflicted
+ *         shortfall is possible) and with-rules spending never exceeds the plan; across cumulative
+ *         multi-year tax paths this monotonicity is empirically pinned (integration tests incl.
+ *         RMD/tax dynamics; a 60,000-trial-pair adversarial probe found zero regressions), not
+ *         formally proven. {@code null} when no guardrail adaptation applies (no positive
  *         {@code maxAnnualAdjustmentRate}, degenerate zero-year runs) or when the response predates
  *         the disclosure (persisted-profile reads — it is a computed-only field, not persisted).
  *         Tracked follow-up: gate/optimize on this with-rules metric rather than reporting it only.
