@@ -50,12 +50,17 @@ import static org.mockito.Mockito.when;
  * spending, and aggregate statistics to the last printed decimal), which is what
  * {@link #optimize_toggleOff_pinsPreT26IdenticalBaseline} pins permanently.
  *
- * <p><strong>Two-stage bias note.</strong> Arm selection runs on the independent 500-path arm set
- * (seed+1); final numbers come from the main set (seed). The "joint optimum never worse" guarantee
- * is exact on the ARM set (a max over correctly-scored arms). On the main set it holds for this
- * pinned fixture (+445.35) but is not a cross-path-set theorem — small negative main-set deltas
- * were observed on other seeds during fixture construction (documented in the T26 report), which
- * is inherent to the (deliberate, T24-reviewed) two-stage bias-control design, not a T26 defect.
+ * <p><strong>Coherence is empirical, not a theorem.</strong> The "joint optimum never worse than
+ * the old no-adapt-scored arms" property empirically holds for the pinned seed but is NOT a
+ * cross-search theorem, for two independent reasons. (1) LOCAL refine: the 21-point grid plus
+ * golden-section refinement is a local search — the gated search is not guaranteed to have
+ * evaluated the old winner's exact refined fraction, so even a same-scorer comparison of the two
+ * selected arms is a near-argmax property, not an exact max-over-superset argument. (2) Two-stage
+ * bias control: arm selection runs on the independent 500-path arm set (seed+1) while final
+ * numbers come from the main set (seed); on the main set the delta is +445.35 for this fixture,
+ * but small negative main-set deltas were observed on other seeds during fixture construction
+ * (documented in the T26 report) — inherent to the deliberate, T24-reviewed two-stage design, not
+ * a T26 defect.
  */
 class JointConversionSearchGatedObjectiveTest {
 
@@ -199,20 +204,83 @@ class JointConversionSearchGatedObjectiveTest {
     }
 
     /**
-     * Monotonic coherence at the pipeline level: the gated recommendation from the joint-optimum
-     * arms is at least the gated recommendation the old pipeline's no-adapt-scored arms produced.
-     * On the ARM scoring set this is a mathematical certainty (argmax over correctly-scored arms
-     * includes the old winner); at the full-pipeline level it additionally survives the two-stage
-     * path-set switch for this fixture (see the class javadoc's two-stage bias note).
+     * Monotonic coherence under a SINGLE scorer: both searches' selected conversion schedules
+     * (no-adapt-scored winner vs gated-scored winner) are re-scored under the SAME gated objective
+     * on the SAME frozen arm-set paths (seed+1 CRN, replicating {@code jointSearch}'s own arm-set
+     * construction), eliminating the two-stage path-set confound from the comparison. This removes
+     * one of the two reasons the coherence property is not a theorem (see the class javadoc); the
+     * other — the grid + golden-section refine is LOCAL, so the gated search needn't have evaluated
+     * the old winner's exact refined fraction — remains, which is why the {@code >=} (and the
+     * strict {@code >} for this constructed fixture) is an empirical pin for the pinned seed, not
+     * a proof. Distinct from
+     * {@link #optimize_toggleOn_recommendsStrictlyMoreSpendingThanOldNoAdaptArmPipeline}, which
+     * compares full-pipeline MAIN-set recommendations against the captured pre-T26 constant.
      */
     @Test
-    void optimize_toggleOn_jointOptimumNeverWorseThanOldArmsUnderGatedObjective() {
-        var optimizer = new MonteCarloSpendingOptimizer(progressiveTax(), ProjectionTestFixtures.TEST_CMA_MATRIX);
+    void jointSearch_bothSelectedArmsRescoredUnderGatedObjectiveOnArmSet_newWinnerAtLeastOld() {
+        var matrix = ProjectionTestFixtures.TEST_CMA_MATRIX;
+        var taxCalc = progressiveTax();
+        var inputOff = fixture(false);
+        var inputOn = fixture(true);
+        var ctx = new OptimizationContextBuilder(taxCalc, null).build(inputOff, matrix);
+        var search = new SustainabilitySearch(new TrialSimulator());
+        var jcs = new JointConversionSearch(taxCalc, search);
 
-        GuardrailProfileResponse on = optimizer.optimize(fixture(true));
+        ConversionResult oldWinner = jcs.optimize(ctx, inputOff, matrix);
+        ConversionResult newWinner = jcs.optimize(ctx, inputOn, matrix);
 
-        assertThat(on.yearlySpending().getFirst().recommended().doubleValue())
-                .isGreaterThanOrEqualTo(Double.parseDouble(PRE_T26_GATED_RECOMMENDED));
+        // Rebuild the SAME frozen arm-set inputs jointSearch used (seed+1 RNG, own floors/tables),
+        // then score BOTH winners under the gated objective on those paths.
+        int searchTrials = Math.min(500, ctx.sim().trialCount());
+        var searchRng = new java.util.Random(SEED + 1);
+        var searchModel = PoolReturnModel.from(inputOn.accounts(), ctx.sim().inflationRate());
+        var searchPaths = PortfolioPathGenerator.generate(
+                searchTrials, ctx.sim().years(), searchModel, matrix, searchRng, ctx.sim().feeRate());
+        double[] searchFloors = SustainabilitySearch.verifyEssentialFloor(
+                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(),
+                ctx.taxIncome().essentialFloor(), ctx.sim().confidenceLevel(),
+                ctx.sim().years(), searchTrials);
+        var searchTables = OrdinaryTaxTable.computeAll(taxCalc, ctx.sim().retirementYear(),
+                ctx.sim().years(), ctx.taxIncome().filingStatus(), inputOn.birthYear());
+        var searchTaxCtx = new TaxContext(ctx.portfolio().initTaxable(),
+                ctx.portfolio().initTraditional(), ctx.portfolio().initRoth(),
+                ctx.portfolio().withdrawalOrder(), searchTables,
+                ctx.taxIncome().rentalAwareTaxableIncome(), ctx.taxIncome().rentalIncomeByYear());
+
+        double gatedScoreOld = gatedArmScore(search, searchPaths, ctx, searchFloors, searchTrials,
+                searchTaxCtx, oldWinner.byYear(), oldWinner.taxByYear());
+        double gatedScoreNew = gatedArmScore(search, searchPaths, ctx, searchFloors, searchTrials,
+                searchTaxCtx, newWinner.byYear(), newWinner.taxByYear());
+
+        // Strict in this constructed fixture: the gated search's winner genuinely out-scores the
+        // no-adapt winner under the objective the profile actually certifies against.
+        assertThat(gatedScoreNew).isGreaterThan(gatedScoreOld);
+    }
+
+    /** Scores one conversion schedule under the gated objective on the given arm-set inputs —
+     * the same {@code SearchContext} shape {@code JointConversionSearch.evalSearchSpending} builds
+     * when the toggle is on. */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private static double gatedArmScore(SustainabilitySearch search, PortfolioReturnPaths searchPaths,
+                                        OptimizationSetup ctx, double[] searchFloors, int searchTrials,
+                                        TaxContext searchTaxCtx,
+                                        double[] conversionByYear, double[] conversionTaxByYear) {
+        var searchContext = new SustainabilitySearch.SearchContext(
+                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(),
+                ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
+                ctx.sim().retirementAge(), ctx.sim().years(), searchTrials,
+                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
+                searchTaxCtx, conversionByYear, conversionTaxByYear,
+                ctx.taxIncome().dsBracketCeilingByYear(),
+                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
+                ctx.sim().rmdStartAge(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
+                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                true, 0.40);
+        return search.evaluateSustainableSpending(searchContext, searchFloors);
     }
 
     @Test

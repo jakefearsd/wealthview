@@ -45,7 +45,12 @@ final class SustainabilitySearch {
      *         no-adaptation success rate. {@code false} (every pre-T24 caller) preserves the exact
      *         original single-pass behavior. T26: {@link JointConversionSearch}'s conversion-fraction
      *         scoring search now threads this straight from the profile's toggle too, so an arm's
-     *         score reflects the SAME objective the discretionary search gates on.
+     *         score reflects the SAME objective the discretionary search gates on. (The resulting
+     *         joint-optimum coherence — gated-scored arms never worse than no-adapt-scored arms —
+     *         empirically holds for the pinned fixture but is NOT a cross-search theorem: the joint
+     *         search's grid + golden-section refine is local, and its final numbers come from a
+     *         different path set than arm selection; see
+     *         {@code JointConversionSearchGatedObjectiveTest}.)
      * @param maxAnnualAdjustmentRate the user's year-over-year adjustment-rate knob, resolved to a
      *         primitive {@code double} (0 when the request omitted it) -- needed here (not just on
      *         {@link TrialSimulator.GuardrailAdaptation}) because a non-positive rate makes the rule
@@ -226,10 +231,11 @@ final class SustainabilitySearch {
      * Evaluates the total sustainable first-year spending (essentialFloor + discretionary)
      * for a given conversion schedule. Used by the joint search to score candidate fractions.
      * Bisection assumes {@link #isSustainable} is monotone in the discretionary level — see the
-     * T24 soundness caveat on {@link #binarySearchDiscretionary} (T26: this joint-search path can
-     * now also run under the adaptive-rules gate, so the caveat applies here identically -- pinned
-     * by the same empirical evidence, see {@code GuardrailAdaptiveGateIntegrationTest}'s bisection
-     * sweep).
+     * T24 soundness caveat on {@link #binarySearchDiscretionary}. T26: this joint-search path can
+     * now also run under the adaptive-rules gate, so the caveat applies here identically; the
+     * empirical support is {@code GuardrailAdaptiveGateIntegrationTest}'s bisection sweep, which
+     * pins the MAIN-search context (not re-swept per arm context) — empirical evidence for the
+     * pinned fixtures, not a proof.
      */
     // UseVarargs: the trailing double[] is a per-year indexed floor array, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
