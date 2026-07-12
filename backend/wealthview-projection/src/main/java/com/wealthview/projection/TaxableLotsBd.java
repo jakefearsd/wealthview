@@ -46,6 +46,34 @@ final class TaxableLotsBd {
         }
     }
 
+    /**
+     * Audit C8: appreciates every lot's VALUE (never basis) via {@link #grow}, then nudges the LAST
+     * lot's value by any leftover cent so {@link #totalValue()} lands EXACTLY on {@code exactTotal}
+     * -- absorbing the sub-cent drift independent per-lot rounding can otherwise introduce over many
+     * lots/years. Unlike {@link #addLot(BigDecimal)}, the residual is folded into an EXISTING lot's
+     * value: it creates NO new lot and touches NO lot's basis, so accumulation-year growth (which
+     * must not book a phantom at-cost distribution lot -- see {@code PoolStrategy.MultiPool
+     * #applyGrowth(boolean)}) still reproduces the exact same total-return trajectory the pre-C8
+     * split path guaranteed by construction. No-op when there are no lots ({@code exactTotal} must
+     * be zero too in that case).
+     */
+    void growToExactTotal(BigDecimal appreciationRate, BigDecimal exactTotal) {
+        grow(appreciationRate);
+        if (lots.isEmpty()) {
+            return;
+        }
+        BigDecimal residual = exactTotal.subtract(totalValue());
+        if (residual.signum() != 0) {
+            BigDecimal[] last = lots.peekLast();
+            last[1] = last[1].add(residual);
+        }
+    }
+
+    /** Number of open lots -- audit C8 test hook confirming accumulation-year growth creates none. */
+    int lotCount() {
+        return lots.size();
+    }
+
     BigDecimal totalValue() {
         BigDecimal v = BigDecimal.ZERO;
         for (BigDecimal[] lot : lots) {

@@ -47,7 +47,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     BigDecimal applyContributions();
 
-    GrowthResult applyGrowth();
+    /**
+     * Grows every pool for the year. {@code retired} gates the taxable pool's yield-distribution
+     * split (audit C8): only a RETIRED year books/taxes a qualified-dividend/ordinary-interest
+     * distribution at all -- see {@code MultiPool#applyGrowth(boolean)}'s javadoc for the full
+     * rationale. Traditional/Roth growth is unaffected by this parameter either way.
+     */
+    GrowthResult applyGrowth(boolean retired);
 
     /**
      * Back-compat overload: no explicit signal that this year's base-income tax was already
@@ -551,18 +557,22 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
         /**
          * The current year's qualified-dividend income (value × dividend yield), booked in
-         * {@link #applyGrowth()} and consumed as LTCG income in {@link #executeWithdrawals}. Reset
-         * each {@code applyGrowth}; during accumulation it is never consumed (the model has no wage
-         * income to stack it on) so only retirement-year dividends are taxed.
+         * {@link #applyGrowth(boolean)} and consumed as LTCG income in {@link #executeWithdrawals}.
+         * Reset each {@code applyGrowth} call. Audit C8: a RETIRED year is the only year that ever
+         * books this at all -- see {@link #applyGrowth(boolean)}'s javadoc for why an accumulation
+         * year no longer runs the distribution split (previously it booked a dividend every year but
+         * only ever taxed/consumed it in a retired or RMD-forced year, which is exactly the untaxed
+         * basis-step bug that item fixes).
          */
         private BigDecimal qualifiedDividendIncome = BigDecimal.ZERO;
         /**
          * Audit C1: the current year's ordinary-interest income (bond+cash share of the taxable
-         * pool's yield, at {@link #interestYield}), booked in {@link #applyGrowth()} alongside
+         * pool's yield, at {@link #interestYield}), booked in {@link #applyGrowth(boolean)} alongside
          * {@link #qualifiedDividendIncome} and consumed as ORDINARY income (not LTCG) in {@link
          * #executeWithdrawals} — it joins {@code taxableIncome} directly, the same bundle {@code
          * effectiveOtherIncome}/{@code conversionAmount}/the traditional distribution feed. Reset
-         * each {@code applyGrowth}; like the dividend, only retirement-year interest is ever taxed.
+         * each {@code applyGrowth} call; audit C8: zero for every accumulation year, exactly like
+         * {@link #qualifiedDividendIncome} above.
          */
         private BigDecimal ordinaryInterestIncome = BigDecimal.ZERO;
 
@@ -680,6 +690,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             return traditional;
         }
 
+        /**
+         * Number of open taxable lots -- a package-visible test-observability hook (audit C8) so a
+         * unit test can confirm an accumulation-year {@link #applyGrowth(boolean)} call creates NO
+         * new at-cost lot, without reaching into {@link #lots} via reflection.
+         */
+        int taxableLotCount() {
+            return lots.lotCount();
+        }
+
         @Override
         public BigDecimal getWeightedReturn() {
             return weightedReturn;
@@ -694,29 +713,64 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         }
 
         @Override
-        public GrowthResult applyGrowth() {
+        public GrowthResult applyGrowth(boolean retired) {
             BigDecimal tradGrowth = traditional.multiply(traditionalReturn).setScale(SCALE, ROUNDING);
             BigDecimal rothGrowth = roth.multiply(rothReturn).setScale(SCALE, ROUNDING);
 
-            // Split the taxable return: existing lots appreciate at (r − blendedYield); the
-            // distribution (≈ value × blendedYield) is reinvested as a fresh at-cost lot, booked as
-            // the residual to the exact target total, so the taxable pool still grows at precisely
-            // r regardless of the split (bit-identical to the pre-lots scalar path when both yields
-            // are 0). Audit C1: the distribution itself is then split BETWEEN qualified-dividend
-            // income (the equity share, taxableEquityShare, at dividendYield — TAXED as LTCG/
-            // qualified-dividend income, unchanged from pre-C1) and ordinary-interest income (the
-            // remaining bond+cash share, at interestYield — TAXED as ORDINARY income instead). Both
-            // are consumed only at withdrawal time (retirement); during accumulation both reset each
-            // year unconsumed, exactly like the pre-C1 dividend-only behavior.
-            //
-            // bondShare == 0 (every ALL_US / no-allocation account, taxableEquityShare == 1) takes a
-            // SEPARATE, byte-identical-to-pre-C1 code path rather than the general proportional
-            // split below — interestYield is then completely irrelevant, and this avoids any
-            // BigDecimal scale/precision drift the general division-based split could otherwise
-            // introduce for the single most common account shape (the backward-compat anchor).
             BigDecimal taxableBefore = lots.totalValue();
             BigDecimal taxableGrowth = taxableBefore.multiply(taxableReturn).setScale(SCALE, ROUNDING);
             BigDecimal targetTotal = taxableBefore.add(taxableGrowth);
+
+            if (retired) {
+                applyTaxableYieldSplit(targetTotal);
+            } else {
+                // Audit C8: an ACCUMULATION year books NO distribution at all -- lots appreciate at
+                // the FULL total return r (pure, unrealized appreciation; basis untouched, no new
+                // at-cost lot created). Pre-C8 the split below ran every year regardless of
+                // retirement status, so an accumulation-year dividend/interest distribution was
+                // reinvested as a fresh at-cost lot even though it is NEVER taxed pre-retirement (see
+                // qualifiedDividendIncome/ordinaryInterestIncome's javadocs for the one narrow
+                // exception this closes too: a still-working, RMD-forced year, whose taxable-pool
+                // yield WAS taxed pre-C8 -- gating strictly on `retired` intentionally stops taxing
+                // it, since that RMD-forced tax was itself only a side effect of the same
+                // now-removed accumulation-year split, not a separate deliberate design point) -- a
+                // real, untaxed basis step-up a taxed investor would never get for free. Treating the
+                // whole return as unrealized appreciation instead simply defers the entire gain to
+                // the eventual sale, which is what an untaxed reinvestment economically IS in this
+                // model's constant-real frame. growToExactTotal keeps the reported total return
+                // (taxableGrowth/targetTotal, and therefore the whole projection's BALANCE
+                // trajectory) byte-identical to the pre-C8 split path's own total-preserving
+                // guarantee -- only the lots' internal basis composition differs.
+                lots.growToExactTotal(taxableReturn, targetTotal);
+                qualifiedDividendIncome = BigDecimal.ZERO;
+                ordinaryInterestIncome = BigDecimal.ZERO;
+            }
+
+            traditional = traditional.add(tradGrowth);
+            roth = roth.add(rothGrowth);
+            return new GrowthResult(tradGrowth.add(rothGrowth).add(taxableGrowth),
+                    taxableGrowth, tradGrowth, rothGrowth);
+        }
+
+        /**
+         * Split the taxable return: existing lots appreciate at (r − blendedYield); the
+         * distribution (≈ value × blendedYield) is reinvested as a fresh at-cost lot, booked as
+         * the residual to the exact target total, so the taxable pool still grows at precisely
+         * r regardless of the split (bit-identical to the pre-lots scalar path when both yields
+         * are 0). Audit C1: the distribution itself is then split BETWEEN qualified-dividend
+         * income (the equity share, taxableEquityShare, at dividendYield — TAXED as LTCG/
+         * qualified-dividend income, unchanged from pre-C1) and ordinary-interest income (the
+         * remaining bond+cash share, at interestYield — TAXED as ORDINARY income instead). Audit
+         * C8: only ever invoked for a RETIRED year (see {@link #applyGrowth(boolean)}) -- an
+         * accumulation year takes a separate, split-free path instead.
+         *
+         * <p>bondShare == 0 (every ALL_US / no-allocation account, taxableEquityShare == 1) takes a
+         * SEPARATE, byte-identical-to-pre-C1 code path rather than the general proportional
+         * split below — interestYield is then completely irrelevant, and this avoids any
+         * BigDecimal scale/precision drift the general division-based split could otherwise
+         * introduce for the single most common account shape (the backward-compat anchor).
+         */
+        private void applyTaxableYieldSplit(BigDecimal targetTotal) {
             BigDecimal bondShare = BigDecimal.ONE.subtract(taxableEquityShare);
 
             if (bondShare.signum() == 0) {
@@ -742,11 +796,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                     ordinaryInterestIncome = BigDecimal.ZERO;
                 }
             }
-
-            traditional = traditional.add(tradGrowth);
-            roth = roth.add(rothGrowth);
-            return new GrowthResult(tradGrowth.add(rothGrowth).add(taxableGrowth),
-                    taxableGrowth, tradGrowth, rothGrowth);
         }
 
         @Override

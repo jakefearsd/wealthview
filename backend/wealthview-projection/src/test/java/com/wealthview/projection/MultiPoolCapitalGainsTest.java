@@ -173,7 +173,7 @@ class MultiPoolCapitalGainsTest {
 
         // Growth splits: lots appreciate at (6% − 2%) = 4% → 104000; dividend = 106000 − 104000 = 2000
         // reinvested at cost. Total taxable still grows at exactly 6% (100000 → 106000).
-        var g = pool.applyGrowth();
+        var g = pool.applyGrowth(true);
         assertThat(g.taxable()).isEqualByComparingTo(bd("6000"));   // full 6% growth reported
 
         // Roth-first draw: no taxable sale (realized gain 0), but the $2000 dividend is LTCG income.

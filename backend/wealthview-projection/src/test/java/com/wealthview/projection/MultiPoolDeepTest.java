@@ -579,7 +579,7 @@ class MultiPoolDeepTest {
                 bd("0.10"), new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                         WithdrawalOrder.TAXABLE_FIRST, null, null));
 
-        var g = p.applyGrowth();
+        var g = p.applyGrowth(true);
 
         assertThat(g.taxable()).isEqualByComparingTo(bd("10"));
         assertThat(g.traditional()).isEqualByComparingTo(bd("20"));
@@ -743,7 +743,7 @@ class MultiPoolDeepTest {
         pool.applyContributions();
         assertThat(pool.getTotal()).isEqualByComparingTo(bd("1100"));
 
-        var g = pool.applyGrowth();
+        var g = pool.applyGrowth(true);
         assertThat(g.total()).isEqualByComparingTo(bd("110"));
 
         var w = pool.executeWithdrawals(bd("50"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);

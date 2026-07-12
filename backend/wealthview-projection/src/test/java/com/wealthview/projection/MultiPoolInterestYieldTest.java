@@ -110,7 +110,7 @@ class MultiPoolInterestYieldTest {
         var pool = pool(allUsTaxableAcct("100000", "100000"), "0.06", "0.02", "0.10",
                 capitalGainsCalc(), null, null);
 
-        var g = pool.applyGrowth();
+        var g = pool.applyGrowth(true);
         assertThat(g.taxable()).isEqualByComparingTo(bd("6000"));   // full 6% growth reported
 
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
@@ -139,7 +139,7 @@ class MultiPoolInterestYieldTest {
         var pool = pool(bondAllocatedTaxableAcct("100000", "100000"), "0.06", "0.02", "0.04",
                 capitalGainsCalc(), null, null);
 
-        var g = pool.applyGrowth();
+        var g = pool.applyGrowth(true);
         assertThat(g.taxable()).isEqualByComparingTo(bd("6000"));   // total return still exactly 6%
 
         var r = pool.executeWithdrawals(bd("50000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
@@ -175,8 +175,8 @@ class MultiPoolInterestYieldTest {
                 null, null, taxStrategy);
         var poolNoInterest = pool(bondAllocatedTaxableAcct("100000", "100000"), "0", "0.018", "0",
                 null, null, taxStrategy);
-        poolWithInterest.applyGrowth();
-        poolNoInterest.applyGrowth();
+        poolWithInterest.applyGrowth(true);
+        poolNoInterest.applyGrowth(true);
 
         var rWithInterest = poolWithInterest.executeWithdrawals(ZERO, YEAR, bd("40000"), ZERO, ZERO, AGE_RETIRED);
         var rNoInterest = poolNoInterest.executeWithdrawals(ZERO, YEAR, bd("40000"), ZERO, ZERO, AGE_RETIRED);

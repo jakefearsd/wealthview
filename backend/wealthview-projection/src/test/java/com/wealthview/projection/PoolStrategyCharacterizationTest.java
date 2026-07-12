@@ -81,7 +81,7 @@ class PoolStrategyCharacterizationTest {
         var pool = allTaxablePool();
 
         BigDecimal contributions = pool.applyContributions();
-        PoolStrategy.GrowthResult growth = pool.applyGrowth();
+        PoolStrategy.GrowthResult growth = pool.applyGrowth(true);
 
         assertThat(contributions).isEqualByComparingTo(bd("20000"));
         assertThat(growth.total()).isEqualByComparingTo(bd("21333.3344"));
@@ -95,7 +95,7 @@ class PoolStrategyCharacterizationTest {
         // golden-file goldens for that).
         var pool = allTaxablePool();
         pool.applyContributions();
-        pool.applyGrowth();
+        pool.applyGrowth(true);
 
         PoolStrategy.WithdrawalTaxResult result = pool.executeWithdrawals(
                 bd("50000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
@@ -118,7 +118,7 @@ class PoolStrategyCharacterizationTest {
         var pool = multiPool();
 
         BigDecimal contributions = pool.applyContributions();
-        PoolStrategy.GrowthResult growth = pool.applyGrowth();
+        PoolStrategy.GrowthResult growth = pool.applyGrowth(true);
 
         assertThat(contributions).isEqualByComparingTo(bd("22000"));
         // Per-pool real returns: taxable 150k@.05, traditional 300k@.06, roth 100k@.07 (inflation 0).
@@ -133,7 +133,7 @@ class PoolStrategyCharacterizationTest {
     void multiPool_executeWithdrawals_pinsTaxableFirstSourcing() {
         var pool = multiPool();
         pool.applyContributions();
-        pool.applyGrowth();
+        pool.applyGrowth(true);
 
         PoolStrategy.WithdrawalTaxResult result = pool.executeWithdrawals(
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
@@ -150,7 +150,7 @@ class PoolStrategyCharacterizationTest {
     void multiPool_buildYearDto_pinsPerPoolEndingBalances() {
         var pool = multiPool();
         BigDecimal contributions = pool.applyContributions();
-        PoolStrategy.GrowthResult growth = pool.applyGrowth();
+        PoolStrategy.GrowthResult growth = pool.applyGrowth(true);
         PoolStrategy.WithdrawalTaxResult withdrawal = pool.executeWithdrawals(
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
 
@@ -171,7 +171,7 @@ class PoolStrategyCharacterizationTest {
         // Structural invariant: the three sub-pool balances always sum to the total.
         var pool = multiPool();
         BigDecimal contributions = pool.applyContributions();
-        PoolStrategy.GrowthResult growth = pool.applyGrowth();
+        PoolStrategy.GrowthResult growth = pool.applyGrowth(true);
         PoolStrategy.WithdrawalTaxResult withdrawal = pool.executeWithdrawals(
                 bd("200000"), 2030, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 65);
 

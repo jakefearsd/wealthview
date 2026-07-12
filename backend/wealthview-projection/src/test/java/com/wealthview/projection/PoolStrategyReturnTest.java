@@ -108,7 +108,7 @@ class PoolStrategyReturnTest {
                 new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.07"), "roth")),
                 config);
 
-        var growth = pool.applyGrowth();
+        var growth = pool.applyGrowth(true);
 
         assertThat(growth.taxable()).isEqualByComparingTo(bd("5000"));       // 100000 * 0.05
         assertThat(growth.traditional()).isEqualByComparingTo(bd("6000"));   // 100000 * 0.06
@@ -129,7 +129,7 @@ class PoolStrategyReturnTest {
                 new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.07"), "roth")),
                 config);
 
-        var growth = pool.applyGrowth();
+        var growth = pool.applyGrowth(true);
 
         assertThat(growth.taxable()).isEqualByComparingTo(bd("4750"));       // 100000 * (0.05 - 0.0025)
         assertThat(growth.traditional()).isEqualByComparingTo(bd("5750"));   // 100000 * (0.06 - 0.0025)

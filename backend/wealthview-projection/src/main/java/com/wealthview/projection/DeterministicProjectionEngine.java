@@ -325,7 +325,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // Snapshot BEFORE applyGrowth(): the RMD for this year is computed off the prior year-end
         // traditional balance (IRS Pub. 590-B), not this year's growth.
         BigDecimal priorYearEndTraditional = pool.getTraditional();
-        var growthResult = pool.applyGrowth();
+        // Audit C8: `retired` (already resolved above) gates the taxable pool's yield-distribution
+        // split -- see PoolStrategy.MultiPool#applyGrowth(boolean)'s javadoc.
+        var growthResult = pool.applyGrowth(retired);
         BigDecimal totalGrowth = growthResult.total();
 
         // T18a-2: RMDs are gated on AGE alone, not `retired` -- IRS rules require a traditional
