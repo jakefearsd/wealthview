@@ -244,4 +244,69 @@ class ProductionConfigValidatorTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("CORS_ORIGIN");
     }
+
+    // --- Fail-fast boot assertion: dev/demo seed profiles must never combine with prod. ---
+    // T30 audit item #4: SampleDataInitializer (@Profile({"dev","docker"})) seeds a
+    // demo@wealthview.local / demo123 admin account with a hardcoded password that is NOT
+    // read from any env var, so the existing secret checks above cannot catch it. Spring's
+    // @Profile uses OR semantics, so if an operator ever sets
+    // SPRING_PROFILES_ACTIVE=prod,docker (or prod,dev) by mistake, the seed beans would run
+    // in production. This is a defense-in-depth check independent of the annotations.
+
+    @Test
+    void validate_prodCombinedWithDevProfile_throws() {
+        var env = new MockEnvironment();
+        env.setActiveProfiles("prod", "dev");
+        var validator = new ProductionConfigValidator(
+                VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, env);
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("prod")
+                .hasMessageContaining("dev");
+    }
+
+    @Test
+    void validate_prodCombinedWithDockerProfile_throws() {
+        // "docker" alone is the legitimate dev/demo containerized stack (SampleDataInitializer
+        // runs there too), but combined with "prod" it means a production deployment
+        // accidentally also has the demo-seed profile active.
+        var env = new MockEnvironment();
+        env.setActiveProfiles("prod", "docker");
+        var validator = new ProductionConfigValidator(
+                VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, env);
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("prod")
+                .hasMessageContaining("docker");
+    }
+
+    @Test
+    void validate_prodProfileAlone_succeeds() {
+        var env = new MockEnvironment();
+        env.setActiveProfiles("prod");
+        var validator = new ProductionConfigValidator(
+                VALID_JWT_SECRET, VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, env);
+
+        assertThatCode(validator::validate).doesNotThrowAnyException();
+    }
+
+    @Test
+    void validate_devSentinelJwtSecret_throwsEvenWhenLongEnough() {
+        // application-dev.yml's JWT fallback is 68 chars — long enough to pass the length
+        // check and not present in KNOWN_DEFAULT_JWT_SECRETS, so without a prefix check it
+        // would silently be accepted as a "valid" production secret.
+        var validator = new ProductionConfigValidator(
+                "LOCAL_DEV_HS256_SIGNING_KEY_NOT_FOR_PRODUCTION_USE_ONLY_FOR_DEVELOPMENT",
+                VALID_SUPER_ADMIN_PASSWORD, VALID_DB_PASSWORD,
+                VALID_MFA_KEY, VALID_CORS_ORIGINS, prodEnv());
+
+        assertThatThrownBy(validator::validate)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("JWT_SECRET");
+    }
 }
