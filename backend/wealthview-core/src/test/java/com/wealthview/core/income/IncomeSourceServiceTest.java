@@ -64,7 +64,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Social Security", "social_security", new BigDecimal("30000"),
-                67, null, new BigDecimal("0.02"), false, "partially_taxable", null);
+                67, null, new BigDecimal("0.02"), false, "partially_taxable", null, null, null);
 
         var result = service.create(tenantId, request);
 
@@ -92,7 +92,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Rental Income", "rental_property", new BigDecimal("24000"),
-                60, null, BigDecimal.ZERO, false, "rental_passive", propertyId);
+                60, null, BigDecimal.ZERO, false, "rental_passive", propertyId, null, null);
 
         var result = service.create(tenantId, request);
 
@@ -110,7 +110,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Rental Income", "rental_property", new BigDecimal("24000"),
-                60, null, BigDecimal.ZERO, false, "rental_passive", propertyId);
+                60, null, BigDecimal.ZERO, false, "rental_passive", propertyId, null, null);
 
         assertThatThrownBy(() -> service.create(tenantId, request))
                 .isInstanceOf(EntityNotFoundException.class)
@@ -123,7 +123,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Bad Type", "invalid_type", new BigDecimal("10000"),
-                65, null, BigDecimal.ZERO, false, "taxable", null);
+                65, null, BigDecimal.ZERO, false, "taxable", null, null, null);
 
         assertThatThrownBy(() -> service.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -136,7 +136,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Pension", "pension", new BigDecimal("20000"),
-                65, null, BigDecimal.ZERO, false, "invalid_treatment", null);
+                65, null, BigDecimal.ZERO, false, "invalid_treatment", null, null, null);
 
         assertThatThrownBy(() -> service.create(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
@@ -150,7 +150,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "SS", "social_security", new BigDecimal("30000"),
-                67, null, BigDecimal.ZERO, false, "taxable", null);
+                67, null, BigDecimal.ZERO, false, "taxable", null, null, null);
 
         assertThatThrownBy(() -> service.create(tenantId, request))
                 .isInstanceOf(InvalidSessionException.class);
@@ -206,7 +206,7 @@ class IncomeSourceServiceTest {
 
         var request = new UpdateIncomeSourceRequest(
                 "Updated Pension", "pension", new BigDecimal("28000"), 66, 90,
-                new BigDecimal("0.03"), false, "taxable", null);
+                new BigDecimal("0.03"), false, "taxable", null, null, null);
 
         var result = service.update(tenantId, sourceId, request);
 
@@ -234,7 +234,7 @@ class IncomeSourceServiceTest {
 
         var request = new UpdateIncomeSourceRequest(
                 "Rental", "rental_property", new BigDecimal("26000"), 60, null,
-                BigDecimal.ZERO, false, "rental_active_reps", propertyId);
+                BigDecimal.ZERO, false, "rental_active_reps", propertyId, null, null);
 
         var result = service.update(tenantId, sourceId, request);
 
@@ -249,7 +249,7 @@ class IncomeSourceServiceTest {
                 .thenReturn(Optional.empty());
 
         var request = new UpdateIncomeSourceRequest(
-                "Name", null, new BigDecimal("10000"), 65, null, BigDecimal.ZERO, false, "taxable", null);
+                "Name", null, new BigDecimal("10000"), 65, null, BigDecimal.ZERO, false, "taxable", null, null, null);
 
         assertThatThrownBy(() -> service.update(tenantId, sourceId, request))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -286,7 +286,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Bonus", "other", new BigDecimal("5000"),
-                60, 60, BigDecimal.ZERO, null, "taxable", null);
+                60, 60, BigDecimal.ZERO, null, "taxable", null, null, null);
 
         var result = service.create(tenantId, request);
 
@@ -301,7 +301,7 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Side Income", "other", new BigDecimal("10000"),
-                55, 65, null, false, "taxable", null);
+                55, 65, null, false, "taxable", null, null, null);
 
         var result = service.create(tenantId, request);
 
@@ -316,10 +316,136 @@ class IncomeSourceServiceTest {
 
         var request = new CreateIncomeSourceRequest(
                 "Other Income", "other", new BigDecimal("10000"),
-                55, null, BigDecimal.ZERO, false, null, null);
+                55, null, BigDecimal.ZERO, false, null, null, null, null);
 
         var result = service.create(tenantId, request);
 
         assertThat(result.taxTreatment()).isEqualTo("taxable");
+    }
+
+    // Household/survivor modeling (sub-project A, T3): owner + survivor_percent round-trip and
+    // validation, mirroring the existing null-default and invalid-value test patterns above.
+
+    @Test
+    void create_withOwnerAndSurvivorPercent_passesThrough() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null,
+                "spouse", new BigDecimal("0.5"));
+
+        var result = service.create(tenantId, request);
+
+        assertThat(result.owner()).isEqualTo("spouse");
+        assertThat(result.survivorPercent()).isEqualByComparingTo("0.5");
+    }
+
+    @Test
+    void create_withNullOwner_defaultsToPrimary() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null, null, null);
+
+        var result = service.create(tenantId, request);
+
+        assertThat(result.owner()).isEqualTo("primary");
+    }
+
+    @Test
+    void create_withNullSurvivorPercent_defaultsToOne() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null, null, null);
+
+        var result = service.create(tenantId, request);
+
+        assertThat(result.survivorPercent()).isEqualByComparingTo("1");
+    }
+
+    @Test
+    void create_invalidOwner_throwsIllegalArgument() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null, "grandparent", null);
+
+        assertThatThrownBy(() -> service.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid owner");
+    }
+
+    @Test
+    void create_survivorPercentAboveOne_throwsIllegalArgument() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null, null, new BigDecimal("1.5"));
+
+        assertThatThrownBy(() -> service.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("survivor_percent");
+    }
+
+    @Test
+    void create_survivorPercentBelowZero_throwsIllegalArgument() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+
+        var request = new CreateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"),
+                65, null, BigDecimal.ZERO, false, "taxable", null, null, new BigDecimal("-0.1"));
+
+        assertThatThrownBy(() -> service.create(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("survivor_percent");
+    }
+
+    @Test
+    void update_withOwnerAndSurvivorPercent_updatesFields() {
+        var sourceId = UUID.randomUUID();
+        var entity = new IncomeSourceEntity(tenant, "Pension", "pension",
+                new BigDecimal("20000"), 65, null, BigDecimal.ZERO, false, "taxable");
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId))
+                .thenReturn(Optional.of(entity));
+        when(incomeSourceRepository.save(any(IncomeSourceEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new UpdateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"), 65, null,
+                BigDecimal.ZERO, false, "taxable", null, "spouse", new BigDecimal("0.75"));
+
+        var result = service.update(tenantId, sourceId, request);
+
+        assertThat(result.owner()).isEqualTo("spouse");
+        assertThat(result.survivorPercent()).isEqualByComparingTo("0.75");
+    }
+
+    @Test
+    void update_invalidOwner_throwsIllegalArgument() {
+        var sourceId = UUID.randomUUID();
+        var entity = new IncomeSourceEntity(tenant, "Pension", "pension",
+                new BigDecimal("20000"), 65, null, BigDecimal.ZERO, false, "taxable");
+        when(incomeSourceRepository.findByTenant_IdAndId(tenantId, sourceId))
+                .thenReturn(Optional.of(entity));
+
+        var request = new UpdateIncomeSourceRequest(
+                "Pension", "pension", new BigDecimal("20000"), 65, null,
+                BigDecimal.ZERO, false, "taxable", null, "grandparent", null);
+
+        assertThatThrownBy(() -> service.update(tenantId, sourceId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid owner");
     }
 }

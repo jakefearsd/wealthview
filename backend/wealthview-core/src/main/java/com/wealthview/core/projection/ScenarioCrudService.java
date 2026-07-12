@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -23,6 +24,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountResponse;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceResponse;
 import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.dto.ScenarioParamsSource;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioResponse;
 import com.wealthview.core.projection.dto.SpendingProfileResponse;
@@ -58,6 +60,11 @@ public class ScenarioCrudService {
     private static final BigDecimal MAX_DIVIDEND_YIELD = new BigDecimal("0.10");
     private static final BigDecimal MAX_FEE_RATE = new BigDecimal("0.03");
     private static final BigDecimal MAX_INTEREST_YIELD = new BigDecimal("0.10");
+    private static final int MIN_DEATH_AGE = 50;
+    private static final int MAX_DEATH_AGE = 120;
+    private static final BigDecimal MIN_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.5");
+    private static final BigDecimal MAX_SURVIVOR_SPENDING_FACTOR = BigDecimal.ONE;
+    private static final Set<String> VALID_ACCOUNT_OWNERS = Set.of("primary", "spouse", "joint");
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -99,6 +106,8 @@ public class ScenarioCrudService {
         validateDividendYield(request.dividendYield());
         validateFeeRate(request.feeRate());
         validateInterestYield(request.interestYield());
+        validateHouseholdFields(request);
+        validateAccounts(request.accounts());
         var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
@@ -145,6 +154,8 @@ public class ScenarioCrudService {
         validateDividendYield(request.dividendYield());
         validateFeeRate(request.feeRate());
         validateInterestYield(request.interestYield());
+        validateHouseholdFields(request);
+        validateAccounts(request.accounts());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
 
@@ -262,9 +273,10 @@ public class ScenarioCrudService {
     }
 
     /**
-     * Builds the (id, effective-amount) income-source signatures the guardrail staleness check
-     * hashes alongside the scenario (see {@link GuardrailProfileService#computeScenarioHash}), so an
-     * income-source add or amount edit is detected the same way an account edit already is.
+     * Builds the (id, effective-amount, owner, survivor-percent) income-source signatures the
+     * guardrail staleness check hashes alongside the scenario (see
+     * {@link GuardrailProfileService#computeScenarioHash}), so an income-source add, amount edit,
+     * or owner/survivor-percent edit is detected the same way an account edit already is.
      */
     private List<GuardrailProfileService.IncomeSourceSignature> currentIncomeSourceSignatures(UUID scenarioId) {
         return scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenarioId).stream()
@@ -272,7 +284,8 @@ public class ScenarioCrudService {
                     var src = link.getIncomeSource();
                     var effective = link.getOverrideAnnualAmount() != null
                             ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
-                    return new GuardrailProfileService.IncomeSourceSignature(src.getId(), effective);
+                    return new GuardrailProfileService.IncomeSourceSignature(
+                            src.getId(), effective, src.getOwner(), src.getSurvivorPercent());
                 })
                 .toList();
     }
@@ -309,6 +322,7 @@ public class ScenarioCrudService {
             // Linked accounts always derive cost basis live from holdings (ProjectionInputBuilder);
             // the stored field is only meaningful for hypothetical accounts.
             projAcct.setCostBasis(linkedAccount != null ? null : acctReq.costBasis());
+            projAcct.setOwner(acctReq.owner() != null ? acctReq.owner() : "primary");
             if (acctReq.allocation() != null) {
                 acctReq.allocation().validate();
                 projAcct.setAllocation(acctReq.allocation().toWeightMap());
@@ -351,6 +365,68 @@ public class ScenarioCrudService {
         }
         if (interestYield.signum() < 0 || interestYield.compareTo(MAX_INTEREST_YIELD) > 0) {
             throw new IllegalArgumentException("interest_yield must be between 0 and 0.10");
+        }
+    }
+
+    /**
+     * Household/survivor modeling (sub-project A): death ages (when set) must be plausible
+     * planning ages; every spouse-scoped or household-only field requires {@code spouse_birth_year}
+     * to be set (a household field with no spouse is meaningless and almost certainly a client
+     * bug); the survivor spending factor (when set) must be in its documented 0.5-1.0 range.
+     * {@code primary_death_age} is exempt from the spouse-presence check — it truncates the
+     * horizon for single-person households too.
+     */
+    private static void validateHouseholdFields(ScenarioParamsSource request) {
+        validateDeathAge(request.primaryDeathAge(), "primary_death_age");
+        validateDeathAge(request.spouseDeathAge(), "spouse_death_age");
+        validateSurvivorSpendingFactor(request.survivorSpendingFactor());
+        if (request.spouseBirthYear() == null && (request.spouseDeathAge() != null
+                || request.survivorSpendingFactor() != null || request.communityProperty() != null)) {
+            throw new IllegalArgumentException(
+                    "spouse_death_age, survivor_spending_factor, and community_property require "
+                            + "spouse_birth_year to be set");
+        }
+    }
+
+    private static void validateDeathAge(Integer deathAge, String fieldName) {
+        if (deathAge == null) {
+            return;
+        }
+        if (deathAge < MIN_DEATH_AGE || deathAge > MAX_DEATH_AGE) {
+            throw new IllegalArgumentException(fieldName + " must be between " + MIN_DEATH_AGE
+                    + " and " + MAX_DEATH_AGE);
+        }
+    }
+
+    private static void validateSurvivorSpendingFactor(BigDecimal survivorSpendingFactor) {
+        if (survivorSpendingFactor == null) {
+            return;
+        }
+        if (survivorSpendingFactor.compareTo(MIN_SURVIVOR_SPENDING_FACTOR) < 0
+                || survivorSpendingFactor.compareTo(MAX_SURVIVOR_SPENDING_FACTOR) > 0) {
+            throw new IllegalArgumentException("survivor_spending_factor must be between 0.5 and 1.0");
+        }
+    }
+
+    private static void validateAccounts(List<CreateProjectionAccountRequest> accounts) {
+        if (accounts == null) {
+            return;
+        }
+        for (var account : accounts) {
+            validateAccountOwner(account.owner(), account.accountType());
+        }
+    }
+
+    private static void validateAccountOwner(String owner, String accountType) {
+        if (owner == null) {
+            return;
+        }
+        if (!VALID_ACCOUNT_OWNERS.contains(owner)) {
+            throw new IllegalArgumentException("owner must be one of: " + VALID_ACCOUNT_OWNERS);
+        }
+        var resolvedType = accountType != null ? accountType : "taxable";
+        if ("joint".equals(owner) && !"taxable".equals(resolvedType)) {
+            throw new IllegalArgumentException("owner 'joint' is only valid for taxable accounts");
         }
     }
 

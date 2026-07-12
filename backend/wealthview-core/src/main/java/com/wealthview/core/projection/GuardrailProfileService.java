@@ -28,6 +28,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -324,14 +325,26 @@ public class GuardrailProfileService {
      * {@code ProjectionInput}, or raw {@code ScenarioIncomeSourceEntity} rows) can both produce it
      * without coupling this hash/seed logic to either shape.
      */
-    public record IncomeSourceSignature(UUID incomeSourceId, BigDecimal effectiveAmount) {}
+    public record IncomeSourceSignature(UUID incomeSourceId, BigDecimal effectiveAmount,
+                                         String owner, BigDecimal survivorPercent) {
+
+        /**
+         * Back-compat convenience for call sites predating {@code owner}/{@code survivorPercent}
+         * (household modeling): defaults owner to {@code "primary"} and survivorPercent to
+         * {@code BigDecimal.ONE}, matching every pre-household income source.
+         */
+        public IncomeSourceSignature(UUID incomeSourceId, BigDecimal effectiveAmount) {
+            this(incomeSourceId, effectiveAmount, "primary", BigDecimal.ONE);
+        }
+    }
 
     /** Builds {@link IncomeSourceSignature}s from the resolved income sources already carried by
-     * a {@link GuardrailOptimizationInput} / {@code ProjectionInput} (id + override-or-base amount). */
+     * a {@link GuardrailOptimizationInput} / {@code ProjectionInput} (id + override-or-base amount,
+     * plus owner + survivor_percent for household staleness detection). */
     public static List<IncomeSourceSignature> toIncomeSourceSignatures(
             List<ProjectionIncomeSourceInput> incomeSources) {
         return incomeSources.stream()
-                .map(s -> new IncomeSourceSignature(s.id(), s.annualAmount()))
+                .map(s -> new IncomeSourceSignature(s.id(), s.annualAmount(), s.owner(), s.survivorPercent()))
                 .toList();
     }
 
@@ -359,14 +372,18 @@ public class GuardrailProfileService {
      * account), and depression-years window opt-in (audit
      * C10 — toggling it switches the capital-market matrix window, a different Monte Carlo result
      * for the identical seed unless the seed itself also changes), and linked income sources
-     * (id + effective amount).
+     * (id + effective amount). Household/survivor modeling (sub-project A) adds:
+     * spouse birth year, both death ages (resolved -- explicit value or the SSA planning default
+     * for the respective birth year, since the resolved value is what the engine actually uses),
+     * survivor spending factor, community-property flag, each account's owner, and each income
+     * source's owner + survivor_percent.
      * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
      * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
      * scenario always yields the same signature regardless of collection iteration order.
      */
     private static String scenarioSignature(ProjectionScenarioEntity scenario,
                                              List<IncomeSourceSignature> incomeSources) {
-        var sb = new StringBuilder();
+        var sb = new StringBuilder(256);
         sb.append(scenario.getRetirementDate())
                 .append('|').append(scenario.getEndAge())
                 .append('|').append(scenario.getInflationRate());
@@ -378,7 +395,12 @@ public class GuardrailProfileService {
         sb.append('|').append(hashParams.dividendYield())
                 .append('|').append(hashParams.feeRate())
                 .append('|').append(hashParams.interestYield())
-                .append('|').append(Boolean.TRUE.equals(hashParams.includeDepressionYears()));
+                .append('|').append(Boolean.TRUE.equals(hashParams.includeDepressionYears()))
+                .append('|').append(hashParams.spouseBirthYear())
+                .append('|').append(resolveDeathAge(hashParams.primaryDeathAge(), hashParams.birthYear()))
+                .append('|').append(resolveDeathAge(hashParams.spouseDeathAge(), hashParams.spouseBirthYear()))
+                .append('|').append(hashParams.survivorSpendingFactor())
+                .append('|').append(Boolean.TRUE.equals(hashParams.communityProperty()));
 
         scenario.getAccounts().stream()
                 .sorted(Comparator.comparing(ProjectionAccountEntity::getId,
@@ -388,15 +410,31 @@ public class GuardrailProfileService {
                         .append(':').append(acct.getAnnualContribution())
                         .append(':').append(acct.getExpectedReturn())
                         .append(':').append(acct.getCostBasis())
-                        .append(':').append(allocationSignature(acct.getAllocation())));
+                        .append(':').append(allocationSignature(acct.getAllocation()))
+                        .append(':').append(acct.getOwner()));
 
         incomeSources.stream()
                 .sorted(Comparator.comparing(IncomeSourceSignature::incomeSourceId,
                         Comparator.nullsLast(Comparator.naturalOrder())))
                 .forEach(src -> sb.append('|').append(src.incomeSourceId())
-                        .append(':').append(src.effectiveAmount()));
+                        .append(':').append(src.effectiveAmount())
+                        .append(':').append(src.owner())
+                        .append(':').append(src.survivorPercent()));
 
         return sb.toString();
+    }
+
+    /**
+     * Resolves a household death age to the value the engine will actually use: the explicit
+     * override when set, else the SSA planning default for {@code birthYear} — or {@code null}
+     * when even {@code birthYear} is unknown (nothing to resolve against).
+     */
+    @Nullable
+    private static Integer resolveDeathAge(@Nullable Integer explicitDeathAge, @Nullable Integer birthYear) {
+        if (explicitDeathAge != null) {
+            return explicitDeathAge;
+        }
+        return birthYear != null ? LifeExpectancy.defaultDeathAge(birthYear) : null;
     }
 
     /** Stable (sorted-key) serialization of an account's asset-allocation override, e.g. {@code

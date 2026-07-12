@@ -48,13 +48,18 @@ public record ScenarioParams(
         BigDecimal dividendYield,
         BigDecimal feeRate,
         Boolean includeDepressionYears,
-        BigDecimal interestYield) {
+        BigDecimal interestYield,
+        Integer spouseBirthYear,
+        Integer primaryDeathAge,
+        Integer spouseDeathAge,
+        BigDecimal survivorSpendingFactor,
+        Boolean communityProperty) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null);
+            null, null, null, null, null, null, null, null);
 
     public static ScenarioParams from(ScenarioParamsSource source) {
         return new ScenarioParams(
@@ -65,7 +70,8 @@ public record ScenarioParams(
                 source.targetBracketRate(), source.rothConversionStartYear(), source.state(),
                 source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest(),
                 source.dividendYield(), source.feeRate(), source.includeDepressionYears(),
-                source.interestYield());
+                source.interestYield(), source.spouseBirthYear(), source.primaryDeathAge(),
+                source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty());
     }
 
     /**

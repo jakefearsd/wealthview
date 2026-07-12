@@ -18,5 +18,9 @@ public record UpdateIncomeSourceRequest(
         @DecimalMin("0") @DecimalMax("1") BigDecimal inflationRate,
         Boolean oneTime,
         String taxTreatment,
-        UUID propertyId
+        UUID propertyId,
+        // Household/survivor modeling (sub-project A): owner in {primary, spouse}, null -> primary.
+        String owner,
+        // Non-SS survivor continuation fraction (0-1, ignored for SS-typed sources); null -> 1.0.
+        @DecimalMin("0") @DecimalMax("1") BigDecimal survivorPercent
 ) {}

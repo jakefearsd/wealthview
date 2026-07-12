@@ -11,7 +11,8 @@ public record LinkedAccountInput(
         AssetAllocation allocation,
         Optional<BigDecimal> expectedReturnOverride,
         BigDecimal costBasis,
-        String accountType
+        String accountType,
+        String owner
 ) implements ProjectionAccountInput {
 
     /**
@@ -24,5 +25,16 @@ public record LinkedAccountInput(
                               String accountType) {
         this(linkedAccountId, initialBalance, annualContribution, allocation, expectedReturnOverride,
                 initialBalance, accountType);
+    }
+
+    /**
+     * Back-compat convenience for call sites predating {@code owner} (household modeling):
+     * defaults to {@code "primary"}, reproducing pre-household behavior byte-for-byte.
+     */
+    public LinkedAccountInput(UUID linkedAccountId, BigDecimal initialBalance, BigDecimal annualContribution,
+                              AssetAllocation allocation, Optional<BigDecimal> expectedReturnOverride,
+                              BigDecimal costBasis, String accountType) {
+        this(linkedAccountId, initialBalance, annualContribution, allocation, expectedReturnOverride,
+                costBasis, accountType, "primary");
     }
 }

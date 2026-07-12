@@ -24,6 +24,7 @@ import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -542,6 +543,153 @@ class ProjectionInputBuilderTest {
         assertThat(result.endAge()).isEqualTo(90);
         assertThat(result.inflationRate()).isEqualByComparingTo(new BigDecimal("0.03"));
         assertThat(result.paramsJson()).isEqualTo("{\"birth_year\":1990}");
+    }
+
+    // ── Household/survivor modeling (sub-project A, T3) ──
+
+    @Test
+    void build_withoutSpouseBirthYear_buildsSingleHousehold() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1968}");
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().isHousehold()).isFalse();
+        assertThat(result.household().primary().birthYear()).isEqualTo(1968);
+        assertThat(result.household().spouse()).isNull();
+    }
+
+    @Test
+    void build_withSpouseBirthYear_buildsTwoPersonHousehold() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().isHousehold()).isTrue();
+        assertThat(result.household().primary().birthYear()).isEqualTo(1968);
+        assertThat(result.household().spouse().birthYear()).isEqualTo(1970);
+    }
+
+    @Test
+    void build_withExplicitDeathAges_usesExplicitValues() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,"
+                        + "\"primary_death_age\":88,\"spouse_death_age\":92}");
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().primary().deathYear()).isEqualTo(1968 + 88);
+        assertThat(result.household().spouse().deathYear()).isEqualTo(1970 + 92);
+    }
+
+    @Test
+    void build_withoutExplicitDeathAges_usesSsaDefaults() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().primary().deathYear())
+                .isEqualTo(1968 + LifeExpectancy.defaultDeathAge(1968));
+        assertThat(result.household().spouse().deathYear())
+                .isEqualTo(1970 + LifeExpectancy.defaultDeathAge(1970));
+    }
+
+    @Test
+    void build_withSecondDeathBeyondHorizon_secondDeathYearEmptyButTransitionYearPresent() {
+        // endAge=90, birthYear=1968 -> horizonEndYear = 2058. Primary dies at 80 (2048, within
+        // horizon, the first death -> transitionYear). Spouse (born 2000) dies at 90 (2090, well
+        // beyond the horizon) -> secondDeathYear is clamped to empty per HouseholdContext#of.
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":2000,\"spouse_death_age\":90,"
+                        + "\"primary_death_age\":80}");
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.household().transitionYear()).contains(2048);
+        assertThat(result.household().secondDeathYear()).isEmpty();
+    }
+
+    @Test
+    void toAccountInput_ownerPersisted_passesThroughToInput() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "traditional");
+        projAcct.setOwner("spouse");
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account.owner()).isEqualTo("spouse");
+    }
+
+    @Test
+    void toAccountInput_ownerNotSet_defaultsToPrimary() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var projAcct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
+        scenario.addAccount(projAcct);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of());
+
+        var account = builder.build(scenario, tenantId).accounts().getFirst();
+
+        assertThat(account.owner()).isEqualTo("primary");
+    }
+
+    @Test
+    void toIncomeSourceInput_ownerAndSurvivorPercentPersisted_passesThrough() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+
+        var incomeSource = new IncomeSourceEntity(
+                tenant, "Pension", "pension",
+                new BigDecimal("24000"), 65, null,
+                BigDecimal.ZERO, false, "taxable");
+        incomeSource.setOwner("spouse");
+        incomeSource.setSurvivorPercent(new BigDecimal("0.5"));
+        var link = new ScenarioIncomeSourceEntity(scenario, incomeSource, null);
+
+        when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
+                .thenReturn(List.of(link));
+
+        var result = builder.build(scenario, tenantId);
+
+        assertThat(result.incomeSources()).hasSize(1);
+        assertThat(result.incomeSources().getFirst().owner()).isEqualTo("spouse");
+        assertThat(result.incomeSources().getFirst().survivorPercent()).isEqualByComparingTo("0.5");
     }
 
     // ── Guardrail Spending Loading Tests ──

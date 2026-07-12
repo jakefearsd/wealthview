@@ -62,4 +62,41 @@ public interface ScenarioParamsSource {
      * by {@code ScenarioParamsParser.includeDepressionYears}.
      */
     Boolean includeDepressionYears();
+
+    /**
+     * Household/survivor modeling (sub-project A): the spouse's birth year. {@code null} means
+     * single-person — every household field is then ignored and the household degenerates
+     * (see {@code HouseholdContext#single}), reproducing pre-household behavior byte-for-byte.
+     */
+    Integer spouseBirthYear();
+
+    /**
+     * The primary's assumed death age. {@code null} resolves to the SSA planning default for the
+     * primary's birth year via {@code LifeExpectancy.defaultDeathAge}. Meaningful even for a
+     * single-person household (bounds the projection horizon truncation).
+     */
+    Integer primaryDeathAge();
+
+    /**
+     * The spouse's assumed death age. {@code null} resolves to the SSA planning default for the
+     * spouse's birth year via {@code LifeExpectancy.defaultDeathAge}. Only meaningful when
+     * {@link #spouseBirthYear()} is set.
+     */
+    Integer spouseDeathAge();
+
+    /**
+     * The fraction of pre-transition spending the survivor keeps from the first-death year
+     * forward (floors, discretionary, and tiers all scale by this factor). {@code null} resolves
+     * to {@code 0.75}; valid range is {@code [0.5, 1.0]}. Only meaningful when
+     * {@link #spouseBirthYear()} is set.
+     */
+    BigDecimal survivorSpendingFactor();
+
+    /**
+     * Whether the household is in a community-property state, which changes the joint-taxable
+     * basis step-up at first death from 50% (common-law default) to 100% of the embedded gain.
+     * {@code null} resolves to {@code false}. Only meaningful when {@link #spouseBirthYear()} is
+     * set.
+     */
+    Boolean communityProperty();
 }

@@ -9,7 +9,8 @@ public record HypotheticalAccountInput(
         AssetAllocation allocation,
         Optional<BigDecimal> expectedReturnOverride,
         BigDecimal costBasis,
-        String accountType
+        String accountType,
+        String owner
 ) implements ProjectionAccountInput {
 
     /**
@@ -21,6 +22,17 @@ public record HypotheticalAccountInput(
                                     AssetAllocation allocation, Optional<BigDecimal> expectedReturnOverride,
                                     String accountType) {
         this(initialBalance, annualContribution, allocation, expectedReturnOverride, initialBalance, accountType);
+    }
+
+    /**
+     * Back-compat convenience for call sites predating {@code owner} (household modeling):
+     * defaults to {@code "primary"}, reproducing pre-household behavior byte-for-byte.
+     */
+    public HypotheticalAccountInput(BigDecimal initialBalance, BigDecimal annualContribution,
+                                    AssetAllocation allocation, Optional<BigDecimal> expectedReturnOverride,
+                                    BigDecimal costBasis, String accountType) {
+        this(initialBalance, annualContribution, allocation, expectedReturnOverride, costBasis, accountType,
+                "primary");
     }
 
     /**

@@ -15,7 +15,8 @@ public record ProjectionAccountResponse(
         BigDecimal costBasis,
         AllocationDto allocation,
         boolean allocationIsOverride,
-        String accountType) {
+        String accountType,
+        String owner) {
 
     /**
      * Builds a response for a projection account. Balance, effective allocation, and cost basis
@@ -41,6 +42,7 @@ public record ProjectionAccountResponse(
                 costBasis,
                 allocation,
                 allocationIsOverride,
-                entity.getAccountType());
+                entity.getAccountType(),
+                entity.getOwner());
     }
 }

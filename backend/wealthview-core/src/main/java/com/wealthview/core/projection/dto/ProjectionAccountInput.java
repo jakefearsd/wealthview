@@ -28,4 +28,13 @@ public sealed interface ProjectionAccountInput
     BigDecimal costBasis();
 
     String accountType();
+
+    /**
+     * Household/survivor modeling (sub-project A): {@code "primary"}, {@code "spouse"}, or
+     * {@code "joint"} ({@code "joint"} only valid for taxable accounts). Every existing
+     * constructor defaults this to {@code "primary"}, reproducing pre-household behavior
+     * byte-for-byte — the deterministic and Monte Carlo engines ignore it until the
+     * owner-aware pool generalization (a later task) consumes it.
+     */
+    String owner();
 }

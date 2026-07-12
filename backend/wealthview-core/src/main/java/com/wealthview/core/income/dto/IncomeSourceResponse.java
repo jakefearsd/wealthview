@@ -19,7 +19,9 @@ public record IncomeSourceResponse(
         UUID propertyId,
         String propertyAddress,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        String owner,
+        BigDecimal survivorPercent
 ) {
     public static IncomeSourceResponse from(IncomeSourceEntity entity) {
         var property = entity.getProperty();
@@ -36,7 +38,9 @@ public record IncomeSourceResponse(
                 property != null ? property.getId() : null,
                 property != null ? property.getAddress() : null,
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getOwner(),
+                entity.getSurvivorPercent()
         );
     }
 }

@@ -67,7 +67,7 @@ class IncomeSourceControllerTest {
                 new BigDecimal("30000"), 67, null,
                 new BigDecimal("0.02"), false, "partially_taxable",
                 null, null,
-                OffsetDateTime.now(), OffsetDateTime.now());
+                OffsetDateTime.now(), OffsetDateTime.now(), null, null);
     }
 
     @Test
@@ -127,7 +127,7 @@ class IncomeSourceControllerTest {
                 new BigDecimal("35000"), 68, null,
                 new BigDecimal("0.025"), false, "partially_taxable",
                 null, null,
-                OffsetDateTime.now(), OffsetDateTime.now());
+                OffsetDateTime.now(), OffsetDateTime.now(), null, null);
         when(incomeSourceService.update(eq(TENANT_ID), eq(SOURCE_ID), any(UpdateIncomeSourceRequest.class)))
                 .thenReturn(updated);
 
@@ -171,7 +171,7 @@ class IncomeSourceControllerTest {
                 new BigDecimal("24000"), 60, null,
                 BigDecimal.ZERO, false, "rental_passive",
                 propertyId, "123 Elm St",
-                OffsetDateTime.now(), OffsetDateTime.now());
+                OffsetDateTime.now(), OffsetDateTime.now(), null, null);
         when(incomeSourceService.create(eq(TENANT_ID), any(CreateIncomeSourceRequest.class)))
                 .thenReturn(response);
 

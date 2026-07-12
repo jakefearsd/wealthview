@@ -132,7 +132,28 @@ class ScenarioCrudServiceTest {
                 new BigDecimal("0.03"), null, null, null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                null, null, null, interestYield, List.of(), null, null, null);
+                null, null, null, interestYield,
+                null, null, null, null, null,
+                List.of(), null, null, null);
+    }
+
+    private ScenarioRequest scenarioRequestWithHousehold(Integer spouseBirthYear, Integer primaryDeathAge,
+                                                          Integer spouseDeathAge, BigDecimal survivorSpendingFactor,
+                                                          Boolean communityProperty) {
+        return new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, null,
+                spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+                List.of(), null, null, null);
+    }
+
+    private ScenarioRequest scenarioRequestWithAccountOwner(String owner, String accountType) {
+        return scenarioRequestWithAccounts(List.of(new CreateProjectionAccountRequest(
+                null, new BigDecimal("100000"), new BigDecimal("5000"),
+                new BigDecimal("0.07"), null, null, accountType, owner)));
     }
 
     private ProjectionScenarioEntity captureSavedScenario() {
@@ -985,6 +1006,199 @@ class ScenarioCrudServiceTest {
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("0.10");
+    }
+
+    // Household/survivor modeling (sub-project A, T3): death-age range, spouse-presence, and
+    // survivor-spending-factor range validation, plus account-owner enum/joint-taxable-only rule.
+
+    @Test
+    void createScenario_primaryDeathAgeAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, 150, null, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("primary_death_age");
+    }
+
+    @Test
+    void createScenario_primaryDeathAgeBelowMin_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, 30, null, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("primary_death_age");
+    }
+
+    @Test
+    void createScenario_primaryDeathAgeWithinRange_doesNotRequireSpouseBirthYear() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithHousehold(null, 88, null, null, null);
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void createScenario_spouseDeathAgeAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(1972, null, 150, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_death_age");
+    }
+
+    @Test
+    void createScenario_spouseDeathAgeWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, null, 88, null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_survivorSpendingFactorWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, null, null, new BigDecimal("0.8"), null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_communityPropertyWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, null, null, null, Boolean.TRUE);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_survivorSpendingFactorBelowMin_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("0.3"), null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("survivor_spending_factor");
+    }
+
+    @Test
+    void createScenario_survivorSpendingFactorAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("1.1"), null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("survivor_spending_factor");
+    }
+
+    @Test
+    void createScenario_householdFieldsWithinRange_persistsInParamsJson() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithHousehold(1972, 88, 90, new BigDecimal("0.8"), Boolean.TRUE);
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getParamsJson()).contains("\"spouse_birth_year\":1972");
+        assertThat(saved.getParamsJson()).contains("\"primary_death_age\":88");
+        assertThat(saved.getParamsJson()).contains("\"spouse_death_age\":90");
+        assertThat(saved.getParamsJson()).contains("\"survivor_spending_factor\":0.8");
+        assertThat(saved.getParamsJson()).contains("\"community_property\":true");
+    }
+
+    @Test
+    void updateScenario_spouseDeathAgeWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithHousehold(null, null, 88, null, null);
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_accountOwnerInvalid_throwsIllegalArgument() {
+        var request = scenarioRequestWithAccountOwner("grandparent", "taxable");
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("owner");
+    }
+
+    @Test
+    void createScenario_jointOwnerOnTraditionalAccount_throwsIllegalArgument() {
+        var request = scenarioRequestWithAccountOwner("joint", "traditional");
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("joint");
+    }
+
+    @Test
+    void createScenario_jointOwnerOnTaxableAccount_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithAccountOwner("joint", "taxable");
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.accounts()).hasSize(1);
+    }
+
+    @Test
+    void createScenario_accountOwnerSpouse_persistsOwnerOnEntity() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithAccountOwner("spouse", "traditional");
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getAccounts().getFirst().getOwner()).isEqualTo("spouse");
+    }
+
+    @Test
+    void createScenario_accountOwnerNull_defaultsToPrimaryOnEntity() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithAccountOwner(null, "taxable");
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getAccounts().getFirst().getOwner()).isEqualTo("primary");
+    }
+
+    @Test
+    void getScenario_accountOwner_echoedInResponse() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null);
+        var acct = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"),
+                new BigDecimal("0"), null, "traditional");
+        acct.setOwner("spouse");
+        scenario.addAccount(acct);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+
+        var result = service.getScenario(tenantId, scenarioId);
+
+        assertThat(result.accounts().getFirst().owner()).isEqualTo("spouse");
     }
 
     @Test

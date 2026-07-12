@@ -33,6 +33,12 @@ public class IncomeSourceService {
             "rental_passive", "rental_active_reps", "rental_active_str",
             "self_employment");
 
+    // Household/survivor modeling (sub-project A): income sources are owned by one person only
+    // (never "joint" -- that concept is account-only, see ScenarioCrudService.validateAccountOwner).
+    private static final Set<String> VALID_OWNERS = Set.of("primary", "spouse");
+    private static final BigDecimal MIN_SURVIVOR_PERCENT = BigDecimal.ZERO;
+    private static final BigDecimal MAX_SURVIVOR_PERCENT = BigDecimal.ONE;
+
     private final IncomeSourceRepository incomeSourceRepository;
     private final PropertyRepository propertyRepository;
     private final TenantLookup tenantLookup;
@@ -52,6 +58,8 @@ public class IncomeSourceService {
         validateIncomeType(request.incomeType());
         var taxTreatment = request.taxTreatment() != null ? request.taxTreatment() : "taxable";
         validateTaxTreatment(taxTreatment);
+        validateOwner(request.owner());
+        validateSurvivorPercent(request.survivorPercent());
 
         var inflationRate = request.inflationRate() != null ? request.inflationRate() : BigDecimal.ZERO;
         var oneTime = request.oneTime() != null && request.oneTime();
@@ -59,6 +67,8 @@ public class IncomeSourceService {
         var entity = new IncomeSourceEntity(tenant, request.name(), request.incomeType(),
                 request.annualAmount(), request.startAge(), request.endAge(),
                 inflationRate, oneTime, taxTreatment);
+        entity.setOwner(request.owner() != null ? request.owner() : "primary");
+        entity.setSurvivorPercent(request.survivorPercent() != null ? request.survivorPercent() : BigDecimal.ONE);
 
         if (request.propertyId() != null) {
             var property = propertyRepository.findByTenant_IdAndId(tenantId, request.propertyId())
@@ -95,6 +105,8 @@ public class IncomeSourceService {
             entity.setIncomeType(request.incomeType());
         }
         validateTaxTreatment(request.taxTreatment());
+        validateOwner(request.owner());
+        validateSurvivorPercent(request.survivorPercent());
 
         entity.setName(request.name());
         entity.setAnnualAmount(request.annualAmount());
@@ -103,6 +115,8 @@ public class IncomeSourceService {
         entity.setInflationRate(request.inflationRate() != null ? request.inflationRate() : BigDecimal.ZERO);
         entity.setOneTime(request.oneTime() != null && request.oneTime());
         entity.setTaxTreatment(request.taxTreatment());
+        entity.setOwner(request.owner() != null ? request.owner() : "primary");
+        entity.setSurvivorPercent(request.survivorPercent() != null ? request.survivorPercent() : BigDecimal.ONE);
 
         if (request.propertyId() != null) {
             var property = propertyRepository.findByTenant_IdAndId(tenantId, request.propertyId())
@@ -136,6 +150,25 @@ public class IncomeSourceService {
         if (!VALID_TAX_TREATMENTS.contains(taxTreatment)) {
             throw new IllegalArgumentException(
                     "Invalid tax treatment: " + taxTreatment + ". Must be one of: " + VALID_TAX_TREATMENTS);
+        }
+    }
+
+    private void validateOwner(String owner) {
+        if (owner == null) {
+            return;
+        }
+        if (!VALID_OWNERS.contains(owner)) {
+            throw new IllegalArgumentException("Invalid owner: " + owner + ". Must be one of: " + VALID_OWNERS);
+        }
+    }
+
+    private void validateSurvivorPercent(BigDecimal survivorPercent) {
+        if (survivorPercent == null) {
+            return;
+        }
+        if (survivorPercent.compareTo(MIN_SURVIVOR_PERCENT) < 0
+                || survivorPercent.compareTo(MAX_SURVIVOR_PERCENT) > 0) {
+            throw new IllegalArgumentException("survivor_percent must be between 0 and 1");
         }
     }
 }

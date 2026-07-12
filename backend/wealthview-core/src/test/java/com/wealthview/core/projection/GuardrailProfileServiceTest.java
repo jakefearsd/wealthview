@@ -1148,6 +1148,131 @@ class GuardrailProfileServiceTest {
         assertThat(hashA).isNotEqualTo(hashB);
     }
 
+    // Household/survivor modeling (sub-project A, T3): every new household field, account owner,
+    // and income-source owner/survivor_percent must be part of the guardrail staleness signature.
+
+    @Test
+    void computeScenarioHash_spouseBirthYearChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1972}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_primaryDeathAgeChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"primary_death_age\":85}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"primary_death_age\":95}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    // The signature hashes the RESOLVED death age (explicit override, or the SSA planning default
+    // for the birth year), not the raw possibly-null field -- an explicit death age that happens
+    // to equal the default must hash identically to leaving it unset, since the engine treats them
+    // identically. LifeExpectancy.defaultDeathAge(1968) == 87.
+    @Test
+    void computeScenarioHash_explicitDeathAgeMatchingSsaDefault_hashesSameAsUnset() {
+        var scenarioUnset = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968}");
+        var scenarioExplicitDefault = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"primary_death_age\":87}");
+
+        var hashUnset = GuardrailProfileService.computeScenarioHash(scenarioUnset, List.of());
+        var hashExplicit = GuardrailProfileService.computeScenarioHash(scenarioExplicitDefault, List.of());
+
+        assertThat(hashUnset).isEqualTo(hashExplicit);
+    }
+
+    @Test
+    void computeScenarioHash_survivorSpendingFactorChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.75}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.9}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_communityPropertyChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":false}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":true}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_accountOwnerChanged_hashChanges() {
+        var scenarioA = scenarioWithSingleAccount();
+        scenarioA.getAccounts().getFirst().setOwner("primary");
+        var scenarioB = scenarioWithSingleAccount();
+        scenarioB.getAccounts().getFirst().setOwner("spouse");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_incomeSourceOwnerChanged_hashChanges() {
+        var scenario = scenarioWithSingleAccount();
+        var incomeSourceId = UUID.randomUUID();
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(
+                        incomeSourceId, new BigDecimal("24000"), "primary", BigDecimal.ONE)));
+        var hashB = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(
+                        incomeSourceId, new BigDecimal("24000"), "spouse", BigDecimal.ONE)));
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_incomeSourceSurvivorPercentChanged_hashChanges() {
+        var scenario = scenarioWithSingleAccount();
+        var incomeSourceId = UUID.randomUUID();
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(
+                        incomeSourceId, new BigDecimal("24000"), "primary", BigDecimal.ONE)));
+        var hashB = GuardrailProfileService.computeScenarioHash(scenario, List.of(
+                new GuardrailProfileService.IncomeSourceSignature(
+                        incomeSourceId, new BigDecimal("24000"), "primary", new BigDecimal("0.5"))));
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
     // The persisted `accounts` collection is an unordered JPA bag; @OrderBy("id") keeps normal
     // reads stable, and scenarioSignature also sorts defensively by id, so the signature (and the
     // seed derived from it) must not depend on collection iteration order.

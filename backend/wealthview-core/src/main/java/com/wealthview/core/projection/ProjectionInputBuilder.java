@@ -31,7 +31,10 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.household.HouseholdContext;
+import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
@@ -90,11 +93,40 @@ public class ProjectionInputBuilder {
         var incomeSources   = resolveIncomeSources(scenario.getId());
         var guardrailSpending = resolveGuardrailSpending(scenario);
         var properties      = resolveProperties(tenantId);
+        var household       = resolveHousehold(scenario);
         var input = new ProjectionInput(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
-                accounts, spendingProfile, null, incomeSources, guardrailSpending, properties);
+                accounts, spendingProfile, null, incomeSources, guardrailSpending, properties, household);
         return new ProjectionInputResult(input, List.copyOf(unclassifiedSymbols));
+    }
+
+    /**
+     * Household/survivor modeling (sub-project A): resolves the scenario's {@link HouseholdContext}
+     * from its params — {@link HouseholdContext#single} when no spouse birth year is set (the
+     * global back-compat anchor: every existing single-person scenario degenerates exactly as
+     * before), otherwise a two-person context with death ages resolved from explicit params or the
+     * SSA planning default, truncated to the scenario's own end-of-horizon calendar year (mirroring
+     * {@code DeterministicProjectionEngine.resolveProjectionParams}'s identical birthYear/endYear
+     * fallback chain so both stay in lockstep).
+     */
+    private HouseholdContext resolveHousehold(ProjectionScenarioEntity scenario) {
+        var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
+        int currentYear = LocalDate.now().getYear();
+        int primaryBirthYear = params.birthYear() != null ? params.birthYear() : currentYear - 35;
+
+        if (params.spouseBirthYear() == null) {
+            return HouseholdContext.single(primaryBirthYear);
+        }
+
+        int endAge = scenario.getEndAge() != null ? scenario.getEndAge() : 90;
+        int horizonEndYear = primaryBirthYear + endAge;
+        int primaryDeathAge = params.primaryDeathAge() != null
+                ? params.primaryDeathAge() : LifeExpectancy.defaultDeathAge(primaryBirthYear);
+        int spouseDeathAge = params.spouseDeathAge() != null
+                ? params.spouseDeathAge() : LifeExpectancy.defaultDeathAge(params.spouseBirthYear());
+        return HouseholdContext.of(primaryBirthYear, primaryDeathAge,
+                params.spouseBirthYear(), spouseDeathAge, horizonEndYear);
     }
 
     private SpendingProfileInput resolveSpendingProfile(ProjectionScenarioEntity scenario) {
@@ -191,7 +223,7 @@ public class ProjectionInputBuilder {
             return new LinkedAccountInput(
                     entity.getLinkedAccount().getId(), liveBalance,
                     entity.getAnnualContribution(), allocation, override,
-                    liveCostBasis, entity.getAccountType());
+                    liveCostBasis, entity.getAccountType(), entity.getOwner());
         }
         AssetAllocation allocation = entity.getAllocation() != null
                 ? parseAllocation(entity.getAllocation())
@@ -200,7 +232,7 @@ public class ProjectionInputBuilder {
         return new HypotheticalAccountInput(
                 entity.getInitialBalance(),
                 entity.getAnnualContribution(), allocation, override,
-                costBasis, entity.getAccountType());
+                costBasis, entity.getAccountType(), entity.getOwner());
     }
 
     private static AssetAllocation parseAllocation(Map<String, BigDecimal> raw) {
@@ -258,7 +290,7 @@ public class ProjectionInputBuilder {
                 amount, source.getStartAge(), source.getEndAge(),
                 source.getInflationRate(), source.isOneTime(), source.getTaxTreatment(),
                 annualOpEx, annualMortgageInterest, annualMortgagePrincipal, annualPropertyTax,
-                depreciationMethod, depreciationByYear);
+                depreciationMethod, depreciationByYear, source.getOwner(), source.getSurvivorPercent());
     }
 
 }

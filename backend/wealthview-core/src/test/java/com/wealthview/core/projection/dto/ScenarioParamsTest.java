@@ -21,7 +21,7 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -48,7 +48,7 @@ class ScenarioParamsTest {
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
                 "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"),
-                new BigDecimal("0.003"), Boolean.TRUE, new BigDecimal("0.045"));
+                new BigDecimal("0.003"), Boolean.TRUE, new BigDecimal("0.045"), null, null, null, null, null);
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
@@ -59,7 +59,7 @@ class ScenarioParamsTest {
     void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new BigDecimal("0.021"), null, null, null);
+                null, null, null, new BigDecimal("0.021"), null, null, null, null, null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -86,7 +86,7 @@ class ScenarioParamsTest {
     void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, new BigDecimal("0.003"), null, null);
+                null, null, null, null, new BigDecimal("0.003"), null, null, null, null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -115,7 +115,7 @@ class ScenarioParamsTest {
     void toJson_interestYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, new BigDecimal("0.04"));
+                null, null, null, null, null, null, new BigDecimal("0.04"), null, null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -144,14 +144,16 @@ class ScenarioParamsTest {
                 null, null, null,
                 null, null, null, null, null, null, null, null,
                 null, null, null,
-                null, null, null, interestYield, List.of(), null, null, null);
+                null, null, null, interestYield,
+                null, null, null, null, null,
+                List.of(), null, null, null);
     }
 
     @Test
     void toJson_includeDepressionYearsPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, Boolean.TRUE, null);
+                null, null, null, null, null, Boolean.TRUE, null, null, null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -190,6 +192,108 @@ class ScenarioParamsTest {
                 null, null, null, null, null, null, null, null,
                 null, null, null,
                 null, null, includeDepressionYears, null, null, null, null);
+    }
+
+    // Household/survivor modeling (sub-project A, T3): mirrors the interestYield/
+    // includeDepressionYears test pattern exactly for each new field.
+
+    @Test
+    void toJson_householdFieldsPresent_writesSnakeCaseKeys() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                1972, 88, 90, new BigDecimal("0.8"), Boolean.TRUE);
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("spouse_birth_year").asInt()).isEqualTo(1972);
+        assertThat(node.get("primary_death_age").asInt()).isEqualTo(88);
+        assertThat(node.get("spouse_death_age").asInt()).isEqualTo(90);
+        assertThat(node.get("survivor_spending_factor").decimalValue()).isEqualByComparingTo("0.8");
+        assertThat(node.get("community_property").asBoolean()).isTrue();
+    }
+
+    @Test
+    void from_spouseBirthYearPresent_passesThrough() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).spouseBirthYear()).isEqualTo(1972);
+    }
+
+    @Test
+    void from_spouseBirthYearNull_staysNullForDefault() {
+        var request = scenarioRequestWithHousehold(null, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).spouseBirthYear()).isNull();
+    }
+
+    @Test
+    void from_primaryDeathAgePresent_passesThrough() {
+        var request = scenarioRequestWithHousehold(1972, 88, null, null, null);
+
+        assertThat(ScenarioParams.from(request).primaryDeathAge()).isEqualTo(88);
+    }
+
+    @Test
+    void from_primaryDeathAgeNull_staysNullForDefault() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).primaryDeathAge()).isNull();
+    }
+
+    @Test
+    void from_spouseDeathAgePresent_passesThrough() {
+        var request = scenarioRequestWithHousehold(1972, null, 90, null, null);
+
+        assertThat(ScenarioParams.from(request).spouseDeathAge()).isEqualTo(90);
+    }
+
+    @Test
+    void from_spouseDeathAgeNull_staysNullForDefault() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).spouseDeathAge()).isNull();
+    }
+
+    @Test
+    void from_survivorSpendingFactorPresent_passesThrough() {
+        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("0.8"), null);
+
+        assertThat(ScenarioParams.from(request).survivorSpendingFactor()).isEqualByComparingTo("0.8");
+    }
+
+    @Test
+    void from_survivorSpendingFactorNull_staysNullForDefault() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).survivorSpendingFactor()).isNull();
+    }
+
+    @Test
+    void from_communityPropertyPresent_passesThrough() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, Boolean.TRUE);
+
+        assertThat(ScenarioParams.from(request).communityProperty()).isTrue();
+    }
+
+    @Test
+    void from_communityPropertyNull_staysNullForDefault() {
+        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).communityProperty()).isNull();
+    }
+
+    private ScenarioRequest scenarioRequestWithHousehold(Integer spouseBirthYear, Integer primaryDeathAge,
+                                                          Integer spouseDeathAge, BigDecimal survivorSpendingFactor,
+                                                          Boolean communityProperty) {
+        return new ScenarioRequest(
+                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, null,
+                spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+                List.of(), null, null, null);
     }
 
     @Test
