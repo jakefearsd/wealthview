@@ -38,5 +38,32 @@ public record GuardrailOptimizationRequest(
         BigDecimal rmdTargetBracketRate,
         Integer traditionalExhaustionBuffer,
         BigDecimal rmdBracketHeadroom,
-        BigDecimal dynamicSequencingBracketRate
-) {}
+        BigDecimal dynamicSequencingBracketRate,
+        // T24: per-profile toggle for the sustainability search gate; see #gateOnAdaptiveRules().
+        Boolean gateOnAdaptiveRules
+) {
+
+    /**
+     * Back-compat convenience for callers that predate the T24 {@link #gateOnAdaptiveRules} toggle.
+     * Defaults it to {@code null} (treated as {@code false} downstream by
+     * {@code GuardrailProfileService.buildOptimizationInput}) so every existing positional call site
+     * (controller tests, service tests) keeps compiling and behaving identically -- the sustainability
+     * search's gate stays on the no-adaptation metric, exactly as before this toggle existed.
+     */
+    // ExcessiveParameterList: mirrors the record's own 21-field canonical constructor (pre-T24
+    // shape) so existing positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailOptimizationRequest(
+            UUID scenarioId, String name, BigDecimal essentialFloor, BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean, Integer trialCount, BigDecimal confidenceLevel,
+            List<GuardrailPhaseInput> phases, BigDecimal portfolioFloor, BigDecimal maxAnnualAdjustmentRate,
+            Integer phaseBlendYears, String riskTolerance, Integer cashReserveYears, BigDecimal cashReturnRate,
+            Boolean optimizeConversions, BigDecimal conversionBracketRate, BigDecimal rmdTargetBracketRate,
+            Integer traditionalExhaustionBuffer, BigDecimal rmdBracketHeadroom,
+            BigDecimal dynamicSequencingBracketRate) {
+        this(scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance, cashReserveYears,
+                cashReturnRate, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
+                traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, null);
+    }
+}

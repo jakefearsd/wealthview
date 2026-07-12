@@ -210,6 +210,88 @@ class GuardrailProfileResponseTest {
         assertThat(response.originalFloorSuccessProbability()).isEqualByComparingTo("0.8200");
     }
 
+    // ---- T24: gated_on ----
+
+    @Test
+    void from_entityGateOnAdaptiveRulesFalse_gatedOnIsNoAdaptation() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+        when(entity.isGateOnAdaptiveRules()).thenReturn(false);
+        when(entity.getMaxAnnualAdjustmentRate()).thenReturn(new BigDecimal("0.10"));
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
+    @Test
+    void from_entityGateOnAdaptiveRulesTrueWithPositiveRate_gatedOnIsWithRules() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+        when(entity.isGateOnAdaptiveRules()).thenReturn(true);
+        when(entity.getMaxAnnualAdjustmentRate()).thenReturn(new BigDecimal("0.10"));
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_WITH_RULES);
+    }
+
+    @Test
+    void from_entityGateOnAdaptiveRulesTrueButZeroRate_gatedOnFallsBackToNoAdaptation() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+        when(entity.isGateOnAdaptiveRules()).thenReturn(true);
+        when(entity.getMaxAnnualAdjustmentRate()).thenReturn(BigDecimal.ZERO);
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
+    @Test
+    void from_entityGateOnAdaptiveRulesTrueButNullRate_gatedOnFallsBackToNoAdaptation() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+        when(entity.isGateOnAdaptiveRules()).thenReturn(true);
+        when(entity.getMaxAnnualAdjustmentRate()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
+    @Test
+    void resolveGatedOn_toggleOnWithPositiveRate_returnsWithRules() {
+        assertThat(GuardrailProfileResponse.resolveGatedOn(true, new BigDecimal("0.05")))
+                .isEqualTo(GuardrailProfileResponse.GATED_ON_WITH_RULES);
+    }
+
+    @Test
+    void resolveGatedOn_toggleOff_returnsNoAdaptationRegardlessOfRate() {
+        assertThat(GuardrailProfileResponse.resolveGatedOn(false, new BigDecimal("0.05")))
+                .isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
+    @Test
+    void resolveGatedOn_toggleOnZeroRate_returnsNoAdaptation() {
+        assertThat(GuardrailProfileResponse.resolveGatedOn(true, BigDecimal.ZERO))
+                .isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
+    @Test
+    void resolveGatedOn_toggleOnNullRate_returnsNoAdaptation() {
+        assertThat(GuardrailProfileResponse.resolveGatedOn(true, null))
+                .isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
+    }
+
     @Test
     void isOlderThan24Hours_withRecentUpdate_returnsFalse() {
         var entity = mock(GuardrailSpendingProfileEntity.class);

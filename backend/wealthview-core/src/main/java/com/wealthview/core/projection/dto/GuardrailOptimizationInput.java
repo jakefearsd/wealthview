@@ -42,6 +42,17 @@ import java.util.List;
  *         {@code ScenarioParamsParser.DEFAULT_INTEREST_YIELD}). Audit C1: splits {@link
  *         #dividendYield} by the taxable pool's own allocation — the bond+cash share is taxed
  *         ORDINARY at this rate instead of at LTCG/qualified-dividend rates.
+ * @param gateOnAdaptiveRules T24: when {@code true} (and {@link #maxAnnualAdjustmentRate} is
+ *         positive), {@code SustainabilitySearch}'s candidate evaluation runs each candidate
+ *         discretionary schedule WITH the audit-C9 simulated guardrail-adaptation rule active and
+ *         gates on ITS success rate, instead of the no-adaptation success rate every prior caller
+ *         used. Default {@code false} preserves the original no-adaptation gate exactly.
+ *         {@link #maxAnnualAdjustmentRate} not being positive makes the rule a no-op (it cannot move
+ *         spending), so the search silently falls back to the no-adaptation gate in that case too.
+ *         Does not affect {@link GuardrailProfileResponse#successProbability}/
+ *         {@link GuardrailProfileResponse#successProbabilityWithRules}, which are ALWAYS the
+ *         no-adaptation / with-rules rates respectively on the final schedule — only which one
+ *         certified the recommendation during the search.
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -74,7 +85,8 @@ public record GuardrailOptimizationInput(
         BigDecimal feeRate,
         int baseYear,
         boolean includeDepressionYears,
-        BigDecimal interestYield
+        BigDecimal interestYield,
+        boolean gateOnAdaptiveRules
 ) {
 
     /**
@@ -105,6 +117,6 @@ public record GuardrailOptimizationInput(
                 maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
                 withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
-                feeRate, retirementDate.getYear(), false, null);
+                feeRate, retirementDate.getYear(), false, null, false);
     }
 }

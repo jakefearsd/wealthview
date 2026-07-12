@@ -203,6 +203,7 @@ public class GuardrailProfileService {
         entity.setCashReserveYears(optimizationInput.cashReserveYears());
         entity.setCashReturnRate(optimizationInput.cashReturnRate());
         entity.setRiskTolerance(request.riskTolerance());
+        entity.setGateOnAdaptiveRules(optimizationInput.gateOnAdaptiveRules());
     }
 
     private void serializeGuardrailJson(GuardrailSpendingProfileEntity entity,
@@ -282,7 +283,9 @@ public class GuardrailProfileService {
                 existing.getRmdTargetBracketRate(),
                 existing.getTraditionalExhaustionBuffer(),
                 existing.getRmdBracketHeadroom(),
-                null);
+                null,
+                // T24: reoptimize honors the profile's stored search-gate toggle.
+                existing.isGateOnAdaptiveRules());
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -487,7 +490,8 @@ public class GuardrailProfileService {
                 feeRate,
                 baseYear,
                 Boolean.TRUE.equals(includeDepressionYears),
-                interestYield
+                interestYield,
+                Boolean.TRUE.equals(request.gateOnAdaptiveRules())
         );
     }
 

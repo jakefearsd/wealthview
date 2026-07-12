@@ -474,6 +474,64 @@ class GuardrailProfileServiceTest {
     }
 
     @Test
+    void reoptimize_storedGateOnAdaptiveRulesTrue_honorsFlagOnInput() {
+        var entity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Existing Plan", new BigDecimal("30000"));
+        entity.setPhases("[]");
+        entity.setYearlySpending("[]");
+        entity.setScenarioHash("old-hash");
+        entity.setReturnMean(new BigDecimal("0.10"));
+        entity.setTrialCount(5000);
+        entity.setConfidenceLevel(new BigDecimal("0.95"));
+        entity.setTerminalBalanceTarget(BigDecimal.ZERO);
+        entity.setGateOnAdaptiveRules(true);
+
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
+                .thenReturn(Optional.of(entity));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().gateOnAdaptiveRules()).isTrue();
+    }
+
+    @Test
+    void reoptimize_storedGateOnAdaptiveRulesFalse_honorsFlagOnInput() {
+        var entity = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Existing Plan", new BigDecimal("30000"));
+        entity.setPhases("[]");
+        entity.setYearlySpending("[]");
+        entity.setScenarioHash("old-hash");
+        entity.setReturnMean(new BigDecimal("0.10"));
+        entity.setTrialCount(5000);
+        entity.setConfidenceLevel(new BigDecimal("0.95"));
+        entity.setTerminalBalanceTarget(BigDecimal.ZERO);
+        // gateOnAdaptiveRules left at its default (false).
+
+        when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
+                .thenReturn(Optional.of(entity));
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.of(entity));
+        var captor = ArgumentCaptor.forClass(GuardrailOptimizationInput.class);
+        when(spendingOptimizer.optimize(captor.capture())).thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        service.reoptimize(tenantId, scenarioId);
+
+        assertThat(captor.getValue().gateOnAdaptiveRules()).isFalse();
+    }
+
+    @Test
     void reoptimize_notFound_throws() {
         when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
                 .thenReturn(Optional.empty());
@@ -608,6 +666,65 @@ class GuardrailProfileServiceTest {
         assertThat(input.cashReturnRate()).isEqualByComparingTo("0.015");
         assertThat(input.terminalBalanceTarget()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(input.phases()).isEmpty();
+    }
+
+    // ---- T24: gate_on_adaptive_rules plumbing ----
+
+    @Test
+    void optimize_gateOnAdaptiveRulesOmitted_defaultsToFalseOnInput() {
+        var input = captureOptimizationInput(buildRequest(req -> req.withGateOnAdaptiveRules(null)));
+
+        assertThat(input.gateOnAdaptiveRules()).isFalse();
+    }
+
+    @Test
+    void optimize_gateOnAdaptiveRulesFalseExplicitly_staysFalseOnInput() {
+        var input = captureOptimizationInput(buildRequest(req -> req.withGateOnAdaptiveRules(false)));
+
+        assertThat(input.gateOnAdaptiveRules()).isFalse();
+    }
+
+    @Test
+    void optimize_gateOnAdaptiveRulesTrue_propagatesToInputEntityAndResponse() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(baseOptimizerResponse());
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = buildRequest(req -> req.withGateOnAdaptiveRules(true)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10")));
+        var result = service.optimize(tenantId, scenarioId, request);
+
+        // Entity round-trip: the toggle persists on the saved entity ...
+        assertThat(savedCaptor.getValue().isGateOnAdaptiveRules()).isTrue();
+        // ... and the final response (re-hydrated from that SAME saved entity, per
+        // GuardrailProfileResponse.from) echoes gated_on = with_rules, since the entity's
+        // max_annual_adjustment_rate is positive.
+        assertThat(result.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_WITH_RULES);
+    }
+
+    @Test
+    void optimize_gateOnAdaptiveRulesTrueButZeroAdjustmentRate_responseGatedOnStaysNoAdaptation() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(baseOptimizerResponse());
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = buildRequest(req -> req.withGateOnAdaptiveRules(true)
+                .withMaxAnnualAdjustmentRate(BigDecimal.ZERO));
+        var result = service.optimize(tenantId, scenarioId, request);
+
+        // The toggle is on, but a zero adjustment rate makes the rule a no-op -- gated_on reflects
+        // what ACTUALLY certified the run, not raw user intent.
+        assertThat(result.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_NO_ADAPTATION);
     }
 
     @Test
@@ -1250,8 +1367,10 @@ class GuardrailProfileServiceTest {
         private Integer buffer;
         private BigDecimal rmdBracketHeadroom;
         private BigDecimal dynamicSequencingBracketRate;
+        private Boolean gateOnAdaptiveRules;
 
         RequestBuilder(UUID scenarioId) { this.scenarioId = scenarioId; }
+        RequestBuilder withGateOnAdaptiveRules(Boolean v) { this.gateOnAdaptiveRules = v; return this; }
         RequestBuilder withConfidence(BigDecimal v) { this.confidence = v; return this; }
         RequestBuilder withRiskTolerance(String v) { this.riskTolerance = v; return this; }
         RequestBuilder withReturnMean(BigDecimal v) { this.returnMean = v; return this; }
@@ -1274,7 +1393,7 @@ class GuardrailProfileServiceTest {
                     portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance,
                     cashReserveYears, cashReturnRate, optimizeConversions,
                     conversionBracketRate, rmdTargetBracketRate, buffer,
-                    rmdBracketHeadroom, dynamicSequencingBracketRate);
+                    rmdBracketHeadroom, dynamicSequencingBracketRate, gateOnAdaptiveRules);
         }
     }
 }
