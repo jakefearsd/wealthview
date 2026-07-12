@@ -153,10 +153,12 @@ final class GuardrailResponseBuilder {
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
                 input.phaseBlendYears(), null,
                 input.cashReserveYears(), input.cashReturnRate(),
-                convScheduleResponse, null,
-                floorReduced, originalFloorSuccessProbability, successProbabilityWithRules,
-                // T24: which metric actually certified this run's search gate.
-                GuardrailProfileResponse.resolveGatedOn(input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate()));
+                convScheduleResponse,
+                new GuardrailProfileResponse.Disclosure(null, floorReduced, originalFloorSuccessProbability,
+                        successProbabilityWithRules,
+                        // T24: which metric actually certified this run's search gate.
+                        GuardrailProfileResponse.resolveGatedOn(
+                                input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate())));
     }
 
     /** Pool balances/order the terminal simulation grows and withdraws from (audit C6 extraction). */

@@ -236,8 +236,8 @@ class GuardrailControllerTest {
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, new BigDecimal("0.10"), 0, null, 2, new BigDecimal("0.04"), null,
-                null, false, null, new BigDecimal("0.8000"),
-                GuardrailProfileResponse.GATED_ON_WITH_RULES);
+                new GuardrailProfileResponse.Disclosure(null, false, null, new BigDecimal("0.8000"),
+                        GuardrailProfileResponse.GATED_ON_WITH_RULES));
         var requestCaptor = ArgumentCaptor.forClass(GuardrailOptimizationRequest.class);
         when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID), requestCaptor.capture()))
                 .thenReturn(gatedResponse);

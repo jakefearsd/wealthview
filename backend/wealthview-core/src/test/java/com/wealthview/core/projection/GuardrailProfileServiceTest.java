@@ -157,8 +157,9 @@ class GuardrailProfileServiceTest {
                 new BigDecimal("0"), new BigDecimal("0"), new BigDecimal("1.0000"),
                 new BigDecimal("0"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
-                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null, null,
-                true, new BigDecimal("0.0000"));
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null,
+                new GuardrailProfileResponse.Disclosure(null, true, new BigDecimal("0.0000"), null,
+                        GuardrailProfileResponse.GATED_ON_NO_ADAPTATION));
 
         when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
                 .thenReturn(optimizerResponse);
