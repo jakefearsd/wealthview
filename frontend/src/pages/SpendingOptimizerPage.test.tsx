@@ -42,6 +42,7 @@ const mockScenario: Scenario = {
     accounts: [{
         id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 500000, annual_contribution: 0,
         expected_return: 0.07, account_type: 'taxable', cost_basis: null, allocation: null, allocation_is_override: false,
+        owner: 'primary',
     }],
     spending_profile: null,
     guardrail_profile: null,

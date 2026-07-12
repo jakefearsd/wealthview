@@ -55,7 +55,7 @@ function makeScenario(account: Partial<ProjectionAccount>): Scenario {
         accounts: [{
             id: 'a1', linked_account_id: null, name: 'Brokerage', initial_balance: 100000,
             annual_contribution: 10000, expected_return: null, account_type: 'taxable',
-            cost_basis: null, allocation: null, allocation_is_override: false, ...account,
+            cost_basis: null, allocation: null, allocation_is_override: false, owner: 'primary', ...account,
         }],
         spending_profile: null,
         guardrail_profile: null,
@@ -131,6 +131,69 @@ function includeDepressionYearsCheckbox(): HTMLInputElement {
         throw new Error('Include depression years checkbox not found');
     }
     return input as HTMLInputElement;
+}
+
+function spouseBirthYearInput(): HTMLInputElement {
+    const label = screen.getByText('Spouse Birth Year');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Spouse Birth Year input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function primaryDeathAgeInput(): HTMLInputElement {
+    const label = screen.getByText('Primary Death Age');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Primary Death Age input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function spouseDeathAgeInput(): HTMLInputElement {
+    const label = screen.getByText('Spouse Death Age');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Spouse Death Age input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function survivorSpendingFactorInput(): HTMLInputElement {
+    const label = screen.getByText('Survivor Spending Factor (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Survivor Spending Factor input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function communityPropertyCheckbox(): HTMLInputElement {
+    const label = screen.getByText('Community Property State');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Community Property checkbox not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function ownerSelect(): HTMLSelectElement {
+    const label = screen.getByText('Owner');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Owner select not found');
+    }
+    return select as HTMLSelectElement;
+}
+
+function accountTypeSelect(): HTMLSelectElement {
+    const label = screen.getByText('Account Type');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Account Type select not found');
+    }
+    return select as HTMLSelectElement;
 }
 
 describe('ScenarioForm', () => {
@@ -496,5 +559,212 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.accounts[0].expected_return).toBe(0);
+    });
+
+    describe('household / survivor modeling', () => {
+        it('hides household death-age, survivor, and community-property fields by default (no spouse)', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(spouseBirthYearInput().value).toBe('');
+            expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
+            expect(screen.queryByText('Spouse Death Age')).not.toBeInTheDocument();
+            expect(screen.queryByText('Survivor Spending Factor (%)')).not.toBeInTheDocument();
+            expect(screen.queryByText('Community Property State')).not.toBeInTheDocument();
+            expect(screen.queryByText('Owner')).not.toBeInTheDocument();
+        });
+
+        it('reveals the dependent household fields once a spouse birth year is entered', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+
+            expect(screen.getByText('Primary Death Age')).toBeInTheDocument();
+            expect(screen.getByText('Spouse Death Age')).toBeInTheDocument();
+            expect(screen.getByText('Survivor Spending Factor (%)')).toBeInTheDocument();
+            expect(screen.getByText('Community Property State')).toBeInTheDocument();
+            expect(survivorSpendingFactorInput().value).toBe('75');
+            expect(communityPropertyCheckbox().checked).toBe(false);
+        });
+
+        it('clears (nulls) the dependent household fields, hiding them again, when spouse birth year is cleared', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(primaryDeathAgeInput(), { target: { value: '85' } });
+            fireEvent.change(spouseDeathAgeInput(), { target: { value: '88' } });
+            fireEvent.change(survivorSpendingFactorInput(), { target: { value: '60' } });
+            fireEvent.click(communityPropertyCheckbox());
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '' } });
+
+            expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
+
+            // Re-adding a spouse shows fresh (not stale) defaults, not the previously entered values.
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1972' } });
+            expect(primaryDeathAgeInput().value).toBe('');
+            expect(spouseDeathAgeInput().value).toBe('');
+            expect(survivorSpendingFactorInput().value).toBe('75');
+            expect(communityPropertyCheckbox().checked).toBe(false);
+        });
+
+        it('submits every household field as null for a single-person scenario', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.spouse_birth_year).toBeNull();
+            expect(call.primary_death_age).toBeNull();
+            expect(call.spouse_death_age).toBeNull();
+            expect(call.survivor_spending_factor).toBeNull();
+            expect(call.community_property).toBeNull();
+        });
+
+        it('submits entered household fields, converting the survivor spending factor to a decimal', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(primaryDeathAgeInput(), { target: { value: '85' } });
+            fireEvent.change(spouseDeathAgeInput(), { target: { value: '88' } });
+            fireEvent.change(survivorSpendingFactorInput(), { target: { value: '70' } });
+            fireEvent.click(communityPropertyCheckbox());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.spouse_birth_year).toBe(1970);
+            expect(call.primary_death_age).toBe(85);
+            expect(call.spouse_death_age).toBe(88);
+            expect(call.survivor_spending_factor).toBeCloseTo(0.70);
+            expect(call.community_property).toBe(true);
+        });
+
+        it('serializes death ages as null (not omitted) when left blank with a spouse set, using a != null guard', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            // Leave primary/spouse death age blank -- they must serialize as null, not 0 or undefined.
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.primary_death_age).toBeNull();
+            expect(call.spouse_death_age).toBeNull();
+            expect(call.survivor_spending_factor).toBeCloseTo(0.75);
+            expect(call.community_property).toBe(false);
+        });
+
+        it('bounds the death-age inputs to 50-120', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+
+            expect(primaryDeathAgeInput().min).toBe('50');
+            expect(primaryDeathAgeInput().max).toBe('120');
+            expect(spouseDeathAgeInput().min).toBe('50');
+            expect(spouseDeathAgeInput().max).toBe('120');
+        });
+
+        it('hydrates household fields from an existing scenario\'s params_json and round-trips them unchanged', async () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({
+                spouse_birth_year: 1958,
+                primary_death_age: 85,
+                spouse_death_age: 90,
+                survivor_spending_factor: 0.70,
+                community_property: true,
+            });
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(spouseBirthYearInput().value).toBe('1958');
+            expect(primaryDeathAgeInput().value).toBe('85');
+            expect(spouseDeathAgeInput().value).toBe('90');
+            expect(survivorSpendingFactorInput().value).toBe('70');
+            expect(communityPropertyCheckbox().checked).toBe(true);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.spouse_birth_year).toBe(1958);
+            expect(call.primary_death_age).toBe(85);
+            expect(call.spouse_death_age).toBe(90);
+            expect(call.survivor_spending_factor).toBeCloseTo(0.70);
+            expect(call.community_property).toBe(true);
+        });
+
+        it('hydrates a single-person scenario (no spouse_birth_year in params_json) with household fields hidden', () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({ primary_death_age: 85 });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(spouseBirthYearInput().value).toBe('');
+            expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
+        });
+
+        it('does not render an account Owner select for a single-person scenario', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.queryByText('Owner')).not.toBeInTheDocument();
+        });
+
+        it('round-trips an account owner selection once household is enabled', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            const scenario = makeScenario({ owner: 'spouse' });
+            scenario.params_json = JSON.stringify({ spouse_birth_year: 1970 });
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(ownerSelect().value).toBe('spouse');
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.accounts[0].owner).toBe('spouse');
+        });
+
+        it('disables the joint owner option for a non-taxable account and resets a stale joint selection to primary', () => {
+            setupMocks();
+            const scenario = makeScenario({ owner: 'joint', account_type: 'taxable' });
+            scenario.params_json = JSON.stringify({ spouse_birth_year: 1970 });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(ownerSelect().value).toBe('joint');
+            const jointOptionBefore = Array.from(ownerSelect().options).find(o => o.value === 'joint');
+            expect(jointOptionBefore?.disabled).toBe(false);
+
+            fireEvent.change(accountTypeSelect(), { target: { value: 'traditional' } });
+
+            expect(ownerSelect().value).toBe('primary');
+            const jointOptionAfter = Array.from(ownerSelect().options).find(o => o.value === 'joint');
+            expect(jointOptionAfter?.disabled).toBe(true);
+        });
     });
 });

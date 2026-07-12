@@ -43,6 +43,8 @@ const SOURCE: IncomeSource = {
     property_address: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    owner: 'primary',
+    survivor_percent: 1,
 };
 
 const CREATE: CreateIncomeSourceRequest = {
@@ -55,6 +57,8 @@ const CREATE: CreateIncomeSourceRequest = {
     one_time: false,
     tax_treatment: 'partially_taxable',
     property_id: null,
+    owner: 'primary',
+    survivor_percent: null,
 };
 
 const UPDATE: UpdateIncomeSourceRequest = { ...CREATE, annual_amount: 32000 };

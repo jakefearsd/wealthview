@@ -33,6 +33,27 @@ const ACCOUNT_TYPE_HELP: Record<string, string> = {
     roth: 'After-tax contributions. Growth and qualified withdrawals in retirement are completely tax-free.',
 };
 
+const MIN_DEATH_AGE = 50;
+const MAX_DEATH_AGE = 120;
+const DEFAULT_SURVIVOR_SPENDING_FACTOR = 75;
+
+/**
+ * Client-side, DISPLAY-ONLY mirror of the backend's SSA 2021 period-life-table planning defaults
+ * (com.wealthview.core.projection.household.LifeExpectancy#cohortDeathAge). Used only to render a
+ * placeholder hint on the death-age inputs before first save — the server does not echo resolved
+ * defaults in params_json until a death age is actually set. Keep in sync manually if the backend
+ * cohort table changes.
+ */
+function ssaDefaultDeathAge(birthYear: number): number {
+    if (birthYear <= 1940) return 84;
+    if (birthYear <= 1950) return 85;
+    if (birthYear <= 1960) return 86;
+    if (birthYear <= 1970) return 87;
+    if (birthYear <= 1980) return 88;
+    if (birthYear <= 1990) return 89;
+    return 90;
+}
+
 interface ScenarioFormProps {
     initialValues?: Scenario | null;
     onSubmit: (data: CreateScenarioRequest) => Promise<void>;
@@ -65,6 +86,11 @@ interface ScenarioFormFields {
     interestYield: number | null;
     includeDepressionYears: boolean;
     spendingPlanSelection: string;
+    spouseBirthYear: number | null;
+    primaryDeathAge: number | null;
+    spouseDeathAge: number | null;
+    survivorSpendingFactor: number;
+    communityProperty: boolean;
 }
 
 function defaultAccount(): ScenarioAccountInput {
@@ -78,6 +104,7 @@ function defaultAccount(): ScenarioAccountInput {
         account_type: 'taxable',
         cost_basis: null,
         allocation: null,
+        owner: 'primary',
     };
 }
 
@@ -121,6 +148,13 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         interestYield: parsedParams.interest_yield != null ? parsedParams.interest_yield * 100 : 4.0,
         includeDepressionYears: parsedParams.include_depression_years ?? false,
         spendingPlanSelection,
+        spouseBirthYear: parsedParams.spouse_birth_year ?? null,
+        primaryDeathAge: parsedParams.primary_death_age ?? null,
+        spouseDeathAge: parsedParams.spouse_death_age ?? null,
+        survivorSpendingFactor: parsedParams.survivor_spending_factor != null
+            ? toPercent(parsedParams.survivor_spending_factor)
+            : DEFAULT_SURVIVOR_SPENDING_FACTOR,
+        communityProperty: parsedParams.community_property ?? false,
     };
 }
 
@@ -150,6 +184,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             // so re-saving without touching it keeps sending null (auto-derive) rather than
             // freezing a snapshot of the derived mix as a permanent override.
             allocation: a.allocation_is_override ? (a.allocation ?? null) : null,
+            owner: a.owner || 'primary',
         })) ?? [defaultAccount()]
     );
     // Parallel-indexed with `accounts`: the effective (derived-or-override) mix the backend last
@@ -174,10 +209,40 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
         dividendYield, feeRate, interestYield, includeDepressionYears, spendingPlanSelection,
+        spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
     } = fields;
 
+    const household = spouseBirthYear != null;
+
+    // Clearing the spouse birth year nulls (and hides) every dependent household field — a
+    // household field with no spouse is meaningless, mirrors the backend's own validation
+    // (ScenarioCrudService.validateHouseholdFields), and guarantees a stale value can't sneak
+    // back into the payload if the user re-adds a spouse later.
+    function handleSpouseBirthYearChange(raw: string) {
+        const value = raw === '' ? null : Number(raw);
+        setFields(prev => ({
+            ...prev,
+            spouseBirthYear: value,
+            ...(value == null ? {
+                primaryDeathAge: null,
+                spouseDeathAge: null,
+                survivorSpendingFactor: DEFAULT_SURVIVOR_SPENDING_FACTOR,
+                communityProperty: false,
+            } : {}),
+        }));
+    }
+
     function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null | AllocationInput) {
-        setAccounts(prev => prev.map((a, i) => i === index ? { ...a, [field]: value } : a));
+        setAccounts(prev => prev.map((a, i) => {
+            if (i !== index) return a;
+            const updated = { ...a, [field]: value };
+            // "joint" is only valid for taxable accounts -- if the type changes away from taxable
+            // while joint is selected, fall back to primary rather than submit an invalid pair.
+            if (field === 'account_type' && updated.owner === 'joint' && value !== 'taxable') {
+                updated.owner = 'primary';
+            }
+            return updated;
+        }));
     }
 
     function customizeAllocation(index: number) {
@@ -197,17 +262,21 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         }
         const acct = existingAccounts.find(a => a.id === accountId);
         if (acct) {
+            const newAccountType = mapAccountType(acct.type);
             setAccounts(prev => prev.map((a, i) => i === index ? {
                 ...a,
                 linked_account_id: acct.id,
                 initial_balance: acct.balance,
-                account_type: mapAccountType(acct.type),
+                account_type: newAccountType,
                 // Linking derives allocation, cost basis, and return from the account's holdings, so
                 // clear any stale manual override carried over from the row's prior state — a
                 // leftover override is NOT link-gated and would wrongly apply to the new account.
                 allocation: null,
                 cost_basis: null,
                 expected_return: null,
+                // "joint" is only valid for taxable accounts -- drop a stale joint owner if the
+                // newly-linked account isn't taxable, same guard as a manual type change.
+                owner: a.owner === 'joint' && newAccountType !== 'taxable' ? 'primary' : a.owner,
             } : a));
             // Newly linked account: we don't have a fetched derived mix for it yet (that
             // requires a projection run), so drop any stale summary from a previous selection.
@@ -250,6 +319,11 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 fee_rate: feeRate != null ? feeRate / 100 : undefined,
                 interest_yield: interestYield != null ? interestYield / 100 : undefined,
                 include_depression_years: includeDepressionYears,
+                spouse_birth_year: spouseBirthYear,
+                primary_death_age: household && primaryDeathAge != null ? primaryDeathAge : null,
+                spouse_death_age: household && spouseDeathAge != null ? spouseDeathAge : null,
+                survivor_spending_factor: household ? survivorSpendingFactor / 100 : null,
+                community_property: household ? communityProperty : null,
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({
@@ -476,6 +550,76 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 </div>
             </div>
 
+            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
+                <h4 style={{ marginBottom: '0.75rem' }}>Spouse / Household</h4>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+                    <FormField label="Spouse Birth Year" helpText="Leave blank for a single-person household. Set to model a spouse, survivor transitions, and joint accounts.">
+                        <input
+                            style={inputStyle}
+                            type="number"
+                            value={spouseBirthYear ?? ''}
+                            onChange={e => handleSpouseBirthYearChange(e.target.value)}
+                        />
+                    </FormField>
+                    {household && (
+                        <>
+                            <FormField
+                                label="Primary Death Age"
+                                helpText="Assumed planning age at which the primary passes away (50-120). Blank uses the SSA planning default."
+                            >
+                                <input
+                                    style={inputStyle}
+                                    type="number"
+                                    min={MIN_DEATH_AGE}
+                                    max={MAX_DEATH_AGE}
+                                    placeholder={`SSA default (~${ssaDefaultDeathAge(birthYear)})`}
+                                    value={primaryDeathAge ?? ''}
+                                    onChange={e => setField('primaryDeathAge', e.target.value === '' ? null : Number(e.target.value))}
+                                />
+                            </FormField>
+                            <FormField
+                                label="Spouse Death Age"
+                                helpText="Assumed planning age at which the spouse passes away (50-120). Blank uses the SSA planning default."
+                            >
+                                <input
+                                    style={inputStyle}
+                                    type="number"
+                                    min={MIN_DEATH_AGE}
+                                    max={MAX_DEATH_AGE}
+                                    placeholder={`SSA default (~${ssaDefaultDeathAge(spouseBirthYear)})`}
+                                    value={spouseDeathAge ?? ''}
+                                    onChange={e => setField('spouseDeathAge', e.target.value === '' ? null : Number(e.target.value))}
+                                />
+                            </FormField>
+                            <FormField
+                                label="Survivor Spending Factor (%)"
+                                helpText="Share of pre-transition spending the survivor keeps from the first death forward (50-100%, default 75%)."
+                            >
+                                <input
+                                    style={inputStyle}
+                                    type="number"
+                                    step="1"
+                                    min="50"
+                                    max="100"
+                                    value={survivorSpendingFactor}
+                                    onChange={e => setField('survivorSpendingFactor', Number(e.target.value))}
+                                />
+                            </FormField>
+                            <FormField
+                                label="Community Property State"
+                                helpText="Steps up 100% of embedded gain on joint taxable accounts at first death, instead of the common-law 50%."
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={communityProperty}
+                                    onChange={e => setField('communityProperty', e.target.checked)}
+                                />
+                            </FormField>
+                        </>
+                    )}
+                </div>
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                 <h4>Accounts</h4>
                 <button
@@ -525,7 +669,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                             )}
                         </div>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'start' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: household ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'start' }}>
                         <FormField label="Account Type" helpText={ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}>
                             <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
                                 <option value="taxable">Taxable</option>
@@ -533,6 +677,21 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                 <option value="roth">Roth</option>
                             </select>
                         </FormField>
+                        {household && (
+                            <FormField label="Owner" helpText="Whose account this is. Joint ownership is only available for taxable accounts.">
+                                <select style={inputStyle} value={acct.owner || 'primary'} onChange={e => updateAccount(idx, 'owner', e.target.value)}>
+                                    <option value="primary">Primary</option>
+                                    <option value="spouse">Spouse</option>
+                                    <option
+                                        value="joint"
+                                        disabled={(acct.account_type || 'taxable') !== 'taxable'}
+                                        title={(acct.account_type || 'taxable') !== 'taxable' ? 'Joint ownership is only available for taxable accounts.' : undefined}
+                                    >
+                                        Joint
+                                    </option>
+                                </select>
+                            </FormField>
+                        )}
                         <FormField label={`Initial Balance${acct.linked_account_id ? ' (live)' : ''}`}>
                             <CurrencyInput
                                 style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}

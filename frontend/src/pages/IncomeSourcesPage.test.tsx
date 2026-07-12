@@ -1,4 +1,4 @@
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderWithRouter } from '../test-utils';
 import type { IncomeSource } from '../types/projection';
@@ -9,8 +9,8 @@ vi.mock('../hooks/useApiQuery', () => ({
 
 vi.mock('../api/incomeSources', () => ({
     listIncomeSources: vi.fn(),
-    createIncomeSource: vi.fn(),
-    updateIncomeSource: vi.fn(),
+    createIncomeSource: vi.fn().mockResolvedValue(undefined),
+    updateIncomeSource: vi.fn().mockResolvedValue(undefined),
     deleteIncomeSource: vi.fn(),
 }));
 
@@ -48,9 +48,12 @@ vi.mock('react-hot-toast', () => ({
 }));
 
 import { useApiQuery } from '../hooks/useApiQuery';
+import { createIncomeSource, updateIncomeSource } from '../api/incomeSources';
 import IncomeSourcesPage from './IncomeSourcesPage';
 
 const mockUseApiQuery = vi.mocked(useApiQuery);
+const mockCreateIncomeSource = vi.mocked(createIncomeSource);
+const mockUpdateIncomeSource = vi.mocked(updateIncomeSource);
 
 const ssSource: IncomeSource = {
     id: 'inc-1',
@@ -65,6 +68,60 @@ const ssSource: IncomeSource = {
     property_id: null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any;
+
+const pensionSource: IncomeSource = {
+    id: 'inc-2',
+    name: 'My Pension',
+    income_type: 'pension',
+    annual_amount: 12000,
+    start_age: 62,
+    end_age: null,
+    inflation_rate: 0,
+    one_time: false,
+    tax_treatment: 'taxable',
+    property_id: null,
+    property_address: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+    owner: 'spouse',
+    survivor_percent: 0.6,
+};
+
+function ownerSelect(): HTMLSelectElement {
+    const label = screen.getByText('Owner');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Owner select not found');
+    }
+    return select as HTMLSelectElement;
+}
+
+function survivorPercentInput(): HTMLInputElement {
+    const label = screen.getByText('Survivor % (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Survivor % input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function incomeTypeSelect(): HTMLSelectElement {
+    const label = screen.getByText('Income Type');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Income Type select not found');
+    }
+    return select as HTMLSelectElement;
+}
+
+function annualAmountInput(): HTMLInputElement {
+    const label = screen.getByText('Annual Amount');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Annual Amount input not found');
+    }
+    return input as HTMLInputElement;
+}
 
 function setupMocks({ sources, properties }: { sources?: IncomeSource[]; properties?: unknown[] } = {}) {
     let call = 0;
@@ -107,5 +164,89 @@ describe('IncomeSourcesPage', () => {
         renderWithRouter(<IncomeSourcesPage />);
         fireEvent.click(screen.getByText('New Income Source'));
         expect(screen.getByPlaceholderText('e.g., Social Security')).toBeInTheDocument();
+    });
+
+    describe('household / survivor modeling', () => {
+        it('shows the statutory survivor note (not a Survivor % input) for social_security, the default type', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+
+            expect(screen.getByText(/Statutory survivor rule applies automatically/i)).toBeInTheDocument();
+            expect(screen.queryByText('Survivor % (%)')).not.toBeInTheDocument();
+            // Owner is not SS-gated -- it's always available.
+            expect(ownerSelect()).toBeInTheDocument();
+        });
+
+        it('shows a Survivor % input (not the statutory note) once the type is changed off social_security', () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+
+            expect(screen.getByText('Survivor % (%)')).toBeInTheDocument();
+            expect(screen.queryByText(/Statutory survivor rule applies automatically/i)).not.toBeInTheDocument();
+            expect(survivorPercentInput().value).toBe('100');
+        });
+
+        it('submits owner and a decimal survivor_percent for a non-SS income source', async () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+
+            fireEvent.change(screen.getByPlaceholderText('e.g., Social Security'), { target: { value: 'My Pension' } });
+            fireEvent.change(incomeTypeSelect(), { target: { value: 'pension' } });
+            fireEvent.change(annualAmountInput(), { target: { value: '12000' } });
+            fireEvent.change(ownerSelect(), { target: { value: 'spouse' } });
+            fireEvent.change(survivorPercentInput(), { target: { value: '50' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Create Income Source' }));
+
+            await waitFor(() => {
+                expect(mockCreateIncomeSource).toHaveBeenCalled();
+            });
+            const request = mockCreateIncomeSource.mock.calls[0][0];
+            expect(request.owner).toBe('spouse');
+            expect(request.survivor_percent).toBeCloseTo(0.5);
+        });
+
+        it('submits owner but nulls survivor_percent for a social_security income source', async () => {
+            setupMocks();
+            renderWithRouter(<IncomeSourcesPage />);
+            fireEvent.click(screen.getByText('New Income Source'));
+
+            fireEvent.change(screen.getByPlaceholderText('e.g., Social Security'), { target: { value: 'My SS' } });
+            fireEvent.change(annualAmountInput(), { target: { value: '30000' } });
+            fireEvent.change(ownerSelect(), { target: { value: 'spouse' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Create Income Source' }));
+
+            await waitFor(() => {
+                expect(mockCreateIncomeSource).toHaveBeenCalled();
+            });
+            const request = mockCreateIncomeSource.mock.calls[0][0];
+            expect(request.owner).toBe('spouse');
+            expect(request.survivor_percent).toBeNull();
+        });
+
+        it('hydrates owner and survivor_percent (as a percent) when editing an existing income source', async () => {
+            setupMocks({ sources: [pensionSource] });
+            renderWithRouter(<IncomeSourcesPage />);
+
+            fireEvent.click(screen.getByText('Edit'));
+
+            expect(ownerSelect().value).toBe('spouse');
+            expect(survivorPercentInput().value).toBe('60');
+
+            fireEvent.click(screen.getByText('Update Income Source'));
+
+            await waitFor(() => {
+                expect(mockUpdateIncomeSource).toHaveBeenCalled();
+            });
+            const [, request] = mockUpdateIncomeSource.mock.calls[0];
+            expect(request.owner).toBe('spouse');
+            expect(request.survivor_percent).toBeCloseTo(0.6);
+        });
     });
 });

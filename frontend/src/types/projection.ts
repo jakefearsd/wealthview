@@ -16,6 +16,8 @@ export interface ProjectionAccount {
     cost_basis: number | null;
     allocation: AllocationInput | null;
     allocation_is_override: boolean;
+    /** Household/survivor modeling: "primary" | "spouse" | "joint" ("joint" only valid for taxable accounts). */
+    owner: string;
 }
 
 export interface ScenarioIncomeSourceInput {
@@ -160,6 +162,8 @@ export interface ScenarioAccountInput {
     account_type?: string;
     cost_basis?: number | null;
     allocation?: AllocationInput | null;
+    /** Household/survivor modeling: "primary" | "spouse" | "joint" ("joint" only valid for taxable accounts). Null/omitted resolves to "primary". */
+    owner?: string | null;
 }
 
 export interface CreateScenarioRequest {
@@ -188,6 +192,16 @@ export interface CreateScenarioRequest {
     /** Nominal coupon assumption for the bond portion of taxable accounts (decimal, default 0.04, range 0-0.10). */
     interest_yield?: number | null;
     include_depression_years?: boolean | null;
+    /** Household/survivor modeling: null means single-person; every field below is then ignored. */
+    spouse_birth_year?: number | null;
+    /** Primary's assumed death age (50-120). Null resolves to the server's SSA planning default. */
+    primary_death_age?: number | null;
+    /** Spouse's assumed death age (50-120). Null resolves to the server's SSA planning default. Only meaningful when spouse_birth_year is set. */
+    spouse_death_age?: number | null;
+    /** Fraction (0.5-1.0) of pre-transition spending the survivor keeps from the first-death year forward. Null resolves to 0.75. Only meaningful when spouse_birth_year is set. */
+    survivor_spending_factor?: number | null;
+    /** Community-property state: steps up 100% of embedded gain on joint taxable accounts at first death instead of the common-law 50%. Only meaningful when spouse_birth_year is set. */
+    community_property?: boolean | null;
     spending_profile_id?: string | null;
     use_guardrail_profile?: boolean | null;
     accounts: ScenarioAccountInput[];
@@ -250,6 +264,10 @@ export interface IncomeSource {
     property_address: string | null;
     created_at: string;
     updated_at: string;
+    /** Household/survivor modeling: "primary" | "spouse". */
+    owner: string;
+    /** Fraction (0-1) of this income the survivor keeps after the owner's death. Ignored for social_security sources (statutory keep-larger rule applies instead). */
+    survivor_percent: number;
 }
 
 export interface CreateIncomeSourceRequest {
@@ -262,6 +280,10 @@ export interface CreateIncomeSourceRequest {
     one_time: boolean;
     tax_treatment: string;
     property_id: string | null;
+    /** Household/survivor modeling: "primary" | "spouse". Null resolves to "primary". */
+    owner: string | null;
+    /** Fraction (0-1) of this income the survivor keeps after the owner's death. Null resolves to 1.0. Ignored for social_security sources. */
+    survivor_percent: number | null;
 }
 
 export interface UpdateIncomeSourceRequest {
@@ -274,6 +296,10 @@ export interface UpdateIncomeSourceRequest {
     one_time: boolean;
     tax_treatment: string;
     property_id: string | null;
+    /** Household/survivor modeling: "primary" | "spouse". Null resolves to "primary". */
+    owner: string | null;
+    /** Fraction (0-1) of this income the survivor keeps after the owner's death. Null resolves to 1.0. Ignored for social_security sources. */
+    survivor_percent: number | null;
 }
 
 export interface GuardrailPhase {

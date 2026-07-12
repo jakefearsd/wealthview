@@ -88,6 +88,10 @@ interface IncomeSourceFormData {
     one_time: boolean;
     tax_treatment: string;
     property_id: string | null;
+    /** Household/survivor modeling: "primary" | "spouse". */
+    owner: string;
+    /** Percent (0-100) of this income the survivor keeps after the owner's death. Ignored for social_security (statutory keep-larger rule applies instead). */
+    survivor_percent: number;
 }
 
 const initialFormData: IncomeSourceFormData = {
@@ -100,6 +104,8 @@ const initialFormData: IncomeSourceFormData = {
     one_time: false,
     tax_treatment: 'partially_taxable',
     property_id: null,
+    owner: 'primary',
+    survivor_percent: 100,
 };
 
 export default function IncomeSourcesPage() {
@@ -123,6 +129,10 @@ export default function IncomeSourcesPage() {
             one_time: data.one_time,
             tax_treatment: data.tax_treatment,
             property_id: data.income_type === 'rental_property' ? data.property_id : null,
+            owner: data.owner,
+            // Statutory keep-larger rule governs SS survivor behavior automatically; the
+            // per-source override doesn't apply, so don't send a stale edited value for it.
+            survivor_percent: data.income_type === 'social_security' ? null : data.survivor_percent / 100,
         };
         return createIncomeSource(request);
     }, []);
@@ -138,6 +148,8 @@ export default function IncomeSourcesPage() {
             one_time: data.one_time,
             tax_treatment: data.tax_treatment,
             property_id: data.income_type === 'rental_property' ? data.property_id : null,
+            owner: data.owner,
+            survivor_percent: data.income_type === 'social_security' ? null : data.survivor_percent / 100,
         });
     }, []);
 
@@ -171,6 +183,8 @@ export default function IncomeSourcesPage() {
             one_time: source.one_time,
             tax_treatment: source.tax_treatment,
             property_id: source.property_id,
+            owner: source.owner,
+            survivor_percent: toPercent(source.survivor_percent),
         });
         setShowForm(true);
     }
@@ -202,7 +216,7 @@ export default function IncomeSourcesPage() {
         return acc;
     }, {});
 
-    const { name, income_type: incomeType, annual_amount: annualAmount, start_age: startAge, end_age: endAge, inflation_rate: inflationRate, one_time: oneTime, tax_treatment: taxTreatment, property_id: propertyId } = formData;
+    const { name, income_type: incomeType, annual_amount: annualAmount, start_age: startAge, end_age: endAge, inflation_rate: inflationRate, one_time: oneTime, tax_treatment: taxTreatment, property_id: propertyId, owner, survivor_percent: survivorPercent } = formData;
     const treatments = TAX_TREATMENTS[incomeType] ?? TAX_TREATMENTS.other;
 
     return (
@@ -241,6 +255,39 @@ export default function IncomeSourcesPage() {
                             </select>
                             <HelpText>Type determines how this income is taxed in projections.</HelpText>
                         </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div>
+                            <label style={labelStyle}>Owner</label>
+                            <select style={inputStyle} value={owner} onChange={e => setFormData(prev => ({ ...prev, owner: e.target.value }))}>
+                                <option value="primary">Primary</option>
+                                <option value="spouse">Spouse</option>
+                            </select>
+                            <HelpText>Whose income this is, for household/survivor modeling.</HelpText>
+                        </div>
+                        {incomeType === 'social_security' ? (
+                            <div>
+                                <label style={labelStyle}>Survivor Benefit</label>
+                                <div style={{ ...inputStyle, background: '#f5f5f5', color: '#666' }}>
+                                    Statutory survivor rule applies automatically (survivor keeps the larger benefit)
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <label style={labelStyle}>Survivor % (%)</label>
+                                <input
+                                    style={inputStyle}
+                                    type="number"
+                                    step="1"
+                                    min="0"
+                                    max="100"
+                                    value={survivorPercent}
+                                    onChange={e => setFormData(prev => ({ ...prev, survivor_percent: Number(e.target.value) }))}
+                                />
+                                <HelpText>Share of this income the survivor keeps after the owner&apos;s death (0-100%, default 100%).</HelpText>
+                            </div>
+                        )}
                     </div>
 
                     {incomeType === 'rental_property' && (
