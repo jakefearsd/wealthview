@@ -1,11 +1,29 @@
 name: Backend Release Verify
 
 # Runs ONLY when a version tag (v*) is created (plus a manual workflow_dispatch
-# escape hatch). Full backend verification on a GitHub-hosted runner: unit +
-# Failsafe integration tests + the enforced PMD/CPD/SpotBugs/Checkstyle/JaCoCo
-# gates (all bound to the verify phase), then a Docker image build to confirm
-# the release image assembles. No deploy — deployment is performed on the
-# server via `./wv update` (a GitHub-hosted runner cannot reach the host box).
+# escape hatch). Full backend verification on GitHub-hosted runners, split into
+# jobs so a fast-gate failure short-circuits before the slower Testcontainers
+# integration suite spins up:
+#   1. verify             - unit tests + @DataJpaTest Testcontainers tests +
+#                            the enforced PMD/CPD/SpotBugs/Checkstyle/JaCoCo
+#                            quality gates (mvn verify -DskipITs).
+#   2. integration-tests   - needs: verify. The wealthview-app Failsafe/HTTP
+#                            integration suite against a Testcontainers
+#                            PostgreSQL instance (mvn verify -pl wealthview-app,
+#                            no -DskipITs). This used to be skipped on CI
+#                            because the O(n^2) price rescan in
+#                            StockSplitService.unapplySplit made StockSplitIT
+#                            time out on free 2-core runners; that regression
+#                            was fixed 2026-07-02 (StockSplitIT: 188s -> 24s
+#                            locally), so tag builds now gate on the full IT
+#                            suite here instead of requiring a manual local
+#                            `mvn verify` before tagging.
+#   3. docker-image        - needs: [verify, integration-tests]. Builds the
+#                            release image only after both test jobs pass, to
+#                            confirm the release image assembles from verified
+#                            code. No deploy — deployment happens on the
+#                            server via `./wv update` (a GitHub-hosted runner
+#                            cannot reach the host box).
 on:
   push:
     tags:
@@ -14,7 +32,9 @@ on:
 
 jobs:
   verify:
+    name: Unit tests + quality gates
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -35,13 +55,61 @@ jobs:
           done
 
       - name: Verify (unit tests + @DataJpaTest + quality gates)
-        # -DskipITs skips the app-module HTTP Failsafe integration tests: the heavy
-        # DELETE/backfill operations are CPU-starved and time out non-deterministically
-        # on free 2-core GitHub-hosted runners (they pass locally and must be run via a
-        # local `mvn verify` before tagging). Everything deterministic still runs here:
-        # all Surefire unit tests, the persistence @DataJpaTest Testcontainers tests,
-        # and the enforced PMD/CPD/SpotBugs/Checkstyle/JaCoCo gates.
+        # -DskipITs skips the app-module HTTP Failsafe integration tests, which
+        # now run in the integration-tests job below instead of being skipped
+        # outright. Keeping this job IT-free means PMD/CPD/SpotBugs/Checkstyle/
+        # JaCoCo and unit-test failures surface quickly, before the slower IT
+        # suite spends runner time on a build that was already going to fail.
         run: mvn -f backend/pom.xml clean verify -B -DskipITs
+
+  integration-tests:
+    name: Full Testcontainers integration suite
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Configure Docker API version for Testcontainers
+        run: |
+          # See matching step in the verify job: same Testcontainers API-version
+          # pin is needed here since AbstractApiIntegrationTest also boots a
+          # Testcontainers PostgreSQL instance.
+          for dir in backend/*/src/test/resources; do
+            mkdir -p "$dir"
+            echo "api.version=1.44" > "$dir/docker-java.properties"
+          done
+
+      - name: Install reactor (skip ITs) so wealthview-app resolves sibling modules
+        # This is a separate job/runner/checkout from `verify`, so the local
+        # Maven repo has no installed wealthview-* artifacts yet. Build and
+        # install the whole reactor first (still skipping ITs) so the
+        # wealthview-app-only `verify` below can resolve its sibling-module
+        # dependencies without needing -am.
+        run: mvn -f backend/pom.xml clean install -B -DskipITs
+
+      - name: Verify wealthview-app (Failsafe integration tests)
+        # No -DskipITs here: this is the full HTTP Testcontainers-backed IT
+        # suite (AbstractApiIntegrationTest and friends) that CI previously
+        # skipped entirely. Locally this module's Failsafe run is ~24s
+        # post-fix (was 188s); the 45-minute job timeout above gives generous
+        # headroom for a shared 2-core runner plus Testcontainers image pulls.
+        run: mvn -f backend/pom.xml verify -pl wealthview-app -B
+
+  docker-image:
+    name: Build release image
+    needs: [verify, integration-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Build release Docker image
         run: docker build -t "wealthview:${{ github.ref_name }}" .
