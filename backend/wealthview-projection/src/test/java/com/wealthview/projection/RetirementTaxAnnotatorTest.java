@@ -99,6 +99,50 @@ class RetirementTaxAnnotatorTest {
         assertThat(result.federalTax().add(result.stateTax())).isEqualByComparingTo(totalTaxLiability);
     }
 
+    /**
+     * T23 item 3: {@code annotate} previously gated its whole fold on {@code retired}, so a
+     * pre-retirement year with real tax activity (e.g. an accumulation-year Roth conversion with
+     * {@code rothConversionStartYear} set) showed a positive {@code taxLiability} with NO federal/
+     * state breakdown at all -- a display gap, since the pool-level funding for that tax is already
+     * correct regardless of retirement status (T18a-2). The fold must apply to any year with
+     * positive {@code taxLiability}.
+     */
+    @Test
+    void annotate_notRetiredYearWithPositiveTaxLiability_stillFoldsBreakdown() {
+        var ordinaryFederal = new BigDecimal("3000.0000");
+        var ordinaryBreakdown = new CombinedTaxResult(ordinaryFederal, BigDecimal.ZERO,
+                ordinaryFederal, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        var taxStrategy = mock(TaxCalculationStrategy.class);
+        when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
+                any(BigDecimal.class), any(BigDecimal.class)))
+                .thenReturn(ordinaryBreakdown);
+        PoolStrategy pool = filingStatusOnlyPool();
+
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(false, AGE, YEAR,
+                BigDecimal.ZERO, BigDecimal.valueOf(20_000), BigDecimal.ZERO,
+                ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal);
+    }
+
+    /** Zero/null taxLiability pre-retirement stays a true no-op, same as the retired case. */
+    @Test
+    void annotate_notRetiredYearWithZeroTaxLiability_staysNoOp() {
+        PoolStrategy pool = filingStatusOnlyPool();
+
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(false, AGE, YEAR,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.federalTax()).isNull();
+    }
+
     @Test
     void annotate_retiredYearNoLtcgTax_federalTaxUnchangedFromOrdinaryBreakdown() {
         // Zero LTCG tax is a true no-op fold: federalTax stays exactly the ordinary-tax figure,

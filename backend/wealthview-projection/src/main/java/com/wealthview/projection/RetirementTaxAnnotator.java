@@ -63,13 +63,16 @@ final class RetirementTaxAnnotator {
 
     /**
      * Applies the detailed federal/state tax breakdown and the IRMAA surcharge/warning to the year
-     * DTO. The tax breakdown is only meaningful for retired years with a non-null tax strategy and
-     * positive tax liability; the IRMAA fields are set whenever the caller passed a positive
-     * surcharge (which is already gated on retired/Medicare-age by the caller -- see
+     * DTO. The tax breakdown is meaningful for ANY year with a non-null tax strategy and positive
+     * tax liability -- T23 item 3 dropped the earlier {@code retired} gate: a pre-retirement year
+     * can owe real tax (e.g. an accumulation-year Roth conversion, or a still-working-past-RMD-age
+     * forced distribution -- see T18a-2) and the pool-level funding for that tax is already correct
+     * regardless of retirement status, so withholding the DISPLAY breakdown from those years was a
+     * display-only gap, not a funding one. The IRMAA fields are set whenever the caller passed a
+     * positive surcharge (which is already gated on retired/Medicare-age by the caller -- see
      * {@code DeterministicProjectionEngine#processYear}).
      */
     ProjectionYearDto annotate(ProjectionYearDto yearDto, AnnotationContext annCtx) {
-        boolean retired = annCtx.retired();
         int year = annCtx.year();
         var wdFromTraditional = annCtx.wdFromTraditional();
         var conversionAmount = annCtx.conversionAmount();
@@ -81,7 +84,7 @@ final class RetirementTaxAnnotator {
         var realizedLtcgIncome = annCtx.realizedLtcgIncome();
         var federallyTaxedSocialSecurity = annCtx.federallyTaxedSocialSecurity();
 
-        if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
+        if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
                     .add(effectiveOtherIncome).add(annCtx.ordinaryInterestIncome());
             var filingStatus = pool.getFilingStatus();
