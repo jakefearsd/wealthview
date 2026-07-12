@@ -4,13 +4,19 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.split.dto.DetectedSplit;
 import com.wealthview.persistence.repository.StockSplitRepository;
@@ -47,9 +53,23 @@ class StockSplitBackfillRunnerTest {
 
     private StockSplitBackfillRunner runner;
 
+    private ListAppender<ILoggingEvent> appender;
+    private Logger runnerLogger;
+
     @BeforeEach
     void setUp() {
         runner = newRunner(true);
+
+        appender = new ListAppender<>();
+        appender.start();
+        runnerLogger = (Logger) LoggerFactory.getLogger(StockSplitBackfillRunner.class);
+        runnerLogger.addAppender(appender);
+        runnerLogger.setLevel(Level.WARN);
+    }
+
+    @AfterEach
+    void tearDown() {
+        runnerLogger.detachAppender(appender);
     }
 
     private StockSplitBackfillRunner newRunner(boolean backfillAutoRun) {
@@ -161,5 +181,50 @@ class StockSplitBackfillRunnerTest {
         runner.runIfNeeded();
 
         verify(stockSplitService, never()).applySplit(any(), any(), anyInt(), anyInt(), any());
+    }
+
+    @Test
+    void runIfNeeded_appliedSplitAffectsNoTenants_warnsInsteadOfSilentlySucceeding() {
+        // AAPL only reaches applySplit because findDistinctSymbolsAcrossAllTenants()
+        // just reported at least one tenant holds it — so a post-apply read of
+        // findDistinctTenantIdsBySymbol coming back empty for that exact symbol is
+        // never legitimate for a backfill-discovered split (unlike an admin-driven
+        // apply for a symbol nobody currently holds). It must be surfaced loudly,
+        // not swallowed into "1 splits applied" with zero trace.
+        when(systemConfigService.get("stock_splits.backfill_completed")).thenReturn(null);
+        when(transactionRepository.findDistinctSymbolsAcrossAllTenants()).thenReturn(List.of("AAPL"));
+        when(transactionRepository.findEarliestDateBySymbol("AAPL"))
+                .thenReturn(Optional.of(LocalDate.of(2015, 1, 1)));
+        var detected = new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1);
+        when(splitDetectionClient.fetch(eq("AAPL"), any(), any())).thenReturn(List.of(detected));
+        when(stockSplitRepository.existsBySymbolAndEffectiveDate("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(false);
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        runner.runIfNeeded();
+
+        assertThat(appender.list)
+                .anyMatch(event -> event.getLevel() == Level.WARN
+                        && event.getFormattedMessage().contains("AAPL")
+                        && event.getFormattedMessage().contains("ZERO tenants"));
+    }
+
+    @Test
+    void runIfNeeded_appliedSplitAffectsTenants_doesNotWarn() {
+        // Sanity counterpart: the normal, non-anomalous path must stay silent at WARN.
+        when(systemConfigService.get("stock_splits.backfill_completed")).thenReturn(null);
+        when(transactionRepository.findDistinctSymbolsAcrossAllTenants()).thenReturn(List.of("AAPL"));
+        when(transactionRepository.findEarliestDateBySymbol("AAPL"))
+                .thenReturn(Optional.of(LocalDate.of(2015, 1, 1)));
+        var detected = new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1);
+        when(splitDetectionClient.fetch(eq("AAPL"), any(), any())).thenReturn(List.of(detected));
+        when(stockSplitRepository.existsBySymbolAndEffectiveDate("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(false);
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL"))
+                .thenReturn(List.of(java.util.UUID.randomUUID()));
+
+        runner.runIfNeeded();
+
+        assertThat(appender.list).isEmpty();
     }
 }

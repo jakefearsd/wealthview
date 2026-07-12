@@ -14,6 +14,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.core.split.dto.DetectedSplit;
 import com.wealthview.core.split.dto.SplitSyncResult;
 import com.wealthview.persistence.repository.StockSplitRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
@@ -85,6 +86,7 @@ public class StockSplitSyncService {
                     if (!stockSplitRepository.existsBySymbolAndEffectiveDate(symbol, s.date())) {
                         stockSplitService.applySplit(symbol, s.date(), s.numerator(), s.denominator(), SOURCE);
                         applied++;
+                        warnIfSplitAffectedNoTenants(symbol, s);
                     }
                 }
             } catch (Exception e) {
@@ -103,6 +105,27 @@ public class StockSplitSyncService {
         log.info("Split sync complete: {} symbols, {} discovered, {} applied, {} failed",
                 symbols.size(), discovered, applied, failures.size());
         return new SplitSyncResult(symbols.size(), discovered, applied, failures);
+    }
+
+    /**
+     * {@code symbol} reached this point via {@link TransactionRepository#findDistinctSymbolsAcrossAllTenants()}
+     * moments earlier in this same run, so by definition at least one tenant held it then. If
+     * {@link StockSplitService#applySplit} reports zero affected tenants for that exact symbol
+     * immediately afterward, the two reads disagree about the same committed data — unlike an
+     * admin-driven apply for a symbol nobody currently holds (a legitimate, documented case),
+     * that is never expected for a sync-discovered split. The split row is still recorded (so a
+     * future sync's {@code existsBySymbolAndEffectiveDate} check will not re-detect it), but
+     * holdings for the symbol may be un-adjusted; surface that loudly instead of letting it
+     * vanish silently into "splits applied".
+     */
+    private void warnIfSplitAffectedNoTenants(String symbol, DetectedSplit split) {
+        if (transactionRepository.findDistinctTenantIdsBySymbol(symbol).isEmpty()) {
+            log.warn("Sync applied split {}:{} for {} on {} but found ZERO tenants holding {} "
+                    + "immediately afterward, despite {} being discovered by this run's own "
+                    + "distinct-symbol scan — holdings may not be split-adjusted; investigate before "
+                    + "trusting balances for this symbol",
+                    split.numerator(), split.denominator(), symbol, split.date(), symbol, symbol);
+        }
     }
 
     private LocalDate computeFromDate() {

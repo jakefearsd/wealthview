@@ -4,13 +4,20 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.slf4j.LoggerFactory;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.split.dto.DetectedSplit;
 import com.wealthview.persistence.repository.StockSplitRepository;
@@ -44,11 +51,25 @@ class StockSplitSyncServiceTest {
 
     private StockSplitSyncService service;
 
+    private ListAppender<ILoggingEvent> appender;
+    private Logger serviceLogger;
+
     @BeforeEach
     void setUp() {
         service = new StockSplitSyncService(splitDetectionClient, stockSplitService,
                 stockSplitRepository, transactionRepository, systemConfigService,
                 new SimpleMeterRegistry());
+
+        appender = new ListAppender<>();
+        appender.start();
+        serviceLogger = (Logger) LoggerFactory.getLogger(StockSplitSyncService.class);
+        serviceLogger.addAppender(appender);
+        serviceLogger.setLevel(Level.WARN);
+    }
+
+    @AfterEach
+    void tearDown() {
+        serviceLogger.detachAppender(appender);
     }
 
     @Test
@@ -151,5 +172,44 @@ class StockSplitSyncServiceTest {
 
         verify(splitDetectionClient).fetch("AAPL",
                 LocalDate.now().minusDays(7), LocalDate.now());
+    }
+
+    @Test
+    void syncAll_appliedSplitAffectsNoTenants_warnsInsteadOfSilentlySucceeding() {
+        // AAPL only reaches applySplit because findDistinctSymbolsAcrossAllTenants()
+        // just reported at least one tenant holds it — so a post-apply read of
+        // findDistinctTenantIdsBySymbol coming back empty for that exact symbol is
+        // never legitimate for a sync-discovered split. It must be surfaced loudly,
+        // not swallowed into "1 applied" with zero trace.
+        when(transactionRepository.findDistinctSymbolsAcrossAllTenants()).thenReturn(List.of("AAPL"));
+        when(systemConfigService.get(any())).thenReturn(null);
+        var detected = new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1);
+        when(splitDetectionClient.fetch(eq("AAPL"), any(), any())).thenReturn(List.of(detected));
+        when(stockSplitRepository.existsBySymbolAndEffectiveDate("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(false);
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of());
+
+        service.syncAll();
+
+        assertThat(appender.list)
+                .anyMatch(event -> event.getLevel() == Level.WARN
+                        && event.getFormattedMessage().contains("AAPL")
+                        && event.getFormattedMessage().contains("ZERO tenants"));
+    }
+
+    @Test
+    void syncAll_appliedSplitAffectsTenants_doesNotWarn() {
+        // Sanity counterpart: the normal, non-anomalous path must stay silent at WARN.
+        when(transactionRepository.findDistinctSymbolsAcrossAllTenants()).thenReturn(List.of("AAPL"));
+        when(systemConfigService.get(any())).thenReturn(null);
+        var detected = new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1);
+        when(splitDetectionClient.fetch(eq("AAPL"), any(), any())).thenReturn(List.of(detected));
+        when(stockSplitRepository.existsBySymbolAndEffectiveDate("AAPL", LocalDate.of(2020, 8, 31)))
+                .thenReturn(false);
+        when(transactionRepository.findDistinctTenantIdsBySymbol("AAPL")).thenReturn(List.of(UUID.randomUUID()));
+
+        service.syncAll();
+
+        assertThat(appender.list).isEmpty();
     }
 }

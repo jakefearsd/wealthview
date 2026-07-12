@@ -14,6 +14,7 @@ import org.springframework.core.task.support.TaskExecutorAdapter;
 import org.springframework.stereotype.Component;
 
 import com.wealthview.core.config.SystemConfigService;
+import com.wealthview.core.split.dto.DetectedSplit;
 import com.wealthview.persistence.repository.StockSplitRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -105,6 +106,7 @@ public class StockSplitBackfillRunner {
                     if (!stockSplitRepository.existsBySymbolAndEffectiveDate(symbol, s.date())) {
                         stockSplitService.applySplit(symbol, s.date(), s.numerator(), s.denominator(), "backfill");
                         totalApplied++;
+                        warnIfSplitAffectedNoTenants(symbol, s);
                     }
                 }
             } catch (Exception e) {
@@ -116,5 +118,26 @@ public class StockSplitBackfillRunner {
         meterRegistry.counter("wealthview.splits.backfill_completed_total").increment();
         log.info("Stock split backfill complete: {} symbols scanned, {} splits applied",
                 symbols.size(), totalApplied);
+    }
+
+    /**
+     * {@code symbol} reached this point via {@link TransactionRepository#findDistinctSymbolsAcrossAllTenants()}
+     * moments earlier in this same run, so by definition at least one tenant held it then. If
+     * {@link StockSplitService#applySplit} reports zero affected tenants for that exact symbol
+     * immediately afterward, the two reads disagree about the same committed data — unlike an
+     * admin-driven apply for a symbol nobody currently holds (a legitimate, documented case),
+     * that is never expected for a backfill-discovered split. The split row is still recorded
+     * (so a future run's {@code existsBySymbolAndEffectiveDate} check will not re-detect it),
+     * but holdings for the symbol may be un-adjusted; surface that loudly instead of letting it
+     * vanish silently into "splits applied".
+     */
+    private void warnIfSplitAffectedNoTenants(String symbol, DetectedSplit split) {
+        if (transactionRepository.findDistinctTenantIdsBySymbol(symbol).isEmpty()) {
+            log.warn("Backfill applied split {}:{} for {} on {} but found ZERO tenants holding {} "
+                    + "immediately afterward, despite {} being discovered by this run's own "
+                    + "distinct-symbol scan — holdings may not be split-adjusted; investigate before "
+                    + "trusting balances for this symbol",
+                    split.numerator(), split.denominator(), symbol, split.date(), symbol, symbol);
+        }
     }
 }
