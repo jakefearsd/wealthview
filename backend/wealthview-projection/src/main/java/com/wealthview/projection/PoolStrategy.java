@@ -167,7 +167,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                           BigDecimal withdrawalFromTaxable, BigDecimal withdrawalFromTraditional,
                           BigDecimal withdrawalFromRoth,
                           TaxSourceResult combinedTaxSource,
-                          BigDecimal rmdAmount, BigDecimal ltcgTax) {}
+                          BigDecimal rmdAmount, BigDecimal ltcgTax,
+                          BigDecimal earlyWithdrawalPenalty) {}
 
     /** Back-compat overload predating the audit-C3 state-base adjustment (zero taxable SS). */
     default ConversionResult executeRothConversionOverride(int year, BigDecimal effectiveOtherIncome,
@@ -263,10 +264,19 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * <p>{@code realizedLtcgIncome} is the year's realized long-term capital-gains + qualified-
      * dividend INCOME (not tax), floored at zero. The Social Security provisional-income convergence
      * (audit B2) folds it into AGI-ex-SS alongside {@code fromTraditional} and the Roth conversion.
+     *
+     * <p>{@code earlyWithdrawalPenalty} (T18a-4) is the 10% IRC 72(t) additional tax on this year's
+     * traditional-sourced DISTRIBUTIONS (spend draw + RMD force-out + the audit-C2 tax-funding
+     * gross-up slice -- everything {@code fromTraditional} above counts) when {@code age} is below
+     * {@link RetirementAges#EARLY_WITHDRAWAL_AGE}. It is ALREADY folded into {@code taxLiability}
+     * (additive) and funded from the pools; broken out here so the engine can surface it as its own
+     * DTO field. Roth conversions are OUT OF SCOPE -- converted dollars move internally to Roth,
+     * they are not withdrawn to the household.
      */
     record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
                                BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
-                               TaxSourceResult taxSource, BigDecimal ltcgTax, BigDecimal realizedLtcgIncome) {}
+                               TaxSourceResult taxSource, BigDecimal ltcgTax, BigDecimal realizedLtcgIncome,
+                               BigDecimal earlyWithdrawalPenalty) {}
 
     /**
      * Opaque, per-implementation snapshot of a pool's mutable state, taken AFTER the year's growth
@@ -479,6 +489,9 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * the JUMP -- the polish loop still converges to the true fixed point afterwards.
          */
         private static final BigDecimal GROSS_UP_WARM_START_RATE_CAP = new BigDecimal("0.50");
+        /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions,
+         * a statutory constant (T18a-4). */
+        private static final BigDecimal EARLY_WITHDRAWAL_PENALTY_RATE = new BigDecimal("0.10");
         private BigDecimal traditional;
         private BigDecimal roth;
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
@@ -729,10 +742,27 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             TaxSourceResult withdrawalTaxSource = totalWithdrawalTax.compareTo(BigDecimal.ZERO) > 0
                     ? deductFromPools(totalWithdrawalTax) : TaxSourceResult.ZERO;
 
+            // T18a-4: 10% IRC 72(t) additional tax on traditional DISTRIBUTIONS before age 59½
+            // (whole-year proxy: age < RetirementAges.EARLY_WITHDRAWAL_AGE, the SAME proxy the
+            // withdrawal-order strategies already use to steer clear of early traditional draws).
+            // Applies to the year's FULL traditional-sourced distribution captured by
+            // traditionalOrdinaryIncome (spend draw + RMD force-out + the C2 tax-funding gross-up
+            // slice) -- Roth conversions are OUT OF SCOPE (the converted dollars move internally to
+            // Roth, not withdrawn to the household). Funded via its own simple pool drain, NOT
+            // re-run through growTraditionalGrossUp's fixed point -- re-stacking the penalty's own
+            // funding draw as further taxable/penalizable income is a documented, out-of-scope
+            // second-order effect, the same category as ltcgTax/extraPoolFundedTax above.
+            BigDecimal earlyWithdrawalPenalty = age < RetirementAges.EARLY_WITHDRAWAL_AGE
+                    ? traditionalOrdinaryIncome.multiply(EARLY_WITHDRAWAL_PENALTY_RATE)
+                    : BigDecimal.ZERO;
+            if (earlyWithdrawalPenalty.compareTo(BigDecimal.ZERO) > 0) {
+                withdrawalTaxSource = withdrawalTaxSource.add(deductFromPools(earlyWithdrawalPenalty));
+            }
+
             return new WithdrawalTaxResult(
-                    fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax,
+                    fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax.add(earlyWithdrawalPenalty),
                     fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
-                    realizedLtcgIncome);
+                    realizedLtcgIncome, earlyWithdrawalPenalty);
         }
 
         /** The year's ordinary-income tax bundle: the net pool-funded tax plus the detailed result. */
@@ -1121,7 +1151,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                     ctx.conversionAmount(), ctx.taxLiability(), ctx.growthResult(),
                     ctx.withdrawalFromTaxable(), ctx.withdrawalFromTraditional(), ctx.withdrawalFromRoth(),
                     ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional, roth,
-                    ctx.rmdAmount(), ctx.ltcgTax());
+                    ctx.rmdAmount(), ctx.ltcgTax(), ctx.earlyWithdrawalPenalty());
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
             CombinedTaxResult breakdown = lastTaxBreakdown.orElse(null);

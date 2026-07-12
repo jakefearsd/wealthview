@@ -526,6 +526,45 @@ class TrialSimulatorReturnTest {
         assertThat(result.finalBalance()).isEqualTo(388_030.487805, within(1e-4));
     }
 
+    // === T18a-4: 10% IRC 72(t) early-withdrawal penalty on pre-59½ traditional distributions ===
+
+    private static TrialSimulator.SimulationConfig penaltyTestConfig(int retirementAge) {
+        // Taxable ($50,000) comfortably funds the ordinary tax AND the penalty -- isolates the
+        // penalty from the C2 gross-up fixed point. Traditional-first order draws the $10,000
+        // spend need entirely from traditional. rmdStartAge (75) is far above either retirement
+        // age tested, so no RMD ever enters the picture.
+        return new TrialSimulator.SimulationConfig(
+                50_000.0, 100_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0},
+                null, null, retirementAge, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
+                50_000.0, null, 0.0);
+    }
+
+    @Test
+    void simulateTrial_traditionalDrawBeforeAge60_appliesTenPercentPenalty() {
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1,
+                penaltyTestConfig(55));
+
+        // Ordinary tax: 10,000 * 10% = 1,000 (taxable-funded, no gross-up). Penalty: the actual
+        // traditional draw (10,000) * 10% = 1,000, also taxable-funded. Taxable: 50,000 - 1,000 -
+        // 1,000 = 48,000; traditional: 100,000 - 10,000 = 90,000. Final = 138,000.
+        assertThat(result.finalBalance()).isEqualTo(138_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_traditionalDrawAtAge60_noPenaltyAppliesExactlyOneThousandMoreThanBelow60() {
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1,
+                penaltyTestConfig(RetirementAges.EARLY_WITHDRAWAL_AGE));
+
+        // Same fixture, retirement (and thus the trial's only) age is exactly the proxy threshold
+        // -- no penalty. Only the $1,000 ordinary tax leaves the portfolio: final = 139,000, i.e.
+        // exactly $1,000 (one penalty's worth) more than the below-60 case above.
+        assertThat(result.finalBalance()).isEqualTo(139_000.0, within(1e-6));
+    }
+
     // === A4 fix: tax on outside income must be a funded outflow every year, not just surplus years ===
 
     @Test

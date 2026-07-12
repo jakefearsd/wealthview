@@ -105,7 +105,8 @@ final class YearFinanceResolver {
             PoolStrategy.TaxSourceResult combinedTaxSource,
             BigDecimal realizedPortfolioTaxable,
             BigDecimal realizedLtcgIncome,
-            BigDecimal socialSecurityTaxable) {
+            BigDecimal socialSecurityTaxable,
+            BigDecimal earlyWithdrawalPenalty) {
     }
 
     YearComputation resolve(YearContext yc) {
@@ -165,6 +166,7 @@ final class YearFinanceResolver {
         PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
         BigDecimal ltcgTax = BigDecimal.ZERO;
         BigDecimal realizedLtcgIncome = BigDecimal.ZERO;
+        BigDecimal earlyWithdrawalPenalty = BigDecimal.ZERO;
 
         // The converged federally-taxable Social Security amount for this year (audit B2's fixed
         // point has already run by the time this method returns for the final pass) -- zero when no
@@ -196,6 +198,7 @@ final class YearFinanceResolver {
             withdrawalTaxSource = retirementResult.withdrawalTaxSource();
             ltcgTax = retirementResult.ltcgTax();
             realizedLtcgIncome = retirementResult.realizedLtcgIncome();
+            earlyWithdrawalPenalty = retirementResult.earlyWithdrawalPenalty();
         } else if (rmdForced.compareTo(BigDecimal.ZERO) > 0) {
             // T18a-2: RMDs apply from the SECURE-2.0 age regardless of retirement status (a
             // still-working owner still owes tax on a forced traditional distribution) -- but a
@@ -214,6 +217,7 @@ final class YearFinanceResolver {
             withdrawalTaxSource = withdrawalResult.taxSource();
             ltcgTax = withdrawalResult.ltcgTax();
             realizedLtcgIncome = withdrawalResult.realizedLtcgIncome();
+            earlyWithdrawalPenalty = withdrawalResult.earlyWithdrawalPenalty();
         }
 
         var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
@@ -227,7 +231,7 @@ final class YearFinanceResolver {
                 incomeResult.effectiveOtherIncome(), conversionAmount, taxLiability, suspendedLoss,
                 withdrawals, previousWithdrawal, surplusReinvested, wdFromTaxable, wdFromTraditional,
                 wdFromRoth, ltcgTax, combinedTaxSource, realizedPortfolioTaxable, realizedLtcgIncome,
-                socialSecurityTaxable);
+                socialSecurityTaxable, earlyWithdrawalPenalty);
     }
 
     private record IncomeAndConversionResult(

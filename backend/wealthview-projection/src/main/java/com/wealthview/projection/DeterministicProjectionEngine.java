@@ -377,6 +377,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal wdFromRoth = comp.wdFromRoth();
         BigDecimal previousWithdrawal = comp.previousWithdrawal();
         BigDecimal ltcgTax = comp.ltcgTax();
+        BigDecimal earlyWithdrawalPenalty = comp.earlyWithdrawalPenalty();
         var combinedTaxSource = comp.combinedTaxSource();
 
         pool.floorAtZero();
@@ -388,7 +389,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 year, age, startBalance, contributions,
                 totalGrowth, withdrawals, retired, conversionAmount, taxLiability,
                 growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource,
-                rmdAmount, ltcgTax));
+                rmdAmount, ltcgTax, earlyWithdrawalPenalty));
         yearDto = PropertyEquityCalculator.apply(yearDto, propertyEquity);
         yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
                 ctx.inflationRate(), comp.totalActiveIncome());

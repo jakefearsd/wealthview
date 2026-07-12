@@ -658,7 +658,7 @@ class MultiPoolDeepTest {
                 bd("100"), true, ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 ZERO, bd("100"), ZERO,
-                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO), ZERO, ZERO));
+                new PoolStrategy.TaxSourceResult(ZERO, bd("20"), ZERO), ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("15"));
         assertThat(dto.stateTax()).isEqualByComparingTo(bd("5"));
@@ -674,7 +674,7 @@ class MultiPoolDeepTest {
                 bd("50"), true, ZERO, ZERO,
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 bd("50"), ZERO, ZERO,
-                PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO));
+                PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isNull();
         assertThat(dto.stateTax()).isNull();
@@ -697,7 +697,7 @@ class MultiPoolDeepTest {
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
                 ZERO, bd("20"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
-                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO));
+                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("25"));
         assertThat(dto.stateTax()).isNull();
@@ -743,6 +743,71 @@ class MultiPoolDeepTest {
     // Note: the pre-C11 SinglePool "executeRothConversion always returns zero" spot-check is
     // superseded by executeRothConversion_emptyTraditional_returnsZero above, which already covers
     // MultiPool's real reason for returning zero when there is no traditional balance to convert.
+
+    // === T18a-4: 10% IRC 72(t) early-withdrawal penalty on pre-59½ traditional distributions ===
+
+    @Test
+    void executeWithdrawals_traditionalDrawBeforeAge60_appliesTenPercentPenalty() {
+        // Taxable ($50,000) comfortably funds the ordinary tax AND the penalty, so gross-up never
+        // triggers -- isolates the penalty math from audit C2's fixed point.
+        var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST,
+                flatTaxCalc("0.10"));
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY,
+                ZERO, ZERO, ZERO);
+
+        // Ordinary tax: 10000 * 10% = 1000. Penalty: 10000 (the full traditional distribution,
+        // matching traditionalOrdinaryIncome) * 10% = 1000. taxLiability = both, additive.
+        assertThat(result.taxLiability()).isEqualByComparingTo(bd("2000"));
+        assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(bd("1000"));
+        // The penalty is funded from taxable (which has plenty), NOT re-added to traditional's
+        // reported ordinary income -- fromTraditional stays exactly the distribution amount.
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("10000"));
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("90000")); // untouched by tax/penalty funding
+        // Taxable funds both the $1,000 ordinary tax and the $1,000 penalty: 50000 - 2000 = 48000.
+    }
+
+    @Test
+    void executeWithdrawals_traditionalDrawAtOrAfterAge60_noPenalty() {
+        var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST,
+                flatTaxCalc("0.10"));
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO,
+                RetirementAges.EARLY_WITHDRAWAL_AGE, ZERO, ZERO, ZERO);
+
+        assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(ZERO);
+        assertThat(result.taxLiability()).isEqualByComparingTo(bd("1000")); // ordinary tax only
+    }
+
+    @Test
+    void executeWithdrawals_noTraditionalDrawBeforeAge60_noPenaltyOnTaxableOnlySpend() {
+        // Taxable-first order with a small draw fully covered by taxable -- zero traditional
+        // distribution, so no penalty applies even though age is under 60.
+        var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TAXABLE_FIRST,
+                flatTaxCalc("0.10"));
+
+        var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY,
+                ZERO, ZERO, ZERO);
+
+        assertThat(result.fromTraditional()).isEqualByComparingTo(ZERO);
+        assertThat(result.earlyWithdrawalPenalty()).isEqualByComparingTo(ZERO);
+    }
+
+    @Test
+    void executeRothConversion_beforeAge60_notPenalized() {
+        // T18a-4 explicitly scopes OUT Roth conversions -- the converted dollars move internally
+        // to Roth, they are not withdrawn to the household, so the 10% penalty never applies to a
+        // conversion regardless of age. (executeRothConversion has no age parameter at all --
+        // this test documents that the penalty logic lives entirely in executeWithdrawals.)
+        var tax = flatTaxCalc("0.20");
+        var p = poolWithConversion("0", "500000", "0", "50000", "fixed", null, null, tax);
+
+        var r = p.executeRothConversion(YEAR, ZERO, ZERO);
+
+        // Ordinary conversion tax only (50000 * 20% = 10000) -- no penalty component exists on
+        // ConversionResult at all.
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("10000"));
+    }
 
     // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===
 

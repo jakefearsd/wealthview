@@ -30,7 +30,7 @@ class MultiPoolYearDtoBuilderTest {
                 bd("10000"), bd("40000"), ZERO,
                 PoolStrategy.TaxSourceResult.ZERO,
                 bd("450000"), bd("100000"), bd("300000"), bd("50000"),
-                rmdAmount, ltcgTax);
+                rmdAmount, ltcgTax, ZERO);
     }
 
     @Test

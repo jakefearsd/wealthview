@@ -32,7 +32,8 @@ final class MultiPoolYearDtoBuilder {
                          PoolStrategy.TaxSourceResult combinedTaxSource,
                          BigDecimal endBalance, BigDecimal endingTaxable,
                          BigDecimal endingTraditional, BigDecimal endingRoth,
-                         BigDecimal rmdAmount, BigDecimal ltcgTax) {}
+                         BigDecimal rmdAmount, BigDecimal ltcgTax,
+                         BigDecimal earlyWithdrawalPenalty) {}
 
     private MultiPoolYearDtoBuilder() {
     }
@@ -75,6 +76,7 @@ final class MultiPoolYearDtoBuilder {
                 .usedItemizedDeduction(usedItemized)
                 .rmdAmount(positiveOrNull(in.rmdAmount()))
                 .capitalGainsTax(positiveOrNull(in.ltcgTax()))
+                .earlyWithdrawalPenalty(positiveOrNull(in.earlyWithdrawalPenalty()))
                 .build();
     }
 

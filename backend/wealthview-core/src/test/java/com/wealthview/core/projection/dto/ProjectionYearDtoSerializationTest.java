@@ -46,7 +46,7 @@ class ProjectionYearDtoSerializationTest {
             "taxPaidFromTaxable", "taxPaidFromTraditional", "taxPaidFromRoth", "withdrawalFromTaxable",
             "withdrawalFromTraditional", "withdrawalFromRoth", "rentalPropertyDetails", "federalTax",
             "stateTax", "saltDeduction", "usedItemizedDeduction", "irmaaWarning", "rmdAmount",
-            "capitalGainsTax", "irmaaSurcharge");
+            "capitalGainsTax", "irmaaSurcharge", "earlyWithdrawalPenalty");
 
     private static final Set<String> SNAKE_KEYS = Set.of(
             "year", "age", "start_balance", "contributions", "growth", "withdrawals", "end_balance",
@@ -60,7 +60,7 @@ class ProjectionYearDtoSerializationTest {
             "tax_paid_from_traditional", "tax_paid_from_roth", "withdrawal_from_taxable",
             "withdrawal_from_traditional", "withdrawal_from_roth", "rental_property_details",
             "federal_tax", "state_tax", "salt_deduction", "used_itemized_deduction", "irmaa_warning",
-            "rmd_amount", "capital_gains_tax", "irmaa_surcharge");
+            "rmd_amount", "capital_gains_tax", "irmaa_surcharge", "early_withdrawal_penalty");
 
     /** A year with every field populated to a distinct value, so a swapped field is detectable. */
     private ProjectionYearDto fullyPopulated() {
@@ -95,6 +95,7 @@ class ProjectionYearDtoSerializationTest {
                 .usedItemizedDeduction(true).irmaaWarning(true)
                 .rmdAmount(new BigDecimal("6000")).capitalGainsTax(new BigDecimal("900"))
                 .irmaaSurcharge(new BigDecimal("2643.60"))
+                .earlyWithdrawalPenalty(new BigDecimal("450"))
                 .build();
     }
 
@@ -134,6 +135,7 @@ class ProjectionYearDtoSerializationTest {
         assertThat(t.get("rmd_amount").decimalValue()).isEqualByComparingTo("6000");            // tax breakdown
         assertThat(t.get("capital_gains_tax").decimalValue()).isEqualByComparingTo("900");       // tax breakdown
         assertThat(t.get("irmaa_surcharge").decimalValue()).isEqualByComparingTo("2643.60");     // tax breakdown
+        assertThat(t.get("early_withdrawal_penalty").decimalValue()).isEqualByComparingTo("450"); // tax breakdown
     }
 
     @Test

@@ -120,13 +120,19 @@ public record ProjectionYearDto(
      * {@code federalTax}. {@code irmaaWarning} is {@code true} exactly when {@code irmaaSurcharge}
      * is positive (derived from the real IRMAA tiers, audit Wave-4 IRMAA item -- previously a
      * warning-only bracket-ceiling proxy with no dollar figure).
+     *
+     * <p>{@code earlyWithdrawalPenalty} (T18a-4) is the 10% IRC 72(t) additional tax on traditional
+     * distributions before age 59½ (whole-year proxy). Unlike {@code rmdAmount}/
+     * {@code capitalGainsTax}, it IS additive -- it is already folded into {@code taxLiability}, so
+     * this field surfaces the component rather than double-counting it.
      */
     public record TaxBreakdown(BigDecimal rothConversionAmount, BigDecimal taxLiability,
                                BigDecimal federalTax, BigDecimal stateTax, BigDecimal saltDeduction,
                                Boolean usedItemizedDeduction, Boolean irmaaWarning,
-                               BigDecimal rmdAmount, BigDecimal capitalGainsTax, BigDecimal irmaaSurcharge) {
+                               BigDecimal rmdAmount, BigDecimal capitalGainsTax, BigDecimal irmaaSurcharge,
+                               BigDecimal earlyWithdrawalPenalty) {
         static TaxBreakdown empty() {
-            return new TaxBreakdown(null, null, null, null, null, null, null, null, null, null);
+            return new TaxBreakdown(null, null, null, null, null, null, null, null, null, null, null);
         }
     }
 
@@ -308,6 +314,10 @@ public record ProjectionYearDto(
         return tax.irmaaSurcharge();
     }
 
+    public BigDecimal earlyWithdrawalPenalty() {
+        return tax.earlyWithdrawalPenalty();
+    }
+
     public BigDecimal propertyEquity() {
         return netWorth.propertyEquity();
     }
@@ -473,6 +483,7 @@ public record ProjectionYearDto(
         private BigDecimal rmdAmount;
         private BigDecimal capitalGainsTax;
         private BigDecimal irmaaSurcharge;
+        private BigDecimal earlyWithdrawalPenalty;
 
         private Builder() {}
 
@@ -526,6 +537,7 @@ public record ProjectionYearDto(
             b.rmdAmount = dto.rmdAmount();
             b.capitalGainsTax = dto.capitalGainsTax();
             b.irmaaSurcharge = dto.irmaaSurcharge();
+            b.earlyWithdrawalPenalty = dto.earlyWithdrawalPenalty();
             return b;
         }
 
@@ -769,6 +781,11 @@ public record ProjectionYearDto(
             return this;
         }
 
+        public Builder earlyWithdrawalPenalty(BigDecimal earlyWithdrawalPenalty) {
+            this.earlyWithdrawalPenalty = earlyWithdrawalPenalty;
+            return this;
+        }
+
         public ProjectionYearDto build() {
             return new ProjectionYearDto(
                     year, age, retired,
@@ -784,7 +801,7 @@ public record ProjectionYearDto(
                             selfEmploymentTax, incomeBySource, rentalPropertyDetails),
                     new TaxBreakdown(rothConversionAmount, taxLiability, federalTax, stateTax,
                             saltDeduction, usedItemizedDeduction, irmaaWarning,
-                            rmdAmount, capitalGainsTax, irmaaSurcharge),
+                            rmdAmount, capitalGainsTax, irmaaSurcharge, earlyWithdrawalPenalty),
                     new NetWorth(propertyEquity, totalNetWorth, surplusReinvested));
         }
     }

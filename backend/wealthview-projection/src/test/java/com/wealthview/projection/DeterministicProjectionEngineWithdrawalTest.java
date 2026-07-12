@@ -501,6 +501,71 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(year1.withdrawalFromRoth()).isNull();
     }
 
+    // === T18a-4: 10% IRC 72(t) early-withdrawal penalty (main projection) ===
+
+    @Test
+    void run_traditionalFirstRetireeBeforeAge60_appliesEarlyWithdrawalPenalty() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Age 55 at retirement -- before the 59.5 threshold (60 proxy). Unlike dynamic_sequencing
+        // (which steers clear of early traditional draws), traditional_first draws straight from
+        // traditional regardless of age, so this scenario actually exercises the penalty.
+        int retireAge = 55;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(retireAge);
+        assertThat(year1.withdrawalFromTraditional()).isNotNull();
+        assertThat(year1.withdrawalFromTraditional()).isGreaterThan(BigDecimal.ZERO);
+
+        // The penalty is a distinct, positive, additive component of taxLiability.
+        assertThat(year1.earlyWithdrawalPenalty()).isNotNull();
+        assertThat(year1.earlyWithdrawalPenalty()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.earlyWithdrawalPenalty())
+                .isEqualByComparingTo(year1.withdrawalFromTraditional().multiply(bd("0.10")));
+        assertThat(year1.taxLiability()).isGreaterThan(year1.earlyWithdrawalPenalty());
+    }
+
+    @Test
+    void run_traditionalFirstRetireeAtAge60_noEarlyWithdrawalPenalty() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int retireAge = 60;
+        int birthYear = LocalDate.now().getYear() - retireAge;
+
+        var input = createInput(
+                LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(
+                        acct("500000", "0", "0.00", "traditional"),
+                        acct("200000", "0", "0.00", "taxable")));
+
+        var result = engineTax.run(input);
+        var year1 = result.yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(retireAge);
+        assertThat(year1.withdrawalFromTraditional()).isNotNull();
+        assertThat(year1.withdrawalFromTraditional()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.earlyWithdrawalPenalty()).isNull();
+    }
+
     // === RMD forcing (main projection) ===
 
     @Test

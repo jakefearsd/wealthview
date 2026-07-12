@@ -46,6 +46,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -95,6 +96,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -144,6 +146,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -193,6 +196,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -242,6 +246,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -291,6 +296,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -340,6 +346,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -389,6 +396,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -438,6 +446,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -487,6 +496,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -536,6 +546,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -585,6 +596,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -634,6 +646,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -683,6 +696,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -732,6 +746,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -781,6 +796,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -830,6 +846,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -879,6 +896,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -928,6 +946,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -977,6 +996,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1026,6 +1046,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1075,6 +1096,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1124,6 +1146,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1173,6 +1196,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1222,6 +1246,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1271,6 +1296,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1320,6 +1346,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1369,6 +1396,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1418,6 +1446,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1467,6 +1496,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : null,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1516,6 +1546,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6520.1070,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1565,6 +1596,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6754.3549,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1614,6 +1646,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6979.6590,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1663,6 +1696,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7196.0912,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1712,6 +1746,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7403.7167,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1761,6 +1796,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7602.5952,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1810,6 +1846,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7792.7796,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1859,6 +1896,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7974.3172,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1908,6 +1946,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 8147.2486,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -1957,6 +1996,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 8061.9690,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2006,6 +2046,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7905.0624,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2055,6 +2096,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7763.2325,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2104,6 +2146,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7630.9873,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2153,6 +2196,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7466.0482,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2202,6 +2246,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7333.9994,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2251,6 +2296,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7199.4715,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2300,6 +2346,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 7058.9756,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2349,6 +2396,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6934.7852,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2398,6 +2446,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6814.2970,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2447,6 +2496,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6676.1116,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2496,6 +2546,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6568.2125,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2545,6 +2596,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6456.8366,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2594,6 +2646,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6321.6905,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2643,6 +2696,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6214.3630,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -2692,6 +2746,7 @@
     "rmdAmount" : null,
     "capitalGainsTax" : 6106.3232,
     "irmaaSurcharge" : null,
+    "earlyWithdrawalPenalty" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null

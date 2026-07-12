@@ -25,6 +25,10 @@ final class TrialSimulator {
      * 50% is a generous ceiling that only ever bites on a corrupt/out-of-range input. */
     private static final double GROSS_UP_RATE_CAP = 0.50;
 
+    /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions, a
+     * statutory constant (T18a-4). */
+    private static final double EARLY_WITHDRAWAL_PENALTY_RATE = 0.10;
+
     /** Per-trial simulation result. */
     record TrialResult(
             double finalBalance,
@@ -275,15 +279,14 @@ final class TrialSimulator {
             double unfundedBaseTax = baseIncomeTax - fundedFromSurplus;
             double withdrawal = Math.max(0, spending - income[y]);
 
-            // Split withdrawal across pools (59.5 rule: taxable only before age 60)
+            // Split withdrawal across pools (59.5 rule: taxable only before age 60). aux bundles the
+            // remaining per-year array-or-default lookups (dynamic-sequencing ceiling/conversion,
+            // LTCG table, rental income) into one call to keep this NCSS-capped hot method lean.
             boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
-            double dsCeiling = config.dsBracketCeilingByYear() != null
-                    ? config.dsBracketCeilingByYear()[y] : 0;
-            double dsConvAmt = config.conversionByYear() != null
-                    ? config.conversionByYear()[y] : 0;
+            var aux = resolveYearAuxInputs(config, y);
             var drawn = splitWithdrawal(pools[0], pools[1], pools[2],
                     withdrawal, order, preAge595,
-                    dsCeiling, income[y], dsConvAmt, rmd);
+                    aux.dsCeiling(), income[y], aux.dsConvAmt(), rmd);
 
             // EXACT incremental tax on the traditional withdrawal (audit C5): the draw stacks on
             // base + the forced RMD + this year's ACTUAL conversion income (T18a-1 order) --
@@ -308,6 +311,8 @@ final class TrialSimulator {
                     config.cashReserveYears(), portfolioReturn, table, base + rmdForced + actualConv);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
+            applyEarlyWithdrawalPenalty(pools, lots, traditionalDrawnOut[0], age);
+
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
             // spending resources only -- identical to its pre-A4 shape.
@@ -324,12 +329,11 @@ final class TrialSimulator {
             settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax,
                     table, ordinaryStack);
 
-            LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
-            // T18a-3: this year's net rental income, threaded into the NIIT Net Investment Income
-            // base only (never the LTCG bracket tax) -- zero when no rental array is configured.
-            double rentalIncome = config.rentalIncomeByYear() != null ? config.rentalIncomeByYear()[y] : 0.0;
-            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, ltcgTable, ordinaryStack, table,
-                    rentalIncome);
+            // T18a-3: aux.rentalIncome() threads this year's net rental income into the NIIT Net
+            // Investment Income base only (never the LTCG bracket tax) -- zero when no rental array
+            // is configured.
+            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, aux.ltcgTable(), ordinaryStack, table,
+                    aux.rentalIncome());
 
             clampPoolsNonNegative(pools);
             cashBalance = Math.max(0, cashBalance);
@@ -457,6 +461,22 @@ final class TrialSimulator {
         double taxableSold = taxableBefore - after[0];
         if (taxableSold > 0) {
             lots.sellFifo(taxableSold);
+        }
+    }
+
+    /**
+     * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (whole-year
+     * proxy: {@link RetirementAges#EARLY_WITHDRAWAL_AGE} = 60, already used above by
+     * {@code preAge595} to steer clear of traditional draws). Flat 10% on the ACTUAL dollars
+     * debited from traditional for this year's spending draw ({@code traditionalDrawn} -- branch-
+     * agnostic across the cash-reserve down-year scaling and the plain up-market draw); Roth
+     * conversions are OUT OF SCOPE. Funded via the simple (non-grossed-up) tax cascade -- hot-loop
+     * cheap, matching the Roth-conversion-tax drain's own no-gross-up design.
+     */
+    private static void applyEarlyWithdrawalPenalty(double[] pools, TaxableLots lots,
+                                                      double traditionalDrawn, int age) {
+        if (age < RetirementAges.EARLY_WITHDRAWAL_AGE && traditionalDrawn > 0) {
+            deductTaxFromPools(traditionalDrawn * EARLY_WITHDRAWAL_PENALTY_RATE, pools, lots);
         }
     }
 
@@ -611,6 +631,19 @@ final class TrialSimulator {
         }
         double divisor = RmdCalculator.distributionPeriod(age);
         return divisor > 0 ? pools1PreGrowth / divisor : 0;
+    }
+
+    /** Bundles {@link #simulateTrial}'s remaining per-year array-or-default lookups (dynamic-
+     * sequencing bracket ceiling/conversion amount, the LTCG table, and T18a-3's net rental
+     * income) into a single call, keeping the NCSS-capped hot method lean. */
+    private record YearAuxInputs(double dsCeiling, double dsConvAmt, LtcgTaxTable ltcgTable, double rentalIncome) {}
+
+    private static YearAuxInputs resolveYearAuxInputs(SimulationConfig config, int y) {
+        double dsCeiling = config.dsBracketCeilingByYear() != null ? config.dsBracketCeilingByYear()[y] : 0;
+        double dsConvAmt = config.conversionByYear() != null ? config.conversionByYear()[y] : 0;
+        LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
+        double rentalIncome = config.rentalIncomeByYear() != null ? config.rentalIncomeByYear()[y] : 0.0;
+        return new YearAuxInputs(dsCeiling, dsConvAmt, ltcgTable, rentalIncome);
     }
 
     /**

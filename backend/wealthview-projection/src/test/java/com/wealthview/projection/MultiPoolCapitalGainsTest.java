@@ -185,7 +185,7 @@ class MultiPoolCapitalGainsTest {
         // The dividend tax drained the taxable pool from 106000 to 105700 (only the $300 drag).
         var dto = pool.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("300000"),
                 ZERO, g.total(), bd("50000"), true, ZERO, r.taxLiability(), g,
-                r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO));
+                r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO, ZERO));
         assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105700"));
     }
 
