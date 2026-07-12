@@ -42,3 +42,10 @@ app:
 logging:
   level:
     com.wealthview: WARN
+    # INFO for the split package so CI logs show the backfill runner's
+    # startup auto-run lifecycle ("backfill starting" / "N symbols scanned,
+    # M splits applied" / "Applied split ..."). StockSplitBackfillIT failed
+    # on hosted 2-core runners with a silent signature that WARN-level logs
+    # could not distinguish (see runs 29195289770 / 29198018267); keeping
+    # this at INFO makes any recurrence diagnosable from the CI log alone.
+    com.wealthview.core.split: INFO

@@ -74,14 +74,18 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
      * {@link StockSplitBackfillRunner}'s {@code @ConditionalOnBean}, so its
      * {@code ContextRefreshedEvent}-triggered auto-run can race this test's own
      * {@link StubSplitClient} under CI-runner CPU contention, silently consuming a
-     * queued split before this class's own sync-endpoint calls run. Block, once
-     * per context, on the actual settle condition (not a fixed sleep) before any
-     * test body queues a split.
+     * queued split before this class's own sync-endpoint calls run. Settle condition
+     * matches BackfillIT's: flag "true" AND every "stock-split-backfill" thread
+     * parked WAITING (executor queue drained) — waiting on the flag alone proved
+     * insufficient on hosted run 29198018267.
      */
     private void awaitStartupAutoRunSettled() {
         var deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
-        while (!"true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
-                && System.nanoTime() < deadline) {
+        while (System.nanoTime() < deadline) {
+            if ("true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
+                    && backfillExecutorDrained()) {
+                return;
+            }
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
@@ -89,6 +93,14 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
                 return;
             }
         }
+    }
+
+    private static boolean backfillExecutorDrained() {
+        var backfillThreads = Thread.getAllStackTraces().keySet().stream()
+                .filter(t -> "stock-split-backfill".equals(t.getName()))
+                .toList();
+        return !backfillThreads.isEmpty()
+                && backfillThreads.stream().allMatch(t -> t.getState() == Thread.State.WAITING);
     }
 
     @Test
@@ -169,21 +181,29 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         private final Map<String, List<DetectedSplit>> queued = new HashMap<>();
         private final java.util.Set<String> failures = new java.util.HashSet<>();
 
-        void queueSplit(String symbol, DetectedSplit split) {
+        synchronized void queueSplit(String symbol, DetectedSplit split) {
             queued.computeIfAbsent(symbol, k -> new java.util.ArrayList<>()).add(split);
         }
 
-        void queueFailure(String symbol) {
+        synchronized void queueFailure(String symbol) {
             failures.add(symbol);
         }
 
-        void reset() {
+        synchronized void reset() {
             queued.clear();
             failures.clear();
         }
 
         @Override
-        public List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
+        public synchronized List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
+            // Same defense as StockSplitBackfillIT.StubBackfillClient#fetch: queued
+            // splits/failures are fixture state for this class's sync-endpoint calls
+            // (which run on HTTP worker threads) — never serve or consume them on the
+            // backfill runner's background startup thread. `synchronized` also gives
+            // cross-thread memory visibility a bare HashMap lacks.
+            if ("stock-split-backfill".equals(Thread.currentThread().getName())) {
+                return List.of();
+            }
             if (failures.contains(symbol)) {
                 throw new RuntimeException("simulated finnhub failure");
             }

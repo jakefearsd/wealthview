@@ -66,28 +66,35 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
 
     /**
      * {@link StockSplitBackfillRunner} auto-runs once, asynchronously on a background
-     * thread, via its {@code ContextRefreshedEvent} listener as soon as this test
-     * class's Spring context comes up (the {@code @ConditionalOnBean(SplitDetectionClient)}
-     * guard is satisfied because {@link StubBackfillClientConfig} supplies one). On a fast
-     * machine that auto-run always finishes before this method runs. Under CPU contention
-     * (e.g. a shared 2-core CI runner) scheduling delays can push its completion into the
-     * window where the test body below is queuing its own split — letting that unrelated
-     * auto-run silently consume it and mark the backfill "completed" in
-     * {@link SystemConfigService}'s in-memory cache (which the raw-JDBC deletes above don't
-     * touch) before this test's own explicit {@code runIfNeeded()} call ever gets a chance
-     * to run. That is a genuine race, not a slow-assertion issue: waiting longer after the
-     * fact would not help, because by the time it manifests the split has already been
-     * silently dropped. Block here, once, on the actual settle condition (not a fixed
-     * sleep) until that startup auto-run has visibly finished, so every step below is
-     * guaranteed to happen strictly after it rather than racing it. Bounded and
-     * non-throwing: if the auto-run never settles (e.g. an unrelated startup failure) this
-     * simply falls through and the reset below runs as it always did, so behavior can only
-     * improve relative to before this guard existed.
+     * "stock-split-backfill" thread, via its {@code ContextRefreshedEvent} listener as
+     * soon as this test class's Spring context comes up (the
+     * {@code @ConditionalOnBean(SplitDetectionClient)} guard is satisfied because
+     * {@link StubBackfillClientConfig} supplies one). On a fast machine that auto-run
+     * always finishes before this method runs. Under CPU contention (shared 2-core CI
+     * runners: hosted runs 29195289770, 29197264627, 29198018267) its execution can be
+     * delayed into or across the test bodies, where it silently consumes the stub's
+     * queued split and/or re-writes {@code stock_splits.backfill_completed=true} into
+     * {@link SystemConfigService}'s in-memory cache after this setUp's reset — making the
+     * test's own {@code runIfNeeded()} call a no-op (holdings stay at pre-split quantity).
+     *
+     * <p>Waiting on the flag alone proved insufficient on CI (run 29198018267): the flag
+     * shows that one execution completed, not that the runner's single-thread executor is
+     * drained. The settle condition here is therefore: flag reads "true" AND at least one
+     * "stock-split-backfill" thread exists AND every thread with that name is parked in
+     * {@code WAITING} — i.e. blocked on the idle executor queue's take(), so the queue is
+     * empty and nothing is in flight. Cached sibling contexts (e.g.
+     * {@link StockSplitSyncIT}'s) keep identically-named parked threads alive, hence the
+     * for-all quantifier. ContextRefreshedEvents only occur during startup, so once
+     * drained the runner stays drained. Bounded and non-throwing: on timeout this falls
+     * through and the reset below runs as it always did.
      */
     private void awaitStartupAutoRunSettled() {
         var deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
-        while (!"true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
-                && System.nanoTime() < deadline) {
+        while (System.nanoTime() < deadline) {
+            if ("true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
+                    && backfillExecutorDrained()) {
+                return;
+            }
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
@@ -95,6 +102,14 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
                 return;
             }
         }
+    }
+
+    private static boolean backfillExecutorDrained() {
+        var backfillThreads = Thread.getAllStackTraces().keySet().stream()
+                .filter(t -> "stock-split-backfill".equals(t.getName()))
+                .toList();
+        return !backfillThreads.isEmpty()
+                && backfillThreads.stream().allMatch(t -> t.getState() == Thread.State.WAITING);
     }
 
     @Test
@@ -144,16 +159,27 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
     static class StubBackfillClient implements SplitDetectionClient {
         private final Map<String, List<DetectedSplit>> queued = new HashMap<>();
 
-        void queueSplit(String symbol, DetectedSplit split) {
+        synchronized void queueSplit(String symbol, DetectedSplit split) {
             queued.computeIfAbsent(symbol, k -> new java.util.ArrayList<>()).add(split);
         }
 
-        void reset() {
+        synchronized void reset() {
             queued.clear();
         }
 
         @Override
-        public List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
+        public synchronized List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
+            // Defense in depth against the startup auto-run race documented on
+            // awaitStartupAutoRunSettled(): the runner's ContextRefreshedEvent
+            // auto-run always executes on its dedicated "stock-split-backfill"
+            // thread, while the tests invoke runIfNeeded() directly on the JUnit
+            // thread. Splits queued by a test are fixture state for that test's
+            // own call — never hand them to the background thread, and never let
+            // it consume (remove) them either. `synchronized` also gives the
+            // cross-thread memory visibility a bare HashMap lacks.
+            if ("stock-split-backfill".equals(Thread.currentThread().getName())) {
+                return List.of();
+            }
             var list = queued.remove(symbol);
             return list == null ? List.of() : list;
         }
