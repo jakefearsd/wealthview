@@ -112,6 +112,9 @@ public class GuardrailSpendingProfileEntity extends Auditable {
     @Column(name = "is_stale", nullable = false)
     private boolean stale = false;
 
+    @Column(name = "gate_on_adaptive_rules", nullable = false)
+    private boolean gateOnAdaptiveRules = false;
+
     protected GuardrailSpendingProfileEntity() {
     }
 
@@ -325,6 +328,14 @@ public class GuardrailSpendingProfileEntity extends Auditable {
 
     public void setStale(boolean stale) {
         this.stale = stale;
+    }
+
+    public boolean isGateOnAdaptiveRules() {
+        return gateOnAdaptiveRules;
+    }
+
+    public void setGateOnAdaptiveRules(boolean gateOnAdaptiveRules) {
+        this.gateOnAdaptiveRules = gateOnAdaptiveRules;
     }
 
 }
