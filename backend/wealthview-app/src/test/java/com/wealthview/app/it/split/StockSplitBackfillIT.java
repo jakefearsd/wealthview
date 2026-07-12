@@ -1,5 +1,6 @@
 package com.wealthview.app.it.split;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +54,7 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
         super.setUp();
         stubClient = (StubBackfillClient) detectionClient;
         stubClient.reset();
+        awaitStartupAutoRunSettled();
         // Ensure flag is unset (cleaner already removes stock_splits.* keys
         // but explicit for the test's intent). Also wipe the SystemConfigService
         // in-memory cache so the runner re-reads from DB.
@@ -60,6 +62,39 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
         systemConfigService.set("stock_splits.backfill_completed", "false");
         jdbcTemplate.update("DELETE FROM system_config WHERE key = 'stock_splits.backfill_completed'");
         accountId = data.createBrokerageAccountAndGetId();
+    }
+
+    /**
+     * {@link StockSplitBackfillRunner} auto-runs once, asynchronously on a background
+     * thread, via its {@code ContextRefreshedEvent} listener as soon as this test
+     * class's Spring context comes up (the {@code @ConditionalOnBean(SplitDetectionClient)}
+     * guard is satisfied because {@link StubBackfillClientConfig} supplies one). On a fast
+     * machine that auto-run always finishes before this method runs. Under CPU contention
+     * (e.g. a shared 2-core CI runner) scheduling delays can push its completion into the
+     * window where the test body below is queuing its own split — letting that unrelated
+     * auto-run silently consume it and mark the backfill "completed" in
+     * {@link SystemConfigService}'s in-memory cache (which the raw-JDBC deletes above don't
+     * touch) before this test's own explicit {@code runIfNeeded()} call ever gets a chance
+     * to run. That is a genuine race, not a slow-assertion issue: waiting longer after the
+     * fact would not help, because by the time it manifests the split has already been
+     * silently dropped. Block here, once, on the actual settle condition (not a fixed
+     * sleep) until that startup auto-run has visibly finished, so every step below is
+     * guaranteed to happen strictly after it rather than racing it. Bounded and
+     * non-throwing: if the auto-run never settles (e.g. an unrelated startup failure) this
+     * simply falls through and the reset below runs as it always did, so behavior can only
+     * improve relative to before this guard existed.
+     */
+    private void awaitStartupAutoRunSettled() {
+        var deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        while (!"true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
+                && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     @Test

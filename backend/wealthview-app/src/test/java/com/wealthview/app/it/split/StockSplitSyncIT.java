@@ -1,5 +1,6 @@
 package com.wealthview.app.it.split;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -17,7 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
+import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.split.SplitDetectionClient;
+import com.wealthview.core.split.StockSplitBackfillRunner;
 import com.wealthview.core.split.dto.DetectedSplit;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
@@ -28,6 +31,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Sync flow coverage. Uses a {@link TestConfiguration} to provide a stub
  * {@link SplitDetectionClient} bean so the sync service runs without needing
  * a real Finnhub key (the {@code @ConditionalOnBean} guard flips on).
+ *
+ * <p>That same conditional guard also flips on {@link StockSplitBackfillRunner}
+ * (its own {@code @ConditionalOnBean(SplitDetectionClient.class)}), which fires a
+ * one-shot backfill asynchronously as soon as this context refreshes and can race
+ * this class's {@link StubSplitClient} the same way it does in
+ * {@link StockSplitBackfillIT} — see {@link #awaitStartupAutoRunSettled()}.
  */
 @Import(StockSplitSyncIT.StubSplitClientConfig.class)
 class StockSplitSyncIT extends AbstractApiIntegrationTest {
@@ -41,6 +50,9 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private SystemConfigService systemConfigService;
+
     private AuthHelper.Session superAdmin;
     private String accountId;
 
@@ -49,9 +61,34 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
     protected void setUp() {
         super.setUp();
         stubSplitClient.reset();
+        awaitStartupAutoRunSettled();
         authHelper.createSuperAdminDirectly(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         superAdmin = authHelper.loginAsSession(restTemplate, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         accountId = data.createBrokerageAccountAndGetId();
+    }
+
+    /**
+     * See the identical guard (and full rationale) in
+     * {@link StockSplitBackfillIT#awaitStartupAutoRunSettled()}: importing a
+     * {@link SplitDetectionClient} bean here also satisfies
+     * {@link StockSplitBackfillRunner}'s {@code @ConditionalOnBean}, so its
+     * {@code ContextRefreshedEvent}-triggered auto-run can race this test's own
+     * {@link StubSplitClient} under CI-runner CPU contention, silently consuming a
+     * queued split before this class's own sync-endpoint calls run. Block, once
+     * per context, on the actual settle condition (not a fixed sleep) before any
+     * test body queues a split.
+     */
+    private void awaitStartupAutoRunSettled() {
+        var deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
+        while (!"true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
+                && System.nanoTime() < deadline) {
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+        }
     }
 
     @Test
