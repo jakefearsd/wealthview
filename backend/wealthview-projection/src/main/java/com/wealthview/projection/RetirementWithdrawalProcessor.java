@@ -30,6 +30,10 @@ final class RetirementWithdrawalProcessor {
      * pool the scenario's withdrawal order draws from, WITHOUT going through the
      * {@code extraPoolFundedTax}/surplus-netting machinery {@code seTax} uses (that machinery folds
      * its amount into the reported {@code taxLiability}, which the surcharge must stay out of).
+     *
+     * <p>{@code survivorSpendingFactor} (household task 5) scales the plan-resolved spending from the
+     * first-death transition year forward; {@link BigDecimal#ONE} (both alive / single-person) leaves
+     * spending unchanged. See {@link #scaleBySurvivorFactor}.
      */
     record RetirementWithdrawalContext(
             PoolStrategy pool,
@@ -47,7 +51,8 @@ final class RetirementWithdrawalProcessor {
             @Nullable IncomeSourceProcessor.IncomeSourceYearResult isResult,
             @Nullable TaxCalculationStrategy taxStrategy,
             BigDecimal rmdAmount,
-            BigDecimal irmaaSurcharge) {
+            BigDecimal irmaaSurcharge,
+            BigDecimal survivorSpendingFactor) {
 
         /**
          * T18a-3: this year's aggregate net taxable rental income, threaded into the LTCG/NIIT
@@ -127,15 +132,25 @@ final class RetirementWithdrawalProcessor {
         // A4: this used to vanish at the old `.max(ZERO)` floor on the surplus deposit).
         BigDecimal extraPoolFundedTax = seTax;
 
+        // Household task 5 (transition step 4): from the first-death year the survivor spends
+        // survivorSpendingFactor of the plan-resolved amount. Applied HERE, at the single
+        // plan-resolution seam, so EVERY strategy inherits it uniformly — tier plans, guardrail
+        // schedules, and the withdrawal-rate strategies below. A factor of exactly 1.0 (both alive,
+        // single-person, or the pre-transition years) short-circuits to the original value, so those
+        // paths stay byte-identical.
+        BigDecimal factor = rwCtx.survivorSpendingFactor() != null
+                ? rwCtx.survivorSpendingFactor() : BigDecimal.ONE;
+
         if (spendingPlan != null) {
             var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement,
                     inflationRate, totalActiveIncome);
-            portfolioNeed = resolved.portfolioWithdrawal().min(aggBalance);
-            previousWithdrawal = resolved.totalSpending();
+            BigDecimal scaledSpending = scaleBySurvivorFactor(resolved.totalSpending(), factor);
+            portfolioNeed = scaleBySurvivorFactor(resolved.portfolioWithdrawal(), factor).min(aggBalance);
+            previousWithdrawal = scaledSpending;
 
             // Detect surplus or exact-match: income meets or exceeds total spending.
             // Tax must be computed even when income exactly equals spending (zero surplus).
-            BigDecimal grossSurplus = totalActiveIncome.subtract(resolved.totalSpending());
+            BigDecimal grossSurplus = totalActiveIncome.subtract(scaledSpending);
             if (grossSurplus.compareTo(BigDecimal.ZERO) >= 0) {
                 BigDecimal tax = BigDecimal.ZERO;
                 if (taxStrategy != null) {
@@ -177,7 +192,7 @@ final class RetirementWithdrawalProcessor {
             var ctx = new WithdrawalContext(
                     aggBalance, startBalance, previousWithdrawal, pool.getWeightedReturn(),
                     inflationRate, yearsInRetirement);
-            portfolioNeed = strategy.computeWithdrawal(ctx).min(aggBalance);
+            portfolioNeed = scaleBySurvivorFactor(strategy.computeWithdrawal(ctx), factor).min(aggBalance);
             previousWithdrawal = portfolioNeed;
         }
 
@@ -207,5 +222,17 @@ final class RetirementWithdrawalProcessor {
                 withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax(),
                 withdrawalResult.realizedLtcgIncome(), withdrawalResult.earlyWithdrawalPenalty(),
                 withdrawalResult.ordinaryInterestIncome());
+    }
+
+    /**
+     * Scales a plan-resolved spending/withdrawal amount by the survivor factor, short-circuiting to
+     * the original value when the factor is exactly 1.0 so the pre-transition and single-person paths
+     * stay byte-identical (no BigDecimal scale/precision drift from a redundant multiply).
+     */
+    private static BigDecimal scaleBySurvivorFactor(BigDecimal amount, BigDecimal factor) {
+        if (factor.compareTo(BigDecimal.ONE) == 0) {
+            return amount;
+        }
+        return amount.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
     }
 }

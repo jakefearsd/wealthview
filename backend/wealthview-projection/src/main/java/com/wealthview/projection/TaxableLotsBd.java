@@ -38,6 +38,23 @@ final class TaxableLotsBd {
         }
     }
 
+    /**
+     * Household task 5 (first-death basis step-up): raises each lot's BASIS toward its current value
+     * by {@code factor} of the embedded gain — per-lot {@code basis += (value − basis) × factor}. A
+     * {@code factor} of {@code 1.0} sets {@code basis := value} exactly (a full step-up to fair
+     * market value, so a subsequent FIFO sale realizes no gain on the stepped portion); {@code 0.5}
+     * (the common-law half step-up on jointly-held property at first death) moves the basis halfway
+     * to value. Value is never touched, so {@link #totalValue()} — and therefore the pool balance —
+     * is unchanged; only future realized-gain arithmetic shrinks. A lot carrying a loss
+     * ({@code value < basis}) is stepped DOWN by the same formula, matching a true step-to-FMV.
+     */
+    void stepUp(BigDecimal factor) {
+        for (BigDecimal[] lot : lots) {
+            BigDecimal adjustment = lot[1].subtract(lot[0]).multiply(factor).setScale(SCALE, ROUNDING);
+            lot[0] = lot[0].add(adjustment);
+        }
+    }
+
     /** Appreciates each lot's value (not its basis) by {@code appreciationRate}. */
     void grow(BigDecimal appreciationRate) {
         BigDecimal factor = BigDecimal.ONE.add(appreciationRate);

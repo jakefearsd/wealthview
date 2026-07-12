@@ -134,6 +134,24 @@ final class OwnerPool {
         return debited;
     }
 
+    /**
+     * Household task 5 (first-death spousal rollover): moves the ENTIRE {@code from} owner's balance
+     * into the {@code to} owner's balance and zeroes {@code from}. An unconditional transfer with no
+     * tax, no lot creation, and no RMD/force-out accounting — the treat-as-own inheritance the
+     * survivor takes at the first death. Conservation-preserving by construction: {@link #total()} is
+     * unchanged. A {@code from == to} call or an empty {@code from} balance is a no-op.
+     */
+    void transferAll(PersonId from, PersonId to) {
+        if (from == to) {
+            return;
+        }
+        BigDecimal fromBalance = balances.getOrDefault(from, BigDecimal.ZERO);
+        if (fromBalance.signum() != 0) {
+            balances.merge(to, fromBalance, BigDecimal::add);
+            balances.put(from, BigDecimal.ZERO);
+        }
+    }
+
     /** Forces up to {@code amount} out of ONE owner's balance; returns the amount actually removed. */
     BigDecimal forceOwner(PersonId owner, BigDecimal amount) {
         BigDecimal ownerBalance = balances.getOrDefault(owner, BigDecimal.ZERO);

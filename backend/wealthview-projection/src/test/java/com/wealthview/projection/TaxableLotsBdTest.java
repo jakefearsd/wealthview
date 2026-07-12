@@ -75,4 +75,56 @@ class TaxableLotsBdTest {
         assertThat(lots.sellFifo(bd("999"))).isEqualByComparingTo(bd("50"));
         assertThat(lots.totalValue()).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    // === Household task 5: first-death basis step-up ===
+
+    @Test
+    void stepUp_fullFactor_setsBasisToValueAndEliminatesGain() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("60000"), bd("100000")); // basis 60k, value 100k → 40k embedded gain
+
+        lots.stepUp(BigDecimal.ONE); // full step-up: basis := value
+
+        assertThat(lots.totalValue()).isEqualByComparingTo(bd("100000")); // value untouched
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("100000")); // basis stepped to value
+        // a subsequent full sale now realizes ZERO gain
+        assertThat(lots.sellFifo(bd("100000"))).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void stepUp_halfFactor_movesBasisHalfwayToValue() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("60000"), bd("100000")); // 40k embedded gain
+
+        lots.stepUp(new BigDecimal("0.5")); // basis += 40k * 0.5 = 20k → 80k
+
+        assertThat(lots.totalValue()).isEqualByComparingTo(bd("100000")); // value untouched
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("80000"));
+        // remaining realizable gain is halved: 100k - 80k = 20k
+        assertThat(lots.sellFifo(bd("100000"))).isEqualByComparingTo(bd("20000"));
+    }
+
+    @Test
+    void stepUp_perLot_appliesFormulaToEachLotIndependently() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100"), bd("300"));  // gain 200
+        lots.addLot(bd("500"), bd("500"));  // gain 0 (at cost)
+
+        lots.stepUp(new BigDecimal("0.5"));
+
+        // lot A basis 100 + 200*0.5 = 200; lot B basis 500 + 0 = 500 → total 700
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("700"));
+        assertThat(lots.totalValue()).isEqualByComparingTo(bd("800"));
+    }
+
+    @Test
+    void stepUp_lossLot_stepsBasisDownToValueAtFullFactor() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100000"), bd("60000")); // basis above value: a 40k embedded loss
+
+        lots.stepUp(BigDecimal.ONE); // step to FMV: basis := value
+
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("60000"));
+        assertThat(lots.totalValue()).isEqualByComparingTo(bd("60000"));
+    }
 }

@@ -53,6 +53,12 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
     /** Medicare (and thus IRMAA) eligibility age -- Wave-4 IRMAA item. */
     private static final int MEDICARE_AGE = 65;
+    /**
+     * Household task 5: the survivor spending factor assumed when a household scenario omits it (spec
+     * §1 default). Only ever consulted once a first-death transition fires, so single-person and
+     * both-alive years are unaffected.
+     */
+    private static final BigDecimal DEFAULT_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.75");
 
     /**
      * Fallback inflation assumption used to convert a user's NOMINAL expected-return override into a
@@ -184,7 +190,9 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             SpendingPlan spendingPlan,
             List<ProjectionIncomeSourceInput> incomeSources,
             List<ProjectionPropertyInput> properties,
-            TaxCalculationStrategy taxStrategy) {
+            TaxCalculationStrategy taxStrategy,
+            BigDecimal survivorSpendingFactor,
+            boolean communityProperty) {
     }
 
     private ProjectionResultResponse runInternal(ProjectionInput input) {
@@ -201,10 +209,18 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate(),
                 resolved.currentYear());
 
+        // Household task 5: the survivor spending factor (spec default 0.75 when a household scenario
+        // omits it) and the community-property flag drive the first-death transition. Both are inert
+        // for a single-person context (no transition ever fires), so the defaults never move a
+        // pre-household path.
+        BigDecimal survivorSpendingFactor = params.survivorSpendingFactor() != null
+                ? params.survivorSpendingFactor() : DEFAULT_SURVIVOR_SPENDING_FACTOR;
+        boolean communityProperty = Boolean.TRUE.equals(params.communityProperty());
+
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
                 resolved.currentYear(), resolved.birthYear(), resolved.retirementYear(), resolved.endYear(),
                 resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
-                resolved.properties(), taxStrategy);
+                resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty);
         return runProjection(ctx);
     }
 
@@ -291,7 +307,19 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var yearlyData = new ArrayList<ProjectionYearDto>();
         var acc = YearAccumulator.INITIAL;
 
-        for (int year = ctx.currentYear(); year < ctx.endYear(); year++) {
+        // Household task 5 (transition step 6 — truncation): when the SECOND (survivor's) death falls
+        // inside the horizon, the projection ends in that year — the final row's balance is the
+        // bequest. HouseholdContext only reports secondDeathYear when it is within the configured
+        // horizon, so the min() here is belt-and-suspenders; single-person/both-beyond-horizon
+        // contexts report empty and the loop runs the full horizon unchanged (the byte-identical
+        // anchor).
+        int loopEndYear = ctx.endYear();
+        var household = ctx.input().household();
+        if (household != null && household.secondDeathYear().isPresent()) {
+            loopEndYear = Math.min(loopEndYear, household.secondDeathYear().get() + 1);
+        }
+
+        for (int year = ctx.currentYear(); year < loopEndYear; year++) {
             var step = processYear(ctx, year, acc);
             yearlyData.add(step.yearDto());
             acc = step.nextAccumulator();
@@ -345,6 +373,14 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         BigDecimal rmdAmount = rmdStreams.requested();
         BigDecimal rmdForced = rmdStreams.forced();
 
+        // Household task 5: fire the first-death transition (once, at the boundary) and resolve this
+        // year's survivor-mode income sources + spending factor — see HouseholdTransition.
+        var survivorYear = HouseholdTransition.resolveYear(ctx.input().household(), pool, year,
+                ctx.incomeSources(), ctx.currentYear(), ctx.inflationRate(),
+                ctx.survivorSpendingFactor(), ctx.communityProperty());
+        List<ProjectionIncomeSourceInput> yearIncomeSources = survivorYear.incomeSources();
+        BigDecimal yearSurvivorSpendingFactor = survivorYear.spendingFactor();
+
         // Wave-4 IRMAA: this year's Medicare premium surcharge, keyed on MAGI from TWO CALENDAR
         // YEARS PRIOR (the statutory lookback -- see YearAccumulator's javadoc for how the window
         // rolls forward). Gated on `retired` like RMDs (a documented simplification: working-past-
@@ -363,9 +399,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         }
 
         var comp = yearFinanceResolver.resolve(new YearFinanceResolver.YearContext(
-                pool, ctx.incomeSources(), ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
+                pool, yearIncomeSources, ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
                 ctx.inflationRate(), year, age, retired, yearsInRetirement, startBalance,
-                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdForced, irmaaSurcharge));
+                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdForced, irmaaSurcharge,
+                yearSurvivorSpendingFactor));
 
         BigDecimal suspendedLoss = comp.suspendedLoss();
         BigDecimal conversionAmount = comp.conversionAmount();

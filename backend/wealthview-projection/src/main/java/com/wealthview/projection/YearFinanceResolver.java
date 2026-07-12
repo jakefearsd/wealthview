@@ -78,7 +78,8 @@ final class YearFinanceResolver {
             BigDecimal previousWithdrawal,
             BigDecimal suspendedLoss,
             BigDecimal rmdForced,
-            BigDecimal irmaaSurcharge) {
+            BigDecimal irmaaSurcharge,
+            BigDecimal survivorSpendingFactor) {
     }
 
     /**
@@ -197,7 +198,8 @@ final class YearFinanceResolver {
                     pool, yc.strategy(), yc.spendingPlan(), yc.age(), yc.yearsInRetirement(), yc.year(),
                     yc.inflationRate(), incomeResult.totalActiveIncome(), yc.startBalance(),
                     previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                    incomeResult.isResult(), yc.taxStrategy(), rmdForced, yc.irmaaSurcharge());
+                    incomeResult.isResult(), yc.taxStrategy(), rmdForced, yc.irmaaSurcharge(),
+                    yc.survivorSpendingFactor());
             var retirementResult = retirementWithdrawalProcessor.process(rwCtx);
             withdrawals = retirementResult.withdrawals();
             taxLiability = taxLiability.add(retirementResult.taxLiability());

@@ -31,6 +31,11 @@ class MultiPoolOwnerTest {
                 Optional.empty(), bd(balance), "traditional", owner);
     }
 
+    private static ProjectionAccountInput owned(String balance, String costBasis, String type, String owner) {
+        return new HypotheticalAccountInput(bd(balance), ZERO, AssetAllocation.ALL_US,
+                Optional.empty(), bd(costBasis), type, owner);
+    }
+
     /** A MultiPool with the given traditional accounts, zero growth and no tax calculator. */
     private static PoolStrategy.MultiPool tradPool(List<ProjectionAccountInput> traditionalAccounts) {
         var config = new PoolStrategy.PoolConfig(
@@ -38,6 +43,96 @@ class MultiPoolOwnerTest {
                 WithdrawalOrder.TAXABLE_FIRST, null, null);
         return new PoolStrategy.MultiPool(
                 Map.of(PoolStrategy.POOL_TRADITIONAL, traditionalAccounts), ZERO, config);
+    }
+
+    /** A MultiPool over the given type-grouped accounts, MFJ, zero growth, no tax calculator. */
+    private static PoolStrategy.MultiPool pool(Map<String, List<ProjectionAccountInput>> grouped) {
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.MARRIED_FILING_JOINTLY, ZERO, ZERO, "fixed", null, null,
+                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        return new PoolStrategy.MultiPool(grouped, ZERO, config);
+    }
+
+    // === Household task 5: first-death transition on the pools ===
+
+    @Test
+    void applyFirstDeathTransition_rollsDeceasedTraditionalIntoSurvivor_conservingTotal() {
+        var pool = pool(Map.of(
+                PoolStrategy.POOL_TRADITIONAL, List.of(
+                        owned("300000", "0", "traditional", "primary"),
+                        owned("500000", "0", "traditional", "spouse")),
+                PoolStrategy.POOL_ROTH, List.of(
+                        owned("100000", "0", "roth", "primary"),
+                        owned("200000", "0", "roth", "spouse"))));
+        BigDecimal totalBefore = pool.getTotal();
+
+        // Primary dies; spouse survives.
+        pool.applyFirstDeathTransition(PersonId.PRIMARY, PersonId.SPOUSE, false);
+
+        // Rollover conservation pin: total unchanged.
+        assertThat(pool.getTotal()).isEqualByComparingTo(totalBefore);
+        // Traditional: deceased (primary) zeroed, survivor (spouse) holds the sum.
+        var trad = pool.getTraditionalByOwner();
+        assertThat(trad.get(PersonId.PRIMARY)).isEqualByComparingTo(ZERO);
+        assertThat(trad.get(PersonId.SPOUSE)).isEqualByComparingTo(bd("800000"));
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("800000"));
+    }
+
+    @Test
+    void applyFirstDeathTransition_flipsFilingStatusToSingle() {
+        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL,
+                List.of(owned("300000", "0", "traditional", "primary"))));
+        assertThat(pool.getFilingStatus()).isEqualTo(FilingStatus.MARRIED_FILING_JOINTLY);
+
+        pool.applyFirstDeathTransition(PersonId.SPOUSE, PersonId.PRIMARY, false);
+
+        assertThat(pool.getFilingStatus()).isEqualTo(FilingStatus.SINGLE);
+    }
+
+    @Test
+    void applyFirstDeathTransition_survivorIsSpouse_rollsPrimaryPoolsIntoSpouse() {
+        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL, List.of(
+                owned("400000", "0", "traditional", "primary"),
+                owned("100000", "0", "traditional", "spouse"))));
+
+        pool.applyFirstDeathTransition(PersonId.PRIMARY, PersonId.SPOUSE, false);
+
+        var trad = pool.getTraditionalByOwner();
+        assertThat(trad.get(PersonId.PRIMARY)).isEqualByComparingTo(ZERO);
+        assertThat(trad.get(PersonId.SPOUSE)).isEqualByComparingTo(bd("500000"));
+    }
+
+    @Test
+    void applyFirstDeathTransition_thenSnapshotRestore_preservesTransitionExactlyOnce() {
+        // Mirrors the Social Security convergence interaction: the transition fires, THEN the pool is
+        // snapshotted, mutated by a convergence pass, and restored. The restore must return to the
+        // POST-transition state (rollover + filing flip intact) and never re-apply or revert it.
+        var pool = pool(Map.of(PoolStrategy.POOL_TRADITIONAL, List.of(
+                owned("300000", "0", "traditional", "primary"),
+                owned("500000", "0", "traditional", "spouse"))));
+
+        pool.applyFirstDeathTransition(PersonId.PRIMARY, PersonId.SPOUSE, false); // rollover + filing flip
+        var snapshot = pool.snapshot();          // B2 snapshot, taken AFTER the transition
+        pool.forceRmd(PersonId.SPOUSE, bd("50000")); // a convergence-pass mutation
+        pool.restore(snapshot);                   // B2 restore
+
+        var trad = pool.getTraditionalByOwner();
+        assertThat(trad.get(PersonId.PRIMARY)).isEqualByComparingTo(ZERO); // rollover still applied, once
+        assertThat(trad.get(PersonId.SPOUSE)).isEqualByComparingTo(bd("800000"));
+        assertThat(pool.getFilingStatus()).isEqualTo(FilingStatus.SINGLE); // filing flip survives restore
+    }
+
+    @Test
+    void applyFirstDeathTransition_stepUpConservesTotalValue_jointTaxable() {
+        // Joint taxable with embedded gain: basis 300k, value 500k.
+        var pool = pool(Map.of(PoolStrategy.POOL_TAXABLE,
+                List.of(owned("500000", "300000", "taxable", "joint"))));
+        BigDecimal totalBefore = pool.getTotal();
+
+        pool.applyFirstDeathTransition(PersonId.PRIMARY, PersonId.SPOUSE, false);
+
+        // Step-up touches basis only, never value: total portfolio value is unchanged.
+        assertThat(pool.getTotal()).isEqualByComparingTo(totalBefore);
     }
 
     @Test
