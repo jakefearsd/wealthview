@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 
 /**
@@ -35,6 +37,19 @@ final class SustainabilitySearch {
     /**
      * Simulation-invariant inputs to a sustainability search run. Bundling them as a
      * single parameter object keeps the recursive search call sites concise.
+     *
+     * @param gateOnAdaptiveRules T24: when {@code true} (and {@code maxAnnualAdjustmentRate} is
+     *         positive), {@link #isSustainable} evaluates each candidate schedule WITH the audit-C9
+     *         simulated guardrail-adaptation rule active (derived fresh per candidate via {@link
+     *         #buildCandidateAdaptation}) and gates on ITS success rate, instead of the original
+     *         no-adaptation success rate. {@code false} (every pre-T24 caller, and
+     *         {@link JointConversionSearch}'s conversion-fraction scoring search, which deliberately
+     *         never sets this) preserves the exact original single-pass behavior.
+     * @param maxAnnualAdjustmentRate the user's year-over-year adjustment-rate knob, resolved to a
+     *         primitive {@code double} (0 when the request omitted it) -- needed here (not just on
+     *         {@link TrialSimulator.GuardrailAdaptation}) because a non-positive rate makes the rule
+     *         a no-op, in which case {@link #isSustainable} silently falls back to the no-adaptation
+     *         gate even when {@code gateOnAdaptiveRules} is {@code true}.
      */
     record SearchContext(
             double[][] paths, double[] income, double[] surplusTax,
@@ -46,7 +61,8 @@ final class SustainabilitySearch {
             double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
             int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-            double interestYield, double taxableEquityShare) {}
+            double interestYield, double taxableEquityShare,
+            boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate) {}
 
     /**
      * Verifies the essential floor against portfolio capacity at the required confidence level,
@@ -263,65 +279,37 @@ final class SustainabilitySearch {
      * longer drive sustainability on their own. Each trial grows its pools at the
      * per-pool real return sequences carried on the {@link SearchContext}
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}).
+     *
+     * <p>T24: when {@code ctx.gateOnAdaptiveRules()} is set (and the adjustment rate is positive),
+     * the gate is computed from a trial pass with the audit-C9 simulated guardrail-adaptation rule
+     * active — see {@link #buildCandidateAdaptation}. Every pre-T24 caller (and every caller with
+     * the toggle off) takes the exact original single no-adaptation pass, byte-identical.
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
-    // NPathComplexity: the trial-loop body fans out over independent per-year guards; the path
-    // count is multiplicative but each branch is a trivial comparison, so it stays readable.
-    @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
+    @SuppressWarnings("PMD.UseVarargs")
     boolean isSustainable(SearchContext ctx, double[] floors, double[] discretionary) {
-        int trialCount = ctx.trialCount();
-        int years = ctx.years();
-        double[][] paths = ctx.paths();
-        TaxContext taxCtx = ctx.taxCtx();
-
-        double[] finalBalances = new double[trialCount];
-        double[] minBalances = new double[trialCount];
-        boolean[] successFlags = new boolean[trialCount];
-
-        boolean hasPools = taxCtx != null
-                && (taxCtx.initTraditional() > 0 || taxCtx.initRoth() > 0);
-        double initTraditional = hasPools ? taxCtx.initTraditional() : 0;
-        double initRoth = hasPools ? taxCtx.initRoth() : 0;
-        String order = hasPools ? taxCtx.withdrawalOrder() : "taxable_first";
-        OrdinaryTaxTable[] ordinaryTaxTables = hasPools ? taxCtx.ordinaryTaxTableByYear() : null;
-        double[] ordinaryBaseIncomeByYear = hasPools ? taxCtx.ordinaryBaseIncomeByYear() : null;
-        // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
-        double[] rentalIncomeByYear = hasPools ? taxCtx.rentalIncomeByYear() : null;
-
-        for (int t = 0; t < trialCount; t++) {
-            // Pool case: fixed starting balances from the tax context. Non-pool case: the whole
-            // portfolio sits in the taxable pool, starting balance varies per trial via paths[t][0].
-            double initTaxable = hasPools ? taxCtx.initTaxable() : paths[t][0];
-            var trialConfig = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order,
-                    ordinaryTaxTables, ordinaryBaseIncomeByYear,
-                    ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
-                    ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(), false,
-                    ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
-                    ctx.rmdStartAge(),
-                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), null,
-                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare());
-
-            var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
-                    floors, discretionary, years, trialConfig);
-            finalBalances[t] = result.finalBalance();
-            minBalances[t] = result.minBalance();
-            successFlags[t] = result.success();
+        TrialSimulator.GuardrailAdaptation adaptation = null;
+        if (ctx.gateOnAdaptiveRules() && ctx.maxAnnualAdjustmentRate() > 0) {
+            adaptation = buildCandidateAdaptation(ctx, floors, discretionary);
         }
+        TrialBatch batch = runTrials(ctx, floors, discretionary, adaptation, false);
 
         // Primary gate: the fraction of trials that fund the essential floor every year
         // must meet the target confidence (success probability).
         int successCount = 0;
-        for (boolean success : successFlags) {
+        for (boolean success : batch.successFlags()) {
             if (success) {
                 successCount++;
             }
         }
-        double successRate = (double) successCount / trialCount;
+        double successRate = (double) successCount / ctx.trialCount();
         if (successRate < ctx.confidenceLevel()) {
             return false;
         }
+
+        double[] finalBalances = batch.finalBalances();
+        double[] minBalances = batch.minBalances();
 
         // Optional bequest constraints, layered on top of the success gate — only
         // enforced when the caller explicitly set a positive target/floor.
@@ -344,5 +332,115 @@ final class SustainabilitySearch {
         }
 
         return true;
+    }
+
+    /** One batch of {@code ctx.trialCount()} trial runs (T24 extraction of {@link #isSustainable}'s
+     * original single-pass loop, generalized so it can also run the T24 reference/gate passes).
+     * {@code yearBalances} is {@code [years][trialCount]} (year-major, matching
+     * {@link GuardrailResponseBuilder}'s own layout) and {@code null} unless tracking was
+     * requested. */
+    private record TrialBatch(double[] finalBalances, double[] minBalances, boolean[] successFlags,
+                               double[][] yearBalances) {}
+
+    /**
+     * Runs one batch of trials for {@code discretionary} under {@code adaptation} ({@code null} for
+     * the fixed-schedule no-rules path). Byte-identical to {@code isSustainable}'s original inline
+     * loop when called with {@code (ctx, floors, discretionary, null, false)} — every pre-T24 call
+     * path and every T24 call with the toggle off takes exactly this shape.
+     */
+    // NPathComplexity: the trial-loop body fans out over independent per-year guards; the path
+    // count is multiplicative but each branch is a trivial comparison, so it stays readable.
+    // (UseVarargs does not apply: the last parameter is boolean, not an array.)
+    @SuppressWarnings("PMD.NPathComplexity")
+    private TrialBatch runTrials(SearchContext ctx, double[] floors, double[] discretionary,
+                                  @Nullable TrialSimulator.GuardrailAdaptation adaptation,
+                                  boolean trackYearBalances) {
+        int trialCount = ctx.trialCount();
+        int years = ctx.years();
+        double[][] paths = ctx.paths();
+        TaxContext taxCtx = ctx.taxCtx();
+
+        double[] finalBalances = new double[trialCount];
+        double[] minBalances = new double[trialCount];
+        boolean[] successFlags = new boolean[trialCount];
+        double[][] yearBalances = trackYearBalances ? new double[years][trialCount] : null;
+
+        boolean hasPools = taxCtx != null
+                && (taxCtx.initTraditional() > 0 || taxCtx.initRoth() > 0);
+        double initTraditional = hasPools ? taxCtx.initTraditional() : 0;
+        double initRoth = hasPools ? taxCtx.initRoth() : 0;
+        String order = hasPools ? taxCtx.withdrawalOrder() : "taxable_first";
+        OrdinaryTaxTable[] ordinaryTaxTables = hasPools ? taxCtx.ordinaryTaxTableByYear() : null;
+        double[] ordinaryBaseIncomeByYear = hasPools ? taxCtx.ordinaryBaseIncomeByYear() : null;
+        // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
+        double[] rentalIncomeByYear = hasPools ? taxCtx.rentalIncomeByYear() : null;
+
+        for (int t = 0; t < trialCount; t++) {
+            // Pool case: fixed starting balances from the tax context. Non-pool case: the whole
+            // portfolio sits in the taxable pool, starting balance varies per trial via paths[t][0].
+            double initTaxable = hasPools ? taxCtx.initTaxable() : paths[t][0];
+            var trialConfig = new TrialSimulator.SimulationConfig(
+                    initTaxable, initTraditional, initRoth, order,
+                    ordinaryTaxTables, ordinaryBaseIncomeByYear,
+                    ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
+                    ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(),
+                    trackYearBalances,
+                    ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
+                    ctx.rmdStartAge(),
+                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), adaptation,
+                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare());
+
+            var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
+                    floors, discretionary, years, trialConfig);
+            finalBalances[t] = result.finalBalance();
+            minBalances[t] = result.minBalance();
+            successFlags[t] = result.success();
+            if (trackYearBalances) {
+                for (int y = 0; y < years; y++) {
+                    yearBalances[y][t] = result.yearBalances()[y];
+                }
+            }
+        }
+        return new TrialBatch(finalBalances, minBalances, successFlags, yearBalances);
+    }
+
+    /**
+     * T24: builds this candidate schedule's {@link TrialSimulator.GuardrailAdaptation} rule inputs
+     * so {@link #isSustainable} can gate on the with-rules success rate. Runs an extra no-adaptation
+     * TRACKED reference pass (mirroring {@link GuardrailResponseBuilder}'s headline terminal pass)
+     * to get the median-per-year balance the rule's {@code expectedStartBalance} needs, then
+     * delegates the corridor/array assembly to the shared {@link GuardrailRuleInputBuilder} so this
+     * derivation never forks from the reporting-only with-rules pass's.
+     */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private TrialSimulator.GuardrailAdaptation buildCandidateAdaptation(SearchContext ctx, double[] floors,
+                                                                          double[] discretionary) {
+        TrialBatch reference = runTrials(ctx, floors, discretionary, null, true);
+        int years = ctx.years();
+        double[] medianBalanceByYear = new double[years];
+        for (int y = 0; y < years; y++) {
+            double[] balancesAtYear = reference.yearBalances()[y].clone();
+            Arrays.sort(balancesAtYear);
+            medianBalanceByYear[y] = PercentileCalculator.percentile(balancesAtYear, 0.50);
+        }
+
+        return GuardrailRuleInputBuilder.build(ctx.paths(), ctx.income(), floors, discretionary,
+                years, ctx.trialCount(), initialTotalBalance(ctx), medianBalanceByYear,
+                ctx.maxAnnualAdjustmentRate());
+    }
+
+    /** The initial total portfolio balance (taxable + traditional + roth), mirroring how
+     * {@link GuardrailResponseBuilder} derives it from its own pool setup: fixed pool balances when
+     * pools exist, else the non-pool scalar every trial's path is seeded from
+     * ({@code paths[t][0]}, constant across trials by construction — see
+     * {@code PortfolioPathGenerator.generate}). */
+    private static double initialTotalBalance(SearchContext ctx) {
+        TaxContext taxCtx = ctx.taxCtx();
+        boolean hasPools = taxCtx != null && (taxCtx.initTraditional() > 0 || taxCtx.initRoth() > 0);
+        return hasPools
+                ? taxCtx.initTaxable() + taxCtx.initTraditional() + taxCtx.initRoth()
+                : ctx.paths()[0][0];
     }
 }

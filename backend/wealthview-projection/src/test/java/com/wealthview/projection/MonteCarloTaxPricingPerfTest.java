@@ -10,6 +10,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
+import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
@@ -61,6 +62,11 @@ class MonteCarloTaxPricingPerfTest {
     }
 
     private static GuardrailOptimizationInput poolInput(int trialCount, BigDecimal maxAnnualAdjustmentRate) {
+        return poolInput(trialCount, maxAnnualAdjustmentRate, false);
+    }
+
+    private static GuardrailOptimizationInput poolInput(int trialCount, BigDecimal maxAnnualAdjustmentRate,
+                                                          boolean gateOnAdaptiveRules) {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
         return new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
@@ -73,7 +79,7 @@ class MonteCarloTaxPricingPerfTest {
                 new BigDecimal("0.06"), trialCount, new BigDecimal("0.90"),
                 phases, 20260712L, BigDecimal.ZERO, maxAnnualAdjustmentRate, 0, 0, BigDecimal.ZERO,
                 "single", "taxable_first", false, null, null, 5, null, null,
-                null, null);
+                null, null, 2030, false, null, gateOnAdaptiveRules);
     }
 
     @Test
@@ -135,5 +141,45 @@ class MonteCarloTaxPricingPerfTest {
                 + (total / TIMED_RUNS / 1_000_000) + " ms");
 
         assertThat(withRules).isNotNull();
+    }
+
+    /**
+     * T24: same fixture and {@code max_annual_adjustment_rate} as {@link
+     * #timing_poolBearingTaxAwareOptimize_5000Trials_withGuardrailRules} (isolating JUST the
+     * search-gate toggle's own cost -- the reporting-only with-rules pass's overhead is already
+     * measured by that baseline), but with {@code gate_on_adaptive_rules} ALSO on: every candidate
+     * {@code SustainabilitySearch} evaluates during the discretionary-spending search now runs an
+     * extra no-adaptation TRACKED reference pass plus a with-adaptation pass (see {@code
+     * SustainabilitySearch#buildCandidateAdaptation}/{@code #runTrials}), roughly doubling the cost
+     * of every {@code isSustainable} call in the search loop -- which dominates total optimize()
+     * time. The design budget is a &lt;=1.5x total regression versus the
+     * {@code _withGuardrailRules} (toggle-off) baseline above; toggle-off itself is unchanged
+     * (measured by that same baseline, which does not set the toggle).
+     */
+    @Test
+    void timing_poolBearingTaxAwareOptimize_5000Trials_withGateOnAdaptiveRules() {
+        var optimizer = new MonteCarloSpendingOptimizer(realSingleCalc(), ProjectionTestFixtures.TEST_CMA_MATRIX);
+        var input = poolInput(5000, new BigDecimal("0.10"), true);
+
+        for (int i = 0; i < WARMUP_RUNS; i++) {
+            optimizer.optimize(input);
+        }
+
+        long best = Long.MAX_VALUE;
+        long total = 0;
+        String gatedOn = null;
+        for (int i = 0; i < TIMED_RUNS; i++) {
+            long start = System.nanoTime();
+            var result = optimizer.optimize(input);
+            long elapsed = System.nanoTime() - start;
+            best = Math.min(best, elapsed);
+            total += elapsed;
+            gatedOn = result.gatedOn();
+            System.out.println("PERF+GATE run " + i + ": " + (elapsed / 1_000_000) + " ms, gatedOn=" + gatedOn);
+        }
+        System.out.println("PERF+GATE best=" + (best / 1_000_000) + " ms, avg="
+                + (total / TIMED_RUNS / 1_000_000) + " ms");
+
+        assertThat(gatedOn).isEqualTo(GuardrailProfileResponse.GATED_ON_WITH_RULES);
     }
 }

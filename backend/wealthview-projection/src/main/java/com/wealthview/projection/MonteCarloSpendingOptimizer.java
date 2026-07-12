@@ -131,7 +131,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private double[] allocateAndSmooth(OptimizationSetup ctx, GuardrailOptimizationInput input,
                                        double[] conversionByYear, double[] conversionTaxByYear) {
         // Priority-weighted discretionary allocation
-        var searchContext = searchContextFor(ctx, conversionByYear, conversionTaxByYear);
+        var searchContext = searchContextFor(ctx, input, conversionByYear, conversionTaxByYear);
         double[] discretionaryByYear = sustainabilitySearch.allocateSpending(
                 searchContext, ctx.taxIncome().adjustedFloors(), input.phases());
 
@@ -186,8 +186,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     // argument list — varargs would change the call contract and invite accidental misuse.
     @SuppressWarnings("PMD.UseVarargs")
     private SustainabilitySearch.SearchContext searchContextFor(OptimizationSetup ctx,
+                                                                 GuardrailOptimizationInput input,
                                                                  double[] conversionByYear,
                                                                  double[] conversionTaxByYear) {
+        double maxAdjRate = input.maxAnnualAdjustmentRate() != null
+                ? input.maxAnnualAdjustmentRate().doubleValue() : 0.0;
         return new SustainabilitySearch.SearchContext(
                 ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
                 ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
@@ -199,7 +202,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare());
+                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                // T24: the search gate honors the profile's toggle; JointConversionSearch's own
+                // conversion-fraction scoring search deliberately never sets this (see its
+                // SearchContext construction).
+                input.gateOnAdaptiveRules(), maxAdjRate);
     }
 
     /**
@@ -230,6 +237,10 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
                 input.phaseBlendYears(), null,
-                input.cashReserveYears(), input.cashReturnRate(), null);
+                input.cashReserveYears(), input.cashReturnRate(), null, null,
+                false, null, null,
+                // T24: no search ran (degenerate zero-year input), but the derivation is still the
+                // accurate statement of what WOULD have gated had one run.
+                GuardrailProfileResponse.resolveGatedOn(input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate()));
     }
 }

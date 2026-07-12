@@ -193,7 +193,13 @@ final class JointConversionSearch {
                 searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare());
+                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                // T24: conversion-fraction scoring intentionally never gates on the with-rules
+                // metric, independent of the profile's toggle -- it scores tax schedules by
+                // sustainable spending, not the spending plan itself; keeping it on the cheaper
+                // no-adaptation gate bounds the toggle's perf cost to the discretionary-spending
+                // search alone.
+                false, 0.0);
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

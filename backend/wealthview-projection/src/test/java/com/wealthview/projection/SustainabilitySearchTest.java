@@ -43,7 +43,8 @@ class SustainabilitySearchTest {
                 null, null, null,
                 null,
                 taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, null, 0.0, 0.0, 1.0);
+                0.0, null, 0.0, 0.0, 1.0,
+                false, 0.0);
     }
 
     private static double[] bracketingFloors() {
@@ -60,6 +61,87 @@ class SustainabilitySearchTest {
         double[] tooHighDiscretionary = { 1_000, 1_000, 1_000 };
 
         assertThat(search.isSustainable(ctx, floors, tooHighDiscretionary)).isFalse();
+    }
+
+    /**
+     * T24: a fixture shaped like production ({@code paths[t][0]} constant across trials -- the
+     * invariant {@code PortfolioPathGenerator} guarantees, which {@code expectedStartBalance[0]}
+     * relies on) with a minority of "crashing" trials (steep, sustained decline) and a majority of
+     * "flat" trials, so the no-adaptation median trajectory (dominated by the flat majority) reads
+     * as healthy while the crashing minority's OWN trajectory falls far below it -- exactly the
+     * signal {@link TrialSimulator#adaptYearSpending} cuts on.
+     */
+    private static SustainabilitySearch.SearchContext crashMinorityContext(double maxAdjRate,
+                                                                            boolean gateOnAdaptiveRules) {
+        int years = 5;
+        int trialCount = 10;
+        int crashingTrials = 3;
+
+        double[][] paths = new double[trialCount][years + 1];
+        double[][] taxableReturns = new double[trialCount][years];
+        double[][] traditionalReturns = new double[trialCount][years];
+        double[][] rothReturns = new double[trialCount][years];
+        for (int t = 0; t < trialCount; t++) {
+            double rate = t < crashingTrials ? -0.15 : 0.0;
+            paths[t][0] = 300_000;
+            for (int y = 0; y < years; y++) {
+                taxableReturns[t][y] = rate;
+                paths[t][y + 1] = paths[t][y] * (1 + rate);
+            }
+        }
+
+        double[] income = new double[years];
+        double[] surplusTax = new double[years];
+
+        return new SustainabilitySearch.SearchContext(
+                paths, income, surplusTax,
+                0.0, 65, years, trialCount,
+                0.80, 0.0,
+                0, 0.0,
+                null, null, null,
+                null,
+                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
+                0.0, null, 0.0, 0.0, 1.0,
+                gateOnAdaptiveRules, maxAdjRate);
+    }
+
+    private static double[] crashMinorityFloors() {
+        return new double[] { 15_000, 15_000, 15_000, 15_000, 15_000 };
+    }
+
+    private static double[] crashMinorityDiscretionary() {
+        return new double[] { 40_000, 40_000, 40_000, 40_000, 40_000 };
+    }
+
+    @Test
+    void isSustainable_gateOnAdaptiveRules_rescuesCandidateThatFailsNoAdaptationGate() {
+        var search = new SustainabilitySearch(new TrialSimulator());
+        double[] floors = crashMinorityFloors();
+        double[] discretionary = crashMinorityDiscretionary();
+
+        // No adaptation: the 3 crashing trials run out of money and miss the floor in the final
+        // year (7/10 = 0.70 success), below the 0.80 target.
+        var gateOff = crashMinorityContext(1.0, false);
+        assertThat(search.isSustainable(gateOff, floors, discretionary)).isFalse();
+
+        // Same candidate, same trials, gate ON: the rule cuts the crashing trials' spending toward
+        // their own (far-below-median) trajectory well before they run out, rescuing their floor
+        // funding in every year -- the SAME candidate now passes the gate. A generous adjustment
+        // rate (1.0 = up to 100%/year) lets the rule react in a single step.
+        var gateOn = crashMinorityContext(1.0, true);
+        assertThat(search.isSustainable(gateOn, floors, discretionary)).isTrue();
+    }
+
+    @Test
+    void isSustainable_gateOnAdaptiveRulesButNoAdjustmentRate_fallsBackToNoAdaptationGate() {
+        var search = new SustainabilitySearch(new TrialSimulator());
+        double[] floors = crashMinorityFloors();
+        double[] discretionary = crashMinorityDiscretionary();
+
+        // gateOnAdaptiveRules=true but maxAnnualAdjustmentRate=0 -- the rule is a no-op, so the
+        // gate must fall back to the exact no-adaptation result (still false for this candidate).
+        var gateOnNoRate = crashMinorityContext(0.0, true);
+        assertThat(search.isSustainable(gateOnNoRate, floors, discretionary)).isFalse();
     }
 
     @Test

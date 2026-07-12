@@ -125,7 +125,7 @@ final class GuardrailResponseBuilder {
         // with the simulated guardrail adaptation active. Returns null when no positive
         // max_annual_adjustment_rate is configured. The optimizer's gate/objective are unchanged.
         BigDecimal successProbabilityWithRules = computeSuccessProbabilityWithRules(ctx, discretionaryByYear,
-                poolSetup, conversionByYear, conversionTaxByYear, corridors, medianBalanceByYear,
+                poolSetup, conversionByYear, conversionTaxByYear, medianBalanceByYear,
                 input.maxAnnualAdjustmentRate());
 
         var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
@@ -154,7 +154,9 @@ final class GuardrailResponseBuilder {
                 input.phaseBlendYears(), null,
                 input.cashReserveYears(), input.cashReturnRate(),
                 convScheduleResponse, null,
-                floorReduced, originalFloorSuccessProbability, successProbabilityWithRules);
+                floorReduced, originalFloorSuccessProbability, successProbabilityWithRules,
+                // T24: which metric actually certified this run's search gate.
+                GuardrailProfileResponse.resolveGatedOn(input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate()));
     }
 
     /** Pool balances/order the terminal simulation grows and withdraws from (audit C6 extraction). */
@@ -268,7 +270,7 @@ final class GuardrailResponseBuilder {
      */
     private BigDecimal computeSuccessProbabilityWithRules(OptimizationSetup ctx, double[] discretionaryByYear,
                                                           PoolSimSetup poolSetup, double[] conversionByYear,
-                                                          double[] conversionTaxByYear, double[][] corridors,
+                                                          double[] conversionTaxByYear,
                                                           double[] medianBalanceByYear,
                                                           BigDecimal maxAnnualAdjustmentRate) {
         double maxAdjRate = maxAnnualAdjustmentRate != null ? maxAnnualAdjustmentRate.doubleValue() : 0.0;
@@ -278,12 +280,10 @@ final class GuardrailResponseBuilder {
         int years = ctx.sim().years();
         int trialCount = ctx.sim().trialCount();
 
-        double[] expectedStartBalance = new double[years];
-        expectedStartBalance[0] = poolSetup.initTaxable() + poolSetup.initTraditional() + poolSetup.initRoth();
-        System.arraycopy(medianBalanceByYear, 0, expectedStartBalance, 1, years - 1);
-
-        var adaptation = new TrialSimulator.GuardrailAdaptation(
-                corridors[0], corridors[1], expectedStartBalance, maxAdjRate);
+        double initTotalBalance = poolSetup.initTaxable() + poolSetup.initTraditional() + poolSetup.initRoth();
+        var adaptation = GuardrailRuleInputBuilder.build(ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
+                ctx.taxIncome().adjustedFloors(), discretionaryByYear, years, trialCount,
+                initTotalBalance, medianBalanceByYear, maxAdjRate);
 
         int successCount = 0;
         for (int t = 0; t < trialCount; t++) {
