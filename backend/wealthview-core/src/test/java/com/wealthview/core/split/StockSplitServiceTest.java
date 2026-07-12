@@ -13,6 +13,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.wealthview.core.auth.CrossTenant;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -518,5 +519,30 @@ class StockSplitServiceTest {
             throw new IllegalStateException(e);
         }
         return t;
+    }
+
+    @Test
+    void applySplit_isCrossTenant_soGlobalSplitApplicationIsNeverTenantFiltered() throws NoSuchMethodException {
+        // Splits are global market events: applySplit reads transactions across ALL
+        // tenants. If the calling thread carries a tenant-scoped Authentication, the
+        // TenantFilterAspect would otherwise silently filter those reads to one
+        // (possibly stale) tenant — recording the split globally while adjusting
+        // nobody (hosted CI runs 29195289770..29203911100). @CrossTenant pins the
+        // filter OFF for the whole method.
+        var method = StockSplitService.class.getMethod("applySplit",
+                String.class, LocalDate.class, int.class, int.class, String.class);
+
+        assertThat(method.getAnnotation(CrossTenant.class))
+                .as("applySplit must be @CrossTenant — it operates across all tenants")
+                .isNotNull();
+    }
+
+    @Test
+    void unapplySplit_isCrossTenant_soGlobalSplitReversalIsNeverTenantFiltered() throws NoSuchMethodException {
+        var method = StockSplitService.class.getMethod("unapplySplit", UUID.class);
+
+        assertThat(method.getAnnotation(CrossTenant.class))
+                .as("unapplySplit must be @CrossTenant — it operates across all tenants")
+                .isNotNull();
     }
 }

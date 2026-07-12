@@ -92,6 +92,14 @@ public abstract class AbstractApiIntegrationTest {
 
     @BeforeEach
     protected void setUp() {
+        // Defense-in-depth against SecurityContext leakage between IT classes:
+        // JUnit runs every test on the same worker thread, and a test that
+        // plants an Authentication there (e.g. TenantFilterBackstopIT) would
+        // otherwise tenant-filter service-level @Transactional calls in every
+        // LATER class that invokes services directly instead of over HTTP —
+        // the root cause of the deterministic StockSplitBackfillIT failures on
+        // hosted CI (runs 29195289770..29203911100).
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
         databaseCleaner.clean();
         authHelper.bootstrap(restTemplate);
         data = new TestDataHelper(restTemplate, authHelper);

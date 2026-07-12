@@ -3,6 +3,7 @@ package com.wealthview.app.it.isolation;
 import java.util.List;
 import java.util.UUID;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +54,20 @@ class TenantFilterBackstopIT extends AbstractApiIntegrationTest {
                 authHelper.authEntity(java.util.Map.of("name", "T2 Acct", "type", "brokerage"),
                         authHelper.tenant2Token()), MAP_TYPE);
         tenant2AccountId = UUID.fromString((String) account2.getBody().get("id"));
+    }
+
+    /**
+     * {@link #authenticateAs} plants an Authentication on the shared JUnit
+     * worker thread. Without this cleanup it leaks into every later test
+     * class on the thread, and any service-level {@code @Transactional} they
+     * run directly (not over HTTP) gets tenant-filtered by this class's
+     * long-dead tenant — the root cause of the deterministic
+     * StockSplitBackfillIT failures on hosted CI (runs 29195289770..29203911100),
+     * where this class happens to run before the split ITs.
+     */
+    @AfterEach
+    void clearLeakedAuthentication() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test

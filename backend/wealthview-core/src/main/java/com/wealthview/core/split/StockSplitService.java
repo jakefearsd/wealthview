@@ -15,6 +15,7 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.core.auth.CrossTenant;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -83,7 +84,20 @@ public class StockSplitService {
      * Apply a split retroactively. Idempotent: a second call for the same
      * {@code (symbol, effectiveDate)} returns the existing row and does no
      * work.
+     *
+     * <p>{@code @CrossTenant}: splits are global market events — this method
+     * must read and adjust the transactions of <em>every</em> tenant holding
+     * the symbol, so the {@code tenantFilter} must never scope its queries to
+     * whatever Authentication the calling thread happens to carry. Without the
+     * bypass, a tenant-scoped (or stale) principal silently shrinks the reads
+     * to one tenant: the split row is recorded globally while other tenants'
+     * transactions and holdings stay un-adjusted (observed as
+     * "0 tenants, 0 transactions, 0 prices adjusted" in hosted CI runs
+     * 29195289770..29203911100). Safe: callers are the SUPER_ADMIN-only admin
+     * endpoint, the scheduled sync, and the startup backfill; nothing here
+     * returns cross-tenant data to a caller.
      */
+    @CrossTenant
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public StockSplitEntity applySplit(String symbol, LocalDate effectiveDate,
@@ -123,7 +137,12 @@ public class StockSplitService {
      * Reverse a previously-applied split. All adjustment rows are read back
      * and the captured old values restored. The split row itself is deleted,
      * which cascades-deletes the adjustment rows.
+     *
+     * <p>{@code @CrossTenant}: same rationale as {@link #applySplit} — the
+     * reversal must restore every affected tenant's rows regardless of the
+     * calling thread's Authentication.
      */
+    @CrossTenant
     @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
     @Transactional
     public void unapplySplit(UUID splitId) {

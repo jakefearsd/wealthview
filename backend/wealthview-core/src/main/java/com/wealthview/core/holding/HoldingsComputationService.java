@@ -12,6 +12,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.core.auth.CrossTenant;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
 import com.wealthview.persistence.entity.AccountEntity;
@@ -43,7 +44,17 @@ public class HoldingsComputationService {
      * has at least one transaction in {@code symbol}. Used by the stock-split
      * apply/unapply flow, where a single split touches every account holding
      * the symbol within a tenant.
+     *
+     * <p>{@code @CrossTenant}: called from the {@code @CrossTenant} split
+     * apply/unapply flow once per affected tenant, iterating tenants that are
+     * unrelated to the calling thread's Authentication. As a separate
+     * {@code @Transactional} bean method it gets its own TenantFilterAspect
+     * pass, which would otherwise re-enable the {@code tenantFilter} from a
+     * tenant-scoped (or stale) principal and silently skip the recompute.
+     * Safe: tenant scoping is enforced by the explicit {@code tenantId}
+     * parameter on every query, and nothing is returned to the caller.
      */
+    @CrossTenant
     @Transactional
     public void recomputeAllForTenantAndSymbol(java.util.UUID tenantId, String symbol) {
         if (symbol == null || symbol.isBlank()) {

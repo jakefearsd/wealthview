@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import com.wealthview.core.auth.CrossTenant;
 import com.wealthview.core.pricefeed.NewHoldingCreatedEvent;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
@@ -290,5 +291,22 @@ class HoldingsComputationServiceTest {
         service.recomputeForAccountAndSymbol(account, tenant, "AAPL");
 
         verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    void recomputeAllForTenantAndSymbol_isCrossTenant_soSplitDrivenRecomputeIsNeverTenantFiltered()
+            throws NoSuchMethodException {
+        // Called from StockSplitService.applySplit/unapplySplit (both @CrossTenant)
+        // once per affected tenant. As a separate @Transactional bean method it gets
+        // its own TenantFilterAspect pass, which would RE-enable the tenant filter
+        // from a stale thread Authentication and silently skip the recompute
+        // (hosted CI runs 29195289770..29203911100). Tenant scoping is enforced by
+        // the explicit tenantId parameter, so disabling the filter here is safe.
+        var method = HoldingsComputationService.class.getMethod(
+                "recomputeAllForTenantAndSymbol", UUID.class, String.class);
+
+        assertThat(method.getAnnotation(CrossTenant.class))
+                .as("recomputeAllForTenantAndSymbol must be @CrossTenant")
+                .isNotNull();
     }
 }
