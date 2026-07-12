@@ -29,16 +29,15 @@ final class GuardrailResponseBuilder {
 
     private static final Logger log = LoggerFactory.getLogger(GuardrailResponseBuilder.class);
 
+    /** Tolerance (dollars) for detecting a floor clamp (audit C6) past floating-point noise. */
+    private static final double FLOOR_CLAMP_EPSILON = 1e-6;
+
     private final TrialSimulator trialSimulator;
 
     GuardrailResponseBuilder(TrialSimulator trialSimulator) {
         this.trialSimulator = trialSimulator;
     }
 
-    // NPathComplexity: response assembly fans out over many independent optional fields; the
-    // path count is multiplicative but each branch is a trivial null/empty guard, so the method
-    // is far simpler than its NPath number suggests. Splitting it would only scatter the mapping.
-    @SuppressWarnings("PMD.NPathComplexity")
     GuardrailProfileResponse build(OptimizationSetup ctx,
                                    GuardrailOptimizationInput input,
                                    double[] discretionaryByYear,
@@ -59,18 +58,8 @@ final class GuardrailResponseBuilder {
         }
 
         // Simulate with withdrawals to get final balances and per-year median balances
-        boolean simPools = conversionByYear != null
-                || ctx.portfolio().initTraditional() > 0 || ctx.portfolio().initRoth() > 0;
-        double initTaxable = simPools
-                ? ctx.portfolio().initTaxable() : ctx.portfolio().initialPortfolio();
-        double initTraditional = simPools ? ctx.portfolio().initTraditional() : 0;
-        double initRoth = simPools ? ctx.portfolio().initRoth() : 0;
-        String order = simPools && ctx.portfolio().withdrawalOrder() != null
-                ? ctx.portfolio().withdrawalOrder() : "taxable_first";
+        var poolSetup = resolvePoolSetup(ctx, conversionByYear);
 
-        double[][] taxableReturns = ctx.sim().taxableReturns();
-        double[][] traditionalReturns = ctx.sim().traditionalReturns();
-        double[][] rothReturns = ctx.sim().rothReturns();
         double[][] yearBalances = new double[ctx.sim().years()][ctx.sim().trialCount()];
         double[] finalBalances = new double[ctx.sim().trialCount()];
         int tradExhaustedCount = 0;
@@ -81,17 +70,7 @@ final class GuardrailResponseBuilder {
             // deducted whenever pools (traditional/roth) are in play, so reported balances match
             // what the optimizer actually modeled. Each trial reuses the per-pool real return
             // sequences generated for the run.
-            var simConfig = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order,
-                    simPools ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
-                    simPools ? ctx.taxIncome().rentalAwareTaxableIncome() : null,
-                    conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                    ctx.taxIncome().dsBracketCeilingByYear(),
-                    ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
-                    taxableReturns[t], traditionalReturns[t], rothReturns[t],
-                    ctx.sim().rmdStartAge(),
-                    ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                    ctx.sim().dividendYield());
+            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, true);
 
             var result = trialSimulator.simulateTrial(
                     ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
@@ -130,6 +109,18 @@ final class GuardrailResponseBuilder {
         double successProbability = (double) successCount / ctx.sim().trialCount();
         double failureRate = 1.0 - successProbability;
 
+        // Audit C6: verifyEssentialFloor silently clamps an unaffordable floor down to portfolio
+        // capacity (SustainabilitySearch.verifyEssentialFloor) -- successProbability above then
+        // measures that REDUCED floor, not the floor the user asked for. Disclose the clamp and,
+        // when it happened, the success rate against the user's TRUE (unclamped) floor via one
+        // extra simulation pass over the same trials/discretionary plan/conversion schedule already
+        // computed above. Behavior/gating semantics are untouched -- this is read-only disclosure.
+        boolean floorReduced = isFloorReduced(ctx.taxIncome().adjustedFloors(), ctx.taxIncome().essentialFloor());
+        BigDecimal originalFloorSuccessProbability = floorReduced
+                ? toBD(computeOriginalFloorSuccessRate(ctx, discretionaryByYear, poolSetup,
+                        conversionByYear, conversionTaxByYear))
+                : null;
+
         var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
                 medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
 
@@ -155,7 +146,87 @@ final class GuardrailResponseBuilder {
                 input.portfolioFloor(), input.maxAnnualAdjustmentRate(),
                 input.phaseBlendYears(), null,
                 input.cashReserveYears(), input.cashReturnRate(),
-                convScheduleResponse);
+                convScheduleResponse, null,
+                floorReduced, originalFloorSuccessProbability);
+    }
+
+    /** Pool balances/order the terminal simulation grows and withdraws from (audit C6 extraction). */
+    private record PoolSimSetup(
+            double initTaxable, double initTraditional, double initRoth, String order, boolean simPools) {}
+
+    // UseVarargs: conversionByYear is a per-year indexed array, not a variable argument list --
+    // varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private PoolSimSetup resolvePoolSetup(OptimizationSetup ctx, double[] conversionByYear) {
+        boolean simPools = conversionByYear != null
+                || ctx.portfolio().initTraditional() > 0 || ctx.portfolio().initRoth() > 0;
+        double initTaxable = simPools
+                ? ctx.portfolio().initTaxable() : ctx.portfolio().initialPortfolio();
+        double initTraditional = simPools ? ctx.portfolio().initTraditional() : 0;
+        double initRoth = simPools ? ctx.portfolio().initRoth() : 0;
+        String order = simPools && ctx.portfolio().withdrawalOrder() != null
+                ? ctx.portfolio().withdrawalOrder() : "taxable_first";
+        return new PoolSimSetup(initTaxable, initTraditional, initRoth, order, simPools);
+    }
+
+    /** Builds trial {@code t}'s {@link TrialSimulator.SimulationConfig} (audit C6 extraction, shared
+     * by the headline terminal simulation and the floor-clamp disclosure's extra pass). */
+    private TrialSimulator.SimulationConfig buildSimConfig(OptimizationSetup ctx, int t, PoolSimSetup poolSetup,
+                                                            double[] conversionByYear, double[] conversionTaxByYear,
+                                                            boolean trackYearBalances) {
+        return new TrialSimulator.SimulationConfig(
+                poolSetup.initTaxable(), poolSetup.initTraditional(), poolSetup.initRoth(), poolSetup.order(),
+                poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
+                poolSetup.simPools() ? ctx.taxIncome().rentalAwareTaxableIncome() : null,
+                conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
+                ctx.taxIncome().dsBracketCeilingByYear(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), trackYearBalances,
+                ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t], ctx.sim().rothReturns()[t],
+                ctx.sim().rmdStartAge(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
+                ctx.sim().dividendYield());
+    }
+
+    /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}
+     * in at least one year (audit C6). {@code adjustedFloors} is constant-real, so any year strictly
+     * below {@code essentialFloor} (beyond floating-point noise) can only be
+     * {@code SustainabilitySearch.verifyEssentialFloor}'s capacity clamp. */
+    private static boolean isFloorReduced(double[] adjustedFloors, double essentialFloor) {
+        for (double floor : adjustedFloors) {
+            if (floor < essentialFloor - FLOOR_CLAMP_EPSILON) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** One extra simulation pass (audit C6) measuring the success rate of the SAME discretionary
+     * plan and conversion schedule already optimized, against the user's UNCLAMPED essential floor
+     * (constant {@code essentialFloor} every year) instead of the clamped {@code adjustedFloors}.
+     * Reuses the same per-trial return sequences as the headline pass so the two success rates are
+     * directly comparable. Read-only: does not feed back into optimization or gating. */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private double computeOriginalFloorSuccessRate(OptimizationSetup ctx, double[] discretionaryByYear,
+                                                    PoolSimSetup poolSetup, double[] conversionByYear,
+                                                    double[] conversionTaxByYear) {
+        int years = ctx.sim().years();
+        int trialCount = ctx.sim().trialCount();
+        double[] originalFloors = new double[years];
+        Arrays.fill(originalFloors, ctx.taxIncome().essentialFloor());
+
+        int successCount = 0;
+        for (int t = 0; t < trialCount; t++) {
+            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, false);
+            var result = trialSimulator.simulateTrial(
+                    ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
+                    originalFloors, discretionaryByYear, years, simConfig);
+            if (result.success()) {
+                successCount++;
+            }
+        }
+        return (double) successCount / trialCount;
     }
 
     // UseVarargs: the double[] params are per-year indexed arrays, not a variable argument

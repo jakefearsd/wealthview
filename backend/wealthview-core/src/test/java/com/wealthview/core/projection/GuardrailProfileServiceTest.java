@@ -127,6 +127,59 @@ class GuardrailProfileServiceTest {
         verify(guardrailRepository).save(any(GuardrailSpendingProfileEntity.class));
     }
 
+    // Audit C6: floor-clamp disclosure isn't persisted (like fixedReturnShare) -- optimize() must
+    // thread it straight from the fresh spendingOptimizer.optimize() result into the final response
+    // rather than losing it in the save/re-hydrate round trip through GuardrailProfileResponse.from.
+    @Test
+    void optimize_optimizerDisclosesFloorClamp_threadsBothFieldsIntoFinalResponse() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId))
+                .thenReturn(new com.wealthview.core.projection.dto.ProjectionInput(
+                        scenarioId, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
+                        new BigDecimal("0.03"), "{\"birth_year\":1968}",
+                        List.of(new HypotheticalAccountInput(
+                                new BigDecimal("500000"), BigDecimal.ZERO,
+                                new BigDecimal("0.07"), "taxable")),
+                        null));
+        when(guardrailRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.empty());
+
+        var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
+
+        var optimizerResponse = new GuardrailProfileResponse(
+                null, scenarioId, "Optimized Plan",
+                new BigDecimal("80000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"),
+                500, new BigDecimal("0.95"),
+                phases,
+                List.of(),
+                new BigDecimal("0"), new BigDecimal("0"), new BigDecimal("1.0000"),
+                new BigDecimal("0"),
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null, null,
+                true, new BigDecimal("0.0000"));
+
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(optimizerResponse);
+        when(guardrailRepository.save(any(GuardrailSpendingProfileEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = new GuardrailOptimizationRequest(
+                scenarioId, "Optimized Plan",
+                new BigDecimal("80000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"),
+                500, new BigDecimal("0.95"), phases,
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        var result = service.optimize(tenantId, scenarioId, request);
+
+        assertThat(result.floorReduced()).isTrue();
+        assertThat(result.originalFloorSuccessProbability()).isEqualByComparingTo("0.0000");
+    }
+
     @Test
     void optimize_nullEssentialFloor_defaultsToZero() {
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))

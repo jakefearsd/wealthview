@@ -2786,4 +2786,53 @@ class MonteCarloSpendingOptimizerTest {
                 .as("Portfolio floor reduction should be material")
                 .isLessThan(noFloorAvg * 0.90);
     }
+
+    // === Floor-clamp disclosure (audit C6) ===
+
+    @Test
+    void optimize_unaffordableEssentialFloor_disclosesClampAndLowerOriginalSuccessRate() {
+        // $100k can't fund an $80k/year essential floor for 28 years at 95% confidence --
+        // SustainabilitySearch.verifyEssentialFloor clamps the floor down to portfolio capacity in
+        // most years, so the headline successProbability (measured against the REDUCED floor)
+        // overstates what the user's true $80k floor can actually achieve.
+        var input = buildInput(
+                new BigDecimal("100000"),
+                new BigDecimal("80000"),
+                BigDecimal.ZERO,
+                List.of(),
+                List.of(),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        // $100k can't sustain an $80k/year floor at 95% confidence at all -- verifyEssentialFloor
+        // clamps every year down to whatever the portfolio can fund, so the headline
+        // successProbability against the REDUCED floor is a trivial 100%, while the SAME
+        // discretionary plan funds the user's true unclamped $80k floor 0% of the time.
+        assertThat(result.floorReduced()).isTrue();
+        assertThat(result.successProbability()).isEqualByComparingTo("1.0000");
+        assertThat(result.originalFloorSuccessProbability()).isEqualByComparingTo("0.0000");
+        assertThat(result.originalFloorSuccessProbability().doubleValue())
+                .isLessThan(result.successProbability().doubleValue());
+    }
+
+    @Test
+    void optimize_affordableEssentialFloor_noClampDisclosed() {
+        // $3M easily funds a $30k/year essential floor -- verifyEssentialFloor never needs to
+        // clamp, so both new disclosure fields report "no clamp" (false / null).
+        var input = buildInput(
+                new BigDecimal("3000000"),
+                new BigDecimal("30000"),
+                BigDecimal.ZERO,
+                List.of(),
+                List.of(),
+                500,
+                42L);
+
+        var result = optimizer.optimize(input);
+
+        assertThat(result.floorReduced()).isFalse();
+        assertThat(result.originalFloorSuccessProbability()).isNull();
+    }
 }

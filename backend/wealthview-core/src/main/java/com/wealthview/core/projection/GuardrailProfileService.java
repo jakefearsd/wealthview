@@ -117,7 +117,11 @@ public class GuardrailProfileService {
             scenarioRepository.save(scenario);
 
             log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
-            return GuardrailProfileResponse.from(saved, fixedReturnShare);
+            // Audit C6: floor-clamp disclosure is not persisted (like fixedReturnShare) -- it is
+            // only meaningful for the run that just executed, so thread it straight from the fresh
+            // optimizer result rather than re-deriving it from the saved entity.
+            return GuardrailProfileResponse.from(saved, fixedReturnShare,
+                    optimizerResult.floorReduced(), optimizerResult.originalFloorSuccessProbability());
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioId");

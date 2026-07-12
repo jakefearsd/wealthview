@@ -171,6 +171,46 @@ class GuardrailProfileResponseTest {
     }
 
     @Test
+    void from_singleArgOverload_leavesFloorReducedFalseAndOriginalFloorSuccessProbabilityNull() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity);
+
+        assertThat(response.floorReduced()).isFalse();
+        assertThat(response.originalFloorSuccessProbability()).isNull();
+    }
+
+    @Test
+    void from_twoArgOverload_leavesFloorReducedFalseAndOriginalFloorSuccessProbabilityNull() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity, new BigDecimal("0.6000"));
+
+        assertThat(response.floorReduced()).isFalse();
+        assertThat(response.originalFloorSuccessProbability()).isNull();
+    }
+
+    @Test
+    void from_withFloorClampDisclosure_attachesBothFieldsToResponse() {
+        var entity = baseEntity();
+        when(entity.getPhases()).thenReturn("[]");
+        when(entity.getYearlySpending()).thenReturn("[]");
+        when(entity.getConversionSchedule()).thenReturn(null);
+
+        var response = GuardrailProfileResponse.from(entity, new BigDecimal("0.6000"),
+                true, new BigDecimal("0.8200"));
+
+        assertThat(response.floorReduced()).isTrue();
+        assertThat(response.originalFloorSuccessProbability()).isEqualByComparingTo("0.8200");
+    }
+
+    @Test
     void isOlderThan24Hours_withRecentUpdate_returnsFalse() {
         var entity = mock(GuardrailSpendingProfileEntity.class);
         when(entity.getUpdatedAt()).thenReturn(OffsetDateTime.now().minusHours(3));

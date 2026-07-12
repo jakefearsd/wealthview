@@ -20,6 +20,17 @@ import tools.jackson.databind.ObjectMapper;
  *         in real terms so users see the rate that actually drove the schedule. Because the stored
  *         value is real, it is never fed back into a request (whose contract is nominal) — see
  *         {@code GuardrailProfileService.reoptimize}.
+ * @param floorReduced audit C6: {@code true} when {@code SustainabilitySearch.verifyEssentialFloor}
+ *         clamped the user's essential floor down to portfolio capacity in at least one projection
+ *         year — the headline {@link #successProbability} then measures the REDUCED floor, not the
+ *         floor the user actually asked for. {@code false} (never {@code null}) when no clamp
+ *         occurred, or when this response predates the disclosure (persisted-profile reads via
+ *         {@link #from(GuardrailSpendingProfileEntity)}).
+ * @param originalFloorSuccessProbability audit C6: the success rate measured against the user's
+ *         UNCLAMPED essential floor (one extra simulation pass, same trials/discretionary plan as
+ *         the headline run), computed only when {@link #floorReduced} is {@code true}. {@code null}
+ *         when no clamp occurred — the headline {@link #successProbability} already reflects the
+ *         user's floor in that case — or when this response predates the disclosure.
  */
 public record GuardrailProfileResponse(
         UUID id,
@@ -46,7 +57,9 @@ public record GuardrailProfileResponse(
         int cashReserveYears,
         BigDecimal cashReturnRate,
         RothConversionScheduleResponse conversionSchedule,
-        BigDecimal fixedReturnShare
+        BigDecimal fixedReturnShare,
+        boolean floorReduced,
+        BigDecimal originalFloorSuccessProbability
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -93,6 +106,49 @@ public record GuardrailProfileResponse(
                 riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, null);
     }
 
+    /**
+     * Back-compat convenience for callers that predate the {@link #floorReduced} /
+     * {@link #originalFloorSuccessProbability} disclosure fields (audit C6: floor-clamp
+     * disclosure). Defaults them to {@code false} / {@code null} — "no clamp info available for
+     * this response" — so existing positional call sites (persisted-profile hydration, tests)
+     * keep compiling unchanged.
+     */
+    // ExcessiveParameterList: mirrors the record's own 26-field canonical constructor
+    // (pre-floorReduced shape) so existing positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailProfileResponse(
+            UUID id,
+            UUID scenarioId,
+            String name,
+            BigDecimal essentialFloor,
+            BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean,
+            int trialCount,
+            BigDecimal confidenceLevel,
+            List<GuardrailPhaseInput> phases,
+            List<GuardrailYearlySpending> yearlySpending,
+            BigDecimal medianFinalBalance,
+            BigDecimal failureRate,
+            BigDecimal successProbability,
+            BigDecimal percentile10Final,
+            boolean stale,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            BigDecimal portfolioFloor,
+            BigDecimal maxAnnualAdjustmentRate,
+            int phaseBlendYears,
+            String riskTolerance,
+            int cashReserveYears,
+            BigDecimal cashReturnRate,
+            RothConversionScheduleResponse conversionSchedule,
+            BigDecimal fixedReturnShare) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
+                stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, fixedReturnShare,
+                false, null);
+    }
+
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
         return from(entity, null);
     }
@@ -103,8 +159,19 @@ public record GuardrailProfileResponse(
      * where live account inputs are on hand — {@link #from(GuardrailSpendingProfileEntity)}
      * alone always reports {@code null} since a persisted profile does not store this value).
      */
-    @SuppressWarnings("PMD.UseDiamondOperator")
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity, BigDecimal fixedReturnShare) {
+        return from(entity, fixedReturnShare, false, null);
+    }
+
+    /**
+     * Same as {@link #from(GuardrailSpendingProfileEntity, BigDecimal)}, but also attaches the
+     * freshly computed floor-clamp disclosure (audit C6: only available right after {@code
+     * optimize()} runs, where the trial simulations are on hand — neither field is persisted, so
+     * every other overload reports the "no clamp info" defaults {@code false} / {@code null}).
+     */
+    @SuppressWarnings("PMD.UseDiamondOperator")
+    public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity, BigDecimal fixedReturnShare,
+                                                boolean floorReduced, BigDecimal originalFloorSuccessProbability) {
         List<GuardrailPhaseInput> phases;
         List<GuardrailYearlySpending> yearlySpending;
         try {
@@ -152,7 +219,9 @@ public record GuardrailProfileResponse(
                 entity.getCashReserveYears(),
                 entity.getCashReturnRate(),
                 conversionSchedule,
-                fixedReturnShare
+                fixedReturnShare,
+                floorReduced,
+                originalFloorSuccessProbability
         );
     }
 
