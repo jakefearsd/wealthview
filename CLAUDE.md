@@ -325,6 +325,10 @@ frontend/src/
 - Custom hooks for data fetching and shared stateful logic: `useAccounts()`, `useAuth()`.
 - Context API + useReducer for global state (auth, tenant).
 - Axios instance with interceptors for JWT attachment and 401 redirect.
+- **Subresource Integrity (SRI):** `index.html` currently loads no third-party CDN assets. If one is
+  ever added (Google Fonts, a `<script src="https://...">`, etc.), it MUST carry
+  `integrity="sha384-..."` and `crossorigin="anonymous"`. See the comment in `frontend/index.html`
+  and `docs/deployment/security-hardening.md`.
 
 ### Frontend Testing (Lighter Approach)
 - **Vitest** as the test runner. **React Testing Library** for component tests.
