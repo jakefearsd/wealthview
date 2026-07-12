@@ -78,13 +78,42 @@ final class TrialSimulator {
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
             int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-            GuardrailAdaptation adaptation
+            GuardrailAdaptation adaptation, double[] rentalIncomeByYear
     ) {
+        /**
+         * Back-compat constructor predating T18a-3: no per-year net rental income to thread into
+         * the NIIT Net Investment Income base (null -- every year contributes zero rental to NII,
+         * byte-identical to pre-fix behavior).
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-rental shape)
+        // so existing positional call sites keep compiling and behaving identically.
+        @SuppressWarnings("PMD.ExcessiveParameterList")
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+                GuardrailAdaptation adaptation) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, null);
+        }
+
         /**
          * Back-compat constructor (audit C9): every pre-C9 call site (the sustainability search, the
          * headline terminal pass, and the unit tests) builds a fixed-schedule config with no
-         * simulated guardrail rule. Defaulting {@code adaptation} to {@code null} keeps
-         * {@link #simulateTrial} on the byte-identical no-rules path for all of them.
+         * simulated guardrail rule and no rental income. Defaulting {@code adaptation} to
+         * {@code null} keeps {@link #simulateTrial} on the byte-identical no-rules path for all of
+         * them.
          */
         // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-adaptation
         // shape) so existing positional call sites keep compiling and behaving identically.
@@ -296,7 +325,11 @@ final class TrialSimulator {
                     table, ordinaryStack);
 
             LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
-            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, ltcgTable, ordinaryStack, table);
+            // T18a-3: this year's net rental income, threaded into the NIIT Net Investment Income
+            // base only (never the LTCG bracket tax) -- zero when no rental array is configured.
+            double rentalIncome = config.rentalIncomeByYear() != null ? config.rentalIncomeByYear()[y] : 0.0;
+            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, ltcgTable, ordinaryStack, table,
+                    rentalIncome);
 
             clampPoolsNonNegative(pools);
             cashBalance = Math.max(0, cashBalance);
@@ -546,11 +579,13 @@ final class TrialSimulator {
      * gross-up rate, not the LTCG rate: the traditional draw funding this bill is itself ordinary
      * income once withdrawn, regardless of what kind of tax it is paying. A {@code null} table (no
      * capital-gains calculator wired) or a non-positive net LTCG income leaves the pools
-     * untouched.
+     * untouched. {@code netRentalIncome} (T18a-3) joins the NIIT Net Investment Income base only
+     * (never the LTCG bracket tax) -- see {@link LtcgTaxTable#taxAt(double, double, double)}.
      */
     private static void applyLtcgTax(double[] pools, TaxableLots lots, double realizedGain,
                                       double dividendIncome, LtcgTaxTable ltcgTable,
-                                      double ordinaryStack, OrdinaryTaxTable ordinaryTable) {
+                                      double ordinaryStack, OrdinaryTaxTable ordinaryTable,
+                                      double netRentalIncome) {
         if (ltcgTable == null) {
             return;
         }
@@ -558,7 +593,7 @@ final class TrialSimulator {
         if (ltcgIncome <= 0) {
             return;
         }
-        double ltcgTax = ltcgTable.taxAt(Math.max(0, ordinaryStack), ltcgIncome);
+        double ltcgTax = ltcgTable.taxAt(Math.max(0, ordinaryStack), ltcgIncome, netRentalIncome);
         if (ltcgTax > 0) {
             deductTaxFromPoolsGrossedUp(ltcgTax, pools, lots, ordinaryTable, ordinaryStack);
         }

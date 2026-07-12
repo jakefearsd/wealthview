@@ -173,6 +173,12 @@ final class YearFinanceResolver {
         BigDecimal socialSecurityTaxable = incomeResult.isResult() != null
                 ? incomeResult.isResult().socialSecurityTaxable() : BigDecimal.ZERO;
 
+        // T18a-3: this year's aggregate net taxable rental income, threaded into the LTCG/NIIT
+        // bundle's Net Investment Income base (see PoolStrategy#executeWithdrawals's 10-arg
+        // overload) -- zero when no rental income sources are active.
+        BigDecimal netRentalIncome = incomeResult.isResult() != null
+                ? incomeResult.isResult().netRentalTaxableIncome() : BigDecimal.ZERO;
+
         if (yc.retired()) {
             var rwCtx = new RetirementWithdrawalProcessor.RetirementWithdrawalContext(
                     pool, yc.strategy(), yc.spendingPlan(), yc.age(), yc.yearsInRetirement(), yc.year(),
@@ -200,7 +206,7 @@ final class YearFinanceResolver {
             // a forced RMD past a zero portfolio need.
             var withdrawalResult = pool.executeWithdrawals(BigDecimal.ZERO, yc.year(),
                     incomeResult.effectiveOtherIncome(), conversionAmount, rmdForced, yc.age(),
-                    BigDecimal.ZERO, BigDecimal.ZERO, socialSecurityTaxable);
+                    BigDecimal.ZERO, BigDecimal.ZERO, socialSecurityTaxable, netRentalIncome);
             taxLiability = taxLiability.add(withdrawalResult.taxLiability());
             wdFromTaxable = withdrawalResult.fromTaxable();
             wdFromTraditional = withdrawalResult.fromTraditional();

@@ -118,10 +118,25 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      *     LTCG/dividend state addition needs no parameter -- it is computed internally from the
      *     FIFO sale and the year's booked dividend. Zero when no Social Security is taxable.
      */
+    default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
+                                           BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
+                                           BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax,
+                                           BigDecimal federallyTaxedSocialSecurity) {
+        return executeWithdrawals(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, BigDecimal.ZERO);
+    }
+
+    /**
+     * As the 9-arg {@link #executeWithdrawals(BigDecimal, int, BigDecimal, BigDecimal, BigDecimal,
+     * int, BigDecimal, BigDecimal, BigDecimal)}, additionally threading {@code netRentalIncome}
+     * (T18a-3) into the year's LTCG/NIIT bundle's Net Investment Income base -- see
+     * {@code CapitalGainsTaxCalculator#computeLtcgTax}'s rental overload for the mechanics. Zero
+     * when no rental income sources are active.
+     */
     WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
                                            BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax,
-                                           BigDecimal federallyTaxedSocialSecurity);
+                                           BigDecimal federallyTaxedSocialSecurity, BigDecimal netRentalIncome);
 
     /** Back-compat overload predating the audit-C3 state-base adjustment (zero taxable SS). */
     default ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
@@ -620,7 +635,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                                                       BigDecimal rmdAmount, int age,
                                                       BigDecimal alreadyChargedBaseTax,
                                                       BigDecimal extraPoolFundedTax,
-                                                      BigDecimal federallyTaxedSocialSecurity) {
+                                                      BigDecimal federallyTaxedSocialSecurity,
+                                                      BigDecimal netRentalIncome) {
             // A fully income-covered year (totalNeed <= 0, e.g. pension/rental/SS covers spending)
             // still owes the RMD force-out and this year's dividend/LTCG tax below -- required
             // distributions and portfolio income are due regardless of whether the retiree needed
@@ -674,15 +690,17 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             CombinedTaxResult detailed = ordinaryTax.detailed();
 
             // Long-term capital-gains tax on the realized FIFO gain + this year's qualified dividend,
-            // stacked on ordinary income against the 0/15/20 LTCG brackets (+ deflated NIIT). This runs
-            // only in retirement (executeWithdrawals is only called when retired). LTCG is a federal
-            // tax, so it belongs in the federal-tax breakdown -- it folds into taxLiability and drains
-            // the pools via the same cascade as the ordinary withdrawal tax, AND is returned separately
-            // (below) so the engine can fold it into the year's federalTax field. It is deliberately NOT
-            // added to lastTaxBreakdown here: for retired years RetirementTaxAnnotator recomputes (and
-            // overwrites) the DTO's federal/state breakdown from scratch downstream of this call, so
-            // that is where the fold actually has to happen -- see RetirementTaxAnnotator#annotate.
-            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed);
+            // stacked on ordinary income against the 0/15/20 LTCG brackets (+ deflated NIIT, T18a-3:
+            // now including net rental income in the NIIT base). This runs whenever executeWithdrawals
+            // runs -- both in retirement and, since T18a-2, in a still-working RMD-age year. LTCG is a
+            // federal tax, so it belongs in the federal-tax breakdown -- it folds into taxLiability and
+            // drains the pools via the same cascade as the ordinary withdrawal tax, AND is returned
+            // separately (below) so the engine can fold it into the year's federalTax field. It is
+            // deliberately NOT added to lastTaxBreakdown here: for retired years RetirementTaxAnnotator
+            // recomputes (and overwrites) the DTO's federal/state breakdown from scratch downstream of
+            // this call, so that is where the fold actually has to happen -- see
+            // RetirementTaxAnnotator#annotate.
+            BigDecimal ltcgTax = computeLtcgTax(realizedGain, taxableIncome, year, detailed, netRentalIncome);
 
             // C2: a tax payment sourced from the traditional pool is ITSELF an ordinary-income
             // distribution once withdrawn -- converge the traditional-funded slice of the bill to
@@ -958,7 +976,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * above-the-line for the LTCG floor, overstating LTCG tax.
          */
         private BigDecimal computeLtcgTax(BigDecimal realizedGain, BigDecimal ordinaryTaxableIncome, int year,
-                                           CombinedTaxResult ordinaryTaxDetail) {
+                                           CombinedTaxResult ordinaryTaxDetail, BigDecimal netRentalIncome) {
             if (capitalGainsTaxCalculator == null) {
                 return BigDecimal.ZERO;
             }
@@ -969,8 +987,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal magi = ordinaryTaxableIncome.add(ltcgIncome);
             BigDecimal deduction = resolveOrdinaryDeduction(ordinaryTaxDetail, year);
             BigDecimal ordinaryForLtcg = ordinaryTaxableIncome.subtract(deduction).max(BigDecimal.ZERO);
+            // T18a-3: net rental income joins the NIIT's Net Investment Income base (NOT the LTCG
+            // bracket-tax base) -- see CapitalGainsTaxCalculator's rental overload.
             return capitalGainsTaxCalculator.computeLtcgTax(ordinaryForLtcg, ltcgIncome, year,
-                    filingStatus, year - baseYear, inflationRate, magi);
+                    filingStatus, year - baseYear, inflationRate, magi, netRentalIncome);
         }
 
         /**

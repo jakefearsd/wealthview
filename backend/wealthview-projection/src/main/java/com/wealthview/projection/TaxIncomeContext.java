@@ -17,5 +17,6 @@ record TaxIncomeContext(
         IncomeYearData[] incomeData, double[] rentalAwareTaxableIncome,
         double[] adjustedFloors, OrdinaryTaxTable[] ordinaryTaxTableByYear, TaxContext taxCtx,
         double[] dsBracketCeilingByYear,
-        LtcgTaxTable[] ltcgTaxTableByYear
+        LtcgTaxTable[] ltcgTaxTableByYear,
+        double[] rentalIncomeByYear
 ) {}

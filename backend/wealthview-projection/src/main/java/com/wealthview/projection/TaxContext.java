@@ -11,7 +11,16 @@ package com.wealthview.projection;
  *
  * <p>Extracted from {@code MonteCarloSpendingOptimizer} during the Phase 3
  * decomposition so the optimizer and {@link SustainabilitySearch} can share it.
+ *
+ * <p>{@code rentalIncomeByYear} (T18a-3) is the per-year net taxable rental income, threaded into
+ * the NIIT Net Investment Income base ({@code TrialSimulator#applyLtcgTax}). Derived as the delta
+ * between the rental-aware {@code ordinaryBaseIncomeByYear} and the crude (non-rental-aware) base
+ * taxable-income array (see {@code OptimizationContextBuilder}) -- a documented approximation that
+ * can under-count in the rare year where the aggregate goes negative and gets floor-clamped at
+ * zero by {@code IncomeProjector#computeRentalAwareTaxable}. {@code null} when no pools exist
+ * (mirrors {@code ordinaryBaseIncomeByYear}'s own null-when-absent shape).
  */
 record TaxContext(
         double initTaxable, double initTraditional, double initRoth,
-        String withdrawalOrder, OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear) {}
+        String withdrawalOrder, OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+        double[] rentalIncomeByYear) {}

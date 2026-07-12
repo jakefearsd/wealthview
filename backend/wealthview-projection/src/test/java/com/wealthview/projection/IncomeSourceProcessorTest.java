@@ -273,6 +273,49 @@ class IncomeSourceProcessorTest {
         assertThat(result.incomeBySource()).containsKey(rentalId.toString());
         assertThat(result.incomeBySource().get(rentalId.toString()))
                 .isEqualByComparingTo(new BigDecimal("5800"));
+        // T18a-3: the aggregate net rental taxable income (post loss-limitation) is broken out
+        // separately so callers can thread it into the NIIT Net Investment Income base.
+        assertThat(result.netRentalTaxableIncome()).isEqualByComparingTo(new BigDecimal("5800"));
+    }
+
+    @Test
+    void process_multipleRentalProperties_netRentalTaxableIncomeSumsAcrossSources() {
+        var rentalA = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental A", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("24000"), 65, null, BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("3600"), new BigDecimal("9600"), null, new BigDecimal("5000"), null, null);
+        var rentalB = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Rental B", IncomeSourceType.RENTAL_PROPERTY,
+                new BigDecimal("18000"), 65, null, BigDecimal.ZERO, false, "rental_passive",
+                new BigDecimal("2000"), new BigDecimal("6000"), null, new BigDecimal("3000"), null, null);
+
+        when(rentalLossCalculator.applyLossRules(any(), eq("rental_passive"), any(), any(), any()))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("5800")))
+                .thenReturn(new RentalLossCalculator.LossResult(
+                        BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("7000")));
+
+        var result = processor.process(
+                List.of(rentalA, rentalB), 67, 3, 2028,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+
+        // 5800 (rental A) + 7000 (rental B) = 12800 -- the NII base the NIIT computation needs.
+        assertThat(result.netRentalTaxableIncome()).isEqualByComparingTo(new BigDecimal("12800"));
+    }
+
+    @Test
+    void process_noRentalSources_netRentalTaxableIncomeIsZero() {
+        var pension = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Pension", IncomeSourceType.PENSION,
+                new BigDecimal("30000"), 65, null,
+                BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null, null);
+
+        var result = processor.process(
+                List.of(pension), 67, 3, 2028,
+                BigDecimal.ZERO, FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+
+        assertThat(result.netRentalTaxableIncome()).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
     @Test

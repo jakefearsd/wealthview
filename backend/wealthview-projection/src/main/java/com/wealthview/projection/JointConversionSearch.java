@@ -110,7 +110,7 @@ final class JointConversionSearch {
                 ctx.sim().retirementYear(), ctx.sim().years(), ctx.taxIncome().filingStatus(), input.birthYear());
         TaxContext searchTaxCtx = new TaxContext(ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
                 ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchOrdinaryTaxTables,
-                ctx.taxIncome().rentalAwareTaxableIncome());
+                ctx.taxIncome().rentalAwareTaxableIncome(), ctx.taxIncome().rentalIncomeByYear());
 
         int gridSize = JOINT_GRID_SIZE;
         double bestFraction = 0.0;

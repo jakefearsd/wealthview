@@ -285,6 +285,8 @@ final class SustainabilitySearch {
         String order = hasPools ? taxCtx.withdrawalOrder() : "taxable_first";
         OrdinaryTaxTable[] ordinaryTaxTables = hasPools ? taxCtx.ordinaryTaxTableByYear() : null;
         double[] ordinaryBaseIncomeByYear = hasPools ? taxCtx.ordinaryBaseIncomeByYear() : null;
+        // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
+        double[] rentalIncomeByYear = hasPools ? taxCtx.rentalIncomeByYear() : null;
 
         for (int t = 0; t < trialCount; t++) {
             // Pool case: fixed starting balances from the tax context. Non-pool case: the whole
@@ -297,7 +299,8 @@ final class SustainabilitySearch {
                     ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(), false,
                     ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
                     ctx.rmdStartAge(),
-                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield());
+                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), null,
+                    rentalIncomeByYear);
 
             var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);

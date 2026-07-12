@@ -48,6 +48,15 @@ final class RetirementWithdrawalProcessor {
             @Nullable TaxCalculationStrategy taxStrategy,
             BigDecimal rmdAmount,
             BigDecimal irmaaSurcharge) {
+
+        /**
+         * T18a-3: this year's aggregate net taxable rental income, threaded into the LTCG/NIIT
+         * bundle's Net Investment Income base -- see {@code PoolStrategy#executeWithdrawals}'s
+         * 10-arg overload. Zero when no rental income sources were processed this year.
+         */
+        BigDecimal netRentalIncome() {
+            return isResult != null ? isResult.netRentalTaxableIncome() : BigDecimal.ZERO;
+        }
     }
 
     /**
@@ -178,7 +187,7 @@ final class RetirementWithdrawalProcessor {
 
         var withdrawalResult = pool.executeWithdrawals(
                 totalDraw, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age,
-                alreadyChargedBaseTax, extraPoolFundedTax, ssTaxable);
+                alreadyChargedBaseTax, extraPoolFundedTax, ssTaxable, rwCtx.netRentalIncome());
 
         // withdrawalResult.taxLiability() already includes extraPoolFundedTax (now pool-funded).
         // Add back exactly the portion funded from this year's cash surplus instead (zero in

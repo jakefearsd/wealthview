@@ -59,7 +59,7 @@ final class OptimizationContextBuilder {
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
                             null, null, null, null, rmdStartAge, 0, 0, 0),
-                    new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null));
+                    new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null, null));
         }
 
         int trialCount = input.trialCount();
@@ -121,6 +121,15 @@ final class OptimizationContextBuilder {
                 incomeArrays.taxableIncomeByYear(), input.incomeSources(),
                 retirementAge, input.birthYear(), years);
 
+        // T18a-3: the per-year net rental income contribution, isolated as the delta between the
+        // rental-aware base and the crude (non-rental-aware) base taxable income -- both already
+        // computed above. rentalAwareTaxableIncome floors its aggregate at zero
+        // (IncomeProjector#computeRentalAwareTaxable), so this delta can under-count in the rare
+        // year where that floor actually clips (a documented approximation; see TaxContext's
+        // javadoc) -- acceptable for the NIIT surtax's secondary role in the MC engine.
+        double[] rentalIncomeByYear = computeRentalIncomeDelta(
+                rentalAwareTaxableIncome, incomeArrays.taxableIncomeByYear(), years);
+
         // Verify essential floor feasibility (constant real)
         double[] adjustedFloors = SustainabilitySearch.verifyEssentialFloor(
                 portfolioPaths, incomeArrays.incomeByYear(), essentialFloor,
@@ -130,7 +139,7 @@ final class OptimizationContextBuilder {
                 taxCalculator, retirementYear, years, filingStatus, input.birthYear());
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
-                        withdrawalOrder, ordinaryTaxTables, rentalAwareTaxableIncome)
+                        withdrawalOrder, ordinaryTaxTables, rentalAwareTaxableIncome, rentalIncomeByYear)
                 : null;
 
         double[] dsBracketCeilingByYear = computeDsBracketCeilings(
@@ -166,7 +175,21 @@ final class OptimizationContextBuilder {
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
-                        taxCtx, dsBracketCeilingByYear, ltcgTaxTables));
+                        taxCtx, dsBracketCeilingByYear, ltcgTaxTables, rentalIncomeByYear));
+    }
+
+    /**
+     * The per-year net rental income contribution isolated from the rental-aware taxable-income
+     * array (T18a-3) -- see the {@link TaxContext#rentalIncomeByYear()} javadoc for the
+     * floor-clamping caveat.
+     */
+    private static double[] computeRentalIncomeDelta(double[] rentalAwareTaxableIncome,
+                                                       double[] baseTaxableIncome, int years) {
+        double[] delta = new double[years];
+        for (int y = 0; y < years; y++) {
+            delta[y] = rentalAwareTaxableIncome[y] - baseTaxableIncome[y];
+        }
+        return delta;
     }
 
     /**

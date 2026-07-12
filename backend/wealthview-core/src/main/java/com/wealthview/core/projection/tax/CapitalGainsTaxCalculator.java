@@ -55,6 +55,32 @@ public class CapitalGainsTaxCalculator {
     public BigDecimal computeLtcgTax(BigDecimal ordinaryTaxableIncome, BigDecimal ltcgIncome, int taxYear,
                                       FilingStatus status, int yearsFromBase, BigDecimal inflationRate,
                                       BigDecimal magi) {
+        return computeLtcgTax(ordinaryTaxableIncome, ltcgIncome, taxYear, status, yearsFromBase, inflationRate,
+                magi, BigDecimal.ZERO);
+    }
+
+    /**
+     * As {@link #computeLtcgTax(BigDecimal, BigDecimal, int, FilingStatus, int, BigDecimal, BigDecimal)},
+     * additionally threading {@code netRentalIncome} into the 3.8% NIIT's Net Investment Income
+     * base. Rental real estate is passive investment income under IRC 1411 (absent the
+     * real-estate-professional exception, which is out of scope here -- a documented
+     * simplification), so it belongs in the SAME "how much NII exists" pot as realized capital
+     * gains and qualified dividends when capping how much of the {@code magi}-over-threshold
+     * excess the surtax can reach.
+     *
+     * <p>It does NOT join {@code ltcgIncome} for the 0/15/20% LTCG BRACKET tax
+     * ({@link #stackOnBrackets}) -- rental income is ORDINARY income, already taxed via the
+     * ordinary brackets elsewhere, not LTCG. {@code magi} is unaffected too: the caller's ordinary
+     * taxable income already includes net rental (folded in upstream via the effective-other-income
+     * aggregate), so the MAGI/threshold comparison was already correct without this parameter.
+     *
+     * @param netRentalIncome the year's net taxable rental income (may be negative for a net rental
+     *     loss, which reduces the NII pot like any other IRC 1411 aggregation); zero when no rental
+     *     income sources are active.
+     */
+    public BigDecimal computeLtcgTax(BigDecimal ordinaryTaxableIncome, BigDecimal ltcgIncome, int taxYear,
+                                      FilingStatus status, int yearsFromBase, BigDecimal inflationRate,
+                                      BigDecimal magi, BigDecimal netRentalIncome) {
         if (ltcgIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
@@ -62,7 +88,8 @@ public class CapitalGainsTaxCalculator {
 
         var brackets = loadBracketsWithFallback(taxYear, status);
         BigDecimal bracketTax = stackOnBrackets(ordinary, ltcgIncome, brackets);
-        BigDecimal niit = computeNiit(ltcgIncome, magi, status, yearsFromBase, inflationRate);
+        BigDecimal netInvestmentIncome = ltcgIncome.add(netRentalIncome != null ? netRentalIncome : BigDecimal.ZERO);
+        BigDecimal niit = computeNiit(netInvestmentIncome, magi, status, yearsFromBase, inflationRate);
 
         return bracketTax.add(niit).setScale(SCALE, ROUNDING);
     }
@@ -132,9 +159,15 @@ public class CapitalGainsTaxCalculator {
         return totalTax;
     }
 
-    /** NIIT = 3.8% x max(0, min(ltcgIncome, magi - deflatedThreshold)). */
-    private BigDecimal computeNiit(BigDecimal ltcgIncome, BigDecimal magi, FilingStatus status, int yearsFromBase,
-                                    BigDecimal inflationRate) {
+    /**
+     * NIIT = 3.8% x max(0, min(netInvestmentIncome, magi - deflatedThreshold)).
+     *
+     * @param netInvestmentIncome the year's Net Investment Income (T18a-3: realized LTCG +
+     *     qualified dividends + net rental income) -- the pot the 3.8% surtax can reach, capped at
+     *     the MAGI-over-threshold excess.
+     */
+    private BigDecimal computeNiit(BigDecimal netInvestmentIncome, BigDecimal magi, FilingStatus status,
+                                    int yearsFromBase, BigDecimal inflationRate) {
         BigDecimal threshold = status == FilingStatus.MARRIED_FILING_JOINTLY
                 ? NIIT_THRESHOLD_MFJ : NIIT_THRESHOLD_SINGLE;
         BigDecimal deflator = thresholdDeflator(yearsFromBase, inflationRate);
@@ -142,7 +175,7 @@ public class CapitalGainsTaxCalculator {
             threshold = threshold.multiply(deflator).setScale(SCALE, ROUNDING);
         }
         BigDecimal excess = magi.subtract(threshold);
-        BigDecimal niitBase = ltcgIncome.min(excess).max(BigDecimal.ZERO);
+        BigDecimal niitBase = netInvestmentIncome.min(excess).max(BigDecimal.ZERO);
         return niitBase.multiply(NIIT_RATE);
     }
 

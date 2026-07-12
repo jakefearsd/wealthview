@@ -188,4 +188,42 @@ class MultiPoolCapitalGainsTest {
                 r.fromTaxable(), r.fromTraditional(), r.fromRoth(), r.taxSource(), ZERO, ZERO));
         assertThat(dto.taxableBalance()).isEqualByComparingTo(bd("105700"));
     }
+
+    // ---- T18a-3: net rental income joins the NIIT Net Investment Income base ----
+
+    @Test
+    void executeWithdrawals_highIncomeRealizedGainNoRentalParam_niitOnGainAlone() {
+        // Same $200k-embedded-gain taxable pool as (a) above, but high ordinary income (250000)
+        // clears the $200k NIIT threshold. Draw $100k taxable-first -> FIFO gain 40000, entirely in
+        // the 15% bracket (ordinary 250000 already past the 48350/533400 band) = 6000.00.
+        // magi = 250000 + 40000 = 290000; excess over the 200000 threshold = 90000. Without a rental
+        // figure, NII is just the 40000 gain -> niit = 40000 * 0.038 = 1520.00.
+        var pool = pool(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth"),
+                "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc());
+
+        var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("250000"), ZERO, ZERO, AGE_RETIRED,
+                ZERO, ZERO, ZERO, ZERO);
+
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("7520.00")); // 6000 bracket + 1520 NIIT
+        assertThat(r.ltcgTax()).isEqualByComparingTo(r.taxLiability());
+    }
+
+    @Test
+    void executeWithdrawals_highIncomeRealizedGainWithRentalIncome_niitGrowsByRentalShare() {
+        // Identical fixture to the test above, but with 30000 of net taxable rental income threaded
+        // through the new 10-arg executeWithdrawals overload -- rental joins the NII pot (still
+        // under the 90000 magi-over-threshold excess): NII = 40000 gain + 30000 rental = 70000 ->
+        // niit = 70000 * 0.038 = 2660.00. The bracket tax (6000.00) is UNCHANGED -- rental income is
+        // ordinary income, not LTCG, so it never touches the 0/15/20% bracket walk.
+        var pool = pool(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth"),
+                "0", "0", WithdrawalOrder.TAXABLE_FIRST, capitalGainsCalc());
+
+        var r = pool.executeWithdrawals(bd("100000"), YEAR, bd("250000"), ZERO, ZERO, AGE_RETIRED,
+                ZERO, ZERO, ZERO, bd("30000"));
+
+        assertThat(r.taxLiability()).isEqualByComparingTo(bd("8660.00")); // 6000 bracket + 2660 NIIT
+        assertThat(r.ltcgTax()).isEqualByComparingTo(r.taxLiability());
+        // Isolate the delta to exactly the rental-driven NIIT growth (30000 * 3.8% = 1140.00).
+        assertThat(r.taxLiability().subtract(bd("7520.00"))).isEqualByComparingTo(bd("1140.00"));
+    }
 }

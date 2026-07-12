@@ -64,11 +64,27 @@ final class LtcgTaxTable {
 
     /**
      * Exact LTCG tax (bracket + NIIT) on {@code ltcgIncome} stacked on top of
-     * {@code grossOrdinaryFloor}. The bracket walk nets {@code grossOrdinaryFloor} by the year's
-     * standard deduction (cross-engine parity with {@code PoolStrategy.MultiPool#computeLtcgTax});
-     * MAGI (for NIIT) stays GROSS, matching {@code LtcgRateCalculator}'s convention.
+     * {@code grossOrdinaryFloor}. Back-compat overload for callers that don't thread net rental
+     * income into the NIIT base (T18a-3) -- zero rental, byte-identical to the pre-fix behavior.
      */
     double taxAt(double grossOrdinaryFloor, double ltcgIncome) {
+        return taxAt(grossOrdinaryFloor, ltcgIncome, 0.0);
+    }
+
+    /**
+     * As {@link #taxAt(double, double)}, additionally threading {@code netRentalIncome} (T18a-3)
+     * into the 3.8% NIIT's Net Investment Income base -- mirrors
+     * {@code CapitalGainsTaxCalculator}'s rental overload. Rental income does NOT join the LTCG
+     * BRACKET tax (it is ordinary income, already priced via {@link OrdinaryTaxTable} elsewhere in
+     * the trial loop) -- only the NIIT surtax's NII pot. The bracket walk nets
+     * {@code grossOrdinaryFloor} by the year's standard deduction (cross-engine parity with
+     * {@code PoolStrategy.MultiPool#computeLtcgTax}); MAGI (for the NIIT threshold comparison)
+     * stays GROSS and is UNAFFECTED by rental income -- {@code grossOrdinaryFloor} already includes
+     * it (via {@code ordinaryBaseIncomeByYear}, which is rental-aware -- see
+     * {@code OptimizationContextBuilder}), matching {@code CapitalGainsTaxCalculator}'s convention
+     * that {@code magi} needs no separate rental parameter.
+     */
+    double taxAt(double grossOrdinaryFloor, double ltcgIncome, double netRentalIncome) {
         if (ltcgIncome <= 0) {
             return 0;
         }
@@ -76,7 +92,8 @@ final class LtcgTaxTable {
         double bracketTax = stackOnBrackets(nettedFloor, ltcgIncome);
         double magi = grossOrdinaryFloor + ltcgIncome;
         double excess = magi - niitThreshold;
-        double niitBase = Math.min(ltcgIncome, Math.max(0, excess));
+        double netInvestmentIncome = ltcgIncome + netRentalIncome;
+        double niitBase = Math.min(netInvestmentIncome, Math.max(0, excess));
         double niit = niitBase * NIIT_RATE;
         return bracketTax + niit;
     }

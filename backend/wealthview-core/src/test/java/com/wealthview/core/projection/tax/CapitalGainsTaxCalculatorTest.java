@@ -173,6 +173,56 @@ class CapitalGainsTaxCalculatorTest {
                 .isEqualByComparingTo(bd("250000"));
     }
 
+    // === T18a-3: net rental income joins the NIIT Net Investment Income base ===
+
+    @Test
+    void computeLtcgTax_netRentalIncomeOmitted_matchesExplicitZeroOverload() {
+        // The 7-arg overload must stay byte-identical to threading an explicit zero -- no observable
+        // behavior change for any caller that doesn't opt into the rental parameter.
+        var withoutOverload = calculator.computeLtcgTax(bd("250000"), bd("20000"), 2025, FilingStatus.SINGLE, 0,
+                bd("0.025"), bd("270000"));
+        var withExplicitZero = calculator.computeLtcgTax(bd("250000"), bd("20000"), 2025, FilingStatus.SINGLE, 0,
+                bd("0.025"), bd("270000"), bd("0"));
+
+        assertThat(withoutOverload).isEqualByComparingTo(withExplicitZero);
+        assertThat(withoutOverload).isEqualByComparingTo("3760.0000"); // 3000 bracket (15%) + 760 NIIT
+    }
+
+    @Test
+    void computeLtcgTax_netRentalIncomeAddedToNiitBase_increasesNiitButNotBracketTax() {
+        // ordinary 250000, ltcg 20000: entirely in the 15% bracket -> bracket tax 3000.00 (matches
+        // the zero-rental case above) -- rental income must NOT touch this component.
+        // NIIT: magi 270000 - threshold 200000 = 70000 excess headroom. Without rental, the NII pot
+        // is just the 20000 ltcg -> niit 760.00 (as above). With 30000 of net rental income folded
+        // into NII, the pot grows to 50000 (still under the 70000 excess) -> niit 1900.00.
+        var tax = calculator.computeLtcgTax(bd("250000"), bd("20000"), 2025, FilingStatus.SINGLE, 0, bd("0.025"),
+                bd("270000"), bd("30000"));
+
+        assertThat(tax).isEqualByComparingTo("4900.0000"); // 3000 bracket + 1900 NIIT
+    }
+
+    @Test
+    void computeLtcgTax_netRentalLoss_reducesNiitBase() {
+        // A net rental LOSS aggregates into NII like any other IRC 1411 component, shrinking (not
+        // just failing to grow) the NIIT base: NII pot = 20000 ltcg - 15000 rental loss = 5000 ->
+        // niit 190.00 (below the zero-rental case's 760.00).
+        var tax = calculator.computeLtcgTax(bd("250000"), bd("20000"), 2025, FilingStatus.SINGLE, 0, bd("0.025"),
+                bd("270000"), bd("-15000"));
+
+        assertThat(tax).isEqualByComparingTo("3190.0000"); // 3000 bracket + 190 NIIT
+    }
+
+    @Test
+    void computeLtcgTax_netRentalIncomeCapsAtMagiExcess_niitStillBoundedByThreshold() {
+        // Even with a large rental figure, NIIT can never exceed 3.8% of the magi-over-threshold
+        // excess (70000 here): NII pot = 20000 + 200000 = 220000, but niitBase caps at the 70000
+        // excess -> niit = 70000 * 0.038 = 2660.00 (the statutory ceiling, not 220000 * 0.038).
+        var tax = calculator.computeLtcgTax(bd("250000"), bd("20000"), 2025, FilingStatus.SINGLE, 0, bd("0.025"),
+                bd("270000"), bd("200000"));
+
+        assertThat(tax).isEqualByComparingTo("5660.0000"); // 3000 bracket + 2660 NIIT
+    }
+
     @Test
     void niitThresholdReal_erodesOverHorizon_matchesComputeLtcgTaxDeflation() {
         // Cross-check against computeLtcgTax's OWN internal deflation (same test shape as
