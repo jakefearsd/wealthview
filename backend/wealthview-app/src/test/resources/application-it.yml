@@ -38,6 +38,14 @@ app:
     api-key: ""
   zillow:
     enabled: false
+  stock-splits:
+    # Disable StockSplitBackfillRunner's ContextRefreshedEvent auto-run: its
+    # asynchronous startup execution raced the split ITs' stubbed fixtures on
+    # 2-core hosted runners (runs 29195289770 / 29197264627 / 29198018267 /
+    # 29200037679), consuming queued splits and re-writing backfill_completed
+    # mid-test. The split ITs drive runIfNeeded() explicitly; production
+    # default is true (see StockSplitBackfillRunnerTest's default-pin test).
+    backfill-auto-run: false
 
 logging:
   level:

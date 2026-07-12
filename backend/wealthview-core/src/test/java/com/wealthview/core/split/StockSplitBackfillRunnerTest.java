@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.split.dto.DetectedSplit;
@@ -16,11 +17,14 @@ import com.wealthview.persistence.repository.StockSplitRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,9 +49,50 @@ class StockSplitBackfillRunnerTest {
 
     @BeforeEach
     void setUp() {
-        runner = new StockSplitBackfillRunner(splitDetectionClient, stockSplitService,
+        runner = newRunner(true);
+    }
+
+    private StockSplitBackfillRunner newRunner(boolean backfillAutoRun) {
+        return new StockSplitBackfillRunner(splitDetectionClient, stockSplitService,
                 stockSplitRepository, transactionRepository, systemConfigService,
-                new SimpleMeterRegistry());
+                new SimpleMeterRegistry(), backfillAutoRun);
+    }
+
+    @Test
+    void onApplicationReady_autoRunDisabled_doesNotScheduleBackfill() {
+        // The gate must short-circuit BEFORE anything is handed to the executor:
+        // no flag read, no symbol scan — the startup path is completely inert.
+        runner = newRunner(false);
+
+        runner.onApplicationReady();
+
+        verifyNoInteractions(systemConfigService, transactionRepository,
+                splitDetectionClient, stockSplitService);
+    }
+
+    @Test
+    void onApplicationReady_autoRunEnabled_runsBackfillAsynchronously() {
+        // Default-true production behavior: the event listener hands runIfNeeded
+        // to the background executor. The flag read is the async run's first
+        // action, so a timeout-verify on it proves the run was scheduled.
+        when(systemConfigService.get("stock_splits.backfill_completed")).thenReturn("true");
+
+        runner.onApplicationReady();
+
+        verify(systemConfigService, timeout(5000)).get("stock_splits.backfill_completed");
+    }
+
+    @Test
+    void constructor_autoRunProperty_isAppStockSplitsBackfillAutoRunDefaultTrue() {
+        // Pins the property binding so the prod path cannot silently lose the
+        // auto-run: the @Value expression must keep matchIfMissing-equivalent
+        // semantics (default true when the property is absent).
+        var ctor = StockSplitBackfillRunner.class.getDeclaredConstructors()[0];
+        var params = ctor.getParameters();
+        var valueAnnotation = params[params.length - 1].getAnnotation(Value.class);
+
+        assertThat(valueAnnotation).isNotNull();
+        assertThat(valueAnnotation.value()).isEqualTo("${app.stock-splits.backfill-auto-run:true}");
     }
 
     @Test

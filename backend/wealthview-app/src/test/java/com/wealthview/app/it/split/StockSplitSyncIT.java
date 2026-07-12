@@ -1,6 +1,5 @@
 package com.wealthview.app.it.split;
 
-import java.time.Duration;
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +17,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
-import com.wealthview.core.config.SystemConfigService;
 import com.wealthview.core.split.SplitDetectionClient;
 import com.wealthview.core.split.StockSplitBackfillRunner;
 import com.wealthview.core.split.dto.DetectedSplit;
@@ -32,11 +30,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@link SplitDetectionClient} bean so the sync service runs without needing
  * a real Finnhub key (the {@code @ConditionalOnBean} guard flips on).
  *
- * <p>That same conditional guard also flips on {@link StockSplitBackfillRunner}
- * (its own {@code @ConditionalOnBean(SplitDetectionClient.class)}), which fires a
- * one-shot backfill asynchronously as soon as this context refreshes and can race
- * this class's {@link StubSplitClient} the same way it does in
- * {@link StockSplitBackfillIT} — see {@link #awaitStartupAutoRunSettled()}.
+ * <p>That same conditional guard also flips on {@link StockSplitBackfillRunner},
+ * whose {@code ContextRefreshedEvent} auto-run raced this class's
+ * {@link StubSplitClient} on slow CI runners. The auto-run is disabled in the
+ * "it" profile ({@code app.stock-splits.backfill-auto-run: false}), so the stub
+ * queue is only ever touched by this class's own sync-endpoint calls.
  */
 @Import(StockSplitSyncIT.StubSplitClientConfig.class)
 class StockSplitSyncIT extends AbstractApiIntegrationTest {
@@ -50,9 +48,6 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
-    private SystemConfigService systemConfigService;
-
     private AuthHelper.Session superAdmin;
     private String accountId;
 
@@ -61,46 +56,9 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
     protected void setUp() {
         super.setUp();
         stubSplitClient.reset();
-        awaitStartupAutoRunSettled();
         authHelper.createSuperAdminDirectly(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         superAdmin = authHelper.loginAsSession(restTemplate, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         accountId = data.createBrokerageAccountAndGetId();
-    }
-
-    /**
-     * See the identical guard (and full rationale) in
-     * {@link StockSplitBackfillIT#awaitStartupAutoRunSettled()}: importing a
-     * {@link SplitDetectionClient} bean here also satisfies
-     * {@link StockSplitBackfillRunner}'s {@code @ConditionalOnBean}, so its
-     * {@code ContextRefreshedEvent}-triggered auto-run can race this test's own
-     * {@link StubSplitClient} under CI-runner CPU contention, silently consuming a
-     * queued split before this class's own sync-endpoint calls run. Settle condition
-     * matches BackfillIT's: flag "true" AND every "stock-split-backfill" thread
-     * parked WAITING (executor queue drained) — waiting on the flag alone proved
-     * insufficient on hosted run 29198018267.
-     */
-    private void awaitStartupAutoRunSettled() {
-        var deadline = System.nanoTime() + Duration.ofSeconds(20).toNanos();
-        while (System.nanoTime() < deadline) {
-            if ("true".equalsIgnoreCase(systemConfigService.get("stock_splits.backfill_completed"))
-                    && backfillExecutorDrained()) {
-                return;
-            }
-            try {
-                Thread.sleep(50);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-        }
-    }
-
-    private static boolean backfillExecutorDrained() {
-        var backfillThreads = Thread.getAllStackTraces().keySet().stream()
-                .filter(t -> "stock-split-backfill".equals(t.getName()))
-                .toList();
-        return !backfillThreads.isEmpty()
-                && backfillThreads.stream().allMatch(t -> t.getState() == Thread.State.WAITING);
     }
 
     @Test
@@ -181,6 +139,9 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         private final Map<String, List<DetectedSplit>> queued = new HashMap<>();
         private final java.util.Set<String> failures = new java.util.HashSet<>();
 
+        // synchronized: splits are queued on the JUnit thread but fetched on the
+        // server's HTTP worker threads — a bare HashMap has no cross-thread
+        // memory-visibility guarantee.
         synchronized void queueSplit(String symbol, DetectedSplit split) {
             queued.computeIfAbsent(symbol, k -> new java.util.ArrayList<>()).add(split);
         }
@@ -196,14 +157,6 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
 
         @Override
         public synchronized List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
-            // Same defense as StockSplitBackfillIT.StubBackfillClient#fetch: queued
-            // splits/failures are fixture state for this class's sync-endpoint calls
-            // (which run on HTTP worker threads) — never serve or consume them on the
-            // backfill runner's background startup thread. `synchronized` also gives
-            // cross-thread memory visibility a bare HashMap lacks.
-            if ("stock-split-backfill".equals(Thread.currentThread().getName())) {
-                return List.of();
-            }
             if (failures.contains(symbol)) {
                 throw new RuntimeException("simulated finnhub failure");
             }

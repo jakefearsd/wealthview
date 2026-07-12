@@ -5,6 +5,7 @@ import java.util.concurrent.Executors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
@@ -26,6 +27,13 @@ import io.micrometer.core.instrument.MeterRegistry;
  * <p>Runs asynchronously after {@link ContextRefreshedEvent} so it never
  * blocks app startup. May take a minute or two against Finnhub depending on
  * portfolio breadth; progress is logged at INFO.
+ *
+ * <p>The startup auto-run is gated by {@code app.stock-splits.backfill-auto-run}
+ * (default {@code true}, so production behavior is unchanged when the property
+ * is absent). Integration tests set it to {@code false}: they drive
+ * {@link #runIfNeeded()} explicitly, and the asynchronous startup execution
+ * otherwise races their fixtures on slow CI runners (it consumes stubbed
+ * splits and re-writes the completed flag mid-test).
  */
 @Component
 @ConditionalOnBean(SplitDetectionClient.class)
@@ -41,19 +49,23 @@ public class StockSplitBackfillRunner {
     private final SystemConfigService systemConfigService;
     private final MeterRegistry meterRegistry;
     private final TaskExecutor taskExecutor;
+    private final boolean backfillAutoRun;
 
     public StockSplitBackfillRunner(SplitDetectionClient splitDetectionClient,
                                     StockSplitService stockSplitService,
                                     StockSplitRepository stockSplitRepository,
                                     TransactionRepository transactionRepository,
                                     SystemConfigService systemConfigService,
-                                    MeterRegistry meterRegistry) {
+                                    MeterRegistry meterRegistry,
+                                    @Value("${app.stock-splits.backfill-auto-run:true}")
+                                    boolean backfillAutoRun) {
         this.splitDetectionClient = splitDetectionClient;
         this.stockSplitService = stockSplitService;
         this.stockSplitRepository = stockSplitRepository;
         this.transactionRepository = transactionRepository;
         this.systemConfigService = systemConfigService;
         this.meterRegistry = meterRegistry;
+        this.backfillAutoRun = backfillAutoRun;
         // Use a dedicated single-thread executor so the backfill cannot starve
         // the @Async pool the app uses for unrelated work.
         this.taskExecutor = new TaskExecutorAdapter(Executors.newSingleThreadExecutor(r -> {
@@ -65,6 +77,10 @@ public class StockSplitBackfillRunner {
 
     @EventListener(ContextRefreshedEvent.class)
     public void onApplicationReady() {
+        if (!backfillAutoRun) {
+            log.info("Stock split backfill auto-run disabled via app.stock-splits.backfill-auto-run");
+            return;
+        }
         taskExecutor.execute(this::runIfNeeded);
     }
 
