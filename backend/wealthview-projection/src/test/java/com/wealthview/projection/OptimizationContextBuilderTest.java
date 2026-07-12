@@ -177,6 +177,47 @@ class OptimizationContextBuilderTest {
         assertThat(share).isGreaterThan(0.0).isLessThan(0.85);
     }
 
+    // T7-M3 (audit C7 follow-up): the pre-fix code deflated the SS threshold with the bare
+    // retirement-anchored year index y; fixed to (retirementYear - baseYear) + y, matching the
+    // deterministic engine's IncomeSourceProcessor (Math.max(0, taxYear - baseYear)).
+    @Test
+    void build_socialSecurityIncome_thresholdDeflatorAnchorsOnBaseYearNotRetirementYear() {
+        // Retirement starts 10 calendar years after the base year (2020 -> 2030). At year index 5
+        // (calendar year 2035, age 67, non-boundary) the correct deflator exponent is
+        // (2030 - 2020) + 5 = 15 -- NOT the bare y = 5 the pre-fix code used. The SS source's OWN
+        // COLA rate is set to match scenario inflation (3%) so its BENEFIT amount stays invariant
+        // at exactly $40,000 (see the realAmount/realGrossForYear invariance pin elsewhere) --
+        // isolating this test to ONLY the threshold-deflator anchor, not the benefit-amount clock.
+        var ss = new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "SS", IncomeSourceType.SOCIAL_SECURITY,
+                new BigDecimal("40000"), 62, null, new BigDecimal("0.03"), false, "partially_taxable",
+                null, null, null, null, null, null);
+        var input = ssHeavyInputWithBaseYear(ss, new BigDecimal("0.03"), 2020);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        double taxableAt5 = setup.taxIncome().taxableIncomeByYear()[5];
+
+        // Independent oracle: the SAME worksheet (Pub. 915 two-tier formula), evaluated with the
+        // base-year-anchored exponent for calendar year 2035 -- provisional = 30,000 draw + 50% *
+        // 40,000 SS = 50,000 (mirrors build_socialSecurityIncome_taxableShareIsPartialNotFull's
+        // provisional derivation, just at a different calendar year / deflator exponent).
+        double oracle = new SocialSecurityTaxCalculator()
+                .computeTaxableAmount(new BigDecimal("40000"), new BigDecimal("30000"), "single",
+                        15, new BigDecimal("0.03"))
+                .doubleValue();
+        // The WRONG (pre-fix) retirement-anchored exponent would have used y = 5 instead of 15,
+        // deflating the thresholds far less and understating taxable SS -- confirm the two
+        // differ materially so this test cannot pass on the old anchor by coincidence.
+        double wrongAnchorOracle = new SocialSecurityTaxCalculator()
+                .computeTaxableAmount(new BigDecimal("40000"), new BigDecimal("30000"), "single",
+                        5, new BigDecimal("0.03"))
+                .doubleValue();
+
+        assertThat(taxableAt5).isCloseTo(oracle, within(0.01));
+        assertThat(oracle).isNotCloseTo(wrongAnchorOracle, within(1.0));
+    }
+
     private GuardrailOptimizationInput ssHeavyInput(ProjectionIncomeSourceInput ss) {
         return new GuardrailOptimizationInput(
                 LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
@@ -190,6 +231,25 @@ class OptimizationContextBuilderTest {
                 "single", null,
                 false, null, null, 5, null, null,
                 null, null);
+    }
+
+    // T7-M3 (audit C7 follow-up): the SS threshold deflator must anchor on the SAME calendar clock
+    // (taxYear - baseYear) as the deterministic engine, not the MC's bare retirement-anchored year
+    // index y -- see OptimizationContextBuilder#applySocialSecurityTaxableShare.
+    private GuardrailOptimizationInput ssHeavyInputWithBaseYear(ProjectionIncomeSourceInput ss,
+                                                                BigDecimal inflationRate, int baseYear) {
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, inflationRate,
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO, new BigDecimal("0.05"), "taxable")),
+                List.of(ss),
+                new BigDecimal("70000"), BigDecimal.ZERO,
+                new BigDecimal("0.05"), 100, new BigDecimal("0.90"),
+                List.of(), 42L,
+                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                "single", null,
+                false, null, null, 5, null, null,
+                null, null, baseYear);
     }
 
     private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {

@@ -67,16 +67,23 @@ class IncomeSourceProcessor {
     }
 
     IncomeSourceYearResult process(
-            List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
+            List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
             BigDecimal scenarioInflationRate, int baseYear) {
-        return process(sources, age, yearsInRetirement, taxYear, magi, filingStatus,
+        return process(sources, age, yearsFromBase, taxYear, magi, filingStatus,
                 priorSuspendedLoss, scenarioInflationRate, baseYear, BigDecimal.ZERO);
     }
 
     /**
      * Processes income sources for one projection year.
      *
+     * @param yearsFromBase a 1-INDEXED count of calendar years since the projection's base year
+     *     (audit C7: {@code (taxYear - baseYear) + 1}, floored by the caller so the base year and
+     *     any earlier year are 1) — NOT years since retirement. Feeds
+     *     {@link IncomeYearMath#realAmount}'s income-deflation clock (same 1-indexed shape the
+     *     pre-C7 {@code yearsInRetirement} parameter used) so a fixed-nominal source erodes
+     *     correctly across BOTH accumulation and retirement years, matching the Social Security
+     *     threshold deflator's own {@code taxYear - baseYear} anchor computed just below.
      * @param additionalProvisionalIncome ordinary income realized elsewhere this year (traditional
      *     withdrawals + RMD excess + Roth conversion + realized LTCG/dividends) that belongs in the
      *     Social Security provisional-income base (audit B2). The deterministic engine converges this
@@ -87,7 +94,7 @@ class IncomeSourceProcessor {
      *     (audit T3-1).
      */
     IncomeSourceYearResult process(
-            List<ProjectionIncomeSourceInput> sources, int age, int yearsInRetirement,
+            List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
             BigDecimal scenarioInflationRate, int baseYear, BigDecimal additionalProvisionalIncome) {
 
@@ -119,7 +126,7 @@ class IncomeSourceProcessor {
             }
 
             BigDecimal multiplier = transitionMultiplier(source, age);
-            BigDecimal amount = computeRealAmount(source, yearsInRetirement, scenarioInflationRate)
+            BigDecimal amount = computeRealAmount(source, yearsFromBase, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
             if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY) {
                 ssBenefit = ssBenefit.add(amount);
@@ -148,7 +155,7 @@ class IncomeSourceProcessor {
             }
 
             BigDecimal multiplier = transitionMultiplier(source, age);
-            BigDecimal amount = computeRealAmount(source, yearsInRetirement, scenarioInflationRate)
+            BigDecimal amount = computeRealAmount(source, yearsFromBase, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
 
             String sourceKey = source.id().toString();
@@ -300,8 +307,8 @@ class IncomeSourceProcessor {
         return IncomeYearMath.isBoundaryAge(source, age) ? new BigDecimal("0.5") : BigDecimal.ONE;
     }
 
-    BigDecimal computeRealAmount(ProjectionIncomeSourceInput source, int yearsInRetirement,
+    BigDecimal computeRealAmount(ProjectionIncomeSourceInput source, int yearsFromBase,
                                  BigDecimal scenarioInflationRate) {
-        return IncomeYearMath.realAmount(source, yearsInRetirement, scenarioInflationRate);
+        return IncomeYearMath.realAmount(source, yearsFromBase, scenarioInflationRate);
     }
 }

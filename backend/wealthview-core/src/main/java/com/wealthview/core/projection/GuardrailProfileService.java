@@ -91,12 +91,18 @@ public class GuardrailProfileService {
             String filingStatus = params.filingStatus();
             String withdrawalOrder = params.withdrawalOrder() != null
                     ? params.withdrawalOrder() : "taxable_first";
+            // Audit C7 / T7-M3: same default the deterministic engine applies
+            // (DeterministicProjectionEngine.resolveProjectionParams) when the scenario has no
+            // explicit reference year, so both engines anchor their calendar-year deflation clocks
+            // identically.
+            int baseYear = projectionInput.referenceYear() != null
+                    ? projectionInput.referenceYear() : java.time.LocalDate.now().getYear();
 
             BigDecimal confidence = resolveConfidence(request);
 
             var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
                     birthYear, confidence, filingStatus, withdrawalOrder, params.dividendYield(),
-                    params.feeRate());
+                    params.feeRate(), baseYear);
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
             var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
@@ -426,7 +432,8 @@ public class GuardrailProfileService {
                                                                String filingStatus,
                                                                String withdrawalOrder,
                                                                BigDecimal dividendYield,
-                                                               BigDecimal feeRate) {
+                                                               BigDecimal feeRate,
+                                                               int baseYear) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
@@ -467,7 +474,8 @@ public class GuardrailProfileService {
                         ? request.rmdBracketHeadroom() : new BigDecimal("0.10"),
                 request.dynamicSequencingBracketRate(),
                 dividendYield,
-                feeRate
+                feeRate,
+                baseYear
         );
     }
 

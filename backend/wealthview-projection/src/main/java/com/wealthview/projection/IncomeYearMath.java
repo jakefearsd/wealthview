@@ -36,20 +36,28 @@ final class IncomeYearMath {
     }
 
     /**
-     * The source's REAL (today's-dollars) annual amount at {@code yearsInRetirement}. The nominal
-     * amount grows by the source's own inflation rate and is then deflated by the scenario inflation
-     * rate over the same {@code n = yearsInRetirement - 1} compounding steps, i.e.
-     * {@code amount * (1 + sourceInflation)^n / (1 + scenarioInflation)^n}. A COLA source whose rate
-     * matches scenario inflation therefore stays constant real, while a fixed-nominal source (source
-     * inflation 0) loses purchasing power over time. The first year and any one-time source pays the
-     * base amount unchanged.
+     * The source's REAL (today's-dollars) annual amount at {@code yearsFromBase} — a 1-INDEXED
+     * count of calendar years since the projection's base year (audit C7: {@code (taxYear -
+     * baseYear) + 1}, so the base year itself is 1, one calendar year later is 2, etc. — NOT years
+     * since retirement; same 1-indexed shape the pre-C7 {@code yearsInRetirement} parameter used,
+     * just re-anchored). The nominal amount grows by the source's own inflation rate and is then
+     * deflated by the scenario inflation rate over the same {@code n = yearsFromBase - 1}
+     * compounding steps, i.e. {@code amount * (1 + sourceInflation)^n / (1 + scenarioInflation)^n}.
+     * A COLA source whose rate matches scenario inflation therefore stays EXACTLY constant real
+     * (equal to its face {@code annualAmount}) at every calendar year, including across the
+     * accumulation/retirement boundary, because growth and deflation share one calendar-anchored
+     * clock. A fixed-nominal source (source inflation 0) loses purchasing power over time —
+     * including during accumulation, where the prior retirement-anchored clock stayed pinned at
+     * {@code yearsInRetirement <= 1} (steps = 0) regardless of elapsed calendar time (audit C7's
+     * bug: up to ~45% overstatement at a 15-year accumulation boundary). The base year itself
+     * ({@code yearsFromBase <= 1}) and any one-time source pay the base amount unchanged.
      */
-    static BigDecimal realAmount(ProjectionIncomeSourceInput source, int yearsInRetirement,
+    static BigDecimal realAmount(ProjectionIncomeSourceInput source, int yearsFromBase,
                                  BigDecimal scenarioInflationRate) {
-        if (source.oneTime() || yearsInRetirement <= 1) {
+        if (source.oneTime() || yearsFromBase <= 1) {
             return source.annualAmount();
         }
-        int steps = yearsInRetirement - 1;
+        int steps = yearsFromBase - 1;
         BigDecimal grown = CompoundGrowth.inflate(source.annualAmount(), source.inflationRate(), steps);
         if (scenarioInflationRate.signum() == 0) {
             return grown.setScale(SCALE, ROUNDING);

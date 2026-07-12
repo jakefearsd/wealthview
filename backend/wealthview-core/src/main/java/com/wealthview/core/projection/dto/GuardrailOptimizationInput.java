@@ -23,6 +23,13 @@ import java.util.List;
  *         ({@code params_json.fee_rate}), or {@code null} when the scenario doesn't set one. The
  *         MC engine falls back to the same default the deterministic engine uses (see
  *         {@code ScenarioParamsParser.DEFAULT_FEE_RATE}).
+ * @param baseYear the projection's base ("today") year — audit C7 / T7-M3: anchors the income
+ *         deflation clock and the Social Security threshold deflator on CALENDAR years elapsed
+ *         ({@code taxYear - baseYear}), matching the deterministic engine's {@code currentYear}
+ *         (see {@code DeterministicProjectionEngine.resolveProjectionParams}), instead of the MC's
+ *         own retirement-anchored year index. Resolved by {@code GuardrailProfileService} from the
+ *         scenario's {@code referenceYear} (falling back to {@code LocalDate.now().getYear()}) —
+ *         the same default the deterministic engine applies when unset.
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -52,5 +59,36 @@ public record GuardrailOptimizationInput(
         BigDecimal rmdBracketHeadroom,
         BigDecimal dynamicSequencingBracketRate,
         BigDecimal dividendYield,
-        BigDecimal feeRate
-) {}
+        BigDecimal feeRate,
+        int baseYear
+) {
+
+    /**
+     * Back-compat convenience for callers that predate {@link #baseYear} (audit C7 / T7-M3).
+     * Defaults it to {@code retirementDate.getYear()} — "as if retirement starts today" —
+     * reproducing the OLD retirement-anchored deflation/threshold clock exactly (offset 0), so
+     * every pre-existing positional call site (tests, other optimizer builders) keeps compiling
+     * AND behaving identically. Production ({@code GuardrailProfileService}) always uses the
+     * canonical constructor with the scenario's actual resolved base year.
+     */
+    // ExcessiveParameterList: mirrors the record's own 28-field canonical constructor
+    // (pre-baseYear shape) so existing positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailOptimizationInput(
+            LocalDate retirementDate, int birthYear, int endAge, BigDecimal inflationRate,
+            List<ProjectionAccountInput> accounts, List<ProjectionIncomeSourceInput> incomeSources,
+            BigDecimal essentialFloor, BigDecimal terminalBalanceTarget, BigDecimal returnMean,
+            int trialCount, BigDecimal confidenceLevel, List<GuardrailPhaseInput> phases, Long seed,
+            BigDecimal portfolioFloor, BigDecimal maxAnnualAdjustmentRate, int phaseBlendYears,
+            int cashReserveYears, BigDecimal cashReturnRate, String filingStatus, String withdrawalOrder,
+            boolean optimizeConversions, BigDecimal conversionBracketRate, BigDecimal rmdTargetBracketRate,
+            int traditionalExhaustionBuffer, BigDecimal rmdBracketHeadroom,
+            BigDecimal dynamicSequencingBracketRate, BigDecimal dividendYield, BigDecimal feeRate) {
+        this(retirementDate, birthYear, endAge, inflationRate, accounts, incomeSources, essentialFloor,
+                terminalBalanceTarget, returnMean, trialCount, confidenceLevel, phases, seed, portfolioFloor,
+                maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
+                withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
+                traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
+                feeRate, retirementDate.getYear());
+    }
+}

@@ -93,9 +93,15 @@ final class OptimizationContextBuilder {
                 trialCount, years, returnModel, matrix, rng, feeRate);
         double[][] portfolioPaths = returnPaths.portfolioPaths();
 
+        // Audit C7 / T7-M3: the MC engine only models years from retirement onward, so its own
+        // year index is retirement-anchored. This offset converts it to the SAME calendar-anchored
+        // clock (taxYear - baseYear) the deterministic engine's income deflation and Social
+        // Security threshold deflator both use -- see IncomeProjector.computeDeterministic.
+        int retirementYearOffsetFromBase = retirementYear - input.baseYear();
+
         // Compute deterministic income for each year (real terms: deflated by scenario inflation)
         IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(
-                input.incomeSources(), retirementAge, years, inflationRate);
+                input.incomeSources(), retirementAge, years, retirementYearOffsetFromBase, inflationRate);
         FilingStatus filingStatus = input.filingStatus() != null
                 ? FilingStatus.fromString(input.filingStatus()) : FilingStatus.SINGLE;
 
@@ -103,7 +109,7 @@ final class OptimizationContextBuilder {
         // that with the IRS two-tier taxable SHARE so the MC's income base matches the deterministic
         // engine's direction rather than over-taxing Social Security.
         incomeData = applySocialSecurityTaxableShare(incomeData, input.incomeSources(),
-                retirementAge, years, essentialFloor, filingStatus, inflationRate);
+                retirementAge, years, essentialFloor, filingStatus, inflationRate, retirementYearOffsetFromBase);
 
         var incomeArrays = computeIncomeArrays(incomeData, years, retirementYear, filingStatus);
 
@@ -173,16 +179,19 @@ final class OptimizationContextBuilder {
      * the expected draw is a fixed deterministic quantity that does not depend on how much Social
      * Security is taxable, so no iteration is needed. The whole draw is treated as ordinary income
      * (an upper-bound approximation — some of it would come from Roth/taxable pools), and the
-     * fixed-nominal thresholds are deflated on the retirement-anchored clock the MC already uses for
-     * income and bracket ceilings. Years with no Social Security benefit are returned unchanged, so
-     * the hot loop and non-SS scenarios are untouched.
+     * fixed-nominal thresholds are deflated on the SAME base-year-anchored calendar clock as income
+     * (audit C7 / T7-M3 — {@code retirementYearOffsetFromBase + y}, matching the deterministic
+     * engine's {@code taxYear - baseYear}; previously deflated on the bare retirement-anchored
+     * {@code y}, understating erosion whenever retirement starts after the base year). Years with
+     * no Social Security benefit are returned unchanged, so the hot loop and non-SS scenarios are
+     * untouched.
      */
     private IncomeYearData[] applySocialSecurityTaxableShare(
             IncomeYearData[] incomeData, List<ProjectionIncomeSourceInput> sources,
             int retirementAge, int years, double essentialFloor, FilingStatus filingStatus,
-            double inflationRate) {
+            double inflationRate, int retirementYearOffsetFromBase) {
         double[] ssBenefitByYear = IncomeProjector.socialSecurityBenefitByYear(
-                sources, retirementAge, years, inflationRate);
+                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate);
         BigDecimal inflationBd = BigDecimal.valueOf(inflationRate);
         IncomeYearData[] adjusted = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
@@ -195,9 +204,10 @@ final class OptimizationContextBuilder {
             double nonSsTaxable = Math.max(0, incomeData[y].taxableIncome() - ssBenefit);
             double expectedDraw = Math.max(0, essentialFloor - total);
             double provisionalOther = nonSsTaxable + expectedDraw;
+            int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             double ssTaxable = SS_TAX_CALCULATOR.computeTaxableAmount(
                     BigDecimal.valueOf(ssBenefit), BigDecimal.valueOf(provisionalOther),
-                    filingStatus.value(), y, inflationBd).doubleValue();
+                    filingStatus.value(), yearsFromBase, inflationBd).doubleValue();
             adjusted[y] = new IncomeYearData(total, nonSsTaxable + ssTaxable);
         }
         return adjusted;

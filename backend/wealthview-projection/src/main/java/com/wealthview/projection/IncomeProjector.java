@@ -21,8 +21,21 @@ final class IncomeProjector {
     private IncomeProjector() {
     }
 
+    /**
+     * Projects deterministic per-year income (real terms) for the MC engine's full retirement horizon.
+     *
+     * @param retirementYearOffsetFromBase {@code retirementYear - baseYear} (audit C7 / T7-M3):
+     *     the MC engine only models years from retirement onward (no accumulation phase), so its
+     *     own year index {@code y} is retirement-anchored, not calendar-anchored. Adding this
+     *     (possibly negative, when retirement precedes the base year) offset converts {@code y}
+     *     into {@code taxYear - baseYear} — the SAME calendar clock
+     *     {@link IncomeSourceProcessor}/{@link IncomeContributionCalculator} use — before it is
+     *     floored at 0 and fed to {@link #realGrossForYear}.
+     */
     static IncomeYearData[] computeDeterministic(List<ProjectionIncomeSourceInput> sources,
-                                                 int retirementAge, int years, double scenarioInflationRate) {
+                                                 int retirementAge, int years,
+                                                 int retirementYearOffsetFromBase,
+                                                 double scenarioInflationRate) {
         IncomeYearData[] result = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
             result[y] = new IncomeYearData(0, 0);
@@ -33,14 +46,14 @@ final class IncomeProjector {
 
         for (int y = 0; y < years; y++) {
             int age = retirementAge + y;
-            int yearsInRetirement = y + 1;
+            int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             double totalIncome = 0;
             double taxableIncome = 0;
             for (var source : sources) {
                 if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
-                double amount = realGrossForYear(source, yearsInRetirement - 1, scenarioInflationRate);
+                double amount = realGrossForYear(source, yearsFromBase, scenarioInflationRate);
 
                 // For rental properties, subtract all cash outflows to get net cash flow,
                 // matching IncomeSourceProcessor: operating expenses, mortgage interest,
@@ -77,22 +90,26 @@ final class IncomeProjector {
      * per-source amount logic — inflation growth, scenario deflation, and boundary-year (0.5)
      * proration — but restricted to {@link IncomeSourceType#SOCIAL_SECURITY} sources. Used by the MC
      * to split the taxable Social Security SHARE out of the naive 100%-taxable figure (audit B2).
+     * {@code retirementYearOffsetFromBase}: see {@link #computeDeterministic}.
      */
     static double[] socialSecurityBenefitByYear(List<ProjectionIncomeSourceInput> sources,
-                                                int retirementAge, int years, double scenarioInflationRate) {
+                                                int retirementAge, int years,
+                                                int retirementYearOffsetFromBase,
+                                                double scenarioInflationRate) {
         double[] result = new double[years];
         if (sources == null || sources.isEmpty()) {
             return result;
         }
         for (int y = 0; y < years; y++) {
             int age = retirementAge + y;
+            int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             double benefit = 0;
             for (var source : sources) {
                 if (source.incomeType() != IncomeSourceType.SOCIAL_SECURITY
                         || !ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
                     continue;
                 }
-                double amount = realGrossForYear(source, y, scenarioInflationRate);
+                double amount = realGrossForYear(source, yearsFromBase, scenarioInflationRate);
                 if (IncomeYearMath.isBoundaryAge(source, age)) {
                     amount *= 0.5;
                 }
@@ -153,22 +170,24 @@ final class IncomeProjector {
     }
 
     /**
-     * The source's REAL (today's-dollars) gross amount at {@code steps = yearsInRetirement - 1}: grown
-     * by the source's own inflation, then deflated by scenario inflation over the same steps (COLA
-     * source -> constant real; fixed-nominal source -> eroded). One-time sources pay their face amount
-     * unchanged, matching {@link IncomeYearMath#realAmount}.
+     * The source's REAL (today's-dollars) gross amount {@code yearsFromBase} calendar years after
+     * the projection's base year (audit C7): grown by the source's own inflation, then deflated by
+     * scenario inflation over the SAME calendar-anchored exponent (COLA source -> constant real at
+     * every calendar year, including across the accumulation/retirement boundary; fixed-nominal
+     * source -> eroded). One-time sources pay their face amount unchanged, matching
+     * {@link IncomeYearMath#realAmount}.
      */
-    private static double realGrossForYear(ProjectionIncomeSourceInput source, int steps,
+    private static double realGrossForYear(ProjectionIncomeSourceInput source, int yearsFromBase,
                                            double scenarioInflationRate) {
         double gross = source.annualAmount().doubleValue();
         if (source.oneTime()) {
             return gross;
         }
         if (source.inflationRate() != null && source.inflationRate().compareTo(BigDecimal.ZERO) > 0) {
-            gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), steps);
+            gross *= CompoundGrowth.factor(source.inflationRate().doubleValue(), yearsFromBase);
         }
-        if (scenarioInflationRate > 0 && steps > 0) {
-            gross /= CompoundGrowth.factor(scenarioInflationRate, steps);
+        if (scenarioInflationRate > 0 && yearsFromBase > 0) {
+            gross /= CompoundGrowth.factor(scenarioInflationRate, yearsFromBase);
         }
         return gross;
     }

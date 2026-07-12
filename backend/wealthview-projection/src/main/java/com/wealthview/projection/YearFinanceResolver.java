@@ -208,20 +208,28 @@ final class YearFinanceResolver {
         int yearsInRetirement = yc.yearsInRetirement();
         int year = yc.year();
         BigDecimal inflationRate = yc.inflationRate();
+        // Audit C7: income deflates on the CALENDAR clock (years elapsed since the projection's
+        // base year), not the retirement-anchored yearsInRetirement -- a fixed-nominal source held
+        // full face value through accumulation (yearsInRetirement pinned at 0) regardless of how
+        // many calendar years had actually passed. 1-indexed (IncomeYearMath.realAmount's shape):
+        // the base year itself is 1. Floored at 1 so a year at-or-before the base year never goes
+        // negative, mirroring the Social Security threshold deflator's own
+        // Math.max(0, taxYear - baseYear) floor.
+        int yearsFromBase = Math.max(0, year - yc.baseYear()) + 1;
 
         IncomeSourceProcessor.IncomeSourceYearResult incomeSourceResult = null;
         BigDecimal totalActiveIncome;
         BigDecimal taxableActiveIncome;
 
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
-            incomeSourceResult = incomeSourceProcessor.process(yc.incomeSources(), age, yearsInRetirement,
+            incomeSourceResult = incomeSourceProcessor.process(yc.incomeSources(), age, yearsFromBase,
                     year, pool.getMagi(), pool.getFilingStatus(), yc.suspendedLoss(), inflationRate,
                     yc.baseYear(), additionalProvisionalIncome);
             totalActiveIncome = incomeSourceResult.totalCashInflow();
             taxableActiveIncome = incomeSourceResult.totalTaxableIncome();
         } else {
             totalActiveIncome = incomeContributionCalculator.compute(
-                    yc.incomeSources(), age, yearsInRetirement, inflationRate);
+                    yc.incomeSources(), age, yearsFromBase, inflationRate);
             taxableActiveIncome = totalActiveIncome;
         }
 

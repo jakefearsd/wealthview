@@ -520,6 +520,60 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
         assertThat(yearsWithIncome).isEqualTo(1);
     }
 
+    // === Audit C7: base-year-anchored deflation clock ===
+
+    @Test
+    void run_zeroColaPension_retirement15YearsOut_deflatesFromBaseYear() {
+        // A 0%-COLA pension active since the base year (age 50 == startAge, so no boundary
+        // halving by the time retirement starts). Retirement is 15 CALENDAR years after the
+        // projection's base year (2026 -> 2041). Pre-C7, the accumulation-phase clock
+        // (yearsInRetirement) stayed pinned at 0 the entire time, so the first retirement year
+        // (yearsInRetirement=1 -> steps=0) still paid the full $10,000 face value -- zero
+        // deflation despite 15 real calendar years having passed. Fixed: the clock is now
+        // (taxYear - baseYear), so year 1 of retirement (2041) deflates by 15 years of 3%
+        // scenario inflation: 10000 / 1.03^15 = 6418.6195.
+        var input = createInput(
+                LocalDate.of(2041, 1, 1), 90, bd("0.03"),
+                "{\"birth_year\": 1976}",
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("0"), bd("0"), null),
+                2026,
+                List.of(incomeSource("Pension", "10000", 50, null, "0")));
+
+        var result = engine.run(input);
+
+        var firstRetirementYear = result.yearlyData().get(15);
+        assertThat(firstRetirementYear.age()).isEqualTo(65);
+        assertThat(firstRetirementYear.retired()).isTrue();
+        assertThat(firstRetirementYear.incomeStreamsTotal()).isEqualByComparingTo(bd("6418.6195"));
+    }
+
+    @Test
+    void run_cpiMatchedPension_retirement15YearsOut_staysConstantRealAcrossBoundary() {
+        // Invariance pin (audit C7): a source whose OWN inflation rate exactly matches scenario
+        // inflation must stay at EXACTLY its face value forever -- including across the
+        // accumulation/retirement boundary -- because growth and deflation now share one
+        // calendar-anchored clock. (Pre-C7 this happened to hold too, but only because the buggy
+        // clock stayed at 0 the whole time for BOTH growth and deflation during accumulation; the
+        // zero-COLA test above proves this run is exercising the real fix, not a no-op.)
+        var input = createInput(
+                LocalDate.of(2041, 1, 1), 90, bd("0.03"),
+                "{\"birth_year\": 1976}",
+                List.of(acct("500000.0000", "0", "0.0500")),
+                new SpendingProfileInput(bd("0"), bd("0"), null),
+                2026,
+                List.of(incomeSource("Pension", "10000", 50, null, "0.03")));
+
+        var result = engine.run(input);
+
+        var firstRetirementYear = result.yearlyData().get(15);
+        assertThat(firstRetirementYear.age()).isEqualTo(65);
+        assertThat(firstRetirementYear.incomeStreamsTotal()).isEqualByComparingTo(bd("10000"));
+
+        var laterRetirementYear = result.yearlyData().get(20);
+        assertThat(laterRetirementYear.incomeStreamsTotal()).isEqualByComparingTo(bd("10000"));
+    }
+
     // === Surplus Income Reinvestment Tests ===
 
     @Test
