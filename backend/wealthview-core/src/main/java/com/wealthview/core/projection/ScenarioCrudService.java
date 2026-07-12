@@ -373,8 +373,11 @@ public class ScenarioCrudService {
      * planning ages; every spouse-scoped or household-only field requires {@code spouse_birth_year}
      * to be set (a household field with no spouse is meaningless and almost certainly a client
      * bug); the survivor spending factor (when set) must be in its documented 0.5-1.0 range.
-     * {@code primary_death_age} is exempt from the spouse-presence check — it truncates the
-     * horizon for single-person households too.
+     * {@code primary_death_age} is exempt from the spouse-presence check but is currently INERT
+     * for single-person scenarios: {@code ProjectionInputBuilder.resolveHousehold} builds the
+     * degenerate {@code HouseholdContext.single(...)} (empty transition/second-death optionals),
+     * so no truncation occurs without a spouse — deliberately preserving pre-household behavior
+     * for singles. Range-validated anyway so a stored value is sane if a future change wires it.
      */
     private static void validateHouseholdFields(ScenarioParamsSource request) {
         validateDeathAge(request.primaryDeathAge(), "primary_death_age");
