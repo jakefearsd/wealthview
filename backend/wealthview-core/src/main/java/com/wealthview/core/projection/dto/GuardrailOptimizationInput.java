@@ -36,6 +36,12 @@ import java.util.List;
  *         which {@code CapitalMarketAssumptionsProvider} window ({@code matrix(boolean)}) the MC
  *         block bootstrap samples from — {@code false} (every pre-existing caller) is the
  *         unchanged 1972-2025 window; {@code true} widens it to 1928-2025.
+ * @param interestYield the scenario's configured taxable-pool bond/cash-sleeve interest yield
+ *         ({@code params_json.interest_yield}), or {@code null} when the scenario doesn't set one.
+ *         The MC engine falls back to the same default the deterministic engine uses (see
+ *         {@code ScenarioParamsParser.DEFAULT_INTEREST_YIELD}). Audit C1: splits {@link
+ *         #dividendYield} by the taxable pool's own allocation — the bond+cash share is taxed
+ *         ORDINARY at this rate instead of at LTCG/qualified-dividend rates.
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -67,7 +73,8 @@ public record GuardrailOptimizationInput(
         BigDecimal dividendYield,
         BigDecimal feeRate,
         int baseYear,
-        boolean includeDepressionYears
+        boolean includeDepressionYears,
+        BigDecimal interestYield
 ) {
 
     /**
@@ -98,6 +105,6 @@ public record GuardrailOptimizationInput(
                 maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
                 withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
-                feeRate, retirementDate.getYear(), false);
+                feeRate, retirementDate.getYear(), false, null);
     }
 }

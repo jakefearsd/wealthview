@@ -34,6 +34,7 @@ public record ScenarioRequest(
         BigDecimal dividendYield,
         BigDecimal feeRate,
         Boolean includeDepressionYears,
+        BigDecimal interestYield,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
@@ -63,6 +64,33 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                null, accounts, spendingProfileId, useGuardrailProfile, incomeSources);
+                null, null, accounts, spendingProfileId, useGuardrailProfile, incomeSources);
+    }
+
+    /**
+     * Back-compat convenience for callers that predate {@link #interestYield} (audit C1) but
+     * already carry {@link #includeDepressionYears} (audit C10) — mirrors that field's identical
+     * pattern. Defaults it to {@code null} ("not set" — {@code ScenarioParamsParser} resolves that
+     * to {@code DEFAULT_INTEREST_YIELD}), so every pre-C1 positional call site keeps compiling.
+     */
+    // ExcessiveParameterList: mirrors the record's own 28-field canonical constructor (pre-C1
+    // shape) so existing positional call sites keep compiling unchanged.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public ScenarioRequest(
+            String name, LocalDate retirementDate, Integer endAge, BigDecimal inflationRate,
+            Integer birthYear, BigDecimal withdrawalRate, String withdrawalStrategy,
+            BigDecimal dynamicCeiling, BigDecimal dynamicFloor, String filingStatus,
+            BigDecimal otherIncome, BigDecimal annualRothConversion, String withdrawalOrder,
+            BigDecimal dynamicSequencingBracketRate, String rothConversionStrategy,
+            BigDecimal targetBracketRate, Integer rothConversionStartYear, String state,
+            BigDecimal primaryResidencePropertyTax, BigDecimal primaryResidenceMortgageInterest,
+            BigDecimal dividendYield, BigDecimal feeRate, Boolean includeDepressionYears,
+            List<CreateProjectionAccountRequest> accounts, UUID spendingProfileId,
+            Boolean useGuardrailProfile, List<ScenarioIncomeSourceInput> incomeSources) {
+        this(name, retirementDate, endAge, inflationRate, birthYear, withdrawalRate, withdrawalStrategy,
+                dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
+                dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
+                state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
+                includeDepressionYears, null, accounts, spendingProfileId, useGuardrailProfile, incomeSources);
     }
 }

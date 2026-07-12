@@ -62,6 +62,32 @@ class ScenarioParamsParserTest {
         assertThat(parser.feeRate(params)).isEqualByComparingTo(BigDecimal.ZERO);
     }
 
+    // C1 (2026-07-12 audit): bond-sleeve interest yield -- mirrors the feeRate tests above exactly.
+
+    @Test
+    void interestYield_absentFromParams_defaultsToPoint04() {
+        assertThat(parser.interestYield(ScenarioParams.EMPTY)).isEqualByComparingTo("0.04");
+    }
+
+    @Test
+    void interestYield_presentInParsedParams_returnsParsedValue() {
+        var params = parser.parseParams("""
+                {"interest_yield": 0.05}
+                """);
+
+        assertThat(params.interestYield()).isEqualByComparingTo("0.05");
+        assertThat(parser.interestYield(params)).isEqualByComparingTo("0.05");
+    }
+
+    @Test
+    void interestYield_explicitZero_isNotTreatedAsAbsent() {
+        var params = parser.parseParams("""
+                {"interest_yield": 0}
+                """);
+
+        assertThat(parser.interestYield(params)).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
     // C10 (2026-07-12 audit): optional pre-1972 (Depression-era) capital-market window.
 
     @Test

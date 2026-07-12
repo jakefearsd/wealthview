@@ -35,6 +35,15 @@ final class ScenarioParamsParser {
      */
     static final BigDecimal DEFAULT_FEE_RATE = new BigDecimal("0.0025");
 
+    /**
+     * Nominal annual coupon proxy assumed for the taxable pool's bond/cash sleeve when a scenario
+     * doesn't set one -- audit C1: the single whole-pool {@link #DEFAULT_DIVIDEND_YIELD} drag
+     * mistaxed the bond sleeve's ordinary interest at qualified-dividend/LTCG rates. Split by the
+     * taxable account's own allocation (equity share keeps {@link #DEFAULT_DIVIDEND_YIELD}'s
+     * treatment; bond+cash share is taxed ORDINARY at this rate) in both engines.
+     */
+    static final BigDecimal DEFAULT_INTEREST_YIELD = new BigDecimal("0.04");
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     ScenarioParams parseParams(@Nullable String paramsJson) {
@@ -53,6 +62,11 @@ final class ScenarioParamsParser {
     /** Resolves the effective fee rate, defaulting to {@link #DEFAULT_FEE_RATE} when unset. */
     BigDecimal feeRate(ScenarioParams params) {
         return params.feeRate() != null ? params.feeRate() : DEFAULT_FEE_RATE;
+    }
+
+    /** Resolves the effective interest yield, defaulting to {@link #DEFAULT_INTEREST_YIELD} when unset. */
+    BigDecimal interestYield(ScenarioParams params) {
+        return params.interestYield() != null ? params.interestYield() : DEFAULT_INTEREST_YIELD;
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +21,7 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null, null, null, null);
+                null, null, null, null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -47,7 +48,7 @@ class ScenarioParamsTest {
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
                 "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"),
-                new BigDecimal("0.003"), Boolean.TRUE);
+                new BigDecimal("0.003"), Boolean.TRUE, new BigDecimal("0.045"));
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
@@ -58,7 +59,7 @@ class ScenarioParamsTest {
     void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new BigDecimal("0.021"), null, null);
+                null, null, null, new BigDecimal("0.021"), null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -85,7 +86,7 @@ class ScenarioParamsTest {
     void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, new BigDecimal("0.003"), null);
+                null, null, null, null, new BigDecimal("0.003"), null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -108,11 +109,49 @@ class ScenarioParamsTest {
         assertThat(ScenarioParams.from(request).feeRate()).isNull();
     }
 
+    // C1 (2026-07-12 audit): bond-sleeve interest yield -- mirrors the feeRate tests above exactly.
+
+    @Test
+    void toJson_interestYieldPresent_writesSnakeCaseKey() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, new BigDecimal("0.04"));
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("interest_yield").decimalValue()).isEqualByComparingTo("0.04");
+    }
+
+    @Test
+    void from_interestYieldPresent_passesThrough() {
+        var request = scenarioRequestWithInterestYield(new BigDecimal("0.04"));
+
+        var params = ScenarioParams.from(request);
+
+        assertThat(params.interestYield()).isEqualByComparingTo("0.04");
+    }
+
+    @Test
+    void from_interestYieldNull_staysNullForDefault() {
+        var request = scenarioRequestWithInterestYield(null);
+
+        assertThat(ScenarioParams.from(request).interestYield()).isNull();
+    }
+
+    private ScenarioRequest scenarioRequestWithInterestYield(BigDecimal interestYield) {
+        return new ScenarioRequest(
+                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, interestYield, List.of(), null, null, null);
+    }
+
     @Test
     void toJson_includeDepressionYearsPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, Boolean.TRUE);
+                null, null, null, null, null, Boolean.TRUE, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 

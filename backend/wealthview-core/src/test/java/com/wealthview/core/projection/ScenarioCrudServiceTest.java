@@ -126,6 +126,15 @@ class ScenarioCrudServiceTest {
                 null, feeRate, List.of(), null, null, null);
     }
 
+    private ScenarioRequest scenarioRequestWithInterestYield(BigDecimal interestYield) {
+        return new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, interestYield, List.of(), null, null, null);
+    }
+
     private ProjectionScenarioEntity captureSavedScenario() {
         var captor = ArgumentCaptor.forClass(ProjectionScenarioEntity.class);
         verify(scenarioRepository).save(captor.capture());
@@ -903,6 +912,79 @@ class ScenarioCrudServiceTest {
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("0.03");
+    }
+
+    // C1 (2026-07-12 audit): bond-sleeve interest yield -- mirrors the dividendYield validation
+    // tests above (same [0, 0.10] range).
+
+    @Test
+    void createScenario_interestYieldAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithInterestYield(new BigDecimal("0.15"));
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0.10");
+    }
+
+    @Test
+    void createScenario_interestYieldBelowZero_throwsIllegalArgument() {
+        var request = scenarioRequestWithInterestYield(new BigDecimal("-0.001"));
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0.10");
+    }
+
+    @Test
+    void createScenario_interestYieldWithinRange_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithInterestYield(new BigDecimal("0.04"));
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void createScenario_interestYieldNull_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithInterestYield(null);
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    // Explicit zero is a real, valid, interest-free election -- must persist as "interest_yield":0
+    // rather than being dropped/collapsed to the ScenarioParamsParser default (0.04), mirroring
+    // the fee_rate null-vs-set handling.
+    @Test
+    void createScenario_interestYieldZero_persistsExplicitZeroNotDefault() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithInterestYield(BigDecimal.ZERO);
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getParamsJson()).contains("\"interest_yield\":0");
+    }
+
+    @Test
+    void updateScenario_interestYieldAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithInterestYield(new BigDecimal("0.15"));
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("0.10");
     }
 
     @Test

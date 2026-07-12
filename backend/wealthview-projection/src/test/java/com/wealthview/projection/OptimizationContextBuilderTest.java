@@ -249,7 +249,7 @@ class OptimizationContextBuilderTest {
                 BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 "single", null,
                 false, null, null, 5, null, null,
-                null, null, baseYear, false);
+                null, null, baseYear, false, null);
     }
 
     private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {

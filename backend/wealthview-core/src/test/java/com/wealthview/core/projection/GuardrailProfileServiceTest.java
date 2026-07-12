@@ -748,6 +748,25 @@ class GuardrailProfileServiceTest {
         assertThat(input.feeRate()).isNull();
     }
 
+    // C1 (2026-07-12 audit): the scenario's interest_yield param must reach the MC's
+    // GuardrailOptimizationInput the same way dividend_yield/fee_rate do. Absent -> null passed
+    // through -- OptimizationContextBuilder applies the 0.04 default (see
+    // ScenarioParamsParserTest / OptimizationContextBuilderTest).
+    @Test
+    void optimize_paramsJsonWithInterestYield_propagatesToInput() {
+        var scenarioWithInterest = new ProjectionScenarioEntity(
+                tenant, "Interest", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"interest_yield\":0.05}");
+        var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithInterest);
+        assertThat(input.interestYield()).isEqualByComparingTo("0.05");
+    }
+
+    @Test
+    void optimize_paramsJsonWithoutInterestYield_propagatesNull() {
+        var input = captureOptimizationInput(buildRequest(req -> req), scenario);
+        assertThat(input.interestYield()).isNull();
+    }
+
     @Test
     void optimize_paramsJsonNull_birthYearDefaultsFromCurrentYear() {
         var scenarioSansParams = new ProjectionScenarioEntity(
@@ -936,6 +955,24 @@ class GuardrailProfileServiceTest {
         var scenarioB = new ProjectionScenarioEntity(
                 tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
                 "{\"birth_year\":1968,\"fee_rate\":0.01}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    // C1 (2026-07-12 audit): interest_yield is a realism-v2 MC input (splits the taxable pool's
+    // yield by allocation) that must stale-out an existing guardrail profile on edit, exactly like
+    // dividend_yield/fee_rate.
+    @Test
+    void computeScenarioHash_interestYieldChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"interest_yield\":0.04}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"interest_yield\":0.06}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());

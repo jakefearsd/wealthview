@@ -102,7 +102,7 @@ public class GuardrailProfileService {
 
             var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
                     birthYear, confidence, filingStatus, withdrawalOrder, params.dividendYield(),
-                    params.feeRate(), baseYear, params.includeDepressionYears());
+                    params.feeRate(), baseYear, params.includeDepressionYears(), params.interestYield());
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
             var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
@@ -351,7 +351,9 @@ public class GuardrailProfileService {
      *
      * <p>Covers every realism-v2 input that changes Monte Carlo results: retirement date, end age,
      * inflation, birth year, each account's type/balance/contribution/expected-return/allocation/cost
-     * basis, the scenario's dividend yield, fee rate, and depression-years window opt-in (audit
+     * basis, the scenario's dividend yield, fee rate, bond/cash-sleeve interest yield (audit C1 —
+     * changing it moves the taxable pool's ordinary-vs-LTCG tax split for any bond-allocated
+     * account), and depression-years window opt-in (audit
      * C10 — toggling it switches the capital-market matrix window, a different Monte Carlo result
      * for the identical seed unless the seed itself also changes), and linked income sources
      * (id + effective amount).
@@ -372,6 +374,7 @@ public class GuardrailProfileService {
         }
         sb.append('|').append(hashParams.dividendYield())
                 .append('|').append(hashParams.feeRate())
+                .append('|').append(hashParams.interestYield())
                 .append('|').append(Boolean.TRUE.equals(hashParams.includeDepressionYears()));
 
         scenario.getAccounts().stream()
@@ -439,7 +442,8 @@ public class GuardrailProfileService {
                                                                BigDecimal dividendYield,
                                                                BigDecimal feeRate,
                                                                int baseYear,
-                                                               Boolean includeDepressionYears) {
+                                                               Boolean includeDepressionYears,
+                                                               BigDecimal interestYield) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
@@ -482,7 +486,8 @@ public class GuardrailProfileService {
                 dividendYield,
                 feeRate,
                 baseYear,
-                Boolean.TRUE.equals(includeDepressionYears)
+                Boolean.TRUE.equals(includeDepressionYears),
+                interestYield
         );
     }
 

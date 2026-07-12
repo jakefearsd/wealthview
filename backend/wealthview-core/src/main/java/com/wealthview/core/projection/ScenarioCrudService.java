@@ -57,6 +57,7 @@ public class ScenarioCrudService {
     private static final int MAX_END_AGE = 120;
     private static final BigDecimal MAX_DIVIDEND_YIELD = new BigDecimal("0.10");
     private static final BigDecimal MAX_FEE_RATE = new BigDecimal("0.03");
+    private static final BigDecimal MAX_INTEREST_YIELD = new BigDecimal("0.10");
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -97,6 +98,7 @@ public class ScenarioCrudService {
         validateEndAge(request.endAge());
         validateDividendYield(request.dividendYield());
         validateFeeRate(request.feeRate());
+        validateInterestYield(request.interestYield());
         var tenant = tenantLookup.requireTenant(tenantId);
 
         String paramsJson = ScenarioParams.from(request).toJson(objectMapper);
@@ -142,6 +144,7 @@ public class ScenarioCrudService {
         validateEndAge(request.endAge());
         validateDividendYield(request.dividendYield());
         validateFeeRate(request.feeRate());
+        validateInterestYield(request.interestYield());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
 
@@ -339,6 +342,15 @@ public class ScenarioCrudService {
         }
         if (feeRate.signum() < 0 || feeRate.compareTo(MAX_FEE_RATE) > 0) {
             throw new IllegalArgumentException("fee_rate must be between 0 and 0.03");
+        }
+    }
+
+    private static void validateInterestYield(BigDecimal interestYield) {
+        if (interestYield == null) {
+            return;
+        }
+        if (interestYield.signum() < 0 || interestYield.compareTo(MAX_INTEREST_YIELD) > 0) {
+            throw new IllegalArgumentException("interest_yield must be between 0 and 0.10");
         }
     }
 
