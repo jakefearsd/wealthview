@@ -59,7 +59,12 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
                 new BigDecimal("0.06"), 1000, new BigDecimal("0.90"),
                 phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 null, null, false, null, null, 5, null, null,
-                null, null);
+                // T24/V077: gateOnAdaptiveRules is EXPLICITLY false (last arg) so this golden
+                // anchor keeps its historical no-adaptation-gate meaning permanently, independent
+                // of any past or future default flips. baseYear 2030 / includeDepressionYears
+                // false / interestYield null reproduce the old back-compat-constructor values
+                // byte-identically.
+                null, null, 2030, false, null, false);
     }
 
     @Test

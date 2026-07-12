@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -109,6 +110,88 @@ class GuardrailAdaptiveGateIntegrationTest {
         assertThat(a.yearlySpending().getFirst().recommended())
                 .isEqualByComparingTo(b.yearlySpending().getFirst().recommended());
         assertThat(a.gatedOn()).isEqualTo(b.gatedOn());
+    }
+
+    /**
+     * Permanent bisection-soundness sweep (T24 review request): {@code SustainabilitySearch}'s
+     * binary searches assume {@code isSustainable} is MONOTONE in the uniform discretionary level.
+     * Under the adaptive-rules gate the rule inputs are re-derived from each candidate schedule, so
+     * that monotonicity is not formally proven -- this sweep empirically pins it on the stressed
+     * fixture: a 1000-unit coarse grid over candidate discretionary levels, then a 100-unit
+     * refinement through the transition window, asserting EXACTLY ONE sustainable-to-unsustainable
+     * transition (a re-entrant "sustainable again above an unsustainable level" pocket would break
+     * bisection). Mirrors the empirically-pinned-not-proven stance documented on
+     * {@code TrialSimulator#adaptYearSpending} and
+     * {@code SustainabilitySearch#binarySearchDiscretionary}.
+     */
+    @Test
+    void isSustainable_adaptiveGateCandidateGrid_exactlyOneSustainabilityTransition() {
+        var contextBuilder = new OptimizationContextBuilder(null, null);
+        var ctx = contextBuilder.build(stressedInput(true), ProjectionTestFixtures.TEST_CMA_MATRIX);
+        int years = ctx.sim().years();
+        var searchContext = new SustainabilitySearch.SearchContext(
+                ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
+                ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
+                ctx.sim().retirementAge(), years, ctx.sim().trialCount(),
+                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
+                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
+                ctx.taxIncome().taxCtx(), null, null, ctx.taxIncome().dsBracketCeilingByYear(),
+                ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
+                ctx.sim().rmdStartAge(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
+                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                true, 0.10);
+        var search = new SustainabilitySearch(new TrialSimulator());
+        double[] floors = ctx.taxIncome().adjustedFloors();
+
+        // Coarse 1000-unit grid. The toggled-on recommendation sits near 22.4k discretionary
+        // (52407 recommended - 30000 floor), so 0..40000 safely brackets the transition.
+        double coarseStep = 1000;
+        int coarsePoints = 41;
+        double lastSustainable = -1;
+        double firstUnsustainable = -1;
+        int coarseTransitions = 0;
+        boolean prev = evaluateAt(search, searchContext, floors, years, 0);
+        assertThat(prev).as("grid start (discretionary=0) must be sustainable").isTrue();
+        for (int i = 1; i < coarsePoints; i++) {
+            double level = i * coarseStep;
+            boolean sustainable = evaluateAt(search, searchContext, floors, years, level);
+            if (sustainable != prev) {
+                coarseTransitions++;
+                assertThat(prev)
+                        .as("re-entrant transition at %s: unsustainable->sustainable breaks bisection", level)
+                        .isTrue();
+                lastSustainable = level - coarseStep;
+                firstUnsustainable = level;
+            }
+            prev = sustainable;
+        }
+        assertThat(coarseTransitions).as("exactly one coarse sustainable->unsustainable transition").isEqualTo(1);
+        assertThat(prev).as("grid end (discretionary=40000) must be unsustainable").isFalse();
+
+        // 100-unit refinement through the coarse transition window: same single-transition law.
+        int fineTransitions = 0;
+        boolean prevFine = true;   // window start == lastSustainable, known sustainable
+        for (double level = lastSustainable + 100; level <= firstUnsustainable + 1e-9; level += 100) {
+            boolean sustainable = evaluateAt(search, searchContext, floors, years, level);
+            if (sustainable != prevFine) {
+                fineTransitions++;
+                assertThat(prevFine)
+                        .as("re-entrant fine transition at %s", level)
+                        .isTrue();
+            }
+            prevFine = sustainable;
+        }
+        assertThat(fineTransitions).as("exactly one fine sustainable->unsustainable transition").isEqualTo(1);
+        assertThat(prevFine).as("refinement end must be unsustainable").isFalse();
+    }
+
+    private static boolean evaluateAt(SustainabilitySearch search,
+                                       SustainabilitySearch.SearchContext searchContext,
+                                       double[] floors, int years, double discretionaryLevel) {
+        double[] discretionary = new double[years];
+        Arrays.fill(discretionary, discretionaryLevel);
+        return search.isSustainable(searchContext, floors, discretionary);
     }
 
     @Test

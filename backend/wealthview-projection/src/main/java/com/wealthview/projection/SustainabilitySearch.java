@@ -224,6 +224,9 @@ final class SustainabilitySearch {
     /**
      * Evaluates the total sustainable first-year spending (essentialFloor + discretionary)
      * for a given conversion schedule. Used by the joint search to score candidate fractions.
+     * Bisection assumes {@link #isSustainable} is monotone in the discretionary level — see the
+     * T24 soundness caveat on {@link #binarySearchDiscretionary} (only relevant under the
+     * adaptive-rules gate, which this joint-search path never enables).
      */
     // UseVarargs: the trailing double[] is a per-year indexed floor array, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
@@ -247,6 +250,20 @@ final class SustainabilitySearch {
         return floors[0] + low;
     }
 
+    /**
+     * Bisects the maximum sustainable uniform discretionary level for one phase window.
+     *
+     * <p>Bisection soundness caveat (T24): this search (like {@link #evaluateSustainableSpending})
+     * assumes {@link #isSustainable} is MONOTONE in the discretionary level — sustainable at
+     * {@code x} implies sustainable at every {@code x' < x}. On the classic no-adaptation gate that
+     * holds trivially (lower spending only preserves balances). With the T24 adaptive-rules gate
+     * the rule's corridor and median-reference inputs are themselves re-derived from each candidate
+     * schedule, so cross-candidate monotonicity is NOT formally proven — like the
+     * with-rules-&gt;=-no-rules success monotonicity (see {@code TrialSimulator#adaptYearSpending}),
+     * it is empirically pinned: {@code GuardrailAdaptiveGateIntegrationTest}'s permanent grid sweep
+     * (1000-unit steps plus 100-unit refinement through the transition, adaptation-gated stressed
+     * fixture) asserts exactly one sustainable→unsustainable transition.
+     */
     private double binarySearchDiscretionary(SearchContext ctx, double[] floors,
                                              double[] currentDiscretionary,
                                              int phaseStart, int phaseEnd) {
