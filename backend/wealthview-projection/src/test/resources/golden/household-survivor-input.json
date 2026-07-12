@@ -1,0 +1,76 @@
+{
+  "scenarioName": "Household Survivor",
+  "retirementDate": "2030-01-01",
+  "endAge": 108,
+  "inflationRate": "0.025",
+  "paramsJson": "{\"birth_year\": 1958, \"filing_status\": \"married_filing_jointly\", \"withdrawal_order\": \"taxable_first\", \"fee_rate\": 0, \"dividend_yield\": 0, \"spouse_birth_year\": 1966, \"primary_death_age\": 85, \"spouse_death_age\": 90, \"survivor_spending_factor\": 0.75, \"community_property\": false}",
+  "referenceYear": 2025,
+  "accounts": [
+    {
+      "initialBalance": "800000",
+      "annualContribution": "0",
+      "expectedReturn": "0.05",
+      "accountType": "taxable",
+      "costBasis": "500000",
+      "owner": "joint"
+    },
+    {
+      "initialBalance": "900000",
+      "annualContribution": "0",
+      "expectedReturn": "0.06",
+      "accountType": "traditional",
+      "owner": "primary"
+    },
+    {
+      "initialBalance": "400000",
+      "annualContribution": "0",
+      "expectedReturn": "0.06",
+      "accountType": "traditional",
+      "owner": "spouse"
+    }
+  ],
+  "spendingProfile": {
+    "essentialExpenses": "50000",
+    "discretionaryExpenses": "20000",
+    "spendingTiers": "[{\"name\":\"Go-Go\",\"startAge\":72,\"endAge\":79,\"essentialExpenses\":70000,\"discretionaryExpenses\":30000},{\"name\":\"Slow-Go\",\"startAge\":80,\"endAge\":84,\"essentialExpenses\":60000,\"discretionaryExpenses\":20000},{\"name\":\"No-Go\",\"startAge\":85,\"endAge\":null,\"essentialExpenses\":60000,\"discretionaryExpenses\":16000}]"
+  },
+  "incomeSources": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000d1",
+      "name": "Primary Social Security",
+      "incomeType": "social_security",
+      "annualAmount": "38000",
+      "startAge": 62,
+      "endAge": null,
+      "inflationRate": "0.025",
+      "oneTime": false,
+      "taxTreatment": "taxable",
+      "owner": "primary"
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000d2",
+      "name": "Spouse Social Security",
+      "incomeType": "social_security",
+      "annualAmount": "22000",
+      "startAge": 62,
+      "endAge": null,
+      "inflationRate": "0.025",
+      "oneTime": false,
+      "taxTreatment": "taxable",
+      "owner": "spouse"
+    },
+    {
+      "id": "00000000-0000-0000-0000-0000000000d3",
+      "name": "Single-Life-Election Pension",
+      "incomeType": "pension",
+      "annualAmount": "30000",
+      "startAge": 62,
+      "endAge": null,
+      "inflationRate": "0.025",
+      "oneTime": false,
+      "taxTreatment": "taxable",
+      "owner": "primary",
+      "survivorPercent": "0.5"
+    }
+  ]
+}

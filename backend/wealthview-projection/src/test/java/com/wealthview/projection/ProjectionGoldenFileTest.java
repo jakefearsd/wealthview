@@ -15,12 +15,16 @@ import org.skyscreamer.jsonassert.JSONCompareMode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.household.HouseholdContext;
+import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.IrmaaSurchargeCalculator;
@@ -61,7 +65,13 @@ class ProjectionGoldenFileTest {
             // T18b: accumulation-gap-pension pins a 15-year accumulation phase into retirement
             // at age 58, a 0%-COLA pension (audit C7's base-anchored deflation clock), and
             // traditional_first draws before age 60 (the IRC 72(t) early-withdrawal penalty field).
-            "accumulation-gap-pension"
+            "accumulation-gap-pension",
+            // Household task 10: household-survivor pins the full first-death cliff year-by-year
+            // (spec 2026-07-12 §4): an age-gap couple (1958/1966), two per-owner RMD streams that
+            // merge at the 2043 spousal rollover, Social Security keep-larger (38k over 22k), a
+            // 50%-survivor pension, a joint-taxable basis step-up, survivor spending x0.75 on a
+            // tiered profile, the MFJ-to-single filing flip, and second-death truncation at 2056.
+            "household-survivor"
     })
     void run_matchesGoldenFile(String scenario) throws Exception {
         var inputJson = readResource("golden/" + scenario + "-input.json");
@@ -125,6 +135,9 @@ class ProjectionGoldenFileTest {
         if (node.has("incomeSources") && node.get("incomeSources").isArray()) {
             var sourceList = new java.util.ArrayList<ProjectionIncomeSourceInput>();
             for (var item : node.get("incomeSources")) {
+                // Household task 10: optional "owner"/"survivorPercent" default to the same
+                // "primary"/1.0 the production back-compat constructor uses, so the five
+                // pre-household input files parse to byte-identical inputs.
                 sourceList.add(new ProjectionIncomeSourceInput(
                         UUID.fromString(item.get("id").asText()),
                         item.get("name").asText(),
@@ -135,26 +148,69 @@ class ProjectionGoldenFileTest {
                         new BigDecimal(item.get("inflationRate").asText()),
                         item.get("oneTime").asBoolean(),
                         item.get("taxTreatment").asText(),
-                        null, null, null, null, null, null
+                        null, null, null, null, null, null,
+                        item.has("owner") ? item.get("owner").asText() : "primary",
+                        item.has("survivorPercent")
+                                ? new BigDecimal(item.get("survivorPercent").asText()) : BigDecimal.ONE
                 ));
             }
             incomeSources = sourceList;
         }
 
+        var household = resolveHousehold(paramsJson, endAge);
         return new ProjectionInput(UUID.nameUUIDFromBytes(scenarioName.getBytes()), scenarioName,
                 retirementDate, endAge, inflationRate, paramsJson, accounts, spendingProfile,
-                referenceYear, incomeSources);
+                referenceYear, incomeSources, null, List.of(), household);
+    }
+
+    /**
+     * Household task 10: mirrors {@code ProjectionInputBuilder#resolveHousehold} — a scenario whose
+     * params carry no {@code spouse_birth_year} gets a {@code null} household (the engines treat
+     * that identically to a degenerate single-person context, keeping the five pre-household golden
+     * inputs byte-identical); a household scenario resolves death ages from explicit params or the
+     * SSA planning default, with the horizon end anchored to the primary's birth year + end age.
+     */
+    private HouseholdContext resolveHousehold(String paramsJson, int endAge) {
+        var params = ScenarioParams.parseOrEmpty(MAPPER, paramsJson);
+        if (params.spouseBirthYear() == null) {
+            return null;
+        }
+        int primaryBirthYear = params.birthYear();
+        int primaryDeathAge = params.primaryDeathAge() != null
+                ? params.primaryDeathAge() : LifeExpectancy.defaultDeathAge(primaryBirthYear);
+        int spouseDeathAge = params.spouseDeathAge() != null
+                ? params.spouseDeathAge() : LifeExpectancy.defaultDeathAge(params.spouseBirthYear());
+        return HouseholdContext.of(primaryBirthYear, primaryDeathAge,
+                params.spouseBirthYear(), spouseDeathAge, primaryBirthYear + endAge);
     }
 
     private List<ProjectionAccountInput> parseAccounts(JsonNode accountsNode) {
         var accounts = new java.util.ArrayList<ProjectionAccountInput>();
         for (var acctNode : accountsNode) {
-            accounts.add(new HypotheticalAccountInput(
-                    new BigDecimal(acctNode.get("initialBalance").asText()),
-                    new BigDecimal(acctNode.get("annualContribution").asText()),
-                    new BigDecimal(acctNode.get("expectedReturn").asText()),
-                    acctNode.get("accountType").asText()
-            ));
+            // Household task 10: optional "costBasis"/"owner" thread the taxable basis (step-up
+            // fixture) and the account owner (per-owner pools). Absent, the legacy 4-arg
+            // constructor path is used verbatim (costBasis = initialBalance, owner = "primary"),
+            // keeping the five pre-household input files byte-identical.
+            if (acctNode.has("costBasis") || acctNode.has("owner")) {
+                var initialBalance = new BigDecimal(acctNode.get("initialBalance").asText());
+                accounts.add(new HypotheticalAccountInput(
+                        initialBalance,
+                        new BigDecimal(acctNode.get("annualContribution").asText()),
+                        AssetAllocation.ALL_US,
+                        java.util.Optional.of(new BigDecimal(acctNode.get("expectedReturn").asText())),
+                        acctNode.has("costBasis")
+                                ? new BigDecimal(acctNode.get("costBasis").asText()) : initialBalance,
+                        acctNode.get("accountType").asText(),
+                        acctNode.has("owner") ? acctNode.get("owner").asText() : "primary"
+                ));
+            } else {
+                accounts.add(new HypotheticalAccountInput(
+                        new BigDecimal(acctNode.get("initialBalance").asText()),
+                        new BigDecimal(acctNode.get("annualContribution").asText()),
+                        new BigDecimal(acctNode.get("expectedReturn").asText()),
+                        acctNode.get("accountType").asText()
+                ));
+            }
         }
         return accounts;
     }
