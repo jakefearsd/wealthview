@@ -462,6 +462,40 @@ describe('SpendingOptimizerPage', () => {
         const [, request] = mockOptimizeSpending.mock.calls[0];
         expect(request.gate_on_adaptive_rules).toBe(false);
     });
+
+    it('hydrates the gate checkbox unchecked from a no_adaptation profile and re-optimize sends false', async () => {
+        const user = userEvent.setup();
+        mockGetProfile.mockResolvedValue({ ...mockProfile, gated_on: 'no_adaptation' });
+        mockOptimizeSpending.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /adjust & re-run/i })).toBeInTheDocument();
+        });
+        await user.click(screen.getByRole('button', { name: /adjust & re-run/i }));
+
+        expect(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i })).not.toBeChecked();
+
+        await user.click(screen.getByRole('button', { name: /run optimization/i }));
+        await waitFor(() => {
+            expect(mockOptimizeSpending).toHaveBeenCalled();
+        });
+        const [, request] = mockOptimizeSpending.mock.calls[0];
+        expect(request.gate_on_adaptive_rules).toBe(false);
+    });
+
+    it('hydrates the gate checkbox checked from a with_rules profile', async () => {
+        const user = userEvent.setup();
+        mockGetProfile.mockResolvedValue({ ...mockProfile, gated_on: 'with_rules' });
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /adjust & re-run/i })).toBeInTheDocument();
+        });
+        await user.click(screen.getByRole('button', { name: /adjust & re-run/i }));
+
+        expect(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i })).toBeChecked();
+    });
 });
 
 describe('computePlanDiagnostics', () => {

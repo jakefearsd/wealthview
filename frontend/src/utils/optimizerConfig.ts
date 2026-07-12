@@ -36,10 +36,10 @@ export interface OptimizerConfig {
     /**
      * T24: per-profile toggle for the sustainability search gate. Always sent explicitly to the
      * API (never omitted) so the UI's checkbox state is the source of truth, not the server's
-     * omitted-defaults-to-true fallback. The response doesn't echo this raw toggle back (only the
-     * derived {@code gated_on}), so {@link fromProfile} cannot restore it from a persisted
-     * profile — it keeps the form default, matching the "recommended, always-on unless the user
-     * explicitly opts out" UX.
+     * omitted-defaults-to-true fallback. The response doesn't echo this raw toggle back, but the
+     * derived {@code gated_on} carries the equivalent (which gate actually certified the run), so
+     * {@link fromProfile} hydrates from it — a deliberately-conservative profile stays opted out
+     * on re-run instead of silently resetting to the checked default.
      */
     gateOnAdaptiveRules: boolean;
 }
@@ -99,6 +99,7 @@ export function fromProfile(profile: GuardrailProfileResponse): OptimizerConfig 
         riskTolerance: profile.risk_tolerance
             ? (profile.risk_tolerance as RiskTolerance)
             : defaults.riskTolerance,
+        gateOnAdaptiveRules: profile.gated_on === 'with_rules',
         phases: profile.phases.length > 0 ? profile.phases : defaults.phases,
     };
 

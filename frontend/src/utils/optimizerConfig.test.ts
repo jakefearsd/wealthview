@@ -149,6 +149,18 @@ describe('fromProfile', () => {
         expect(config.optimizeConversions).toBe(false);
         expect(config.conversionBracketRate).toBe(0.22);
     });
+
+    it('hydrates the adaptive gate unchecked from a no_adaptation profile', () => {
+        const config = fromProfile(makeProfile({ gated_on: 'no_adaptation' }));
+
+        expect(config.gateOnAdaptiveRules).toBe(false);
+    });
+
+    it('hydrates the adaptive gate checked from a with_rules profile', () => {
+        const config = fromProfile(makeProfile({ gated_on: 'with_rules' }));
+
+        expect(config.gateOnAdaptiveRules).toBe(true);
+    });
 });
 
 describe('toRequest', () => {

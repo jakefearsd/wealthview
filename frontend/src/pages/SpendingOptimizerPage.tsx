@@ -187,9 +187,11 @@ export default function SpendingOptimizerPage() {
     const [rmdBracketHeadroom, setRmdBracketHeadroom] = useState(10);
 
     // T24: gates the sustainability search on the with-rules success metric instead of the
-    // no-adaptation one. Defaults to checked (recommended) — the response never echoes this raw
-    // toggle back (only the derived `gated_on`), so it is NOT restored when loading an existing
-    // profile; it always starts from this default, matching "recommended unless opted out".
+    // no-adaptation one. Defaults to checked (recommended) when no profile exists yet. When an
+    // existing profile loads, this is hydrated from the derived `gated_on` (the response doesn't
+    // echo the raw toggle, but `gated_on` names the gate that actually certified the persisted
+    // numbers), so a deliberately-conservative profile isn't silently flipped to with-rules
+    // gating just because the checkbox reset to its default before a re-run.
     const [gateOnAdaptiveRules, setGateOnAdaptiveRules] = useState(true);
 
     // Advanced parameters (collapsed by default)
@@ -231,6 +233,7 @@ export default function SpendingOptimizerPage() {
                 if (profile.risk_tolerance) {
                     setRiskTolerance(profile.risk_tolerance as RiskTolerance);
                 }
+                setGateOnAdaptiveRules(profile.gated_on === 'with_rules');
                 if (profile.phases.length > 0) {
                     setPhases(profile.phases);
                 }
