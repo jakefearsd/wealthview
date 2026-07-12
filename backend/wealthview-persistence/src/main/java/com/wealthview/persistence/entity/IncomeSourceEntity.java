@@ -55,6 +55,12 @@ public class IncomeSourceEntity extends Auditable {
     @JoinColumn(name = "property_id")
     private PropertyEntity property;
 
+    @Column(name = "owner", nullable = false)
+    private String owner = "primary";
+
+    @Column(name = "survivor_percent", nullable = false, precision = 5, scale = 4)
+    private BigDecimal survivorPercent = BigDecimal.ONE;
+
     protected IncomeSourceEntity() {
     }
 
@@ -154,6 +160,22 @@ public class IncomeSourceEntity extends Auditable {
 
     public void setProperty(PropertyEntity property) {
         this.property = property;
+    }
+
+    public String getOwner() {
+        return owner;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
+    }
+
+    public BigDecimal getSurvivorPercent() {
+        return survivorPercent;
+    }
+
+    public void setSurvivorPercent(BigDecimal survivorPercent) {
+        this.survivorPercent = survivorPercent;
     }
 
 }

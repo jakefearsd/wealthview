@@ -51,6 +51,9 @@ public class ProjectionAccountEntity extends Auditable {
     @Column(name = "account_type", nullable = false)
     private String accountType = "taxable";
 
+    @Column(name = "owner", nullable = false)
+    private String owner = "primary";
+
     protected ProjectionAccountEntity() {
     }
 
@@ -133,6 +136,14 @@ public class ProjectionAccountEntity extends Auditable {
 
     public void setAccountType(String accountType) {
         this.accountType = accountType;
+    }
+
+    public String getOwner() {
+        return owner;
+    }
+
+    public void setOwner(String owner) {
+        this.owner = owner;
     }
 
 }
