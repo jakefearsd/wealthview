@@ -120,11 +120,11 @@ final class OptimizationContextBuilder {
                 portfolioPaths, incomeArrays.incomeByYear(), essentialFloor,
                 confidenceLevel, years, trialCount);
 
-        double[] marginalRates = MarginalRateCalculator.compute(
-                taxCalculator, rentalAwareTaxableIncome, retirementYear, years, filingStatus, input.birthYear());
+        OrdinaryTaxTable[] ordinaryTaxTables = OrdinaryTaxTable.computeAll(
+                taxCalculator, retirementYear, years, filingStatus, input.birthYear());
         TaxContext taxCtx = (initTraditional > 0 || initRoth > 0)
                 ? new TaxContext(initTaxable, initTraditional, initRoth,
-                        withdrawalOrder, marginalRates)
+                        withdrawalOrder, ordinaryTaxTables, rentalAwareTaxableIncome)
                 : null;
 
         double[] dsBracketCeilingByYear = computeDsBracketCeilings(
@@ -140,8 +140,8 @@ final class OptimizationContextBuilder {
         //  - dividendYield comes from the scenario's params_json (same field the deterministic engine
         //    reads via ScenarioParamsParser.dividendYield), falling back to the same default when unset.
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
-        double[] ltcgRateByYear = LtcgRateCalculator.compute(
-                capitalGainsTaxCalculator, taxCalculator, rentalAwareTaxableIncome, retirementYear, years,
+        LtcgTaxTable[] ltcgTaxTables = LtcgTaxTable.computeAll(
+                capitalGainsTaxCalculator, taxCalculator, retirementYear, years,
                 filingStatus, inflationRate, input.birthYear());
         double dividendYield = resolveDividendYield(input);
         double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
@@ -157,8 +157,8 @@ final class OptimizationContextBuilder {
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
-                        incomeData, rentalAwareTaxableIncome, adjustedFloors, marginalRates,
-                        taxCtx, dsBracketCeilingByYear, ltcgRateByYear));
+                        incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
+                        taxCtx, dsBracketCeilingByYear, ltcgTaxTables));
     }
 
     /**

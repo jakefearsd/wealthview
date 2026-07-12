@@ -82,13 +82,14 @@ final class GuardrailResponseBuilder {
             // sequences generated for the run.
             var simConfig = new TrialSimulator.SimulationConfig(
                     initTaxable, initTraditional, initRoth, order,
-                    simPools ? ctx.taxIncome().marginalRates() : null,
+                    simPools ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
+                    simPools ? ctx.taxIncome().rentalAwareTaxableIncome() : null,
                     conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
                     ctx.taxIncome().dsBracketCeilingByYear(),
                     ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
                     taxableReturns[t], traditionalReturns[t], rothReturns[t],
                     ctx.sim().rmdStartAge(),
-                    ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                    ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                     ctx.sim().dividendYield());
 
             var result = trialSimulator.simulateTrial(

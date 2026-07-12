@@ -15,6 +15,7 @@ import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.tax.BracketPoint;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -1666,7 +1667,26 @@ class MonteCarloSpendingOptimizerTest {
         when(taxCalc.computeMaxIncomeForBracket(
                 any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
+        stubFlatOrdinaryBrackets(taxCalc, "0.20");
         return new MonteCarloSpendingOptimizer(taxCalc, ProjectionTestFixtures.TEST_CMA_MATRIX);
+    }
+
+    /**
+     * Audit C5: {@link OrdinaryTaxTable} (replacing the old $50k-chord {@code
+     * MarginalRateCalculator}) reads bracket data directly via
+     * {@link FederalTaxCalculator#loadOrdinaryBrackets}/{@link FederalTaxCalculator#loadStandardDeduction},
+     * not {@code computeTax} -- a mocked calculator that stubs only {@code computeTax} (the pattern
+     * every fixture in this file used pre-C5) leaves those two unstubbed, and Mockito's default
+     * answer for an unstubbed {@code BigDecimal}-returning method is {@code null}, NPEing inside
+     * {@code OrdinaryTaxTable.build}. This reproduces a single flat bracket (0% deduction, one
+     * uncapped bracket at {@code rate}) -- the exact shape {@code computeTax(x) = x * rate} already
+     * implies -- so the new exact table and the old flat-mock formula agree exactly.
+     */
+    static void stubFlatOrdinaryBrackets(FederalTaxCalculator taxCalc, String rate) {
+        var brackets = List.of(new BracketPoint(BigDecimal.ZERO, null, new BigDecimal(rate)));
+        when(taxCalc.loadOrdinaryBrackets(anyInt(), any(FilingStatus.class))).thenReturn(brackets);
+        when(taxCalc.loadStandardDeduction(anyInt(), any(FilingStatus.class), anyInt()))
+                .thenReturn(BigDecimal.ZERO);
     }
 
     @Test
@@ -1773,6 +1793,7 @@ class MonteCarloSpendingOptimizerTest {
                             ? BigDecimal.ZERO
                             : income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
                 });
+        stubFlatOrdinaryBrackets(taxCalc, "0.20");
         var matrix = ProjectionTestFixtures.TEST_CMA_MATRIX;
         var ctxTaxed = new OptimizationContextBuilder(taxCalc).build(input, matrix);
         var ctxNoTax = new OptimizationContextBuilder(null).build(input, matrix);
@@ -1972,6 +1993,17 @@ class MonteCarloSpendingOptimizerTest {
         when(taxCalc.computeMaxIncomeForBracket(
                 any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenReturn(new BigDecimal("100000"));
+        // Audit C5: OrdinaryTaxTable reads raw brackets, not computeTax -- mirror the SAME
+        // 10%/22%/32% progressive structure the computeTax mock above encodes, with 0 deduction
+        // (the mock's formula has none), so the new exact table agrees with the old flat-mock
+        // formula exactly.
+        var progressiveBracketPoints = List.of(
+                new BracketPoint(BigDecimal.ZERO, new BigDecimal("50000"), new BigDecimal("0.10")),
+                new BracketPoint(new BigDecimal("50000"), new BigDecimal("100000"), new BigDecimal("0.22")),
+                new BracketPoint(new BigDecimal("100000"), null, new BigDecimal("0.32")));
+        when(taxCalc.loadOrdinaryBrackets(anyInt(), any(FilingStatus.class))).thenReturn(progressiveBracketPoints);
+        when(taxCalc.loadStandardDeduction(anyInt(), any(FilingStatus.class), anyInt()))
+                .thenReturn(BigDecimal.ZERO);
         return new MonteCarloSpendingOptimizer(taxCalc, ProjectionTestFixtures.TEST_CMA_MATRIX);
     }
 

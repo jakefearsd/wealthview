@@ -20,7 +20,7 @@ class TrialSimulatorReturnTest {
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns) {
         return new TrialSimulator.SimulationConfig(
                 initTaxable, initTraditional, initRoth,
-                "taxable_first", null, null, null, 62, null,
+                "taxable_first", null, null, null, null, 62, null,
                 cashReserveYears, 0.0, false,
                 taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
                 initTaxable, null, 0.0);
@@ -74,7 +74,7 @@ class TrialSimulatorReturnTest {
         // Tiny portfolio, no income, a floor larger than the portfolio can ever supply → shortfall.
         double[] flatNoReturn = {0.0, 0.0};
         var config = new TrialSimulator.SimulationConfig(
-                100.0, 0.0, 0.0, "taxable_first", null,
+                100.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 60, null, 0, 0.0, false,
                 flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
                 100.0, null, 0.0);
@@ -93,7 +93,7 @@ class TrialSimulatorReturnTest {
         var sim = new TrialSimulator();
         double[] flatNoReturn = {0.0, 0.0};
         var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null,
+                1000.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 60, null, 0, 0.0, false,
                 flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
                 1000.0, null, 0.0);
@@ -115,10 +115,10 @@ class TrialSimulatorReturnTest {
         // (vs 500 with no LTCG tax: the 30 is exactly the extra cash the capital-gains tax removes).
         double[] flatNoReturn = {0.0};
         var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null,
+                1000.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 62, null, 0, 0.0, false,
                 flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
-                600.0, new double[]{0.15}, 0.0);
+                600.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.0);
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{500}, new double[]{0}, 1, config);
@@ -132,10 +132,10 @@ class TrialSimulatorReturnTest {
         // (dividend booked as residual), but the 2% dividend (20) is qualified-dividend income taxed
         // at the 0.15 LTCG rate -> 3 leaves the portfolio. Final = 1100 - 3 = 1097 (dividend drag).
         var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null,
+                1000.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 62, null, 0, 0.0, false,
                 new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                1000.0, new double[]{0.15}, 0.02);
+                1000.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.02);
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
@@ -154,7 +154,8 @@ class TrialSimulatorReturnTest {
         // (the tax on the forced distribution is the only amount that leaves the portfolio).
         double[] flatNoReturn = {0.0};
         var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "taxable_first", new double[]{0.20},
+                0.0, 100_000.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 75, null, 0, 0.0, false,
                 flatNoReturn, flatNoReturn, flatNoReturn, 75,
                 0.0, null, 0.0);
@@ -185,7 +186,8 @@ class TrialSimulatorReturnTest {
         // marginalRate=0 isolates the A1 pool-scaling fix from audit C2's gross-up (pinned
         // separately below in applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM).
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05, 0.0);
+                traditionalDrawnOut, 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05,
+                OrdinaryTaxTable.flat(0.0), 0.0);
 
         // Spending draw: taxable -= 95*(2/3)=63.3333 -> 31.6667; traditional -= 285*(2/3)=190 ->
         // 95; roth -= 220*(2/3)=146.6667 -> 138.3333. Tax (57) then cascades taxable-first:
@@ -215,7 +217,8 @@ class TrialSimulatorReturnTest {
         // marginalRate=0.20 (nonzero, to prove it's IRRELEVANT here): taxable ($360) fully covers
         // the $30 tax, so traditional is never touched and there is nothing to gross up (audit C2).
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05, 0.20);
+                traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
+                OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(330.0, within(1e-6));   // 360 - 30 tax only
         assertThat(pools[1]).isEqualTo(180.0, within(1e-6));   // untouched by the spending draw
@@ -239,7 +242,8 @@ class TrialSimulatorReturnTest {
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0); // no spending draw this call -- isolates the tax
 
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, 0.20);
+                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
+                OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(0.0, within(1e-9));
         assertThat(pools[1]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // = 428.75
@@ -260,12 +264,51 @@ class TrialSimulatorReturnTest {
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
         double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, 0.20);
+                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
+                OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(500.0 - 57.0, within(1e-9)); // = 443.0, taxable-funded, no gross-up
         assertThat(pools[1]).isEqualTo(500.0, within(1e-9));        // traditional untouched
         assertThat(pools[2]).isEqualTo(0.0, within(1e-9));
         assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
+    }
+
+    // === Audit C5: gross-up "m" is the EXACT rate at the post-draw point (base + T), not a flat
+    // chord -- distinct from every fixture above, which deliberately used a flat single-bracket
+    // table (where the post-draw point can never matter, by linearity). This one uses a REAL
+    // two-bracket table so the post-draw point crosses a boundary the base point alone does not. ===
+
+    @Test
+    void applyTrialWithdrawals_grossUpRateReadAtPostDrawPoint_crossesBracketBaseAloneDoesNot() {
+        // Table: [0,100) @10%, [100,inf) @30%, no deduction. Taxable is $0, so the whole $57 tax
+        // bill drains from traditional: T=57. base=90 sits in the 10% bracket, but base+T=147
+        // crosses into the 30% bracket -- the gross-up rate MUST be read at base+T (30%), not at
+        // base's own bracket (10%): m=0.30, grossUp = 57*0.30/0.70 = 24.428571428571427, total
+        // traditional debit = 57 + 24.428571428571427 = 81.428571428571427.
+        var table = new OrdinaryTaxTable(0,
+                new double[]{0, 100}, new double[]{0.10, 0.30}, new double[]{0, 10});
+        double base = 90.0;
+        double[] pools = {0.0, 500.0, 0.0};
+        TaxableLots lots = new TaxableLots();
+        double[] realizedGainOut = {0.0};
+        double[] traditionalDrawnOut = {0.0};
+        var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
+
+        TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
+                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
+
+        double expectedGrossUp = 57.0 * 0.30 / 0.70;
+        assertThat(pools[1]).isEqualTo(500.0 - 57.0 - expectedGrossUp, within(1e-9)); // 418.5714286
+
+        // Direction proof: a (wrong) naive gross-up using the rate AT base's own bracket (10%,
+        // sourced from table.rateAt(base) rather than table.rateAt(base + T)) would leave
+        // MEANINGFULLY more in the pool -- confirming the post-draw-point read is not a no-op vs.
+        // the "obvious" alternative of reusing the pre-draw bracket.
+        double naiveGrossUp = 57.0 * 0.10 / 0.90;
+        double naiveResultingPool = 500.0 - 57.0 - naiveGrossUp;
+        assertThat(pools[1]).isLessThan(naiveResultingPool - 1.0);
+        assertThat(table.rateAt(base)).isEqualTo(0.10, within(1e-9));      // pre-draw bracket
+        assertThat(table.rateAt(base + 57.0)).isEqualTo(0.30, within(1e-9)); // actual post-draw point
     }
 
     @Test
@@ -280,7 +323,8 @@ class TrialSimulatorReturnTest {
         // $25.3333 traditional slice of the tax by 25.3333*0.20/0.80 = 6.3333 more, so finalBalance
         // = 208 - 6.3333 = 201.6667, cash fully drained.
         var config = new TrialSimulator.SimulationConfig(
-                300.0, 300.0, 300.0, "taxable_first", new double[]{0.20},
+                300.0, 300.0, 300.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 62, null, 1, 0.0, false,
                 new double[]{-0.05}, new double[]{-0.05}, new double[]{-0.05}, Integer.MAX_VALUE,
                 300.0, null, 0.0);
@@ -300,7 +344,8 @@ class TrialSimulatorReturnTest {
         // the no-tax final-response path. taxable 500 -> (seed 100) 400 -> (*0.9) 360;
         // traditional 200 -> 180; roth 100 -> 90; cash 100 -> 0 (drained by the draw).
         var config = new TrialSimulator.SimulationConfig(
-                500.0, 200.0, 100.0, "taxable_first", new double[]{0.20},
+                500.0, 200.0, 100.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 62, null, 1, 0.0, false,
                 new double[]{-0.10}, new double[]{-0.10}, new double[]{-0.10}, Integer.MAX_VALUE,
                 500.0, null, 0.0);
@@ -333,7 +378,8 @@ class TrialSimulatorReturnTest {
         // deductTaxFromPools drain, so it stays out of C2's scope).
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "traditional_first", new double[]{0.20},
+                0.0, 100_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 75, null, 1, 0.0, false,
                 flatZero, new double[]{-0.05}, flatZero, 75,
                 0.0, null, 0.0);
@@ -360,7 +406,7 @@ class TrialSimulatorReturnTest {
         // $80,000.
         double[] flatZero = {0.0, 0.0};
         var config = new TrialSimulator.SimulationConfig(
-                100_000.0, 0.0, 0.0, "taxable_first", null,
+                100_000.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 62, null, 0, 0.0, false,
                 flatZero, flatZero, flatZero, Integer.MAX_VALUE,
                 100_000.0, null, 0.0);
@@ -384,7 +430,7 @@ class TrialSimulatorReturnTest {
         // formula already produced for this case.
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
-                100_000.0, 0.0, 0.0, "taxable_first", null,
+                100_000.0, 0.0, 0.0, "taxable_first", null, null,
                 null, null, 62, null, 0, 0.0, false,
                 flatZero, flatZero, flatZero, Integer.MAX_VALUE,
                 100_000.0, null, 0.0);
@@ -415,7 +461,8 @@ class TrialSimulatorReturnTest {
         // tax-free.
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "traditional_first", new double[]{0.20},
+                0.0, 100_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 62, null, 0, 0.0, false,
                 flatZero, flatZero, flatZero, Integer.MAX_VALUE,
                 0.0, null, 0.0);

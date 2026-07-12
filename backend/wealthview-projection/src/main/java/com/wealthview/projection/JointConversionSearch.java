@@ -106,11 +106,11 @@ final class JointConversionSearch {
                 searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().essentialFloor(),
                 ctx.sim().confidenceLevel(), ctx.sim().years(), searchTrials);
 
-        double[] searchMarginalRates = MarginalRateCalculator.compute(taxCalculator,
-                ctx.taxIncome().rentalAwareTaxableIncome(), ctx.sim().retirementYear(), ctx.sim().years(),
-                ctx.taxIncome().filingStatus(), input.birthYear());
+        OrdinaryTaxTable[] searchOrdinaryTaxTables = OrdinaryTaxTable.computeAll(taxCalculator,
+                ctx.sim().retirementYear(), ctx.sim().years(), ctx.taxIncome().filingStatus(), input.birthYear());
         TaxContext searchTaxCtx = new TaxContext(ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
-                ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchMarginalRates);
+                ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchOrdinaryTaxTables,
+                ctx.taxIncome().rentalAwareTaxableIncome());
 
         int gridSize = JOINT_GRID_SIZE;
         double bestFraction = 0.0;
@@ -192,7 +192,7 @@ final class JointConversionSearch {
                 ctx.taxIncome().dsBracketCeilingByYear(),
                 searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
                 ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }

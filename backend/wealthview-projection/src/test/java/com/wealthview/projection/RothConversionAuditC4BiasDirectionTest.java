@@ -86,6 +86,14 @@ class RothConversionAuditC4BiasDirectionTest {
         when(calc.computeMaxIncomeForBracket(
                 any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
                 .thenAnswer(bracketAnswer);
+        // Audit C5: OrdinaryTaxTable reads raw brackets/deduction directly, not computeTax --
+        // mirror the SAME flat-20% formula the computeTax mock above encodes (0 deduction), so the
+        // new exact table agrees with the old flat-mock formula exactly.
+        when(calc.loadOrdinaryBrackets(anyInt(), any(FilingStatus.class)))
+                .thenReturn(List.of(new com.wealthview.core.projection.tax.BracketPoint(
+                        BigDecimal.ZERO, null, new BigDecimal("0.20"))));
+        when(calc.loadStandardDeduction(anyInt(), any(FilingStatus.class), anyInt()))
+                .thenReturn(BigDecimal.ZERO);
         return calc;
     }
 

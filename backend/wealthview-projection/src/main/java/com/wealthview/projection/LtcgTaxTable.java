@@ -49,6 +49,11 @@ final class LtcgTaxTable {
     private final double[] rates;
     private final double niitThreshold;
 
+    // ArrayIsStoredDirectly: this constructor is only ever called by build()/flat()/ZERO with
+    // freshly-allocated arrays never mutated afterward (and never handed to a caller) -- defensive
+    // copies would add per-year allocation on a path this class exists specifically to keep
+    // allocation-free.
+    @SuppressWarnings("PMD.ArrayIsStoredDirectly")
     LtcgTaxTable(double deduction, double[] floors, double[] ceilings, double[] rates, double niitThreshold) {
         this.deduction = deduction;
         this.floors = floors;
@@ -96,6 +101,14 @@ final class LtcgTaxTable {
             gainTaxedSoFar += taxedInBracket;
         }
         return totalTax;
+    }
+
+    /** A single-bracket, no-NIIT table taxing every dollar of gain at a flat {@code rate},
+     * regardless of stacking floor. Lets tests exercising a synthetic constant LTCG rate (rather
+     * than the real bracket structure) avoid hand-building bracket arrays. */
+    static LtcgTaxTable flat(double rate) {
+        return new LtcgTaxTable(0, new double[]{0}, new double[]{Double.POSITIVE_INFINITY}, new double[]{rate},
+                Double.POSITIVE_INFINITY);
     }
 
     /** Builds the table for one (taxYear, status) pair. {@code federalTaxCalculator} may be

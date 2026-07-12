@@ -191,7 +191,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear(),
                 ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
                 ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgRateByYear(),
+                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield());
     }
 

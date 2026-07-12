@@ -90,11 +90,12 @@ class OptimizationContextBuilderTest {
     }
 
     // Audit D (2026-07-11 audit, Tier-3): the age-65+ additional standard deduction must reach the
-    // MC's marginal-rate precompute, not just the deterministic engine -- OptimizationContextBuilder
-    // threads GuardrailOptimizationInput#birthYear() into MarginalRateCalculator/LtcgRateCalculator
-    // (both already unit-tested directly; this proves the wiring end-to-end through build()).
+    // MC's exact-tax precompute (audit C5, OrdinaryTaxTable), not just the deterministic engine --
+    // OptimizationContextBuilder threads GuardrailOptimizationInput#birthYear() into
+    // OrdinaryTaxTable#computeAll/LtcgTaxTable#computeAll (both already unit-tested directly; this
+    // proves the wiring end-to-end through build()).
     @Test
-    void build_birthYearMakesRetireeAge65Plus_marginalRateReflectsBoostedDeduction() {
+    void build_birthYearMakesRetireeAge65Plus_ordinaryTaxTableReflectsBoostedDeduction() {
         var builderWithTax = new OptimizationContextBuilder(federalTaxCalcWithAge65Addition());
 
         var under65 = inputWithBirthYear(1968); // age 62 at retirement (2030)
@@ -104,13 +105,15 @@ class OptimizationContextBuilderTest {
         var setupOver65 = builderWithTax.build(over65, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         // No income sources -> base taxable income is 0 in year 0 for both; only the deduction used
-        // to tax the $50,000 marginal-rate probe differs.
-        // Under 65: deduction 15,750 -> taxable 34,250 -> 1,192.50 + 22,325*0.12 = 3,871.50 -> 0.07743
-        // Age 71: deduction 17,750 -> taxable 32,250 -> 1,192.50 + 20,325*0.12 = 3,631.50 -> 0.07263
-        assertThat(setupUnder65.taxIncome().marginalRates()[0]).isEqualTo(0.07743, within(1e-9));
-        assertThat(setupOver65.taxIncome().marginalRates()[0]).isEqualTo(0.07263, within(1e-9));
-        assertThat(setupOver65.taxIncome().marginalRates()[0])
-                .isLessThan(setupUnder65.taxIncome().marginalRates()[0]);
+        // to tax a $50,000 draw differs. incrementalTax(0, 50_000) = taxAt(50_000) - taxAt(0) =
+        // taxAt(50_000) here, exactly reproducing computeTax(50_000, ...) since taxAt(0) = 0.
+        // Under 65: deduction 15,750 -> taxable 34,250 -> 1,192.50 + 22,325*0.12 = 3,871.50
+        // Age 71: deduction 17,750 -> taxable 32,250 -> 1,192.50 + 20,325*0.12 = 3,631.50
+        double taxUnder65 = setupUnder65.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000);
+        double taxOver65 = setupOver65.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000);
+        assertThat(taxUnder65).isEqualTo(3871.50, within(1e-6));
+        assertThat(taxOver65).isEqualTo(3631.50, within(1e-6));
+        assertThat(taxOver65).isLessThan(taxUnder65);
     }
 
     /** Single-filer 2025 fixtures with a deduction carrying a nonzero age-65 addition. */

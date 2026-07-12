@@ -42,6 +42,12 @@ final class OrdinaryTaxTable {
     private final double[] rates;
     private final double[] cumTax;
 
+    // ArrayIsStoredDirectly: this constructor is only ever called by build()/flat()/ZERO with
+    // freshly-allocated arrays never mutated afterward (and never handed to a caller) -- defensive
+    // copies would add per-year allocation on a path this class exists specifically to keep
+    // allocation-free.
+    // UseVarargs: cumTax is a bracket-indexed array, not a variable argument list.
+    @SuppressWarnings({"PMD.ArrayIsStoredDirectly", "PMD.UseVarargs"})
     OrdinaryTaxTable(double deduction, double[] floors, double[] rates, double[] cumTax) {
         this.deduction = deduction;
         this.floors = floors;
@@ -82,7 +88,13 @@ final class OrdinaryTaxTable {
             return 0;
         }
         double taxable = grossIncome - deduction;
-        if (taxable <= 0) {
+        // Strictly negative, unlike taxAt's <=0 guard: AT the deduction boundary (taxable == 0
+        // exactly) the marginal rate on the NEXT dollar is the first bracket's rate, not 0 -- this
+        // makes no difference to taxAt (the bracket walk evaluates to the same 0 there either way,
+        // since the first bracket's floor is always 0 and its own cumulative tax is 0) but matters
+        // here, where a caller may legitimately query the rate exactly at income == deduction (e.g.
+        // a synthetic flat-rate table built with deduction 0, queried at gross income 0).
+        if (taxable < 0) {
             return 0;
         }
         return rates[bracketIndex(taxable)];
@@ -94,6 +106,14 @@ final class OrdinaryTaxTable {
             i++;
         }
         return i;
+    }
+
+    /** A single-bracket, no-deduction table taxing every dollar at a flat {@code rate}. By
+     * linearity {@code incrementalTax}/{@code rateAt} are exact for this table at ANY base value
+     * (0 works equally well as any other), so tests exercising a synthetic constant marginal rate
+     * (rather than the real bracket structure) can use this instead of hand-building arrays. */
+    static OrdinaryTaxTable flat(double rate) {
+        return new OrdinaryTaxTable(0, new double[]{0}, new double[]{rate}, new double[]{0});
     }
 
     /** Builds the table for one (taxYear, status) pair. {@code age} follows

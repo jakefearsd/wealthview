@@ -45,7 +45,7 @@ final class SustainabilitySearch {
             double[] dsBracketCeilingByYear,
             double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
             int rmdStartAge,
-            double initTaxableBasis, double[] ltcgRateByYear, double dividendYield) {}
+            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield) {}
 
     /**
      * Verifies the essential floor against portfolio capacity at the required confidence level,
@@ -283,19 +283,21 @@ final class SustainabilitySearch {
         double initTraditional = hasPools ? taxCtx.initTraditional() : 0;
         double initRoth = hasPools ? taxCtx.initRoth() : 0;
         String order = hasPools ? taxCtx.withdrawalOrder() : "taxable_first";
-        double[] marginalRates = hasPools ? taxCtx.marginalRateByYear() : null;
+        OrdinaryTaxTable[] ordinaryTaxTables = hasPools ? taxCtx.ordinaryTaxTableByYear() : null;
+        double[] ordinaryBaseIncomeByYear = hasPools ? taxCtx.ordinaryBaseIncomeByYear() : null;
 
         for (int t = 0; t < trialCount; t++) {
             // Pool case: fixed starting balances from the tax context. Non-pool case: the whole
             // portfolio sits in the taxable pool, starting balance varies per trial via paths[t][0].
             double initTaxable = hasPools ? taxCtx.initTaxable() : paths[t][0];
             var trialConfig = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order, marginalRates,
+                    initTaxable, initTraditional, initRoth, order,
+                    ordinaryTaxTables, ordinaryBaseIncomeByYear,
                     ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
                     ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(), false,
                     ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
                     ctx.rmdStartAge(),
-                    ctx.initTaxableBasis(), ctx.ltcgRateByYear(), ctx.dividendYield());
+                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield());
 
             var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);
