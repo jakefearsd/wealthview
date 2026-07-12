@@ -35,6 +35,32 @@ final class TrialSimulator {
     ) {}
 
     /**
+     * Simulated guardrail-adaptation rule inputs (audit C9). When a
+     * {@link SimulationConfig#adaptation()} is present the trial adapts the year's DISCRETIONARY
+     * spending in-simulation toward the DISPLAYED spending corridor instead of running the fixed
+     * planned schedule; when it is {@code null} the trial runs the fixed schedule exactly as before
+     * (byte-identical no-rules behavior). A single instance is built once per run and shared across
+     * every trial (allocation-free hot loop), so this is NOT a per-trial object.
+     *
+     * <p>All four arrays are indexed by projection year:
+     * <ul>
+     *   <li>{@code corridorLow}/{@code corridorHigh} — the final, smoothed-and-clamped displayed
+     *       corridor (the very arrays that populate {@code GuardrailYearlySpending}). The rule keys
+     *       off {@code corridorLow}: only the LOWER guardrail can bind in-simulation, because
+     *       constraint (2) caps adapted spending at the planned schedule (no prosperity ratchet) and
+     *       {@code corridorHigh} is always {@code >=} the plan — the upper band is display-only here.
+     *   <li>{@code expectedStartBalance} — the no-adaptation median start-of-year total portfolio
+     *       (year 0 = initial portfolio; year y&gt;0 = the prior year's median end-of-year balance
+     *       from the headline terminal pass). The trial's own start-of-year balance is measured
+     *       against this to form the {@code trialPortfolio / expectedMedianPortfolio[y]} sensitivity.
+     * </ul>
+     * {@code maxAnnualAdjustmentRate} is the existing user knob bounding the year-over-year change.
+     */
+    record GuardrailAdaptation(
+            double[] corridorLow, double[] corridorHigh,
+            double[] expectedStartBalance, double maxAnnualAdjustmentRate) {}
+
+    /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
      * arrays, cash config) are shared across trials; the three per-pool real return sequences
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
@@ -51,8 +77,37 @@ final class TrialSimulator {
             boolean trackYearBalances,
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
             int rmdStartAge,
-            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield
-    ) {}
+            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+            GuardrailAdaptation adaptation
+    ) {
+        /**
+         * Back-compat constructor (audit C9): every pre-C9 call site (the sustainability search, the
+         * headline terminal pass, and the unit tests) builds a fixed-schedule config with no
+         * simulated guardrail rule. Defaulting {@code adaptation} to {@code null} keeps
+         * {@link #simulateTrial} on the byte-identical no-rules path for all of them.
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-adaptation
+        // shape) so existing positional call sites keep compiling and behaving identically.
+        @SuppressWarnings("PMD.ExcessiveParameterList")
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, null);
+        }
+    }
 
     /**
      * Simulates a single MC trial: year-by-year portfolio evolution with growth,
@@ -100,6 +155,12 @@ final class TrialSimulator {
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
         boolean essentialFloorMet = true;
 
+        // Audit C9: `prevSpending` carries the prior year's adapted total spending so the
+        // year-over-year adjustment can be bounded; seeded to year 0's planned total so the first
+        // year runs the plan (ratio ~= 1 -> within corridor). Inert (a dead store) on the no-rules
+        // path (config.adaptation() == null), which every pre-C9 caller takes.
+        double prevSpending = floors[0] + discretionary[0];
+
         for (int y = 0; y < years; y++) {
             double taxableReturn = taxableReturns[y];
             double traditionalReturn = traditionalReturns[y];
@@ -114,6 +175,11 @@ final class TrialSimulator {
                     ? (pools[0] * taxableReturn + pools[1] * traditionalReturn + pools[2] * rothReturn)
                             / preGrowthTotal
                     : 0.0;
+
+            // Audit C9: the trial's start-of-year total portfolio (pre-growth pools + pre-growth
+            // cash) — the signal the simulated guardrail rule measures against the no-adaptation
+            // median. Captured before this year's growth is applied below.
+            double trialStartTotal = preGrowthTotal + cashBalance;
 
             // Prior-year-end traditional balance — the IRS RMD basis for this year, snapshotted
             // before this year's growth is applied.
@@ -147,7 +213,15 @@ final class TrialSimulator {
             double actualConv = applyTrialConversion(pools, lots, config.conversionByYear(),
                     config.conversionTaxByYear(), y, age, table, base);
 
-            double spending = floors[y] + discretionary[y];
+            // Audit C9: with-rules pass adapts the year's total spending toward the displayed
+            // corridor from the trial's own portfolio state (cutting discretionary in down markets,
+            // recovering toward plan otherwise -- floor inviolate, never above plan); no-rules pass
+            // returns the fixed planned schedule (byte-identical to pre-C9). Only the SPENDING INPUT
+            // differs -- the entire tax/withdrawal/RMD/LTCG year-step below is shared verbatim (no
+            // forked tax logic). The chained assignment updates prevSpending in lock-step without
+            // adding a statement to this NCSS-capped hot method.
+            double spending = prevSpending = resolveYearSpending(config, y, floors[y],
+                    discretionary[y], trialStartTotal, prevSpending);
             // A4: tax on this year's base (outside) income is a real obligation every year, not
             // just when income exceeds spending -- fund it from any surplus first; the unfunded
             // remainder drains straight from the pools via the shared tax cascade below
@@ -236,9 +310,7 @@ final class TrialSimulator {
             LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
             applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, ltcgTable, ordinaryStack, table);
 
-            pools[0] = Math.max(0, pools[0]);
-            pools[1] = Math.max(0, pools[1]);
-            pools[2] = Math.max(0, pools[2]);
+            clampPoolsNonNegative(pools);
             cashBalance = Math.max(0, cashBalance);
 
             double totalBalance = pools[0] + pools[1] + pools[2] + cashBalance;
@@ -259,6 +331,83 @@ final class TrialSimulator {
         boolean traditionalExhausted = config.conversionByYear() != null && pools[1] <= 0;
 
         return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet);
+    }
+
+    /** Floors the three equity pools at zero after the year's mutations. Extracted from
+     * {@link #simulateTrial} so the NCSS-capped hot method stays within budget. */
+    // UseVarargs: {@code pools} is the fixed three-element pool state array mutated in place, not a
+    // variable argument list.
+    @SuppressWarnings("PMD.UseVarargs")
+    private static void clampPoolsNonNegative(double[] pools) {
+        pools[0] = Math.max(0, pools[0]);
+        pools[1] = Math.max(0, pools[1]);
+        pools[2] = Math.max(0, pools[2]);
+    }
+
+    /**
+     * Resolves this trial-year's total spending. On the no-rules path (no
+     * {@link GuardrailAdaptation} on the config) this is the fixed planned schedule
+     * {@code floor + discretionary}, byte-identical to pre-C9. On the with-rules pass it is the
+     * corridor-coupled adaptation of {@link #adaptYearSpending} (audit C9).
+     */
+    private static double resolveYearSpending(SimulationConfig config, int y,
+                                               double floor, double discretionary,
+                                               double trialStartTotal, double prevSpending) {
+        double plannedSpending = floor + discretionary;
+        GuardrailAdaptation adaptation = config.adaptation();
+        return adaptation != null
+                ? adaptYearSpending(adaptation, y, plannedSpending, floor, trialStartTotal, prevSpending)
+                : plannedSpending;
+    }
+
+    /**
+     * Applies the simulated guardrail-adaptation rule (audit C9) for one trial-year: returns the
+     * TOTAL spending the trial should attempt this year, adapting the planned schedule toward the
+     * displayed corridor based on the trial's actual portfolio state.
+     *
+     * <p><b>Corridor coupling.</b> The rule reuses the very corridor the response displays. It
+     * forms the portfolio-implied spending capacity signal the corridor is built from —
+     * {@code impliedSpending = plannedSpending * (trialStartBalance / expectedMedianStart[y])} —
+     * i.e. the planned total spending scaled by how the trial's portfolio is doing relative to the
+     * no-adaptation median. When that implied capacity falls below the displayed lower guardrail
+     * ({@code corridorLow[y]}) the trial CUTS discretionary toward it; otherwise it RECOVERS toward
+     * the planned schedule (the upper guardrail {@code corridorHigh[y]} is the ceiling of that
+     * recovery, but the no-ratchet cap at {@code plannedSpending <= corridorHigh[y]} always binds
+     * first — see constraint 2, so the upper band is display-only in-simulation).
+     *
+     * <p><b>Bounds.</b> The year-over-year change is capped at {@code maxAnnualAdjustmentRate}
+     * relative to the prior year's spending (the same relative form the pre-optimization
+     * {@link SpendingSmoother#applyYearOverYearSmoothing} uses). Result is then capped at
+     * {@code plannedSpending} (never exceed the plan — recovering cuts, never an unbounded prosperity
+     * ratchet, so with-rules spending is always {@code <=} the no-rules schedule and can therefore
+     * never REDUCE floor-funding success) and floored at {@code floor} (the essential floor is
+     * inviolate — cuts never take spending below it).
+     *
+     * <p>Pure, allocation-free, no branching on trial identity — safe for the hot loop.
+     */
+    static double adaptYearSpending(GuardrailAdaptation adapt, int y,
+                                     double plannedSpending, double floor,
+                                     double trialStartBalance, double prevSpending) {
+        double rate = adapt.maxAnnualAdjustmentRate();
+        double expected = adapt.expectedStartBalance()[y];
+        double ratio = expected > 0 ? trialStartBalance / expected : 1.0;
+        double impliedSpending = plannedSpending * ratio;
+
+        double target;
+        if (impliedSpending < adapt.corridorLow()[y]) {
+            // Lower guardrail breached: cut toward the implied capacity.
+            target = impliedSpending;
+        } else {
+            // At/above the lower guardrail: recover toward the planned schedule, ceilinged by the
+            // upper guardrail (which is >= plan, so the plan cap below binds first).
+            target = Math.min(plannedSpending, adapt.corridorHigh()[y]);
+        }
+
+        double maxUp = prevSpending * (1 + rate);
+        double maxDown = prevSpending * (1 - rate);
+        double adapted = Math.max(maxDown, Math.min(maxUp, target));
+        adapted = Math.min(adapted, plannedSpending);   // no prosperity ratchet
+        return Math.max(adapted, floor);                // essential floor inviolate
     }
 
     /**
