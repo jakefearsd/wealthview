@@ -52,4 +52,35 @@ class MultiPoolYearDtoBuilderTest {
         assertThat(dto.tax().rmdAmount()).isNull();
         assertThat(dto.tax().capitalGainsTax()).isNull();
     }
+
+    /**
+     * T23 item 1: a stale pre-annotator {@code CombinedTaxResult} (e.g. left over from an earlier
+     * bundle in the year's tax cascade -- see {@code MultiPool#lastTaxBreakdown}'s javadoc) must
+     * never surface federal/state breakdown fields for a year whose {@code taxLiability} nets to
+     * zero (fully absorbed elsewhere this year). The breakdown is a decomposition of
+     * {@code taxLiability}; when there is no taxLiability left to decompose, every breakdown field
+     * must be null too -- the same "positive value or null" convention every other tax field on
+     * this DTO already follows.
+     */
+    @Test
+    void build_zeroTaxLiabilityWithStaleTaxBreakdown_clearsFederalStateSaltAndItemizedFields() {
+        var in = new MultiPoolYearDtoBuilder.YearDtoInputs(
+                YEAR, AGE_RETIRED, bd("500000"), ZERO, ZERO, bd("50000"), true,
+                ZERO, ZERO,
+                new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
+                bd("10000"), bd("40000"), ZERO,
+                PoolStrategy.TaxSourceResult.ZERO,
+                bd("450000"), bd("100000"), bd("300000"), bd("50000"),
+                ZERO, ZERO, ZERO);
+        var staleBreakdown = new CombinedTaxResult(
+                bd("5000"), bd("500"), bd("5500"), bd("1000"), bd("14600"), true);
+
+        var dto = MultiPoolYearDtoBuilder.build(in, staleBreakdown);
+
+        assertThat(dto.taxLiability()).isNull();
+        assertThat(dto.federalTax()).isNull();
+        assertThat(dto.stateTax()).isNull();
+        assertThat(dto.saltDeduction()).isNull();
+        assertThat(dto.usedItemizedDeduction()).isNull();
+    }
 }

@@ -19,6 +19,14 @@ import com.wealthview.core.projection.tax.CombinedTaxResult;
 final class MultiPoolYearDtoBuilder {
 
     /**
+     * T23 item 1: reconciliation tolerance (dollars) between {@code yearTaxBreakdown.totalTax()}
+     * and {@code taxLiability} used to detect a STALE breakdown -- see {@link #build}'s javadoc.
+     * Matches the cent-level tolerance {@code EngineInvariantsTest}'s own tax-reconciliation
+     * invariant uses for the identical comparison.
+     */
+    private static final BigDecimal STALE_BREAKDOWN_TOLERANCE = new BigDecimal("0.01");
+
+    /**
      * Per-year inputs for {@link #build}. Collapses what would otherwise be a long
      * parameter list. {@code endingTaxable / endingTraditional / endingRoth} are the
      * post-floor sub-pool balances; {@code endBalance} is their aggregate.
@@ -41,9 +49,33 @@ final class MultiPoolYearDtoBuilder {
     /**
      * Builds the year DTO. {@code yearTaxBreakdown} is the tax breakdown accumulated during the
      * year's withdrawal + conversion cycle, or {@code null} if no tax was computed this year.
+     *
+     * <p>T23 item 1: {@code yearTaxBreakdown} can be STALE -- left over from an earlier bundle in
+     * the year's tax cascade (e.g. a Roth-conversion's own {@code computeDetailedTax} call) that a
+     * LATER event this year never superseded, because that later call's own recording condition
+     * didn't fire -- see {@code MultiPool#lastTaxBreakdown}'s javadoc. A stale breakdown's own
+     * {@code totalTax} (== {@code federalTax + stateTax}, see
+     * {@code CombinedTaxCalculator#computeTax}) then disagrees with the year's ACTUAL
+     * {@code taxLiability}, which is exactly the "federal/state breakdown without its
+     * taxLiability" defect this method must not produce.
+     *
+     * <p>A breakdown that is CURRENT -- even one whose total happens to be exactly zero, e.g. a
+     * retiree whose withdrawal is fully absorbed by the standard/itemized deduction -- is NOT
+     * stale: its total already agrees with {@code taxLiability} (both zero), and the fields
+     * (especially {@code usedItemizedDeduction}) remain meaningful at $0 (see
+     * {@code MultiPoolYearDtoBuilderTest}'s itemized-deduction and zero-tax-year pins). So the
+     * breakdown is suppressed only when it genuinely DISAGREES with {@code taxLiability} -- never
+     * merely because {@code taxLiability} nets to zero (which the DTO already represents as
+     * {@code null} via the "positive value or null" convention, a separate, unrelated display
+     * choice from whether the breakdown itself is trustworthy).
      */
     static ProjectionYearDto build(YearDtoInputs in, @Nullable CombinedTaxResult yearTaxBreakdown) {
-        Optional<CombinedTaxResult> taxBreakdown = Optional.ofNullable(yearTaxBreakdown);
+        boolean stale = yearTaxBreakdown != null
+                && yearTaxBreakdown.totalTax().subtract(in.taxLiability()).abs()
+                        .compareTo(STALE_BREAKDOWN_TOLERANCE) >= 0;
+        Optional<CombinedTaxResult> taxBreakdown = stale
+                ? Optional.empty()
+                : Optional.ofNullable(yearTaxBreakdown);
         BigDecimal fedTax = taxBreakdown.map(CombinedTaxResult::federalTax).orElse(null);
         BigDecimal stTax = taxBreakdown
                 .filter(b -> b.stateTax().compareTo(BigDecimal.ZERO) > 0)

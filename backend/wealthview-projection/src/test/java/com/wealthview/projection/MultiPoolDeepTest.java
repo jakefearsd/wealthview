@@ -711,19 +711,50 @@ class MultiPoolDeepTest {
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                         WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
 
-        // The YearDtoContext's own taxLiability (20 below) is a caller-supplied display figure and
-        // deliberately NOT re-derived here; federalTax instead comes from the pool's stored
-        // lastTaxBreakdown (set by executeWithdrawals above), which -- taxable being $0 -- audit C2
-        // grosses up to the exact fixed point 25 (same warm-started recursion as the sibling tests).
+        // taxable being $0, audit C2 grosses the $100 traditional draw's own 20% tax up to the exact
+        // fixed point 25 (100 need + tax = taxableIncome; tax = 0.20*(100+tax) => tax = 25) -- same
+        // warm-started recursion as the sibling tests. The YearDtoContext's own taxLiability below
+        // matches that same figure: T23 item 1 made MultiPoolYearDtoBuilder suppress the pool's
+        // stored lastTaxBreakdown whenever it DISAGREES with the caller-supplied taxLiability (a
+        // stale breakdown -- see that class's javadoc), so this test must supply the true converged
+        // liability, not an arbitrary mismatched one, for federalTax to surface at all.
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
-                ZERO, bd("20"),
+                ZERO, bd("25"),
                 new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
                 ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO, ZERO));
 
         assertThat(dto.federalTax()).isEqualByComparingTo(bd("25"));
         assertThat(dto.stateTax()).isNull();
         assertThat(dto.saltDeduction()).isNull();
+    }
+
+    /**
+     * T23 item 1: end-to-end (pool + builder) pin of the stale-breakdown suppression, complementing
+     * {@code MultiPoolYearDtoBuilderTest}'s pure-builder-level pin. Same fixture as the sibling test
+     * above (converged gross-up fixed point $25), but the caller now supplies a MISMATCHED
+     * {@code taxLiability} ($20, a different year's/branch's figure) -- exactly the "federal/state
+     * breakdown without its taxLiability" defect the item targets. The stored breakdown must be
+     * suppressed entirely, not partially surfaced.
+     */
+    @Test
+    void buildYearDto_taxLiabilityDisagreesWithStoredBreakdown_suppressesStaleFederalTax() {
+        var p = new PoolStrategy.MultiPool(
+                grouped("0", "1000", "100", "0", "0", "0"),
+                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+
+        p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
+        var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
+                ZERO, bd("20"),
+                new PoolStrategy.GrowthResult(ZERO, ZERO, ZERO, ZERO),
+                ZERO, bd("100"), ZERO, PoolStrategy.TaxSourceResult.ZERO, ZERO, ZERO, ZERO));
+
+        assertThat(dto.taxLiability()).isEqualByComparingTo(bd("20"));
+        assertThat(dto.federalTax()).isNull();
+        assertThat(dto.stateTax()).isNull();
+        assertThat(dto.saltDeduction()).isNull();
+        assertThat(dto.usedItemizedDeduction()).isNull();
     }
 
     // ---- all-taxable MultiPool spot-checks (audit C11: formerly SinglePool) ----

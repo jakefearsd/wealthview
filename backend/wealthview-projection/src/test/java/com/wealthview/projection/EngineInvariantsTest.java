@@ -99,12 +99,20 @@ import static org.mockito.Mockito.mock;
  * exclusion is non-vacuous: at least one scenario-year genuinely needs the wider tolerance (the
  * flat-$1 formula alone would fail there).
  *
- * <h2>Invariant 2 — tax reconciliation (T18a-5b)</h2>
- * Whenever {@code federalTax} is non-null (retired, a tax strategy is wired, and {@code
- * taxLiability > 0} — see {@code RetirementTaxAnnotator#annotate}), {@code federalTax + stateTax
- * == taxLiability} to the cent. Self-employment tax and the early-withdrawal penalty are already
- * folded into {@code federalTax} by the annotator (see its javadoc); this class does not need to
- * add them separately.
+ * <h2>Invariant 2 — tax reconciliation (T18a-5b, closed out by T23 item 1)</h2>
+ * {@code nz(federalTax) + nz(stateTax) == nz(taxLiability)} to the cent, UNCONDITIONALLY, every
+ * year. Self-employment tax and the early-withdrawal penalty are already folded into
+ * {@code federalTax} by {@code RetirementTaxAnnotator} (see its javadoc) whenever it runs
+ * ({@code taxLiability > 0}); this class does not need to add them separately. When
+ * {@code taxLiability} is null (nets to zero — the DTO's "positive value or null" convention),
+ * {@code federalTax} can still be legitimately non-null (a literal {@code $0}, e.g. a retiree
+ * whose withdrawal is fully absorbed by the deduction) — the SAME zero shown two ways, not a
+ * defect. T23 item 1 removed this invariant's original workaround (skip years with a null/non-
+ * positive {@code taxLiability}, added because {@code MultiPoolYearDtoBuilder} could surface a
+ * genuinely STALE breakdown — one that DISAGREED with {@code taxLiability} — in that window; see
+ * {@code MultiPoolYearDtoBuilder#build}'s javadoc for the fix) by fixing the production code
+ * instead: the breakdown is now suppressed whenever (and only whenever) it disagrees with
+ * {@code taxLiability}, so this identity holds unconditionally with no per-year exception.
  *
  * <h2>Invariant 3 — direction properties</h2>
  * Each base scenario is re-run three ways: {@code fee_rate} 0 -&gt; 0.01 (strictly lower final
@@ -249,23 +257,19 @@ class EngineInvariantsTest {
 
     private void assertTaxReconciliation(ScenarioCase sc, List<ProjectionYearDto> years) {
         for (var y : years) {
-            // "Defined" per the T18a-5b identity means RetirementTaxAnnotator's fold actually ran
-            // (retired && taxStrategy != null && taxLiability > 0 -- see its javadoc), NOT merely
-            // "federalTax happens to be non-null". A DISCOVERED, pre-existing DTO quirk (unrelated
-            // to T18a-5b, out of scope to fix in this test-only task): when taxLiability nets to
-            // zero via RetirementWithdrawalProcessor's alreadyChargedBaseTax offset, MultiPool's
-            // buildYearDto can still surface a stale, non-netted federalTax from the pool's last
-            // computeOrdinaryTax call (MultiPool.lastTaxBreakdown) because RetirementTaxAnnotator's
-            // gate skips the fold -- that pre-annotator value was never claimed to reconcile with
-            // taxLiability, so gating on taxLiability (the identity's own precondition) rather than
-            // federalTax avoids a false failure on that unrelated gap.
-            if (y.taxLiability() == null || y.taxLiability().compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
+            // T23 item 1: MultiPoolYearDtoBuilder now suppresses the pool's raw federalTax/stateTax
+            // breakdown whenever it genuinely DISAGREES with taxLiability (a stale breakdown -- see
+            // its javadoc), so every remaining breakdown is trustworthy by construction. federalTax
+            // can still legitimately be non-null (even exactly $0) in a year whose taxLiability nets
+            // to null via the DTO's "positive value or null" convention -- that is the SAME zero
+            // represented two different ways, not a defect (see MultiPoolYearDtoBuilderTest's
+            // itemized-deduction pin). Comparing both sides null-safe (nz()), with no skip/continue,
+            // exercises this identity unconditionally on every year instead of the old workaround
+            // that special-cased away the stale-breakdown gap this class discovered (T18b).
             BigDecimal total = nz(y.federalTax()).add(nz(y.stateTax()));
             assertThat(total)
                     .as("[%s] federalTax + stateTax == taxLiability year %d", sc.label(), y.year())
-                    .isCloseTo(y.taxLiability(), offset(bd("0.01")));
+                    .isCloseTo(nz(y.taxLiability()), offset(bd("0.01")));
         }
     }
 
