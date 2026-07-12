@@ -231,7 +231,10 @@ class DeterministicProjectionEngineSocialSecurityConvergenceTest
         var year1 = taxEngine.run(input).yearlyData().getFirst();
 
         assertThat(year1.rmdAmount()).isEqualByComparingTo(bd("20000"));
-        assertThat(year1.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO);
+        // T18a-5a: withdrawals is the aggregate GROSS pool distribution, so it now includes the
+        // forced RMD excess even though the $0 spend draw itself pulled nothing -- previously
+        // this asserted ZERO, silently dropping the RMD from the reported total.
+        assertThat(year1.withdrawals()).isEqualByComparingTo(bd("20000"));
         assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(bd("26600"));
         assertThat(year1.socialSecurityTaxable()).isEqualByComparingTo(
                 ssOracle.computeTaxableAmount(bd("40000"), bd("40000"), "single")); // pension 20k + RMD 20k

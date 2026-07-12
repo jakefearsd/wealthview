@@ -744,13 +744,15 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
         assertThat(rmdYear.age()).isEqualTo(73);
         assertThat(noRmdYear.age()).isEqualTo(72);
-        assertThat(rmdYear.withdrawals()).isEqualByComparingTo(BigDecimal.ZERO); // no spending draw
         assertThat(noRmdYear.rmdAmount()).isNull();
 
         // RMD = priorYearEndTraditional (1,000,000) / distributionPeriod(73)=26.5 = 37,735.8491,
         // forced out of traditional even though the pension alone covers spending.
         BigDecimal expectedRmd = bd("37735.8491");
         assertThat(rmdYear.rmdAmount()).isEqualByComparingTo(expectedRmd);
+        // T18a-5a: withdrawals is the aggregate GROSS pool distribution, so even though there is no
+        // spending draw (pension covers it), the forced RMD still counts.
+        assertThat(rmdYear.withdrawals()).isEqualByComparingTo(expectedRmd);
         assertThat(rmdYear.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000").subtract(expectedRmd));
 
         // taxLiability must equal the FULL combined tax on (RMD + pension) -- not that plus a

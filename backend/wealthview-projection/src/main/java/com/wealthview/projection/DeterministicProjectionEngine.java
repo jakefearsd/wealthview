@@ -395,10 +395,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 ctx.inflationRate(), comp.totalActiveIncome());
         yearDto = IncomeSourceFieldMapper.apply(yearDto, comp.isResult());
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
+        // T18a-5b: threaded into the annotator so its federal/state recompute can fold both
+        // already-charged additive obligations into the federal component -- see
+        // RetirementTaxAnnotator.AnnotationContext's javadoc.
+        BigDecimal selfEmploymentTax = comp.isResult() != null
+                ? comp.isResult().selfEmploymentTax() : BigDecimal.ZERO;
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,
                 wdFromTraditional, conversionAmount, comp.effectiveOtherIncome(),
                 taxLiability, pool, ctx.taxStrategy(), ltcgTax,
-                comp.realizedLtcgIncome(), comp.socialSecurityTaxable(), irmaaSurcharge);
+                comp.realizedLtcgIncome(), comp.socialSecurityTaxable(), irmaaSurcharge,
+                selfEmploymentTax, earlyWithdrawalPenalty);
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
         // Wave-4 IRMAA: roll the 2-year MAGI lookback window forward -- see YearAccumulator's

@@ -300,6 +300,28 @@ class MultiPoolDeepTest {
     }
 
     @Test
+    void executeWithdrawals_rmdForced_totalWithdrawnIncludesRmdExcessAndReconcilesToPoolSum() {
+        // T18a-5a: totalWithdrawn (the DTO's `withdrawals` aggregate) must include the forced RMD
+        // excess so it reconciles with fromTaxable + fromTraditional (reported) + fromRoth -- no
+        // tax calculator wired here, so there is no C2 gross-up to reopen the gap.
+        var pool = pool("0", "500000", "0", WithdrawalOrder.TAXABLE_FIRST);
+        var forced = pool.forceRmd(bd("20000"));
+
+        var result = pool.executeWithdrawals(bd("5000"), YEAR, ZERO, ZERO, forced, AGE_RETIRED);
+
+        // Spend draw (5000) comes entirely from the RMD's reinvested taxable cash; traditional's
+        // OWN spend-draw pull is 0, but its reported ordinary income (20000) still reflects the
+        // forced RMD.
+        assertThat(result.fromTaxable()).isEqualByComparingTo(bd("5000"));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("20000"));
+        assertThat(result.fromRoth()).isEqualByComparingTo(ZERO);
+        assertThat(result.totalWithdrawn()).isEqualByComparingTo(bd("25000"));
+        // Sum identity: fromTaxable + fromTraditional + fromRoth == totalWithdrawn.
+        assertThat(result.fromTaxable().add(result.fromTraditional()).add(result.fromRoth()))
+                .isEqualByComparingTo(result.totalWithdrawn());
+    }
+
+    @Test
     void getWeightedReturn_returnsConfiguredRate() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "100", "100", "0", "0", "0"),

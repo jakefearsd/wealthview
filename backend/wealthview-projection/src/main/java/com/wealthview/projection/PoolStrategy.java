@@ -256,7 +256,20 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability, TaxSourceResult taxSource) {}
 
     /**
-     * {@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero when no
+     * {@code totalWithdrawn} (T18a-5a) is the year's aggregate GROSS distribution across the three
+     * pools, INCLUDING any forced RMD excess (previously excluded here while {@code fromTraditional}
+     * counted it, breaking the {@code fromTaxable + fromTraditional + fromRoth == totalWithdrawn}
+     * sum identity whenever an RMD forced money out beyond the spend draw). Like
+     * {@code fromTraditional}/{@code traditionalOrdinaryIncome}, it reports the RMD as a
+     * distribution the moment it is force-taken, regardless of whether the retiree needed the cash
+     * (the after-tax remainder may be reinvested to taxable rather than spent) -- "withdrawal" here
+     * means "left the tax-advantaged pool", the same convention {@code withdrawal_from_traditional}
+     * already uses, not literally "spent by the household". The sum identity still does NOT hold in
+     * a year with an audit-C2 tax-funding gross-up (which further inflates {@code fromTraditional}
+     * without a matching addition here) -- closing that residual gap is a separate, narrower fix
+     * scope than this item.
+     *
+     * <p>{@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero when no
      * {@code CapitalGainsTaxCalculator} is wired -- see {@link PoolConfig}). It is broken out
      * separately so the engine can fold it into the year's federal-tax breakdown -- see
      * {@link RetirementTaxAnnotator}.
@@ -759,8 +772,12 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 withdrawalTaxSource = withdrawalTaxSource.add(deductFromPools(earlyWithdrawalPenalty));
             }
 
+            // T18a-5a: the aggregate includes the forced RMD excess (rmdForced) on top of the raw
+            // spend-draw allocation, so it reconciles exactly with fromTaxable + traditionalOrdinaryIncome
+            // (which already counts rmdForced) + fromRoth -- see the WithdrawalTaxResult javadoc.
             return new WithdrawalTaxResult(
-                    fromTaxable.add(fromTraditional).add(fromRoth), totalWithdrawalTax.add(earlyWithdrawalPenalty),
+                    fromTaxable.add(fromTraditional).add(fromRoth).add(rmdForced),
+                    totalWithdrawalTax.add(earlyWithdrawalPenalty),
                     fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
                     realizedLtcgIncome, earlyWithdrawalPenalty);
         }

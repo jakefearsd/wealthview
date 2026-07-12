@@ -146,17 +146,27 @@ class DeterministicProjectionEngineCharacterizationTest {
     @Test
     void run_threePoolWithdrawalRateScenario_endBalanceChainIsConsistent() {
         // Structural invariant: each year's startBalance equals the prior endBalance,
-        // and end = start + contributions + growth - withdrawals.
+        // and end = start + contributions + growth - withdrawals + rmdAmount.
+        //
+        // T18a-5a: `withdrawals` is the aggregate GROSS pool distribution and now includes any
+        // forced RMD excess (see PoolStrategy.WithdrawalTaxResult's javadoc) -- but a forced RMD is
+        // an internal traditional-to-taxable transfer, not money actually leaving the total
+        // portfolio (this fixture wires no tax calculator, so there is no offsetting tax leak
+        // either). The chain-consistency formula below adds `rmdAmount` back to correct for that
+        // double-count, exactly canceling the RMD's contribution to `withdrawals` and leaving the
+        // true total-portfolio conservation identity intact.
         var engine = new DeterministicProjectionEngine(null, null);
 
         var data = engine.run(goldenInput()).yearlyData();
 
         for (int i = 0; i < data.size(); i++) {
             ProjectionYearDto y = data.get(i);
+            BigDecimal rmdAmount = y.rmdAmount() != null ? y.rmdAmount() : BigDecimal.ZERO;
             BigDecimal expectedEnd = y.startBalance()
                     .add(y.contributions())
                     .add(y.growth())
-                    .subtract(y.withdrawals());
+                    .subtract(y.withdrawals())
+                    .add(rmdAmount);
             assertThat(y.endBalance()).isEqualByComparingTo(expectedEnd);
             if (i > 0) {
                 assertThat(y.startBalance())

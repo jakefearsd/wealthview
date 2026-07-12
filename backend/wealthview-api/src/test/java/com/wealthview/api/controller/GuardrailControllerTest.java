@@ -123,6 +123,95 @@ class GuardrailControllerTest {
                 .andExpect(status().isNotFound());
     }
 
+    // === T18a-5c: trialCount [100, 50000] / confidenceLevel [0.5, 0.999] bounds ===
+
+    @Test
+    void optimize_trialCountBelowMinimum_returns400() throws Exception {
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, 99, null, List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"));
+    }
+
+    @Test
+    void optimize_trialCountAboveMaximum_returns400() throws Exception {
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, 50001, null, List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_confidenceLevelBelowMinimum_returns400() throws Exception {
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, null, new BigDecimal("0.4"), List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_confidenceLevelAtOrAboveOne_returns400() throws Exception {
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, null, new BigDecimal("1.0"), List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void optimize_trialCountAndConfidenceLevelWithinBounds_returns200() throws Exception {
+        // Direction pin: valid boundary values (unlike the base validRequest test, which leaves
+        // both null) must NOT be rejected.
+        when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class)))
+                .thenReturn(sampleResponse());
+
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, 5000, new BigDecimal("0.95"), List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void getGuardrail_exists_returns200() throws Exception {
         when(guardrailProfileService.getGuardrailProfile(TENANT_ID, SCENARIO_ID))

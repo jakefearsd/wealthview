@@ -60,7 +60,7 @@ class RetirementTaxAnnotatorTest {
         var ltcgTax = new BigDecimal("5308.2164");
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, ltcgTax, pool, taxStrategy, ltcgTax,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -87,7 +87,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(40_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 totalTaxLiability, pool, taxStrategy, ltcgTax, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -114,11 +114,64 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(30_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
         assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal);
+    }
+
+    // === T18a-5b: SE tax and the early-withdrawal penalty must also fold into federalTax, or
+    // federalTax + stateTax silently falls short of taxLiability whenever either is present ===
+
+    @Test
+    void annotate_seTaxYear_foldsIntoFederalTaxComponentAndRestoresIdentity() {
+        var ordinaryFederal = new BigDecimal("4000.0000");
+        var ordinaryState = new BigDecimal("600.0000");
+        var ordinaryBreakdown = new CombinedTaxResult(ordinaryFederal, ordinaryState,
+                ordinaryFederal.add(ordinaryState), BigDecimal.ZERO, BigDecimal.ZERO, false);
+        var taxStrategy = mock(TaxCalculationStrategy.class);
+        when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
+                any(BigDecimal.class), any(BigDecimal.class)))
+                .thenReturn(ordinaryBreakdown);
+        PoolStrategy pool = filingStatusOnlyPool();
+
+        var seTax = new BigDecimal("2189.4000");
+        var totalTaxLiability = ordinaryFederal.add(ordinaryState).add(seTax);
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
+                BigDecimal.valueOf(20_000), BigDecimal.ZERO, BigDecimal.ZERO,
+                totalTaxLiability, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, seTax, BigDecimal.ZERO);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal.add(seTax));
+        assertThat(result.stateTax()).isEqualByComparingTo(ordinaryState);
+        assertThat(result.federalTax().add(result.stateTax())).isEqualByComparingTo(totalTaxLiability);
+    }
+
+    @Test
+    void annotate_earlyWithdrawalPenaltyYear_foldsIntoFederalTaxComponentAndRestoresIdentity() {
+        var ordinaryFederal = new BigDecimal("1500.0000");
+        var ordinaryBreakdown = new CombinedTaxResult(ordinaryFederal, BigDecimal.ZERO,
+                ordinaryFederal, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        var taxStrategy = mock(TaxCalculationStrategy.class);
+        when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
+                any(BigDecimal.class), any(BigDecimal.class)))
+                .thenReturn(ordinaryBreakdown);
+        PoolStrategy pool = filingStatusOnlyPool();
+
+        var penalty = new BigDecimal("1000.0000");
+        var totalTaxLiability = ordinaryFederal.add(penalty);
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
+                BigDecimal.valueOf(10_000), BigDecimal.ZERO, BigDecimal.ZERO,
+                totalTaxLiability, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, penalty);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal.add(penalty));
+        assertThat(result.federalTax()).isEqualByComparingTo(totalTaxLiability); // stateTax is null/0 here
     }
 
     @Test
@@ -142,7 +195,8 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 totalTaxableIncome, BigDecimal.ZERO, BigDecimal.ZERO,
                 ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO,
-                realizedLtcgIncome, federallyTaxedSocialSecurity, BigDecimal.ZERO);
+                realizedLtcgIncome, federallyTaxedSocialSecurity, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -157,7 +211,8 @@ class RetirementTaxAnnotatorTest {
         var surcharge = new BigDecimal("2643.6000");
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, surcharge);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, surcharge,
+                BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -170,7 +225,8 @@ class RetirementTaxAnnotatorTest {
         PoolStrategy pool = filingStatusOnlyPool();
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 

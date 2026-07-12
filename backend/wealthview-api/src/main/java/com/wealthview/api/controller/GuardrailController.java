@@ -2,6 +2,7 @@ package com.wealthview.api.controller;
 
 import java.util.UUID;
 
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -35,7 +36,7 @@ public class GuardrailController {
     public ResponseEntity<GuardrailProfileResponse> optimize(
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID scenarioId,
-            @RequestBody GuardrailOptimizationRequest request) {
+            @Valid @RequestBody GuardrailOptimizationRequest request) {
         log.info("Running guardrail optimization for scenario {} tenant {}",
                 scenarioId, principal.tenantId());
         var result = guardrailProfileService.optimize(principal.tenantId(), scenarioId, request);

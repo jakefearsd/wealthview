@@ -26,6 +26,13 @@ final class RetirementTaxAnnotator {
      * fully exempt Social Security. {@code irmaaSurcharge} is the year's ALREADY-COMPUTED Medicare
      * IRMAA premium surcharge (Wave-4 IRMAA item; zero when not applicable) -- this class does not
      * compute it, only surfaces it onto the DTO and derives {@code irmaaWarning} from it.
+     *
+     * <p>{@code selfEmploymentTax} and {@code earlyWithdrawalPenalty} (T18a-5b) are two further
+     * federal-level additive components ALREADY folded into {@code taxLiability} that the ordinary
+     * {@code computeDetailedTax} recompute below has no way to reproduce (neither is bracket-based
+     * ordinary income tax) -- both must be added into the federal component here too, or
+     * {@code federalTax + stateTax} silently falls short of {@code taxLiability} in any year either
+     * one is present. Zero when not applicable.
      */
     record AnnotationContext(
             boolean retired,
@@ -40,7 +47,9 @@ final class RetirementTaxAnnotator {
             BigDecimal ltcgTax,
             BigDecimal realizedLtcgIncome,
             BigDecimal federallyTaxedSocialSecurity,
-            BigDecimal irmaaSurcharge) {
+            BigDecimal irmaaSurcharge,
+            BigDecimal selfEmploymentTax,
+            BigDecimal earlyWithdrawalPenalty) {
     }
 
     /**
@@ -69,9 +78,12 @@ final class RetirementTaxAnnotator {
             var filingStatus = pool.getFilingStatus();
             var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus,
                     realizedLtcgIncome, federallyTaxedSocialSecurity);
-            // LTCG is a federal tax; fold it into the federal component so federalTax + stateTax
-            // reconciles with taxLiability (which already includes it) instead of leaving a gap.
-            BigDecimal fedTax = breakdown.federalTax().add(ltcgTax);
+            // LTCG, self-employment tax, and the early-withdrawal penalty (T18a-5b) are all federal
+            // obligations already folded into taxLiability that this ordinary-bracket recompute has
+            // no way to reproduce; fold all three into the federal component so federalTax +
+            // stateTax reconciles with taxLiability exactly instead of leaving a gap.
+            BigDecimal fedTax = breakdown.federalTax().add(ltcgTax)
+                    .add(annCtx.selfEmploymentTax()).add(annCtx.earlyWithdrawalPenalty());
             BigDecimal stTax = breakdown.stateTax().compareTo(BigDecimal.ZERO) > 0
                     ? breakdown.stateTax() : null;
             BigDecimal saltDed = breakdown.saltDeduction().compareTo(BigDecimal.ZERO) > 0
