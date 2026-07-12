@@ -25,6 +25,7 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
@@ -35,6 +36,8 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025Ltcg;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
@@ -162,6 +165,10 @@ class EngineInvariantsTest {
         ltcgBracketRepository = mock(LtcgBracketRepository.class);
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         stubSingle2025Ltcg(ltcgBracketRepository);
+        // Household matrix (task 10): the household cases file MFJ until the first-death filing
+        // flip. Lenient stubs -- the single-person matrix never queries the MFJ tables.
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025Ltcg(ltcgBracketRepository);
 
         var federalTaxCalculator = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
         var capitalGainsTaxCalculator = new CapitalGainsTaxCalculator(ltcgBracketRepository);
@@ -217,8 +224,8 @@ class EngineInvariantsTest {
         var baseInput = buildInput(sc, paramsJson(sc, BigDecimal.ZERO, BigDecimal.ZERO, false));
         var baseResult = engine.run(baseInput);
 
-        assertBalanceIdentity(sc, baseResult.yearlyData());
-        assertTaxReconciliation(sc, baseResult.yearlyData());
+        assertBalanceIdentity(sc.label(), baseResult.yearlyData());
+        assertTaxReconciliation(sc.label(), baseResult.yearlyData());
         if (sc.hasTraditional()) {
             assertRmdInvariant(sc, baseResult.yearlyData());
         } else {
@@ -232,7 +239,7 @@ class EngineInvariantsTest {
 
     // === Invariant 1: balance identity ===
 
-    private void assertBalanceIdentity(ScenarioCase sc, List<ProjectionYearDto> years) {
+    private void assertBalanceIdentity(String label, List<ProjectionYearDto> years) {
         for (var y : years) {
             BigDecimal expectedEnd = nz(y.startBalance())
                     .add(nz(y.contributions()))
@@ -248,14 +255,14 @@ class EngineInvariantsTest {
             BigDecimal tolerance = grossSurplusApprox.max(BigDecimal.ZERO).add(ONE_DOLLAR);
 
             assertThat(nz(y.endBalance()).subtract(expectedEnd).abs())
-                    .as("[%s] balance identity year %d (age %d)", sc.label(), y.year(), y.age())
+                    .as("[%s] balance identity year %d (age %d)", label, y.year(), y.age())
                     .isLessThanOrEqualTo(tolerance);
         }
     }
 
     // === Invariant 2: tax reconciliation (T18a-5b) ===
 
-    private void assertTaxReconciliation(ScenarioCase sc, List<ProjectionYearDto> years) {
+    private void assertTaxReconciliation(String label, List<ProjectionYearDto> years) {
         for (var y : years) {
             // T23 item 1: MultiPoolYearDtoBuilder now suppresses the pool's raw federalTax/stateTax
             // breakdown whenever it genuinely DISAGREES with taxLiability (a stale breakdown -- see
@@ -268,7 +275,7 @@ class EngineInvariantsTest {
             // that special-cased away the stale-breakdown gap this class discovered (T18b).
             BigDecimal total = nz(y.federalTax()).add(nz(y.stateTax()));
             assertThat(total)
-                    .as("[%s] federalTax + stateTax == taxLiability year %d", sc.label(), y.year())
+                    .as("[%s] federalTax + stateTax == taxLiability year %d", label, y.year())
                     .isCloseTo(nz(y.taxLiability()), offset(bd("0.01")));
         }
     }
@@ -498,6 +505,260 @@ class EngineInvariantsTest {
                 AssetClass.US_STOCK, bd("0.6"), AssetClass.BOND, bd("0.4")));
         return new HypotheticalAccountInput(bd(balance), BigDecimal.ZERO, allocation,
                 Optional.of(bd(expectedReturn)), "taxable");
+    }
+
+    // === Household matrix (household task 10): the same invariants across the first-death
+    // transition boundary ===
+
+    /**
+     * Household case shape: an age-gap couple (births 1955/1965 — RMD start ages on BOTH sides of
+     * the SECURE-2.0 threshold: 73 in 2028 for the primary, 75 in 2040 for the spouse), owned
+     * accounts across all five pools (joint taxable with embedded gain, trad-P, trad-S, roth-P,
+     * roth-S), an SS pair plus a 50%-survivor pension, and a first death at the 2042 boundary
+     * (primary dies at 87). The spouse's death (2060) lands beyond the 2050 horizon, so every
+     * invariant runs the FULL horizon across the transition: the balance identity (the spousal
+     * rollover and basis step-up are value-neutral, so no new identity term is needed — pinned
+     * additionally by {@link #assertYearChainContinuity} at the boundary), the unconditional tax
+     * reconciliation through the MFJ-to-single flip, the three direction properties, and — for the
+     * {@code taxable_first} case, where portfolio draws never touch the traditional pools — a
+     * TWO-STREAM per-owner RMD oracle built from single-owner control runs (see
+     * {@link #assertTwoStreamRmdOracle}).
+     */
+    record HouseholdCase(String label, String withdrawalOrder, boolean communityProperty) {
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    static Stream<HouseholdCase> householdScenarios() {
+        return Stream.of(
+                new HouseholdCase("household | taxable_first | ss-pair+pension", "taxable_first", false),
+                new HouseholdCase("household | dynamic_sequencing | community-property",
+                        "dynamic_sequencing", true));
+    }
+
+    private static final int HH_PRIMARY_BIRTH = 1955;
+    private static final int HH_SPOUSE_BIRTH = 1965;
+    /** First-death calendar year: the primary dies at 87 (1955 + 87). */
+    private static final int HH_TRANSITION_YEAR = 2042;
+    private static final String HH_TRAD_P = "600000.0000";
+    private static final String HH_TRAD_S = "500000.0000";
+    // Fixed ids for the same reason as PENSION_SOURCE_ID above: the depression-years byte-compare
+    // serializes incomeBySource keyed by source id.
+    private static final UUID HH_SS_PRIMARY_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a3");
+    private static final UUID HH_SS_SPOUSE_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a4");
+    private static final UUID HH_PENSION_ID = UUID.fromString("00000000-0000-0000-0000-0000000000a5");
+    private static final UUID HH_SCENARIO_ID = UUID.nameUUIDFromBytes("household-invariants".getBytes());
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("householdScenarios")
+    void invariantsHoldAcrossHouseholdTransition(HouseholdCase hc) {
+        var base = engine.run(buildHouseholdInput(hc, BigDecimal.ZERO, BigDecimal.ZERO, false,
+                HH_TRAD_P, HH_TRAD_S));
+        var years = base.yearlyData();
+
+        // The transition fires inside the horizon; the second death (2060) is beyond it, so the
+        // projection runs the full horizon (no truncation) and both phases are exercised.
+        assertThat(years.getFirst().year()).isEqualTo(REFERENCE_YEAR);
+        assertThat(years.getLast().year()).isEqualTo(HH_PRIMARY_BIRTH + END_AGE - 1);
+
+        assertBalanceIdentity(hc.label(), years);
+        assertTaxReconciliation(hc.label(), years);
+        assertYearChainContinuity(hc.label(), years);
+
+        assertHouseholdFeeRateDirection(hc, base);
+        assertHouseholdDividendYieldDirection(hc, base);
+        assertHouseholdDepressionYearsByteIdentical(hc, base);
+
+        if ("taxable_first".equals(hc.withdrawalOrder())) {
+            assertTwoStreamRmdOracle(hc, base);
+        }
+    }
+
+    /**
+     * Rollover + step-up conservation: the transition is an internal reshuffle (deceased's
+     * trad/roth move to the survivor; the joint-taxable BASIS steps up, never the value), so the
+     * year chain must stay perfectly continuous across the boundary — year Y's opening balance is
+     * exactly year Y-1's close, with no value created or destroyed. Asserted over EVERY adjacent
+     * pair so the transition year gets no special-case exemption.
+     */
+    private void assertYearChainContinuity(String label, List<ProjectionYearDto> years) {
+        for (int i = 1; i < years.size(); i++) {
+            assertThat(years.get(i).startBalance())
+                    .as("[%s] startBalance(%d) == endBalance(%d) — transition conserves value",
+                            label, years.get(i).year(), years.get(i - 1).year())
+                    .isEqualByComparingTo(years.get(i - 1).endBalance());
+        }
+    }
+
+    /**
+     * Two-stream per-owner RMD oracle (spec §3): each owner's traditional pool RMDs at that
+     * owner's own SECURE-2.0 age from that owner's own prior-year balance. Because the DTO only
+     * exposes the SUMMED traditional balance, per-owner streams are isolated via two single-owner
+     * CONTROL runs (the other owner's traditional account zeroed). Under {@code taxable_first}
+     * with a never-depleting taxable pool, no draw or tax cascade ever touches a traditional pool,
+     * so each control run's stream is bit-identical to that owner's stream inside the full run:
+     * <ul>
+     *   <li>each control run's stream must match the {@link RmdCalculator} oracle applied to its
+     *       own prior-year DTO traditional balance — starting exactly at the OWNER's start year
+     *       (2028 at 73 for the primary born 1955; 2040 at 75 for the spouse born 1965 — the
+     *       age-gap correctness this feature exists for), and switching to the SURVIVOR's
+     *       age/divisor from the post-rollover year (2043) onward;</li>
+     *   <li>the full run's {@code rmd_amount} must equal the SUM of the two control streams —
+     *       bit-exact through the transition year (two independently-rounded streams on both
+     *       sides), and within a rounding tick after the rollover merges the pools (one
+     *       merged-balance division versus the controls' two — HALF_UP drift is bounded by one
+     *       0.0001 tick per divide per year).</li>
+     * </ul>
+     */
+    private void assertTwoStreamRmdOracle(HouseholdCase hc, ProjectionResultResponse full) {
+        var primaryOnly = engine.run(buildHouseholdInput(hc, BigDecimal.ZERO, BigDecimal.ZERO, false,
+                HH_TRAD_P, "0.0000"));
+        var spouseOnly = engine.run(buildHouseholdInput(hc, BigDecimal.ZERO, BigDecimal.ZERO, false,
+                "0.0000", HH_TRAD_S));
+
+        assertSingleOwnerStreamMatchesOracle("primary-only control", primaryOnly, HH_PRIMARY_BIRTH, 2028);
+        assertSingleOwnerStreamMatchesOracle("spouse-only control", spouseOnly, HH_SPOUSE_BIRTH, 2040);
+
+        for (var y : full.yearlyData()) {
+            BigDecimal sum = rmdOf(primaryOnly, y.year()).add(rmdOf(spouseOnly, y.year()));
+            if (y.year() <= HH_TRANSITION_YEAR) {
+                assertThat(nz(y.rmdAmount()))
+                        .as("[%s] rmd_amount == primary stream + spouse stream (bit-exact), year %d",
+                                hc.label(), y.year())
+                        .isEqualByComparingTo(sum);
+            } else {
+                assertThat(nz(y.rmdAmount()))
+                        .as("[%s] merged survivor stream == sum of control streams (rounding tick), year %d",
+                                hc.label(), y.year())
+                        .isCloseTo(sum, offset(bd("0.001")));
+            }
+        }
+    }
+
+    private void assertSingleOwnerStreamMatchesOracle(String label, ProjectionResultResponse run,
+                                                      int ownerBirthYear, int expectedFirstRmdYear) {
+        BigDecimal priorTraditional = null;
+        for (var y : run.yearlyData()) {
+            if (priorTraditional != null && priorTraditional.compareTo(BigDecimal.ZERO) > 0) {
+                if (y.year() < expectedFirstRmdYear) {
+                    assertThat(y.rmdAmount())
+                            .as("[%s] no RMD before the owner's own start year, year %d", label, y.year())
+                            .isNull();
+                } else {
+                    // Post-rollover (2043+) the surviving spouse's age/table governs the inherited
+                    // pool — including in the primary-only control, whose pool the survivor now owns.
+                    int streamAge = y.year() <= HH_TRANSITION_YEAR
+                            ? y.year() - ownerBirthYear
+                            : y.year() - HH_SPOUSE_BIRTH;
+                    BigDecimal expected = priorTraditional.divide(
+                            BigDecimal.valueOf(RmdCalculator.distributionPeriod(streamAge)),
+                            4, RoundingMode.HALF_UP);
+                    assertThat(nz(y.rmdAmount()))
+                            .as("[%s] stream matches RmdCalculator oracle (age %d), year %d",
+                                    label, streamAge, y.year())
+                            .isEqualByComparingTo(expected);
+                }
+            }
+            priorTraditional = nz(y.traditionalBalance());
+        }
+    }
+
+    private static BigDecimal rmdOf(ProjectionResultResponse run, int year) {
+        return run.yearlyData().stream()
+                .filter(y -> y.year() == year)
+                .findFirst()
+                .map(y -> nz(y.rmdAmount()))
+                .orElse(BigDecimal.ZERO);
+    }
+
+    // Direction properties over the household path (same claims as the single-person matrix).
+
+    private void assertHouseholdFeeRateDirection(HouseholdCase hc, ProjectionResultResponse base) {
+        var feeResult = engine.run(buildHouseholdInput(hc, bd("0.01"), BigDecimal.ZERO, false,
+                HH_TRAD_P, HH_TRAD_S));
+        assertThat(feeResult.finalBalance())
+                .as("[%s] fee_rate 0->0.01 must strictly lower the final balance", hc.label())
+                .isLessThan(base.finalBalance());
+    }
+
+    private void assertHouseholdDividendYieldDirection(HouseholdCase hc, ProjectionResultResponse base) {
+        var divResult = engine.run(buildHouseholdInput(hc, BigDecimal.ZERO, bd("0.03"), false,
+                HH_TRAD_P, HH_TRAD_S));
+        assertThat(divResult.finalBalance())
+                .as("[%s] dividend_yield 0->0.03 must not increase the final balance", hc.label())
+                .isLessThanOrEqualTo(base.finalBalance());
+        var baseYears = base.yearlyData();
+        var divYears = divResult.yearlyData();
+        for (int i = 0; i < baseYears.size(); i++) {
+            if (!baseYears.get(i).retired()) {
+                continue;
+            }
+            assertThat(nz(divYears.get(i).capitalGainsTax()))
+                    .as("[%s] dividend_yield 0->0.03 must not decrease capitalGainsTax, year %d",
+                            hc.label(), baseYears.get(i).year())
+                    .isGreaterThanOrEqualTo(nz(baseYears.get(i).capitalGainsTax()));
+        }
+    }
+
+    private void assertHouseholdDepressionYearsByteIdentical(HouseholdCase hc, ProjectionResultResponse base) {
+        var depResult = engine.run(buildHouseholdInput(hc, BigDecimal.ZERO, BigDecimal.ZERO, true,
+                HH_TRAD_P, HH_TRAD_S));
+        assertThat(MAPPER.writeValueAsString(depResult.yearlyData()))
+                .as("[%s] include_depression_years toggle must be byte-identical (no CMA provider wired)",
+                        hc.label())
+                .isEqualTo(MAPPER.writeValueAsString(base.yearlyData()));
+    }
+
+    private ProjectionInput buildHouseholdInput(HouseholdCase hc, BigDecimal feeRate, BigDecimal dividendYield,
+                                                boolean includeDepressionYears,
+                                                String tradPrimaryBalance, String tradSpouseBalance) {
+        // Second death 2060 (1965 + 95) is beyond the 2050 horizon => transition only, no truncation.
+        var household = HouseholdContext.of(HH_PRIMARY_BIRTH, 87, HH_SPOUSE_BIRTH, 95,
+                HH_PRIMARY_BIRTH + END_AGE);
+        List<ProjectionAccountInput> accounts = List.of(
+                hhAcct("1400000.0000", "900000.0000", "0.0500", "taxable", "joint"),
+                hhAcct(tradPrimaryBalance, tradPrimaryBalance, "0.0600", "traditional", "primary"),
+                hhAcct(tradSpouseBalance, tradSpouseBalance, "0.0600", "traditional", "spouse"),
+                hhAcct("200000.0000", "200000.0000", "0.0600", "roth", "primary"),
+                hhAcct("100000.0000", "100000.0000", "0.0600", "roth", "spouse"));
+        // Deficit in every retirement year on BOTH sides of the transition (income 47k < 50k
+        // spending both alive; 20k kept SS + 7.5k half-pension = 27.5k < 37.5k scaled after), so
+        // the balance identity runs at its tight flat-$1 tolerance throughout.
+        var incomeSources = List.of(
+                hhSource(HH_SS_PRIMARY_ID, "SS-P", IncomeSourceType.SOCIAL_SECURITY, "20000", "primary", "1"),
+                hhSource(HH_SS_SPOUSE_ID, "SS-S", IncomeSourceType.SOCIAL_SECURITY, "12000", "spouse", "1"),
+                hhSource(HH_PENSION_ID, "Pension", IncomeSourceType.PENSION, "15000", "primary", "0.5"));
+        var spending = new SpendingProfileInput(bd("40000"), bd("10000"), null);
+        var sb = new StringBuilder("{");
+        sb.append("\"birth_year\": ").append(HH_PRIMARY_BIRTH).append(", ");
+        sb.append("\"filing_status\": \"married_filing_jointly\", ");
+        sb.append("\"withdrawal_order\": \"").append(hc.withdrawalOrder()).append("\", ");
+        if ("dynamic_sequencing".equals(hc.withdrawalOrder())) {
+            sb.append("\"dynamic_sequencing_bracket_rate\": 0.12, ");
+        }
+        sb.append("\"survivor_spending_factor\": 0.75, ");
+        sb.append("\"community_property\": ").append(hc.communityProperty()).append(", ");
+        sb.append("\"fee_rate\": ").append(feeRate).append(", ");
+        sb.append("\"dividend_yield\": ").append(dividendYield).append(", ");
+        sb.append("\"include_depression_years\": ").append(includeDepressionYears);
+        sb.append('}');
+        return new ProjectionInput(HH_SCENARIO_ID, "Household invariants", ALWAYS_RETIRED_DATE, END_AGE,
+                bd("0.02"), sb.toString(), accounts, spending, REFERENCE_YEAR, incomeSources,
+                null, List.of(), household);
+    }
+
+    private static HypotheticalAccountInput hhAcct(String balance, String costBasis, String expectedReturn,
+                                                   String type, String owner) {
+        return new HypotheticalAccountInput(bd(balance), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                Optional.of(bd(expectedReturn)), bd(costBasis), type, owner);
+    }
+
+    private static ProjectionIncomeSourceInput hhSource(UUID id, String name, IncomeSourceType type,
+                                                        String amount, String owner, String survivorPercent) {
+        return new ProjectionIncomeSourceInput(id, name, type, bd(amount), 62, null, bd("0.02"),
+                false, "taxable", null, null, null, null, null, null, owner, bd(survivorPercent));
     }
 
     // === Fixture construction ===
