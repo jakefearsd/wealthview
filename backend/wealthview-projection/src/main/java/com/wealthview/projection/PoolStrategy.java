@@ -20,10 +20,12 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 /**
- * Strategy for managing investment pool balances during projection year-loop.
- * SinglePool manages a single aggregate balance; MultiPool manages traditional/roth/taxable.
+ * Strategy for managing investment pool balances during projection year-loop. {@link MultiPool} is
+ * the sole implementation: it manages traditional/roth/taxable sub-pools, with empty pools for any
+ * account type absent from the scenario (audit C11 -- an all-taxable scenario is simply a MultiPool
+ * with zero traditional and zero roth, not a distinct untaxed code path; see {@link #create}).
  */
-sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.MultiPool {
+sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     static final int SCALE = 4;
     static final RoundingMode ROUNDING = RoundingMode.HALF_UP;
@@ -82,7 +84,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      * like any other distribution, folded into the returned ordinary-income reporting (so the
      * Social Security provisional-income convergence and the tax-liability/DTO breakdown all agree),
      * and counts toward RMD satisfaction. See {@code PoolStrategy.MultiPool#growTraditionalGrossUp}
-     * for the fixed-point search. SinglePool computes no tax at all, so this is a no-op there.
+     * for the fixed-point search.
      *
      * @param alreadyChargedBaseTax the dollar amount of ordinary tax on {@code (effectiveOtherIncome
      *     + conversionAmount)} that {@link RetirementWithdrawalProcessor}'s spending-plan surplus
@@ -163,7 +165,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     void floorAtZero();
 
     /**
-     * Deposits a surplus amount into the taxable account (or aggregate balance for SinglePool).
+     * Deposits a surplus amount into the taxable account.
      */
     void depositToTaxable(BigDecimal amount);
 
@@ -221,9 +223,10 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     record ConversionResult(BigDecimal amountConverted, BigDecimal taxLiability, TaxSourceResult taxSource) {}
 
     /**
-     * {@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero for
-     * {@link SinglePool}, which tracks no cost basis). It is broken out separately so the engine
-     * can fold it into the year's federal-tax breakdown -- see {@link RetirementTaxAnnotator}.
+     * {@code ltcgTax} is the long-term capital-gains portion of {@code taxLiability} (zero when no
+     * {@code CapitalGainsTaxCalculator} is wired -- see {@link PoolConfig}). It is broken out
+     * separately so the engine can fold it into the year's federal-tax breakdown -- see
+     * {@link RetirementTaxAnnotator}.
      *
      * <p>{@code realizedLtcgIncome} is the year's realized long-term capital-gains + qualified-
      * dividend INCOME (not tax), floored at zero. The Social Security provisional-income convergence
@@ -239,7 +242,7 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
      * provisional-income fixed-point loop (audit B2) can re-run those steps from an identical
      * starting state each iteration.
      */
-    sealed interface Memento permits SinglePool.SinglePoolMemento, MultiPool.MultiPoolMemento {}
+    sealed interface Memento permits MultiPool.MultiPoolMemento {}
 
     /** Captures the pool's mutable state for later {@link #restore(Memento)}. */
     Memento snapshot();
@@ -347,56 +350,40 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
     }
 
     /**
-     * Factory method that decides whether to create a SinglePool or MultiPool based on the
-     * account types present, and encapsulates all construction details.
+     * Factory method that builds a {@link MultiPool} from the account types present, grouping
+     * accounts by type and encapsulating all construction details. Always builds a MultiPool --
+     * audit C11: an all-taxable (or all-any-single-type, or empty) account list used to dispatch to
+     * a separate {@code SinglePool} strategy that computed NO tax of any kind (not even on outside
+     * income), which silently understated every all-taxable scenario. MultiPool already supports
+     * empty sub-pools (an absent account type just groups to an empty list below), so routing every
+     * scenario through it is a behavior-preserving generalization for mixed portfolios and a
+     * real-taxation fix for the all-taxable ones.
      */
     static PoolStrategy create(List<ProjectionAccountInput> accounts, PoolConfig config) {
         Map<AssetClass, Double> geoMeans = config.geoMeans();
         BigDecimal inflationRate = config.inflationRate();
         BigDecimal feeRate = config.feeRate();
-        if (hasMultipleAccountTypes(accounts)) {
-            Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
-                    .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
+        Map<String, List<ProjectionAccountInput>> grouped = accounts.stream()
+                .collect(Collectors.groupingBy(ProjectionAccountInput::accountType));
 
-            BigDecimal totalBalance = sumInitialBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()))
-                    .add(sumInitialBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of())))
-                    .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
+        BigDecimal totalBalance = sumInitialBalances(grouped.getOrDefault(POOL_TAXABLE, List.of()))
+                .add(sumInitialBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of())))
+                .add(sumInitialBalances(grouped.getOrDefault(POOL_ROTH, List.of())));
 
-            return new MultiPool(grouped,
-                    poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate,
-                            feeRate),
-                    poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate,
-                            feeRate),
-                    poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate,
-                            feeRate),
-                    computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate, feeRate),
-                    config);
-        } else {
-            BigDecimal balance = sumInitialBalances(accounts);
-            return new SinglePool(balance, sumContributions(accounts),
-                    computeWeightedReturn(accounts, balance, geoMeans, inflationRate, feeRate));
-        }
-    }
-
-    private static boolean hasMultipleAccountTypes(List<ProjectionAccountInput> accounts) {
-        long distinctTypes = accounts.stream()
-                .map(ProjectionAccountInput::accountType)
-                .distinct()
-                .count();
-        boolean hasNonTaxable = accounts.stream()
-                .anyMatch(a -> !POOL_TAXABLE.equals(a.accountType()));
-        return distinctTypes > 1 || hasNonTaxable;
+        return new MultiPool(grouped,
+                poolWeightedReturn(grouped.getOrDefault(POOL_TAXABLE, List.of()), geoMeans, inflationRate,
+                        feeRate),
+                poolWeightedReturn(grouped.getOrDefault(POOL_TRADITIONAL, List.of()), geoMeans, inflationRate,
+                        feeRate),
+                poolWeightedReturn(grouped.getOrDefault(POOL_ROTH, List.of()), geoMeans, inflationRate,
+                        feeRate),
+                computeWeightedReturn(accounts, totalBalance, geoMeans, inflationRate, feeRate),
+                config);
     }
 
     private static BigDecimal sumInitialBalances(List<ProjectionAccountInput> accounts) {
         return accounts.stream()
                 .map(ProjectionAccountInput::initialBalance)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private static BigDecimal sumContributions(List<ProjectionAccountInput> accounts) {
-        return accounts.stream()
-                .map(ProjectionAccountInput::annualContribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -427,144 +414,6 @@ sealed interface PoolStrategy permits PoolStrategy.SinglePool, PoolStrategy.Mult
                                                   BigDecimal inflationRate,
                                                   BigDecimal feeRate) {
         return computeWeightedReturn(accounts, sumInitialBalances(accounts), geoMeans, inflationRate, feeRate);
-    }
-
-    // --- SinglePool ---
-
-    final class SinglePool implements PoolStrategy {
-        private BigDecimal balance;
-        private final BigDecimal totalContributions;
-        private final BigDecimal weightedReturn;
-
-        SinglePool(BigDecimal balance, BigDecimal totalContributions, BigDecimal weightedReturn) {
-            this.balance = balance;
-            this.totalContributions = totalContributions;
-            this.weightedReturn = weightedReturn;
-        }
-
-        @Override
-        public BigDecimal getTotal() {
-            return balance;
-        }
-
-        @Override
-        public BigDecimal getTraditional() {
-            return BigDecimal.ZERO;
-        }
-
-        @Override
-        public BigDecimal getWeightedReturn() {
-            return weightedReturn;
-        }
-
-        @Override
-        public BigDecimal applyContributions() {
-            balance = balance.add(totalContributions);
-            return totalContributions;
-        }
-
-        @Override
-        public GrowthResult applyGrowth() {
-            BigDecimal growth = balance.multiply(weightedReturn).setScale(SCALE, ROUNDING);
-            balance = balance.add(growth);
-            return new GrowthResult(growth, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
-        }
-
-        @Override
-        public WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year,
-                                                      BigDecimal effectiveOtherIncome,
-                                                      BigDecimal conversionAmount,
-                                                      BigDecimal rmdAmount, int age,
-                                                      BigDecimal alreadyChargedBaseTax,
-                                                      BigDecimal extraPoolFundedTax,
-                                                      BigDecimal federallyTaxedSocialSecurity) {
-            // Simple path: withdrawal is just min(need, balance); SinglePool tracks no ordinary-tax
-            // bundle to net alreadyChargedBaseTax against (see interface javadoc), and computes no
-            // tax at all -- so the audit-C3 federallyTaxedSocialSecurity state adjustment is ignored
-            // here too (untaxed passthrough). extraPoolFundedTax (audit A4: SE tax / an unfunded
-            // surplus-tax remainder) still has to leave the balance, otherwise it would vanish here
-            // exactly as it used to for MultiPool.
-            BigDecimal withdrawn = need.min(balance);
-            balance = balance.subtract(withdrawn);
-            BigDecimal tax = extraPoolFundedTax.max(BigDecimal.ZERO);
-            if (tax.compareTo(BigDecimal.ZERO) > 0) {
-                balance = balance.subtract(tax);
-            }
-            return new WithdrawalTaxResult(withdrawn, tax,
-                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO,
-                    BigDecimal.ZERO, BigDecimal.ZERO);
-        }
-
-        /** SinglePool holds a single scalar balance, so its memento is just that value. */
-        record SinglePoolMemento(BigDecimal balance) implements Memento {}
-
-        @Override
-        public Memento snapshot() {
-            return new SinglePoolMemento(balance);
-        }
-
-        @Override
-        public void restore(Memento memento) {
-            if (memento instanceof SinglePoolMemento m) {
-                this.balance = m.balance();
-            }
-        }
-
-        @Override
-        public ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
-                                                       BigDecimal rmdAmount,
-                                                       BigDecimal federallyTaxedSocialSecurity) {
-            // No-op for single pool
-            return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
-        }
-
-        @Override
-        public void floorAtZero() {
-            if (balance.compareTo(BigDecimal.ZERO) < 0) {
-                balance = BigDecimal.ZERO;
-            }
-        }
-
-        @Override
-        public void depositToTaxable(BigDecimal amount) {
-            balance = balance.add(amount);
-        }
-
-        @Override
-        public ProjectionYearDto buildYearDto(YearDtoContext ctx) {
-            return ProjectionYearDto.simple(ctx.year(), ctx.age(), ctx.startBalance(), ctx.contributions(),
-                    ctx.totalGrowth(), ctx.withdrawals(), balance, ctx.retired());
-        }
-
-        @Override
-        public BigDecimal getMagi() {
-            return BigDecimal.ZERO;
-        }
-
-        @Override
-        public FilingStatus getFilingStatus() {
-            return FilingStatus.SINGLE;
-        }
-
-        @Override
-        public boolean processIncomeSourcesEveryYear() {
-            return false;
-        }
-
-        @Override
-        public boolean tracksSETax() {
-            return false;
-        }
-
-        @Override
-        public BigDecimal computeEffectiveOtherIncome(BigDecimal activeIncome, BigDecimal incomeSourceCash) {
-            return BigDecimal.ZERO;
-        }
-
-        @Override
-        public String logTag() {
-            return "Projection";
-        }
     }
 
     // --- MultiPool ---

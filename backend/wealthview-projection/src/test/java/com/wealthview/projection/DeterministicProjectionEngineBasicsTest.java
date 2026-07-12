@@ -222,6 +222,9 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
 
     @Test
     void run_noAccountTypes_backwardsCompatible() {
+        // Audit C11: an all-taxable account list now always builds a MultiPool (with empty
+        // traditional/roth sub-pools), never the old untaxed SinglePool -- so the per-pool balance
+        // fields are populated (zero for the absent pools), not null.
         var input = createInput(
                 LocalDate.now().plusYears(30), 90, bd("0.0300"),
                 """
@@ -232,9 +235,9 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.traditionalBalance()).isNull();
-        assertThat(year1.rothBalance()).isNull();
-        assertThat(year1.taxableBalance()).isNull();
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.rothBalance()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.taxableBalance()).isNotNull();
     }
 
     // ── Per-Pool Transparency Tests ──
@@ -264,7 +267,12 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
     }
 
     @Test
-    void run_singlePool_perPoolFieldsAreNull() {
+    void run_allTaxableAccounts_perPoolGrowthFieldsArePopulated() {
+        // Audit C11: an all-taxable scenario is a real MultiPool now, so the per-pool growth field
+        // is populated (taxableGrowth non-null; traditional/roth zero, not null) -- the opposite of
+        // the pre-fix SinglePool contract this test used to pin. withdrawalFromTraditional/Roth stay
+        // null: this is a pre-retirement, no-withdrawal year, and the DTO's "positive value or null"
+        // convention (MultiPoolYearDtoBuilder#positiveOrNull) leaves zero withdrawals null.
         var input = createInput(
                 LocalDate.now().plusYears(30), 90, bd("0.0300"),
                 """
@@ -275,13 +283,9 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
         var result = engine.run(input);
 
         var year1 = result.yearlyData().getFirst();
-        assertThat(year1.taxableGrowth()).isNull();
-        assertThat(year1.traditionalGrowth()).isNull();
-        assertThat(year1.rothGrowth()).isNull();
-        assertThat(year1.taxPaidFromTaxable()).isNull();
-        assertThat(year1.taxPaidFromTraditional()).isNull();
-        assertThat(year1.taxPaidFromRoth()).isNull();
-        assertThat(year1.withdrawalFromTaxable()).isNull();
+        assertThat(year1.taxableGrowth()).isEqualByComparingTo(year1.growth());
+        assertThat(year1.traditionalGrowth()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(year1.rothGrowth()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(year1.withdrawalFromTraditional()).isNull();
         assertThat(year1.withdrawalFromRoth()).isNull();
     }

@@ -19,9 +19,9 @@ class IncomeContributionCalculator {
      * @param yearsFromBase a 1-INDEXED count of calendar years since the projection's base year
      *     (audit C7: {@code (taxYear - baseYear) + 1}, floored by the caller so the base year and
      *     any earlier year are 1) — NOT years since retirement. {@link IncomeSourceProcessor#process}
-     *     takes the same parameter; the two are the accumulation-phase (this class, SinglePool only)
-     *     and retirement-phase halves of income processing and must anchor their deflation clock
-     *     identically.
+     *     takes the same parameter; the two are the accumulation-phase (this class, used only when
+     *     {@code !pool.processIncomeSourcesEveryYear()}) and retirement-phase halves of income
+     *     processing and must anchor their deflation clock identically.
      */
     BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
                        BigDecimal scenarioInflationRate) {

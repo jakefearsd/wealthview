@@ -14,18 +14,20 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Golden-master characterization test for {@link PoolStrategy} (and its two sealed
- * implementations {@code SinglePool} and {@code MultiPool}).
+ * Golden-master characterization test for {@link PoolStrategy}, whose sole implementation is
+ * {@code MultiPool} (audit C11 retired the untaxed {@code SinglePool} branch: an all-taxable
+ * scenario is now just a MultiPool with zero traditional and zero roth sub-pools).
  *
  * <p>{@code PoolStrategy} is fully deterministic — it contains no randomness; balances,
  * growth, contributions and withdrawals are pure arithmetic over the input accounts.
  * The same accounts and {@code PoolConfig} always produce the same numbers, so no seed
  * seam is needed.
  *
- * <p>Two fixtures pin the factory's dispatch and both branches of the public API:
+ * <p>Two fixtures pin the factory's dispatch and both shapes of the public API:
  * <ul>
- *   <li><b>SinglePool</b> — all-taxable accounts collapse into one aggregate balance.</li>
- *   <li><b>MultiPool</b> — mixed traditional / roth / taxable accounts kept in separate
+ *   <li><b>all-taxable</b> — a single account type collapses to zero traditional/roth
+ *       sub-pools, but is still a real, tax-aware {@code MultiPool}.</li>
+ *   <li><b>mixed</b> — traditional / roth / taxable accounts kept in separate
  *       sub-pools, with taxable-first withdrawal ordering.</li>
  * </ul>
  * Every value below was produced by {@code PoolStrategy} itself and sanity-checked
@@ -40,7 +42,7 @@ class PoolStrategyCharacterizationTest {
                 "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null);
     }
 
-    private static PoolStrategy singlePool() {
+    private static PoolStrategy allTaxablePool() {
         return PoolStrategy.create(
                 List.of(
                         new HypotheticalAccountInput(bd("200000"), bd("12000"), bd("0.06"), "taxable"),
@@ -58,17 +60,25 @@ class PoolStrategyCharacterizationTest {
     }
 
     @Test
-    void create_allTaxableAccounts_buildsSinglePool() {
-        var pool = singlePool();
+    void create_allTaxableAccounts_buildsMultiPoolWithZeroTraditionalAndRoth() {
+        // Audit C11: the factory no longer special-cases an all-taxable account list into a
+        // separate untaxed SinglePool -- it is a real MultiPool with empty traditional/roth
+        // sub-pools. Totals and weighted return are unchanged from the pre-fix numbers (both were
+        // always derived the same way), but the CLASS and the downstream taxation behavior differ.
+        var pool = allTaxablePool();
 
-        assertThat(pool.getClass().getSimpleName()).isEqualTo("SinglePool");
+        assertThat(pool.getClass().getSimpleName()).isEqualTo("MultiPool");
+        assertThat(pool.getTraditional()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(pool.getTotal()).isEqualByComparingTo(bd("300000"));
         assertThat(pool.getWeightedReturn()).isEqualByComparingTo(bd("0.06666667"));
     }
 
     @Test
-    void singlePool_applyContributionsThenGrowth_pinsBalances() {
-        var pool = singlePool();
+    void allTaxablePool_applyContributionsThenGrowth_pinsBalances() {
+        // Bit-identical to the pre-C11 SinglePool numbers: with dividendYield=0 and feeRate=0
+        // (fixedConfig's 9-arg PoolConfig), MultiPool's taxable-lot growth is designed to reproduce
+        // the scalar-balance growth exactly (see PoolStrategy.MultiPool#applyGrowth javadoc).
+        var pool = allTaxablePool();
 
         BigDecimal contributions = pool.applyContributions();
         PoolStrategy.GrowthResult growth = pool.applyGrowth();
@@ -79,8 +89,11 @@ class PoolStrategyCharacterizationTest {
     }
 
     @Test
-    void singlePool_executeWithdrawals_pinsRemainingBalance() {
-        var pool = singlePool();
+    void allTaxablePool_executeWithdrawals_pinsRemainingBalance() {
+        // No tax calculator is wired in fixedConfig, so the withdrawal is still tax-free here --
+        // this test only pins the balance arithmetic, not audit C11's taxation consequence (see the
+        // golden-file goldens for that).
+        var pool = allTaxablePool();
         pool.applyContributions();
         pool.applyGrowth();
 

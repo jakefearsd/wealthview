@@ -130,7 +130,13 @@ class MultiPoolDeepTest {
     // ---- factory method ----
 
     @Test
-    void create_onlyTaxableAccounts_returnsSinglePool() {
+    void create_onlyTaxableAccounts_returnsMultiPoolWithZeroTraditionalAndRoth() {
+        // Audit C11: an all-taxable account list used to dispatch to a separate, entirely untaxed
+        // SinglePool (income sources never processed, SE tax never tracked, filing status hardcoded
+        // SINGLE regardless of config). It now returns a real MultiPool with empty traditional/roth
+        // sub-pools -- processIncomeSourcesEveryYear()/tracksSETax() flip from false to true and
+        // computeEffectiveOtherIncome sums its arguments instead of discarding them: the intended
+        // consequence of routing all-taxable scenarios through real taxation.
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("100000"), bd("5000"), bd("0.07"), "taxable"));
         var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
@@ -138,14 +144,15 @@ class MultiPoolDeepTest {
 
         var strategy = PoolStrategy.create(accounts, config);
 
-        assertThat(strategy).isInstanceOf(PoolStrategy.SinglePool.class);
+        assertThat(strategy).isInstanceOf(PoolStrategy.MultiPool.class);
+        assertThat(strategy.getTraditional()).isEqualByComparingTo(ZERO);
         assertThat(strategy.getTotal()).isEqualByComparingTo(bd("100000"));
         assertThat(strategy.getFilingStatus()).isEqualTo(FilingStatus.SINGLE);
-        assertThat(strategy.processIncomeSourcesEveryYear()).isFalse();
-        assertThat(strategy.tracksSETax()).isFalse();
+        assertThat(strategy.processIncomeSourcesEveryYear()).isTrue();
+        assertThat(strategy.tracksSETax()).isTrue();
         assertThat(strategy.getMagi()).isEqualByComparingTo(ZERO);
-        assertThat(strategy.computeEffectiveOtherIncome(bd("1"), bd("2"))).isEqualByComparingTo(ZERO);
-        assertThat(strategy.logTag()).isEqualTo("Projection");
+        assertThat(strategy.computeEffectiveOtherIncome(bd("1"), bd("2"))).isEqualByComparingTo(bd("3"));
+        assertThat(strategy.logTag()).isEqualTo("Projection with pools");
     }
 
     @Test
@@ -470,17 +477,19 @@ class MultiPoolDeepTest {
     }
 
     @Test
-    void executeRothConversionOverride_onSinglePool_delegatesToDefault() {
+    void executeRothConversionOverride_allTaxableAccounts_emptyTraditional_returnsZero() {
+        // Audit C11: an all-taxable account list is now a MultiPool with an empty traditional
+        // sub-pool, so MultiPool's own override guard (traditional <= 0) short-circuits -- there is
+        // no more SinglePool default-method delegation path to exercise here.
         var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                 WithdrawalOrder.TAXABLE_FIRST, null, null);
-        var single = PoolStrategy.create(
+        var allTaxable = PoolStrategy.create(
                 List.<ProjectionAccountInput>of(
                         new HypotheticalAccountInput(bd("100000"), ZERO, ZERO, "taxable")),
                 config);
 
-        var r = single.executeRothConversionOverride(YEAR, ZERO, bd("1000"), ZERO);
+        var r = allTaxable.executeRothConversionOverride(YEAR, ZERO, bd("1000"), ZERO);
 
-        // SinglePool.executeRothConversion returns ZERO → default delegates to same
         assertThat(r.amountConverted()).isEqualByComparingTo(ZERO);
     }
 
@@ -653,57 +662,45 @@ class MultiPoolDeepTest {
         assertThat(dto.saltDeduction()).isNull();
     }
 
-    // ---- SinglePool spot-checks ----
+    // ---- all-taxable MultiPool spot-checks (audit C11: formerly SinglePool) ----
 
     @Test
-    void singlePool_applyContributionsGrowthWithdrawFloorDeposit() {
+    void allTaxableAccounts_applyContributionsGrowthWithdrawFloorDeposit() {
+        // Bit-identical arithmetic to the pre-C11 SinglePool spot-check: no tax calculator is wired,
+        // so this pins balance/growth/withdrawal math only, not the taxation consequence of C11.
         var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
                 WithdrawalOrder.TAXABLE_FIRST, null, null);
-        var sp = PoolStrategy.create(
+        var pool = PoolStrategy.create(
                 List.<ProjectionAccountInput>of(
                         new HypotheticalAccountInput(bd("1000"), bd("100"), bd("0.10"), "taxable")),
                 config);
+        assertThat(pool).isInstanceOf(PoolStrategy.MultiPool.class);
 
-        sp.applyContributions();
-        assertThat(sp.getTotal()).isEqualByComparingTo(bd("1100"));
+        pool.applyContributions();
+        assertThat(pool.getTotal()).isEqualByComparingTo(bd("1100"));
 
-        var g = sp.applyGrowth();
+        var g = pool.applyGrowth();
         assertThat(g.total()).isEqualByComparingTo(bd("110"));
 
-        var w = sp.executeWithdrawals(bd("50"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
+        var w = pool.executeWithdrawals(bd("50"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         assertThat(w.totalWithdrawn()).isEqualByComparingTo(bd("50"));
 
-        sp.depositToTaxable(bd("25"));
-        sp.floorAtZero(); // positive balance → no-op
-        assertThat(sp.getTotal()).isEqualByComparingTo(bd("1185"));
+        pool.depositToTaxable(bd("25"));
+        pool.floorAtZero(); // positive traditional/roth (both zero) → no-op
+        assertThat(pool.getTotal()).isEqualByComparingTo(bd("1185"));
     }
 
-    @Test
-    void singlePool_floorAtZero_clampsNegativeBalance() {
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
-        var sp = PoolStrategy.create(
-                List.<ProjectionAccountInput>of(
-                        new HypotheticalAccountInput(bd("100"), ZERO, ZERO, "taxable")),
-                config);
+    // Note: the pre-C11 SinglePool "floorAtZero clamps a negative balance driven by
+    // depositToTaxable(negative)" spot-check has no MultiPool equivalent -- MultiPool's
+    // floorAtZero() only clamps the scalar traditional/roth pools (see its javadoc: taxable lots
+    // can never go negative via the real sellFifo path), so a synthetic negative deposit into the
+    // taxable lots is not floored. depositToTaxable is only ever called in production with a
+    // positive surplus (RetirementWithdrawalProcessor), so this is not a reachable regression;
+    // floorAtZero_clampsNegativePools above already covers the real (traditional/roth) invariant.
 
-        sp.depositToTaxable(bd("-200"));
-        sp.floorAtZero();
-
-        assertThat(sp.getTotal()).isEqualByComparingTo(ZERO);
-    }
-
-    @Test
-    void singlePool_executeRothConversion_alwaysReturnsZero() {
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
-        var sp = PoolStrategy.create(
-                List.<ProjectionAccountInput>of(
-                        new HypotheticalAccountInput(bd("100"), ZERO, ZERO, "taxable")),
-                config);
-
-        assertThat(sp.executeRothConversion(YEAR, ZERO, ZERO).amountConverted()).isEqualByComparingTo(ZERO);
-    }
+    // Note: the pre-C11 SinglePool "executeRothConversion always returns zero" spot-check is
+    // superseded by executeRothConversion_emptyTraditional_returnsZero above, which already covers
+    // MultiPool's real reason for returning zero when there is no traditional balance to convert.
 
     // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===
 

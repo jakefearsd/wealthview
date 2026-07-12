@@ -1,10 +1,12 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
@@ -33,6 +35,17 @@ class RetirementTaxAnnotatorTest {
                 BigDecimal.ZERO, BigDecimal.valueOf(50_000), BigDecimal.valueOf(950_000), true);
     }
 
+    /**
+     * PoolStrategy is sealed with {@code MultiPool} as its sole implementation (audit C11 retired
+     * the SinglePool branch) and cannot be mocked; an empty-accounts MultiPool configured with
+     * FilingStatus.SINGLE is all {@code annotate()} needs from the pool in these tests.
+     */
+    private static PoolStrategy filingStatusOnlyPool() {
+        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
+                "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null);
+        return new PoolStrategy.MultiPool(Map.of(), BigDecimal.ZERO, config);
+    }
+
     @Test
     void annotate_retiredYearWithLtcgTax_foldsLtcgIntoFederalTaxComponent() {
         // Ordinary tax on $0 taxable income (no traditional withdrawal/conversion/other income
@@ -46,9 +59,7 @@ class RetirementTaxAnnotatorTest {
         // branch is a no-op and doesn't NPE on an unstubbed mock.
         when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(BigDecimal.ZERO);
-        // PoolStrategy is sealed and cannot be mocked; SinglePool.getFilingStatus() always returns
-        // SINGLE, which is all annotate() needs from the pool here.
-        PoolStrategy pool = new PoolStrategy.SinglePool(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        PoolStrategy pool = filingStatusOnlyPool();
 
         var ltcgTax = new BigDecimal("5308.2164");
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
@@ -75,9 +86,7 @@ class RetirementTaxAnnotatorTest {
                 .thenReturn(ordinaryBreakdown);
         when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(BigDecimal.ZERO);
-        // PoolStrategy is sealed and cannot be mocked; SinglePool.getFilingStatus() always returns
-        // SINGLE, which is all annotate() needs from the pool here.
-        PoolStrategy pool = new PoolStrategy.SinglePool(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        PoolStrategy pool = filingStatusOnlyPool();
 
         var ltcgTax = new BigDecimal("1964.6018");
         var totalTaxLiability = ordinaryFederal.add(ordinaryState).add(ltcgTax);
@@ -107,9 +116,7 @@ class RetirementTaxAnnotatorTest {
                 .thenReturn(ordinaryBreakdown);
         when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(BigDecimal.ZERO);
-        // PoolStrategy is sealed and cannot be mocked; SinglePool.getFilingStatus() always returns
-        // SINGLE, which is all annotate() needs from the pool here.
-        PoolStrategy pool = new PoolStrategy.SinglePool(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        PoolStrategy pool = filingStatusOnlyPool();
 
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(30_000), BigDecimal.ZERO, BigDecimal.ZERO,
@@ -138,7 +145,7 @@ class RetirementTaxAnnotatorTest {
                 .thenReturn(ordinaryBreakdown);
         when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(BigDecimal.ZERO);
-        PoolStrategy pool = new PoolStrategy.SinglePool(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        PoolStrategy pool = filingStatusOnlyPool();
 
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 totalTaxableIncome, BigDecimal.ZERO, BigDecimal.ZERO,
