@@ -285,11 +285,20 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * (additive) and funded from the pools; broken out here so the engine can surface it as its own
      * DTO field. Roth conversions are OUT OF SCOPE -- converted dollars move internally to Roth,
      * they are not withdrawn to the household.
+     *
+     * <p>{@code ordinaryInterestIncome} (audit C1) is the year's ordinary-interest income (the
+     * taxable pool's bond+cash sleeve), floored at zero. Unlike {@code realizedLtcgIncome} it is
+     * NOT LTCG income -- it is already folded into the ORDINARY {@code taxableIncome} bundle
+     * {@code taxLiability} was computed from (see {@code executeWithdrawals}); broken out here so
+     * callers can fold it into the Social Security provisional-income convergence
+     * ({@code realizedPortfolioTaxable}) and the displayed tax-breakdown recompute
+     * ({@link RetirementTaxAnnotator}) the same way {@code fromTraditional}/{@code conversionAmount}
+     * already are.
      */
     record WithdrawalTaxResult(BigDecimal totalWithdrawn, BigDecimal taxLiability,
                                BigDecimal fromTaxable, BigDecimal fromTraditional, BigDecimal fromRoth,
                                TaxSourceResult taxSource, BigDecimal ltcgTax, BigDecimal realizedLtcgIncome,
-                               BigDecimal earlyWithdrawalPenalty) {}
+                               BigDecimal earlyWithdrawalPenalty, BigDecimal ordinaryInterestIncome) {}
 
     /**
      * Opaque, per-implementation snapshot of a pool's mutable state, taken AFTER the year's growth
@@ -322,6 +331,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal inflationRate,
             CapitalGainsTaxCalculator capitalGainsTaxCalculator,
             BigDecimal dividendYield,
+            BigDecimal interestYield,
             BigDecimal feeRate,
             int baseYear,
             FederalTaxCalculator federalTaxCalculator) {
@@ -332,7 +342,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * overrides (the legacy {@code expectedReturn} path). No capital-gains calculator and a
          * zero dividend yield, so the taxable pool tracks cost basis but realizes no LTCG tax and
          * no dividend drag — the pre-lots scalar behavior, bit-for-bit. Zero fee rate for the same
-         * reason (audit B1) — these legacy callers stay fee-free.
+         * reason (audit B1) — these legacy callers stay fee-free. Zero interest yield for the same
+         * reason (audit C1) — these legacy callers realize no bond-sleeve interest either.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -340,13 +351,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                    TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
+                    Map.of(), BigDecimal.ZERO, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
         }
 
         /**
          * Back-compat constructor for allocation-driven callers that predate capital-gains taxation:
-         * supplies capital-market means and inflation but no LTCG calculator / dividend yield / fee
-         * rate / federal standard-deduction source.
+         * supplies capital-market means and inflation but no LTCG calculator / dividend yield /
+         * interest yield / fee rate / federal standard-deduction source.
          */
         PoolConfig(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
                    String rothConversionStrategy, BigDecimal targetBracketRate,
@@ -355,7 +366,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                    Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
-                    geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
+                    geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
         }
     }
 
@@ -388,6 +399,36 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             grossReal = BigDecimal.valueOf(blended).setScale(SCALE + 4, ROUNDING);
         }
         return grossReal.subtract(feeRate);
+    }
+
+    /**
+     * Audit C1: the balance-weighted "equity share" (us_stock + intl_stock weight) of a set of
+     * taxable accounts, used to split the taxable pool's annual yield between qualified-dividend
+     * treatment (the equity share, at {@code dividendYield}) and ordinary-interest treatment (the
+     * remaining bond+cash share, at {@code interestYield} — {@link AssetClass#CASH} is treated as
+     * bond-like ordinary interest at the same proxy rate; a distinct money-market yield is not
+     * modeled). Computed ONCE from each account's INITIAL balance/allocation, exactly like {@link
+     * #realReturnFor}'s per-account return — it does not track allocation drift as the pool's
+     * composition or relative balances change over the projection horizon.
+     *
+     * <p>Returns {@link BigDecimal#ONE} (100% equity, 0% bond/cash) when the accounts carry no
+     * balance at all — the split is then moot (there is no taxable value to distribute a yield
+     * against), and defaulting to the ALL_US-equivalent share keeps this degenerate case on the
+     * same code path as the byte-identical backward-compat anchor.
+     */
+    static BigDecimal taxableEquityShare(List<ProjectionAccountInput> taxableAccounts) {
+        BigDecimal totalBalance = sumInitialBalances(taxableAccounts);
+        if (totalBalance.signum() <= 0) {
+            return BigDecimal.ONE;
+        }
+        BigDecimal weighted = BigDecimal.ZERO;
+        for (var acct : taxableAccounts) {
+            BigDecimal weights0 = acct.allocation().weights().getOrDefault(AssetClass.US_STOCK, BigDecimal.ZERO);
+            BigDecimal equityWeight = weights0.add(
+                    acct.allocation().weights().getOrDefault(AssetClass.INTL_STOCK, BigDecimal.ZERO));
+            weighted = weighted.add(acct.initialBalance().multiply(equityWeight));
+        }
+        return weighted.divide(totalBalance, SCALE + 4, ROUNDING);
     }
 
     /**
@@ -515,6 +556,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * income to stack it on) so only retirement-year dividends are taxed.
          */
         private BigDecimal qualifiedDividendIncome = BigDecimal.ZERO;
+        /**
+         * Audit C1: the current year's ordinary-interest income (bond+cash share of the taxable
+         * pool's yield, at {@link #interestYield}), booked in {@link #applyGrowth()} alongside
+         * {@link #qualifiedDividendIncome} and consumed as ORDINARY income (not LTCG) in {@link
+         * #executeWithdrawals} — it joins {@code taxableIncome} directly, the same bundle {@code
+         * effectiveOtherIncome}/{@code conversionAmount}/the traditional distribution feed. Reset
+         * each {@code applyGrowth}; like the dividend, only retirement-year interest is ever taxed.
+         */
+        private BigDecimal ordinaryInterestIncome = BigDecimal.ZERO;
 
         private final BigDecimal tradContrib;
         private final BigDecimal rothContrib;
@@ -538,6 +588,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         // preserving pre-lots behavior for callers that don't wire capital gains).
         private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
         private final BigDecimal dividendYield;
+        /** Audit C1: nominal annual coupon proxy for the taxable pool's bond+cash sleeve. */
+        private final BigDecimal interestYield;
+        /**
+         * Audit C1: the taxable pool's balance-weighted equity share (us_stock + intl_stock),
+         * computed once at construction via {@link PoolStrategy#taxableEquityShare} — {@code 1.0}
+         * (bond share {@code 0.0}) for every ALL_US or no-allocation account, the byte-identical
+         * backward-compat anchor for {@link #applyGrowth()}'s yield split.
+         */
+        private final BigDecimal taxableEquityShare;
         private final BigDecimal inflationRate;
         private final int baseYear;
         /**
@@ -564,9 +623,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // Seed one FIFO lot per taxable account: basis = its cost basis, value = its balance,
             // so any embedded (unrealized) gain is carried into the projection.
             this.lots = new TaxableLotsBd();
-            for (var acct : grouped.getOrDefault(POOL_TAXABLE, List.of())) {
+            var taxableAccounts = grouped.getOrDefault(POOL_TAXABLE, List.of());
+            for (var acct : taxableAccounts) {
                 lots.addLot(acct.costBasis(), acct.initialBalance());
             }
+            // Audit C1: the taxable pool's own allocation-derived equity share, computed once from
+            // the same account list the lots above were seeded from.
+            this.taxableEquityShare = taxableEquityShare(taxableAccounts);
             this.traditional = sumBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
             this.roth = sumBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
 
@@ -589,6 +652,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.dynamicSequencingBracketRate = config.dynamicSequencingBracketRate();
             this.capitalGainsTaxCalculator = config.capitalGainsTaxCalculator();
             this.dividendYield = config.dividendYield();
+            this.interestYield = config.interestYield();
             this.inflationRate = config.inflationRate();
             this.baseYear = config.baseYear();
             this.federalTaxCalculator = config.federalTaxCalculator();
@@ -634,19 +698,50 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             BigDecimal tradGrowth = traditional.multiply(traditionalReturn).setScale(SCALE, ROUNDING);
             BigDecimal rothGrowth = roth.multiply(rothReturn).setScale(SCALE, ROUNDING);
 
-            // Split the taxable return: existing lots appreciate at (r − dividendYield); the
-            // dividend (≈ value × dividendYield) is reinvested as a fresh at-cost lot. The dividend
-            // is booked as the residual to the exact target total, so the taxable pool still grows
-            // at precisely r (bit-identical to the pre-lots scalar path when dividendYield is 0).
-            // The dividend becomes this year's qualifiedDividendIncome and is TAXED only at
-            // withdrawal time (retirement); during accumulation it resets each year unconsumed.
+            // Split the taxable return: existing lots appreciate at (r − blendedYield); the
+            // distribution (≈ value × blendedYield) is reinvested as a fresh at-cost lot, booked as
+            // the residual to the exact target total, so the taxable pool still grows at precisely
+            // r regardless of the split (bit-identical to the pre-lots scalar path when both yields
+            // are 0). Audit C1: the distribution itself is then split BETWEEN qualified-dividend
+            // income (the equity share, taxableEquityShare, at dividendYield — TAXED as LTCG/
+            // qualified-dividend income, unchanged from pre-C1) and ordinary-interest income (the
+            // remaining bond+cash share, at interestYield — TAXED as ORDINARY income instead). Both
+            // are consumed only at withdrawal time (retirement); during accumulation both reset each
+            // year unconsumed, exactly like the pre-C1 dividend-only behavior.
+            //
+            // bondShare == 0 (every ALL_US / no-allocation account, taxableEquityShare == 1) takes a
+            // SEPARATE, byte-identical-to-pre-C1 code path rather than the general proportional
+            // split below — interestYield is then completely irrelevant, and this avoids any
+            // BigDecimal scale/precision drift the general division-based split could otherwise
+            // introduce for the single most common account shape (the backward-compat anchor).
             BigDecimal taxableBefore = lots.totalValue();
             BigDecimal taxableGrowth = taxableBefore.multiply(taxableReturn).setScale(SCALE, ROUNDING);
             BigDecimal targetTotal = taxableBefore.add(taxableGrowth);
-            lots.grow(taxableReturn.subtract(dividendYield));
-            BigDecimal dividend = targetTotal.subtract(lots.totalValue());
-            lots.addLot(dividend);
-            qualifiedDividendIncome = dividend.max(BigDecimal.ZERO);
+            BigDecimal bondShare = BigDecimal.ONE.subtract(taxableEquityShare);
+
+            if (bondShare.signum() == 0) {
+                lots.grow(taxableReturn.subtract(dividendYield));
+                BigDecimal dividend = targetTotal.subtract(lots.totalValue());
+                lots.addLot(dividend);
+                qualifiedDividendIncome = dividend.max(BigDecimal.ZERO);
+                ordinaryInterestIncome = BigDecimal.ZERO;
+            } else {
+                BigDecimal equityYieldRate = taxableEquityShare.multiply(dividendYield);
+                BigDecimal blendedYield = equityYieldRate.add(bondShare.multiply(interestYield));
+                lots.grow(taxableReturn.subtract(blendedYield));
+                BigDecimal totalDistribution = targetTotal.subtract(lots.totalValue());
+                lots.addLot(totalDistribution);
+
+                if (blendedYield.signum() != 0) {
+                    BigDecimal dividendPortion = totalDistribution.multiply(equityYieldRate)
+                            .divide(blendedYield, SCALE + 4, ROUNDING);
+                    qualifiedDividendIncome = dividendPortion.max(BigDecimal.ZERO);
+                    ordinaryInterestIncome = totalDistribution.subtract(dividendPortion).max(BigDecimal.ZERO);
+                } else {
+                    qualifiedDividendIncome = BigDecimal.ZERO;
+                    ordinaryInterestIncome = BigDecimal.ZERO;
+                }
+            }
 
             traditional = traditional.add(tradGrowth);
             roth = roth.add(rothGrowth);
@@ -710,7 +805,16 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // provisional-income convergence (audit B2).
             BigDecimal realizedLtcgIncome = realizedGain.add(qualifiedDividendIncome).max(BigDecimal.ZERO);
 
-            BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount);
+            // Audit C1: this year's ordinary-interest income (the taxable pool's bond+cash sleeve,
+            // booked in applyGrowth) joins the ORDINARY bundle directly -- unlike qualifiedDividend/
+            // realizedGain, it is NOT LTCG income, so it does NOT flow through realizedLtcgIncome
+            // above (no LTCG-rate treatment, no LTCG-bracket floor stacking). It DOES flow through
+            // the same ordinary path effectiveOtherIncome/conversionAmount/traditionalOrdinaryIncome
+            // already take: the full taxableIncome bundle below (which feeds the Social Security
+            // provisional-income convergence via realizedPortfolioTaxable -- see
+            // YearFinanceResolver -- and the state base for capital-gains-as-ordinary states).
+            BigDecimal taxableIncome = traditionalOrdinaryIncome.add(effectiveOtherIncome).add(conversionAmount)
+                    .add(ordinaryInterestIncome);
             var ordinaryTax = computeOrdinaryTax(taxableIncome, year, effectiveOtherIncome,
                     conversionAmount, alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity);
             CombinedTaxResult detailed = ordinaryTax.detailed();
@@ -779,7 +883,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                     fromTaxable.add(fromTraditional).add(fromRoth).add(rmdForced),
                     totalWithdrawalTax.add(earlyWithdrawalPenalty),
                     fromTaxable, traditionalOrdinaryIncome, fromRoth, withdrawalTaxSource, ltcgTax,
-                    realizedLtcgIncome, earlyWithdrawalPenalty);
+                    realizedLtcgIncome, earlyWithdrawalPenalty, ordinaryInterestIncome);
         }
 
         /** The year's ordinary-income tax bundle: the net pool-funded tax plus the detailed result. */
@@ -988,17 +1092,19 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         /**
          * Snapshot of MultiPool's mutable state: a deep copy of the taxable FIFO lots plus the
-         * scalar traditional/roth balances, this year's booked qualified dividend, and the last tax
-         * breakdown. Restoring returns the pool to its exact post-growth, pre-withdrawal state.
+         * scalar traditional/roth balances, this year's booked qualified dividend and (audit C1)
+         * ordinary interest, and the last tax breakdown. Restoring returns the pool to its exact
+         * post-growth, pre-withdrawal state.
          */
         record MultiPoolMemento(List<BigDecimal[]> lots, BigDecimal traditional,
                                 BigDecimal roth, BigDecimal qualifiedDividendIncome,
+                                BigDecimal ordinaryInterestIncome,
                                 Optional<CombinedTaxResult> lastTaxBreakdown) implements Memento {}
 
         @Override
         public Memento snapshot() {
             return new MultiPoolMemento(lots.snapshot(), traditional, roth,
-                    qualifiedDividendIncome, lastTaxBreakdown);
+                    qualifiedDividendIncome, ordinaryInterestIncome, lastTaxBreakdown);
         }
 
         @Override
@@ -1008,6 +1114,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 this.traditional = m.traditional();
                 this.roth = m.roth();
                 this.qualifiedDividendIncome = m.qualifiedDividendIncome();
+                this.ordinaryInterestIncome = m.ordinaryInterestIncome();
                 this.lastTaxBreakdown = m.lastTaxBreakdown();
             }
         }

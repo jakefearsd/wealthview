@@ -33,6 +33,14 @@ final class RetirementTaxAnnotator {
      * ordinary income tax) -- both must be added into the federal component here too, or
      * {@code federalTax + stateTax} silently falls short of {@code taxLiability} in any year either
      * one is present. Zero when not applicable.
+     *
+     * <p>{@code ordinaryInterestIncome} (audit C1) is the year's ordinary-interest income (the
+     * taxable pool's bond+cash sleeve) -- UNLIKE the other two additive components above, it is NOT
+     * added on top of the recompute below; it is folded INTO {@code totalTaxableIncome} (the base
+     * the recompute itself taxes), matching exactly how {@link PoolStrategy.MultiPool#executeWithdrawals}
+     * folds it into its own {@code taxableIncome} bundle -- see that method's javadoc. Omitting it
+     * here would make the DISPLAYED federal/state breakdown silently disagree with the actually-
+     * funded {@code taxLiability} whenever a bond-allocated taxable account realizes interest.
      */
     record AnnotationContext(
             boolean retired,
@@ -49,7 +57,8 @@ final class RetirementTaxAnnotator {
             BigDecimal federallyTaxedSocialSecurity,
             BigDecimal irmaaSurcharge,
             BigDecimal selfEmploymentTax,
-            BigDecimal earlyWithdrawalPenalty) {
+            BigDecimal earlyWithdrawalPenalty,
+            BigDecimal ordinaryInterestIncome) {
     }
 
     /**
@@ -74,7 +83,7 @@ final class RetirementTaxAnnotator {
 
         if (taxStrategy != null && taxLiability.compareTo(BigDecimal.ZERO) > 0 && retired) {
             BigDecimal totalTaxableIncome = wdFromTraditional.add(conversionAmount)
-                    .add(effectiveOtherIncome);
+                    .add(effectiveOtherIncome).add(annCtx.ordinaryInterestIncome());
             var filingStatus = pool.getFilingStatus();
             var breakdown = taxStrategy.computeDetailedTax(totalTaxableIncome, year, filingStatus,
                     realizedLtcgIncome, federallyTaxedSocialSecurity);

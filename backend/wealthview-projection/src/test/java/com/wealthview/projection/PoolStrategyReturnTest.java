@@ -122,7 +122,7 @@ class PoolStrategyReturnTest {
     void multiPool_perPoolGrowth_subtractsFeeRateUniformlyAcrossPools() {
         var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
                 "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null, GEO, BigDecimal.ZERO,
-                null, BigDecimal.ZERO, new BigDecimal("0.0025"), 2025, null);
+                null, BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("0.0025"), 2025, null);
         var pool = PoolStrategy.create(List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.05"), "taxable"),
                 new HypotheticalAccountInput(bd("100000"), BigDecimal.ZERO, bd("0.06"), "traditional"),

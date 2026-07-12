@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -13,6 +15,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
@@ -390,6 +395,95 @@ class EngineInvariantsTest {
                 .as("pension-heavy fixture must actually trigger the surplus-funded-tax-slice exclusion "
                         + "in at least one year")
                 .isTrue();
+    }
+
+    // === Audit C1: interest_yield direction properties ===
+
+    /**
+     * A 60/40 us_stock/bond taxable account (NO traditional pool -- deliberately: an RMD-forced
+     * traditional distribution in later years would push Social Security's provisional income
+     * straight to its 85%-of-benefit cap, saturating the very effect this test is isolating) plus
+     * a real Social Security income source: interest income is ordinary AGI, so raising {@code
+     * interest_yield} must (a) raise the AGGREGATE federal tax paid across the horizon, (b) raise
+     * the AGGREGATE Social Security taxable amount across the horizon (the provisional-income
+     * effect audit C1 threads through {@code realizedPortfolioTaxable}), and (c) not increase the
+     * final balance. Aggregate (summed) rather than strict per-year monotonicity is the right
+     * granularity for BOTH (a) and (b): a materially higher EARLY-year tax bill draws the taxable
+     * pool down by a few extra dollars, which can shift a LATER year's realized gain/dividend (and
+     * thus that year's own tax AND its own provisional-income base) by cents in either direction
+     * -- a real, harmless second-order effect the direction property must not choke on.
+     */
+    @Test
+    void interestYieldDirection_bondAllocatedTaxableAccount_raisesTaxLowersBalance() {
+        List<ProjectionAccountInput> accounts = List.of(bondAllocatedAcct("1200000.0000", "0.0500"));
+        var incomeSources = incomeSourcesFor("ss-typed");
+        var spending = new SpendingProfileInput(bd("40000"), bd("10000"), null);
+
+        var baseInput = createInput(ALWAYS_RETIRED_DATE, END_AGE, bd("0.02"),
+                interestYieldParamsJson(BigDecimal.ZERO), accounts, spending, REFERENCE_YEAR, incomeSources);
+        var interestInput = createInput(ALWAYS_RETIRED_DATE, END_AGE, bd("0.02"),
+                interestYieldParamsJson(bd("0.04")), accounts, spending, REFERENCE_YEAR, incomeSources);
+
+        var baseResult = engine.run(baseInput);
+        var interestResult = engine.run(interestInput);
+
+        assertThat(interestResult.finalBalance())
+                .as("interest_yield 0->0.04 on a bond-allocated account must not increase the final balance")
+                .isLessThanOrEqualTo(baseResult.finalBalance());
+
+        assertThat(sumField(interestResult.yearlyData(), ProjectionYearDto::federalTax))
+                .as("interest_yield 0->0.04 must raise the AGGREGATE federal tax paid across the horizon")
+                .isGreaterThan(sumField(baseResult.yearlyData(), ProjectionYearDto::federalTax));
+
+        assertThat(sumField(interestResult.yearlyData(), ProjectionYearDto::socialSecurityTaxable))
+                .as("interest_yield 0->0.04 must raise the AGGREGATE Social Security taxable amount "
+                        + "across the horizon (provisional-income effect)")
+                .isGreaterThan(sumField(baseResult.yearlyData(), ProjectionYearDto::socialSecurityTaxable));
+    }
+
+    private static BigDecimal sumField(List<ProjectionYearDto> years,
+                                        java.util.function.Function<ProjectionYearDto, BigDecimal> field) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (var y : years) {
+            total = total.add(nz(field.apply(y)));
+        }
+        return total;
+    }
+
+    /**
+     * The byte-identical backward-compat anchor (audit C1): an ALL_US taxable account (equity
+     * share 1.0, bond share 0.0) must be COMPLETELY invariant to interest_yield -- the bond+cash
+     * sleeve that rate taxes doesn't exist for this account, mirroring
+     * {@link #assertDepressionYearsByteIdentical}'s no-op-toggle pattern.
+     */
+    @Test
+    void interestYieldDirection_allUsScenario_invariantToToggle() {
+        var sc = new ScenarioCase("taxable-only | taxable_first | none",
+                "taxable-only", "taxable_first", "none", 1965, false);
+        var baseInput = buildInput(sc, interestYieldParamsJson(BigDecimal.ZERO));
+        var interestInput = buildInput(sc, interestYieldParamsJson(bd("0.04")));
+
+        var baseResult = engine.run(baseInput);
+        var interestResult = engine.run(interestInput);
+
+        String baseJson = MAPPER.writeValueAsString(baseResult.yearlyData());
+        String interestJson = MAPPER.writeValueAsString(interestResult.yearlyData());
+        assertThat(interestJson)
+                .as("interest_yield toggle must be byte-identical for an ALL_US account (no bond/cash sleeve)")
+                .isEqualTo(baseJson);
+    }
+
+    private String interestYieldParamsJson(BigDecimal interestYield) {
+        return "{\"birth_year\": 1965, \"filing_status\": \"single\", "
+                + "\"withdrawal_order\": \"taxable_first\", \"dividend_yield\": 0, "
+                + "\"interest_yield\": " + interestYield + "}";
+    }
+
+    private static HypotheticalAccountInput bondAllocatedAcct(String balance, String expectedReturn) {
+        var allocation = new AssetAllocation(Map.of(
+                AssetClass.US_STOCK, bd("0.6"), AssetClass.BOND, bd("0.4")));
+        return new HypotheticalAccountInput(bd(balance), BigDecimal.ZERO, allocation,
+                Optional.of(bd(expectedReturn)), "taxable");
     }
 
     // === Fixture construction ===

@@ -87,6 +87,13 @@ final class YearFinanceResolver {
      * separately (rather than only folded into {@code realizedPortfolioTaxable}) so callers can
      * thread them into the STATE tax base (audit C3: {@code CombinedTaxCalculator}'s LTCG /
      * Social-Security-exemption seam) without re-deriving them from the SS convergence arithmetic.
+     *
+     * <p>{@code ordinaryInterestIncome} (audit C1) is the year's ordinary-interest income (the
+     * taxable pool's bond+cash sleeve) -- unlike {@code realizedLtcgIncome} it is ORDINARY, not
+     * LTCG, income: it is already folded into {@code taxLiability}'s bundle and into {@code
+     * realizedPortfolioTaxable} below (the Social Security provisional-income base), and is broken
+     * out separately so {@link DeterministicProjectionEngine} can also fold it into {@link
+     * RetirementTaxAnnotator}'s displayed federal/state recompute the same way.
      */
     record YearComputation(
             IncomeSourceProcessor.IncomeSourceYearResult isResult,
@@ -106,7 +113,8 @@ final class YearFinanceResolver {
             BigDecimal realizedPortfolioTaxable,
             BigDecimal realizedLtcgIncome,
             BigDecimal socialSecurityTaxable,
-            BigDecimal earlyWithdrawalPenalty) {
+            BigDecimal earlyWithdrawalPenalty,
+            BigDecimal ordinaryInterestIncome) {
     }
 
     YearComputation resolve(YearContext yc) {
@@ -167,6 +175,7 @@ final class YearFinanceResolver {
         BigDecimal ltcgTax = BigDecimal.ZERO;
         BigDecimal realizedLtcgIncome = BigDecimal.ZERO;
         BigDecimal earlyWithdrawalPenalty = BigDecimal.ZERO;
+        BigDecimal ordinaryInterestIncome = BigDecimal.ZERO;
 
         // The converged federally-taxable Social Security amount for this year (audit B2's fixed
         // point has already run by the time this method returns for the final pass) -- zero when no
@@ -199,6 +208,7 @@ final class YearFinanceResolver {
             ltcgTax = retirementResult.ltcgTax();
             realizedLtcgIncome = retirementResult.realizedLtcgIncome();
             earlyWithdrawalPenalty = retirementResult.earlyWithdrawalPenalty();
+            ordinaryInterestIncome = retirementResult.ordinaryInterestIncome();
         } else if (rmdForced.compareTo(BigDecimal.ZERO) > 0) {
             // T18a-2: RMDs apply from the SECURE-2.0 age regardless of retirement status (a
             // still-working owner still owes tax on a forced traditional distribution) -- but a
@@ -218,20 +228,24 @@ final class YearFinanceResolver {
             ltcgTax = withdrawalResult.ltcgTax();
             realizedLtcgIncome = withdrawalResult.realizedLtcgIncome();
             earlyWithdrawalPenalty = withdrawalResult.earlyWithdrawalPenalty();
+            ordinaryInterestIncome = withdrawalResult.ordinaryInterestIncome();
         }
 
         var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
 
         // Realized ordinary income for the Social Security provisional-income fixed point: taxable
         // traditional distributions (spend draw + RMD force-out) + Roth conversion + realized
-        // LTCG/dividend income. Matches the IRS worksheet's AGI-ex-SS additions.
-        BigDecimal realizedPortfolioTaxable = wdFromTraditional.add(conversionAmount).add(realizedLtcgIncome);
+        // LTCG/dividend income + (audit C1) realized ordinary-interest income. Matches the IRS
+        // worksheet's AGI-ex-SS additions -- interest is ordinary AGI same as a traditional
+        // distribution, so it belongs in this base exactly like realizedLtcgIncome already does.
+        BigDecimal realizedPortfolioTaxable = wdFromTraditional.add(conversionAmount)
+                .add(realizedLtcgIncome).add(ordinaryInterestIncome);
 
         return new YearComputation(incomeResult.isResult(), incomeResult.totalActiveIncome(),
                 incomeResult.effectiveOtherIncome(), conversionAmount, taxLiability, suspendedLoss,
                 withdrawals, previousWithdrawal, surplusReinvested, wdFromTaxable, wdFromTraditional,
                 wdFromRoth, ltcgTax, combinedTaxSource, realizedPortfolioTaxable, realizedLtcgIncome,
-                socialSecurityTaxable, earlyWithdrawalPenalty);
+                socialSecurityTaxable, earlyWithdrawalPenalty, ordinaryInterestIncome);
     }
 
     private record IncomeAndConversionResult(

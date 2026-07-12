@@ -268,8 +268,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
                 params.dynamicSequencingBracketRate(),
                 geoMeans, inflationRate,
-                capitalGainsTaxCalculator, paramsParser.dividendYield(params), paramsParser.feeRate(params),
-                baseYear, federalTaxCalculator);
+                capitalGainsTaxCalculator, paramsParser.dividendYield(params), paramsParser.interestYield(params),
+                paramsParser.feeRate(params), baseYear, federalTaxCalculator);
         return PoolStrategy.create(accounts, config);
     }
 
@@ -404,18 +404,19 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 wdFromTraditional, conversionAmount, comp.effectiveOtherIncome(),
                 taxLiability, pool, ctx.taxStrategy(), ltcgTax,
                 comp.realizedLtcgIncome(), comp.socialSecurityTaxable(), irmaaSurcharge,
-                selfEmploymentTax, earlyWithdrawalPenalty);
+                selfEmploymentTax, earlyWithdrawalPenalty, comp.ordinaryInterestIncome());
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
         // Wave-4 IRMAA: roll the 2-year MAGI lookback window forward -- see YearAccumulator's
         // javadoc. This year's MAGI proxy mirrors the composition already used for the audit-B2
         // Social Security provisional-income convergence (wdFromTraditional + conversionAmount +
-        // realizedLtcgIncome, i.e. realizedPortfolioTaxable) plus effectiveOtherIncome (which itself
-        // already folds in the taxable portion of Social Security via that same convergence) --
-        // the same depth of MAGI modeling already established elsewhere in this engine. It is NOT
-        // full IRS MAGI (no tax-exempt-interest add-back), a documented simplification.
+        // realizedLtcgIncome + ordinaryInterestIncome, i.e. realizedPortfolioTaxable) plus
+        // effectiveOtherIncome (which itself already folds in the taxable portion of Social
+        // Security via that same convergence) -- the same depth of MAGI modeling already
+        // established elsewhere in this engine. It is NOT full IRS MAGI (no tax-exempt-interest
+        // add-back), a documented simplification.
         BigDecimal magiThisYear = comp.effectiveOtherIncome().add(conversionAmount)
-                .add(wdFromTraditional).add(comp.realizedLtcgIncome());
+                .add(wdFromTraditional).add(comp.realizedLtcgIncome()).add(comp.ordinaryInterestIncome());
 
         return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss,
                 magiThisYear, acc.magiYearMinus1()));

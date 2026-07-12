@@ -63,6 +63,9 @@ final class RetirementWithdrawalProcessor {
      * {@code ltcgTax} is the long-term capital-gains slice of {@code taxLiability} (see
      * {@link PoolStrategy.WithdrawalTaxResult#ltcgTax()}), threaded through so the engine can fold
      * it into the year's federal-tax breakdown -- see {@link RetirementTaxAnnotator}.
+     *
+     * <p>{@code ordinaryInterestIncome} (audit C1) is the year's ordinary-interest income (the
+     * taxable pool's bond+cash sleeve) -- see {@link PoolStrategy.WithdrawalTaxResult#ordinaryInterestIncome()}.
      */
     record RetirementWithdrawalResult(
             BigDecimal withdrawals,
@@ -75,7 +78,8 @@ final class RetirementWithdrawalProcessor {
             PoolStrategy.TaxSourceResult withdrawalTaxSource,
             BigDecimal ltcgTax,
             BigDecimal realizedLtcgIncome,
-            BigDecimal earlyWithdrawalPenalty) {
+            BigDecimal earlyWithdrawalPenalty,
+            BigDecimal ordinaryInterestIncome) {
     }
 
     RetirementWithdrawalResult process(RetirementWithdrawalContext rwCtx) {
@@ -201,6 +205,7 @@ final class RetirementWithdrawalProcessor {
                 previousWithdrawal, surplusReinvested,
                 withdrawalResult.fromTaxable(), withdrawalResult.fromTraditional(),
                 withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax(),
-                withdrawalResult.realizedLtcgIncome(), withdrawalResult.earlyWithdrawalPenalty());
+                withdrawalResult.realizedLtcgIncome(), withdrawalResult.earlyWithdrawalPenalty(),
+                withdrawalResult.ordinaryInterestIncome());
     }
 }

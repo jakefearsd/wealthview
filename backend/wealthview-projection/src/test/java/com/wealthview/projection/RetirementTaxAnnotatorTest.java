@@ -60,7 +60,8 @@ class RetirementTaxAnnotatorTest {
         var ltcgTax = new BigDecimal("5308.2164");
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, ltcgTax, pool, taxStrategy, ltcgTax,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -87,7 +88,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(40_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 totalTaxLiability, pool, taxStrategy, ltcgTax, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -114,7 +115,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(30_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -141,7 +142,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(20_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 totalTaxLiability, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, seTax, BigDecimal.ZERO);
+                BigDecimal.ZERO, seTax, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -166,7 +167,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(10_000), BigDecimal.ZERO, BigDecimal.ZERO,
                 totalTaxLiability, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO, penalty);
+                BigDecimal.ZERO, BigDecimal.ZERO, penalty, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -196,7 +197,41 @@ class RetirementTaxAnnotatorTest {
                 totalTaxableIncome, BigDecimal.ZERO, BigDecimal.ZERO,
                 ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO,
                 realizedLtcgIncome, federallyTaxedSocialSecurity, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal);
+    }
+
+    // === Audit C1: ordinary-interest income must fold into the recomputed base, not stack on top ===
+
+    @Test
+    void annotate_ordinaryInterestIncomePresent_foldsIntoRecomputedTaxableIncomeBase() {
+        // Mirrors the LTCG/SS seam test above, but for audit C1's ordinaryInterestIncome: it must
+        // land INSIDE totalTaxableIncome (the base the mock's computeDetailedTax stub is keyed on)
+        // rather than being ignored or double-added on top -- exactly matching how
+        // PoolStrategy.MultiPool#executeWithdrawals folds it into ITS OWN taxableIncome bundle. A
+        // wrong wiring here (interest omitted, or the mock invoked with a different base) fails the
+        // eq(...) match below and the stub returns Mockito's default CombinedTaxResult, tripping
+        // the federalTax assertion.
+        var ordinaryFederal = new BigDecimal("6200.0000");
+        var ordinaryBreakdown = new CombinedTaxResult(ordinaryFederal, BigDecimal.ZERO,
+                ordinaryFederal, BigDecimal.ZERO, BigDecimal.ZERO, false);
+        var taxStrategy = mock(TaxCalculationStrategy.class);
+        BigDecimal wdFromTraditional = BigDecimal.valueOf(30_000);
+        BigDecimal ordinaryInterestIncome = new BigDecimal("1600.0000");
+        BigDecimal expectedBase = wdFromTraditional.add(ordinaryInterestIncome); // 31,600
+        when(taxStrategy.computeDetailedTax(eq(expectedBase), eq(YEAR), eq(FilingStatus.SINGLE),
+                eq(BigDecimal.ZERO), eq(BigDecimal.ZERO)))
+                .thenReturn(ordinaryBreakdown);
+        PoolStrategy pool = filingStatusOnlyPool();
+
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
+                wdFromTraditional, BigDecimal.ZERO, BigDecimal.ZERO,
+                ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, ordinaryInterestIncome);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -212,7 +247,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, surcharge,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -226,7 +261,7 @@ class RetirementTaxAnnotatorTest {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
