@@ -46,6 +46,11 @@ describe('PortfolioFanChart', () => {
         expect(screen.getByText('No portfolio balance data available.')).toBeInTheDocument();
     });
 
+    it('renders the per-year statistics caveat below the chart', () => {
+        render(<PortfolioFanChart yearlySpending={[makeYearlySpending()]} />);
+        expect(screen.getByText(/Percentile bands are per-year statistics, not a single portfolio's path\./)).toBeInTheDocument();
+    });
+
     it('handles multiple years of data', () => {
         const data = [
             makeYearlySpending({ age: 62 }),

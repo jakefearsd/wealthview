@@ -273,6 +273,22 @@ export default function ProjectionDetailPage() {
                         <UnclassifiedSymbolsNotice symbols={result.unclassified_symbols} onReclassified={handleRun} />
                     ) : null}
 
+                    {result.warnings && result.warnings.length > 0 && (
+                        <div data-testid="projection-warnings-banner" style={{ marginBottom: '1rem' }}>
+                            {result.warnings.map((warning, i) => (
+                                <div
+                                    key={i}
+                                    style={{
+                                        background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '4px',
+                                        padding: '0.6rem 0.9rem', marginBottom: '0.5rem', color: '#e65100', fontSize: '0.85rem',
+                                    }}
+                                >
+                                    {warning}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
                     {feasibility && !feasibility.spending_feasible && (
                         <div style={{
                             background: '#fff3e0', borderLeft: '4px solid #e65100', padding: '1rem',

@@ -62,6 +62,8 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number; age: numb
         used_itemized_deduction: null,
         rmd_amount: null,
         capital_gains_tax: null,
+        irmaa_surcharge: null,
+        early_withdrawal_penalty: null,
         ...overrides,
     };
 }
@@ -95,5 +97,29 @@ describe('IncomeTaxTab', () => {
 
         expect(screen.queryByText('RMD')).not.toBeInTheDocument();
         expect(screen.queryByText('Cap-Gains Tax')).not.toBeInTheDocument();
+    });
+
+    it('renders IRMAA and Early Penalty columns with formatted values when present', () => {
+        const data = [
+            makeYear({ year: 2040, age: 72, irmaa_surcharge: 2500, early_withdrawal_penalty: 800, tax_liability: 9000 }),
+        ];
+
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} />);
+
+        expect(screen.getByText('IRMAA')).toBeInTheDocument();
+        expect(screen.getByText('Early Penalty')).toBeInTheDocument();
+        expect(screen.getByText('$2,500')).toBeInTheDocument();
+        expect(screen.getByText('$800')).toBeInTheDocument();
+    });
+
+    it('hides IRMAA and Early Penalty columns when no year has values', () => {
+        const data = [
+            makeYear({ year: 2040, age: 65, tax_liability: 5000 }),
+        ];
+
+        render(<IncomeTaxTab yearlyData={data} {...commonProps} />);
+
+        expect(screen.queryByText('IRMAA')).not.toBeInTheDocument();
+        expect(screen.queryByText('Early Penalty')).not.toBeInTheDocument();
     });
 });

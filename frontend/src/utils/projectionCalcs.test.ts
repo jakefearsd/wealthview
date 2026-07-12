@@ -58,6 +58,8 @@ function makeYear(overrides: Partial<ProjectionYear> & { year: number }): Projec
         used_itemized_deduction: null,
         rmd_amount: null,
         capital_gains_tax: null,
+        irmaa_surcharge: null,
+        early_withdrawal_penalty: null,
         ...overrides,
     };
 }

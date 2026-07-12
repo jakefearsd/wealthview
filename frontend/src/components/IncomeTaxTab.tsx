@@ -20,6 +20,8 @@ export default function IncomeTaxTab({
     const hasStateTax = yearlyData.some(y => y.state_tax != null);
     const hasRmd = yearlyData.some(y => y.rmd_amount != null);
     const hasCapGains = yearlyData.some(y => y.capital_gains_tax != null);
+    const hasIrmaa = yearlyData.some(y => y.irmaa_surcharge != null);
+    const hasEarlyPenalty = yearlyData.some(y => y.early_withdrawal_penalty != null);
     const stickyTh: React.CSSProperties = {
         textAlign: 'right',
         padding: '0.5rem',
@@ -27,7 +29,8 @@ export default function IncomeTaxTab({
         top: 0,
         background: '#fff',
     };
-    const detailColSpan = (hasStateTax ? 7 : 3) + (hasRmd ? 1 : 0) + (hasCapGains ? 1 : 0);
+    const detailColSpan = (hasStateTax ? 7 : 3) + (hasRmd ? 1 : 0) + (hasCapGains ? 1 : 0)
+        + (hasIrmaa ? 1 : 0) + (hasEarlyPenalty ? 1 : 0);
 
     return (
         <div>
@@ -59,6 +62,8 @@ export default function IncomeTaxTab({
                             {hasStateTax && <th style={stickyTh}>Deduction</th>}
                             {hasRmd && <th style={stickyTh}>RMD</th>}
                             {hasCapGains && <th style={stickyTh}>Cap-Gains Tax</th>}
+                            {hasIrmaa && <th style={stickyTh}>IRMAA</th>}
+                            {hasEarlyPenalty && <th style={stickyTh}>Early Penalty</th>}
                             <th style={stickyTh}>Tax Liability</th>
                         </tr>
                     </thead>
@@ -139,6 +144,16 @@ export default function IncomeTaxTab({
                                         {hasCapGains && (
                                             <td style={{ padding: '0.5rem', textAlign: 'right' }}>
                                                 {y.capital_gains_tax != null ? formatCurrency(y.capital_gains_tax) : '-'}
+                                            </td>
+                                        )}
+                                        {hasIrmaa && (
+                                            <td style={{ padding: '0.5rem', textAlign: 'right' }}>
+                                                {y.irmaa_surcharge != null ? formatCurrency(y.irmaa_surcharge) : '-'}
+                                            </td>
+                                        )}
+                                        {hasEarlyPenalty && (
+                                            <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f' }}>
+                                                {y.early_withdrawal_penalty != null ? formatCurrency(y.early_withdrawal_penalty) : '-'}
                                             </td>
                                         )}
                                         <td style={{ padding: '0.5rem', textAlign: 'right', color: '#d32f2f', fontWeight: 600 }}>

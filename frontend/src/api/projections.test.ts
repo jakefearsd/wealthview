@@ -49,6 +49,7 @@ const RESULT = {
     spending_feasibility: null,
     unclassified_symbols: null,
     final_net_worth: null,
+    warnings: null,
 } as ProjectionResult;
 const COMPARE = { results: [RESULT] } as CompareResponse;
 const GUARDRAIL = { id: 'g1', scenario_id: 's1' } as unknown as GuardrailProfileResponse;

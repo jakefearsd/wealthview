@@ -107,6 +107,8 @@ export interface ProjectionYear {
     irmaa_warning?: boolean;
     rmd_amount: number | null;
     capital_gains_tax: number | null;
+    irmaa_surcharge: number | null;
+    early_withdrawal_penalty: number | null;
 }
 
 export interface SpendingFeasibility {
@@ -125,6 +127,7 @@ export interface ProjectionResult {
     spending_feasibility: SpendingFeasibility | null;
     unclassified_symbols: string[] | null;
     final_net_worth: number | null;
+    warnings: string[] | null;
 }
 
 export interface CompareResponse {

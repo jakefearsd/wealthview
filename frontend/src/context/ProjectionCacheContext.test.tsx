@@ -14,6 +14,7 @@ function makeResult(id: string): ProjectionResult {
         spending_feasibility: null,
         unclassified_symbols: null,
         final_net_worth: null,
+        warnings: null,
     };
 }
 

@@ -4,7 +4,39 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProjectionCacheProvider } from '../context/ProjectionCacheContext';
 import ProjectionDetailPage from './ProjectionDetailPage';
-import type { Scenario } from '../types/projection';
+import type { ProjectionResult, ProjectionYear, Scenario } from '../types/projection';
+
+function makeYear(overrides: Partial<ProjectionYear> & { year: number; age: number }): ProjectionYear {
+    return {
+        start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700,
+        retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null,
+        roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null,
+        income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null,
+        rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null,
+        suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null,
+        income_by_source: null, property_equity: null, total_net_worth: null, surplus_reinvested: null,
+        taxable_growth: null, traditional_growth: null, roth_growth: null, tax_paid_from_taxable: null,
+        tax_paid_from_traditional: null, tax_paid_from_roth: null, withdrawal_from_taxable: null,
+        withdrawal_from_traditional: null, withdrawal_from_roth: null, rental_property_details: null,
+        federal_tax: null, state_tax: null, salt_deduction: null, used_itemized_deduction: null,
+        rmd_amount: null, capital_gains_tax: null, irmaa_surcharge: null, early_withdrawal_penalty: null,
+        ...overrides,
+    };
+}
+
+function makeResult(overrides: Partial<ProjectionResult> = {}): ProjectionResult {
+    return {
+        scenario_id: 'abc-123',
+        yearly_data: [makeYear({ year: 2024, age: 34 })],
+        final_balance: 117700,
+        years_in_retirement: 0,
+        spending_feasibility: null,
+        unclassified_symbols: null,
+        final_net_worth: null,
+        warnings: null,
+        ...overrides,
+    };
+}
 
 const mockScenario: Scenario = {
     id: 'abc-123',
@@ -128,17 +160,7 @@ describe('ProjectionDetailPage', () => {
         // Simulate result by importing and calling runProjection mock
         const { runProjection } = await import('../api/projections');
         const mockRun = vi.mocked(runProjection);
-        mockRun.mockResolvedValue({
-            scenario_id: 'abc-123',
-            yearly_data: [
-                { year: 2024, age: 34, start_balance: 100000, contributions: 10000, growth: 7700, withdrawals: 0, end_balance: 117700, retired: false, traditional_balance: null, roth_balance: null, taxable_balance: null, roth_conversion_amount: null, tax_liability: null, essential_expenses: null, discretionary_expenses: null, income_streams_total: null, net_spending_need: null, spending_surplus: null, discretionary_after_cuts: null, rental_income_gross: null, rental_expenses_total: null, depreciation_total: null, rental_loss_applied: null, suspended_loss_carryforward: null, social_security_taxable: null, self_employment_tax: null, income_by_source: null, property_equity: null, total_net_worth: null, surplus_reinvested: null, taxable_growth: null, traditional_growth: null, roth_growth: null, tax_paid_from_taxable: null, tax_paid_from_traditional: null, tax_paid_from_roth: null, withdrawal_from_taxable: null, withdrawal_from_traditional: null, withdrawal_from_roth: null, rental_property_details: null, federal_tax: null, state_tax: null, salt_deduction: null, used_itemized_deduction: null, rmd_amount: null, capital_gains_tax: null },
-            ],
-            final_balance: 117700,
-            years_in_retirement: 0,
-            spending_feasibility: null,
-            unclassified_symbols: null,
-            final_net_worth: null,
-        });
+        mockRun.mockResolvedValue(makeResult());
 
         await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
 
@@ -152,5 +174,34 @@ describe('ProjectionDetailPage', () => {
         // Click data table tab
         await userEvent.click(screen.getByRole('button', { name: /data table/i }));
         expect(screen.getByText('Year')).toBeInTheDocument();
+    });
+
+    it('renders each projection warning as a banner above the results', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        const { runProjection } = await import('../api/projections');
+        const mockRun = vi.mocked(runProjection);
+        mockRun.mockResolvedValue(makeResult({
+            warnings: ['RMDs are not yet modeled for this account type.', 'Fee drag assumes a flat 0.25% expense ratio.'],
+        }));
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        expect(screen.getByText('RMDs are not yet modeled for this account type.')).toBeInTheDocument();
+        expect(screen.getByText('Fee drag assumes a flat 0.25% expense ratio.')).toBeInTheDocument();
+    });
+
+    it('does not render a warnings banner when the result has no warnings', async () => {
+        mockUseApiQuery.mockReturnValue({ data: mockScenario, loading: false, error: null, refetch: vi.fn() });
+        renderPage();
+
+        const { runProjection } = await import('../api/projections');
+        const mockRun = vi.mocked(runProjection);
+        mockRun.mockResolvedValue(makeResult({ warnings: null }));
+
+        await userEvent.click(screen.getByRole('button', { name: /run projection/i }));
+
+        expect(screen.queryByTestId('projection-warnings-banner')).not.toBeInTheDocument();
     });
 });

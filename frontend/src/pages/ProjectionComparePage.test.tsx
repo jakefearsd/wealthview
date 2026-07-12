@@ -45,6 +45,7 @@ function result(scenarioId: string, years: ProjectionYear[], final: number): Pro
         spending_feasibility: null,
         unclassified_symbols: null,
         final_net_worth: null,
+        warnings: null,
     };
 }
 
