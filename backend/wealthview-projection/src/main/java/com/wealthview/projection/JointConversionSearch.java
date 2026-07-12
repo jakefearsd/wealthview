@@ -210,7 +210,9 @@ final class JointConversionSearch {
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                gateOnAdaptiveRules, maxAnnualAdjustmentRate);
+                gateOnAdaptiveRules, maxAnnualAdjustmentRate,
+                // Household task 6: the conversion search runs the same household economics.
+                ctx.sim().household());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

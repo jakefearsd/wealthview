@@ -486,6 +486,8 @@ public class GuardrailProfileService {
                                                                Boolean includeDepressionYears,
                                                                BigDecimal interestYield) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
+        // Household task 6: the scenario's household fields for the Monte Carlo first-death transition.
+        var hhParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
                 birthYear,
@@ -535,7 +537,18 @@ public class GuardrailProfileService {
                 // byte-identical-to-pre-T24 no-adaptation-gate path. reoptimize() always passes
                 // the profile's STORED flag explicitly, so pre-V077 profiles keep gating on
                 // false until re-optimized with a fresh request that opts in (or omits the flag).
-                request.gateOnAdaptiveRules() == null || request.gateOnAdaptiveRules()
+                request.gateOnAdaptiveRules() == null || request.gateOnAdaptiveRules(),
+                // Household task 6: the first-death transition inputs for the Monte Carlo engine.
+                // spouseBirthYear present enables household modeling; death ages are resolved (explicit
+                // or SSA default) exactly like scenarioSignature does, so the MC engine truncates and
+                // transitions at the same years the deterministic engine does. Null spouseBirthYear ⇒
+                // single-person, byte-identical to pre-household. Survivor factor / community-property
+                // defaults (0.75 / statutory 0.5) are resolved engine-side.
+                hhParams.spouseBirthYear(),
+                resolveDeathAge(hhParams.primaryDeathAge(), hhParams.birthYear()),
+                resolveDeathAge(hhParams.spouseDeathAge(), hhParams.spouseBirthYear()),
+                hhParams.survivorSpendingFactor(),
+                Boolean.TRUE.equals(hhParams.communityProperty())
         );
     }
 

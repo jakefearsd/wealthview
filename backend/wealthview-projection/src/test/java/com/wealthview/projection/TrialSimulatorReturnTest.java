@@ -254,7 +254,11 @@ class TrialSimulatorReturnTest {
         // FULL via the shared PoolTaxCascade against the post-draw pools (taxable-first,
         // spilling into traditional) -- not the old dimensionally-wrong tax^2/portfolio fraction
         // that left ~99% of the tax unpaid.
-        double[] pools = {95.0, 285.0, 285.0};
+        // Household task 6: pools are now the owner-aware double[5] layout {joint-taxable, trad-P,
+        // trad-S, roth-P, roth-S}; a single-person case leaves the spouse slots (2, 4) at 0 so the
+        // economics are identical to the pre-household 3-pool contract (taxable=95, traditional=285,
+        // roth=285). Assertions read the trad/roth TOTALS across the owner slots.
+        double[] pools = {95.0, 285.0, 0.0, 285.0, 0.0};
         TaxableLots lots = new TaxableLots();
         lots.addLot(95.0, 95.0);
         double[] realizedGainOut = {0.0};
@@ -272,8 +276,8 @@ class TrialSimulatorReturnTest {
         // taxable 31.6667 -> 0 (draws 31.6667), remainder 25.3333 from traditional -> 69.6667;
         // roth untouched by tax.
         assertThat(pools[0]).isEqualTo(0.0, within(1e-6));
-        assertThat(pools[1]).isEqualTo(69.666667, within(1e-4));
-        assertThat(pools[2]).isEqualTo(138.333333, within(1e-4));
+        assertThat(pools[1] + pools[2]).isEqualTo(69.666667, within(1e-4));   // traditional total
+        assertThat(pools[3] + pools[4]).isEqualTo(138.333333, within(1e-4));  // roth total
         assertThat(cashAfter).isEqualTo(0.0, within(1e-6));
         assertThat(traditionalDrawnOut[0]).isEqualTo(190.0, within(1e-6));
     }
@@ -285,7 +289,7 @@ class TrialSimulatorReturnTest {
         // point of the reserve. Withdrawal tax ($30) still leaves the pools in full via the
         // cascade, proving tax is never skipped just because the spending draw was cash-funded
         // (and proving the old "deduct pools twice on full cover" bug is gone).
-        double[] pools = {360.0, 180.0, 90.0};
+        double[] pools = {360.0, 180.0, 0.0, 90.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(360.0, 360.0);
         double[] realizedGainOut = {0.0};
@@ -298,9 +302,9 @@ class TrialSimulatorReturnTest {
                 traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
-        assertThat(pools[0]).isEqualTo(330.0, within(1e-6));   // 360 - 30 tax only
-        assertThat(pools[1]).isEqualTo(180.0, within(1e-6));   // untouched by the spending draw
-        assertThat(pools[2]).isEqualTo(90.0, within(1e-6));    // untouched by the spending draw
+        assertThat(pools[0]).isEqualTo(330.0, within(1e-6));           // 360 - 30 tax only
+        assertThat(pools[1] + pools[2]).isEqualTo(180.0, within(1e-6)); // traditional untouched
+        assertThat(pools[3] + pools[4]).isEqualTo(90.0, within(1e-6));  // roth untouched
         assertThat(cashAfter).isEqualTo(0.0, within(1e-6));    // cash drained by the $100 draw
         assertThat(traditionalDrawnOut[0]).isEqualTo(0.0, within(1e-6));
     }
@@ -313,7 +317,7 @@ class TrialSimulatorReturnTest {
         // marginal rate, the closed-form gross-up is T*m/(1-m) = 57*0.20/0.80 = 14.25, drained as a
         // SECOND, separate reduction directly against traditional (not re-cascaded through the
         // taxable-first order) -- total traditional debit for the tax = 57 + 14.25 = 71.25.
-        double[] pools = {0.0, 500.0, 0.0};
+        double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         double[] realizedGainOut = {0.0};
         double[] traditionalDrawnOut = {0.0};
@@ -324,8 +328,8 @@ class TrialSimulatorReturnTest {
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(0.0, within(1e-9));
-        assertThat(pools[1]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // = 428.75
-        assertThat(pools[2]).isEqualTo(0.0, within(1e-9));
+        assertThat(pools[1] + pools[2]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // trad = 428.75
+        assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));                  // roth
         assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
     }
 
@@ -334,7 +338,7 @@ class TrialSimulatorReturnTest {
         // Direction/control pin for the C2 test above: an otherwise-identical trial where taxable
         // covers the SAME $57 tax bill in full -- the marginal rate must be completely irrelevant
         // (no gross-up possible when traditional is never touched by the tax).
-        double[] pools = {500.0, 500.0, 0.0};
+        double[] pools = {500.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(500.0, 500.0);
         double[] realizedGainOut = {0.0};
@@ -346,8 +350,8 @@ class TrialSimulatorReturnTest {
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(500.0 - 57.0, within(1e-9)); // = 443.0, taxable-funded, no gross-up
-        assertThat(pools[1]).isEqualTo(500.0, within(1e-9));        // traditional untouched
-        assertThat(pools[2]).isEqualTo(0.0, within(1e-9));
+        assertThat(pools[1] + pools[2]).isEqualTo(500.0, within(1e-9)); // traditional untouched
+        assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));   // roth
         assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
     }
 
@@ -366,7 +370,7 @@ class TrialSimulatorReturnTest {
         var table = new OrdinaryTaxTable(0,
                 new double[]{0, 100}, new double[]{0.10, 0.30}, new double[]{0, 10});
         double base = 90.0;
-        double[] pools = {0.0, 500.0, 0.0};
+        double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         double[] realizedGainOut = {0.0};
         double[] traditionalDrawnOut = {0.0};
@@ -376,7 +380,8 @@ class TrialSimulatorReturnTest {
                 traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
 
         double expectedGrossUp = 57.0 * 0.30 / 0.70;
-        assertThat(pools[1]).isEqualTo(500.0 - 57.0 - expectedGrossUp, within(1e-9)); // 418.5714286
+        double traditional = pools[1] + pools[2];
+        assertThat(traditional).isEqualTo(500.0 - 57.0 - expectedGrossUp, within(1e-9)); // 418.5714286
 
         // Direction proof: a (wrong) naive gross-up using the rate AT base's own bracket (10%,
         // sourced from table.rateAt(base) rather than table.rateAt(base + T)) would leave
@@ -384,7 +389,7 @@ class TrialSimulatorReturnTest {
         // the "obvious" alternative of reusing the pre-draw bracket.
         double naiveGrossUp = 57.0 * 0.10 / 0.90;
         double naiveResultingPool = 500.0 - 57.0 - naiveGrossUp;
-        assertThat(pools[1]).isLessThan(naiveResultingPool - 1.0);
+        assertThat(traditional).isLessThan(naiveResultingPool - 1.0);
         assertThat(table.rateAt(base)).isEqualTo(0.10, within(1e-9));      // pre-draw bracket
         assertThat(table.rateAt(base + 57.0)).isEqualTo(0.30, within(1e-9)); // actual post-draw point
     }

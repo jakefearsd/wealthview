@@ -51,6 +51,53 @@ class TaxableLotsTest {
     }
 
     @Test
+    void stepUp_fullFactor_setsBasisToValueSoNoGainRemains() {
+        // Household task 6: full step-up (community-property / deceased-owned) zeroes the embedded
+        // gain -- a subsequent full sale realizes nothing.
+        var lots = new TaxableLots();
+        lots.addLot(600, 1000);   // 400 embedded gain
+
+        lots.stepUp(1.0);
+
+        assertThat(lots.totalValue()).isEqualTo(1000.0, within(1e-9)); // value untouched
+        assertThat(lots.totalBasis()).isEqualTo(1000.0, within(1e-9)); // basis stepped to value
+        assertThat(lots.sellFifo(1000)).isEqualTo(0.0, within(1e-9));  // no gain left
+    }
+
+    @Test
+    void stepUp_halfFactor_stepsUpHalfTheEmbeddedGain() {
+        // Common-law joint default: basis += (value - basis) * 0.5.
+        var lots = new TaxableLots();
+        lots.addLot(600, 1000);   // 400 embedded gain
+
+        lots.stepUp(0.5);
+
+        assertThat(lots.totalBasis()).isEqualTo(800.0, within(1e-9)); // 600 + 0.5*400
+        assertThat(lots.totalValue()).isEqualTo(1000.0, within(1e-9));
+        assertThat(lots.sellFifo(1000)).isEqualTo(200.0, within(1e-9)); // remaining gain
+    }
+
+    @Test
+    void stepUp_perLot_appliesToEachLotIndependently() {
+        var lots = new TaxableLots();
+        lots.addLot(100, 300);   // 200 gain
+        lots.addLot(500, 500);   // no gain
+
+        lots.stepUp(1.0);
+
+        assertThat(lots.totalBasis()).isEqualTo(800.0, within(1e-9)); // 300 + 500
+        assertThat(lots.totalValue()).isEqualTo(800.0, within(1e-9));
+    }
+
+    @Test
+    void stepUp_zeroFactor_isNoOp() {
+        var lots = new TaxableLots();
+        lots.addLot(600, 1000);
+        lots.stepUp(0.0);
+        assertThat(lots.totalBasis()).isEqualTo(600.0, within(1e-9));
+    }
+
+    @Test
     void consolidateIfNeeded_overCap_mergesOldestPreservingTotals() {
         var lots = new TaxableLots();
         for (int i = 0; i < 10; i++) { lots.addLot(100); lots.grow(0.0); }

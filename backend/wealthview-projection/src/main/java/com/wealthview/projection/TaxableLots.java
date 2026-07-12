@@ -29,6 +29,20 @@ final class TaxableLots {
         }
     }
 
+    /**
+     * Household task 6: steps up each lot's cost basis toward its current value by {@code factor} of
+     * the embedded gain ({@code basis += (value − basis) × factor}); value is untouched. This is the
+     * {@code double} counterpart of {@link TaxableLotsBd#stepUp} — the first-death basis step-up on
+     * the joint taxable pool. {@code factor == 1.0} sets basis to value (full step-up, no residual
+     * gain); {@code 0.5} steps up half the gain (common-law joint default); {@code 0.0} is a no-op. A
+     * lot carrying an embedded LOSS ({@code value < basis}) steps DOWN symmetrically.
+     */
+    void stepUp(double factor) {
+        for (double[] lot : lots) {
+            lot[0] += (lot[1] - lot[0]) * factor;
+        }
+    }
+
     double totalValue() {
         double v = 0;
         for (double[] lot : lots) {

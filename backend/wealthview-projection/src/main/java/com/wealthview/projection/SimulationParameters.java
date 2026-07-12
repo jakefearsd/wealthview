@@ -1,5 +1,7 @@
 package com.wealthview.projection;
 
+import org.springframework.lang.Nullable;
+
 /**
  * MC simulation run parameters — how many trials, over what time horizon, with what returns.
  *
@@ -34,5 +36,15 @@ record SimulationParameters(
         double feeRate,
         double returnMean,
         double interestYield,
-        double taxableEquityShare
+        double taxableEquityShare,
+        // Household task 6: the survivor spending factor (1.0 ⇒ single-person / no transition). The
+        // floors/discretionary arrays are ALREADY pre-scaled by it from the transition index; this
+        // raw value is carried only so GuardrailResponseBuilder can scale its own freshly-filled
+        // original-floor disclosure array consistently.
+        double survivorSpendingFactor,
+        // Household task 6: the first-death transition params for the MC trials ({@code null} ⇒
+        // single-person, the byte-identical anchor). Threaded into every
+        // {@link TrialSimulator.SimulationConfig} so the search and the terminal/response passes run
+        // the identical household economics.
+        @Nullable TrialSimulator.HouseholdSim household
 ) {}

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+import org.springframework.lang.Nullable;
+
 /**
  * All inputs the guardrail/Monte-Carlo spending optimizer needs for one run.
  *
@@ -90,7 +92,17 @@ public record GuardrailOptimizationInput(
         int baseYear,
         boolean includeDepressionYears,
         BigDecimal interestYield,
-        boolean gateOnAdaptiveRules
+        boolean gateOnAdaptiveRules,
+        // Household task 6 (sub-project A): first-death transition inputs. All null/false ⇒ a
+        // single-person run, byte-identical to pre-household behavior. spouseBirthYear present enables
+        // the household modeling; death ages are the RESOLVED values (explicit override or SSA
+        // default, resolved by the caller); survivorSpendingFactor null ⇒ the engine's 0.75 default;
+        // communityProperty drives the joint-taxable basis step-up factor.
+        @Nullable Integer spouseBirthYear,
+        @Nullable Integer primaryDeathAge,
+        @Nullable Integer spouseDeathAge,
+        @Nullable BigDecimal survivorSpendingFactor,
+        boolean communityProperty
 ) {
 
     /**
@@ -121,6 +133,8 @@ public record GuardrailOptimizationInput(
                 maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
                 withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
-                feeRate, retirementDate.getYear(), false, null, false);
+                feeRate, retirementDate.getYear(), false, null, false,
+                // Household task 6: pre-household callers are single-person (spouse absent).
+                null, null, null, null, false);
     }
 }

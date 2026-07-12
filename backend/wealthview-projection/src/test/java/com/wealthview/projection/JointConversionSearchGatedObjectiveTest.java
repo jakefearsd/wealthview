@@ -137,7 +137,8 @@ class JointConversionSearchGatedObjectiveTest {
                 new BigDecimal("0.06"), 200, new BigDecimal("0.90"),
                 phases, SEED, BigDecimal.ZERO, new BigDecimal("0.40"), 0, 0, BigDecimal.ZERO,
                 "single", "roth_first", true, new BigDecimal("0.32"), new BigDecimal("0.10"), 5, null, null,
-                null, null, 2030, false, null, gateOnAdaptiveRules);
+                null, null, 2030, false, null, gateOnAdaptiveRules,
+                null, null, null, null, false);   // household task 6: single-person
     }
 
     private static double totalConversion(GuardrailProfileResponse r) {
@@ -279,7 +280,7 @@ class JointConversionSearchGatedObjectiveTest {
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                true, 0.40);
+                true, 0.40, null);   // household task 6: single-person
         return search.evaluateSustainableSpending(searchContext, searchFloors);
     }
 

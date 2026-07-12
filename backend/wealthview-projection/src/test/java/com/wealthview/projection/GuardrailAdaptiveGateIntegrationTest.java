@@ -43,7 +43,8 @@ class GuardrailAdaptiveGateIntegrationTest {
                 new BigDecimal("0.06"), 2000, new BigDecimal("0.80"),
                 phases, SEED, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
                 null, null, false, null, null, 5, null, null,
-                null, null, 2030, false, null, gateOnAdaptiveRules);
+                null, null, 2030, false, null, gateOnAdaptiveRules,
+                null, null, null, null, false);   // household task 6: single-person
     }
 
     @Test
@@ -140,7 +141,7 @@ class GuardrailAdaptiveGateIntegrationTest {
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                true, 0.10);
+                true, 0.10, null);   // household task 6: single-person
         var search = new SustainabilitySearch(new TrialSimulator());
         double[] floors = ctx.taxIncome().adjustedFloors();
 
@@ -208,7 +209,8 @@ class GuardrailAdaptiveGateIntegrationTest {
                 new BigDecimal("0.06"), 2000, new BigDecimal("0.80"),
                 phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 null, null, false, null, null, 5, null, null,
-                null, null, 2030, false, null, true);
+                null, null, 2030, false, null, true,
+                null, null, null, null, false);   // household task 6: single-person
         var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailProfileResponse r = optimizer.optimize(noRateInput);

@@ -44,7 +44,7 @@ class SustainabilitySearchTest {
                 null,
                 taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
                 0.0, null, 0.0, 0.0, 1.0,
-                false, 0.0);
+                false, 0.0, null);   // household task 6: single-person
     }
 
     private static double[] bracketingFloors() {
@@ -102,7 +102,7 @@ class SustainabilitySearchTest {
                 null,
                 taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
                 0.0, null, 0.0, 0.0, 1.0,
-                gateOnAdaptiveRules, maxAdjRate);
+                gateOnAdaptiveRules, maxAdjRate, null);   // household task 6: single-person
     }
 
     private static double[] crashMinorityFloors() {

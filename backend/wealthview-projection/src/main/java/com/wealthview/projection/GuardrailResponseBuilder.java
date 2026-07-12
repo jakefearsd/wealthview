@@ -201,7 +201,29 @@ final class GuardrailResponseBuilder {
                 ctx.sim().dividendYield(), adaptation,
                 // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
                 poolSetup.simPools() ? ctx.taxIncome().rentalIncomeByYear() : null,
-                ctx.sim().interestYield(), ctx.sim().taxableEquityShare());
+                ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                // Household task 6: the terminal/response passes run the same household economics as
+                // the search (per-owner RMD streams, first-death transition, second-death truncation).
+                ctx.sim().household());
+    }
+
+    /** Household task 6: scales {@code floors} by the survivor spending factor from the first-death
+     * transition year forward, mirroring the pre-scaling {@link OptimizationContextBuilder} applies to
+     * the main {@code adjustedFloors}. No-op for a single-person run (no household, or the transition
+     * falls outside the modeled window) or a factor of 1.0. */
+    private static void scaleSurvivorFloors(double[] floors, OptimizationSetup ctx, int years) {
+        var household = ctx.sim().household();
+        if (household == null) {
+            return;
+        }
+        int transitionIdx = household.transitionYearIndex();
+        double factor = ctx.sim().survivorSpendingFactor();
+        if (transitionIdx < 0 || transitionIdx >= years || factor == 1.0) {
+            return;
+        }
+        for (int y = transitionIdx; y < years; y++) {
+            floors[y] *= factor;
+        }
     }
 
     /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}
@@ -232,6 +254,10 @@ final class GuardrailResponseBuilder {
         int trialCount = ctx.sim().trialCount();
         double[] originalFloors = new double[years];
         Arrays.fill(originalFloors, ctx.taxIncome().essentialFloor());
+        // Household task 6: the survivor floor is scaled by the survivor spending factor from the
+        // first-death transition year (mirroring the main adjustedFloors, which OptimizationContextBuilder
+        // already pre-scales). No-op for single-person (factor 1.0 / no in-window transition).
+        scaleSurvivorFloors(originalFloors, ctx, years);
 
         int successCount = 0;
         for (int t = 0; t < trialCount; t++) {

@@ -68,7 +68,10 @@ final class SustainabilitySearch {
             int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
             double interestYield, double taxableEquityShare,
-            boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate) {}
+            boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate,
+            // Household task 6: first-death transition params, threaded into each trial config
+            // ({@code null} ⇒ single-person). See {@link TrialSimulator.HouseholdSim}.
+            @Nullable TrialSimulator.HouseholdSim household) {}
 
     /**
      * Verifies the essential floor against portfolio capacity at the required confidence level,
@@ -414,7 +417,7 @@ final class SustainabilitySearch {
                     ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
                     ctx.rmdStartAge(),
                     ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), adaptation,
-                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare());
+                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare(), ctx.household());
 
             var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);

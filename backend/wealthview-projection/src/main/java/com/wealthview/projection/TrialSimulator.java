@@ -1,5 +1,7 @@
 package com.wealthview.projection;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 
 /**
@@ -28,6 +30,17 @@ final class TrialSimulator {
     /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions, a
      * statutory constant (T18a-4). */
     private static final double EARLY_WITHDRAWAL_PENALTY_RATE = 0.10;
+
+    // Household task 6: the owner-aware double[5] pool layout {joint-taxable, trad-primary,
+    // trad-spouse, roth-primary, roth-spouse} and its low-level mechanics live in McPools; these
+    // local aliases keep the index references throughout this class terse. Single-person trials leave
+    // the spouse slots (TRAD_S/ROTH_S) at 0 for the whole trial, so every branch reduces to the
+    // pre-household 3-pool arithmetic bit-for-bit (the anchor).
+    private static final int JOINT_TAXABLE = McPools.JOINT_TAXABLE;
+    private static final int TRAD_P = McPools.TRAD_P;
+    private static final int TRAD_S = McPools.TRAD_S;
+    private static final int ROTH_P = McPools.ROTH_P;
+    private static final int ROTH_S = McPools.ROTH_S;
 
     /** Per-trial simulation result. */
     record TrialResult(
@@ -65,10 +78,36 @@ final class TrialSimulator {
             double[] expectedStartBalance, double maxAnnualAdjustmentRate) {}
 
     /**
+     * Household task 6: the per-trial first-death transition parameters, {@code null} for a
+     * single-person scenario (the byte-identical anchor). Pre-computed once per run by
+     * {@link OptimizationContextBuilder} and only READ in the hot loop — the death year is FIXED, so
+     * no per-trial recomputation is ever needed.
+     *
+     * <p>All year fields are retirement-anchored MC year indices (the same {@code y} the trial loop
+     * uses). {@code initTraditionalSpouse}/{@code initRothSpouse} carve the spouse's slice out of the
+     * config's {@code initTraditional}/{@code initRoth} TOTALS (primary keeps the remainder), so those
+     * totals keep their pre-household single-person meaning. Per-owner RMD streams key off each
+     * owner's own age ({@code spouseAgeOffset = primaryBirthYear − spouseBirthYear}, so
+     * {@code spouseAge = primaryAge + spouseAgeOffset}) and SECURE-2.0 start age. At
+     * {@code transitionYearIndex} the deceased's traditional/Roth roll into the survivor's pools and
+     * the joint-taxable lots step up by {@code stepUpFactor} (the SAME deterministically pre-computed
+     * blended factor the deterministic engine uses — never recomputed here). Trials iterate only up to
+     * {@code truncateYearIndex} (= min(horizon, second-death index + 1)).
+     */
+    record HouseholdSim(
+            double initTraditionalSpouse, double initRothSpouse,
+            int spouseAgeOffset, int spouseRmdStartAge,
+            int transitionYearIndex, boolean survivorIsPrimary,
+            double stepUpFactor, int truncateYearIndex) {}
+
+    /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
      * arrays, cash config) are shared across trials; the three per-pool real return sequences
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
      * each pool grows at its own allocation/override-driven sequence.
+     *
+     * <p>Household task 6: {@code household} is {@code null} for single-person scenarios (every
+     * pre-household call site, via the back-compat constructor below) — the byte-identical anchor.
      */
     record SimulationConfig(
             double initTaxable, double initTraditional, double initRoth,
@@ -83,8 +122,39 @@ final class TrialSimulator {
             int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
             GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
-            double interestYield, double taxableEquityShare
+            double interestYield, double taxableEquityShare,
+            @Nullable HouseholdSim household
     ) {
+        /**
+         * Back-compat constructor (household task 6): every pre-household call site builds a
+         * single-person config with no {@link HouseholdSim}. Defaulting {@code household} to
+         * {@code null} keeps {@link #simulateTrial} on the byte-identical 3-pool path for all of them.
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-household shape)
+        // so existing positional call sites keep compiling and behaving identically.
+        @SuppressWarnings("PMD.ExcessiveParameterList")
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+                GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
+                double interestYield, double taxableEquityShare) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
+                    interestYield, taxableEquityShare, null);
+        }
+
         /**
          * Back-compat constructor predating audit C1: no bond-sleeve interest yield or taxable-pool
          * equity share to split it by -- {@code interestYield} defaults to 0 and {@code
@@ -228,14 +298,15 @@ final class TrialSimulator {
 
         boolean hasConversions = config.conversionByYear() != null;
         boolean hasPools = config.ordinaryTaxTableByYear() != null;
-        double[] taxableReturns = config.taxableReturns();
-        double[] traditionalReturns = config.traditionalReturns();
-        double[] rothReturns = config.rothReturns();
 
-        // pools[0] = taxable, pools[1] = traditional, pools[2] = roth
-        double[] pools = { config.initTaxable(), config.initTraditional(), config.initRoth() };
+        // Household task 6: owner-aware double[5] pools (see McPools) — {taxable, traditional, 0,
+        // roth, 0} for a null household, reducing every branch below to the pre-household 3-pool
+        // arithmetic bit-for-bit.
+        HouseholdSim household = config.household();
+        double[] pools = McPools.initPools(
+                config.initTaxable(), config.initTraditional(), config.initRoth(), household);
         // Basis-aware taxable pool (Task 6): a parallel FIFO-lot view kept in lock-step with the
-        // pools[0] scalar (invariant lots.totalValue() == pools[0]). The scalar remains the value
+        // joint-taxable scalar (invariant lots.totalValue() == pools[JOINT_TAXABLE]). The scalar is the value
         // source-of-truth for the intricate cash-reserve/min/final arithmetic; the lots supply only
         // the dividend split and the realized FIFO gain that drive the annual LTCG tax outflow. The
         // initial lot carries the taxable pool's embedded (unrealized) gain: value − basis.
@@ -247,9 +318,16 @@ final class TrialSimulator {
 
         double cashBalance = seedCashReserve(pools, lots, floors, discretionary, config);
 
-        double minBalance = pools[0] + pools[1] + pools[2] + cashBalance;
+        double minBalance = McPools.poolTotal(pools) + cashBalance;
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
         boolean essentialFloorMet = true;
+
+        // Household task 6: trials truncate at the second (survivor's) death — the bequest year.
+        // Single-person / both-die-beyond-horizon households leave this at the full horizon (the
+        // byte-identical anchor). yearBalances beyond the truncation carry the final bequest forward
+        // (filled after the loop) so a truncated household trial does not inject zeros into the
+        // cross-trial percentile math.
+        int loopYears = household != null ? Math.min(years, household.truncateYearIndex()) : years;
 
         // Audit C9: `prevSpending` carries the prior year's adapted total spending so the
         // year-over-year adjustment can be bounded; seeded to year 0's planned total so the first
@@ -257,19 +335,19 @@ final class TrialSimulator {
         // path (config.adaptation() == null), which every pre-C9 caller takes.
         double prevSpending = floors[0] + discretionary[0];
 
-        for (int y = 0; y < years; y++) {
-            double taxableReturn = taxableReturns[y];
-            double traditionalReturn = traditionalReturns[y];
-            double rothReturn = rothReturns[y];
+        for (int y = 0; y < loopYears; y++) {
+            double taxableReturn = config.taxableReturns()[y];
+            double traditionalReturn = config.traditionalReturns()[y];
+            double rothReturn = config.rothReturns()[y];
 
             // Cash-reserve down-year logic keys on the balance-weighted portfolio real return
             // across the three pools (pre-growth balances). Now that pools grow at distinct rates
             // there is no single "the return" — this weighted figure preserves the original bucket
             // behavior: draw from cash when the portfolio as a whole had a down year.
-            double preGrowthTotal = pools[0] + pools[1] + pools[2];
+            double preGrowthTotal = McPools.poolTotal(pools);
             double portfolioReturn = preGrowthTotal > 0
-                    ? (pools[0] * taxableReturn + pools[1] * traditionalReturn + pools[2] * rothReturn)
-                            / preGrowthTotal
+                    ? (pools[JOINT_TAXABLE] * taxableReturn + (pools[TRAD_P] + pools[TRAD_S]) * traditionalReturn
+                            + (pools[ROTH_P] + pools[ROTH_S]) * rothReturn) / preGrowthTotal
                     : 0.0;
 
             // Audit C9: the trial's start-of-year total portfolio (pre-growth pools + pre-growth
@@ -277,9 +355,11 @@ final class TrialSimulator {
             // median. Captured before this year's growth is applied below.
             double trialStartTotal = preGrowthTotal + cashBalance;
 
-            // Prior-year-end traditional balance — the IRS RMD basis for this year, snapshotted
-            // before this year's growth is applied.
-            double pools1PreGrowth = pools[1];
+            // Household task 6: each owner's prior-year-end traditional balance — the IRS RMD basis
+            // for that owner's own stream this year, snapshotted before this year's growth. Spouse is
+            // 0 for a single-person trial, so its stream contributes nothing.
+            double tradPPreGrowth = pools[TRAD_P];
+            double tradSPreGrowth = pools[TRAD_S];
 
             // This year's exact ordinary tax table (audit C5) and the base ordinary income the
             // year's income events stack on -- replaces the old flat $50k-chord marginal rate.
@@ -311,19 +391,29 @@ final class TrialSimulator {
                     table, base);
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
-            pools[1] *= (1 + traditionalReturn);
-            pools[2] *= (1 + rothReturn);
+            McPools.growNonTaxablePools(pools, traditionalReturn, rothReturn);
             cashBalance *= (1 + config.cashReturnRate());
 
             int age = config.retirementAge() + y;
-            double rmd = computeYearRmd(pools1PreGrowth, age, config.rmdStartAge());
 
-            // T18a-1: force the RMD out of traditional FIRST -- before any Roth conversion --
-            // mirroring the deterministic engine's PoolStrategy#forceRmd. The FULL rmd is
-            // force-distributed unconditionally, independent of what the spending draw later
-            // decides (replaces the old end-of-year forceRmdExcess, which only forced the amount
-            // beyond whatever the spend draw happened to already pull from traditional).
-            double rmdForced = forceRmdFirst(pools, lots, rmd, table, baseWithInterest);
+            // Household task 6 — TWO RMD streams (IRS ordering: distribute before any Roth conversion),
+            // in the pinned ordinary-stack order base+interest → RMD-P → RMD-S. Each stream keys off
+            // its owner's own prior-year balance, age, and SECURE-2.0 start age; for a single-person
+            // trial the spouse stream is 0, so this reduces to the single stream bit-for-bit.
+            // rmdComputed (pre-force) drives the dynamic-sequencing bracket-space calc below.
+            var rmd = McPools.forceRmdStreams(pools, lots, household, tradPPreGrowth, tradSPreGrowth,
+                    age, config.rmdStartAge(), table, baseWithInterest);
+            double rmdComputed = rmd.computed();
+            double rmdForced = rmd.forced();
+
+            // Household task 6 — the first-death transition (atomic, once, at the year boundary):
+            // after both owners' year-of-death RMDs and before any conversion or draw. Rolls the
+            // deceased's traditional/Roth into the survivor's own pools (conservation-preserving) and
+            // steps up the joint-taxable lots' basis. Never fires for a single-person trial (null
+            // household).
+            if (household != null && y == household.transitionYearIndex()) {
+                McPools.applyFirstDeathTransition(pools, lots, household);
+            }
 
             // Roth conversion execution -- stacks on base + interest + the forced RMD (T18a-1).
             // actualConv is the traditional-balance-CAPPED amount actually converted (0 when no
@@ -350,20 +440,18 @@ final class TrialSimulator {
             // like the deterministic engine's extraPoolFundedTax now is. surplusTax[y] is the
             // precomputed full-year tax on this year's taxable base income -- see
             // OptimizationContextBuilder#computeSurplusTax.
-            double grossSurplus = income[y] - spending;
-            double baseIncomeTax = surplusTax[y];
-            double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
-            double unfundedBaseTax = baseIncomeTax - fundedFromSurplus;
-            double withdrawal = Math.max(0, spending - income[y]);
+            var funding = resolveSpendingFunding(income[y], spending, surplusTax[y]);
+            double withdrawal = funding.withdrawal();
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60). aux bundles the
             // remaining per-year array-or-default lookups (dynamic-sequencing ceiling/conversion,
             // LTCG table, rental income) into one call to keep this NCSS-capped hot method lean.
             boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
             var aux = resolveYearAuxInputs(config, y);
-            var drawn = splitWithdrawal(pools[0], pools[1], pools[2],
+            var drawn = splitWithdrawal(pools[JOINT_TAXABLE], pools[TRAD_P] + pools[TRAD_S],
+                    pools[ROTH_P] + pools[ROTH_S],
                     withdrawal, order, preAge595,
-                    aux.dsCeiling(), income[y], aux.dsConvAmt(), rmd);
+                    aux.dsCeiling(), income[y], aux.dsConvAmt(), rmdComputed);
 
             // EXACT incremental tax on the traditional withdrawal (audit C5): the draw stacks on
             // base + interest + the forced RMD + this year's ACTUAL conversion income (T18a-1
@@ -405,8 +493,8 @@ final class TrialSimulator {
             // funding draw (and the LTCG bracket floor) stacks on.
             double ordinaryStack = baseWithInterest + rmdForced + actualConv + traditionalDrawnOut[0];
 
-            settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax,
-                    table, ordinaryStack);
+            settleBaseIncomeTaxAndSurplus(pools, lots, funding.grossSurplus(), funding.fundedFromSurplus(),
+                    funding.unfundedBaseTax(), table, ordinaryStack);
 
             // T18a-3: aux.rentalIncome() threads this year's net rental income into the NIIT Net
             // Investment Income base only (never the LTCG bracket tax) -- zero when no rental array
@@ -414,10 +502,10 @@ final class TrialSimulator {
             applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, aux.ltcgTable(), ordinaryStack, table,
                     aux.rentalIncome());
 
-            clampPoolsNonNegative(pools);
+            McPools.clampNonNegative(pools);
             cashBalance = Math.max(0, cashBalance);
 
-            double totalBalance = pools[0] + pools[1] + pools[2] + cashBalance;
+            double totalBalance = McPools.poolTotal(pools) + cashBalance;
             minBalance = Math.min(minBalance, totalBalance);
             if (yearBalances != null) {
                 yearBalances[y] = totalBalance;
@@ -431,21 +519,41 @@ final class TrialSimulator {
             lots.consolidateIfNeeded(200);
         }
 
-        double finalBalance = Math.max(0, pools[0] + pools[1] + pools[2] + cashBalance);
-        boolean traditionalExhausted = config.conversionByYear() != null && pools[1] <= 0;
+        double finalBalance = Math.max(0, McPools.poolTotal(pools) + cashBalance);
+        carryForwardBequest(yearBalances, loopYears, years, finalBalance);
+        boolean traditionalExhausted = config.conversionByYear() != null
+                && (pools[TRAD_P] + pools[TRAD_S]) <= 0;
 
         return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet);
     }
 
-    /** Floors the three equity pools at zero after the year's mutations. Extracted from
-     * {@link #simulateTrial} so the NCSS-capped hot method stays within budget. */
-    // UseVarargs: {@code pools} is the fixed three-element pool state array mutated in place, not a
-    // variable argument list.
-    @SuppressWarnings("PMD.UseVarargs")
-    private static void clampPoolsNonNegative(double[] pools) {
-        pools[0] = Math.max(0, pools[0]);
-        pools[1] = Math.max(0, pools[1]);
-        pools[2] = Math.max(0, pools[2]);
+    /** Household task 6: a truncated household trial (loopYears &lt; years) carries its final bequest
+     * balance forward across the unsimulated tail so tracked year-balances stay flat rather than
+     * collapsing to zero. No-op for a single-person / full-horizon run (loopYears == years) or an
+     * untracked pass ({@code yearBalances == null}). */
+    private static void carryForwardBequest(@Nullable double[] yearBalances, int loopYears, int years,
+                                            double finalBalance) {
+        if (yearBalances == null) {
+            return;
+        }
+        for (int y = loopYears; y < years; y++) {
+            yearBalances[y] = finalBalance;
+        }
+    }
+
+    /** Audit A4 bundle: the year's surplus/withdrawal split for spending and base-income tax. */
+    private record SpendingFunding(double grossSurplus, double fundedFromSurplus,
+                                   double unfundedBaseTax, double withdrawal) {}
+
+    /** Splits this year's income against spending into: the gross surplus, the portion of the base
+     * income tax funded from that surplus, the unfunded base-tax remainder (drained from pools), and
+     * the spending withdrawal need. Extracted from {@link #simulateTrial} to keep the NCSS-capped hot
+     * method within budget. */
+    private static SpendingFunding resolveSpendingFunding(double income, double spending, double baseIncomeTax) {
+        double grossSurplus = income - spending;
+        double fundedFromSurplus = Math.min(Math.max(0, grossSurplus), baseIncomeTax);
+        return new SpendingFunding(grossSurplus, fundedFromSurplus,
+                baseIncomeTax - fundedFromSurplus, Math.max(0, spending - income));
     }
 
     /**
@@ -523,25 +631,6 @@ final class TrialSimulator {
         return Math.max(adapted, floor);                // essential floor inviolate
     }
 
-    /**
-     * Deducts a tax amount from pools in order: taxable, traditional, roth.
-     * Mutates the pools array in place via the shared {@link PoolTaxCascade}. No gross-up: used only
-     * by the Roth-conversion-tax drain, which stays out of audit C2's scope (see {@link
-     * #applyTrialConversion}).
-     */
-    private static void deductTaxFromPools(double tax, double[] pools, TaxableLots lots) {
-        double taxableBefore = pools[0];
-        double[] after = PoolTaxCascade.deduct(tax, pools[0], pools[1], pools[2]);
-        pools[0] = after[0];
-        pools[1] = after[1];
-        pools[2] = after[2];
-        // Mirror the taxable-first tax sale on the lots to preserve the value invariant; the gain it
-        // realizes is a second-order tax-payment sale, deliberately left untaxed (no tax-on-tax).
-        double taxableSold = taxableBefore - after[0];
-        if (taxableSold > 0) {
-            lots.sellFifo(taxableSold);
-        }
-    }
 
     /**
      * T18a-4: 10% IRC 72(t) additional tax on traditional distributions before age 59½ (whole-year
@@ -555,7 +644,7 @@ final class TrialSimulator {
     private static void applyEarlyWithdrawalPenalty(double[] pools, TaxableLots lots,
                                                       double traditionalDrawn, int age) {
         if (age < RetirementAges.EARLY_WITHDRAWAL_AGE && traditionalDrawn > 0) {
-            deductTaxFromPools(traditionalDrawn * EARLY_WITHDRAWAL_PENALTY_RATE, pools, lots);
+            McPools.deductTaxFromPools(traditionalDrawn * EARLY_WITHDRAWAL_PENALTY_RATE, pools, lots);
         }
     }
 
@@ -583,13 +672,17 @@ final class TrialSimulator {
      */
     private static void deductTaxFromPoolsGrossedUp(double tax, double[] pools, TaxableLots lots,
                                                       OrdinaryTaxTable table, double stackedBase) {
-        double traditionalBefore = pools[1];
-        deductTaxFromPools(tax, pools, lots);
-        double traditionalDrawn = traditionalBefore - pools[1];
+        double traditionalBefore = pools[TRAD_P] + pools[TRAD_S];
+        McPools.deductTaxFromPools(tax, pools, lots);
+        double traditionalDrawn = traditionalBefore - (pools[TRAD_P] + pools[TRAD_S]);
         if (traditionalDrawn > 0 && table != null) {
             double m = Math.min(Math.max(table.rateAt(stackedBase + traditionalDrawn), 0.0), GROSS_UP_RATE_CAP);
             double grossUp = traditionalDrawn * m / (1 - m);
-            pools[1] = Math.max(0, pools[1] - grossUp);
+            // Household task 6: the gross-up drains PROPORTIONALLY across the two traditional pools,
+            // capped at the available traditional total so no slot is driven negative (mirrors the
+            // pre-household Math.max(0, traditional - grossUp) flooring). Single-person: all on TRAD_P.
+            double tradTotal = pools[TRAD_P] + pools[TRAD_S];
+            McPools.debitPair(pools, TRAD_P, TRAD_S, Math.min(grossUp, Math.max(0, tradTotal)));
         }
     }
 
@@ -607,16 +700,20 @@ final class TrialSimulator {
         }
         double annualSpending = floors[0] + discretionary[0];
         double cashBalance = annualSpending * config.cashReserveYears();
-        double cashFromTaxable = Math.min(cashBalance, pools[0]);
-        pools[0] -= cashFromTaxable;
+        double cashFromTaxable = Math.min(cashBalance, pools[JOINT_TAXABLE]);
+        pools[JOINT_TAXABLE] -= cashFromTaxable;
         lots.sellFifo(cashFromTaxable);
         double remaining = cashBalance - cashFromTaxable;
         if (remaining > 0) {
-            double fromTrad = Math.min(remaining, pools[1]);
-            pools[1] -= fromTrad;
+            // Household task 6: draw from traditional (proportional across owners), then Roth for any
+            // remainder, flooring Roth at zero — the same taxable→trad→roth seed cascade, generalized
+            // to the five-pool layout. Single-person: TRAD_P then ROTH_P only, bit-for-bit.
+            double tradTotal = pools[TRAD_P] + pools[TRAD_S];
+            double fromTrad = Math.min(remaining, tradTotal);
+            McPools.debitPair(pools, TRAD_P, TRAD_S, fromTrad);
             remaining -= fromTrad;
-            pools[2] -= remaining;
-            pools[2] = Math.max(0, pools[2]);
+            double rothTotal = pools[ROTH_P] + pools[ROTH_S];
+            McPools.debitPair(pools, ROTH_P, ROTH_S, Math.min(remaining, Math.max(0, rothTotal)));
         }
         return cashBalance;
     }
@@ -637,7 +734,7 @@ final class TrialSimulator {
         if (grossSurplus > 0) {
             double netSurplus = grossSurplus - fundedFromSurplus;
             if (netSurplus > 0) {
-                pools[0] += netSurplus;
+                pools[JOINT_TAXABLE] += netSurplus;
                 lots.addLot(netSurplus);
             }
         }
@@ -668,12 +765,12 @@ final class TrialSimulator {
      */
     private static TaxableYieldSplit growTaxableWithDividendAndInterest(double[] pools, TaxableLots lots,
             double taxableReturn, double dividendYield, double interestYield, double taxableEquityShare) {
-        pools[0] *= (1 + taxableReturn);
+        pools[JOINT_TAXABLE] *= (1 + taxableReturn);
         double bondShare = 1 - taxableEquityShare;
 
         if (bondShare == 0) {
             lots.grow(taxableReturn - dividendYield);
-            double dividendIncome = Math.max(0, pools[0] - lots.totalValue());
+            double dividendIncome = Math.max(0, pools[JOINT_TAXABLE] - lots.totalValue());
             lots.addLot(dividendIncome);
             return new TaxableYieldSplit(dividendIncome, 0);
         }
@@ -681,7 +778,7 @@ final class TrialSimulator {
         double equityYieldRate = taxableEquityShare * dividendYield;
         double blendedYield = equityYieldRate + bondShare * interestYield;
         lots.grow(taxableReturn - blendedYield);
-        double totalDistribution = Math.max(0, pools[0] - lots.totalValue());
+        double totalDistribution = Math.max(0, pools[JOINT_TAXABLE] - lots.totalValue());
         lots.addLot(totalDistribution);
 
         if (blendedYield == 0) {
@@ -761,20 +858,6 @@ final class TrialSimulator {
         }
     }
 
-    /**
-     * Computes this year's Required Minimum Distribution from the prior-year-end traditional
-     * balance ({@code pools1PreGrowth}), per the IRS Uniform Lifetime Table. Returns {@code 0}
-     * before the owner reaches {@code rmdStartAge}, when there is no traditional balance, or
-     * when the table has no distribution period for the age (outside 72-120).
-     */
-    private static double computeYearRmd(double pools1PreGrowth, int age, int rmdStartAge) {
-        if (age < rmdStartAge || pools1PreGrowth <= 0) {
-            return 0;
-        }
-        double divisor = RmdCalculator.distributionPeriod(age);
-        return divisor > 0 ? pools1PreGrowth / divisor : 0;
-    }
-
     /** Bundles {@link #simulateTrial}'s remaining per-year array-or-default lookups (dynamic-
      * sequencing bracket ceiling/conversion amount, the LTCG table, and T18a-3's net rental
      * income) into a single call, keeping the NCSS-capped hot method lean. */
@@ -786,39 +869,6 @@ final class TrialSimulator {
         LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
         double rentalIncome = config.rentalIncomeByYear() != null ? config.rentalIncomeByYear()[y] : 0.0;
         return new YearAuxInputs(dsCeiling, dsConvAmt, ltcgTable, rentalIncome);
-    }
-
-    /**
-     * T18a-1: forces this year's RMD out of the traditional pool FIRST -- before any Roth
-     * conversion or spending withdrawal (IRS ordering: the year's RMD must be distributed before
-     * any conversion) -- mirroring the deterministic engine's {@code PoolStrategy#forceRmd}.
-     * Replaces the old end-of-year {@code forceRmdExcess}, which forced only the amount beyond
-     * whatever the spend draw happened to already pull from traditional; under RMD-first ordering
-     * the FULL rmd is force-distributed unconditionally, independent of any later withdrawal
-     * decision. The after-tax remainder is reinvested to taxable; the tax on the forced
-     * distribution leaves the portfolio entirely (it is not itself reinvested, and is not routed
-     * through the C2 gross-up cascade -- the same direct-leak design the old
-     * {@code forceRmdExcess} used).
-     *
-     * @return the forced amount actually distributed (0 when {@code rmd <= 0} or traditional is
-     *         already exhausted) -- the FIRST ordinary-income stack this trial-year realizes;
-     *         every later pricing call (conversion, spending draw, their gross-ups) stacks on top
-     *         of it.
-     */
-    private static double forceRmdFirst(double[] pools, TaxableLots lots, double rmd,
-                                         OrdinaryTaxTable table, double base) {
-        if (rmd <= 0) {
-            return 0;
-        }
-        double extra = Math.min(rmd, pools[1]);
-        if (extra > 0) {
-            pools[1] -= extra;
-            double taxExtra = table != null ? table.incrementalTax(base, extra) : 0;
-            double reinvested = extra - taxExtra;
-            pools[0] += reinvested;
-            lots.addLot(reinvested);   // after-tax RMD reinvested to taxable at cost
-        }
-        return extra;
     }
 
     /**
@@ -841,12 +891,20 @@ final class TrialSimulator {
     private static double applyTrialConversion(double[] pools, TaxableLots lots, double[] conversionByYear,
                                                 double[] conversionTaxByYear, int y, int age,
                                                 OrdinaryTaxTable table, double base) {
-        if (conversionByYear == null || conversionByYear[y] <= 0 || pools[1] <= 0) {
+        double tradTotal = pools[TRAD_P] + pools[TRAD_S];
+        if (conversionByYear == null || conversionByYear[y] <= 0 || tradTotal <= 0) {
             return 0;
         }
-        double actualConv = Math.min(conversionByYear[y], pools[1]);
-        pools[1] -= actualConv;
-        pools[2] += actualConv;
+        double actualConv = Math.min(conversionByYear[y], tradTotal);
+        // Household task 6: debit traditional PROPORTIONALLY by owner balance and credit each owner's
+        // OWN Roth by that same per-owner amount (a conversion stays within the owner). Single-person:
+        // the whole amount moves TRAD_P → ROTH_P bit-for-bit.
+        double shareP = actualConv * pools[TRAD_P] / tradTotal;
+        double shareS = actualConv - shareP;
+        pools[TRAD_P] -= shareP;
+        pools[ROTH_P] += shareP;
+        pools[TRAD_S] -= shareS;
+        pools[ROTH_S] += shareS;
         double actualTax;
         if (table != null) {
             actualTax = table.incrementalTax(base, actualConv);
@@ -856,11 +914,11 @@ final class TrialSimulator {
                     : conversionTaxByYear[y];
         }
         if (age < RetirementAges.EARLY_WITHDRAWAL_AGE) {
-            double taxPaid = Math.min(actualTax, Math.max(0, pools[0]));
-            pools[0] -= taxPaid;
+            double taxPaid = Math.min(actualTax, Math.max(0, pools[JOINT_TAXABLE]));
+            pools[JOINT_TAXABLE] -= taxPaid;
             lots.sellFifo(taxPaid);   // conversion-tax sale synced; gain untaxed (second-order)
         } else {
-            deductTaxFromPools(actualTax, pools, lots);
+            McPools.deductTaxFromPools(actualTax, pools, lots);
         }
         return actualConv;
     }
@@ -896,9 +954,9 @@ final class TrialSimulator {
                     double scale = equityDraw / Math.max(drawnTotal, equityDraw);
                     double spendingSale = drawn.taxable() * scale;
                     double tradDrawn = drawn.traditional() * scale;
-                    pools[0] -= spendingSale;
-                    pools[1] -= tradDrawn;
-                    pools[2] -= drawn.roth() * scale;
+                    pools[JOINT_TAXABLE] -= spendingSale;
+                    McPools.debitPair(pools, TRAD_P, TRAD_S, tradDrawn);
+                    McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth() * scale);
                     realizedGainOut[0] += lots.sellFifo(spendingSale);
                     traditionalDrawnOut[0] = tradDrawn;
                 }
@@ -915,10 +973,10 @@ final class TrialSimulator {
                 return cashBalance - cashDraw;
             } else {
                 // Up market: normal withdrawal + replenish cash
-                pools[0] -= drawn.taxable();
+                pools[JOINT_TAXABLE] -= drawn.taxable();
                 realizedGainOut[0] += lots.sellFifo(drawn.taxable());
-                pools[1] -= drawn.traditional();
-                pools[2] -= drawn.roth();
+                McPools.debitPair(pools, TRAD_P, TRAD_S, drawn.traditional());
+                McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth());
                 traditionalDrawnOut[0] = drawn.traditional();
                 if (hasPools) {
                     deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, table,
@@ -927,22 +985,23 @@ final class TrialSimulator {
                 double targetCash = spending * cashReserveYears;
                 double replenishment = Math.min(
                         Math.max(0, targetCash - cashBalance),
-                        Math.max(0, pools[0] + pools[1] + pools[2])
-                                * CASH_REPLENISHMENT_RATE);
-                pools[0] -= replenishment;
+                        Math.max(0, McPools.poolTotal(pools)) * CASH_REPLENISHMENT_RATE);
+                pools[JOINT_TAXABLE] -= replenishment;
                 lots.sellFifo(replenishment);   // taxable→cash reserve churn; gain untaxed (second-order)
-                if (pools[0] < 0) {
-                    pools[1] += pools[0];
-                    pools[0] = 0;
+                if (pools[JOINT_TAXABLE] < 0) {
+                    // Household task 6: a taxable overdraw spills into traditional (proportional across
+                    // owners), matching the pre-household `pools[1] += pools[JOINT_TAXABLE]` single-pool spill.
+                    McPools.debitPair(pools, TRAD_P, TRAD_S, -pools[JOINT_TAXABLE]);
+                    pools[JOINT_TAXABLE] = 0;
                 }
                 return cashBalance + replenishment;
             }
         } else {
             // No cash reserve
-            pools[0] -= drawn.taxable();
+            pools[JOINT_TAXABLE] -= drawn.taxable();
             realizedGainOut[0] += lots.sellFifo(drawn.taxable());
-            pools[1] -= drawn.traditional();
-            pools[2] -= drawn.roth();
+            McPools.debitPair(pools, TRAD_P, TRAD_S, drawn.traditional());
+            McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth());
             traditionalDrawnOut[0] = drawn.traditional();
             if (hasPools) {
                 deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, table,

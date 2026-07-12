@@ -206,7 +206,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 // T24: the search gate honors the profile's toggle. T26: JointConversionSearch's own
                 // conversion-fraction scoring search resolves the SAME toggle independently (see its
                 // SearchContext construction), so both stages score/gate under one objective.
-                input.gateOnAdaptiveRules(), maxAdjRate);
+                input.gateOnAdaptiveRules(), maxAdjRate,
+                // Household task 6: the search runs the same household economics as the terminal pass.
+                ctx.sim().household());
     }
 
     /**

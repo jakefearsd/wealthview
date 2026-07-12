@@ -251,7 +251,8 @@ class OptimizationContextBuilderTest {
                 BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 "single", null,
                 false, null, null, 5, null, null,
-                null, null, baseYear, false, null, false);
+                null, null, baseYear, false, null, false,
+                null, null, null, null, false);   // household task 6: single-person
     }
 
     private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {
@@ -338,6 +339,7 @@ class OptimizationContextBuilderTest {
                 BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 null, null,
                 false, null, null, 5, null, null,
-                null, null, 2030, false, interestYield, false);
+                null, null, 2030, false, interestYield, false,
+                null, null, null, null, false);   // household task 6: single-person
     }
 }
