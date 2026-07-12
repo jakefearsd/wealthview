@@ -604,7 +604,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * Audit C1: the taxable pool's balance-weighted equity share (us_stock + intl_stock),
          * computed once at construction via {@link PoolStrategy#taxableEquityShare} — {@code 1.0}
          * (bond share {@code 0.0}) for every ALL_US or no-allocation account, the byte-identical
-         * backward-compat anchor for {@link #applyGrowth()}'s yield split.
+         * backward-compat anchor for {@link #applyGrowth(boolean)}'s yield split.
          */
         private final BigDecimal taxableEquityShare;
         private final BigDecimal inflationRate;

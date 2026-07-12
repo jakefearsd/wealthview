@@ -12,8 +12,10 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
+import com.wealthview.core.projection.tax.CombinedTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.NullStateTaxCalculator;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
@@ -132,6 +134,39 @@ class MultiPoolCapitalGainsTest {
         // No ordinary tax calculator wired in this fixture, so taxLiability is LTCG tax alone --
         // r.ltcgTax() (the field the engine folds into the federalTax breakdown) matches it exactly.
         assertThat(r.ltcgTax()).isEqualByComparingTo(bd("5497.50"));
+    }
+
+    /**
+     * T23 item 2 oracle: {@code resolveOrdinaryDeduction} must net the LTCG stacking floor against
+     * the CHOSEN deduction -- itemized when the year itemizes, per {@code CombinedTaxResult
+     * #usedItemized()} -- not silently fall back to the standard deduction. Same $40,000
+     * realized-gain / $60,000-ordinary-income fixture as the sibling test above, but wired with a
+     * real {@link CombinedTaxCalculator} (SALT-capped $12,000 property tax + $25,000 mortgage
+     * interest = $37,000 itemized, beating the $15,000 single standard deduction) as the ORDINARY
+     * {@code taxCalculator} instead of leaving it {@code null}. The floor lands at
+     * {@code 60000 - 37000 = 23000} instead of the sibling test's {@code 60000 - 15000 = 45000},
+     * leaving MORE 0%-bracket headroom ({@code 48350 - 23000 = 25350} vs {@code 3350}) and therefore
+     * LESS LTCG tax: {@code (40000 - 25350) * 0.15 = 2197.50} -- a concrete, oracle-verified
+     * DIRECTION difference from the sibling test's $5,497.50 under the standard deduction, not
+     * merely a null-vs-non-null check. A regression to the standard-deduction fallback would produce
+     * $5,497.50 here instead, failing this assertion.
+     */
+    @Test
+    void executeWithdrawals_itemizingYear_stackingFloorNetsItemizedDeductionNotStandard() {
+        var federal = federalTaxCalc();
+        var combinedTaxCalc = new CombinedTaxCalculator(federal, new NullStateTaxCalculator(),
+                bd("12000"), bd("25000"));
+        var config = new PoolStrategy.PoolConfig(
+                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST,
+                combinedTaxCalc, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
+                federal);
+        var p = new PoolStrategy.MultiPool(
+                grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
+                ZERO, config);
+
+        var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);
+
+        assertThat(r.ltcgTax()).isEqualByComparingTo(bd("2197.50"));
     }
 
     @Test
