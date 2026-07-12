@@ -118,7 +118,11 @@ final class SpendingFeasibilityAnalyzer {
         }
 
         var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement, inflationRate, activeIncome);
-        BigDecimal factor = survivorSpendingFactor != null ? survivorSpendingFactor : BigDecimal.ONE;
+        // Task 8 follow-up #2: the effective factor is resolved by the SAME shared rule the draw
+        // seam uses (HouseholdTransition.effectiveSpendingFactor) — notably a frozen guardrail
+        // schedule is already survivor-scaled by the optimizer and is consumed at factor 1.0 here
+        // too, so these disclosures never double-scale what the schedule already reduced.
+        BigDecimal factor = HouseholdTransition.effectiveSpendingFactor(spendingPlan, survivorSpendingFactor);
         BigDecimal essential = HouseholdTransition.scaleBySurvivorFactor(resolved.essential(), factor);
         BigDecimal discretionary = HouseholdTransition.scaleBySurvivorFactor(resolved.discretionary(), factor);
 

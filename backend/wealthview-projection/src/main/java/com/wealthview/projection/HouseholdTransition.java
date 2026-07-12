@@ -5,7 +5,9 @@ import java.util.List;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.dto.SpendingPlan;
 import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.household.PersonId;
 
@@ -49,6 +51,30 @@ final class HouseholdTransition {
             return amount;
         }
         return amount.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Task 8 follow-up #2: the survivor spending factor to actually APPLY when consuming
+     * {@code plan}'s resolved spending — shared by {@link RetirementWithdrawalProcessor} (the draw)
+     * and {@link SpendingFeasibilityAnalyzer} (the disclosures) so both seams resolve it identically.
+     *
+     * <p>A frozen guardrail/optimizer schedule ({@link GuardrailSpendingInput}) is ALREADY
+     * survivor-scaled end-to-end at optimization time — task 6 pre-scales the essential floors at
+     * the {@code OptimizationContextBuilder} choke point, task 8 scales the reported discretionary
+     * schedule, and the income splice is household-aware — so the deterministic engine consumes it
+     * at factor {@link BigDecimal#ONE}: re-applying the year factor would double-scale
+     * (0.75&sup2; = 0.5625×). A schedule persisted BEFORE a household edit is the staleness
+     * machinery's problem (the scenario signature covers every household field), not this seam's.
+     *
+     * <p>Tier-based plans and the plan-less withdrawal-rate strategies ({@code plan == null}) are
+     * raw user spending with no survivor awareness — the year's factor applies unchanged
+     * ({@code null} factor coalesces to ONE, the pre-household convention).
+     */
+    static BigDecimal effectiveSpendingFactor(@Nullable SpendingPlan plan, @Nullable BigDecimal factor) {
+        if (factor == null || plan instanceof GuardrailSpendingInput) {
+            return BigDecimal.ONE;
+        }
+        return factor;
     }
 
     static SurvivorYear resolveYear(@Nullable HouseholdContext household, PoolStrategy pool, int year,

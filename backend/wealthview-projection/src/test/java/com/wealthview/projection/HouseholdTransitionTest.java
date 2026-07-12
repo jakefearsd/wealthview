@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -9,6 +10,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.GuardrailSpendingInput;
+import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
@@ -36,6 +39,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTaxAndIrmaa;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
@@ -471,6 +475,139 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(post.discretionaryExpenses()).isEqualByComparingTo(bd("15000"));
         assertThat(post.spendingSurplus()).isEqualByComparingTo(ZERO);
         assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+    }
+
+    // === Task 8 follow-up #2 (second T10 blocker): survivor income nets against SCALED spending ===
+    // The draw must be max(0, factor×N − I), not factor×(N − I): scaling the plan's pre-netted
+    // difference credits survivor income at only factor× (over-draw = (1−factor)×I per year) and,
+    // in the window factor×N < I < N, BOTH draws and deposits a surplus the same year. The MC
+    // engine already nets after scaling (floors pre-scaled at the OptimizationContextBuilder choke
+    // point, then resolveSpendingFunding nets income at 100%) — these pins restore engine parity.
+
+    @Test
+    void transition_survivorIncome_creditsFullyAgainstScaledSpending_notScaledNetDraw() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // T10 probe 1 (deficit region): survivor-kept pension 30k, essential 60k, factor 0.75.
+        // Coherent post-transition draw = 0.75×60,000 − 30,000 = 15,000 (pre-fix: 22,500).
+        var survivorPension = pension("30000", 62, "spouse", "1.0");
+        var result = engine.run(input(2040, 90, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")),
+                new SpendingProfileInput(bd("60000"), bd("0"), null),
+                List.of(survivorPension), household(85, 90)));
+
+        // Pre-transition: draw = 60,000 − 30,000 (MFJ tax on the 30k pension is 0), surplus 0.
+        var pre = yearOf(result.yearlyData(), 2042);
+        assertThat(pre.withdrawals()).isEqualByComparingTo(bd("30000"));
+        assertThat(pre.spendingSurplus()).isEqualByComparingTo(ZERO);
+
+        for (int year : new int[]{TRANSITION_YEAR, 2044}) {
+            var row = yearOf(result.yearlyData(), year);
+            assertThat(row.withdrawals()).as("withdrawals %d", year).isEqualByComparingTo(bd("15000"));
+            assertThat(row.essentialExpenses()).as("essential %d", year).isEqualByComparingTo(bd("45000"));
+            // Coherence identity: available (draw + income) EXACTLY funds the scaled spending —
+            // surplus + taxLiability == 0. (The residual surplus of −tax is the pre-existing
+            // deficit-year convention for base-income tax — funded from the pools outside the
+            // `withdrawals` figure — not a household artifact; pre-fix this identity broke by the
+            // phantom (1−0.75)×30,000 = +7,500 over-draw.)
+            assertThat(nz(row.spendingSurplus()).add(row.taxLiability()))
+                    .as("surplus + tax %d", year).isEqualByComparingTo(ZERO);
+            assertThat(nz(row.surplusReinvested())).as("surplusReinvested %d", year).isEqualByComparingTo(ZERO);
+        }
+    }
+
+    @Test
+    void transition_incomeInsideScaledUnscaledWindow_depositsSurplusWithoutSimultaneousDraw() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // T10 probe 2 (window region): pension 55k sits between scaled (45k) and unscaled (60k)
+        // spending. Coherent: draw 0, deposit the after-tax surplus. Pre-fix the engine BOTH drew
+        // 0.75×(60,000−55,000) = 3,750 AND deposited a surplus the same year — a double-flow
+        // through the pools a coherent model never produces.
+        var survivorPension = pension("55000", 62, "spouse", "1.0");
+        var result = engine.run(input(2040, 90, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")),
+                new SpendingProfileInput(bd("60000"), bd("0"), null),
+                List.of(survivorPension), household(85, 90)));
+
+        for (int year : new int[]{TRANSITION_YEAR, 2044}) {
+            var row = yearOf(result.yearlyData(), year);
+            assertThat(row.withdrawals()).as("withdrawals %d", year).isEqualByComparingTo(ZERO);
+            assertThat(nz(row.surplusReinvested())).as("surplusReinvested %d", year).isPositive();
+        }
+    }
+
+    @Test
+    void transition_deterministicAndMcShareTheNetAfterScalingRule() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Cross-engine parity on the same year-shape: scaled spending 45,000, income 30,000,
+        // taxable-only pool, no growth/tax. Deterministic: exact BigDecimal 15,000. MC: floors
+        // arrive PRE-scaled from OptimizationContextBuilder's choke point and the trial nets
+        // income at 100% (resolveSpendingFunding: max(0, spending − income)) — same rule; the MC
+        // half is asserted at double precision within 1e-6 (the documented tolerance).
+        var survivorPension = pension("30000", 62, "spouse", "1.0");
+        var det = engine.run(input(2040, 90, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")),
+                new SpendingProfileInput(bd("60000"), bd("0"), null),
+                List.of(survivorPension), household(85, 90)));
+        assertThat(yearOf(det.yearlyData(), 2044).withdrawals()).isEqualByComparingTo(bd("15000"));
+
+        var simulator = new TrialSimulator();
+        var config = new TrialSimulator.SimulationConfig(
+                3_000_000.0, 0.0, 0.0, "taxable_first", null, null, null, null, 78, null,
+                0, 0.0, false, new double[]{0.0}, new double[]{0.0}, new double[]{0.0},
+                Integer.MAX_VALUE, 3_000_000.0, null, 0.0);
+        var trial = simulator.simulateTrial(new double[]{30_000.0}, new double[]{0.0},
+                new double[]{45_000.0}, new double[]{0.0}, 1, config);
+        assertThat(trial.finalBalance()).isEqualTo(3_000_000.0 - 15_000.0, within(1e-6));
+    }
+
+    @Test
+    void transition_guardrailSchedule_consumedAsIs_neverRescaledBySurvivorFactor() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // A frozen guardrail/optimizer schedule is ALREADY survivor-scaled end-to-end at
+        // optimization time (T6 pre-scales the floors, T8 the reported discretionary, and the
+        // income splice is household-aware). The deterministic engine must consume it at factor
+        // 1.0 — re-applying the year factor would double-scale (0.75² = 0.5625×). Post-transition
+        // rows here carry the optimizer's own scaled/netted numbers: recommended 45,000
+        // (= 60,000×0.75), floor 30,000, discretionary 15,000, portfolioWithdrawal 15,000 (netted
+        // against the optimizer's survivor income 30,000).
+        var rows = new ArrayList<GuardrailYearlySpending>();
+        for (int y = 2040; y <= 2047; y++) {
+            boolean post = y >= TRANSITION_YEAR;
+            rows.add(new GuardrailYearlySpending(
+                    y, y - PRIMARY_BIRTH,
+                    post ? bd("45000") : bd("60000"), bd("20000"), bd("90000"),
+                    post ? bd("30000") : bd("40000"), post ? bd("15000") : bd("20000"),
+                    bd("30000"), post ? bd("15000") : bd("30000"), "Retirement"));
+        }
+        var survivorPension = pension("30000", 62, "spouse", "1.0");
+        var guardrailInput = new GuardrailSpendingInput(rows);
+        var projectionInput = new ProjectionInput(UUID.randomUUID(), "Household guardrail",
+                LocalDate.of(2020, 1, 1), 90, ZERO, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")),
+                null, 2040, List.of(survivorPension), guardrailInput, List.of(), household(85, 90));
+
+        var result = engine.run(projectionInput);
+
+        // Pre-transition row consumed as-is (factor 1.0 both alive — sanity, not the fix).
+        assertThat(yearOf(result.yearlyData(), 2042).withdrawals()).isEqualByComparingTo(bd("30000"));
+        // Post-transition: the frozen schedule's own numbers — NOT ×0.75 again (draw 11,250 /
+        // essential 22,500 would be the double-scale).
+        var row = yearOf(result.yearlyData(), 2044);
+        assertThat(row.withdrawals()).isEqualByComparingTo(bd("15000"));
+        assertThat(row.essentialExpenses()).isEqualByComparingTo(bd("30000"));
+        assertThat(row.discretionaryExpenses()).isEqualByComparingTo(bd("15000"));
     }
 
     // === Idempotence: the transition fires exactly once, even across the SS convergence re-runs ===

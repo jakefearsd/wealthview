@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.dto.ResolvedYearSpending;
 import com.wealthview.core.projection.dto.SpendingPlan;
 import com.wealthview.core.projection.strategy.WithdrawalContext;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
@@ -134,18 +135,20 @@ final class RetirementWithdrawalProcessor {
 
         // Household task 5 (transition step 4): from the first-death year the survivor spends
         // survivorSpendingFactor of the plan-resolved amount. Applied HERE, at the single
-        // plan-resolution seam, so EVERY strategy inherits it uniformly — tier plans, guardrail
-        // schedules, and the withdrawal-rate strategies below. A factor of exactly 1.0 (both alive,
-        // single-person, or the pre-transition years) short-circuits to the original value, so those
-        // paths stay byte-identical.
-        BigDecimal factor = rwCtx.survivorSpendingFactor() != null
-                ? rwCtx.survivorSpendingFactor() : BigDecimal.ONE;
+        // plan-resolution seam, so EVERY strategy inherits it uniformly — tier plans and the
+        // withdrawal-rate strategies below. A factor of exactly 1.0 (both alive, single-person,
+        // the pre-transition years, or a frozen guardrail schedule — already survivor-scaled by
+        // the optimizer, see HouseholdTransition#effectiveSpendingFactor) short-circuits to the
+        // original value, so those paths stay byte-identical.
+        BigDecimal factor = HouseholdTransition.effectiveSpendingFactor(
+                spendingPlan, rwCtx.survivorSpendingFactor());
 
         if (spendingPlan != null) {
             var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement,
                     inflationRate, totalActiveIncome);
             BigDecimal scaledSpending = scaleBySurvivorFactor(resolved.totalSpending(), factor);
-            portfolioNeed = scaleBySurvivorFactor(resolved.portfolioWithdrawal(), factor).min(aggBalance);
+            portfolioNeed = resolveScaledPortfolioNeed(resolved, scaledSpending, totalActiveIncome, factor)
+                    .min(aggBalance);
             previousWithdrawal = scaledSpending;
 
             // Detect surplus or exact-match: income meets or exceeds total spending.
@@ -222,6 +225,34 @@ final class RetirementWithdrawalProcessor {
                 withdrawalResult.fromRoth(), withdrawalResult.taxSource(), withdrawalResult.ltcgTax(),
                 withdrawalResult.realizedLtcgIncome(), withdrawalResult.earlyWithdrawalPenalty(),
                 withdrawalResult.ordinaryInterestIncome());
+    }
+
+    /**
+     * The year's portfolio need from the plan-resolved spending (task 8 follow-up #2, the second
+     * T10 blocker). Factor exactly 1.0 — single-person, both-alive/pre-transition, or a frozen
+     * guardrail schedule (already survivor-scaled by the optimizer) — short-circuits to the plan's
+     * OWN pre-netted {@code portfolioWithdrawal}, byte-identical to every pre-household path: for
+     * tier plans it equals {@code max(0, totalSpending − income)} by construction
+     * ({@code TierBasedSpendingPlan.resolveYear}); for guardrail plans it is the frozen schedule's
+     * own netting against the optimizer's income model, preserved as-is.
+     *
+     * <p>Post-transition (tier plans, factor &lt; 1.0) the need derives from the SCALED total
+     * spending minus income — netting AFTER scaling ({@code max(0, factor×N − I)}), never
+     * {@code factor×(N − I)}, which credits survivor income at only factor× (over-drawing
+     * {@code (1−factor)×I} per year) and, in the window {@code factor×N < I < N}, both draws AND
+     * deposits a surplus in the same year. Deriving from the SAME {@code scaledSpending} the
+     * {@code grossSurplus} branch nets against makes it impossible for the draw and the surplus
+     * decision to disagree about which spending figure is real; it is also exactly the MC engine's
+     * rule (floors pre-scaled at build time, {@code TrialSimulator.resolveSpendingFunding} nets
+     * income at 100%) — cross-engine parity.
+     */
+    private static BigDecimal resolveScaledPortfolioNeed(
+            ResolvedYearSpending resolved,
+            BigDecimal scaledSpending, BigDecimal totalActiveIncome, BigDecimal factor) {
+        if (factor.compareTo(BigDecimal.ONE) == 0) {
+            return resolved.portfolioWithdrawal();
+        }
+        return scaledSpending.subtract(totalActiveIncome).max(BigDecimal.ZERO);
     }
 
     /**
