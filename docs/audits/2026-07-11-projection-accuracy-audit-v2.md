@@ -128,9 +128,12 @@ Effort M.
    `SpendingCorridorCalculator`): trials run a fixed schedule; the displayed corridor is cosmetic
    and never validated in-simulation. Simulate a simple ratchet/cut rule; report both
    no-adaptation and with-rules success. Effort L.
-10. **Equity tail bounded at 1974 (−36%)** — 1972–2025 window (54 rows) excludes 1929–33; no
-    resampled annual real equity return can be worse than history's best-worst year. Optional
-    stress overlay or synthetic tail blocks. Effort M.
+10. **Equity tail bounded at the window's worst year** — 1972–2025 window (54 rows) excludes
+    1929–33; no resampled annual real equity return can be worse than history's worst sampled
+    year. *(Erratum 2026-07-12: the original claim cited 1974/−36% as the bound; the seed's 2008
+    row is −38.4%, so the true pre-fix bound was 2008. The structural point stands — the fix
+    widens the sample pool with 1928–1971, incl. 1931's −38.3% and the deflation-era dynamics.)*
+    Optional stress overlay or synthetic tail blocks. Effort M.
 11. **SinglePool path is entirely untaxed** (`PoolStrategy.java:246-254,394-396`) — all-taxable
     scenarios get zero tax of any kind (even income-source tax), filing status hardcoded SINGLE.
     Small population; silent. Route all-taxable scenarios through MultiPool or warn. Effort M.
