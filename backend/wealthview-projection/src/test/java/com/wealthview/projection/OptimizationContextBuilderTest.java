@@ -8,6 +8,8 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
+import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
@@ -274,5 +276,68 @@ class OptimizationContextBuilderTest {
                 null, null,
                 false, null, null, 5, null, null,
                 dividendYield, feeRate);
+    }
+
+    // C1 (2026-07-12 audit): interest_yield must thread into SimulationParameters.interestYield()
+    // the same way dividend_yield/fee_rate do -- resolveInterestYield falls back to
+    // ScenarioParamsParser.DEFAULT_INTEREST_YIELD (0.04) when the scenario's params_json doesn't
+    // set one.
+
+    @Test
+    void build_scenarioInterestYieldSet_flowsIntoSimulationConfig() {
+        var input = inputWithInterestYield(new BigDecimal("0.05"), AssetAllocation.ALL_US);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().interestYield()).isEqualTo(0.05);
+    }
+
+    @Test
+    void build_scenarioInterestYieldAbsent_defaultsToPoint04() {
+        var input = inputWithInterestYield(null, AssetAllocation.ALL_US);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().interestYield()).isEqualTo(0.04);
+    }
+
+    // C1: taxableEquityShare must reflect the taxable account's OWN allocation -- 1.0 (100%
+    // equity) for ALL_US/no-allocation accounts (the backward-compat anchor every pre-C1 scenario
+    // takes), and the allocation's actual equity weight otherwise.
+
+    @Test
+    void build_taxableAccountAllUsAllocation_taxableEquityShareIsOne() {
+        var input = inputWithInterestYield(null, AssetAllocation.ALL_US);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().taxableEquityShare()).isEqualTo(1.0);
+    }
+
+    @Test
+    void build_taxableAccountBondAllocation_taxableEquityShareReflectsSplit() {
+        var allocation = new AssetAllocation(java.util.Map.of(
+                AssetClass.US_STOCK, new BigDecimal("0.6"), AssetClass.BOND, new BigDecimal("0.4")));
+        var input = inputWithInterestYield(null, allocation);
+
+        var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setup.sim().taxableEquityShare()).isEqualTo(0.6, within(1e-9));
+    }
+
+    private GuardrailOptimizationInput inputWithInterestYield(BigDecimal interestYield, AssetAllocation allocation) {
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO, allocation,
+                        Optional.empty(), "taxable")),
+                List.of(),
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
+                List.of(), 42L,
+                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                null, null,
+                false, null, null, 5, null, null,
+                null, null, 2030, false, interestYield);
     }
 }

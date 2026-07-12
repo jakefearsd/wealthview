@@ -58,7 +58,7 @@ final class OptimizationContextBuilder {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0, 0, 0),
+                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null, null));
         }
 
@@ -162,6 +162,12 @@ final class OptimizationContextBuilder {
                 filingStatus, inflationRate, input.birthYear());
         double dividendYield = resolveDividendYield(input);
         double returnMean = resolveReturnMean(input, inflationRate, feeRate, matrix);
+        // Audit C1: splits the MC taxable pool's yield the same way PoolStrategy.MultiPool does --
+        // computed once from the taxable accounts' own allocation, falling back to 1.0 (100%
+        // equity, ALL_US-equivalent -- byte-identical to pre-C1) when there are none.
+        double interestYield = resolveInterestYield(input);
+        double taxableEquityShare = PoolStrategy.taxableEquityShare(
+                taxableAccounts(input.accounts())).doubleValue();
 
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
@@ -170,12 +176,19 @@ final class OptimizationContextBuilder {
                 new SimulationParameters(retirementYear, retirementAge, endAge, years,
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
-                        returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean),
+                        returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
+                        interestYield, taxableEquityShare),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeArrays.incomeByYear(), incomeArrays.taxableIncomeByYear(),
                         incomeArrays.surplusTaxByYear(),
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
                         taxCtx, dsBracketCeilingByYear, ltcgTaxTables, rentalIncomeByYear));
+    }
+
+    private static List<ProjectionAccountInput> taxableAccounts(List<ProjectionAccountInput> accounts) {
+        return accounts.stream()
+                .filter(a -> PoolStrategy.POOL_TAXABLE.equals(a.accountType()))
+                .toList();
     }
 
     /**
@@ -291,6 +304,17 @@ final class OptimizationContextBuilder {
     private static double resolveFeeRate(GuardrailOptimizationInput input) {
         return input.feeRate() != null
                 ? input.feeRate().doubleValue() : ScenarioParamsParser.DEFAULT_FEE_RATE.doubleValue();
+    }
+
+    /**
+     * Resolves the scenario's bond/cash-sleeve interest yield for the MC engine, falling back to
+     * the same default the deterministic engine uses (see {@link
+     * ScenarioParamsParser#DEFAULT_INTEREST_YIELD}) when the scenario's {@code params_json} doesn't
+     * set one (audit C1).
+     */
+    private static double resolveInterestYield(GuardrailOptimizationInput input) {
+        return input.interestYield() != null
+                ? input.interestYield().doubleValue() : ScenarioParamsParser.DEFAULT_INTEREST_YIELD.doubleValue();
     }
 
     /**

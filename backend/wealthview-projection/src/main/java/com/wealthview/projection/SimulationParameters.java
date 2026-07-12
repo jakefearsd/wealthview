@@ -15,6 +15,14 @@ package com.wealthview.projection;
  * {@link OptimizationContextBuilder#resolveReturnMean} (audit C4) and consumed by both
  * {@link JointConversionSearch} (drives the {@code ConversionSimulator}) and
  * {@link GuardrailResponseBuilder} (echoed on the response so users see the rate actually used).
+ *
+ * <p>{@code interestYield} (audit C1) is the scenario's bond/cash-sleeve nominal interest-yield
+ * proxy, resolved once (falling back to {@code ScenarioParamsParser.DEFAULT_INTEREST_YIELD} when
+ * unset) exactly like {@code dividendYield}. {@code taxableEquityShare} is the taxable pool's
+ * balance-weighted equity share ({@link PoolStrategy#taxableEquityShare}), used to split the
+ * taxable pool's annual yield between qualified-dividend treatment (the equity share, at {@code
+ * dividendYield}) and ordinary-interest treatment (the bond+cash share, at {@code interestYield})
+ * in {@link TrialSimulator}, exactly like the deterministic engine's {@code PoolStrategy.MultiPool}.
  */
 record SimulationParameters(
         int retirementYear, int retirementAge, int endAge, int years,
@@ -24,5 +32,7 @@ record SimulationParameters(
         int rmdStartAge,
         double dividendYield,
         double feeRate,
-        double returnMean
+        double returnMean,
+        double interestYield,
+        double taxableEquityShare
 ) {}

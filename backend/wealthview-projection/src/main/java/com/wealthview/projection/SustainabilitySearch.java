@@ -45,7 +45,8 @@ final class SustainabilitySearch {
             double[] dsBracketCeilingByYear,
             double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
             int rmdStartAge,
-            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield) {}
+            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+            double interestYield, double taxableEquityShare) {}
 
     /**
      * Verifies the essential floor against portfolio capacity at the required confidence level,
@@ -300,7 +301,7 @@ final class SustainabilitySearch {
                     ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
                     ctx.rmdStartAge(),
                     ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), null,
-                    rentalIncomeByYear);
+                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare());
 
             var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);

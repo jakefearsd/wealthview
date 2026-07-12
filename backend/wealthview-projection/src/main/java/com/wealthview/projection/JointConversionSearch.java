@@ -193,7 +193,7 @@ final class JointConversionSearch {
                 searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield());
+                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare());
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

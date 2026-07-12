@@ -82,8 +82,42 @@ final class TrialSimulator {
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
             int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-            GuardrailAdaptation adaptation, double[] rentalIncomeByYear
+            GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
+            double interestYield, double taxableEquityShare
     ) {
+        /**
+         * Back-compat constructor predating audit C1: no bond-sleeve interest yield or taxable-pool
+         * equity share to split it by -- {@code interestYield} defaults to 0 and {@code
+         * taxableEquityShare} to 1.0 (100% equity, ALL_US-equivalent), the byte-identical anchor
+         * that makes {@link #growTaxableWithDividendAndInterest} take the same code path as the
+         * pre-C1 single-dividendYield {@code growTaxableWithDividend}.
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-C1 shape) so
+        // existing positional call sites keep compiling and behaving identically.
+        // UseVarargs: rentalIncomeByYear is a per-year indexed array, not a variable argument
+        // list -- varargs would change the call contract and invite accidental misuse.
+        @SuppressWarnings({"PMD.ExcessiveParameterList", "PMD.UseVarargs"})
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+                GuardrailAdaptation adaptation, double[] rentalIncomeByYear) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
+                    0.0, 1.0);
+        }
+
         /**
          * Back-compat constructor predating T18a-3: no per-year net rental income to thread into
          * the NIIT Net Investment Income base (null -- every year contributes zero rental to NII,
@@ -110,6 +144,35 @@ final class TrialSimulator {
                     retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
                     trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
                     initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, null);
+        }
+
+        /**
+         * Back-compat constructor for audit-C1 callers/tests that need {@code interestYield}/
+         * {@code taxableEquityShare} but predate the guardrail-adaptation (audit C9) and rental
+         * (T18a-3) knobs -- defaults both of those to their own byte-identical no-op values.
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-adaptation,
+        // pre-rental, C1-aware shape) so these call sites keep compiling and behaving identically.
+        @SuppressWarnings("PMD.ExcessiveParameterList")
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+                double interestYield, double taxableEquityShare) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, null, null,
+                    interestYield, taxableEquityShare);
         }
 
         /**
@@ -218,8 +281,36 @@ final class TrialSimulator {
             // before this year's growth is applied.
             double pools1PreGrowth = pools[1];
 
-            double dividendIncome = growTaxableWithDividend(
-                    pools, lots, taxableReturn, config.dividendYield());
+            // This year's exact ordinary tax table (audit C5) and the base ordinary income the
+            // year's income events stack on -- replaces the old flat $50k-chord marginal rate.
+            // Looked up BEFORE growth (pure per-year array reads, no pool dependency) so the
+            // audit-C1 interest-tax pricing below can use them immediately. STACKING ORDER (T18a-1
+            // review fix, audit C1 update): the year's ordinary income accumulates through the loop
+            // body in execution order -- base income, then (audit C1) this year's realized
+            // ordinary-interest income (priced and funded immediately below, since it is realized
+            // as soon as growth runs -- before any of the RMD/conversion/draw machinery), then the
+            // forced RMD (IRS ordering: the year's RMD must be distributed BEFORE any Roth
+            // conversion), then the conversion, then the traditional spending draw -- and every
+            // pricing call stacks its own amount on top of everything realized BEFORE it, so the
+            // year's summed ordinary tax telescopes to exactly taxAt(base+interest+rmd+conv+draw) -
+            // taxAt(base) (pinned by TrialSimulatorReturnTest's composition-identity test). `table`
+            // is null when hasPools is false (no tax modeling this trial), which naturally makes
+            // every pricing and gross-up call a no-op.
+            OrdinaryTaxTable table = hasPools ? config.ordinaryTaxTableByYear()[y] : null;
+            double base = hasPools ? config.ordinaryBaseIncomeByYear()[y] : 0.0;
+
+            // Audit C1: splits the taxable pool's annual distribution by its own equity share --
+            // the equity portion stays qualified-dividend income (dividendIncome, unchanged
+            // treatment); the bond+cash portion is ordinary-interest income, priced and funded
+            // immediately (stacked directly on `base`, before RMD/conversion/draw). Bundled into
+            // one call to keep this NCSS-capped hot method lean. taxableEquityShare == 1.0 (every
+            // pre-C1 caller) makes this byte-identical to the old growTaxableWithDividend
+            // (interest income always 0, baseWithInterest == base).
+            var growthResult = applyGrowthAndInterestTax(pools, lots, taxableReturn,
+                    config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
+                    table, base);
+            double dividendIncome = growthResult.dividendIncome();
+            double baseWithInterest = growthResult.baseWithInterest();
             pools[1] *= (1 + traditionalReturn);
             pools[2] *= (1 + rothReturn);
             cashBalance *= (1 + config.cashReturnRate());
@@ -227,32 +318,18 @@ final class TrialSimulator {
             int age = config.retirementAge() + y;
             double rmd = computeYearRmd(pools1PreGrowth, age, config.rmdStartAge());
 
-            // This year's exact ordinary tax table (audit C5) and the base ordinary income the
-            // year's income events stack on -- replaces the old flat $50k-chord marginal rate.
-            // STACKING ORDER (T18a-1 review fix): the year's ordinary income accumulates through
-            // the loop body in execution order -- base income, then the forced RMD (IRS ordering:
-            // the year's RMD must be distributed BEFORE any Roth conversion), then the conversion,
-            // then the traditional spending draw -- and every pricing call stacks its own amount
-            // on top of everything realized BEFORE it, so the year's summed ordinary tax telescopes
-            // to exactly taxAt(base+rmd+conv+draw) - taxAt(base) (pinned by
-            // TrialSimulatorReturnTest's composition-identity test). `table` is null when hasPools
-            // is false (no tax modeling this trial), which naturally makes every pricing and
-            // gross-up call a no-op.
-            OrdinaryTaxTable table = hasPools ? config.ordinaryTaxTableByYear()[y] : null;
-            double base = hasPools ? config.ordinaryBaseIncomeByYear()[y] : 0.0;
-
             // T18a-1: force the RMD out of traditional FIRST -- before any Roth conversion --
             // mirroring the deterministic engine's PoolStrategy#forceRmd. The FULL rmd is
             // force-distributed unconditionally, independent of what the spending draw later
             // decides (replaces the old end-of-year forceRmdExcess, which only forced the amount
             // beyond whatever the spend draw happened to already pull from traditional).
-            double rmdForced = forceRmdFirst(pools, lots, rmd, table, base);
+            double rmdForced = forceRmdFirst(pools, lots, rmd, table, baseWithInterest);
 
-            // Roth conversion execution -- stacks on base + the forced RMD (T18a-1).
+            // Roth conversion execution -- stacks on base + interest + the forced RMD (T18a-1).
             // actualConv is the traditional-balance-CAPPED amount actually converted (0 when no
             // conversion runs); every later ordinary pricing call stacks on it too.
             double actualConv = applyTrialConversion(pools, lots, config.conversionByYear(),
-                    config.conversionTaxByYear(), y, age, table, base + rmdForced);
+                    config.conversionTaxByYear(), y, age, table, baseWithInterest + rmdForced);
 
             // Audit C9: with-rules pass adapts the year's total spending toward the displayed
             // corridor from the trial's own portfolio state (cutting discretionary in down markets,
@@ -289,13 +366,14 @@ final class TrialSimulator {
                     aux.dsCeiling(), income[y], aux.dsConvAmt(), rmd);
 
             // EXACT incremental tax on the traditional withdrawal (audit C5): the draw stacks on
-            // base + the forced RMD + this year's ACTUAL conversion income (T18a-1 order) --
-            // taxAt(base + rmd + actualConv + draw) - taxAt(base + rmd + actualConv) -- correctly
-            // pricing any bracket crossing within the draw AND the bracket position the RMD/
-            // conversion already pushed the year into.
+            // base + interest + the forced RMD + this year's ACTUAL conversion income (T18a-1
+            // order) -- taxAt(base+interest+rmd+actualConv+draw) - taxAt(base+interest+rmd+actualConv)
+            // -- correctly pricing any bracket crossing within the draw AND the bracket position
+            // the interest/RMD/conversion already pushed the year into.
             double withdrawalTax = 0;
             if (hasPools && drawn.traditional() > 0) {
-                withdrawalTax = table.incrementalTax(base + rmdForced + actualConv, drawn.traditional());
+                withdrawalTax = table.incrementalTax(baseWithInterest + rmdForced + actualConv,
+                        drawn.traditional());
             }
 
             // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
@@ -308,7 +386,8 @@ final class TrialSimulator {
             double[] traditionalDrawnOut = {0.0};
             cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, traditionalDrawnOut,
                     cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
-                    config.cashReserveYears(), portfolioReturn, table, base + rmdForced + actualConv);
+                    config.cashReserveYears(), portfolioReturn, table,
+                    baseWithInterest + rmdForced + actualConv);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
             applyEarlyWithdrawalPenalty(pools, lots, traditionalDrawnOut[0], age);
@@ -321,10 +400,10 @@ final class TrialSimulator {
                 essentialFloorMet = false;
             }
 
-            // Full ordinary stack realized this year, in T18a-1's rmd -> conversion -> spending
-            // draw order -- the point every remaining tax bill's funding draw (and the LTCG
-            // bracket floor) stacks on.
-            double ordinaryStack = base + rmdForced + actualConv + traditionalDrawnOut[0];
+            // Full ordinary stack realized this year, in audit C1's interest -> T18a-1's
+            // rmd -> conversion -> spending draw order -- the point every remaining tax bill's
+            // funding draw (and the LTCG bracket floor) stacks on.
+            double ordinaryStack = baseWithInterest + rmdForced + actualConv + traditionalDrawnOut[0];
 
             settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax,
                     table, ordinaryStack);
@@ -567,20 +646,83 @@ final class TrialSimulator {
         }
     }
 
+    /** Audit C1: the year's taxable-pool distribution split between the equity share (qualified
+     * dividend, taxed LTCG) and the bond+cash share (ordinary interest, taxed ORDINARY). */
+    private record TaxableYieldSplit(double dividendIncome, double interestIncome) {}
+
     /**
      * Grows the taxable pool by {@code taxableReturn}: the existing lots appreciate at
-     * {@code (taxableReturn − dividendYield)} and the dividend is reinvested as a fresh at-cost lot,
-     * booked as the residual to the exact post-growth scalar so {@code pools[0]} still grows at
-     * precisely {@code taxableReturn} (bit-identical to the pre-lots path when the yield is 0).
-     * Returns this year's qualified-dividend income (taxed as LTCG in {@link #applyLtcgTax}).
+     * {@code (taxableReturn − blendedYield)} and the distribution is reinvested as a fresh at-cost
+     * lot, booked as the residual to the exact post-growth scalar so {@code pools[0]} still grows
+     * at precisely {@code taxableReturn} REGARDLESS of the split (bit-identical to the pre-lots
+     * path when both yields are 0).
+     *
+     * <p>Audit C1: the distribution is then split between qualified-dividend income (the equity
+     * share, {@code taxableEquityShare}, at {@code dividendYield} -- taxed LTCG in {@link
+     * #applyLtcgTax}, unchanged from pre-C1) and ordinary-interest income (the remaining bond+cash
+     * share, at {@code interestYield} -- taxed ORDINARY in {@link #applyInterestTax} instead).
+     * {@code taxableEquityShare == 1.0} (bond share 0, every pre-C1 caller via the back-compat
+     * constructors) takes a SEPARATE code path bit-identical to the old single-dividendYield
+     * {@code growTaxableWithDividend}, avoiding any floating-point division/rounding drift for the
+     * single most common account shape (the backward-compat anchor).
      */
-    private static double growTaxableWithDividend(double[] pools, TaxableLots lots,
-                                                   double taxableReturn, double dividendYield) {
+    private static TaxableYieldSplit growTaxableWithDividendAndInterest(double[] pools, TaxableLots lots,
+            double taxableReturn, double dividendYield, double interestYield, double taxableEquityShare) {
         pools[0] *= (1 + taxableReturn);
-        lots.grow(taxableReturn - dividendYield);
-        double dividendIncome = Math.max(0, pools[0] - lots.totalValue());
-        lots.addLot(dividendIncome);
-        return dividendIncome;
+        double bondShare = 1 - taxableEquityShare;
+
+        if (bondShare == 0) {
+            lots.grow(taxableReturn - dividendYield);
+            double dividendIncome = Math.max(0, pools[0] - lots.totalValue());
+            lots.addLot(dividendIncome);
+            return new TaxableYieldSplit(dividendIncome, 0);
+        }
+
+        double equityYieldRate = taxableEquityShare * dividendYield;
+        double blendedYield = equityYieldRate + bondShare * interestYield;
+        lots.grow(taxableReturn - blendedYield);
+        double totalDistribution = Math.max(0, pools[0] - lots.totalValue());
+        lots.addLot(totalDistribution);
+
+        if (blendedYield == 0) {
+            return new TaxableYieldSplit(0, 0);
+        }
+        double dividendPortion = totalDistribution * equityYieldRate / blendedYield;
+        return new TaxableYieldSplit(dividendPortion, totalDistribution - dividendPortion);
+    }
+
+    /**
+     * Audit C1: prices and funds the tax on this year's ordinary-interest income, exactly (audit
+     * C5) via {@code table.incrementalTax(base, interestIncome)} -- interest is the FIRST ordinary
+     * income stacked directly on the year's base (realized as soon as growth runs, before RMD/
+     * conversion/the spending draw). Like the RMD/withdrawal tax it is drained from the pools,
+     * grossed up when it touches traditional (audit C2). A {@code null} table (no tax modeling this
+     * trial) or non-positive interest income leaves the pools untouched.
+     */
+    private static void applyInterestTax(double[] pools, TaxableLots lots, double interestIncome,
+                                          OrdinaryTaxTable table, double base) {
+        if (table == null || interestIncome <= 0) {
+            return;
+        }
+        double interestTax = table.incrementalTax(base, interestIncome);
+        if (interestTax > 0) {
+            deductTaxFromPoolsGrossedUp(interestTax, pools, lots, table, base);
+        }
+    }
+
+    /** Bundles {@link #growTaxableWithDividendAndInterest} and {@link #applyInterestTax} (audit
+     * C1) into a single call, keeping {@link #simulateTrial}'s NCSS-capped hot method lean.
+     * {@code baseWithInterest} is the ordinary-income base every later pricing call this
+     * trial-year (RMD, conversion, spending draw) stacks on top of. */
+    private record GrowthYieldResult(double dividendIncome, double baseWithInterest) {}
+
+    private static GrowthYieldResult applyGrowthAndInterestTax(double[] pools, TaxableLots lots,
+            double taxableReturn, double dividendYield, double interestYield, double taxableEquityShare,
+            OrdinaryTaxTable table, double base) {
+        var split = growTaxableWithDividendAndInterest(
+                pools, lots, taxableReturn, dividendYield, interestYield, taxableEquityShare);
+        applyInterestTax(pools, lots, split.interestIncome(), table, base);
+        return new GrowthYieldResult(split.dividendIncome(), base + split.interestIncome());
     }
 
     /**

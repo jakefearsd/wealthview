@@ -196,7 +196,8 @@ final class GuardrailResponseBuilder {
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), adaptation,
                 // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
-                poolSetup.simPools() ? ctx.taxIncome().rentalIncomeByYear() : null);
+                poolSetup.simPools() ? ctx.taxIncome().rentalIncomeByYear() : null,
+                ctx.sim().interestYield(), ctx.sim().taxableEquityShare());
     }
 
     /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}

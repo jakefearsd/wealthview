@@ -143,6 +143,84 @@ class TrialSimulatorReturnTest {
         assertThat(result.finalBalance()).isEqualTo(1097.0, within(1e-6));
     }
 
+    // === Audit C1: bond-sleeve interest is split from the qualified-dividend yield and taxed
+    // ORDINARY, not LTCG ===
+
+    @Test
+    void simulateTrial_interestYield_drainsOrdinaryInterestTaxNotLtcg() {
+        // 1 year, taxable +10%, taxableEquityShare 0.6 (60% equity / 40% bond), dividend_yield 0
+        // (isolates interest), interest_yield 4%. blendedYield = 0.6*0 + 0.4*0.04 = 0.016 -> lots
+        // grow at (0.10-0.016)=0.084 -> 1084; total distribution = 1100 - 1084 = 16, entirely
+        // interest (dividendYield is 0). A flat 20% ORDINARY table taxes it: 16*0.20 = 3.20 ->
+        // final = 1100 - 3.20 = 1096.80. No LTCG table is wired at all, proving the interest never
+        // touches the LTCG path.
+        var config = new TrialSimulator.SimulationConfig(
+                1000.0, 0.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
+                null, null, 62, null, 0, 0.0, false,
+                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                1000.0, null, 0.0, 0.04, 0.6);
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(1096.80, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_interestYieldTaxableEquityShareDefault_isOneAndByteIdenticalToPreC1() {
+        // Back-compat anchor: a SimulationConfig built through the pre-C1 constructor (no
+        // interestYield/taxableEquityShare args) must default taxableEquityShare to 1.0 (ALL_US
+        // equivalent) -- bit-identical to simulateTrial_dividendYield_drainsQualifiedDividendTax
+        // above, even though this fixture doesn't pass interestYield/taxableEquityShare at all.
+        var config = new TrialSimulator.SimulationConfig(
+                1000.0, 0.0, 0.0, "taxable_first", null, null,
+                null, null, 62, null, 0, 0.0, false,
+                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                1000.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.02);
+
+        var result = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
+
+        assertThat(result.finalBalance()).isEqualTo(1097.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_interestIncome_scalesWithTrialPathBalance() {
+        // "Path-dependent balance" pin: two trials differing ONLY in their starting taxable
+        // balance (proxy for two different Monte Carlo paths arriving at this year with different
+        // wealth) must realize proportionally different interest income and therefore different
+        // ordinary tax -- interest is computed IN-LOOP from the trial's own balance, not a
+        // precomputed schedule. No growth (taxableReturn 0) isolates the interest distribution:
+        // blendedYield = 0.4 * 0.04 = 0.016 (60/40 split, dividendYield 0) -> distribution =
+        // balance * 0.016 (residual booking against zero growth), taxed at a flat 25% ordinary rate.
+        var configSmallBalance = new TrialSimulator.SimulationConfig(
+                100_000.0, 0.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0},
+                null, null, 62, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                100_000.0, null, 0.0, 0.04, 0.6);
+        var configLargeBalance = new TrialSimulator.SimulationConfig(
+                500_000.0, 0.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0},
+                null, null, 62, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                500_000.0, null, 0.0, 0.04, 0.6);
+
+        var resultSmall = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, configSmallBalance);
+        var resultLarge = simulator.simulateTrial(
+                new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, configLargeBalance);
+
+        // interest = balance * 0.016; tax = interest * 0.25 -> net drag = balance * 0.004.
+        assertThat(resultSmall.finalBalance()).isEqualTo(100_000.0 * (1 - 0.004), within(1e-6));
+        assertThat(resultLarge.finalBalance()).isEqualTo(500_000.0 * (1 - 0.004), within(1e-6));
+        // The two trials' interest-driven drag scales with balance, not a fixed dollar amount.
+        double dragSmall = 100_000.0 - resultSmall.finalBalance();
+        double dragLarge = 500_000.0 - resultLarge.finalBalance();
+        assertThat(dragLarge).isEqualTo(dragSmall * 5, within(1e-6));
+    }
+
     @Test
     void simulateTrial_rmdAgeReached_forcesTraditionalDistributionToTaxable() {
         // 1 year, no growth, no spending: taxable=0, traditional=100000, roth=0,
@@ -474,6 +552,42 @@ class TrialSimulatorReturnTest {
         // Sanity on the magnitude: the identity total is dominated by the 30%-bracket segments
         // (conv crosses 100k; the draw sits entirely above it).
         assertThat(telescopedTax).isEqualTo(10_939.02439024, within(1e-4));
+    }
+
+    @Test
+    void simulateTrial_fullOrdinaryStackWithInterest_interestPricedFirstTelescopesToNewTotal() {
+        // Audit C1: same fixture as simulateTrial_fullOrdinaryStack... above, PLUS a 60/40
+        // us_stock/bond taxable account realizing $8,000 of ordinary interest this year (500,000 *
+        // 0.4 bondShare * 0.04 interestYield -- taxableReturn stays 0, so this is a pure yield-split
+        // RECLASSIFICATION with zero net change to pools[0], exactly like the deterministic
+        // engine's applyGrowth() at r=0: the residual-booking invariant holds regardless of growth).
+        // The new stacking order is base -> INTEREST (priced first, immediately, before RMD/
+        // conversion/draw) -> rmd -> conv -> draw -- interest is realized as soon as growth runs,
+        // before any of the later withdrawal-cycle machinery. The SUM still telescopes to
+        // taxAt(base+interest+rmd+conv+draw) - taxAt(base): total is order-invariant even though
+        // the interest tax is now attributed to its own separate pricing call.
+        var table = twoBracketTable();
+        var config = new TrialSimulator.SimulationConfig(
+                500_000.0, 200_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
+                new double[]{50_000.0}, new double[]{0.0}, 75, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
+                500_000.0, null, 0.0, 0.04, 0.6);
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{5_000.0}, new double[]{0.0}, 1, config);
+
+        double rmd = 200_000.0 / 24.6;
+        double interest = 8_000.0;
+        double telescopedTax = table.taxAt(60_000.0 + interest + rmd + 50_000.0 + 5_000.0)
+                - table.taxAt(60_000.0);
+        double initTotal = 500_000.0 + 200_000.0;
+        assertThat(initTotal - result.finalBalance())
+                .isEqualTo(5_000.0 + telescopedTax, within(1e-6));
+        // Sanity on the magnitude: $2,400 (8,000 * 30%) more than the no-interest pin above, since
+        // the interest is entirely realized in a year where the stack already crosses into the
+        // 30% bracket well before the interest's own slice is added.
+        assertThat(telescopedTax).isEqualTo(13_339.02439024, within(1e-4));
     }
 
     @Test
