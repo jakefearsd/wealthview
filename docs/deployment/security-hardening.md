@@ -286,7 +286,7 @@ Every response from the Spring Boot layer carries:
 
 | Header | Value |
 |--------|-------|
-| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains` |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains; preload` |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` |
 | `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'` |
@@ -299,6 +299,26 @@ not use at all.
 
 If you also add these at the nginx layer (see [tls-and-nginx.md](tls-and-nginx.md)),
 that's fine — duplicates are harmless.
+
+### Rate limiting
+
+`RateLimitFilter` tracks per-IP (auth endpoints) and per-user (all other `/api/**`
+endpoints) request counts in an in-process `ConcurrentHashMap`, sliding in
+60-second windows (60 req/min for auth, 300 req/min for authenticated API calls).
+
+**This is correct for — and only for — a single application instance.** WealthView's
+supported deployment topology (`./wv up`, `docker-compose.prod.yml`) runs exactly one
+`app` container, so an in-memory limiter sees every request and enforces the limit
+accurately.
+
+If WealthView is ever scaled out to multiple `app` instances behind a load balancer,
+this limiter's accounting is **per-instance, not global** — an attacker (or a
+misbehaving client) could receive N× the intended limit by having requests spread
+across N instances. Revisit before scaling horizontally: move the counters to Redis
+(or another shared store) or push rate limiting to the edge proxy (nginx
+`limit_req_zone`, Cloudflare rate limiting rules). Not needed for the current
+single-host deployment model — no action taken as part of the 2026-07-13 hardening
+pass.
 
 ### Outbound HTTP timeouts
 
@@ -405,6 +425,33 @@ Use this to verify your deployment:
 - [ ] Security headers present: `curl -sI https://your-domain | grep -Ei 'strict-transport|permissions-policy|x-frame-options|x-content-type'`
 - [ ] Nightly backups running: `ls -la backups/` shows recent dumps
 - [ ] You have tested a restore at least once in a non-prod environment
+
+---
+
+## Hardening pass 2026-07-13
+
+T30 closed out the 10 deployment/env items deferred from the 2026-04-10 security
+audit (see the `project_security_audit_deferred` memory note). Much had already
+landed as the compose stack, `./wv` dispatcher, and `ProductionConfigValidator`
+matured since April; this pass verified each item against the current code and
+fixed the two real gaps found.
+
+| # | Item | Disposition | Evidence / change |
+|---|------|--------------|--------------------|
+| 1 | `.env` / `.env.local` in `.gitignore` | Already done | `.gitignore` lines for `.env`, `.env.*`, `frontend/.env*` |
+| 2 | docker-compose secret fallbacks | Already done | `docker-compose.yml` and `docker-compose.prod.yml` use `${VAR:?message}` (fail-loud) for `DB_PASSWORD`, `JWT_SECRET`, `SUPER_ADMIN_PASSWORD`, `MFA_ENCRYPTION_KEY` — no `:-` defaults on any secret in either file |
+| 3 | CORS origins in docker profile | Already done | `application-prod.yml` sets `app.cors.allowed-origins: ${CORS_ORIGIN}` (no default, fails loud unresolved); `ProductionConfigValidator.validateCorsOrigins()` additionally rejects empty/blank/non-`https://` origins under `prod`. The `docker` profile (`application-docker.yml`, hardcoded `http://localhost`) is the dev/demo containerized stack per `docker-compose.yml`'s `SPRING_PROFILES_ACTIVE=docker` — never reachable from the prod compose file, which sets `SPRING_PROFILES_ACTIVE=prod`. Bonus fix: `.env.example`'s `CORS_ORIGIN` comment incorrectly said "optional, leave empty for same-origin" — corrected, since the validator has required it non-empty since an earlier pass (`prodProfile_emptyCorsOrigin_fails` test) |
+| 4 | Dev-seed prod assertion | Fixed now | `ProductionConfigValidator.validateNoDevSeedProfileWithProd()` halts startup if `prod` is active alongside `dev`/`docker` (defense-in-depth against `SPRING_PROFILES_ACTIVE=prod,docker` misconfiguration, since `SampleDataInitializer` seeds a hardcoded `demo@wealthview.local`/`demo123` admin that no env-var check can catch). Also generalized the JWT/super-admin/DB-password checks to reject any value with the `LOCAL_DEV_` sentinel prefix, not just the literal strings previously enumerated — closes a real gap where `application-dev.yml`'s 68-char JWT fallback (`LOCAL_DEV_HS256_SIGNING_KEY_...`) was long enough to pass the length check and wasn't in the known-defaults set. TDD: `ProductionConfigValidatorTest` (6 new cases) |
+| 5 | Backup encryption | Fixed now | `--encrypt` + `BACKUP_ENCRYPTION_RECIPIENT` already existed; added a `WARN` in `bin/wv-lib/backup.sh` when a backup is written unencrypted while `wv_mode` is `prod`. Covered by 3 new bats cases in `scripts/test/wv.bats` |
+| 6 | Docker `:latest` tag | Already done | `docker-compose.prod.yml` pins `image: wealthview:${WEALTHVIEW_VERSION:?...}` (fails loud without it); dev's `docker-compose.yml` has no `image:` line at all (local `build: .` only, never pulled by tag) |
+| 7 | httpOnly cookie migration | Already done | `AuthController.buildCookie()` (`backend/wealthview-api/.../AuthController.java:139-147`) sets `httpOnly(true)`, `secure(cookieSecure)`, `sameSite("Strict")`; `SecurityConfig` wires CSRF via `CookieCsrfTokenRepository` double-submit (`X-XSRF-TOKEN` header echo); frontend `client.ts` uses `transport: 'cookie'`, no token in `localStorage` |
+| 8 | SRI rule | Fixed now (docs only) | `frontend/index.html` has no CDN assets to begin with; added an enshrining comment in `<head>` plus a bullet in `CLAUDE.md`'s Frontend Conventions |
+| 9 | HSTS preload | Fixed now | Added `.preload(true)` to `SecurityConfig`'s `httpStrictTransportSecurity` config and `; preload` to `nginx-prod.conf`'s header. **Operator action still required and NOT performed by this pass:** once the production domain is stable, submit it at https://hstspreload.org — that step can't be done from the repo |
+| 10 | Rate-limit backend | Documented / accepted | `RateLimitFilter`'s in-memory `ConcurrentHashMap` is correct for the single-instance deployment `./wv` supports. Acceptance + revisit trigger documented under [Rate limiting](#rate-limiting) above |
+
+**Files touched:** `backend/wealthview-app/.../ProductionConfigValidator.java` (+test),
+`backend/wealthview-api/.../SecurityConfig.java`, `bin/wv-lib/backup.sh` (+bats tests),
+`nginx-prod.conf`, `frontend/index.html`, `.env.example`, `CLAUDE.md`, this file.
 
 ---
 
