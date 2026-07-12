@@ -123,11 +123,13 @@ public class GuardrailProfileService {
             scenarioRepository.save(scenario);
 
             log.info("Guardrail profile optimized for scenario {} tenant {}", scenarioId, tenantId);
-            // Audit C6: floor-clamp disclosure is not persisted (like fixedReturnShare) -- it is
-            // only meaningful for the run that just executed, so thread it straight from the fresh
-            // optimizer result rather than re-deriving it from the saved entity.
+            // Audit C6/C9: floor-clamp disclosure and the with-rules success rate are not persisted
+            // (like fixedReturnShare) -- they are only meaningful for the run that just executed, so
+            // thread them straight from the fresh optimizer result rather than re-deriving from the
+            // saved entity.
             return GuardrailProfileResponse.from(saved, fixedReturnShare,
-                    optimizerResult.floorReduced(), optimizerResult.originalFloorSuccessProbability());
+                    optimizerResult.floorReduced(), optimizerResult.originalFloorSuccessProbability(),
+                    optimizerResult.successProbabilityWithRules());
         } finally {
             MDC.remove("operation");
             MDC.remove("scenarioId");

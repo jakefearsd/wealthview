@@ -70,7 +70,7 @@ final class GuardrailResponseBuilder {
             // deducted whenever pools (traditional/roth) are in play, so reported balances match
             // what the optimizer actually modeled. Each trial reuses the per-pool real return
             // sequences generated for the run.
-            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, true);
+            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, true, null);
 
             var result = trialSimulator.simulateTrial(
                     ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
@@ -121,6 +121,13 @@ final class GuardrailResponseBuilder {
                         conversionByYear, conversionTaxByYear))
                 : null;
 
+        // Audit C9: reporting-only with-rules success rate -- a SECOND pass over the same trials
+        // with the simulated guardrail adaptation active. Returns null when no positive
+        // max_annual_adjustment_rate is configured. The optimizer's gate/objective are unchanged.
+        BigDecimal successProbabilityWithRules = computeSuccessProbabilityWithRules(ctx, discretionaryByYear,
+                poolSetup, conversionByYear, conversionTaxByYear, corridors, medianBalanceByYear,
+                input.maxAnnualAdjustmentRate());
+
         var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
                 medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
 
@@ -147,7 +154,7 @@ final class GuardrailResponseBuilder {
                 input.phaseBlendYears(), null,
                 input.cashReserveYears(), input.cashReturnRate(),
                 convScheduleResponse, null,
-                floorReduced, originalFloorSuccessProbability);
+                floorReduced, originalFloorSuccessProbability, successProbabilityWithRules);
     }
 
     /** Pool balances/order the terminal simulation grows and withdraws from (audit C6 extraction). */
@@ -170,10 +177,13 @@ final class GuardrailResponseBuilder {
     }
 
     /** Builds trial {@code t}'s {@link TrialSimulator.SimulationConfig} (audit C6 extraction, shared
-     * by the headline terminal simulation and the floor-clamp disclosure's extra pass). */
+     * by the headline terminal simulation and the floor-clamp disclosure's extra pass).
+     * {@code adaptation} is {@code null} for the no-rules passes (byte-identical to pre-C9) and
+     * non-null for the audit-C9 with-rules pass. */
     private TrialSimulator.SimulationConfig buildSimConfig(OptimizationSetup ctx, int t, PoolSimSetup poolSetup,
                                                             double[] conversionByYear, double[] conversionTaxByYear,
-                                                            boolean trackYearBalances) {
+                                                            boolean trackYearBalances,
+                                                            TrialSimulator.GuardrailAdaptation adaptation) {
         return new TrialSimulator.SimulationConfig(
                 poolSetup.initTaxable(), poolSetup.initTraditional(), poolSetup.initRoth(), poolSetup.order(),
                 poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
@@ -184,7 +194,7 @@ final class GuardrailResponseBuilder {
                 ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t], ctx.sim().rothReturns()[t],
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield());
+                ctx.sim().dividendYield(), adaptation);
     }
 
     /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}
@@ -218,7 +228,7 @@ final class GuardrailResponseBuilder {
 
         int successCount = 0;
         for (int t = 0; t < trialCount; t++) {
-            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, false);
+            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, false, null);
             var result = trialSimulator.simulateTrial(
                     ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
                     originalFloors, discretionaryByYear, years, simConfig);
@@ -227,6 +237,57 @@ final class GuardrailResponseBuilder {
             }
         }
         return (double) successCount / trialCount;
+    }
+
+    /**
+     * Audit C9: the essential-floor success rate with the SIMULATED guardrail adaptation rule
+     * active. Re-runs the SAME trials (same per-pool return sequences, same
+     * floors/discretionary/conversion inputs) as the headline no-rules terminal pass, but with the
+     * spending adaptation switched on -- so both success rates are directly comparable. Reporting
+     * only: nothing here feeds back into the optimizer's gate/objective.
+     *
+     * <p>The rule couples to the DISPLAYED corridor: each trial-year forms
+     * {@code plannedSpending * (trialStart / expectedStartBalance[y])} and, when that implied
+     * capacity breaches the lower band, cuts discretionary toward it (bounded by
+     * {@code maxAdjRate}); otherwise recovers toward plan (floor inviolate, never above plan). The
+     * expected-start-balance reference is the no-adaptation median trajectory: year 0 is the initial
+     * portfolio, year {@code y>0} is the prior year's median end-of-year balance
+     * ({@code medianBalanceByYear[y-1]}) from the headline pass -- a start-of-year proxy.
+     *
+     * <p>Returns {@code null} when there is no positive {@code maxAnnualAdjustmentRate} (no
+     * adaptation configured -- the rule cannot move spending, so the with-rules rate would equal the
+     * no-rules rate) so the extra pass is skipped entirely.
+     */
+    private BigDecimal computeSuccessProbabilityWithRules(OptimizationSetup ctx, double[] discretionaryByYear,
+                                                          PoolSimSetup poolSetup, double[] conversionByYear,
+                                                          double[] conversionTaxByYear, double[][] corridors,
+                                                          double[] medianBalanceByYear,
+                                                          BigDecimal maxAnnualAdjustmentRate) {
+        double maxAdjRate = maxAnnualAdjustmentRate != null ? maxAnnualAdjustmentRate.doubleValue() : 0.0;
+        if (maxAdjRate <= 0) {
+            return null;
+        }
+        int years = ctx.sim().years();
+        int trialCount = ctx.sim().trialCount();
+
+        double[] expectedStartBalance = new double[years];
+        expectedStartBalance[0] = poolSetup.initTaxable() + poolSetup.initTraditional() + poolSetup.initRoth();
+        System.arraycopy(medianBalanceByYear, 0, expectedStartBalance, 1, years - 1);
+
+        var adaptation = new TrialSimulator.GuardrailAdaptation(
+                corridors[0], corridors[1], expectedStartBalance, maxAdjRate);
+
+        int successCount = 0;
+        for (int t = 0; t < trialCount; t++) {
+            var simConfig = buildSimConfig(ctx, t, poolSetup, conversionByYear, conversionTaxByYear, false, adaptation);
+            var result = trialSimulator.simulateTrial(
+                    ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
+                    ctx.taxIncome().adjustedFloors(), discretionaryByYear, years, simConfig);
+            if (result.success()) {
+                successCount++;
+            }
+        }
+        return toBD((double) successCount / trialCount);
     }
 
     // UseVarargs: the double[] params are per-year indexed arrays, not a variable argument

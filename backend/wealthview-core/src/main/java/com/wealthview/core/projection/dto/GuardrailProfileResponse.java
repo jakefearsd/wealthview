@@ -31,6 +31,18 @@ import tools.jackson.databind.ObjectMapper;
  *         the headline run), computed only when {@link #floorReduced} is {@code true}. {@code null}
  *         when no clamp occurred — the headline {@link #successProbability} already reflects the
  *         user's floor in that case — or when this response predates the disclosure.
+ * @param successProbabilityWithRules audit C9: the essential-floor success rate when the SIMULATED
+ *         guardrail adaptation rule is active — the SAME trials/paths as {@link #successProbability}
+ *         re-run with in-simulation spending adaptation toward the displayed corridor (cut
+ *         discretionary in down markets, recover toward plan otherwise; floor inviolate, never above
+ *         plan). Reporting-only this pass: the optimizer's gate/objective still use the no-adaptation
+ *         {@link #successProbability}, whose semantics and the sustainable-spending recommendations
+ *         are unchanged. Always {@code >=} {@link #successProbability} by construction (with-rules
+ *         spending is never above the plan, so it can only preserve portfolio and help floor
+ *         funding). {@code null} when no guardrail adaptation applies (no positive
+ *         {@code maxAnnualAdjustmentRate}, degenerate zero-year runs) or when the response predates
+ *         the disclosure (persisted-profile reads — it is a computed-only field, not persisted).
+ *         Tracked follow-up: gate/optimize on this with-rules metric rather than reporting it only.
  */
 public record GuardrailProfileResponse(
         UUID id,
@@ -59,7 +71,8 @@ public record GuardrailProfileResponse(
         RothConversionScheduleResponse conversionSchedule,
         BigDecimal fixedReturnShare,
         boolean floorReduced,
-        BigDecimal originalFloorSuccessProbability
+        BigDecimal originalFloorSuccessProbability,
+        BigDecimal successProbabilityWithRules
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -146,7 +159,51 @@ public record GuardrailProfileResponse(
                 phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
                 stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
                 riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, fixedReturnShare,
-                false, null);
+                false, null, null);
+    }
+
+    /**
+     * Back-compat convenience for callers that predate the {@link #successProbabilityWithRules}
+     * disclosure field (audit C9: simulated guardrail rules). Defaults it to {@code null} — "no
+     * with-rules success rate available for this response" — so existing positional call sites
+     * (the audit-C6 canonical shape, tests) keep compiling unchanged.
+     */
+    // ExcessiveParameterList: mirrors the record's own 27-field canonical constructor
+    // (pre-successProbabilityWithRules shape) so existing positional call sites keep compiling.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailProfileResponse(
+            UUID id,
+            UUID scenarioId,
+            String name,
+            BigDecimal essentialFloor,
+            BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean,
+            int trialCount,
+            BigDecimal confidenceLevel,
+            List<GuardrailPhaseInput> phases,
+            List<GuardrailYearlySpending> yearlySpending,
+            BigDecimal medianFinalBalance,
+            BigDecimal failureRate,
+            BigDecimal successProbability,
+            BigDecimal percentile10Final,
+            boolean stale,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            BigDecimal portfolioFloor,
+            BigDecimal maxAnnualAdjustmentRate,
+            int phaseBlendYears,
+            String riskTolerance,
+            int cashReserveYears,
+            BigDecimal cashReturnRate,
+            RothConversionScheduleResponse conversionSchedule,
+            BigDecimal fixedReturnShare,
+            boolean floorReduced,
+            BigDecimal originalFloorSuccessProbability) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
+                stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, fixedReturnShare,
+                floorReduced, originalFloorSuccessProbability, null);
     }
 
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity) {
@@ -169,9 +226,21 @@ public record GuardrailProfileResponse(
      * optimize()} runs, where the trial simulations are on hand — neither field is persisted, so
      * every other overload reports the "no clamp info" defaults {@code false} / {@code null}).
      */
-    @SuppressWarnings("PMD.UseDiamondOperator")
     public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity, BigDecimal fixedReturnShare,
                                                 boolean floorReduced, BigDecimal originalFloorSuccessProbability) {
+        return from(entity, fixedReturnShare, floorReduced, originalFloorSuccessProbability, null);
+    }
+
+    /**
+     * Same as {@link #from(GuardrailSpendingProfileEntity, BigDecimal, boolean, BigDecimal)}, but
+     * also attaches the freshly computed with-rules success rate (audit C9: only available right
+     * after {@code optimize()} runs — it is a computed-only field, not persisted, so every other
+     * overload reports {@code null}).
+     */
+    @SuppressWarnings("PMD.UseDiamondOperator")
+    public static GuardrailProfileResponse from(GuardrailSpendingProfileEntity entity, BigDecimal fixedReturnShare,
+                                                boolean floorReduced, BigDecimal originalFloorSuccessProbability,
+                                                BigDecimal successProbabilityWithRules) {
         List<GuardrailPhaseInput> phases;
         List<GuardrailYearlySpending> yearlySpending;
         try {
@@ -221,7 +290,8 @@ public record GuardrailProfileResponse(
                 conversionSchedule,
                 fixedReturnShare,
                 floorReduced,
-                originalFloorSuccessProbability
+                originalFloorSuccessProbability,
+                successProbabilityWithRules
         );
     }
 
