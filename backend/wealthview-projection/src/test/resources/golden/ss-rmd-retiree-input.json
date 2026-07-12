@@ -1,0 +1,40 @@
+{
+  "scenarioName": "SS RMD Retiree",
+  "retirementDate": "2015-01-01",
+  "endAge": 92,
+  "inflationRate": "0.025",
+  "paramsJson": "{\"birth_year\": 1955, \"filing_status\": \"married_filing_jointly\", \"withdrawal_order\": \"taxable_first\"}",
+  "referenceYear": 2025,
+  "accounts": [
+    {
+      "initialBalance": "300000",
+      "annualContribution": "0",
+      "expectedReturn": "0.05",
+      "accountType": "taxable"
+    },
+    {
+      "initialBalance": "700000",
+      "annualContribution": "0",
+      "expectedReturn": "0.06",
+      "accountType": "traditional"
+    }
+  ],
+  "spendingProfile": {
+    "essentialExpenses": "45000",
+    "discretionaryExpenses": "15000",
+    "spendingTiers": null
+  },
+  "incomeSources": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000b1",
+      "name": "Social Security",
+      "incomeType": "social_security",
+      "annualAmount": "65000",
+      "startAge": 67,
+      "endAge": null,
+      "inflationRate": "0",
+      "oneTime": false,
+      "taxTreatment": "taxable"
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "scenarioName": "Accumulation Gap Pension",
+  "retirementDate": "2040-01-01",
+  "endAge": 85,
+  "inflationRate": "0.025",
+  "paramsJson": "{\"birth_year\": 1982, \"filing_status\": \"single\", \"withdrawal_order\": \"traditional_first\"}",
+  "referenceYear": 2025,
+  "accounts": [
+    {
+      "initialBalance": "50000",
+      "annualContribution": "5000",
+      "expectedReturn": "0.05",
+      "accountType": "taxable"
+    },
+    {
+      "initialBalance": "150000",
+      "annualContribution": "10000",
+      "expectedReturn": "0.06",
+      "accountType": "traditional"
+    }
+  ],
+  "spendingProfile": {
+    "essentialExpenses": "30000",
+    "discretionaryExpenses": "10000",
+    "spendingTiers": null
+  },
+  "incomeSources": [
+    {
+      "id": "00000000-0000-0000-0000-0000000000c1",
+      "name": "Pension",
+      "incomeType": "pension",
+      "annualAmount": "20000",
+      "startAge": 58,
+      "endAge": null,
+      "inflationRate": "0",
+      "oneTime": false,
+      "taxTreatment": "taxable"
+    }
+  ]
+}

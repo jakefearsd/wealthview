@@ -33,6 +33,9 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025Irmaa;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025Ltcg;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Irmaa;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
@@ -50,7 +53,15 @@ class ProjectionGoldenFileTest {
     @ValueSource(strings = {
             "simple-preretirement",
             "tiered-spending-with-income",
-            "multi-pool-roth-conversion"
+            "multi-pool-roth-conversion",
+            // T18b: ss-rmd-retiree pins taxable+traditional accounts with an SS-typed income
+            // source that covers/exceeds spending (T2/A2 zero-need RMD force-out + T7 SS
+            // convergence), MFJ filing, and a birth year that crosses RMD age mid-retirement.
+            "ss-rmd-retiree",
+            // T18b: accumulation-gap-pension pins a 15-year accumulation phase into retirement
+            // at age 58, a 0%-COLA pension (audit C7's base-anchored deflation clock), and
+            // traditional_first draws before age 60 (the IRC 72(t) early-withdrawal penalty field).
+            "accumulation-gap-pension"
     })
     void run_matchesGoldenFile(String scenario) throws Exception {
         var inputJson = readResource("golden/" + scenario + "-input.json");
@@ -59,10 +70,13 @@ class ProjectionGoldenFileTest {
         var taxBracketRepo = mock(TaxBracketRepository.class);
         var deductionRepo = mock(StandardDeductionRepository.class);
         stubSingle2025(taxBracketRepo, deductionRepo);
+        stubMfj2025(taxBracketRepo, deductionRepo);
         var ltcgBracketRepo = mock(LtcgBracketRepository.class);
         stubSingle2025Ltcg(ltcgBracketRepo);
+        stubMfj2025Ltcg(ltcgBracketRepo);
         var irmaaTierRepo = mock(IrmaaTierRepository.class);
         stubSingle2025Irmaa(irmaaTierRepo);
+        stubMfj2025Irmaa(irmaaTierRepo);
 
         var engine = new DeterministicProjectionEngine(
                 new FederalTaxCalculator(taxBracketRepo, deductionRepo), null,
