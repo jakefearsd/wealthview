@@ -165,6 +165,14 @@ final class YearFinanceResolver {
         PoolStrategy.TaxSourceResult withdrawalTaxSource = PoolStrategy.TaxSourceResult.ZERO;
         BigDecimal ltcgTax = BigDecimal.ZERO;
         BigDecimal realizedLtcgIncome = BigDecimal.ZERO;
+
+        // The converged federally-taxable Social Security amount for this year (audit B2's fixed
+        // point has already run by the time this method returns for the final pass) -- zero when no
+        // income sources were processed this year (pre-retirement years that skip income-source
+        // processing entirely; see processIncomeAndConversions).
+        BigDecimal socialSecurityTaxable = incomeResult.isResult() != null
+                ? incomeResult.isResult().socialSecurityTaxable() : BigDecimal.ZERO;
+
         if (yc.retired()) {
             var rwCtx = new RetirementWithdrawalProcessor.RetirementWithdrawalContext(
                     pool, yc.strategy(), yc.spendingPlan(), yc.age(), yc.yearsInRetirement(), yc.year(),
@@ -182,6 +190,24 @@ final class YearFinanceResolver {
             withdrawalTaxSource = retirementResult.withdrawalTaxSource();
             ltcgTax = retirementResult.ltcgTax();
             realizedLtcgIncome = retirementResult.realizedLtcgIncome();
+        } else if (rmdForced.compareTo(BigDecimal.ZERO) > 0) {
+            // T18a-2: RMDs apply from the SECURE-2.0 age regardless of retirement status (a
+            // still-working owner still owes tax on a forced traditional distribution) -- but a
+            // not-yet-retired year has no spend-draw need and none of RetirementWithdrawalProcessor's
+            // spending-plan/withdrawal-strategy machinery applies. Run executeWithdrawals directly
+            // with a zero spend need so ONLY the forced RMD (and any taxable-pool dividend/LTCG) is
+            // taxed -- mirrors the retired, fully-income-covered case (audit A2) that already taxes
+            // a forced RMD past a zero portfolio need.
+            var withdrawalResult = pool.executeWithdrawals(BigDecimal.ZERO, yc.year(),
+                    incomeResult.effectiveOtherIncome(), conversionAmount, rmdForced, yc.age(),
+                    BigDecimal.ZERO, BigDecimal.ZERO, socialSecurityTaxable);
+            taxLiability = taxLiability.add(withdrawalResult.taxLiability());
+            wdFromTaxable = withdrawalResult.fromTaxable();
+            wdFromTraditional = withdrawalResult.fromTraditional();
+            wdFromRoth = withdrawalResult.fromRoth();
+            withdrawalTaxSource = withdrawalResult.taxSource();
+            ltcgTax = withdrawalResult.ltcgTax();
+            realizedLtcgIncome = withdrawalResult.realizedLtcgIncome();
         }
 
         var combinedTaxSource = incomeResult.conversionTaxSource().add(withdrawalTaxSource);
@@ -190,13 +216,6 @@ final class YearFinanceResolver {
         // traditional distributions (spend draw + RMD force-out) + Roth conversion + realized
         // LTCG/dividend income. Matches the IRS worksheet's AGI-ex-SS additions.
         BigDecimal realizedPortfolioTaxable = wdFromTraditional.add(conversionAmount).add(realizedLtcgIncome);
-
-        // The converged federally-taxable Social Security amount for this year (audit B2's fixed
-        // point has already run by the time this method returns for the final pass) -- zero when no
-        // income sources were processed this year (pre-retirement years that skip income-source
-        // processing entirely; see processIncomeAndConversions).
-        BigDecimal socialSecurityTaxable = incomeResult.isResult() != null
-                ? incomeResult.isResult().socialSecurityTaxable() : BigDecimal.ZERO;
 
         return new YearComputation(incomeResult.isResult(), incomeResult.totalActiveIncome(),
                 incomeResult.effectiveOtherIncome(), conversionAmount, taxLiability, suspendedLoss,

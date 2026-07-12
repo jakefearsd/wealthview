@@ -328,8 +328,17 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var growthResult = pool.applyGrowth();
         BigDecimal totalGrowth = growthResult.total();
 
+        // T18a-2: RMDs are gated on AGE alone, not `retired` -- IRS rules require a traditional
+        // (IRA-type) account owner to take RMDs starting at the SECURE-2.0 age regardless of
+        // whether they are still working. This model's generic 'traditional' account type has no
+        // employer-plan "still working" exception (that exception applies only to a 401(k)-style
+        // employer plan at the CURRENT employer, which this projection does not distinguish from
+        // an IRA) -- so the closer real-world analogue is an IRA, where RMDs never wait for
+        // retirement. A working-past-RMD-age owner therefore now takes (and pays tax on) their RMD
+        // exactly like a retired one; see YearFinanceResolver#computeIncomeConversionWithdrawal for
+        // how that tax is charged without also running the retirement spend-draw machinery.
         BigDecimal rmdAmount = BigDecimal.ZERO;
-        if (retired && age >= RmdCalculator.rmdStartAge(ctx.birthYear())) {
+        if (age >= RmdCalculator.rmdStartAge(ctx.birthYear())) {
             double divisor = RmdCalculator.distributionPeriod(age);
             if (divisor > 0) {
                 rmdAmount = priorYearEndTraditional.divide(BigDecimal.valueOf(divisor), 4, RoundingMode.HALF_UP);

@@ -572,6 +572,51 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         assertThat(rmdYear.taxLiability()).isGreaterThan(BigDecimal.ZERO);
     }
 
+    // === T18a-2: RMDs are gated on age alone, not `retired` -- IRA semantics; a working-past-
+    // RMD-age traditional-account owner still owes (and pays) the distribution ===
+
+    @Test
+    void run_stillWorkingAtRmdAge_forcesRmdAndTaxesItDespiteNotRetired() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int rmdStartAge = 73; // SECURE 2.0 start age for birth years well before 1960
+        int referenceYear = 2025;
+        int rmdBirthYear = 1952;               // age 73 at referenceYear -- exactly rmdStartAge
+        LocalDate retirementDate = LocalDate.of(2035, 1, 1); // still working at referenceYear
+
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("1000000.0000", "0", "0.0000", "traditional"),
+                acct("0.0000", "0", "0.0000", "taxable"));
+
+        // fee_rate pinned to 0 (audit B1) so the flat-at-0%-return traditional pool this test
+        // relies on stays exact.
+        var input = createInput(
+                retirementDate, 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "fee_rate": 0}
+                """.formatted(rmdBirthYear),
+                accounts, null, referenceYear, List.of());
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(rmdStartAge);
+        assertThat(year1.retired()).isFalse();
+
+        // RMD = priorYearEndTraditional (1,000,000) / distributionPeriod(73)=26.5 = 37,735.8491,
+        // forced out of traditional EVEN THOUGH the owner is still working -- the generic
+        // 'traditional' account type has no employer-plan "still working" exception, so it is
+        // modeled like an IRA, where RMDs never wait for retirement.
+        BigDecimal expectedRmd = bd("37735.8491");
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("1000000.0000").subtract(expectedRmd));
+        // The after-tax RMD proceeds are reinvested to the (previously empty) taxable pool.
+        assertThat(year1.taxableBalance()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(year1.taxableBalance()).isLessThan(expectedRmd);
+        // The forced distribution is real ordinary income and is taxed, despite no spend-draw
+        // withdrawal ever running (not retired -> RetirementWithdrawalProcessor never invoked).
+        assertThat(year1.taxLiability()).isGreaterThan(BigDecimal.ZERO);
+    }
+
     // === Audit A2: income-covered years must still force RMDs and tax dividends ===
 
     /**
