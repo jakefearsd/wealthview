@@ -45,6 +45,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -93,6 +94,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -143,6 +145,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -193,6 +196,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -243,6 +247,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -293,6 +298,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -343,6 +349,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -393,6 +400,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -443,6 +451,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -493,6 +502,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -543,6 +553,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -593,6 +604,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -643,6 +655,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -693,6 +706,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -743,6 +757,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -793,6 +808,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -843,6 +859,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -893,6 +910,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -943,6 +961,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null
@@ -993,6 +1012,7 @@
     "irmaaWarning" : null,
     "rmdAmount" : null,
     "capitalGainsTax" : null,
+    "irmaaSurcharge" : null,
     "propertyEquity" : null,
     "totalNetWorth" : null,
     "surplusReinvested" : null

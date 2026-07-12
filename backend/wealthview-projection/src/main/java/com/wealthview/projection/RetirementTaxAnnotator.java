@@ -8,13 +8,11 @@ import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
 /**
- * Annotates a retired year's DTO with the detailed federal/state tax breakdown and an
- * IRMAA warning. Extracted from {@link DeterministicProjectionEngine} to isolate the
+ * Annotates a retired year's DTO with the detailed federal/state tax breakdown and the year's
+ * IRMAA surcharge/warning. Extracted from {@link DeterministicProjectionEngine} to isolate the
  * retirement tax-annotation logic.
  */
 final class RetirementTaxAnnotator {
-
-    private static final BigDecimal IRMAA_BRACKET_RATE = new BigDecimal("0.22");
 
     /**
      * Bundles the per-year inputs needed by {@code annotate}. {@code ltcgTax} is the year's
@@ -25,7 +23,9 @@ final class RetirementTaxAnnotator {
      * realized LTCG/dividend income is added to the state base for states that tax capital gains as
      * ordinary income, and the federally-taxed Social Security amount (already folded into {@code
      * effectiveOtherIncome} for federal purposes) is subtracted from the state base for states that
-     * fully exempt Social Security.
+     * fully exempt Social Security. {@code irmaaSurcharge} is the year's ALREADY-COMPUTED Medicare
+     * IRMAA premium surcharge (Wave-4 IRMAA item; zero when not applicable) -- this class does not
+     * compute it, only surfaces it onto the DTO and derives {@code irmaaWarning} from it.
      */
     record AnnotationContext(
             boolean retired,
@@ -39,16 +39,19 @@ final class RetirementTaxAnnotator {
             @Nullable TaxCalculationStrategy taxStrategy,
             BigDecimal ltcgTax,
             BigDecimal realizedLtcgIncome,
-            BigDecimal federallyTaxedSocialSecurity) {
+            BigDecimal federallyTaxedSocialSecurity,
+            BigDecimal irmaaSurcharge) {
     }
 
     /**
-     * Applies the detailed federal/state tax breakdown and IRMAA warning to the year DTO.
-     * Only meaningful for retired years with a non-null tax strategy.
+     * Applies the detailed federal/state tax breakdown and the IRMAA surcharge/warning to the year
+     * DTO. The tax breakdown is only meaningful for retired years with a non-null tax strategy and
+     * positive tax liability; the IRMAA fields are set whenever the caller passed a positive
+     * surcharge (which is already gated on retired/Medicare-age by the caller -- see
+     * {@code DeterministicProjectionEngine#processYear}).
      */
     ProjectionYearDto annotate(ProjectionYearDto yearDto, AnnotationContext annCtx) {
         boolean retired = annCtx.retired();
-        int age = annCtx.age();
         int year = annCtx.year();
         var wdFromTraditional = annCtx.wdFromTraditional();
         var conversionAmount = annCtx.conversionAmount();
@@ -75,16 +78,7 @@ final class RetirementTaxAnnotator {
                     ? breakdown.saltDeduction() : null;
             yearDto = yearDto.withTaxBreakdown(fedTax, stTax, saltDed, breakdown.usedItemized());
         }
-        if (retired && age >= 63 && taxStrategy != null) {
-            BigDecimal totalIncome = effectiveOtherIncome.add(conversionAmount).add(wdFromTraditional);
-            var filingStatus = pool.getFilingStatus();
-            BigDecimal irmaaCeiling = taxStrategy.computeMaxIncomeForTargetRate(
-                    IRMAA_BRACKET_RATE, year, filingStatus);
-            if (irmaaCeiling.compareTo(BigDecimal.ZERO) > 0
-                    && totalIncome.compareTo(irmaaCeiling) > 0) {
-                yearDto = yearDto.withIrmaaWarning(true);
-            }
-        }
+        yearDto = yearDto.withIrmaaSurcharge(annCtx.irmaaSurcharge());
         return yearDto;
     }
 }

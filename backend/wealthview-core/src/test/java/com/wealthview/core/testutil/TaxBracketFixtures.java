@@ -4,9 +4,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import com.wealthview.persistence.entity.IrmaaTierEntity;
 import com.wealthview.persistence.entity.LtcgBracketEntity;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.TaxBracketEntity;
+import com.wealthview.persistence.repository.IrmaaTierRepository;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
@@ -107,5 +109,38 @@ public final class TaxBracketFixtures {
         lenient().when(ltcgBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(),
                         eq("married_filing_jointly")))
                 .thenReturn(mfj2025LtcgBrackets());
+    }
+
+    /** 2025 IRMAA tiers for single filers -- see R__seed_irmaa_tiers.sql for sources. */
+    public static List<IrmaaTierEntity> single2025IrmaaTiers() {
+        return List.of(
+                new IrmaaTierEntity(2025, "single", bd("0"), bd("106000"), bd("0"), bd("0")),
+                new IrmaaTierEntity(2025, "single", bd("106000"), bd("133000"), bd("74.00"), bd("13.70")),
+                new IrmaaTierEntity(2025, "single", bd("133000"), bd("167000"), bd("185.00"), bd("35.30")),
+                new IrmaaTierEntity(2025, "single", bd("167000"), bd("200000"), bd("295.90"), bd("57.00")),
+                new IrmaaTierEntity(2025, "single", bd("200000"), bd("500000"), bd("406.90"), bd("78.60")),
+                new IrmaaTierEntity(2025, "single", bd("500000"), null, bd("443.90"), bd("85.80")));
+    }
+
+    /** 2025 IRMAA tiers for married-filing-jointly filers -- see R__seed_irmaa_tiers.sql for sources. */
+    public static List<IrmaaTierEntity> mfj2025IrmaaTiers() {
+        return List.of(
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("0"), bd("212000"), bd("0"), bd("0")),
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("212000"), bd("266000"), bd("74.00"), bd("13.70")),
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("266000"), bd("334000"), bd("185.00"), bd("35.30")),
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("334000"), bd("400000"), bd("295.90"), bd("57.00")),
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("400000"), bd("750000"), bd("406.90"), bd("78.60")),
+                new IrmaaTierEntity(2025, "married_filing_jointly", bd("750000"), null, bd("443.90"), bd("85.80")));
+    }
+
+    public static void stubSingle2025Irmaa(IrmaaTierRepository irmaaTierRepo) {
+        lenient().when(irmaaTierRepo.findByTaxYearAndFilingStatusOrderByMagiFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025IrmaaTiers());
+    }
+
+    public static void stubMfj2025Irmaa(IrmaaTierRepository irmaaTierRepo) {
+        lenient().when(irmaaTierRepo.findByTaxYearAndFilingStatusOrderByMagiFloorAsc(anyInt(),
+                        eq("married_filing_jointly")))
+                .thenReturn(mfj2025IrmaaTiers());
     }
 }

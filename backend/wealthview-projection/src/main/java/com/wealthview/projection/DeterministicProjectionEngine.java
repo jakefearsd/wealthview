@@ -29,6 +29,7 @@ import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.IrmaaSurchargeCalculator;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
@@ -50,6 +51,8 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
 
     private static final Logger log = LoggerFactory.getLogger(DeterministicProjectionEngine.class);
     private static final BigDecimal DEFAULT_WITHDRAWAL_RATE = new BigDecimal("0.04");
+    /** Medicare (and thus IRMAA) eligibility age -- Wave-4 IRMAA item. */
+    private static final int MEDICARE_AGE = 65;
 
     /**
      * Fallback inflation assumption used to convert a user's NOMINAL expected-return override into a
@@ -78,33 +81,56 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
     private final FederalTaxCalculator federalTaxCalculator;
     @Nullable
     private final CapitalGainsTaxCalculator capitalGainsTaxCalculator;
+    /** Wave-4 IRMAA item: null omits the surcharge entirely (irmaaSurcharge stays zero every year). */
+    @Nullable
+    private final IrmaaSurchargeCalculator irmaaSurchargeCalculator;
     @Nullable
     private final MeterRegistry meterRegistry;
     @Nullable
     private final CapitalMarketAssumptionsProvider capitalMarketAssumptions;
 
-    /** Test-friendly constructor that omits capital-gains taxation, the meter registry and CMA. */
+    /**
+     * Test-friendly constructor that omits capital-gains taxation, IRMAA, the meter registry
+     * and CMA.
+     */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory) {
-        this(taxCalculator, stateTaxCalculatorFactory, null, null, null);
+        this(taxCalculator, stateTaxCalculatorFactory, null, null, null, null);
     }
 
-    /** Test-friendly constructor that wires capital-gains taxation but omits meter registry and CMA. */
+    /**
+     * Test-friendly constructor that wires capital-gains taxation but omits IRMAA, the meter
+     * registry and CMA.
+     */
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
                                           @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
-        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, null, null);
+        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, null, null, null);
+    }
+
+    /**
+     * Test-friendly constructor that wires capital-gains taxation and IRMAA but omits the meter
+     * registry and CMA.
+     */
+    public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
+                                          @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
+                                          @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                          @Nullable IrmaaSurchargeCalculator irmaaSurchargeCalculator) {
+        this(taxCalculator, stateTaxCalculatorFactory, capitalGainsTaxCalculator, irmaaSurchargeCalculator,
+                null, null);
     }
 
     @Autowired
     public DeterministicProjectionEngine(@Nullable FederalTaxCalculator taxCalculator,
                                           @Nullable StateTaxCalculatorFactory stateTaxCalculatorFactory,
                                           @Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                          @Nullable IrmaaSurchargeCalculator irmaaSurchargeCalculator,
                                           @Nullable MeterRegistry meterRegistry,
                                           @Nullable CapitalMarketAssumptionsProvider capitalMarketAssumptions) {
         this.taxStrategyFactory = new TaxStrategyFactory(taxCalculator, stateTaxCalculatorFactory);
         this.federalTaxCalculator = taxCalculator;
         this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
+        this.irmaaSurchargeCalculator = irmaaSurchargeCalculator;
         this.meterRegistry = meterRegistry;
         this.capitalMarketAssumptions = capitalMarketAssumptions;
         var rentalLossCalculator = new RentalLossCalculator();
@@ -245,9 +271,16 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         return PoolStrategy.create(accounts, config);
     }
 
-    /** Carry-forward state threaded between successive year iterations. */
-    private record YearAccumulator(int yearsInRetirement, BigDecimal previousWithdrawal, BigDecimal suspendedLoss) {
-        static final YearAccumulator INITIAL = new YearAccumulator(0, BigDecimal.ZERO, BigDecimal.ZERO);
+    /**
+     * Carry-forward state threaded between successive year iterations. {@code magiYearMinus1} /
+     * {@code magiYearMinus2} are the Wave-4 IRMAA item's 2-year MAGI lookback window (year Y's
+     * surcharge is keyed on year Y-2's MAGI, the statutory lookback) -- {@code null} until that
+     * many years have actually been simulated within THIS projection (the first two years have no
+     * in-horizon prior-year data to look back to; see {@link #processYear}'s IRMAA block).
+     */
+    private record YearAccumulator(int yearsInRetirement, BigDecimal previousWithdrawal, BigDecimal suspendedLoss,
+                                    @Nullable BigDecimal magiYearMinus1, @Nullable BigDecimal magiYearMinus2) {
+        static final YearAccumulator INITIAL = new YearAccumulator(0, BigDecimal.ZERO, BigDecimal.ZERO, null, null);
     }
 
     private record YearStepResult(ProjectionYearDto yearDto, YearAccumulator nextAccumulator) {}
@@ -301,10 +334,27 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             }
         }
 
+        // Wave-4 IRMAA: this year's Medicare premium surcharge, keyed on MAGI from TWO CALENDAR
+        // YEARS PRIOR (the statutory lookback -- see YearAccumulator's javadoc for how the window
+        // rolls forward). Gated on `retired` like RMDs (a documented simplification: working-past-
+        // Medicare-age scenarios are out of scope, mirroring the existing RMD/`retired` gate). The
+        // first two simulated years of any projection have no in-horizon 2-years-prior MAGI to look
+        // back to (that data predates the projection's start) -- SKIPPED (surcharge stays zero)
+        // rather than backfilled with a same-year estimate, since a pre-retirement or
+        // just-retired-year MAGI figure is not a reliable stand-in for whatever the retiree's
+        // ACTUAL income was two years before this projection began. Deterministic engine ONLY --
+        // the Monte Carlo engine (TrialSimulator et al.) is untouched by this item; MC trials do
+        // not model the IRMAA surcharge.
+        BigDecimal irmaaSurcharge = BigDecimal.ZERO;
+        if (retired && age >= MEDICARE_AGE && acc.magiYearMinus2() != null && irmaaSurchargeCalculator != null) {
+            irmaaSurcharge = irmaaSurchargeCalculator.computeAnnualSurcharge(
+                    acc.magiYearMinus2(), year, pool.getFilingStatus());
+        }
+
         var comp = yearFinanceResolver.resolve(new YearFinanceResolver.YearContext(
                 pool, ctx.incomeSources(), ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
                 ctx.inflationRate(), year, age, retired, yearsInRetirement, startBalance,
-                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdAmount));
+                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdAmount, irmaaSurcharge));
 
         BigDecimal suspendedLoss = comp.suspendedLoss();
         BigDecimal conversionAmount = comp.conversionAmount();
@@ -336,10 +386,21 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(retired, age, year,
                 wdFromTraditional, conversionAmount, comp.effectiveOtherIncome(),
                 taxLiability, pool, ctx.taxStrategy(), ltcgTax,
-                comp.realizedLtcgIncome(), comp.socialSecurityTaxable());
+                comp.realizedLtcgIncome(), comp.socialSecurityTaxable(), irmaaSurcharge);
         yearDto = retirementTaxAnnotator.annotate(yearDto, annCtx);
 
-        return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss));
+        // Wave-4 IRMAA: roll the 2-year MAGI lookback window forward -- see YearAccumulator's
+        // javadoc. This year's MAGI proxy mirrors the composition already used for the audit-B2
+        // Social Security provisional-income convergence (wdFromTraditional + conversionAmount +
+        // realizedLtcgIncome, i.e. realizedPortfolioTaxable) plus effectiveOtherIncome (which itself
+        // already folds in the taxable portion of Social Security via that same convergence) --
+        // the same depth of MAGI modeling already established elsewhere in this engine. It is NOT
+        // full IRS MAGI (no tax-exempt-interest add-back), a documented simplification.
+        BigDecimal magiThisYear = comp.effectiveOtherIncome().add(conversionAmount)
+                .add(wdFromTraditional).add(comp.realizedLtcgIncome());
+
+        return new YearStepResult(yearDto, new YearAccumulator(yearsInRetirement, previousWithdrawal, suspendedLoss,
+                magiThisYear, acc.magiYearMinus1()));
     }
 
 }

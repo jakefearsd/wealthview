@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -23,11 +24,14 @@ import com.wealthview.persistence.entity.StandardDeductionEntity;
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Irmaa;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTaxAndIrmaa;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
@@ -1280,108 +1284,174 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         }
     }
 
-    // === IRMAA warning tests ===
+    // === IRMAA warning/surcharge tests (Wave-4 IRMAA item: real tiers, 2-year MAGI lookback) ===
 
     @Test
-    void irmaaWarning_age63AboveBracket_warningTrue() {
+    void irmaaWarning_age65HighMagiTwoYearsPrior_warningTrueWithRealSurcharge() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
-        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineTax = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
 
-        // Person is 63, retired since 60. Large traditional balance → fill_bracket at 22% will
-        // convert up to the 22% ceiling ($118,350 for single). Plus other_income of $50K.
-        // Total income = other_income ($50K) + conversion (~$68,350) = ~$118,350, right at ceiling.
-        // Add an income source to push above the ceiling.
-        int currentAge = 63;
+        // Retired since 60, other_income $70K + a large traditional-first spend draw pushes the
+        // MAGI proxy (effectiveOtherIncome + wdFromTraditional) comfortably past the single $106K
+        // first IRMAA threshold every retired year, including ages 63/64 -- so age 65's surcharge
+        // (keyed on age-63's MAGI, the 2-year lookback) and age 66's (keyed on age-64's) both fire.
+        int currentAge = 60;
         int birthYear = LocalDate.now().getYear() - currentAge;
 
         var input = createInput(
-                LocalDate.of(birthYear + 60, 1, 1), 70, BigDecimal.ZERO,
+                LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single", "other_income": 50000,
-                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
-                 "withdrawal_rate": 0.04}
+                {"birth_year": %d, "filing_status": "single", "other_income": 70000,
+                 "withdrawal_order": "traditional_first"}
                 """.formatted(birthYear),
-                List.of(
-                        acct("2000000", "0", "0.00", "traditional"),
-                        acct("100000", "0", "0.00", "roth")),
-                new SpendingProfileInput(bd("30000"), bd("10000"), null),
-                List.of(incomeSource("Pension", "80000", 60, null, "0")));
+                List.of(acct("3000000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("100000"), bd("20000"), null));
 
         var result = engineTax.run(input);
 
-        // Find the year where age is 63
-        var age63Year = result.yearlyData().stream()
-                .filter(y -> y.age() == 63)
-                .findFirst()
-                .orElseThrow();
+        var age64Year = result.yearlyData().stream().filter(y -> y.age() == 64).findFirst().orElseThrow();
+        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
 
-        assertThat(age63Year.irmaaWarning()).isTrue();
+        // Ages 60-64 (pre-Medicare) never owe the surcharge, regardless of MAGI.
+        assertThat(age64Year.irmaaWarning()).isNull();
+        assertThat(age64Year.irmaaSurcharge()).isNull();
+        // Age 65 is the first Medicare-eligible year and the lookback window is fully populated by
+        // then (ages 60-64 were all simulated within this projection) -- real dollar surcharge.
+        assertThat(age65Year.irmaaWarning()).isTrue();
+        assertThat(age65Year.irmaaSurcharge()).isNotNull();
+        assertThat(age65Year.irmaaSurcharge()).isGreaterThan(BigDecimal.ZERO);
+        assertThat(age66Year.irmaaWarning()).isTrue();
+        assertThat(age66Year.irmaaSurcharge()).isNotNull();
     }
 
     @Test
-    void irmaaWarning_age62AboveBracket_warningFalse() {
+    void irmaaWarning_age64BelowMedicareAge_warningFalseRegardlessOfMagi() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
-        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineTax = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
 
-        // Same high income scenario but at age 62 — below the IRMAA age threshold (63)
-        int currentAge = 62;
+        // Same high-MAGI scenario as above -- but Medicare/IRMAA eligibility starts strictly at 65,
+        // so every pre-65 year must stay unset even though MAGI easily clears the first threshold.
+        int currentAge = 60;
         int birthYear = LocalDate.now().getYear() - currentAge;
 
         var input = createInput(
-                LocalDate.of(birthYear + 60, 1, 1), 65, BigDecimal.ZERO,
+                LocalDate.of(birthYear, 1, 1), 65, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single", "other_income": 50000,
-                 "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
-                 "withdrawal_rate": 0.04}
+                {"birth_year": %d, "filing_status": "single", "other_income": 70000,
+                 "withdrawal_order": "traditional_first"}
                 """.formatted(birthYear),
-                List.of(
-                        acct("2000000", "0", "0.00", "traditional"),
-                        acct("100000", "0", "0.00", "roth")),
-                new SpendingProfileInput(bd("30000"), bd("10000"), null),
-                List.of(incomeSource("Pension", "80000", 60, null, "0")));
+                List.of(acct("3000000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("100000"), bd("20000"), null));
 
         var result = engineTax.run(input);
 
-        // Find the year where age is 62
-        var age62Year = result.yearlyData().stream()
-                .filter(y -> y.age() == 62)
-                .findFirst()
-                .orElseThrow();
-
-        // Age 62 is below IRMAA threshold — no warning regardless of income
-        assertThat(age62Year.irmaaWarning()).isNull();
+        for (var year : result.yearlyData()) {
+            if (year.age() < 65) {
+                assertThat(year.irmaaWarning()).as("age %d should not have IRMAA warning", year.age()).isNull();
+                assertThat(year.irmaaSurcharge()).as("age %d should not have an IRMAA surcharge", year.age())
+                        .isNull();
+            }
+        }
     }
 
     @Test
-    void irmaaWarning_age63BelowBracket_warningFalse() {
+    void irmaaWarning_age65LowMagiTwoYearsPrior_warningFalse() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
-        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineTax = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
 
-        // Age 63 but low income well within 22% bracket ceiling ($118,350 for single)
-        int currentAge = 63;
+        // Retired since 60, modest balance and spending -- MAGI stays well under the $106K single
+        // threshold every year, so age 65 (and its 2-years-prior lookback source, age 63) never
+        // trips the surcharge.
+        int currentAge = 60;
         int birthYear = LocalDate.now().getYear() - currentAge;
 
         var input = createInput(
-                LocalDate.of(birthYear + 60, 1, 1), 70, BigDecimal.ZERO,
+                LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single",
-                 "withdrawal_rate": 0.04}
+                {"birth_year": %d, "filing_status": "single", "withdrawal_order": "traditional_first"}
                 """.formatted(birthYear),
-                List.of(
-                        acct("100000", "0", "0.00", "traditional"),
-                        acct("50000", "0", "0.00", "taxable")),
+                List.of(acct("150000", "0", "0.00", "traditional")),
                 new SpendingProfileInput(bd("5000"), bd("1000"), null));
 
         var result = engineTax.run(input);
 
-        // Find the year where age is 63
-        var age63Year = result.yearlyData().stream()
-                .filter(y -> y.age() == 63)
-                .findFirst()
-                .orElseThrow();
+        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
 
-        // Income is well below 22% bracket ceiling — no IRMAA warning
-        assertThat(age63Year.irmaaWarning()).isNull();
+        assertThat(age65Year.irmaaWarning()).isNull();
+        assertThat(age65Year.irmaaSurcharge()).isNull();
+    }
+
+    @Test
+    void irmaaWarning_noIrmaaCalculatorWired_neverSetEvenWithHighMagi() {
+        // engineWithTax (no IrmaaSurchargeCalculator) -- the surcharge must stay entirely off
+        // rather than silently falling back to some default, mirroring the null-taxCalculator
+        // "no tax breakdown at all" contract elsewhere in this engine.
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        int currentAge = 60;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+
+        var input = createInput(
+                LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 70000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(acct("3000000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("100000"), bd("20000"), null));
+
+        var result = engineTax.run(input);
+
+        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+
+        assertThat(age65Year.irmaaWarning()).isNull();
+        assertThat(age65Year.irmaaSurcharge()).isNull();
+    }
+
+    @Test
+    void run_irmaaSurcharge_fundedFromPortfolio_endBalanceDropsByExactlyTheSurcharge() {
+        // Funding-identity check: an all-taxable account with no traditional pool means the year's
+        // ordinary tax (on other_income) is IDENTICAL with or without IRMAA -- it depends only on
+        // effectiveOtherIncome (a fixed scenario param) and fromTraditional (always zero here), NOT
+        // on the size of the taxable draw. So the ONLY difference the surcharge introduces is an
+        // extra taxable-pool draw of exactly its own dollar amount: endBalance(without IRMAA) -
+        // endBalance(with IRMAA) == irmaaSurcharge, to the penny.
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineNoIrmaa = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        var engineWithIrmaa = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
+
+        int currentAge = 60;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+        String paramsJson = """
+                {"birth_year": %d, "filing_status": "single", "other_income": 150000}
+                """.formatted(birthYear);
+        List<ProjectionAccountInput> accounts = List.of(acct("2000000", "0", "0.00", "taxable"));
+        var spendingProfile = new SpendingProfileInput(bd("150000"), bd("30000"), null);
+
+        var withoutIrmaa = engineNoIrmaa.run(
+                createInput(LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO, paramsJson, accounts,
+                        spendingProfile));
+        var withIrmaa = engineWithIrmaa.run(
+                createInput(LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO, paramsJson, accounts,
+                        spendingProfile));
+
+        var age65Without = withoutIrmaa.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age65With = withIrmaa.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+
+        assertThat(age65With.irmaaSurcharge()).isNotNull();
+        assertThat(age65With.irmaaSurcharge()).isGreaterThan(BigDecimal.ZERO);
+        var balanceDrop = age65Without.endBalance().subtract(age65With.endBalance());
+        assertThat(balanceDrop).isEqualByComparingTo(age65With.irmaaSurcharge());
     }
 
     // === Coverage gap: Tax strategy building (buildTaxStrategy) ===
@@ -1471,71 +1541,76 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
         assertThat(year1.federalTax()).isNotNull();
     }
 
-    // === Coverage gap: IRMAA warning ===
+    // === Coverage gap: IRMAA 2-year lookback timing / lookback-window availability ===
 
     @Test
-    void run_retiredAge63IncomeExceedsIrmaaBracket_irmaaWarningSet() {
+    void run_oneTimeMagiSpikeAtYearY_surchargesAtYPlus2AndClearsAtYPlus3() {
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
-        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineTax = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
 
-        int currentAge = 63;
-        int birthYear = LocalDate.now().getYear() - currentAge;
-
-        // Retired at 60, now 63, large traditional withdrawal + other income pushes past 22% ceiling
-        // 22% bracket ceiling for single: $48,475 + $15,000 std deduction = $63,475
-        // Other income $50K + large traditional withdrawal should exceed this
-        var input = createInput(
-                LocalDate.of(birthYear + 60, 1, 1), 70, BigDecimal.ZERO,
-                """
-                {"birth_year": %d, "filing_status": "single", "other_income": 50000,
-                 "withdrawal_order": "traditional_first"}
-                """.formatted(birthYear),
-                List.of(
-                        acct("2000000", "0", "0.00", "traditional"),
-                        acct("100000", "0", "0.00", "roth")),
-                new SpendingProfileInput(bd("60000"), bd("20000"), null));
-
-        var result = engineTax.run(input);
-
-        var age63Year = result.yearlyData().stream()
-                .filter(y -> y.age() == 63)
-                .findFirst()
-                .orElseThrow();
-
-        // At age 63 with high income, IRMAA warning should be set
-        assertThat(age63Year.irmaaWarning()).isTrue();
-    }
-
-    @Test
-    void run_retiredAgeBelow63_noIrmaaWarningRegardlessOfIncome() {
-        stubSingle2025(taxBracketRepository, standardDeductionRepository);
-        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
-
-        // Retire at 58, check age 60 — well below 63 threshold
+        // Retired since 60 with modest income/spending that keeps the MAGI proxy well under the
+        // single $106K threshold every year EXCEPT one: a $200,000 one-time windfall at age 63 (Y).
+        // The 2-year lookback means the surcharge appears at age 65 (Y+2, keyed on age 63's spiked
+        // MAGI) and clears by age 66 (Y+3, keyed on age 64's back-to-baseline MAGI).
         int currentAge = 60;
         int birthYear = LocalDate.now().getYear() - currentAge;
 
         var input = createInput(
-                LocalDate.of(birthYear + 58, 1, 1), 65, BigDecimal.ZERO,
+                LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO,
                 """
-                {"birth_year": %d, "filing_status": "single", "other_income": 200000,
-                 "annual_roth_conversion": 100000,
+                {"birth_year": %d, "filing_status": "single", "other_income": 40000,
                  "withdrawal_order": "traditional_first"}
                 """.formatted(birthYear),
-                List.of(
-                        acct("3000000", "0", "0.00", "traditional"),
-                        acct("100000", "0", "0.00", "roth")),
-                new SpendingProfileInput(bd("50000"), bd("20000"), null));
+                List.of(acct("400000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("35000"), bd("5000"), null),
+                List.of(oneTimeIncomeSource("Windfall", "200000", 63)));
 
         var result = engineTax.run(input);
 
-        // Check all years before age 63 — none should have IRMAA warning
-        for (var year : result.yearlyData()) {
-            if (year.age() < 63) {
-                assertThat(year.irmaaWarning())
-                        .as("age %d should not have IRMAA warning", year.age())
-                        .isNull();
-            }
-        }
+        var age64Year = result.yearlyData().stream().filter(y -> y.age() == 64).findFirst().orElseThrow();
+        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
+
+        assertThat(age64Year.irmaaWarning()).as("Y+1: lookback = age 62's baseline MAGI").isNull();
+        assertThat(age65Year.irmaaWarning()).as("Y+2: lookback = age 63's spiked MAGI").isTrue();
+        assertThat(age65Year.irmaaSurcharge()).isNotNull();
+        assertThat(age66Year.irmaaWarning()).as("Y+3: lookback = age 64's baseline MAGI again").isNull();
+        assertThat(age66Year.irmaaSurcharge()).isNull();
+    }
+
+    @Test
+    void run_firstTwoYearsOfProjectionAtMedicareAge_emptyLookbackWindowSkipsSurcharge() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engineTax = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository,
+                irmaaTierRepository);
+
+        // The projection STARTS with the retiree already 65 and already retired -- the engine has
+        // no in-horizon MAGI for the 2 calendar years before the projection began, so even though
+        // MAGI is high from day one, the first two SIMULATED years (ages 65-66) must skip the
+        // surcharge; only from age 67 onward does the lookback window hold real in-horizon data.
+        int currentAge = 65;
+        int birthYear = LocalDate.now().getYear() - currentAge;
+
+        var input = createInput(
+                LocalDate.of(birthYear + 60, 1, 1), 75, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "filing_status": "single", "other_income": 150000,
+                 "withdrawal_order": "traditional_first"}
+                """.formatted(birthYear),
+                List.of(acct("500000", "0", "0.00", "traditional")),
+                new SpendingProfileInput(bd("20000"), bd("5000"), null));
+
+        var result = engineTax.run(input);
+
+        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
+        var age67Year = result.yearlyData().stream().filter(y -> y.age() == 67).findFirst().orElseThrow();
+
+        assertThat(age65Year.irmaaWarning()).as("1st simulated year: no in-horizon lookback data").isNull();
+        assertThat(age66Year.irmaaWarning()).as("2nd simulated year: still no in-horizon lookback data").isNull();
+        assertThat(age67Year.irmaaWarning()).as("3rd simulated year: lookback = age 65's real MAGI").isTrue();
     }
 }

@@ -55,16 +55,12 @@ class RetirementTaxAnnotatorTest {
         when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
                 any(BigDecimal.class), any(BigDecimal.class)))
                 .thenReturn(CombinedTaxResult.ZERO);
-        // AGE (65) is >= 63, so annotate() also runs its IRMAA check; stub a zero ceiling so that
-        // branch is a no-op and doesn't NPE on an unstubbed mock.
-        when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(BigDecimal.ZERO);
         PoolStrategy pool = filingStatusOnlyPool();
 
         var ltcgTax = new BigDecimal("5308.2164");
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, ltcgTax, pool, taxStrategy, ltcgTax,
-                BigDecimal.ZERO, BigDecimal.ZERO);
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -84,15 +80,14 @@ class RetirementTaxAnnotatorTest {
         when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
                 any(BigDecimal.class), any(BigDecimal.class)))
                 .thenReturn(ordinaryBreakdown);
-        when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(BigDecimal.ZERO);
         PoolStrategy pool = filingStatusOnlyPool();
 
         var ltcgTax = new BigDecimal("1964.6018");
         var totalTaxLiability = ordinaryFederal.add(ordinaryState).add(ltcgTax);
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(40_000), BigDecimal.ZERO, BigDecimal.ZERO,
-                totalTaxLiability, pool, taxStrategy, ltcgTax, BigDecimal.ZERO, BigDecimal.ZERO);
+                totalTaxLiability, pool, taxStrategy, ltcgTax, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -114,13 +109,12 @@ class RetirementTaxAnnotatorTest {
         when(taxStrategy.computeDetailedTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class),
                 any(BigDecimal.class), any(BigDecimal.class)))
                 .thenReturn(ordinaryBreakdown);
-        when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(BigDecimal.ZERO);
         PoolStrategy pool = filingStatusOnlyPool();
 
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 BigDecimal.valueOf(30_000), BigDecimal.ZERO, BigDecimal.ZERO,
-                ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+                ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
@@ -143,17 +137,44 @@ class RetirementTaxAnnotatorTest {
         when(taxStrategy.computeDetailedTax(eq(totalTaxableIncome), eq(YEAR), eq(FilingStatus.SINGLE),
                 eq(realizedLtcgIncome), eq(federallyTaxedSocialSecurity)))
                 .thenReturn(ordinaryBreakdown);
-        when(taxStrategy.computeMaxIncomeForTargetRate(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenReturn(BigDecimal.ZERO);
         PoolStrategy pool = filingStatusOnlyPool();
 
         var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
                 totalTaxableIncome, BigDecimal.ZERO, BigDecimal.ZERO,
                 ordinaryFederal, pool, taxStrategy, BigDecimal.ZERO,
-                realizedLtcgIncome, federallyTaxedSocialSecurity);
+                realizedLtcgIncome, federallyTaxedSocialSecurity, BigDecimal.ZERO);
 
         var result = annotator.annotate(baseYearDto(), annCtx);
 
         assertThat(result.federalTax()).isEqualByComparingTo(ordinaryFederal);
+    }
+
+    // === Wave-4 IRMAA item: irmaa_surcharge / irmaaWarning derivation ===
+
+    @Test
+    void annotate_positiveIrmaaSurcharge_setsSurchargeFieldAndWarning() {
+        PoolStrategy pool = filingStatusOnlyPool();
+        var surcharge = new BigDecimal("2643.6000");
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, surcharge);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.irmaaSurcharge()).isEqualByComparingTo(surcharge);
+        assertThat(result.irmaaWarning()).isTrue();
+    }
+
+    @Test
+    void annotate_zeroIrmaaSurcharge_leavesSurchargeAndWarningNull() {
+        PoolStrategy pool = filingStatusOnlyPool();
+        var annCtx = new RetirementTaxAnnotator.AnnotationContext(true, AGE, YEAR,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, pool, null,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var result = annotator.annotate(baseYearDto(), annCtx);
+
+        assertThat(result.irmaaSurcharge()).isNull();
+        assertThat(result.irmaaWarning()).isNull();
     }
 }

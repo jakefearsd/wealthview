@@ -113,13 +113,20 @@ public record ProjectionYearDto(
      * into {@code taxLiability} / {@code federalTax} (the required-minimum-distribution amount and
      * the long-term capital-gains tax component, respectively) -- surfacing them here does NOT add
      * to {@code taxLiability}.
+     *
+     * <p>{@code irmaaSurcharge} is DIFFERENT: it is an ADDITIVE Medicare premium expense (not a
+     * tax), funded through the pool cascade like other retirement expenses -- see
+     * {@code RetirementWithdrawalProcessor}. It is NOT included in {@code taxLiability} /
+     * {@code federalTax}. {@code irmaaWarning} is {@code true} exactly when {@code irmaaSurcharge}
+     * is positive (derived from the real IRMAA tiers, audit Wave-4 IRMAA item -- previously a
+     * warning-only bracket-ceiling proxy with no dollar figure).
      */
     public record TaxBreakdown(BigDecimal rothConversionAmount, BigDecimal taxLiability,
                                BigDecimal federalTax, BigDecimal stateTax, BigDecimal saltDeduction,
                                Boolean usedItemizedDeduction, Boolean irmaaWarning,
-                               BigDecimal rmdAmount, BigDecimal capitalGainsTax) {
+                               BigDecimal rmdAmount, BigDecimal capitalGainsTax, BigDecimal irmaaSurcharge) {
         static TaxBreakdown empty() {
-            return new TaxBreakdown(null, null, null, null, null, null, null, null, null);
+            return new TaxBreakdown(null, null, null, null, null, null, null, null, null, null);
         }
     }
 
@@ -297,6 +304,10 @@ public record ProjectionYearDto(
         return tax.capitalGainsTax();
     }
 
+    public BigDecimal irmaaSurcharge() {
+        return tax.irmaaSurcharge();
+    }
+
     public BigDecimal propertyEquity() {
         return netWorth.propertyEquity();
     }
@@ -382,6 +393,18 @@ public record ProjectionYearDto(
                 .build();
     }
 
+    /**
+     * Sets the year's IRMAA surcharge (null when zero/not applicable, matching the DTO's existing
+     * "positive value or null" convention) and derives {@code irmaaWarning} from it directly.
+     */
+    public ProjectionYearDto withIrmaaSurcharge(BigDecimal irmaaSurcharge) {
+        boolean positive = irmaaSurcharge != null && irmaaSurcharge.compareTo(BigDecimal.ZERO) > 0;
+        return Builder.from(this)
+                .irmaaSurcharge(positive ? irmaaSurcharge : null)
+                .irmaaWarning(positive ? Boolean.TRUE : null)
+                .build();
+    }
+
     public static ProjectionYearDto simple(int year, int age, BigDecimal startBalance,
                                             BigDecimal contributions, BigDecimal growth,
                                             BigDecimal withdrawals, BigDecimal endBalance,
@@ -449,6 +472,7 @@ public record ProjectionYearDto(
         private Boolean irmaaWarning;
         private BigDecimal rmdAmount;
         private BigDecimal capitalGainsTax;
+        private BigDecimal irmaaSurcharge;
 
         private Builder() {}
 
@@ -501,6 +525,7 @@ public record ProjectionYearDto(
             b.irmaaWarning = dto.irmaaWarning();
             b.rmdAmount = dto.rmdAmount();
             b.capitalGainsTax = dto.capitalGainsTax();
+            b.irmaaSurcharge = dto.irmaaSurcharge();
             return b;
         }
 
@@ -739,6 +764,11 @@ public record ProjectionYearDto(
             return this;
         }
 
+        public Builder irmaaSurcharge(BigDecimal irmaaSurcharge) {
+            this.irmaaSurcharge = irmaaSurcharge;
+            return this;
+        }
+
         public ProjectionYearDto build() {
             return new ProjectionYearDto(
                     year, age, retired,
@@ -754,7 +784,7 @@ public record ProjectionYearDto(
                             selfEmploymentTax, incomeBySource, rentalPropertyDetails),
                     new TaxBreakdown(rothConversionAmount, taxLiability, federalTax, stateTax,
                             saltDeduction, usedItemizedDeduction, irmaaWarning,
-                            rmdAmount, capitalGainsTax),
+                            rmdAmount, capitalGainsTax, irmaaSurcharge),
                     new NetWorth(propertyEquity, totalNetWorth, surplusReinvested));
         }
     }

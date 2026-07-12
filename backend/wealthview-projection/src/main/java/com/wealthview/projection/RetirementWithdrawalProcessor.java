@@ -18,7 +18,19 @@ import com.wealthview.core.projection.tax.TaxCalculationStrategy;
  */
 final class RetirementWithdrawalProcessor {
 
-    /** Bundles the per-year inputs needed by {@code process}. */
+    /**
+     * Bundles the per-year inputs needed by {@code process}. {@code irmaaSurcharge} is the year's
+     * ALREADY-COMPUTED Medicare IRMAA premium surcharge (Wave-4 IRMAA item) -- keyed on the
+     * 2-years-prior MAGI by the caller ({@code DeterministicProjectionEngine}), so it is a stable,
+     * known-in-advance dollar figure by the time this method runs (no fixed-point circularity like
+     * the audit-B2 Social Security convergence). Zero when not applicable (not retired, under
+     * Medicare age, or below the first IRMAA threshold). It is NOT a tax -- it is added directly to
+     * the year's portfolio draw ({@code portfolioNeed}), exactly like essential/discretionary
+     * spending, so it flows through the SAME withdrawal-order cascade and is funded from whichever
+     * pool the scenario's withdrawal order draws from, WITHOUT going through the
+     * {@code extraPoolFundedTax}/surplus-netting machinery {@code seTax} uses (that machinery folds
+     * its amount into the reported {@code taxLiability}, which the surcharge must stay out of).
+     */
     record RetirementWithdrawalContext(
             PoolStrategy pool,
             WithdrawalStrategy strategy,
@@ -34,7 +46,8 @@ final class RetirementWithdrawalProcessor {
             BigDecimal conversionAmount,
             @Nullable IncomeSourceProcessor.IncomeSourceYearResult isResult,
             @Nullable TaxCalculationStrategy taxStrategy,
-            BigDecimal rmdAmount) {
+            BigDecimal rmdAmount,
+            BigDecimal irmaaSurcharge) {
     }
 
     /**
@@ -88,6 +101,10 @@ final class RetirementWithdrawalProcessor {
         // executeWithdrawals' full bundle must subtract the SAME amount, or the marginal netting
         // there loses its full>=base monotonicity and the .max(ZERO) floor silently over-charges.
         BigDecimal ssTaxable = isResult != null ? isResult.socialSecurityTaxable() : BigDecimal.ZERO;
+        // Wave-4 IRMAA item: this year's Medicare premium surcharge, already computed by the caller
+        // from the 2-years-prior MAGI -- see the RetirementWithdrawalContext javadoc for why it is
+        // added to portfolioNeed below instead of extraPoolFundedTax.
+        BigDecimal irmaaSurcharge = rwCtx.irmaaSurcharge() != null ? rwCtx.irmaaSurcharge() : BigDecimal.ZERO;
         // Explicit signal threaded into executeWithdrawals -- see PoolStrategy#executeWithdrawals
         // javadoc. Zero unless the surplus branch below actually charges base-income tax this year.
         BigDecimal alreadyChargedBaseTax = BigDecimal.ZERO;
@@ -130,7 +147,8 @@ final class RetirementWithdrawalProcessor {
 
                 // A4: fund (tax + SE tax) from the surplus first; route any unfunded remainder
                 // through the pool cascade (extraPoolFundedTax, threaded into executeWithdrawals
-                // below) instead of letting it vanish at a `.max(ZERO)` floor.
+                // below) instead of letting it vanish at a `.max(ZERO)` floor. The IRMAA surcharge
+                // is NOT part of this obligation -- it is added to portfolioNeed below instead.
                 BigDecimal totalObligation = tax.add(seTax);
                 BigDecimal afterTaxSurplus = grossSurplus.subtract(totalObligation);
                 if (afterTaxSurplus.compareTo(BigDecimal.ZERO) > 0) {
@@ -149,8 +167,17 @@ final class RetirementWithdrawalProcessor {
             previousWithdrawal = portfolioNeed;
         }
 
+        // Wave-4 IRMAA: fold the surcharge into the actual dollar draw, AFTER previousWithdrawal is
+        // captured above (the surcharge is a one-off Medicare cost, not part of the ongoing spending
+        // trajectory that previousWithdrawal feeds into next year's withdrawal-rate/smoothing
+        // baseline) -- it flows through the SAME taxable/traditional/roth withdrawal-order cascade
+        // as portfolioNeed, so a traditional-funded portion is taxed normally (as any other
+        // distribution would be), while the surcharge dollar figure itself is reported separately
+        // (not folded into taxLiability) via the DTO's irmaa_surcharge field.
+        BigDecimal totalDraw = portfolioNeed.add(irmaaSurcharge).min(aggBalance);
+
         var withdrawalResult = pool.executeWithdrawals(
-                portfolioNeed, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age,
+                totalDraw, year, effectiveOtherIncome, conversionAmount, rwCtx.rmdAmount(), age,
                 alreadyChargedBaseTax, extraPoolFundedTax, ssTaxable);
 
         // withdrawalResult.taxLiability() already includes extraPoolFundedTax (now pool-funded).

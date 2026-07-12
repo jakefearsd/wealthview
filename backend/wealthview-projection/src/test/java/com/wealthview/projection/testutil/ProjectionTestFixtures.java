@@ -16,6 +16,8 @@ import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.IrmaaSurchargeCalculator;
+import com.wealthview.persistence.repository.IrmaaTierRepository;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.DeterministicProjectionEngine;
@@ -184,5 +186,14 @@ public final class ProjectionTestFixtures {
                                                                 StandardDeductionRepository deductionRepo) {
         var calc = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
         return new DeterministicProjectionEngine(calc, null);
+    }
+
+    /** Like {@link #engineWithTax}, plus the Wave-4 IRMAA item's surcharge calculator. */
+    public static DeterministicProjectionEngine engineWithTaxAndIrmaa(TaxBracketRepository taxBracketRepo,
+                                                                        StandardDeductionRepository deductionRepo,
+                                                                        IrmaaTierRepository irmaaTierRepo) {
+        var calc = new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+        var irmaaCalc = new IrmaaSurchargeCalculator(irmaaTierRepo);
+        return new DeterministicProjectionEngine(calc, null, null, irmaaCalc);
     }
 }

@@ -56,7 +56,12 @@ final class YearFinanceResolver {
         this.retirementWithdrawalProcessor = retirementWithdrawalProcessor;
     }
 
-    /** Immutable per-year inputs consumed by {@link #resolve}. */
+    /**
+     * Immutable per-year inputs consumed by {@link #resolve}. {@code irmaaSurcharge} is the year's
+     * already-computed Medicare IRMAA premium surcharge (Wave-4 IRMAA item, zero when not
+     * applicable) -- passed straight through to {@link RetirementWithdrawalProcessor}; see that
+     * class's javadoc for why it is not part of the Social Security convergence loop.
+     */
     record YearContext(
             PoolStrategy pool,
             List<ProjectionIncomeSourceInput> incomeSources,
@@ -72,7 +77,8 @@ final class YearFinanceResolver {
             int baseYear,
             BigDecimal previousWithdrawal,
             BigDecimal suspendedLoss,
-            BigDecimal rmdAmount) {
+            BigDecimal rmdAmount,
+            BigDecimal irmaaSurcharge) {
     }
 
     /**
@@ -156,7 +162,7 @@ final class YearFinanceResolver {
                     pool, yc.strategy(), yc.spendingPlan(), yc.age(), yc.yearsInRetirement(), yc.year(),
                     yc.inflationRate(), incomeResult.totalActiveIncome(), yc.startBalance(),
                     previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                    incomeResult.isResult(), yc.taxStrategy(), yc.rmdAmount());
+                    incomeResult.isResult(), yc.taxStrategy(), yc.rmdAmount(), yc.irmaaSurcharge());
             var retirementResult = retirementWithdrawalProcessor.process(rwCtx);
             withdrawals = retirementResult.withdrawals();
             taxLiability = taxLiability.add(retirementResult.taxLiability());
