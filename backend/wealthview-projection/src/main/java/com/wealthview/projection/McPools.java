@@ -86,9 +86,13 @@ final class McPools {
      * Debits {@code amount} from an owner pool pair (leading slot {@code a} = primary, trailing slot
      * {@code b} = spouse) split PROPORTIONALLY by balance, mirroring the deterministic
      * {@code OwnerPool.debitProportional}: the leading owner's share is {@code amount × balA ÷ total}
-     * and the trailing owner takes the exact remainder, so the pair drops by EXACTLY {@code amount}
-     * (exactness of the sum over symmetry). When the trailing slot is 0 (single-person, and the
-     * survivor's pool after rollover) {@code balA ÷ total == 1.0} exactly, so this reduces to
+     * and the trailing owner takes the remainder ({@code amount - shareA}), so the pair's combined
+     * drop is {@code amount} — exact after typical 4-decimal-place currency rounding downstream (see
+     * {@code Money.SCALE}), and empirically exact at double precision for realistic dollar
+     * magnitudes, though (unlike {@code OwnerPool.debitProportional}'s BigDecimal remainder, which
+     * IS exact) IEEE-754 {@code double} subtraction/addition is not strictly associative, so this is
+     * not a guaranteed bit-identity in the general case. When the trailing slot is 0 (single-person,
+     * and the survivor's pool after rollover) {@code balA ÷ total == 1.0} exactly, so this reduces to
      * {@code pools[a] -= amount} bit-for-bit. A non-positive pair total puts the whole amount on the
      * leading slot (may drive it negative; the caller clamps later).
      */

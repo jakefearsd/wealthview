@@ -92,6 +92,19 @@ final class HouseholdMcResolver {
         FilingStatus postStatus = preStatus;
         if (household.transitionYear().isPresent()) {
             int firstDeathIdx = household.transitionYear().get() - retirementYear;
+            // Household task 8 (T6-review): a first death BEFORE the MC's own retirement-anchored
+            // window (index 0 == retirementYear) clamps to index 0 -- the survivor enters the
+            // modeled window already alone, so rollover/step-up/single-filing tables apply from
+            // trial year 0. This is the INTENDED MC behavior, not a bug, and it deliberately
+            // differs from the deterministic engine's scope: the deterministic engine models
+            // baseYear..endYear (which can include pre-retirement accumulation years) and so CAN
+            // show the transition firing at its true pre-retirement calendar year when that falls
+            // inside its wider horizon (see HouseholdTransition#resolveYear). The MC engine never
+            // models pre-retirement years at all, so it cannot distinguish "died five years before
+            // retirement" from "died thirty years before retirement" -- both collapse to the same
+            // already-survivor starting state, which is correct for what the optimizer actually
+            // simulates (by retirement the household genuinely IS single). Pinned in
+            // HouseholdMcResolverTest.
             if (firstDeathIdx < 0) {
                 firstDeathIdx = 0;
             }
@@ -152,20 +165,40 @@ final class HouseholdMcResolver {
         return sumByTypeAndOwner(accounts, PoolStrategy.POOL_TAXABLE, owner);
     }
 
-    /** The "primary" owner is the default for any account whose owner is null or unrecognized,
-     * matching {@code OwnerPool.ownerOf} (only {@code "spouse"} / {@code "joint"} are distinct). */
+    /**
+     * Household task 8 (dedup): type-AND-owner-filtered sum, sharing {@link PoolStrategy#ownerCategory}
+     * for the owner-partition rule instead of re-deriving it (the pre-task-8 {@code ownerOrPrimary}
+     * duplicate this replaces). Not lifted onto {@link PoolStrategy} itself as a third public
+     * sum-by-owner method — that interface is already near PMD's {@code ExcessivePublicCount}
+     * threshold, and this type-filtered shape is MC-local (the deterministic side always pre-filters
+     * to one type via {@code PoolStrategy.sumTaxableByOwner}).
+     */
     private static BigDecimal sumByTypeAndOwner(List<ProjectionAccountInput> accounts,
                                                 String type, String owner) {
         BigDecimal sum = BigDecimal.ZERO;
         for (var account : accounts) {
-            if (type.equals(account.accountType()) && owner.equals(ownerOrPrimary(account.owner()))) {
+            if (type.equals(account.accountType()) && owner.equals(PoolStrategy.ownerCategory(account.owner()))) {
                 sum = sum.add(account.initialBalance());
             }
         }
         return sum;
     }
 
-    private static String ownerOrPrimary(@Nullable String owner) {
-        return "spouse".equals(owner) || "joint".equals(owner) ? owner : "primary";
+    /**
+     * Household task 8 (dedup): scales {@code values[y] *= factor} for {@code y} in
+     * {@code [fromIdx, years)} -- the survivor-spending-factor rule shared by
+     * {@link OptimizationContextBuilder} (the essential floor) and {@link GuardrailResponseBuilder}
+     * (the floor again, plus the reported discretionary/corridor plan). A no-op when {@code fromIdx}
+     * is outside {@code [0, years)} (single-person, no in-window transition, or a household whose
+     * transition sentinel already equals {@code years}) or {@code factor == 1.0} (no survivor
+     * spending reduction configured).
+     */
+    static void scaleFromTransition(double[] values, int fromIdx, double factor, int years) {
+        if (fromIdx < 0 || fromIdx >= years || factor == 1.0) {
+            return;
+        }
+        for (int y = fromIdx; y < years; y++) {
+            values[y] *= factor;
+        }
     }
 }

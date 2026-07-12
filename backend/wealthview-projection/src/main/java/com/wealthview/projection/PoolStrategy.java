@@ -538,9 +538,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     /**
      * Household task 5: sums the initial balances of the taxable accounts in one owner category
      * ({@code "primary"} / {@code "spouse"} / {@code "joint"}), the weights for the blended
-     * first-death step-up factor (see {@link MultiPool#applyFirstDeathTransition}). Any owner other
-     * than {@code "spouse"} or {@code "joint"} (including {@code null}) counts as {@code "primary"},
-     * matching the default-owner convention. Lives on the interface (like {@link #sumInitialBalances})
+     * first-death step-up factor (see {@link MultiPool#applyFirstDeathTransition}). Callers pass an
+     * already taxable-filtered account list. Lives on the interface (like {@link #sumInitialBalances})
      * to keep {@link MultiPool}'s own complexity down.
      */
     static BigDecimal sumTaxableByOwner(List<ProjectionAccountInput> accounts, String category) {
@@ -550,8 +549,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /** Normalizes an account owner string to one of {@code "primary"}/{@code "spouse"}/{@code "joint"}. */
-    private static String ownerCategory(String owner) {
+    /** Normalizes an account owner string to one of {@code "primary"}/{@code "spouse"}/{@code
+     * "joint"}: {@code "spouse"} -> {@code "spouse"}, {@code "joint"} -> {@code "joint"}, anything
+     * else (including {@code null}) -> {@code "primary"}, the default-owner convention. Package-visible
+     * (not {@code private}) so {@link HouseholdMcResolver} shares this single categorization rule
+     * instead of re-deriving it (household task 8 dedup — kept package-visible rather than adding a
+     * second public sum-by-type-and-owner method to this already near-{@code ExcessivePublicCount}
+     * sealed interface). */
+    static String ownerCategory(String owner) {
         if ("spouse".equals(owner)) {
             return "spouse";
         }
