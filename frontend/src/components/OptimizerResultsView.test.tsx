@@ -105,7 +105,7 @@ describe('OptimizerResultsView', () => {
         render(
             <OptimizerResultsView
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                result={{ ...baseResult, success_probability_with_rules: 0.97 } as any}
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' } as any}
                 onReoptimize={vi.fn()}
                 retirementDate="2035-01-01"
             />
@@ -113,6 +113,36 @@ describe('OptimizerResultsView', () => {
         expect(screen.getByTestId('success-probability-with-rules-card')).toBeInTheDocument();
         expect(screen.getByText('With Guardrail Cuts')).toBeInTheDocument();
         expect(screen.getByText('97%')).toBeInTheDocument();
+    });
+
+    it('marks the "With Guardrail Cuts" card as certified when gated_on is with_rules', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'with_rules' } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('certified-badge-with-rules')).toBeInTheDocument();
+        expect(screen.queryByTestId('certified-badge-success-probability')).not.toBeInTheDocument();
+        expect(screen.getByText('With Guardrail Cuts')).toBeInTheDocument();
+        expect(screen.getByText('If Never Adjusted')).toBeInTheDocument();
+    });
+
+    it('marks the "Success Probability" card as certified when gated_on is no_adaptation', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, success_probability_with_rules: 0.97, gated_on: 'no_adaptation' } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('certified-badge-success-probability')).toBeInTheDocument();
+        expect(screen.queryByTestId('certified-badge-with-rules')).not.toBeInTheDocument();
+        expect(screen.getByText('Success Probability')).toBeInTheDocument();
+        expect(screen.getByText('If Rules Followed')).toBeInTheDocument();
     });
 
     it('omits the with-rules card when success_probability_with_rules is null', () => {

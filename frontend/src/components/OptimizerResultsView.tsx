@@ -28,6 +28,23 @@ export default function OptimizerResultsView({
     const failureRateColors = { good: '#e8f5e9', caution: '#fff8e1', danger: '#ffebee' };
     const failureRateBorder = { good: '#a5d6a7', caution: '#ffe082', danger: '#ef9a9a' };
 
+    // T24: `gated_on` names which success metric actually certified the recommended schedule.
+    // Legacy fixtures/responses that predate the field are `undefined`, which — like the
+    // explicit "no_adaptation" value — falls back to the original pre-T24 headline (Success
+    // Probability certified), so old callers keep their prior card treatment unchanged.
+    const hasWithRulesCard = result.success_probability_with_rules != null;
+    const withRulesCertified = hasWithRulesCard && result.gated_on === 'with_rules';
+
+    const certifiedBadgeStyle: React.CSSProperties = {
+        display: 'inline-block', padding: '0.1rem 0.4rem', background: '#2e7d32', color: '#fff',
+        borderRadius: '4px', fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
+        letterSpacing: '0.03em',
+    };
+    const metricLabelStyle: React.CSSProperties = {
+        fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem',
+    };
+
     return (
         <div>
             {result.stale && (
@@ -78,21 +95,35 @@ export default function OptimizerResultsView({
             }}>
                 <div data-testid="success-probability-card" style={{
                     ...cardStyle, textAlign: 'center',
-                    background: '#e8f5e9', border: '1px solid #a5d6a7',
+                    background: '#e8f5e9',
+                    border: `1px solid ${hasWithRulesCard && !withRulesCertified ? '#2e7d32' : '#a5d6a7'}`,
                 }}>
-                    <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Success Probability</div>
+                    <div style={metricLabelStyle}>
+                        {withRulesCertified ? 'If Never Adjusted' : 'Success Probability'}
+                        {hasWithRulesCard && !withRulesCertified && (
+                            <span data-testid="certified-badge-success-probability" style={certifiedBadgeStyle}>Certified</span>
+                        )}
+                    </div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.success_probability, 0)}</div>
                 </div>
-                {result.success_probability_with_rules != null && (
+                {hasWithRulesCard && (
                     <div
                         data-testid="success-probability-with-rules-card"
-                        title="Success if you follow this profile's spending-cut rule when the portfolio falls behind — the no-adjustment number is the headline."
+                        title={withRulesCertified
+                            ? "Success if you follow this profile's spending-cut rule when the portfolio falls behind — this profile gates on adaptive rules, so this is the certified number."
+                            : "Success if you follow this profile's spending-cut rule when the portfolio falls behind — the no-adjustment number is the certified headline for this profile."}
                         style={{
                             ...cardStyle, textAlign: 'center',
-                            background: '#e3f2fd', border: '1px solid #90caf9', cursor: 'help',
+                            background: '#e3f2fd',
+                            border: `1px solid ${withRulesCertified ? '#1565c0' : '#90caf9'}`, cursor: 'help',
                         }}
                     >
-                        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>With Guardrail Cuts</div>
+                        <div style={metricLabelStyle}>
+                            {withRulesCertified ? 'With Guardrail Cuts' : 'If Rules Followed'}
+                            {withRulesCertified && (
+                                <span data-testid="certified-badge-with-rules" style={certifiedBadgeStyle}>Certified</span>
+                            )}
+                        </div>
                         <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.success_probability_with_rules, 0)}</div>
                     </div>
                 )}

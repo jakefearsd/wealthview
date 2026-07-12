@@ -33,6 +33,15 @@ export interface OptimizerConfig {
     /** RMD bracket headroom, percent (10 = 10%). API: fraction. */
     rmdBracketHeadroomPct: number;
     phases: GuardrailPhase[];
+    /**
+     * T24: per-profile toggle for the sustainability search gate. Always sent explicitly to the
+     * API (never omitted) so the UI's checkbox state is the source of truth, not the server's
+     * omitted-defaults-to-true fallback. The response doesn't echo this raw toggle back (only the
+     * derived {@code gated_on}), so {@link fromProfile} cannot restore it from a persisted
+     * profile — it keeps the form default, matching the "recommended, always-on unless the user
+     * explicitly opts out" UX.
+     */
+    gateOnAdaptiveRules: boolean;
 }
 
 export function defaultOptimizerConfig(): OptimizerConfig {
@@ -53,6 +62,7 @@ export function defaultOptimizerConfig(): OptimizerConfig {
         rmdTargetBracketRate: 0.12,
         exhaustionBuffer: 5,
         rmdBracketHeadroomPct: 10,
+        gateOnAdaptiveRules: true,
         phases: [
             { name: 'Early retirement', start_age: 62, end_age: 72, priority_weight: 3, target_spending: 80000 },
             { name: 'Mid retirement', start_age: 73, end_age: 82, priority_weight: 2, target_spending: 60000 },
@@ -125,6 +135,7 @@ export function toRequest(config: OptimizerConfig, scenarioId: string): Guardrai
         max_annual_adjustment_rate: config.spendingFlexibilityPct / 100,
         phase_blend_years: config.phaseBlendYears,
         risk_tolerance: config.riskTolerance,
+        gate_on_adaptive_rules: config.gateOnAdaptiveRules,
         ...(config.confidenceLevelPct != null ? { confidence_level: config.confidenceLevelPct / 100 } : {}),
         ...(config.optimizeConversions ? {
             optimize_conversions: true,

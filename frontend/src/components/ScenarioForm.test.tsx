@@ -115,6 +115,15 @@ function feeRateInput(): HTMLInputElement {
     return input as HTMLInputElement;
 }
 
+function interestYieldInput(): HTMLInputElement {
+    const label = screen.getByText('Bond Interest Yield (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Bond Interest Yield input not found');
+    }
+    return input as HTMLInputElement;
+}
+
 function includeDepressionYearsCheckbox(): HTMLInputElement {
     const label = screen.getByText('Include 1928–1971 market history');
     const input = label.parentElement?.querySelector('input');
@@ -367,6 +376,67 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.fee_rate).toBe(0);
+    });
+
+    it('defaults interest_yield to 4.0% when no initial value is present', () => {
+        setupMocks();
+        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(interestYieldInput().value).toBe('4');
+    });
+
+    it('hydrates interest_yield from an existing scenario\'s params_json', () => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ interest_yield: 0.06 });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(interestYieldInput().value).toBe('6');
+    });
+
+    it('submits interest_yield converted from percent to decimal', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(interestYieldInput(), { target: { value: '5.5' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.interest_yield).toBeCloseTo(0.055);
+    });
+
+    it('omits interest_yield when the field is cleared to blank', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(interestYieldInput(), { target: { value: '' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.interest_yield).toBeUndefined();
+    });
+
+    it('round-trips a genuine 0% interest_yield override as 0, not dropped', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(interestYieldInput(), { target: { value: '0' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.interest_yield).toBe(0);
     });
 
     it('submits include_depression_years as false by default', async () => {

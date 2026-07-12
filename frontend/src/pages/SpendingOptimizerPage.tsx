@@ -186,6 +186,12 @@ export default function SpendingOptimizerPage() {
     const [exhaustionBuffer, setExhaustionBuffer] = useState(5);
     const [rmdBracketHeadroom, setRmdBracketHeadroom] = useState(10);
 
+    // T24: gates the sustainability search on the with-rules success metric instead of the
+    // no-adaptation one. Defaults to checked (recommended) — the response never echoes this raw
+    // toggle back (only the derived `gated_on`), so it is NOT restored when loading an existing
+    // profile; it always starts from this default, matching "recommended unless opted out".
+    const [gateOnAdaptiveRules, setGateOnAdaptiveRules] = useState(true);
+
     // Advanced parameters (collapsed by default)
     const [showAdvanced, setShowAdvanced] = useState(false);
     const [trialCount, setTrialCount] = useState(5000);
@@ -284,6 +290,7 @@ export default function SpendingOptimizerPage() {
             max_annual_adjustment_rate: spendingFlexibility / 100,
             phase_blend_years: phaseBlendYears,
             risk_tolerance: riskTolerance,
+            gate_on_adaptive_rules: gateOnAdaptiveRules,
             ...(confidenceLevel != null ? { confidence_level: confidenceLevel / 100 } : {}),
             ...(dynSeqBracketRate != null ? { dynamic_sequencing_bracket_rate: dynSeqBracketRate / 100 } : {}),
             ...(optimizeConversions ? {
@@ -461,6 +468,17 @@ export default function SpendingOptimizerPage() {
                                     <option value={1}>1 year</option>
                                     <option value={2}>2 years</option>
                                 </select>
+                            </FormField>
+                            <FormField
+                                label="Gate on adaptive spending rules"
+                                helpText="Recommended spending assumes you follow the profile's spending-cut rule in downturns (certifies the 'With Guardrail Cuts' number). Uncheck for the conservative never-adjust gate."
+                            >
+                                <input
+                                    type="checkbox"
+                                    aria-label="Gate on adaptive spending rules"
+                                    checked={gateOnAdaptiveRules}
+                                    onChange={e => setGateOnAdaptiveRules(e.target.checked)}
+                                />
                             </FormField>
                         </div>
 

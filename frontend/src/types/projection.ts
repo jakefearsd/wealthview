@@ -167,6 +167,8 @@ export interface CreateScenarioRequest {
     primary_residence_mortgage_interest?: number | null;
     dividend_yield?: number | null;
     fee_rate?: number | null;
+    /** Nominal coupon assumption for the bond portion of taxable accounts (decimal, default 0.04, range 0-0.10). */
+    interest_yield?: number | null;
     include_depression_years?: boolean | null;
     spending_profile_id?: string | null;
     use_guardrail_profile?: boolean | null;
@@ -297,6 +299,12 @@ export interface GuardrailProfileResponse {
     success_probability: number;
     /** Success probability if the guardrail spending-cut rule is followed when the portfolio falls behind. */
     success_probability_with_rules: number | null;
+    /**
+     * T24: which success metric actually certified the recommended schedule — "with_rules" when
+     * the profile's gate_on_adaptive_rules toggle was on AND a positive max_annual_adjustment_rate
+     * made the rule effective, otherwise "no_adaptation". Always present, never null.
+     */
+    gated_on: 'no_adaptation' | 'with_rules';
     /** True when the requested essential floor exceeded what the portfolio could sustain and was reduced. Never null. */
     floor_reduced: boolean;
     /** Success probability against the ORIGINAL (pre-reduction) essential floor, only set when floor_reduced. */
@@ -381,4 +389,10 @@ export interface GuardrailOptimizationRequest {
     traditional_exhaustion_buffer?: number;
     rmd_bracket_headroom?: number;
     dynamic_sequencing_bracket_rate?: number;
+    /**
+     * T24: per-profile toggle for the sustainability search gate. The UI is the source of truth —
+     * always send this explicitly rather than relying on the server's omitted-defaults-to-true
+     * behavior, so the checkbox state and the persisted profile never silently diverge.
+     */
+    gate_on_adaptive_rules: boolean;
 }

@@ -26,10 +26,11 @@ vi.mock('../components/PortfolioFanChart', () => ({
     ),
 }));
 
-import { getScenario, getGuardrailProfile } from '../api/projections';
+import { getScenario, getGuardrailProfile, optimizeSpending } from '../api/projections';
 
 const mockGetScenario = vi.mocked(getScenario);
 const mockGetProfile = vi.mocked(getGuardrailProfile);
+const mockOptimizeSpending = vi.mocked(optimizeSpending);
 
 const mockScenario: Scenario = {
     id: 'sc-1',
@@ -71,6 +72,7 @@ const mockProfile: GuardrailProfileResponse = {
     failure_rate: 0.05,
     success_probability: 0.9,
     success_probability_with_rules: null,
+    gated_on: 'no_adaptation',
     floor_reduced: false,
     original_floor_success_probability: null,
     fixed_return_share: null,
@@ -415,6 +417,50 @@ describe('SpendingOptimizerPage', () => {
         });
 
         expect(screen.queryByTestId('warning-banner')).not.toBeInTheDocument();
+    });
+
+    it('renders the gate-on-adaptive-rules checkbox checked by default', async () => {
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i })).toBeInTheDocument();
+        });
+        expect(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i })).toBeChecked();
+    });
+
+    it('sends gate_on_adaptive_rules true by default when running optimization', async () => {
+        const user = userEvent.setup();
+        mockOptimizeSpending.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('button', { name: /run optimization/i })).toBeInTheDocument();
+        });
+        await user.click(screen.getByRole('button', { name: /run optimization/i }));
+
+        await waitFor(() => {
+            expect(mockOptimizeSpending).toHaveBeenCalled();
+        });
+        const [, request] = mockOptimizeSpending.mock.calls[0];
+        expect(request.gate_on_adaptive_rules).toBe(true);
+    });
+
+    it('sends an explicit false when the gate checkbox is unchecked before running optimization', async () => {
+        const user = userEvent.setup();
+        mockOptimizeSpending.mockResolvedValue(mockProfile);
+        renderPage();
+
+        await waitFor(() => {
+            expect(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i })).toBeInTheDocument();
+        });
+        await user.click(screen.getByRole('checkbox', { name: /gate on adaptive spending rules/i }));
+        await user.click(screen.getByRole('button', { name: /run optimization/i }));
+
+        await waitFor(() => {
+            expect(mockOptimizeSpending).toHaveBeenCalled();
+        });
+        const [, request] = mockOptimizeSpending.mock.calls[0];
+        expect(request.gate_on_adaptive_rules).toBe(false);
     });
 });
 

@@ -62,6 +62,7 @@ interface ScenarioFormFields {
     primaryResidenceMortgageInterest: number;
     dividendYield: number | null;
     feeRate: number | null;
+    interestYield: number | null;
     includeDepressionYears: boolean;
     spendingPlanSelection: string;
 }
@@ -117,6 +118,7 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         primaryResidenceMortgageInterest: parsedParams.primary_residence_mortgage_interest ?? 0,
         dividendYield: parsedParams.dividend_yield != null ? parsedParams.dividend_yield * 100 : 1.8,
         feeRate: parsedParams.fee_rate != null ? parsedParams.fee_rate * 100 : 0.25,
+        interestYield: parsedParams.interest_yield != null ? parsedParams.interest_yield * 100 : 4.0,
         includeDepressionYears: parsedParams.include_depression_years ?? false,
         spendingPlanSelection,
     };
@@ -171,7 +173,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         annualRothConversion, rothConversionStrategy, targetBracketRate,
         rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
-        dividendYield, feeRate, includeDepressionYears, spendingPlanSelection,
+        dividendYield, feeRate, interestYield, includeDepressionYears, spendingPlanSelection,
     } = fields;
 
     function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null | AllocationInput) {
@@ -246,6 +248,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 primary_residence_mortgage_interest: state ? primaryResidenceMortgageInterest : null,
                 dividend_yield: dividendYield != null ? dividendYield / 100 : undefined,
                 fee_rate: feeRate != null ? feeRate / 100 : undefined,
+                interest_yield: interestYield != null ? interestYield / 100 : undefined,
                 include_depression_years: includeDepressionYears,
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
@@ -297,6 +300,20 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         max="10"
                         value={dividendYield ?? ''}
                         onChange={e => setField('dividendYield', e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                </FormField>
+                <FormField
+                    label="Bond Interest Yield (%)"
+                    helpText="Nominal coupon assumption for the bond portion of taxable accounts — taxed annually as ordinary income (bonds are tax-inefficient). Only affects accounts with a bond allocation."
+                >
+                    <input
+                        style={inputStyle}
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        value={interestYield ?? ''}
+                        onChange={e => setField('interestYield', e.target.value === '' ? null : Number(e.target.value))}
                     />
                 </FormField>
                 <FormField

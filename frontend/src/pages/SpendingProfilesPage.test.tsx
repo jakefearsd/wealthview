@@ -48,6 +48,7 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
     failure_rate: 0.05,
     success_probability: 0.95,
     success_probability_with_rules: null,
+    gated_on: 'no_adaptation',
     floor_reduced: false,
     original_floor_success_probability: null,
     fixed_return_share: null,
