@@ -98,17 +98,29 @@ final class SpendingFeasibilityAnalyzer {
      * Annotates a retired year's DTO with resolved essential/discretionary spending,
      * net need, surplus, and post-cut discretionary spending. Returns {@code base}
      * unchanged for working years or when no spending plan is set.
+     *
+     * <p>Task 8 follow-up (T10 blocker): {@code survivorSpendingFactor} is the household's per-year
+     * survivor factor (1.0 for single-person runs and every pre-transition year), applied to the
+     * plan-resolved essential/discretionary via the SAME shared
+     * {@link HouseholdTransition#scaleBySurvivorFactor} rule
+     * {@link RetirementWithdrawalProcessor} scales the actual pool draw with. Every derived field
+     * ({@code netSpendingNeed}/{@code spendingSurplus}/{@code discretionaryAfterCuts}) then follows
+     * coherently, and {@link #computeFeasibility} — which reads these DTO fields back — compares the
+     * scaled requirement against the scaled withdrawal instead of flagging a phantom permanent
+     * shortfall from the transition year forward.
      */
     ProjectionYearDto applyViability(ProjectionYearDto base, @Nullable SpendingPlan spendingPlan,
                                      int year, int age, int yearsInRetirement,
-                                     BigDecimal inflationRate, BigDecimal activeIncome) {
+                                     BigDecimal inflationRate, BigDecimal activeIncome,
+                                     BigDecimal survivorSpendingFactor) {
         if (spendingPlan == null || !base.retired()) {
             return base;
         }
 
         var resolved = spendingPlan.resolveYear(year, age, yearsInRetirement, inflationRate, activeIncome);
-        BigDecimal essential = resolved.essential();
-        BigDecimal discretionary = resolved.discretionary();
+        BigDecimal factor = survivorSpendingFactor != null ? survivorSpendingFactor : BigDecimal.ONE;
+        BigDecimal essential = HouseholdTransition.scaleBySurvivorFactor(resolved.essential(), factor);
+        BigDecimal discretionary = HouseholdTransition.scaleBySurvivorFactor(resolved.discretionary(), factor);
 
         BigDecimal taxBurden = base.taxLiability() != null ? base.taxLiability() : BigDecimal.ZERO;
         BigDecimal netNeed = essential.add(discretionary).subtract(activeIncome).max(BigDecimal.ZERO);

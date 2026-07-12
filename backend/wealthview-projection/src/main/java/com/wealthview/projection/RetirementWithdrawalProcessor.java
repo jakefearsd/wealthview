@@ -225,14 +225,12 @@ final class RetirementWithdrawalProcessor {
     }
 
     /**
-     * Scales a plan-resolved spending/withdrawal amount by the survivor factor, short-circuiting to
-     * the original value when the factor is exactly 1.0 so the pre-transition and single-person paths
-     * stay byte-identical (no BigDecimal scale/precision drift from a redundant multiply).
+     * Scales a plan-resolved spending/withdrawal amount by the survivor factor. Task 8 follow-up:
+     * delegates to the shared {@link HouseholdTransition#scaleBySurvivorFactor} so this draw seam and
+     * {@link SpendingFeasibilityAnalyzer}'s disclosure seam apply the identical rule (factor-1.0
+     * short-circuit included) and can never drift apart again.
      */
     private static BigDecimal scaleBySurvivorFactor(BigDecimal amount, BigDecimal factor) {
-        if (factor.compareTo(BigDecimal.ONE) == 0) {
-            return amount;
-        }
-        return amount.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
+        return HouseholdTransition.scaleBySurvivorFactor(amount, factor);
     }
 }

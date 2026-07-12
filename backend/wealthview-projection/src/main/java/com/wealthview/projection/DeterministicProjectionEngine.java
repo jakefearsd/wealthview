@@ -440,8 +440,11 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 growthResult, wdFromTaxable, wdFromTraditional, wdFromRoth, combinedTaxSource,
                 rmdAmount, ltcgTax, earlyWithdrawalPenalty));
         yearDto = PropertyEquityCalculator.apply(yearDto, propertyEquity);
+        // Task 8 follow-up (T10 blocker): the viability DISCLOSURES scale by the same per-year
+        // survivor factor as the actual draw (RetirementWithdrawalProcessor), so spendingSurplus /
+        // computeFeasibility compare like with like post-transition.
         yearDto = feasibilityAnalyzer.applyViability(yearDto, ctx.spendingPlan(), year, age, yearsInRetirement,
-                ctx.inflationRate(), comp.totalActiveIncome());
+                ctx.inflationRate(), comp.totalActiveIncome(), yearSurvivorSpendingFactor);
         yearDto = IncomeSourceFieldMapper.apply(yearDto, comp.isResult());
         yearDto = yearDto.withSurplusReinvested(surplusReinvested);
         // T18a-5b: threaded into the annotator so its federal/state recompute can fold both

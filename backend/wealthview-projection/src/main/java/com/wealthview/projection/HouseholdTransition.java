@@ -32,6 +32,25 @@ final class HouseholdTransition {
 
     private HouseholdTransition() {}
 
+    /**
+     * Scales a plan-resolved spending amount by the survivor factor, short-circuiting to the
+     * original value when the factor is exactly 1.0 so the pre-transition and single-person paths
+     * stay byte-identical (no BigDecimal scale/precision drift from a redundant multiply).
+     *
+     * <p>Task 8 follow-up: the ONE deterministic-engine scaling rule, shared by
+     * {@link RetirementWithdrawalProcessor} (the actual pool draw, transition step 4) and
+     * {@link SpendingFeasibilityAnalyzer} (the essential/discretionary viability DISCLOSURES and the
+     * feasibility verdict derived from them). The two seams resolve the same {@code SpendingPlan}
+     * through independent calls, so they MUST scale identically — pre-fix the analyzer didn't scale
+     * at all, reporting a phantom permanent shortfall for every post-transition year (T10 blocker).
+     */
+    static BigDecimal scaleBySurvivorFactor(BigDecimal amount, BigDecimal factor) {
+        if (factor.compareTo(BigDecimal.ONE) == 0) {
+            return amount;
+        }
+        return amount.multiply(factor).setScale(4, java.math.RoundingMode.HALF_UP);
+    }
+
     static SurvivorYear resolveYear(@Nullable HouseholdContext household, PoolStrategy pool, int year,
                                     List<ProjectionIncomeSourceInput> incomeSources, int baseYear,
                                     BigDecimal inflationRate, BigDecimal survivorSpendingFactor,

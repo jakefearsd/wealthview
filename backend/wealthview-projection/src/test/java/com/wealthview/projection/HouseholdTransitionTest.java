@@ -405,6 +405,74 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(factorDraw).isEqualByComparingTo(bd("75000")); // 100000 * 0.75
     }
 
+    // === Task 8 follow-up (T10 blocker): the viability/feasibility DISCLOSURES scale too ===
+    // RetirementWithdrawalProcessor scales the actual draw (pinned above), but
+    // SpendingFeasibilityAnalyzer.applyViability resolves the SAME plan through a second,
+    // independent call site -- pre-fix it reported the UNSCALED essential/discretionary
+    // post-transition, so spendingSurplus went (and stayed) negative and computeFeasibility
+    // flagged a perfectly sustainable household plan infeasible. T10's probe scenario, pinned.
+
+    @Test
+    void transition_viabilityDisclosures_scaleBySurvivorFactorFromTransitionYear() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // T10 report's probe: joint taxable $3M (basis == balance, so no LTCG), flat profile
+        // essential 60k / discretionary 20k, factor 0.75, no income sources, zero inflation.
+        var spending = new SpendingProfileInput(bd("60000"), bd("20000"), null);
+        var result = engine.run(input(2040, 90, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")), spending, List.of(), household(85, 90)));
+
+        // Pre-transition (2042): unscaled disclosures, zero surplus (withdrawals fully fund spending).
+        var pre = yearOf(result.yearlyData(), 2042);
+        assertThat(pre.essentialExpenses()).isEqualByComparingTo(bd("60000"));
+        assertThat(pre.discretionaryExpenses()).isEqualByComparingTo(bd("20000"));
+        assertThat(pre.withdrawals()).isEqualByComparingTo(bd("80000"));
+        assertThat(pre.spendingSurplus()).isEqualByComparingTo(ZERO);
+
+        // Transition year + every later year: disclosures scale x0.75 in lockstep with the draw,
+        // so the surplus stays zero instead of reporting a phantom -20,000/yr shortfall.
+        for (int year : new int[]{TRANSITION_YEAR, 2044}) {
+            var row = yearOf(result.yearlyData(), year);
+            assertThat(row.essentialExpenses()).as("essential %d", year).isEqualByComparingTo(bd("45000"));
+            assertThat(row.discretionaryExpenses()).as("discretionary %d", year).isEqualByComparingTo(bd("15000"));
+            assertThat(row.withdrawals()).as("withdrawals %d", year).isEqualByComparingTo(bd("60000"));
+            assertThat(row.netSpendingNeed()).as("netSpendingNeed %d", year).isEqualByComparingTo(bd("60000"));
+            assertThat(row.spendingSurplus()).as("spendingSurplus %d", year).isEqualByComparingTo(ZERO);
+            assertThat(row.discretionaryAfterCuts()).as("discAfterCuts %d", year)
+                    .isEqualByComparingTo(bd("15000"));
+        }
+
+        // The user-facing verdict: a sustainable household plan is FEASIBLE, no phantom shortfall
+        // pinned at the transition year.
+        assertThat(result.spendingFeasibility()).isNotNull();
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+        assertThat(result.spendingFeasibility().firstShortfallYear()).isNull();
+    }
+
+    @Test
+    void transition_viabilityDisclosures_tieredProfile_scaledAndFeasible() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Same probe with a TIER-driven profile (the golden #6 shape): one open-ended tier from
+        // age 62 overrides the base amounts. Tier resolution + survivor scaling must compose.
+        var spending = new SpendingProfileInput(bd("999999"), bd("999999"), """
+                [{"name": "Retirement", "start_age": 62, "end_age": null,
+                  "essential_expenses": 60000, "discretionary_expenses": 20000}]
+                """);
+        var result = engine.run(input(2040, 90, mfjParams("0.75", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")), spending, List.of(), household(85, 90)));
+
+        var post = yearOf(result.yearlyData(), 2044);
+        assertThat(post.essentialExpenses()).isEqualByComparingTo(bd("45000"));
+        assertThat(post.discretionaryExpenses()).isEqualByComparingTo(bd("15000"));
+        assertThat(post.spendingSurplus()).isEqualByComparingTo(ZERO);
+        assertThat(result.spendingFeasibility().spendingFeasible()).isTrue();
+    }
+
     // === Idempotence: the transition fires exactly once, even across the SS convergence re-runs ===
 
     @Test
