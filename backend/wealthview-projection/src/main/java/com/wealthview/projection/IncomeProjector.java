@@ -5,9 +5,12 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 
 /**
@@ -36,6 +39,29 @@ final class IncomeProjector {
                                                  int retirementAge, int years,
                                                  int retirementYearOffsetFromBase,
                                                  double scenarioInflationRate) {
+        return computeDeterministic(sources, retirementAge, years, retirementYearOffsetFromBase,
+                scenarioInflationRate, 0, null);
+    }
+
+    /**
+     * Household task 8 (T7 gap): like the 5-arg overload, but when {@code household} is a real
+     * two-person household, each source's {@code start_age}/{@code end_age} window (and
+     * boundary-year 0.5 proration) is evaluated against ITS OWNER's age in the source's calendar
+     * year rather than the uniform retirement-anchored {@code age} — the MC-precompute mirror of
+     * {@code IncomeSourceProcessor}'s task-7 fix (see {@link IncomeYearMath#resolveSourceAge}). A
+     * spouse-owned source now activates/ends at the SPOUSE's own age while both are alive, matching
+     * the deterministic engine. {@code household} {@code null} (the 5-arg overload, every
+     * pre-task-8 call site) reproduces the age-uniform behavior byte-for-byte; {@code
+     * primaryBirthYear} is unused (and may be any value, including 0) in that case since {@link
+     * IncomeYearMath#resolveSourceAge} short-circuits on a {@code null} household before ever
+     * consulting the calendar year.
+     */
+    static IncomeYearData[] computeDeterministic(List<ProjectionIncomeSourceInput> sources,
+                                                 int retirementAge, int years,
+                                                 int retirementYearOffsetFromBase,
+                                                 double scenarioInflationRate,
+                                                 int primaryBirthYear,
+                                                 @Nullable HouseholdContext household) {
         IncomeYearData[] result = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
             result[y] = new IncomeYearData(0, 0);
@@ -46,11 +72,13 @@ final class IncomeProjector {
 
         for (int y = 0; y < years; y++) {
             int age = retirementAge + y;
+            int calendarYear = primaryBirthYear + age;
             int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             double totalIncome = 0;
             double taxableIncome = 0;
             for (var source : sources) {
-                if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+                int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, calendarYear);
+                if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                     continue;
                 }
                 double amount = realGrossForYear(source, yearsFromBase, scenarioInflationRate);
@@ -69,7 +97,7 @@ final class IncomeProjector {
 
                 // Apply boundary multiplier (0.5 at startAge/endAge) for recurring sources only.
                 // One-time sources pay their full amount at startAge, matching ICC and ISP.
-                if (IncomeYearMath.isBoundaryAge(source, age)) {
+                if (IncomeYearMath.isBoundaryAge(source, sourceAge)) {
                     amount *= 0.5;
                 }
                 totalIncome += amount;
@@ -96,21 +124,44 @@ final class IncomeProjector {
                                                 int retirementAge, int years,
                                                 int retirementYearOffsetFromBase,
                                                 double scenarioInflationRate) {
+        return socialSecurityBenefitByYear(sources, retirementAge, years, retirementYearOffsetFromBase,
+                scenarioInflationRate, 0, null);
+    }
+
+    /**
+     * Household task 8 (T7 gap): like the 5-arg overload, but resolves each Social Security
+     * source's activation age against its OWNER (see {@link #computeDeterministic}'s identical
+     * rework) — MUST stay in lockstep with the {@code computeDeterministic} call that built the
+     * {@code incomeData} this benefit array is subtracted from (see {@code
+     * OptimizationContextBuilder#applySocialSecurityTaxableShare}), else a spouse-owned benefit's
+     * taxable dollars get silently mis-attributed to non-SS ordinary income for the two-tier
+     * taxability formula. {@code household} {@code null} reproduces the 5-arg overload exactly.
+     */
+    static double[] socialSecurityBenefitByYear(List<ProjectionIncomeSourceInput> sources,
+                                                int retirementAge, int years,
+                                                int retirementYearOffsetFromBase,
+                                                double scenarioInflationRate,
+                                                int primaryBirthYear,
+                                                @Nullable HouseholdContext household) {
         double[] result = new double[years];
         if (sources == null || sources.isEmpty()) {
             return result;
         }
         for (int y = 0; y < years; y++) {
             int age = retirementAge + y;
+            int calendarYear = primaryBirthYear + age;
             int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
             double benefit = 0;
             for (var source : sources) {
-                if (source.incomeType() != IncomeSourceType.SOCIAL_SECURITY
-                        || !ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+                if (source.incomeType() != IncomeSourceType.SOCIAL_SECURITY) {
+                    continue;
+                }
+                int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, calendarYear);
+                if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                     continue;
                 }
                 double amount = realGrossForYear(source, yearsFromBase, scenarioInflationRate);
-                if (IncomeYearMath.isBoundaryAge(source, age)) {
+                if (IncomeYearMath.isBoundaryAge(source, sourceAge)) {
                     amount *= 0.5;
                 }
                 benefit += amount;
@@ -128,6 +179,21 @@ final class IncomeProjector {
     static double[] computeRentalAwareTaxable(double[] baseTaxableIncome,
                                               List<ProjectionIncomeSourceInput> sources,
                                               int retirementAge, int birthYear, int years) {
+        return computeRentalAwareTaxable(baseTaxableIncome, sources, retirementAge, birthYear, years, null);
+    }
+
+    /**
+     * Household task 8 (T7 gap): like the 5-arg overload, but resolves each rental source's
+     * activation age against its OWNER (see {@link #computeDeterministic}'s identical rework), so a
+     * spouse-owned rental source's passive-loss/depreciation adjustment is applied in the SAME years
+     * {@code baseTaxableIncome} (built with the owner-aware {@code computeDeterministic}) already
+     * counted its gross income in. {@code household} {@code null} reproduces the 5-arg overload
+     * exactly.
+     */
+    static double[] computeRentalAwareTaxable(double[] baseTaxableIncome,
+                                              List<ProjectionIncomeSourceInput> sources,
+                                              int retirementAge, int birthYear, int years,
+                                              @Nullable HouseholdContext household) {
         double[] result = Arrays.copyOf(baseTaxableIncome, years);
         if (sources == null || sources.isEmpty()) {
             return result;
@@ -153,7 +219,8 @@ final class IncomeProjector {
             double yearAdjustment = 0;
 
             for (var source : rentalSources) {
-                if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+                int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, calendarYear);
+                if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                     continue;
                 }
                 var rentalResult = RentalIncomeHelper.computeForSource(

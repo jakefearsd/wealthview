@@ -11,6 +11,7 @@ import com.wealthview.core.projection.CapitalMarketAssumptionsProvider.RealRetur
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -134,7 +135,7 @@ final class OptimizationContextBuilder {
         double[] adjustedFloors = SustainabilitySearch.verifyEssentialFloor(
                 portfolioPaths, incomeByYear, essentialFloor,
                 confidenceLevel, years, trialCount);
-        scaleSurvivorFloors(adjustedFloors, transitionIdx, household.survivorFactor(), years);
+        HouseholdMcResolver.scaleFromTransition(adjustedFloors, transitionIdx, household.survivorFactor(), years);
 
         // Household task 6: per-year exact tax tables are built MFJ (both-alive) before the transition
         // and SINGLE from it -- a construction-time filing-status switch, zero hot-loop cost.
@@ -222,13 +223,21 @@ final class OptimizationContextBuilder {
      * {@code y}, understating erosion whenever retirement starts after the base year). Years with
      * no Social Security benefit are returned unchanged, so the hot loop and non-SS scenarios are
      * untouched.
+     *
+     * <p>Household task 8 (T7 gap): {@code household} threads the same owner-age activation window
+     * into {@link IncomeProjector#socialSecurityBenefitByYear} that {@code incomeData} was just built
+     * with (see {@link #computeIncomePipeline}) — the two MUST agree on which years a Social Security
+     * source is active, else {@code nonSsTaxable} below silently mis-attributes a spouse-owned
+     * benefit's taxable dollars to "other" ordinary income instead of the two-tier SS formula.
      */
     private IncomeYearData[] applySocialSecurityTaxableShare(
             IncomeYearData[] incomeData, List<ProjectionIncomeSourceInput> sources,
             int retirementAge, int years, double essentialFloor, FilingStatus filingStatus,
-            double inflationRate, int retirementYearOffsetFromBase) {
+            double inflationRate, int retirementYearOffsetFromBase, int birthYear,
+            @Nullable HouseholdContext household) {
         double[] ssBenefitByYear = IncomeProjector.socialSecurityBenefitByYear(
-                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate);
+                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate,
+                birthYear, household);
         BigDecimal inflationBd = BigDecimal.valueOf(inflationRate);
         IncomeYearData[] adjusted = new IncomeYearData[years];
         for (int y = 0; y < years; y++) {
@@ -276,31 +285,39 @@ final class OptimizationContextBuilder {
             int years, int retirementYearOffsetFromBase, double essentialFloor, int retirementYear,
             double inflationRate) {
         var income = computeIncomePipeline(input.incomeSources(), filingStatus, retirementAge, years,
-                retirementYearOffsetFromBase, essentialFloor, retirementYear, input.birthYear(), inflationRate);
+                retirementYearOffsetFromBase, essentialFloor, retirementYear, input.birthYear(), inflationRate,
+                household.context());
         int transitionIdx = household.inWindowTransitionIdx();
         if (transitionIdx < 0) {
             return income;
         }
         var survivorIncome = computeIncomePipeline(household.survivorSources(), household.postStatus(),
                 retirementAge, years, retirementYearOffsetFromBase, essentialFloor, retirementYear,
-                input.birthYear(), inflationRate);
+                input.birthYear(), inflationRate, household.context());
         return spliceIncome(income, survivorIncome, transitionIdx);
     }
 
-    /** Household task 6: the full per-year income pipeline (deterministic income → audit-B2 Social
-     * Security taxable share → income/taxable/surplus arrays → rental-aware taxable) for ONE phase
-     * (a source list + filing status). Called once for the both-alive phase and, for an in-window
-     * first death, again for the survivor phase; {@link #spliceIncome} joins them. */
+    /** Household task 6 + 8: the full per-year income pipeline (deterministic income → audit-B2
+     * Social Security taxable share → income/taxable/surplus arrays → rental-aware taxable) for ONE
+     * phase (a source list + filing status). Called once for the both-alive phase and, for an
+     * in-window first death, again for the survivor phase; {@link #spliceIncome} joins them.
+     * {@code household} (task 8, T7 gap) threads the same owner-age income-window resolution the
+     * deterministic engine's {@code IncomeSourceProcessor} already applies into every {@link
+     * IncomeProjector} precompute call below, so a spouse-owned age-gated source activates at the
+     * SPOUSE's age in the MC engine too — {@code null} for a single-person run, byte-identical to the
+     * pre-task-8 uniform-age precompute. */
     private IncomePipeline computeIncomePipeline(List<ProjectionIncomeSourceInput> sources,
             FilingStatus status, int retirementAge, int years, int retirementYearOffsetFromBase,
-            double essentialFloor, int retirementYear, int birthYear, double inflationRate) {
+            double essentialFloor, int retirementYear, int birthYear, double inflationRate,
+            @Nullable HouseholdContext household) {
         IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(
-                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate);
+                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate,
+                birthYear, household);
         incomeData = applySocialSecurityTaxableShare(incomeData, sources, retirementAge, years,
-                essentialFloor, status, inflationRate, retirementYearOffsetFromBase);
+                essentialFloor, status, inflationRate, retirementYearOffsetFromBase, birthYear, household);
         var arrays = computeIncomeArrays(incomeData, years, retirementYear, status);
         double[] rentalAware = IncomeProjector.computeRentalAwareTaxable(
-                arrays.taxableIncomeByYear(), sources, retirementAge, birthYear, years);
+                arrays.taxableIncomeByYear(), sources, retirementAge, birthYear, years, household);
         return new IncomePipeline(incomeData, arrays.incomeByYear(), arrays.taxableIncomeByYear(),
                 arrays.surplusTaxByYear(), rentalAware);
     }
@@ -318,17 +335,6 @@ final class OptimizationContextBuilder {
                 spliceDoubles(pre.taxableIncomeByYear(), post.taxableIncomeByYear(), fromIdx),
                 spliceDoubles(pre.surplusTaxByYear(), post.surplusTaxByYear(), fromIdx),
                 spliceDoubles(pre.rentalAwareTaxableIncome(), post.rentalAwareTaxableIncome(), fromIdx));
-    }
-
-    /** Household task 6: scales {@code floors[y] *= factor} from {@code transitionIdx} forward.
-     * No-op when there is no in-window transition ({@code transitionIdx < 0}) or the factor is 1.0. */
-    private static void scaleSurvivorFloors(double[] floors, int transitionIdx, double factor, int years) {
-        if (transitionIdx < 0 || factor == 1.0) {
-            return;
-        }
-        for (int y = transitionIdx; y < years; y++) {
-            floors[y] *= factor;
-        }
     }
 
     /** Household task 6 + 7: per-year ordinary tax tables — the both-alive filing status before the

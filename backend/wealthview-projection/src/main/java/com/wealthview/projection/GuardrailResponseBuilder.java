@@ -44,15 +44,25 @@ final class GuardrailResponseBuilder {
                                    double[] conversionByYear,
                                    double[] conversionTaxByYear,
                                    RothConversionOptimizer.RothConversionSchedule convSchedule) {
-        // Compute corridors + corridor smoothing
+        // Household task 8 (T6 deferral): the REPORTED discretionary/recommended schedule and the
+        // corridor derived from it scale by the survivor factor from the transition year forward,
+        // finishing what T6 started on the floors alone. This is a REPORTING-only copy — the
+        // terminal simulation below (and every other trial pass in this class) keeps using the
+        // ORIGINAL, un-scaled `discretionaryByYear` the search actually optimized against, so the
+        // success/failure metrics are untouched (they were already correct: T6's floor-only success
+        // gate doesn't depend on the discretionary level). See #scaleForReporting.
+        double[] reportedDiscretionaryByYear = scaleForReporting(discretionaryByYear, ctx, ctx.sim().years());
+
+        // Compute corridors + corridor smoothing, from the SAME reported (scaled) plan so the
+        // displayed corridor brackets the displayed recommended spending post-transition too.
         double[][] corridors = SpendingCorridorCalculator.computeCorridors(
                 ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().adjustedFloors(),
-                discretionaryByYear, ctx.sim().years(), ctx.sim().trialCount());
+                reportedDiscretionaryByYear, ctx.sim().years(), ctx.sim().trialCount());
         SpendingCorridorCalculator.smoothCorridors(corridors[0], corridors[1], ctx.sim().years());
 
         // Clamp corridors to bracket recommended spending (smoothing can overshoot at phase boundaries)
         for (int y = 0; y < ctx.sim().years(); y++) {
-            double recommended = ctx.taxIncome().adjustedFloors()[y] + discretionaryByYear[y];
+            double recommended = ctx.taxIncome().adjustedFloors()[y] + reportedDiscretionaryByYear[y];
             corridors[0][y] = Math.min(corridors[0][y], recommended);
             corridors[1][y] = Math.max(corridors[1][y], recommended);
         }
@@ -128,7 +138,7 @@ final class GuardrailResponseBuilder {
                 poolSetup, conversionByYear, conversionTaxByYear, medianBalanceByYear,
                 input.maxAnnualAdjustmentRate());
 
-        var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
+        var yearlySpending = buildYearlySpending(ctx, input, reportedDiscretionaryByYear, corridors,
                 medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -207,23 +217,32 @@ final class GuardrailResponseBuilder {
                 ctx.sim().household());
     }
 
-    /** Household task 6: scales {@code floors} by the survivor spending factor from the first-death
-     * transition year forward, mirroring the pre-scaling {@link OptimizationContextBuilder} applies to
-     * the main {@code adjustedFloors}. No-op for a single-person run (no household, or the transition
-     * falls outside the modeled window) or a factor of 1.0. */
-    private static void scaleSurvivorFloors(double[] floors, OptimizationSetup ctx, int years) {
+    /** Household task 6 + 8 (dedup): extracts the transition index + survivor spending factor from
+     * {@code ctx} and scales {@code values} in place via the single shared
+     * {@link HouseholdMcResolver#scaleFromTransition}, mirroring the pre-scaling
+     * {@link OptimizationContextBuilder} applies to the main {@code adjustedFloors}. No-op for a
+     * single-person run (no household). Shared by the floor-clamp disclosure's re-scaled floor (task
+     * 6) and the reported discretionary/corridor plan (task 8, see {@link #scaleForReporting}). */
+    private static void scaleSurvivorFactor(double[] values, OptimizationSetup ctx, int years) {
         var household = ctx.sim().household();
         if (household == null) {
             return;
         }
-        int transitionIdx = household.transitionYearIndex();
-        double factor = ctx.sim().survivorSpendingFactor();
-        if (transitionIdx < 0 || transitionIdx >= years || factor == 1.0) {
-            return;
-        }
-        for (int y = transitionIdx; y < years; y++) {
-            floors[y] *= factor;
-        }
+        HouseholdMcResolver.scaleFromTransition(
+                values, household.transitionYearIndex(), ctx.sim().survivorSpendingFactor(), years);
+    }
+
+    /** Household task 8 (T6 deferral): a REPORTING-only scaled copy of {@code discretionaryByYear} —
+     * the discretionary/recommended schedule shown to the user (and the corridor derived from it)
+     * drops by the survivor spending factor from the first-death transition year forward, finishing
+     * what T6 started on the floors alone. Does NOT feed back into any terminal simulation pass in
+     * this class (every {@code trialSimulator.simulateTrial} call keeps the caller's original,
+     * un-scaled array), so the success/failure metrics — already correct per T6's floor-only success
+     * gate — are unaffected by this change; see the {@link #build} call site's javadoc. */
+    private static double[] scaleForReporting(double[] discretionaryByYear, OptimizationSetup ctx, int years) {
+        double[] reported = discretionaryByYear.clone();
+        scaleSurvivorFactor(reported, ctx, years);
+        return reported;
     }
 
     /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}
@@ -257,7 +276,7 @@ final class GuardrailResponseBuilder {
         // Household task 6: the survivor floor is scaled by the survivor spending factor from the
         // first-death transition year (mirroring the main adjustedFloors, which OptimizationContextBuilder
         // already pre-scales). No-op for single-person (factor 1.0 / no in-window transition).
-        scaleSurvivorFloors(originalFloors, ctx, years);
+        scaleSurvivorFactor(originalFloors, ctx, years);
 
         int successCount = 0;
         for (int t = 0; t < trialCount; t++) {

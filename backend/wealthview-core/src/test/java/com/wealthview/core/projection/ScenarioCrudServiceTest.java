@@ -1504,6 +1504,68 @@ class ScenarioCrudServiceTest {
         verify(guardrailProfileRepository).save(guardrailProfile);
     }
 
+    // Household task 8 (item 2): the scenarioSignature already covers every household field
+    // (T3/T6/T7) — these two tests prove it end-to-end through ScenarioCrudService.updateScenario,
+    // the same way the pre-existing allocation-edit test proves the A5 audit fix.
+
+    @Test
+    void updateScenario_spouseDeathAgeEdited_marksExistingProfileStale() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"spouse_birth_year\":1992,\"spouse_death_age\":88}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
+        guardrailProfile.setStale(false);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Same spouse_birth_year -- only spouse_death_age changes: 88 -> 90.
+        var request = scenarioRequestWithHousehold(1992, null, 90, null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isTrue();
+        verify(guardrailProfileRepository).save(guardrailProfile);
+    }
+
+    @Test
+    void updateScenario_accountOwnerEdited_marksExistingProfileStale() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{}");
+        var existingAccount = new ProjectionAccountEntity(
+                scenario, null, new BigDecimal("100000"), new BigDecimal("5000"),
+                new BigDecimal("0.07"), "taxable");
+        existingAccount.setOwner("primary");
+        scenario.addAccount(existingAccount);
+
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
+        guardrailProfile.setStale(false);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Same balance/contribution/return/type -- only the account owner changes: primary -> spouse.
+        var request = scenarioRequestWithAccountOwner("spouse", "taxable");
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        assertThat(guardrailProfile.isStale()).isTrue();
+        verify(guardrailProfileRepository).save(guardrailProfile);
+    }
+
     @Test
     void updateScenario_withGuardrailProfile_doesNotMarkStaleWhenHashUnchanged() {
         var scenario = new ProjectionScenarioEntity(
