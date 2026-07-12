@@ -112,8 +112,10 @@ import static org.mockito.Mockito.mock;
  * year {@code capitalGainsTax} non-decreasing, final balance non-increasing — realizing more
  * taxable dividend income can only raise the tax bill, which can only reduce what remains);
  * {@code include_depression_years} false -&gt; true (byte-identical {@code yearlyData} JSON). The
- * third is a STRUCTURAL no-op in this suite, not a coincidence: every fixture uses {@code
- * expectedReturn}-override accounts (never allocation-driven) and every engine instance is built
+ * third is a STRUCTURAL no-op in this suite, not a coincidence: every fixture account carries an
+ * {@code expectedReturn} OVERRIDE (returns are never allocation-derived — the audit-C1
+ * bond60/40+traditional mix's allocation drives only the taxable yield SPLIT, not its return) and
+ * every engine instance is built
  * with a {@code null} {@code CapitalMarketAssumptionsProvider} (matching every sibling engine test
  * in this module) — {@code DeterministicProjectionEngine#buildPoolStrategy} short-circuits to an
  * empty {@code geoMeans} map whenever the provider is null, so the {@code
@@ -172,13 +174,21 @@ class EngineInvariantsTest {
 
     static Stream<ScenarioCase> scenarios() {
         List<ScenarioCase> cases = new ArrayList<>();
-        for (String mix : List.of("taxable-only", "taxable+traditional", "all-three")) {
-            // T18b: birth years chosen so RMD age falls inside the horizon for BOTH
-            // traditional-containing mixes, one on each side of the SECURE 2.0 threshold
+        // "bond60/40+traditional" (audit C1): a 60/40 us_stock/bond taxable account, so every
+        // invariant -- especially the tax-reconciliation identity -- runs through the REAL engine
+        // with nonzero ordinary-interest income (the matrix's paramsJson never sets
+        // interest_yield, so the 0.04 default is live). The other three mixes are all ALL_US
+        // (interest income identically zero), which would leave the annotator's interest wiring
+        // pinned only by the mocked RetirementTaxAnnotatorTest.
+        for (String mix : List.of("taxable-only", "taxable+traditional", "all-three",
+                "bond60/40+traditional")) {
+            // T18b: birth years chosen so RMD age falls inside the horizon for the
+            // traditional-containing mixes, on both sides of the SECURE 2.0 threshold
             // (birth year 1960) -- 1955 -> RMD age 73, 1965 -> RMD age 75. taxable-only never
             // forces an RMD (no traditional balance) so its birth year is immaterial.
             int birthYear = switch (mix) {
                 case "taxable+traditional" -> 1955;
+                case "bond60/40+traditional" -> 1955;
                 case "all-three" -> 1965;
                 default -> 1965;
             };
@@ -526,6 +536,13 @@ class EngineInvariantsTest {
                     acct("300000.0000", "0", "0.0500", "taxable"),
                     acct("800000.0000", "0", "0.0600", "traditional"),
                     acct("300000.0000", "0", "0.0600", "roth"));
+            // Audit C1: same balances as taxable+traditional, but the taxable account carries a
+            // 60/40 us_stock/bond allocation (return still from the SAME 5% expectedReturn
+            // override -- allocation drives only the yield split), so ~40% * balance * 0.04 of
+            // ordinary-interest income flows through every retirement year.
+            case "bond60/40+traditional" -> List.of(
+                    bondAllocatedAcct("400000.0000", "0.0500"),
+                    acct("900000.0000", "0", "0.0600", "traditional"));
             default -> throw new IllegalArgumentException("Unknown mix: " + mix);
         };
     }
