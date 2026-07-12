@@ -390,6 +390,132 @@ class TrialSimulatorReturnTest {
         assertThat(result.finalBalance()).isEqualTo(92995.12, within(0.01));
     }
 
+    // === Audit C5 review fix: the ordinary tax BASE must stack across the year's own income
+    // events -- conversion first, then the traditional spending draw, then the forced RMD excess.
+    // Pre-fix, every pricing call stacked on the STATIC income-source base alone, so a year with a
+    // large conversion priced its traditional draw in the base's (lower) bracket. ===
+
+    /** Two real brackets, no deduction: [0, 100k) @ 10%, [100k, inf) @ 30%. */
+    private static OrdinaryTaxTable twoBracketTable() {
+        return new OrdinaryTaxTable(0,
+                new double[]{0, 100_000}, new double[]{0.10, 0.30}, new double[]{0, 10_000});
+    }
+
+    @Test
+    void simulateTrial_conversionIncomeStacksUnderWithdrawalTax_pricesDrawInUpperBracket() {
+        // base 10k + conversion 80k puts the year's ordinary income at 90k BEFORE the 30k
+        // traditional spending draw -- the draw spans 90k..120k, crossing the 100k boundary:
+        //   exact = taxAt(120k) - taxAt(90k) = 16,000 - 9,000 = 7,000.
+        // Pre-fix (RED) the draw was priced on the static base alone: taxAt(40k) - taxAt(10k) =
+        // 3,000 -- the conversion's 80k of ordinary income was invisible to the withdrawal tax.
+        // conversionTaxByYear is supplied as the EXACT table figure for the uncapped conversion
+        // (taxAt(90k) - taxAt(10k) = 8,000) so the conversion-tax repricing is a no-op here and the
+        // pin isolates the withdrawal-tax stacking bug.
+        var config = new TrialSimulator.SimulationConfig(
+                500_000.0, 200_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0},
+                new double[]{80_000.0}, new double[]{8_000.0}, 62, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                500_000.0, null, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{30_000.0}, new double[]{0.0}, 1, config);
+
+        // taxable 500k - 8k conv tax - 7k wd tax = 485k; traditional 200k - 80k conv - 30k draw
+        // = 90k; roth 80k. Final = 655,000 (pre-fix: 659,000 -- 4,000 of bracket-crossing tax
+        // vanished).
+        assertThat(result.finalBalance()).isEqualTo(655_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_fullOrdinaryStack_summedTaxEqualsTelescopedTaxAtTotalMinusTaxAtBase() {
+        // COMPOSITION IDENTITY (pins the stacking order permanently): with base income, a Roth
+        // conversion, a traditional spending draw, and a forced RMD excess ALL live in one year,
+        // the summed ordinary tax must telescope EXACTLY:
+        //   convTax + wdTax + rmdTax = taxAt(base+conv+draw+excess) - taxAt(base)
+        // because each component is priced incrementally on top of everything before it.
+        // Fixture: base 60k, conv 50k (crosses 100k mid-conversion), draw 5k (fully in 30%),
+        // excess = rmd - draw (fully in 30%). conversionTaxByYear is supplied as 0 (deliberately
+        // WRONG) to prove the engine reprices the conversion from the table rather than trusting
+        // the precomputed figure -- RED pre-fix on two counts (conversion tax missing entirely AND
+        // draw/excess priced at the base's 10% bracket).
+        var table = twoBracketTable();
+        var config = new TrialSimulator.SimulationConfig(
+                500_000.0, 200_000.0, 0.0, "traditional_first",
+                new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
+                new double[]{50_000.0}, new double[]{0.0}, 75, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
+                500_000.0, null, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{5_000.0}, new double[]{0.0}, 1, config);
+
+        // rmd basis = pre-growth traditional 200k -> rmd = 200,000 / 24.6; spending draw covers
+        // 5,000 of it, excess forced out on top of the full prior stack.
+        double rmd = 200_000.0 / 24.6;
+        double excess = rmd - 5_000.0;
+        double telescopedTax = table.taxAt(60_000.0 + 50_000.0 + 5_000.0 + excess) - table.taxAt(60_000.0);
+        // Portfolio outflows this year = the 5,000 actually spent + every ordinary tax dollar
+        // (conversion moves money internally; the RMD excess reinvests net of its own tax).
+        double initTotal = 500_000.0 + 200_000.0;
+        assertThat(initTotal - result.finalBalance())
+                .isEqualTo(5_000.0 + telescopedTax, within(1e-6));
+        // Sanity on the magnitude: the identity total is dominated by the 30%-bracket segments
+        // (conv crosses 100k; draw + excess sit entirely above it) -- the pre-fix base-anchored
+        // sum (0 conv + 500 draw + 313 excess) is nowhere near it.
+        assertThat(telescopedTax).isEqualTo(9_439.02439024, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_conversionCappedByTraditional_pricesActualAmountNotProRataTarget() {
+        // Target conversion 120k against only 60k of traditional: actualConv = 60k. Pre-fix the
+        // trial scaled the precomputed target tax pro-rata (18,000 * 60/120 = 9,000) -- a linear
+        // scaling of a CONVEX tax that overstates the capped amount's true tax. Exact:
+        // taxAt(10k + 60k) - taxAt(10k) = 7,000 - 1,000 = 6,000 (the target's 18,000 included
+        // 30%-bracket dollars the capped conversion never reaches).
+        var config = new TrialSimulator.SimulationConfig(
+                500_000.0, 60_000.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0},
+                new double[]{120_000.0}, new double[]{18_000.0}, 62, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
+                500_000.0, null, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 1, config);
+
+        // taxable 500k - 6k = 494k; traditional 0; roth 60k. Final = 554,000 (pre-fix: 551,000).
+        assertThat(result.finalBalance()).isEqualTo(554_000.0, within(1e-6));
+    }
+
+    @Test
+    void simulateTrial_rmdExcessRaisesLtcgStackingFloor_flipsGainFromZeroToFifteenPercent() {
+        // LTCG floor must include the forced RMD excess (review fix): base 40k alone leaves a 5k
+        // realized gain inside the 0% LTCG bracket (floor 40k..45k < 50k ceiling), but the year's
+        // forced RMD excess (300k/24.6 = 12,195.12) lifts the ordinary floor to 52,195.12 -- the
+        // whole gain now prices at 15% = 750. Pre-fix (RED) the floor omitted the excess -> 0.
+        // Ordinary side uses a flat 10% table (linear, so the excess's own ordinary tax is
+        // identical pre/post-fix -- the pin isolates the LTCG floor change).
+        var ltcgTable = new LtcgTaxTable(0,
+                new double[]{0, 50_000}, new double[]{50_000, Double.POSITIVE_INFINITY},
+                new double[]{0.0, 0.15}, Double.POSITIVE_INFINITY);
+        var config = new TrialSimulator.SimulationConfig(
+                100_000.0, 300_000.0, 0.0, "taxable_first",
+                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{40_000.0},
+                null, null, 75, null, 0, 0.0, false,
+                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
+                50_000.0, new LtcgTaxTable[]{ltcgTable}, 0.0);
+
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1, config);
+
+        // taxable 100k (basis 50k): 10k spending sale realizes 5k gain -> 90k. RMD excess
+        // 12,195.121951 leaves traditional (300k -> 287,804.878049); its 10% ordinary tax
+        // (1,219.512195) leaks, net 10,975.609756 reinvested -> taxable 100,975.609756. LTCG 750
+        // drains taxable -> 100,225.609756. Final = 100,225.609756 + 287,804.878049 =
+        // 388,030.487805 (pre-fix: 388,780.487805, the 750 LTCG never charged).
+        assertThat(result.finalBalance()).isEqualTo(388_030.487805, within(1e-4));
+    }
+
     // === A4 fix: tax on outside income must be a funded outflow every year, not just surplus years ===
 
     @Test

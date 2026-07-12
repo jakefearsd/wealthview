@@ -76,9 +76,10 @@ final class GuardrailResponseBuilder {
         int tradExhaustedCount = 0;
         int successCount = 0;
         for (int t = 0; t < ctx.sim().trialCount(); t++) {
-            // marginalRateByYear mirrors the search: real withdrawal tax is deducted whenever
-            // pools (traditional/roth) are in play, so reported balances match what the
-            // optimizer actually modeled. Each trial reuses the per-pool real return
+            // The exact per-year tax tables (audit C5: ordinaryTaxTableByYear plus the base
+            // ordinary-income array draws stack on) mirror the search: real withdrawal tax is
+            // deducted whenever pools (traditional/roth) are in play, so reported balances match
+            // what the optimizer actually modeled. Each trial reuses the per-pool real return
             // sequences generated for the run.
             var simConfig = new TrialSimulator.SimulationConfig(
                     initTaxable, initTraditional, initRoth, order,

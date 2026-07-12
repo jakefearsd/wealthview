@@ -136,7 +136,9 @@ final class OptimizationContextBuilder {
 
         // Capital-gains taxation inputs for the taxable pool's FIFO lots (Task 6):
         //  - initTaxableBasis seeds the initial lot's cost basis (embedded gain = balance - basis);
-        //  - ltcgRateByYear is the per-year marginal LTCG rate probed from the year's ordinary income;
+        //  - ltcgTaxTables (audit C5) are the per-year exact LTCG bracket tables, evaluated in the
+        //    hot loop at the trial's ACTUAL ordinary stacking floor (base income + that year's
+        //    conversion/draws/RMD excess) rather than a fixed probe rate;
         //  - dividendYield comes from the scenario's params_json (same field the deterministic engine
         //    reads via ScenarioParamsParser.dividendYield), falling back to the same default when unset.
         double initTaxableBasis = sumBasisByType(input.accounts(), PoolStrategy.POOL_TAXABLE);
