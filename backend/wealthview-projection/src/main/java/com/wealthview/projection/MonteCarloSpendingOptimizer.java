@@ -203,9 +203,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                // T24: the search gate honors the profile's toggle; JointConversionSearch's own
-                // conversion-fraction scoring search deliberately never sets this (see its
-                // SearchContext construction).
+                // T24: the search gate honors the profile's toggle. T26: JointConversionSearch's own
+                // conversion-fraction scoring search resolves the SAME toggle independently (see its
+                // SearchContext construction), so both stages score/gate under one objective.
                 input.gateOnAdaptiveRules(), maxAdjRate);
     }
 

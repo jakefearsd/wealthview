@@ -112,6 +112,17 @@ final class JointConversionSearch {
                 ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder(), searchOrdinaryTaxTables,
                 ctx.taxIncome().rentalAwareTaxableIncome(), ctx.taxIncome().rentalIncomeByYear());
 
+        // T26: arm scoring evaluates each candidate schedule under the SAME objective the
+        // downstream discretionary search gates on. When the profile gates on-with-rules, an
+        // arm's score must reflect the sustainable spending achievable WITH adaptation active --
+        // otherwise a schedule tuned for the no-adaptation objective can leave spending on the
+        // table once the discretionary search's gate flips to with-rules (the T24 follow-up gap).
+        // When gating no-adapt (toggle off), this resolves to (false, 0.0) -- byte-identical to
+        // pre-T26.
+        boolean gateOnAdaptiveRules = input.gateOnAdaptiveRules();
+        double maxAdjRate = input.maxAnnualAdjustmentRate() != null
+                ? input.maxAnnualAdjustmentRate().doubleValue() : 0.0;
+
         int gridSize = JOINT_GRID_SIZE;
         double bestFraction = 0.0;
         double bestSpending = 0.0;
@@ -123,7 +134,8 @@ final class JointConversionSearch {
             var schedule = convOptimizer.scheduleForFraction(fraction);
 
             double spending = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    schedule.conversionByYear(), schedule.conversionTaxByYear());
+                    schedule.conversionByYear(), schedule.conversionTaxByYear(),
+                    gateOnAdaptiveRules, maxAdjRate);
 
             if (spending > bestSpending) {
                 bestSpending = spending;
@@ -142,10 +154,10 @@ final class JointConversionSearch {
             var s2 = convOptimizer.scheduleForFraction(m2);
 
             double sp1 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    s1.conversionByYear(), s1.conversionTaxByYear());
+                    s1.conversionByYear(), s1.conversionTaxByYear(), gateOnAdaptiveRules, maxAdjRate);
 
             double sp2 = evalSearchSpending(searchPaths, ctx, searchFloors, searchTrials, searchTaxCtx,
-                    s2.conversionByYear(), s2.conversionTaxByYear());
+                    s2.conversionByYear(), s2.conversionTaxByYear(), gateOnAdaptiveRules, maxAdjRate);
 
             if (sp1 > sp2) {
                 hi = m2;
@@ -165,8 +177,8 @@ final class JointConversionSearch {
             }
         }
 
-        log.info("Joint optimization: best fraction={}, sustainable spending={}",
-                bestFraction, bestSpending);
+        log.info("Joint optimization: best fraction={}, sustainable spending={}, gateOnAdaptiveRules={}",
+                bestFraction, bestSpending, gateOnAdaptiveRules);
         return bestSchedule;
     }
 
@@ -176,13 +188,17 @@ final class JointConversionSearch {
      * fields, {@code searchFloors}, {@code searchTrials}, and {@code searchTaxCtx}) so the repeated
      * call sites in {@link #jointSearch} only vary by
      * {@code conversionByYear} / {@code conversionTaxByYear}.
+     *
+     * <p>T26: {@code gateOnAdaptiveRules} / {@code maxAnnualAdjustmentRate} are threaded straight
+     * from the profile's toggle (resolved once in {@link #jointSearch}) so every arm is scored
+     * under the SAME objective the discretionary search will ultimately gate on -- see the T26
+     * note on {@link #jointSearch}. (The pre-T26 {@code UseVarargs} suppression is gone: the
+     * trailing parameter is now a scalar, so the rule no longer fires here.)
      */
-    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
-    // argument list — varargs would change the call contract and invite accidental misuse.
-    @SuppressWarnings("PMD.UseVarargs")
     private double evalSearchSpending(PortfolioReturnPaths searchPaths, OptimizationSetup ctx,
                                       double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
-                                      double[] conversionByYear, double[] conversionTaxByYear) {
+                                      double[] conversionByYear, double[] conversionTaxByYear,
+                                      boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate) {
         var searchContext = new SustainabilitySearch.SearchContext(
                 searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
                 ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
@@ -194,12 +210,7 @@ final class JointConversionSearch {
                 ctx.sim().rmdStartAge(),
                 ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
                 ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                // T24: conversion-fraction scoring intentionally never gates on the with-rules
-                // metric, independent of the profile's toggle -- it scores tax schedules by
-                // sustainable spending, not the spending plan itself; keeping it on the cheaper
-                // no-adaptation gate bounds the toggle's perf cost to the discretionary-spending
-                // search alone.
-                false, 0.0);
+                gateOnAdaptiveRules, maxAnnualAdjustmentRate);
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

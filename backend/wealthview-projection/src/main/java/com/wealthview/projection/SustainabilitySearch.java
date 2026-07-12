@@ -42,9 +42,10 @@ final class SustainabilitySearch {
      *         positive), {@link #isSustainable} evaluates each candidate schedule WITH the audit-C9
      *         simulated guardrail-adaptation rule active (derived fresh per candidate via {@link
      *         #buildCandidateAdaptation}) and gates on ITS success rate, instead of the original
-     *         no-adaptation success rate. {@code false} (every pre-T24 caller, and
-     *         {@link JointConversionSearch}'s conversion-fraction scoring search, which deliberately
-     *         never sets this) preserves the exact original single-pass behavior.
+     *         no-adaptation success rate. {@code false} (every pre-T24 caller) preserves the exact
+     *         original single-pass behavior. T26: {@link JointConversionSearch}'s conversion-fraction
+     *         scoring search now threads this straight from the profile's toggle too, so an arm's
+     *         score reflects the SAME objective the discretionary search gates on.
      * @param maxAnnualAdjustmentRate the user's year-over-year adjustment-rate knob, resolved to a
      *         primitive {@code double} (0 when the request omitted it) -- needed here (not just on
      *         {@link TrialSimulator.GuardrailAdaptation}) because a non-positive rate makes the rule
@@ -225,8 +226,10 @@ final class SustainabilitySearch {
      * Evaluates the total sustainable first-year spending (essentialFloor + discretionary)
      * for a given conversion schedule. Used by the joint search to score candidate fractions.
      * Bisection assumes {@link #isSustainable} is monotone in the discretionary level — see the
-     * T24 soundness caveat on {@link #binarySearchDiscretionary} (only relevant under the
-     * adaptive-rules gate, which this joint-search path never enables).
+     * T24 soundness caveat on {@link #binarySearchDiscretionary} (T26: this joint-search path can
+     * now also run under the adaptive-rules gate, so the caveat applies here identically -- pinned
+     * by the same empirical evidence, see {@code GuardrailAdaptiveGateIntegrationTest}'s bisection
+     * sweep).
      */
     // UseVarargs: the trailing double[] is a per-year indexed floor array, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
