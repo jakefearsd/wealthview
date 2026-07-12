@@ -43,4 +43,13 @@ public interface ScenarioParamsSource {
     BigDecimal dividendYield();
 
     BigDecimal feeRate();
+
+    /**
+     * Audit C10: opt-in to widen the capital-market assumptions window from the default 1972-2025
+     * to the full 1928-2025 seed (adds the Depression-era tail — 1931's ~-38% real equity year —
+     * to both the Monte Carlo block bootstrap and the deterministic engine's blended real return).
+     * {@code null}/absent means "not set", resolved to {@code false} (the unchanged default window)
+     * by {@code ScenarioParamsParser.includeDepressionYears}.
+     */
+    Boolean includeDepressionYears();
 }

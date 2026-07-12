@@ -30,6 +30,12 @@ import java.util.List;
  *         own retirement-anchored year index. Resolved by {@code GuardrailProfileService} from the
  *         scenario's {@code referenceYear} (falling back to {@code LocalDate.now().getYear()}) —
  *         the same default the deterministic engine applies when unset.
+ * @param includeDepressionYears audit C10: the scenario's {@code params_json.include_depression_years}
+ *         opt-in (resolved to a primitive default of {@code false} by
+ *         {@code ScenarioParamsParser.includeDepressionYears} before this input is built). Selects
+ *         which {@code CapitalMarketAssumptionsProvider} window ({@code matrix(boolean)}) the MC
+ *         block bootstrap samples from — {@code false} (every pre-existing caller) is the
+ *         unchanged 1972-2025 window; {@code true} widens it to 1928-2025.
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -60,19 +66,22 @@ public record GuardrailOptimizationInput(
         BigDecimal dynamicSequencingBracketRate,
         BigDecimal dividendYield,
         BigDecimal feeRate,
-        int baseYear
+        int baseYear,
+        boolean includeDepressionYears
 ) {
 
     /**
-     * Back-compat convenience for callers that predate {@link #baseYear} (audit C7 / T7-M3).
-     * Defaults it to {@code retirementDate.getYear()} — "as if retirement starts today" —
-     * reproducing the OLD retirement-anchored deflation/threshold clock exactly (offset 0), so
-     * every pre-existing positional call site (tests, other optimizer builders) keeps compiling
-     * AND behaving identically. Production ({@code GuardrailProfileService}) always uses the
-     * canonical constructor with the scenario's actual resolved base year.
+     * Back-compat convenience for callers that predate {@link #baseYear} (audit C7 / T7-M3) AND
+     * {@link #includeDepressionYears} (audit C10). Defaults {@code baseYear} to
+     * {@code retirementDate.getYear()} — "as if retirement starts today", reproducing the OLD
+     * retirement-anchored deflation/threshold clock exactly (offset 0) — and
+     * {@code includeDepressionYears} to {@code false} — the unchanged default capital-market
+     * window. Every pre-existing positional call site (tests, other optimizer builders) keeps
+     * compiling AND behaving identically. Production ({@code GuardrailProfileService}) always uses
+     * the canonical constructor with both resolved values.
      */
     // ExcessiveParameterList: mirrors the record's own 28-field canonical constructor
-    // (pre-baseYear shape) so existing positional call sites keep compiling unchanged.
+    // (pre-baseYear, pre-C10 shape) so existing positional call sites keep compiling unchanged.
     @SuppressWarnings("PMD.ExcessiveParameterList")
     public GuardrailOptimizationInput(
             LocalDate retirementDate, int birthYear, int endAge, BigDecimal inflationRate,
@@ -89,6 +98,6 @@ public record GuardrailOptimizationInput(
                 maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears, cashReturnRate, filingStatus,
                 withdrawalOrder, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
-                feeRate, retirementDate.getYear());
+                feeRate, retirementDate.getYear(), false);
     }
 }

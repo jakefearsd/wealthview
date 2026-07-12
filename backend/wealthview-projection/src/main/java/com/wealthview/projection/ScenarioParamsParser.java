@@ -55,6 +55,15 @@ final class ScenarioParamsParser {
         return params.feeRate() != null ? params.feeRate() : DEFAULT_FEE_RATE;
     }
 
+    /**
+     * Resolves the audit C10 depression-era window opt-in, defaulting to {@code false} (the
+     * unchanged 1972-2025 {@link com.wealthview.core.projection.CapitalMarketAssumptionsProvider}
+     * window) when the scenario doesn't set {@code include_depression_years}.
+     */
+    boolean includeDepressionYears(ScenarioParams params) {
+        return Boolean.TRUE.equals(params.includeDepressionYears());
+    }
+
     @Nullable
     TierBasedSpendingPlan parseTierBasedPlan(@Nullable SpendingProfileInput profile) {
         if (profile == null) {

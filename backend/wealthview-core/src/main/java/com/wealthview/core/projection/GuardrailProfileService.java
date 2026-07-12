@@ -102,7 +102,7 @@ public class GuardrailProfileService {
 
             var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
                     birthYear, confidence, filingStatus, withdrawalOrder, params.dividendYield(),
-                    params.feeRate(), baseYear);
+                    params.feeRate(), baseYear, params.includeDepressionYears());
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
             var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
@@ -351,8 +351,10 @@ public class GuardrailProfileService {
      *
      * <p>Covers every realism-v2 input that changes Monte Carlo results: retirement date, end age,
      * inflation, birth year, each account's type/balance/contribution/expected-return/allocation/cost
-     * basis, the scenario's dividend yield and fee rate, and linked income sources (id + effective
-     * amount).
+     * basis, the scenario's dividend yield, fee rate, and depression-years window opt-in (audit
+     * C10 — toggling it switches the capital-market matrix window, a different Monte Carlo result
+     * for the identical seed unless the seed itself also changes), and linked income sources
+     * (id + effective amount).
      * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
      * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
      * scenario always yields the same signature regardless of collection iteration order.
@@ -369,7 +371,8 @@ public class GuardrailProfileService {
             sb.append('|').append(hashParams.birthYear());
         }
         sb.append('|').append(hashParams.dividendYield())
-                .append('|').append(hashParams.feeRate());
+                .append('|').append(hashParams.feeRate())
+                .append('|').append(Boolean.TRUE.equals(hashParams.includeDepressionYears()));
 
         scenario.getAccounts().stream()
                 .sorted(Comparator.comparing(ProjectionAccountEntity::getId,
@@ -435,7 +438,8 @@ public class GuardrailProfileService {
                                                                String withdrawalOrder,
                                                                BigDecimal dividendYield,
                                                                BigDecimal feeRate,
-                                                               int baseYear) {
+                                                               int baseYear,
+                                                               Boolean includeDepressionYears) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
@@ -477,7 +481,8 @@ public class GuardrailProfileService {
                 request.dynamicSequencingBracketRate(),
                 dividendYield,
                 feeRate,
-                baseYear
+                baseYear,
+                Boolean.TRUE.equals(includeDepressionYears)
         );
     }
 

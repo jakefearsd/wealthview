@@ -20,7 +20,7 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -47,7 +47,7 @@ class ScenarioParamsTest {
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
                 "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"),
-                new BigDecimal("0.003"));
+                new BigDecimal("0.003"), Boolean.TRUE);
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
@@ -58,7 +58,7 @@ class ScenarioParamsTest {
     void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new BigDecimal("0.021"), null);
+                null, null, null, new BigDecimal("0.021"), null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -85,7 +85,7 @@ class ScenarioParamsTest {
     void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, new BigDecimal("0.003"));
+                null, null, null, null, new BigDecimal("0.003"), null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -108,6 +108,33 @@ class ScenarioParamsTest {
         assertThat(ScenarioParams.from(request).feeRate()).isNull();
     }
 
+    @Test
+    void toJson_includeDepressionYearsPresent_writesSnakeCaseKey() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, Boolean.TRUE);
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("include_depression_years").asBoolean()).isTrue();
+    }
+
+    @Test
+    void from_includeDepressionYearsPresent_passesThrough() {
+        var request = scenarioRequestWithIncludeDepressionYears(Boolean.TRUE);
+
+        var params = ScenarioParams.from(request);
+
+        assertThat(params.includeDepressionYears()).isTrue();
+    }
+
+    @Test
+    void from_includeDepressionYearsNull_staysNullForDefault() {
+        var request = scenarioRequestWithIncludeDepressionYears(null);
+
+        assertThat(ScenarioParams.from(request).includeDepressionYears()).isNull();
+    }
+
     private ScenarioRequest scenarioRequestWith(BigDecimal dividendYield, BigDecimal feeRate) {
         return new ScenarioRequest(
                 "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
@@ -115,6 +142,15 @@ class ScenarioParamsTest {
                 null, null, null, null, null, null, null, null,
                 null, null, null,
                 dividendYield, feeRate, null, null, null, null);
+    }
+
+    private ScenarioRequest scenarioRequestWithIncludeDepressionYears(Boolean includeDepressionYears) {
+        return new ScenarioRequest(
+                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, includeDepressionYears, null, null, null, null);
     }
 
     @Test

@@ -81,15 +81,22 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
         this.contextBuilder = new OptimizationContextBuilder(taxCalculator, capitalGainsTaxCalculator);
     }
 
-    /** Resolves the capital-market matrix — a preset (tests) or the provider's cached matrix (prod). */
-    private RealReturnMatrix matrix() {
+    /**
+     * Resolves the capital-market matrix — a preset (tests) or the provider's cached matrix (prod).
+     *
+     * @param includeDepressionYears audit C10: selects the provider's window when resolving from
+     *         the production path. A test-supplied {@code presetMatrix} is returned as-is
+     *         regardless of this flag (the preset already IS the intended matrix for that test).
+     */
+    private RealReturnMatrix matrix(boolean includeDepressionYears) {
         if (presetMatrix != null) {
             return presetMatrix;
         }
         // Exactly one of presetMatrix / capitalMarketAssumptions is non-null by construction; the
         // provider path (production) requires the capital-market assumptions to be wired.
         return Objects.requireNonNull(capitalMarketAssumptions,
-                "capitalMarketAssumptions required when no preset matrix is supplied").matrix();
+                "capitalMarketAssumptions required when no preset matrix is supplied")
+                .matrix(includeDepressionYears);
     }
 
     @Timed(value = "wealthview.mc.optimize", histogram = true)
@@ -103,7 +110,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
         }
         try {
-            RealReturnMatrix matrix = matrix();
+            RealReturnMatrix matrix = matrix(input.includeDepressionYears());
             var ctx = contextBuilder.build(input, matrix);
             if (ctx.sim().years() <= 0) {
                 return emptyResult(input);

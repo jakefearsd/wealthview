@@ -61,4 +61,30 @@ class ScenarioParamsParserTest {
 
         assertThat(parser.feeRate(params)).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    // C10 (2026-07-12 audit): optional pre-1972 (Depression-era) capital-market window.
+
+    @Test
+    void includeDepressionYears_absentFromParams_defaultsToFalse() {
+        assertThat(parser.includeDepressionYears(ScenarioParams.EMPTY)).isFalse();
+    }
+
+    @Test
+    void includeDepressionYears_presentAndTrueInParsedParams_returnsTrue() {
+        var params = parser.parseParams("""
+                {"include_depression_years": true}
+                """);
+
+        assertThat(params.includeDepressionYears()).isTrue();
+        assertThat(parser.includeDepressionYears(params)).isTrue();
+    }
+
+    @Test
+    void includeDepressionYears_explicitFalse_returnsFalse() {
+        var params = parser.parseParams("""
+                {"include_depression_years": false}
+                """);
+
+        assertThat(parser.includeDepressionYears(params)).isFalse();
+    }
 }

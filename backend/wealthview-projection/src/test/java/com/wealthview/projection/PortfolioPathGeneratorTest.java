@@ -174,6 +174,89 @@ class PortfolioPathGeneratorTest {
         }
     }
 
+    // Audit C10: turning on include_depression_years widens the CapitalMarketAssumptionsProvider
+    // window (see CapitalMarketAssumptionsProviderTest), which changes nothing about
+    // PortfolioPathGenerator itself -- it just receives a matrix with more (and more extreme) rows
+    // to block-bootstrap from. These two tests pin that consequence directly at the bootstrap seam:
+    // a matrix WITHOUT the Depression-era tail can never sample worse than -36% real equity
+    // (bounded by construction), while the SAME matrix plus the real, hand-verified 1931 row (see
+    // .superpowers/sdd/audit2/t17-report.md) reliably does, at a fixed seed.
+
+    /** Ten representative post-1972-style years; worst row is -30% -- never breaches -36%. */
+    private static final RealReturnMatrix DEFAULT_WINDOW_LIKE_MATRIX = new RealReturnMatrix(
+            new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+            ORDER,
+            new double[][]{
+                    { 0.15,  0.10,  0.02,  0.005},
+                    {-0.10, -0.08,  0.06,  0.010},
+                    { 0.22,  0.18,  0.01, -0.005},
+                    {-0.30, -0.25, -0.02,  0.002},
+                    { 0.12,  0.09,  0.05,  0.006},
+                    { 0.28,  0.24,  0.00, -0.010},
+                    { 0.02, -0.03,  0.07,  0.012},
+                    {-0.05,  0.03,  0.04,  0.004},
+                    { 0.18,  0.14,  0.03,  0.003},
+                    {-0.02,  0.01,  0.06,  0.007},
+            });
+
+    /**
+     * Same ten rows plus one Depression-era row -- 1931's real us_stock return, -0.382857
+     * (Damodaran nominal -43.84% / CPI avg-of-year deflation -9.0%; see t17 report), which is
+     * exactly what {@code R__seed_asset_class_returns.sql} carries for that year.
+     */
+    private static final RealReturnMatrix EXTENDED_WINDOW_MATRIX = new RealReturnMatrix(
+            new int[]{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1931},
+            ORDER,
+            new double[][]{
+                    { 0.15,  0.10,  0.02,  0.005},
+                    {-0.10, -0.08,  0.06,  0.010},
+                    { 0.22,  0.18,  0.01, -0.005},
+                    {-0.30, -0.25, -0.02,  0.002},
+                    { 0.12,  0.09,  0.05,  0.006},
+                    { 0.28,  0.24,  0.00, -0.010},
+                    { 0.02, -0.03,  0.07,  0.012},
+                    {-0.05,  0.03,  0.04,  0.004},
+                    { 0.18,  0.14,  0.03,  0.003},
+                    {-0.02,  0.01,  0.06,  0.007},
+                    {-0.382857, -0.382857,  0.070769,  0.124286},
+            });
+
+    @Test
+    void generate_defaultWindowLikeMatrix_neverSamplesBelowMinus36Percent() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("500000", AssetAllocation.ALL_US, "taxable")),
+                0.02);
+
+        var paths = PortfolioPathGenerator.generate(500, 20, model, DEFAULT_WINDOW_LIKE_MATRIX, new Random(2026L),
+                0.0);
+
+        for (double[] trial : paths.taxableReturns()) {
+            for (double yearReturn : trial) {
+                assertThat(yearReturn).isGreaterThanOrEqualTo(-0.36);
+            }
+        }
+    }
+
+    @Test
+    void generate_extendedWindowMatrix_seededRunSamplesAYearWorseThanMinus36Percent() {
+        var model = PoolReturnModel.from(List.of(allocationAccount("500000", AssetAllocation.ALL_US, "taxable")),
+                0.02);
+
+        var paths = PortfolioPathGenerator.generate(500, 20, model, EXTENDED_WINDOW_MATRIX, new Random(2026L), 0.0);
+
+        boolean sampledDepressionTail = false;
+        for (double[] trial : paths.taxableReturns()) {
+            for (double yearReturn : trial) {
+                if (yearReturn < -0.36) {
+                    sampledDepressionTail = true;
+                    break;
+                }
+            }
+        }
+        assertThat(sampledDepressionTail)
+                .as("500 trials x 20 years should sample the added 1931-style row at least once")
+                .isTrue();
+    }
+
     @Test
     void generate_dispersedMatrix_feeRateShiftsEveryTrialYearUniformly() {
         // A seeded generator against a dispersed matrix: every trial/year in the fee-applied run

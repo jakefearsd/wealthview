@@ -249,8 +249,10 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                                               TaxCalculationStrategy taxStrategy,
                                               BigDecimal scenarioInflationRate,
                                               int baseYear) {
+        // Audit C10: geometricMeans(false) (the unchanged default) unless the scenario opts into
+        // the extended 1928-2025 Depression-era window via params_json.include_depression_years.
         Map<AssetClass, Double> geoMeans = capitalMarketAssumptions != null
-                ? capitalMarketAssumptions.geometricMeans()
+                ? capitalMarketAssumptions.geometricMeans(paramsParser.includeDepressionYears(params))
                 : Map.of();
         // Override accounts must deflate at the SAME inflation rate income/SS/spending use — the
         // scenario's own rate — not a fixed CMA constant, or a nominal-override account would compound

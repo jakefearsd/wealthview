@@ -17,9 +17,19 @@ public class CapitalMarketAssumptionsProvider {
 
     private static final AssetClass[] CLASS_ORDER = AssetClass.values();
 
+    /**
+     * Audit C10: the default (baseline) historical window floor. {@code asset_class_returns} holds
+     * 1928-2025, but every caller that doesn't opt into {@code include_depression_years} must see
+     * EXACTLY the pre-C10 1972-2025 window -- unchanged goldens, unchanged Monte Carlo tail. This
+     * is a code predicate, not a schema flag: seeding the 1928-1971 rows alone changes nothing.
+     */
+    static final int DEFAULT_MIN_YEAR = 1972;
+
     private final AssetClassReturnRepository repository;
     private final AtomicReference<RealReturnMatrix> cachedMatrix = new AtomicReference<>();
     private final AtomicReference<Map<AssetClass, Double>> cachedGeoMeans = new AtomicReference<>();
+    private final AtomicReference<RealReturnMatrix> cachedExtendedMatrix = new AtomicReference<>();
+    private final AtomicReference<Map<AssetClass, Double>> cachedExtendedGeoMeans = new AtomicReference<>();
 
     /**
      * A dense grid of historical real (inflation-adjusted) returns by year and asset class.
@@ -39,7 +49,8 @@ public class CapitalMarketAssumptionsProvider {
     }
 
     /**
-     * Returns the cached {@link RealReturnMatrix}, building it on first access.
+     * Returns the cached {@link RealReturnMatrix} for the default (1972-2025) window, building it
+     * on first access. Equivalent to {@code matrix(false)}.
      *
      * <p><strong>Read-only view — do not mutate.</strong> The returned matrix (and its
      * {@code years}/{@code classes}/{@code realReturns} arrays) is the single shared instance
@@ -48,22 +59,51 @@ public class CapitalMarketAssumptionsProvider {
      * "fix" this by adding defensive copies here, as that would defeat the cache.
      */
     public RealReturnMatrix matrix() {
-        var existing = cachedMatrix.get();
+        return matrix(false);
+    }
+
+    /**
+     * Returns the cached {@link RealReturnMatrix}, building it on first access.
+     *
+     * <p><strong>Read-only view — do not mutate.</strong> Same aliasing contract as {@link #matrix()}.
+     *
+     * @param includeDepressionYears audit C10: {@code false} (the default every existing caller
+     *         gets) restricts the matrix to the original 1972-2025 window, byte-identical to the
+     *         provider's pre-C10 behavior; {@code true} widens it to the full 1928-2025 seed,
+     *         pulling in the Depression-era tail (1931's real equity return, ~-38%) that the
+     *         default window's worst year (2008) doesn't quite reach on its own but the extended
+     *         window's minimum comes from. See {@code params_json.include_depression_years}
+     *         (scenario opt-in) — this method itself has no notion of scenarios, it's a pure
+     *         year-window switch.
+     */
+    public RealReturnMatrix matrix(boolean includeDepressionYears) {
+        var cache = includeDepressionYears ? cachedExtendedMatrix : cachedMatrix;
+        var existing = cache.get();
         if (existing != null) {
             return existing;
         }
-        var built = buildMatrix();
-        cachedMatrix.set(built);
+        var built = buildMatrix(includeDepressionYears);
+        cache.set(built);
         return built;
     }
 
+    /** Geometric means for the default (1972-2025) window. Equivalent to {@code geometricMeans(false)}. */
     public Map<AssetClass, Double> geometricMeans() {
-        var existing = cachedGeoMeans.get();
+        return geometricMeans(false);
+    }
+
+    /**
+     * Geometric means for the requested window (audit C10) — see {@link #matrix(boolean)} for the
+     * window semantics.
+     */
+    public Map<AssetClass, Double> geometricMeans(boolean includeDepressionYears) {
+        var cache = includeDepressionYears ? cachedExtendedGeoMeans : cachedGeoMeans;
+        var existing = cache.get();
         if (existing != null) {
             return existing;
         }
-        var built = geometricMeansOf(matrix());
-        cachedGeoMeans.set(built);
+        var built = geometricMeansOf(matrix(includeDepressionYears));
+        cache.set(built);
         return built;
     }
 
@@ -81,17 +121,25 @@ public class CapitalMarketAssumptionsProvider {
     void clearCache() {
         cachedMatrix.set(null);
         cachedGeoMeans.set(null);
+        cachedExtendedMatrix.set(null);
+        cachedExtendedGeoMeans.set(null);
     }
 
-    private RealReturnMatrix buildMatrix() {
+    private RealReturnMatrix buildMatrix(boolean includeDepressionYears) {
         var rows = repository.findAllByOrderByYearAscAssetClassAsc();
         if (rows.isEmpty()) {
             throw new IllegalStateException("asset_class_returns is empty; seed data missing");
         }
         var byYear = new TreeMap<Integer, Map<AssetClass, Double>>();
         for (AssetClassReturnEntity r : rows) {
+            if (!includeDepressionYears && r.getYear() < DEFAULT_MIN_YEAR) {
+                continue;
+            }
             byYear.computeIfAbsent(r.getYear(), k -> new EnumMap<>(AssetClass.class))
                     .put(AssetClass.fromKey(r.getAssetClass()), r.getRealReturn().doubleValue());
+        }
+        if (byYear.isEmpty()) {
+            throw new IllegalStateException("asset_class_returns has no rows in the requested window");
         }
         var years = new ArrayList<Integer>();
         var grid = new ArrayList<double[]>();
