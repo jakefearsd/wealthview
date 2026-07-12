@@ -4,15 +4,19 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.GuardrailSpendingInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -1047,5 +1051,84 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         BigDecimal expectedEnd = year1.startBalance().add(year1.contributions()).add(year1.growth())
                 .subtract(year1.withdrawals()).subtract(year1.taxLiability());
         assertThat(year1.endBalance()).isEqualByComparingTo(expectedEnd);
+    }
+
+    // === Household task 4: two per-owner RMD streams for an age-gap couple ===
+
+    private static ProjectionAccountInput ownedAcct(String balance, String expectedReturn,
+                                                     String type, String owner) {
+        return new HypotheticalAccountInput(bd(balance), BigDecimal.ZERO, AssetAllocation.ALL_US,
+                Optional.of(bd(expectedReturn)), bd(balance), type, owner);
+    }
+
+    @Test
+    void run_ageGapHousehold_onlyPrimaryAtRmdAge_forcesOnlyPrimaryStream() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Primary born 1958 -> age 73 in 2031 (SECURE-2.0 start age 73, born < 1960). Spouse born
+        // 1966 -> age 65 in 2031 and start age 75 (born >= 1960), so the spouse's IRA does NOT RMD.
+        int referenceYear = 2031;
+        int primaryBirthYear = 1958;
+        int spouseBirthYear = 1966;
+        var household = HouseholdContext.of(primaryBirthYear, 95, spouseBirthYear, 95, primaryBirthYear + 95);
+
+        List<ProjectionAccountInput> accounts = List.of(
+                ownedAcct("1000000.0000", "0.0000", "traditional", "primary"),
+                ownedAcct("500000.0000", "0.0000", "traditional", "spouse"),
+                ownedAcct("500000.0000", "0.0000", "taxable", "joint"));
+
+        var input = new ProjectionInput(UUID.randomUUID(), "Age gap only-primary",
+                LocalDate.of(2020, 1, 1), 95, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single",
+                 "withdrawal_order": "taxable_first", "fee_rate": 0}
+                """.formatted(primaryBirthYear),
+                accounts, null, referenceYear, List.of(), null, List.of(), household);
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(73);
+        // Only the primary's stream fires: 1,000,000 / distributionPeriod(73)=26.5 = 37,735.8491
+        // (NOT the whole 1.5M pool -- that is exactly the age-gap correctness this feature adds).
+        assertThat(year1.rmdAmount()).isEqualByComparingTo(bd("37735.8491"));
+        // Total traditional (primary 1M + spouse 500K) drops by the primary RMD alone; the spouse
+        // pool is untouched.
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("1462264.1509"));
+    }
+
+    @Test
+    void run_ageGapHousehold_bothPastRmdAge_forcesBothStreams_dtoShowsSum() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Primary born 1958 -> age 83 in 2041; spouse born 1966 -> age 75 in 2041 (its own start age),
+        // so BOTH streams fire in the first projection year off their own prior balances.
+        int referenceYear = 2041;
+        int primaryBirthYear = 1958;
+        int spouseBirthYear = 1966;
+        var household = HouseholdContext.of(primaryBirthYear, 105, spouseBirthYear, 105, primaryBirthYear + 105);
+
+        List<ProjectionAccountInput> accounts = List.of(
+                ownedAcct("1000000.0000", "0.0000", "traditional", "primary"),
+                ownedAcct("500000.0000", "0.0000", "traditional", "spouse"),
+                ownedAcct("500000.0000", "0.0000", "taxable", "joint"));
+
+        var input = new ProjectionInput(UUID.randomUUID(), "Age gap both streams",
+                LocalDate.of(2020, 1, 1), 105, BigDecimal.ZERO,
+                """
+                {"birth_year": %d, "withdrawal_rate": 0.01, "filing_status": "single",
+                 "withdrawal_order": "taxable_first", "fee_rate": 0}
+                """.formatted(primaryBirthYear),
+                accounts, null, referenceYear, List.of(), null, List.of(), household);
+
+        var year1 = engineTax.run(input).yearlyData().getFirst();
+
+        assertThat(year1.age()).isEqualTo(83);
+        // Primary: 1,000,000 / distributionPeriod(83)=17.7 = 56,497.1751.
+        // Spouse:    500,000 / distributionPeriod(75)=24.6 = 20,325.2033.
+        // The DTO's rmd_amount is the SUM of the two streams.
+        assertThat(year1.rmdAmount()).isEqualByComparingTo(bd("76822.3784"));
+        assertThat(year1.traditionalBalance()).isEqualByComparingTo(bd("1423177.6216"));
     }
 }

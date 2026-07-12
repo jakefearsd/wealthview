@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +24,7 @@ import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingPlan;
+import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -322,30 +322,28 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
             contributions = pool.applyContributions();
         }
 
-        // Snapshot BEFORE applyGrowth(): the RMD for this year is computed off the prior year-end
-        // traditional balance (IRS Pub. 590-B), not this year's growth.
-        BigDecimal priorYearEndTraditional = pool.getTraditional();
+        // Snapshot BEFORE applyGrowth(): each owner's RMD is computed off THAT owner's prior year-end
+        // traditional balance (IRS Pub. 590-B), not this year's growth. Household task 4: per-owner
+        // snapshots so an age-gap couple runs one independent RMD stream per spouse.
+        Map<PersonId, BigDecimal> priorTraditionalByOwner = pool.getTraditionalByOwner();
         // Audit C8: `retired` (already resolved above) gates the taxable pool's yield-distribution
         // split -- see PoolStrategy.MultiPool#applyGrowth(boolean)'s javadoc.
         var growthResult = pool.applyGrowth(retired);
         BigDecimal totalGrowth = growthResult.total();
 
-        // T18a-2: RMDs are gated on AGE alone, not `retired` -- IRS rules require a traditional
-        // (IRA-type) account owner to take RMDs starting at the SECURE-2.0 age regardless of
-        // whether they are still working. This model's generic 'traditional' account type has no
-        // employer-plan "still working" exception (that exception applies only to a 401(k)-style
-        // employer plan at the CURRENT employer, which this projection does not distinguish from
-        // an IRA) -- so the closer real-world analogue is an IRA, where RMDs never wait for
-        // retirement. A working-past-RMD-age owner therefore now takes (and pays tax on) their RMD
-        // exactly like a retired one; see YearFinanceResolver#computeIncomeConversionWithdrawal for
-        // how that tax is charged without also running the retirement spend-draw machinery.
-        BigDecimal rmdAmount = BigDecimal.ZERO;
-        if (age >= RmdCalculator.rmdStartAge(ctx.birthYear())) {
-            double divisor = RmdCalculator.distributionPeriod(age);
-            if (divisor > 0) {
-                rmdAmount = priorYearEndTraditional.divide(BigDecimal.valueOf(divisor), 4, RoundingMode.HALF_UP);
-            }
-        }
+        // T18a-2 + household task 4: RMDs are gated on AGE alone, not `retired` -- IRS rules require a
+        // traditional (IRA-type) account owner to take RMDs starting at the SECURE-2.0 age regardless
+        // of whether they are still working. One stream per owner, each keyed to that owner's own
+        // birth-year start age and prior-year balance, so the spouse's IRA no longer wrongly RMDs at
+        // the primary's age. The physical force-out happens HERE, right after growth and before the
+        // Social Security convergence snapshot inside YearFinanceResolver#resolve (IRS ordering: the
+        // RMD is distributed before any Roth conversion). rmdAmount is the summed REQUESTED figure
+        // (the DTO's rmd_amount); rmdForced is the summed amount actually distributed (capped per
+        // owner at that owner's balance), threaded into the resolver for tax attribution.
+        var rmdStreams = RmdStreamCalculator.computeAndForce(
+                ctx.input().household(), ctx.birthYear(), year, priorTraditionalByOwner, pool);
+        BigDecimal rmdAmount = rmdStreams.requested();
+        BigDecimal rmdForced = rmdStreams.forced();
 
         // Wave-4 IRMAA: this year's Medicare premium surcharge, keyed on MAGI from TWO CALENDAR
         // YEARS PRIOR (the statutory lookback -- see YearAccumulator's javadoc for how the window
@@ -367,7 +365,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         var comp = yearFinanceResolver.resolve(new YearFinanceResolver.YearContext(
                 pool, ctx.incomeSources(), ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
                 ctx.inflationRate(), year, age, retired, yearsInRetirement, startBalance,
-                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdAmount, irmaaSurcharge));
+                ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdForced, irmaaSurcharge));
 
         BigDecimal suspendedLoss = comp.suspendedLoss();
         BigDecimal conversionAmount = comp.conversionAmount();

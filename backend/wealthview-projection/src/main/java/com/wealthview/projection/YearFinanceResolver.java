@@ -77,7 +77,7 @@ final class YearFinanceResolver {
             int baseYear,
             BigDecimal previousWithdrawal,
             BigDecimal suspendedLoss,
-            BigDecimal rmdAmount,
+            BigDecimal rmdForced,
             BigDecimal irmaaSurcharge) {
     }
 
@@ -119,12 +119,14 @@ final class YearFinanceResolver {
 
     YearComputation resolve(YearContext yc) {
         var pool = yc.pool();
-        // T18a-1: IRS ordering -- the year's RMD must be distributed BEFORE any Roth conversion.
-        // Force it out of traditional now, before conversion/withdrawal run and before the
-        // Social Security convergence snapshot below, so every convergence pass restores to a
-        // pool state that already reflects the distribution (the physical RMD is a one-time
-        // event, not itself part of the circular SS fixed point).
-        BigDecimal rmdForced = pool.forceRmd(yc.rmdAmount());
+        // T18a-1 + household task 4: IRS ordering -- the year's RMD must be distributed BEFORE any
+        // Roth conversion. The physical force-out (one stream per owner) has ALREADY happened in
+        // DeterministicProjectionEngine#computeAndForceRmdStreams, right after growth and before this
+        // method's Social Security convergence snapshot below, so every convergence pass restores to
+        // a pool state that already reflects the distribution (the physical RMD is a one-time event,
+        // not itself part of the circular SS fixed point). yc.rmdForced() is the summed amount
+        // actually distributed across the streams.
+        BigDecimal rmdForced = yc.rmdForced();
 
         boolean converge = hasActiveSocialSecurity(yc.incomeSources(), yc.age());
         PoolStrategy.Memento snapshot = converge ? pool.snapshot() : null;

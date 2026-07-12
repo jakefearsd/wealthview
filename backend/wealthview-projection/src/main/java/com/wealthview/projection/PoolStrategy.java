@@ -12,6 +12,7 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
+import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.CombinedTaxResult;
@@ -42,6 +43,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
     /** The traditional (pre-tax) pool balance; zero for strategies with no traditional/Roth split. */
     BigDecimal getTraditional();
+
+    /**
+     * Household task 4: the traditional (pre-tax) pool balance broken out per owner, so the engine
+     * can drive one RMD stream per owner from each owner's own prior-year-end balance. Single-person
+     * scenarios return a one-entry map keyed {@link PersonId#PRIMARY} (the byte-identical anchor:
+     * {@link #getTraditional()} == this map's only value). The returned map is a detached copy —
+     * mutating it does not affect the pool.
+     */
+    Map<PersonId, BigDecimal> getTraditionalByOwner();
 
     BigDecimal getWeightedReturn();
 
@@ -200,6 +210,16 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * returning zero.
      */
     BigDecimal forceRmd(BigDecimal rmdAmount);
+
+    /**
+     * Household task 4: force this year's RMD out of ONE owner's traditional pool (into a fresh
+     * at-cost taxable lot), capped at that owner's balance. Identical mechanics to
+     * {@link #forceRmd(BigDecimal)} but scoped to a single owner's pool — the engine calls it once
+     * per owner whose age has reached that owner's own SECURE-2.0 RMD start age, so an age-gap couple
+     * runs two independent streams (the correctness this feature exists for). A {@code null} or
+     * non-positive amount, or an owner absent from the traditional pool, is a no-op returning zero.
+     */
+    BigDecimal forceRmd(PersonId owner, BigDecimal rmdAmount);
 
     void floorAtZero();
 
@@ -552,8 +572,18 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         /** IRC 72(t) -- 10% additional tax on early (pre-59½) traditional-account distributions,
          * a statutory constant (T18a-4). */
         private static final BigDecimal EARLY_WITHDRAWAL_PENALTY_RATE = new BigDecimal("0.10");
-        private BigDecimal traditional;
-        private BigDecimal roth;
+        /**
+         * Household task 4: the traditional and Roth pools are now owner-keyed ({@link OwnerPool} over
+         * {@link PersonId}) so an age-gap couple can run one RMD stream per owner and contributions
+         * can route to the owning spouse's pool. Every public accessor and the tax cascade still
+         * operate on the SUM across owners ({@link OwnerPool#total()}); a single-person scenario has
+         * exactly one entry ({@link PersonId#PRIMARY}) so all arithmetic reduces to the pre-household
+         * scalar path bit-for-bit. Within-type draws (spend draw, tax cascade) split proportionally by
+         * owner balance — see {@link OwnerPool#debitProportional}. The joint taxable pool stays a
+         * single {@link TaxableLotsBd} (joint accounts are taxable-only).
+         */
+        private final OwnerPool traditional;
+        private final OwnerPool roth;
         private Optional<CombinedTaxResult> lastTaxBreakdown = Optional.empty();
         /**
          * The current year's qualified-dividend income (value × dividend yield), booked in
@@ -576,8 +606,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          */
         private BigDecimal ordinaryInterestIncome = BigDecimal.ZERO;
 
-        private final BigDecimal tradContrib;
-        private final BigDecimal rothContrib;
+        private final OwnerPool tradContrib;
+        private final OwnerPool rothContrib;
         private final BigDecimal taxableContrib;
         private final BigDecimal taxableReturn;
         private final BigDecimal traditionalReturn;
@@ -640,11 +670,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // Audit C1: the taxable pool's own allocation-derived equity share, computed once from
             // the same account list the lots above were seeded from.
             this.taxableEquityShare = taxableEquityShare(taxableAccounts);
-            this.traditional = sumBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
-            this.roth = sumBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
+            this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
+            this.roth = OwnerPool.ofBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
 
-            this.tradContrib = sumContribs(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
-            this.rothContrib = sumContribs(grouped.getOrDefault(POOL_ROTH, List.of()));
+            this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
+            this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_ROTH, List.of()));
             this.taxableContrib = sumContribs(grouped.getOrDefault(POOL_TAXABLE, List.of()));
 
             this.taxableReturn = taxableReturn;
@@ -668,12 +698,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.federalTaxCalculator = config.federalTaxCalculator();
         }
 
-        private static BigDecimal sumBalances(List<ProjectionAccountInput> accounts) {
-            return accounts.stream()
-                    .map(ProjectionAccountInput::initialBalance)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-        }
-
         private static BigDecimal sumContribs(List<ProjectionAccountInput> accounts) {
             return accounts.stream()
                     .map(ProjectionAccountInput::annualContribution)
@@ -682,12 +706,17 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         @Override
         public BigDecimal getTotal() {
-            return lots.totalValue().add(traditional).add(roth);
+            return lots.totalValue().add(traditional.total()).add(roth.total());
         }
 
         @Override
         public BigDecimal getTraditional() {
-            return traditional;
+            return traditional.total();
+        }
+
+        @Override
+        public Map<PersonId, BigDecimal> getTraditionalByOwner() {
+            return traditional.byOwner();
         }
 
         /**
@@ -706,16 +735,19 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         @Override
         public BigDecimal applyContributions() {
-            traditional = traditional.add(tradContrib);
-            roth = roth.add(rothContrib);
+            // Household task 4: contributions route to the owner configured on each account (the
+            // tradContrib/rothContrib schedules are keyed the same way traditional/roth are), so a
+            // spouse-owned account grows the spouse's pool only.
+            traditional.creditAll(tradContrib);
+            roth.creditAll(rothContrib);
             lots.addLot(taxableContrib);   // new contributions enter at cost (basis = value)
-            return tradContrib.add(rothContrib).add(taxableContrib);
+            return tradContrib.total().add(rothContrib.total()).add(taxableContrib);
         }
 
         @Override
         public GrowthResult applyGrowth(boolean retired) {
-            BigDecimal tradGrowth = traditional.multiply(traditionalReturn).setScale(SCALE, ROUNDING);
-            BigDecimal rothGrowth = roth.multiply(rothReturn).setScale(SCALE, ROUNDING);
+            BigDecimal tradGrowth = traditional.grow(traditionalReturn);
+            BigDecimal rothGrowth = roth.grow(rothReturn);
 
             BigDecimal taxableBefore = lots.totalValue();
             BigDecimal taxableGrowth = taxableBefore.multiply(taxableReturn).setScale(SCALE, ROUNDING);
@@ -746,8 +778,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 ordinaryInterestIncome = BigDecimal.ZERO;
             }
 
-            traditional = traditional.add(tradGrowth);
-            roth = roth.add(rothGrowth);
+            // OwnerPool.grow (above) already credited each owner's traditional/Roth slice with its
+            // rounded growth; tradGrowth/rothGrowth are the summed totals for the GrowthResult.
             return new GrowthResult(tradGrowth.add(rothGrowth).add(taxableGrowth),
                     taxableGrowth, tradGrowth, rothGrowth);
         }
@@ -826,7 +858,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                         withdrawalContext);
 
                 WithdrawalOrderStrategy.Result allocation =
-                        strategy.execute(totalNeed, lots.totalValue(), traditional, roth);
+                        strategy.execute(totalNeed, lots.totalValue(), traditional.total(), roth.total());
                 if (allocation != null) {
                     fromTaxable = allocation.fromTaxable();
                     fromTraditional = allocation.fromTraditional();
@@ -835,9 +867,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
 
             // Selling the taxable draw FIFO realizes a long-term capital gain (oldest lots first).
+            // The traditional/Roth spend draws split proportionally by owner balance (task 4).
             BigDecimal realizedGain = lots.sellFifo(fromTaxable);
-            traditional = traditional.subtract(fromTraditional);
-            roth = roth.subtract(fromRoth);
+            traditional.debitProportional(fromTraditional);
+            roth.debitProportional(fromRoth);
 
             // T18a-1: the RMD was already forced out of traditional (into a fresh taxable lot) by
             // a prior forceRmd() call -- BEFORE this method ran, and before any Roth conversion
@@ -896,7 +929,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // byte-identical to pre-C2 behavior.
             var grossUp = growTraditionalGrossUp(taxableIncome, year, effectiveOtherIncome, conversionAmount,
                     alreadyChargedBaseTax, realizedLtcgIncome, federallyTaxedSocialSecurity, ltcgTax,
-                    extraPoolFundedTax, ordinaryTax, lots.totalValue(), traditional);
+                    extraPoolFundedTax, ordinaryTax, lots.totalValue(), traditional.total());
             BigDecimal totalWithdrawalTax = grossUp.tax();
             // The converged gross-up draw is itself a traditional distribution: fold it into the
             // reported ordinary income so it (a) feeds the audit-B2 Social Security provisional-
@@ -1145,14 +1178,17 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * ordinary interest, and the last tax breakdown. Restoring returns the pool to its exact
          * post-growth, pre-withdrawal state.
          */
-        record MultiPoolMemento(List<BigDecimal[]> lots, BigDecimal traditional,
-                                BigDecimal roth, BigDecimal qualifiedDividendIncome,
+        record MultiPoolMemento(List<BigDecimal[]> lots, Map<PersonId, BigDecimal> traditional,
+                                Map<PersonId, BigDecimal> roth, BigDecimal qualifiedDividendIncome,
                                 BigDecimal ordinaryInterestIncome,
                                 Optional<CombinedTaxResult> lastTaxBreakdown) implements Memento {}
 
         @Override
         public Memento snapshot() {
-            return new MultiPoolMemento(lots.snapshot(), traditional, roth,
+            // Household task 4: the memento captures the FULL owner-keyed state (both pools' complete
+            // maps, deep-copied so the SS-convergence loop can restore the same starting state
+            // repeatedly). BigDecimal is immutable, so copying the map is enough.
+            return new MultiPoolMemento(lots.snapshot(), traditional.snapshot(), roth.snapshot(),
                     qualifiedDividendIncome, ordinaryInterestIncome, lastTaxBreakdown);
         }
 
@@ -1160,8 +1196,8 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         public void restore(Memento memento) {
             if (memento instanceof MultiPoolMemento m) {
                 lots.restore(m.lots());
-                this.traditional = m.traditional();
-                this.roth = m.roth();
+                this.traditional.restore(m.traditional());
+                this.roth.restore(m.roth());
                 this.qualifiedDividendIncome = m.qualifiedDividendIncome();
                 this.ordinaryInterestIncome = m.ordinaryInterestIncome();
                 this.lastTaxBreakdown = m.lastTaxBreakdown();
@@ -1236,7 +1272,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             }
 
             if (effectiveLimit.compareTo(BigDecimal.ZERO) <= 0
-                    || traditional.compareTo(BigDecimal.ZERO) <= 0) {
+                    || traditional.total().signum() <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
             return executeConversionWithAmount(effectiveLimit, year, effectiveOtherIncome,
@@ -1250,7 +1286,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // overrideAmount is an explicit, optimizer-scheduled dollar figure -- like the pre-existing
             // bracket-headroom check it bypasses, it does not respect RMD-consumed headroom either.
             if (overrideAmount.compareTo(BigDecimal.ZERO) <= 0
-                    || traditional.compareTo(BigDecimal.ZERO) <= 0) {
+                    || traditional.total().signum() <= 0) {
                 return new ConversionResult(BigDecimal.ZERO, BigDecimal.ZERO, TaxSourceResult.ZERO);
             }
             return executeConversionWithAmount(overrideAmount, year, effectiveOtherIncome,
@@ -1269,9 +1305,15 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         private ConversionResult executeConversionWithAmount(BigDecimal conversionLimit, int year,
                                                                BigDecimal effectiveOtherIncome,
                                                                BigDecimal federallyTaxedSocialSecurity) {
-            BigDecimal actual = conversionLimit.min(traditional);
-            traditional = traditional.subtract(actual);
-            roth = roth.add(actual);
+            // Household task 4: draw the conversion from traditional split proportionally by owner,
+            // and credit each owner's OWN Roth with what came from that owner's traditional (a Roth
+            // conversion stays within one person's accounts) — conservation-preserving and
+            // byte-identical for a single owner.
+            BigDecimal actual = conversionLimit.min(traditional.total());
+            var converted = traditional.debitProportional(actual);
+            for (var entry : converted.entrySet()) {
+                roth.credit(entry.getKey(), entry.getValue());
+            }
 
             if (taxCalculator != null) {
                 BigDecimal taxableIncome = actual.add(effectiveOtherIncome);
@@ -1290,9 +1332,21 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             if (rmdAmount == null || rmdAmount.compareTo(BigDecimal.ZERO) <= 0) {
                 return BigDecimal.ZERO;
             }
-            BigDecimal forced = rmdAmount.min(traditional).max(BigDecimal.ZERO);
+            BigDecimal forced = rmdAmount.min(traditional.total()).max(BigDecimal.ZERO);
             if (forced.compareTo(BigDecimal.ZERO) > 0) {
-                traditional = traditional.subtract(forced);
+                traditional.debitProportional(forced);
+                lots.addLot(forced);
+            }
+            return forced;
+        }
+
+        @Override
+        public BigDecimal forceRmd(PersonId owner, BigDecimal rmdAmount) {
+            if (rmdAmount == null || rmdAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal forced = traditional.forceOwner(owner, rmdAmount);
+            if (forced.compareTo(BigDecimal.ZERO) > 0) {
                 lots.addLot(forced);
             }
             return forced;
@@ -1301,9 +1355,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         @Override
         public void floorAtZero() {
             // The taxable lots can never go negative (sellFifo caps every draw at the current total);
-            // only the scalar traditional/roth pools can be driven below zero by the tax cascade.
-            traditional = traditional.max(BigDecimal.ZERO);
-            roth = roth.max(BigDecimal.ZERO);
+            // only the traditional/Roth pools can be driven below zero by the tax cascade. Each owner's
+            // slice is floored independently (task 4).
+            traditional.floorAtZero();
+            roth.floorAtZero();
         }
 
         @Override
@@ -1323,7 +1378,7 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                     ctx.withdrawals(), ctx.retired(),
                     ctx.conversionAmount(), ctx.taxLiability(), ctx.growthResult(),
                     ctx.withdrawalFromTaxable(), ctx.withdrawalFromTraditional(), ctx.withdrawalFromRoth(),
-                    ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional, roth,
+                    ctx.combinedTaxSource(), getTotal(), lots.totalValue(), traditional.total(), roth.total(),
                     ctx.rmdAmount(), ctx.ltcgTax(), ctx.earlyWithdrawalPenalty());
 
             // The breakdown is consumed once per year, then cleared so the next year starts fresh.
@@ -1381,11 +1436,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             lots.sellFifo(fromTax);
             remaining = remaining.subtract(fromTax);
 
-            BigDecimal fromTrad = remaining.min(traditional);
-            traditional = traditional.subtract(fromTrad);
+            // Traditional and Roth slices of the bill split proportionally by owner balance (task 4);
+            // the Roth catch-all can drive an owner negative, which floorAtZero later clears.
+            BigDecimal fromTrad = remaining.min(traditional.total());
+            traditional.debitProportional(fromTrad);
             remaining = remaining.subtract(fromTrad);
 
-            roth = roth.subtract(remaining);
+            roth.debitProportional(remaining);
             return new TaxSourceResult(fromTax, fromTrad, remaining);
         }
     }
