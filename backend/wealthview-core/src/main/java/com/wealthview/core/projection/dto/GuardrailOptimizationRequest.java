@@ -45,10 +45,10 @@ public record GuardrailOptimizationRequest(
 
     /**
      * Back-compat convenience for callers that predate the T24 {@link #gateOnAdaptiveRules} toggle.
-     * Defaults it to {@code null} (treated as {@code false} downstream by
-     * {@code GuardrailProfileService.buildOptimizationInput}) so every existing positional call site
-     * (controller tests, service tests) keeps compiling and behaving identically -- the sustainability
-     * search's gate stays on the no-adaptation metric, exactly as before this toggle existed.
+     * Defaults it to {@code null} — "not specified". Since V077 (default-to-on, user decision),
+     * {@code GuardrailProfileService.buildOptimizationInput} resolves an unspecified toggle to
+     * {@code true} (gate on the with-rules metric); an EXPLICIT {@code false} is fully honored and
+     * remains the conservative, byte-identical-to-pre-T24 no-adaptation-gate anchor.
      */
     // ExcessiveParameterList: mirrors the record's own 21-field canonical constructor (pre-T24
     // shape) so existing positional call sites keep compiling unchanged.

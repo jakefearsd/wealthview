@@ -491,7 +491,13 @@ public class GuardrailProfileService {
                 baseYear,
                 Boolean.TRUE.equals(includeDepressionYears),
                 interestYield,
-                Boolean.TRUE.equals(request.gateOnAdaptiveRules())
+                // T24 default-to-on (user decision, V077): an absent/null gate_on_adaptive_rules
+                // resolves TRUE -- new optimizations gate on the with-rules metric by default.
+                // Explicit false is fully honored: it is the conservative anchor and the
+                // byte-identical-to-pre-T24 no-adaptation-gate path. reoptimize() always passes
+                // the profile's STORED flag explicitly, so pre-V077 profiles keep gating on
+                // false until re-optimized with a fresh request that opts in (or omits the flag).
+                request.gateOnAdaptiveRules() == null || request.gateOnAdaptiveRules()
         );
     }
 

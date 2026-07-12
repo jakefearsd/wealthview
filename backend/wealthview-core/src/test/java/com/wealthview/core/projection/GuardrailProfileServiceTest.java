@@ -670,18 +670,43 @@ class GuardrailProfileServiceTest {
 
     // ---- T24: gate_on_adaptive_rules plumbing ----
 
+    // Deliberate re-baseline (V077, user decision): an OMITTED toggle now resolves TRUE -- new
+    // optimizations gate on the with-rules metric by default. The pre-V077 pin asserted false here.
     @Test
-    void optimize_gateOnAdaptiveRulesOmitted_defaultsToFalseOnInput() {
+    void optimize_gateOnAdaptiveRulesOmitted_defaultsToTrueOnInput() {
         var input = captureOptimizationInput(buildRequest(req -> req.withGateOnAdaptiveRules(null)));
 
-        assertThat(input.gateOnAdaptiveRules()).isFalse();
+        assertThat(input.gateOnAdaptiveRules()).isTrue();
     }
 
+    // Anchor pin (unchanged by V077): explicit false is fully honored -- the conservative,
+    // byte-identical-to-pre-T24 no-adaptation-gate path.
     @Test
     void optimize_gateOnAdaptiveRulesFalseExplicitly_staysFalseOnInput() {
         var input = captureOptimizationInput(buildRequest(req -> req.withGateOnAdaptiveRules(false)));
 
         assertThat(input.gateOnAdaptiveRules()).isFalse();
+    }
+
+    // V077 default path end-to-end at the service layer: omitted toggle + positive adjustment rate
+    // => the persisted entity carries true and the response reports gated_on == with_rules.
+    @Test
+    void optimize_gateOnAdaptiveRulesOmittedWithPositiveRate_responseGatedOnWithRules() {
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(projectionInputBuilder.build(scenario, tenantId)).thenReturn(simpleProjectionInput());
+        when(guardrailRepository.findByScenario_Id(scenarioId)).thenReturn(Optional.empty());
+        when(spendingOptimizer.optimize(any(GuardrailOptimizationInput.class)))
+                .thenReturn(baseOptimizerResponse());
+        var savedCaptor = ArgumentCaptor.forClass(GuardrailSpendingProfileEntity.class);
+        when(guardrailRepository.save(savedCaptor.capture())).thenAnswer(inv -> inv.getArgument(0));
+
+        var request = buildRequest(req -> req.withGateOnAdaptiveRules(null)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10")));
+        var result = service.optimize(tenantId, scenarioId, request);
+
+        assertThat(savedCaptor.getValue().isGateOnAdaptiveRules()).isTrue();
+        assertThat(result.gatedOn()).isEqualTo(GuardrailProfileResponse.GATED_ON_WITH_RULES);
     }
 
     @Test

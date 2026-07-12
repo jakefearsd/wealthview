@@ -46,7 +46,11 @@ import java.util.List;
  *         positive), {@code SustainabilitySearch}'s candidate evaluation runs each candidate
  *         discretionary schedule WITH the audit-C9 simulated guardrail-adaptation rule active and
  *         gates on ITS success rate, instead of the no-adaptation success rate every prior caller
- *         used. Default {@code false} preserves the original no-adaptation gate exactly.
+ *         used. The back-compat constructor default here is {@code false} — the byte-identical
+ *         pre-T24 no-adaptation gate — but since V077 (default-to-on, user decision) production
+ *         requests that OMIT the flag resolve to {@code true} at the service boundary
+ *         ({@code GuardrailProfileService.buildOptimizationInput}); explicit {@code false} stays
+ *         fully honored as the conservative anchor.
  *         {@link #maxAnnualAdjustmentRate} not being positive makes the rule a no-op (it cannot move
  *         spending), so the search silently falls back to the no-adaptation gate in that case too.
  *         Does not affect {@link GuardrailProfileResponse#successProbability}/
