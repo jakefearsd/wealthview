@@ -140,6 +140,17 @@ Effort M.
 
 ## D. Tier-3 catalog (minor / edge / data updates)
 
+- *(added 2026-07-13, post-C8)* **Working-past-RMD-age taxable yield escapes taxation.** C8 gates the
+  taxable yield split on `retired`; T18a-2 makes RMDs age-gated. Their intersection: a still-working
+  owner past RMD age has the RMD forced and taxed, but the same year's taxable-pool dividends/interest
+  go untaxed (pre-C8 they were taxed only as an accidental side effect of the unconditional split).
+  Exposure ≈ taxableBalance × yield × marginal rate (~$2k/yr at $500k/2%/20%), requires retirement age
+  configured past RMD age + traditional balance + taxable yield. A correct fix must change BOTH the
+  split gate and `YearFinanceResolver`'s consuming branch in lockstep AND settle a design question
+  (the model deliberately taxes nothing else during accumulation — selective yield taxation for this
+  age band is a new carve-out, not a restoration). Deferred as its own item; do not conflate with the
+  already-fixed "RMDs gated on retired" entry below.
+
 - **2025 tax-parameter staleness (OBBBA):** standard deduction seeded $15,000/$30,000 vs post-OBBBA
   $15,750/$31,500 (persists forever as the constant-real value); SALT cap $10k vs $40k through
   2029 (`CombinedTaxCalculator.java:11`). Conservative direction; S.
