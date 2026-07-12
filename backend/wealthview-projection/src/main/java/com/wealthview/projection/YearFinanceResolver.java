@@ -110,11 +110,18 @@ final class YearFinanceResolver {
 
     YearComputation resolve(YearContext yc) {
         var pool = yc.pool();
+        // T18a-1: IRS ordering -- the year's RMD must be distributed BEFORE any Roth conversion.
+        // Force it out of traditional now, before conversion/withdrawal run and before the
+        // Social Security convergence snapshot below, so every convergence pass restores to a
+        // pool state that already reflects the distribution (the physical RMD is a one-time
+        // event, not itself part of the circular SS fixed point).
+        BigDecimal rmdForced = pool.forceRmd(yc.rmdAmount());
+
         boolean converge = hasActiveSocialSecurity(yc.incomeSources(), yc.age());
         PoolStrategy.Memento snapshot = converge ? pool.snapshot() : null;
 
         BigDecimal additionalProvisional = BigDecimal.ZERO;
-        var comp = computeIncomeConversionWithdrawal(yc, additionalProvisional);
+        var comp = computeIncomeConversionWithdrawal(yc, additionalProvisional, rmdForced);
 
         if (converge) {
             int iterations = 1;
@@ -124,7 +131,7 @@ final class YearFinanceResolver {
                 iterations++;
                 additionalProvisional = comp.realizedPortfolioTaxable();
                 pool.restore(snapshot);
-                comp = computeIncomeConversionWithdrawal(yc, additionalProvisional);
+                comp = computeIncomeConversionWithdrawal(yc, additionalProvisional, rmdForced);
             }
         }
         return comp;
@@ -141,9 +148,10 @@ final class YearFinanceResolver {
     }
 
     private YearComputation computeIncomeConversionWithdrawal(YearContext yc,
-                                                             BigDecimal additionalProvisionalIncome) {
+                                                             BigDecimal additionalProvisionalIncome,
+                                                             BigDecimal rmdForced) {
         var pool = yc.pool();
-        var incomeResult = processIncomeAndConversions(yc, additionalProvisionalIncome);
+        var incomeResult = processIncomeAndConversions(yc, additionalProvisionalIncome, rmdForced);
         BigDecimal suspendedLoss = incomeResult.suspendedLoss();
         BigDecimal conversionAmount = incomeResult.conversionAmount();
         BigDecimal taxLiability = incomeResult.taxLiability();
@@ -162,7 +170,7 @@ final class YearFinanceResolver {
                     pool, yc.strategy(), yc.spendingPlan(), yc.age(), yc.yearsInRetirement(), yc.year(),
                     yc.inflationRate(), incomeResult.totalActiveIncome(), yc.startBalance(),
                     previousWithdrawal, incomeResult.effectiveOtherIncome(), conversionAmount,
-                    incomeResult.isResult(), yc.taxStrategy(), yc.rmdAmount(), yc.irmaaSurcharge());
+                    incomeResult.isResult(), yc.taxStrategy(), rmdForced, yc.irmaaSurcharge());
             var retirementResult = retirementWithdrawalProcessor.process(rwCtx);
             withdrawals = retirementResult.withdrawals();
             taxLiability = taxLiability.add(retirementResult.taxLiability());
@@ -208,7 +216,8 @@ final class YearFinanceResolver {
     }
 
     private IncomeAndConversionResult processIncomeAndConversions(YearContext yc,
-                                                                 BigDecimal additionalProvisionalIncome) {
+                                                                 BigDecimal additionalProvisionalIncome,
+                                                                 BigDecimal rmdForced) {
         var pool = yc.pool();
         int age = yc.age();
         int yearsInRetirement = yc.yearsInRetirement();
@@ -250,16 +259,19 @@ final class YearFinanceResolver {
         BigDecimal ssTaxable = incomeSourceResult != null
                 ? incomeSourceResult.socialSecurityTaxable() : BigDecimal.ZERO;
 
+        // T18a-1: rmdForced (not yc.rmdAmount()) — the RMD has ALREADY been forced out of
+        // traditional (see YearFinanceResolver#resolve) by the time conversion runs; the bracket-
+        // headroom subtraction below uses the amount actually realized, not the pre-force estimate.
         PoolStrategy.ConversionResult conversion;
         if (conversionOverride != null && conversionOverride.compareTo(BigDecimal.ZERO) > 0) {
             conversion = pool.executeRothConversionOverride(
-                    year, effectiveOtherIncome, conversionOverride, yc.rmdAmount(), ssTaxable);
+                    year, effectiveOtherIncome, conversionOverride, rmdForced, ssTaxable);
         } else if (conversionOverride != null) {
             // Override is present but zero → no conversion this year
             conversion = new PoolStrategy.ConversionResult(
                     BigDecimal.ZERO, BigDecimal.ZERO, PoolStrategy.TaxSourceResult.ZERO);
         } else {
-            conversion = pool.executeRothConversion(year, effectiveOtherIncome, yc.rmdAmount(), ssTaxable);
+            conversion = pool.executeRothConversion(year, effectiveOtherIncome, rmdForced, ssTaxable);
         }
 
         return new IncomeAndConversionResult(incomeSourceResult, totalActiveIncome, effectiveOtherIncome,

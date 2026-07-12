@@ -86,6 +86,11 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      * and counts toward RMD satisfaction. See {@code PoolStrategy.MultiPool#growTraditionalGrossUp}
      * for the fixed-point search.
      *
+     * @param rmdAmount (T18a-1) the amount of this year's RMD ALREADY forced out of traditional by
+     *     a prior {@link #forceRmd} call — this method itself no longer forces anything out of the
+     *     pool for RMD purposes. It is folded straight into the year's traditional-sourced ordinary
+     *     income for tax attribution, exactly like the spend draw's own traditional portion. Zero
+     *     when no RMD applies this year.
      * @param alreadyChargedBaseTax the dollar amount of ordinary tax on {@code (effectiveOtherIncome
      *     + conversionAmount)} that {@link RetirementWithdrawalProcessor}'s spending-plan surplus
      *     branch has ALREADY charged this year (whether funded from surplus cash or left for
@@ -161,6 +166,18 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                                                             BigDecimal federallyTaxedSocialSecurity) {
         return executeRothConversion(year, effectiveOtherIncome, rmdAmount, federallyTaxedSocialSecurity);
     }
+
+    /**
+     * T18a-1: IRS ordering — the year's RMD must be distributed BEFORE any Roth conversion.
+     * Physically forces {@code min(rmdAmount, traditional)} out of the traditional pool into a
+     * fresh at-cost taxable lot (a real, unconditional distribution — the retiree "has the cash"
+     * once it happens), independent of whatever a later spend-draw withdrawal decides to do.
+     * Callers thread the RETURNED (possibly capped) amount into {@link #executeWithdrawals}'s
+     * {@code rmdAmount} parameter, which after this call represents the amount ALREADY forced —
+     * see that method's javadoc. A {@code null} or non-positive {@code rmdAmount} is a no-op
+     * returning zero.
+     */
+    BigDecimal forceRmd(BigDecimal rmdAmount);
 
     void floorAtZero();
 
@@ -636,18 +653,13 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             traditional = traditional.subtract(fromTraditional);
             roth = roth.subtract(fromRoth);
 
-            // If the RMD exceeds what the spend draw already pulled from traditional, force the
-            // excess out physically: it's a real, legally-required distribution even when the
-            // retiree doesn't need the cash. The gross excess is reinvested to taxable (a fresh
-            // at-cost lot), and the tax on the full distribution flows through the deductFromPools
-            // cascade below, which draws from taxable first -- i.e. from the RMD proceeds just added.
-            BigDecimal rmdExtra = BigDecimal.ZERO;
-            if (rmdAmount != null && rmdAmount.compareTo(fromTraditional) > 0) {
-                rmdExtra = rmdAmount.subtract(fromTraditional).min(traditional).max(BigDecimal.ZERO);
-                traditional = traditional.subtract(rmdExtra);
-                lots.addLot(rmdExtra);
-            }
-            BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdExtra);
+            // T18a-1: the RMD was already forced out of traditional (into a fresh taxable lot) by
+            // a prior forceRmd() call -- BEFORE this method ran, and before any Roth conversion
+            // (IRS ordering). rmdAmount here is that already-forced figure; fold it straight into
+            // this year's traditional-sourced ordinary income alongside the spend draw's own
+            // traditional portion -- no further pool mutation for RMD purposes happens here.
+            BigDecimal rmdForced = rmdAmount != null ? rmdAmount.max(BigDecimal.ZERO) : BigDecimal.ZERO;
+            BigDecimal traditionalOrdinaryIncome = fromTraditional.add(rmdForced);
 
             // Realized LTCG + qualified-dividend INCOME, floored at zero (a net realized loss's
             // small AGI offset is out of scope for this model). Computed BEFORE the ordinary-tax
@@ -1048,6 +1060,19 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 return new ConversionResult(actual, tax, taxSource);
             }
             return new ConversionResult(actual, BigDecimal.ZERO, TaxSourceResult.ZERO);
+        }
+
+        @Override
+        public BigDecimal forceRmd(BigDecimal rmdAmount) {
+            if (rmdAmount == null || rmdAmount.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+            BigDecimal forced = rmdAmount.min(traditional).max(BigDecimal.ZERO);
+            if (forced.compareTo(BigDecimal.ZERO) > 0) {
+                traditional = traditional.subtract(forced);
+                lots.addLot(forced);
+            }
+            return forced;
         }
 
         @Override

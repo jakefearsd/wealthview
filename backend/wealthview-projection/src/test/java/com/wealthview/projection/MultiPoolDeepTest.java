@@ -232,29 +232,71 @@ class MultiPoolDeepTest {
         assertThat(r.totalWithdrawn()).isEqualByComparingTo(ZERO);
     }
 
-    // ---- RMD forcing ----
+    // ---- RMD forcing (T18a-1: RMD forced via a separate forceRmd() call BEFORE
+    // executeWithdrawals runs -- IRS ordering, the year's RMD must be distributed before any
+    // Roth conversion) ----
+
+    @Test
+    void forceRmd_capsAtTraditionalBalance_movesGrossAmountToTaxableLot() {
+        var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TAXABLE_FIRST);
+
+        var forced = pool.forceRmd(bd("20000"));
+
+        assertThat(forced).isEqualByComparingTo(bd("20000"));
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("480000"));
+        assertThat(pool.getTotal()).isEqualByComparingTo(bd("600000")); // unchanged: RMD stays in-portfolio
+    }
+
+    @Test
+    void forceRmd_exceedsTraditionalBalance_capsAtWhateverRemains() {
+        var pool = poolWithRealTax("0", "5000", "0", WithdrawalOrder.TAXABLE_FIRST);
+
+        var forced = pool.forceRmd(bd("20000"));
+
+        assertThat(forced).isEqualByComparingTo(bd("5000"));
+        assertThat(pool.getTraditional()).isEqualByComparingTo(ZERO);
+    }
+
+    @Test
+    void forceRmd_nullOrNonPositiveAmount_isNoOp() {
+        var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TAXABLE_FIRST);
+
+        assertThat(pool.forceRmd(null)).isEqualByComparingTo(ZERO);
+        assertThat(pool.forceRmd(ZERO)).isEqualByComparingTo(ZERO);
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("500000"));
+    }
 
     @Test
     void executeWithdrawals_rmdExceedsSpendDraw_forcesExtraFromTraditionalIntoTaxable() {
         var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TAXABLE_FIRST);
 
-        // Spend draw is small and taxable-first, so it comes entirely from taxable → fromTraditional ~= 0.
-        // The RMD (20000) must still be forced out of traditional and reinvested (gross) to taxable.
-        var result = pool.executeWithdrawals(bd("10000"), 2025, ZERO, ZERO, bd("20000"), 75);
-
+        // T18a-1: the RMD (20000) is forced out of traditional via forceRmd() BEFORE the spend
+        // draw runs; the (possibly capped) forced amount is then passed into executeWithdrawals
+        // for tax attribution -- this method no longer mutates the pool for RMD purposes itself.
+        var forced = pool.forceRmd(bd("20000"));
         assertThat(pool.getTraditional()).isEqualByComparingTo(bd("480000"));
-        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("20000"));
+
+        // Spend draw is small and taxable-first, so it comes entirely from taxable.
+        var result = pool.executeWithdrawals(bd("10000"), 2025, ZERO, ZERO, forced, 75);
+
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("480000")); // unchanged by the spend draw
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("20000")); // forced RMD, reported as ordinary income
         assertThat(result.taxLiability()).isGreaterThan(ZERO);
     }
 
     @Test
-    void executeWithdrawals_spendDrawExceedsRmd_noForcedExtra() {
+    void executeWithdrawals_spendDrawExceedsRmd_rmdForcedSeparatelyPlusAdditionalSpendDraw() {
         var pool = poolWithRealTax("100000", "500000", "0", WithdrawalOrder.TRADITIONAL_FIRST);
 
-        // Traditional-first spend draw (60000) already exceeds the RMD (20000) → no extra forced.
-        var result = pool.executeWithdrawals(bd("60000"), 2025, ZERO, ZERO, bd("20000"), 75);
+        // T18a-1: the RMD (20000) is forced out FIRST, unconditionally -- traditional-first spend
+        // draw (60000) then pulls SEPARATELY/ADDITIONALLY from the (already RMD-reduced)
+        // traditional pool, rather than partially "satisfying" the RMD the way the old post-hoc
+        // force-out did. Reported traditional-sourced ordinary income is therefore the SUM
+        // (80000), not just the larger of the two.
+        var forced = pool.forceRmd(bd("20000"));
+        var result = pool.executeWithdrawals(bd("60000"), 2025, ZERO, ZERO, forced, 75);
 
-        assertThat(result.fromTraditional()).isGreaterThanOrEqualTo(bd("20000"));
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("80000"));
     }
 
     @Test
@@ -724,65 +766,63 @@ class MultiPoolDeepTest {
     }
 
     @Test
-    void executeWithdrawals_taxableDepletedTaxDrainsTraditional_grossesUpToFixedPoint() {
-        // C2: taxable starts at $0, but the RMD force-out below reinvests its $100 excess to taxable
-        // BEFORE the tax cascade runs (a real, pre-existing mechanic -- see PoolStrategy's rmdExtra
-        // handling), so taxableAvail at gross-up time is $100, not $0. Above that, every extra dollar
-        // of tax bill must be paid from traditional -- and that draw is itself ordinary income, which
-        // raises the bill again, which raises the draw again. An "independent closed-form oracle"
-        // derives the TRUE fixed point directly against the flat 10% strategy (not MultiPool's
-        // private machinery): slice solves s = 0.10*(8,100+s) - 100 => 0.9s = 710 =>
-        // s* = 710/0.9 = 788.88888889 (scale-8 HALF_UP, matching the warm-start jump's division),
-        // bill* = 0.10*(8,100+788.88888889) = 888.888888889. The T10-review warm start lands on this
-        // exactly: bill0=810, implied1=710, chord m=(881-810)/710=0.10, jump=710/0.90 -- a flat rate
-        // has no bracket crossing, so the jump IS the fixed point.
+    void executeWithdrawals_rmdForcedFirst_rmdCashFundsTaxWithNoGrossUp() {
+        // T18a-1: because the RMD (8,100) is forced out of traditional BEFORE this call runs
+        // (its after-tax-free gross proceeds already sit in taxable as $8,100 cash), the
+        // withdrawal tax bill on this year's traditional-sourced income (spend draw 8,000 + RMD
+        // 8,100 = 16,100 @ 10% = 1,610) is comfortably absorbed by that taxable cash alone -- NO
+        // audit-C2 gross-up is needed. Pre-T18a-1, only a $100 RMD "excess" reached taxable
+        // BEFORE the tax cascade ran (see the fixed-point test below), forcing a small gross-up;
+        // RMD-first ordering makes the FULL RMD's cash available up front, eliminating it here.
+        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
+        var forced = pool.forceRmd(bd("8100"));
+
+        var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, forced, AGE_RETIRED,
+                ZERO, ZERO, ZERO);
+
+        assertThat(result.taxLiability()).isEqualByComparingTo(bd("1610")); // 10% of (8,000 spend + 8,100 rmd)
+        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("16100")); // no gross-up added
+        // Traditional debited by forceRmd (8,100) + the spend draw (8,000) only -- the tax is paid
+        // entirely from the RMD's own taxable cash, so traditional isn't touched again.
+        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("83900"));
+    }
+
+    @Test
+    void executeWithdrawals_rmdForcedFirstThenGrossUp_convergesToSameFixedPointAsPreT18a1() {
+        // T18a-1 + C2 interaction: even with the RMD forced out FIRST (via a separate forceRmd()
+        // call, not this method), the audit-C2 gross-up machinery inside executeWithdrawals is
+        // unchanged -- it still converges to the TRUE fixed point once the post-RMD-force,
+        // post-spend-draw taxable cash can't cover the whole bill. A small RMD (100, forced
+        // first) plus an $8,000 traditional spend draw (pulled from the ALREADY-reduced
+        // traditional pool) reproduces the EXACT SAME numbers as the pre-T18a-1 fixed-point pin,
+        // because taxable ends up holding the same $100 either way: an "independent closed-form
+        // oracle" derives the TRUE fixed point directly against the flat 10% strategy: slice
+        // solves s = 0.10*(8,100+s) - 100 => 0.9s = 710 => s* = 710/0.9 = 788.88888889
+        // (scale-8 HALF_UP, matching the warm-start jump's division), bill* =
+        // 0.10*(8,100+788.88888889) = 888.888888889.
         BigDecimal slice = bd("710").divide(bd("0.9"), 8, java.math.RoundingMode.HALF_UP);
         BigDecimal bill = bd("8100").add(slice).multiply(bd("0.10"));
         assertThat(slice).isEqualByComparingTo(bd("788.88888889"));
         assertThat(bill).isEqualByComparingTo(bd("888.888888889"));
 
         var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
+        var forced = pool.forceRmd(bd("100"));
+        assertThat(forced).isEqualByComparingTo(bd("100"));
 
-        var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, bd("8100"), AGE_RETIRED,
+        var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, forced, AGE_RETIRED,
                 ZERO, ZERO, ZERO);
 
         // taxLiability matches the oracle's true fixed point exactly (flat rate => warm jump exact).
         assertThat(result.taxLiability()).isEqualByComparingTo(bill);
         // Reported ordinary income (feeds the audit-B2 SS convergence loop and RetirementTaxAnnotator)
-        // = base + the converged gross-up slice.
+        // = (forced RMD + spend draw) + the converged gross-up slice.
         assertThat(result.fromTraditional()).isEqualByComparingTo(bd("8100").add(slice));
-        // Traditional is debited by the spend draw (8,000) + forced RMD excess (100) + the ACTUAL
-        // cascade drain funding the converged bill (taxable's $100 reinvested-RMD lot covers the
-        // first $100, the rest -- 888.8889-100=788.8889 -- comes from traditional).
+        // Traditional is debited by forceRmd (100) + the spend draw (8,000) + the ACTUAL cascade
+        // drain funding the converged bill (taxable's $100 reinvested-RMD lot covers the first
+        // $100, the rest -- 888.8889-100=788.8889 -- comes from traditional).
         BigDecimal actualTraditionalTaxDrain = bill.subtract(bd("100"));
         assertThat(pool.getTraditional()).isEqualByComparingTo(
-                bd("100000").subtract(bd("8000")).subtract(bd("100")).subtract(actualTraditionalTaxDrain));
-    }
-
-    @Test
-    void executeWithdrawals_rmdYearGrossUpDraw_countsTowardRmdSatisfactionWithoutDoubleForceOut() {
-        // C2 + RMD interaction: the RMD force-out (rmdExtra) is computed ONCE, before any gross-up,
-        // from the spend draw alone -- it must never be recomputed once the gross-up draw is folded
-        // into ordinary income (that would force MORE than the legally-required RMD out a second
-        // time). This scenario forces a small RMD excess (100) on top of an $8,000 traditional spend
-        // draw with taxable at $0 -- same numbers as the fixed-point test above, so the reported
-        // ordinary income (8,888.8889) comfortably exceeds the RMD (8,100) by exactly the converged
-        // gross-up (788.8889 = 710/0.9, the true fixed point), never by more -- proof no second
-        // force-out occurred.
-        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
-
-        var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, bd("8100"), AGE_RETIRED,
-                ZERO, ZERO, ZERO);
-
-        assertThat(result.fromTraditional()).isEqualByComparingTo(bd("8888.88888889"));
-        // RMD (8,100) satisfied: reported traditional ordinary income exceeds it...
-        assertThat(result.fromTraditional()).isGreaterThan(bd("8100"));
-        // ...by precisely the converged gross-up, not some larger, double-forced amount.
-        assertThat(result.fromTraditional().subtract(bd("8100"))).isEqualByComparingTo(bd("788.88888889"));
-        // Total traditional debit = 8,000 (spend) + 100 (RMD excess) + 888.888888889 (actual tax
-        // cascade: $100 from the reinvested-RMD taxable lot, the rest traditional) -- matches
-        // getTraditional(), confirming no extra/unexplained draw snuck in via a second force-out.
-        assertThat(pool.getTraditional()).isEqualByComparingTo(bd("91111.111111111"));
+                bd("100000").subtract(bd("100")).subtract(bd("8000")).subtract(actualTraditionalTaxDrain));
     }
 
     // === T10 review: gross-up residual vs the TRUE fixed point must be < $1 ===

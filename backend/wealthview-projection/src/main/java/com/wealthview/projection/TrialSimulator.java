@@ -196,22 +196,30 @@ final class TrialSimulator {
 
             // This year's exact ordinary tax table (audit C5) and the base ordinary income the
             // year's income events stack on -- replaces the old flat $50k-chord marginal rate.
-            // STACKING ORDER (C5 review fix): the year's ordinary income accumulates through the
-            // loop body in execution order -- base income, then the Roth conversion, then the
-            // traditional spending draw, then the forced RMD excess -- and every pricing call
-            // stacks its own amount on top of everything realized BEFORE it, so the year's summed
-            // ordinary tax telescopes to exactly taxAt(base+conv+draw+excess) - taxAt(base)
-            // (pinned by TrialSimulatorReturnTest's composition-identity test). `table` is null
-            // when hasPools is false (no tax modeling this trial), which naturally makes every
-            // pricing and gross-up call a no-op.
+            // STACKING ORDER (T18a-1 review fix): the year's ordinary income accumulates through
+            // the loop body in execution order -- base income, then the forced RMD (IRS ordering:
+            // the year's RMD must be distributed BEFORE any Roth conversion), then the conversion,
+            // then the traditional spending draw -- and every pricing call stacks its own amount
+            // on top of everything realized BEFORE it, so the year's summed ordinary tax telescopes
+            // to exactly taxAt(base+rmd+conv+draw) - taxAt(base) (pinned by
+            // TrialSimulatorReturnTest's composition-identity test). `table` is null when hasPools
+            // is false (no tax modeling this trial), which naturally makes every pricing and
+            // gross-up call a no-op.
             OrdinaryTaxTable table = hasPools ? config.ordinaryTaxTableByYear()[y] : null;
             double base = hasPools ? config.ordinaryBaseIncomeByYear()[y] : 0.0;
 
-            // Roth conversion execution -- the FIRST ordinary income stacked on the year's base.
+            // T18a-1: force the RMD out of traditional FIRST -- before any Roth conversion --
+            // mirroring the deterministic engine's PoolStrategy#forceRmd. The FULL rmd is
+            // force-distributed unconditionally, independent of what the spending draw later
+            // decides (replaces the old end-of-year forceRmdExcess, which only forced the amount
+            // beyond whatever the spend draw happened to already pull from traditional).
+            double rmdForced = forceRmdFirst(pools, lots, rmd, table, base);
+
+            // Roth conversion execution -- stacks on base + the forced RMD (T18a-1).
             // actualConv is the traditional-balance-CAPPED amount actually converted (0 when no
-            // conversion runs); every later ordinary pricing call stacks on it.
+            // conversion runs); every later ordinary pricing call stacks on it too.
             double actualConv = applyTrialConversion(pools, lots, config.conversionByYear(),
-                    config.conversionTaxByYear(), y, age, table, base);
+                    config.conversionTaxByYear(), y, age, table, base + rmdForced);
 
             // Audit C9: with-rules pass adapts the year's total spending toward the displayed
             // corridor from the trial's own portfolio state (cutting discretionary in down markets,
@@ -249,14 +257,13 @@ final class TrialSimulator {
                     dsCeiling, income[y], dsConvAmt, rmd);
 
             // EXACT incremental tax on the traditional withdrawal (audit C5): the draw stacks on
-            // base + this year's ACTUAL conversion income -- taxAt(base + actualConv + draw) -
-            // taxAt(base + actualConv) -- correctly pricing any bracket crossing within the draw
-            // AND the bracket position the conversion already pushed the year into (C5 review fix:
-            // pre-fix the conversion's income was invisible here, pricing the draw in the base's
-            // own, lower bracket).
+            // base + the forced RMD + this year's ACTUAL conversion income (T18a-1 order) --
+            // taxAt(base + rmd + actualConv + draw) - taxAt(base + rmd + actualConv) -- correctly
+            // pricing any bracket crossing within the draw AND the bracket position the RMD/
+            // conversion already pushed the year into.
             double withdrawalTax = 0;
             if (hasPools && drawn.traditional() > 0) {
-                withdrawalTax = table.incrementalTax(base + actualConv, drawn.traditional());
+                withdrawalTax = table.incrementalTax(base + rmdForced + actualConv, drawn.traditional());
             }
 
             // Withdraw from pools + handle cash reserve. The taxable spending sale realizes a FIFO
@@ -269,28 +276,8 @@ final class TrialSimulator {
             double[] traditionalDrawnOut = {0.0};
             cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, traditionalDrawnOut,
                     cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
-                    config.cashReserveYears(), portfolioReturn, table, base + actualConv);
+                    config.cashReserveYears(), portfolioReturn, table, base + rmdForced + actualConv);
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
-
-            // If the RMD exceeds what the spend withdrawal ACTUALLY drew from traditional this
-            // year (traditionalDrawnOut[0] -- not the raw pool-split target drawn.traditional(),
-            // since a cash-reserve down year may have funded spending from cash instead, leaving
-            // traditional untouched), force the excess out physically -- it's a real,
-            // legally-required distribution even when the retiree doesn't need the cash. The
-            // after-tax remainder is reinvested to taxable; the excess's own tax is priced EXACTLY
-            // on top of the full prior ordinary stack (base + conversion + spending draw), C5
-            // review fix -- this REPLACES the earlier single-point-rate approximation. (Still not
-            // routed through the C2 gross-up: the tax leaks directly, it is not a
-            // deductTaxFromPools drain.)
-            // ORDERING NOTE (pre-existing; T10 review): this reads pools[1] AFTER the withdrawal-tax
-            // drain inside applyTrialWithdrawals above -- which, post-C2, removes MORE from
-            // traditional than before (the gross-up enlarges the drain). In the near-depletion edge
-            // where that drain leaves pools[1] below the remaining RMD excess, the `extra =
-            // min(excess, pools[1])` cap inside forceRmdExcess under-forces the RMD. Pre-existing
-            // behavior, merely enlarged by C2; reordering the RMD force-out ahead of the tax drain
-            // is follow-up-ticket material, not a silent behavior change to make here.
-            double rmdExcess = forceRmdExcess(pools, lots, rmd, traditionalDrawnOut[0], table,
-                    base + actualConv + traditionalDrawnOut[0]);
 
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
@@ -300,9 +287,10 @@ final class TrialSimulator {
                 essentialFloorMet = false;
             }
 
-            // Full ordinary stack realized this year -- the point every remaining tax bill's
-            // funding draw (and the LTCG bracket floor) stacks on.
-            double ordinaryStack = base + actualConv + traditionalDrawnOut[0] + rmdExcess;
+            // Full ordinary stack realized this year, in T18a-1's rmd -> conversion -> spending
+            // draw order -- the point every remaining tax bill's funding draw (and the LTCG
+            // bracket floor) stacks on.
+            double ordinaryStack = base + rmdForced + actualConv + traditionalDrawnOut[0];
 
             settleBaseIncomeTaxAndSurplus(pools, lots, grossSurplus, fundedFromSurplus, unfundedBaseTax,
                     table, ordinaryStack);
@@ -591,33 +579,31 @@ final class TrialSimulator {
     }
 
     /**
-     * Forces the RMD excess out of the traditional pool when the spend withdrawal didn't already
-     * draw enough to satisfy it: it's a real, legally-required distribution even when the retiree
-     * doesn't need the cash for spending. The after-tax remainder is reinvested to taxable; the
-     * tax on the forced distribution leaves the portfolio entirely (it is not itself reinvested).
+     * T18a-1: forces this year's RMD out of the traditional pool FIRST -- before any Roth
+     * conversion or spending withdrawal (IRS ordering: the year's RMD must be distributed before
+     * any conversion) -- mirroring the deterministic engine's {@code PoolStrategy#forceRmd}.
+     * Replaces the old end-of-year {@code forceRmdExcess}, which forced only the amount beyond
+     * whatever the spend draw happened to already pull from traditional; under RMD-first ordering
+     * the FULL rmd is force-distributed unconditionally, independent of any later withdrawal
+     * decision. The after-tax remainder is reinvested to taxable; the tax on the forced
+     * distribution leaves the portfolio entirely (it is not itself reinvested, and is not routed
+     * through the C2 gross-up cascade -- the same direct-leak design the old
+     * {@code forceRmdExcess} used).
      *
-     * <p>Audit C5 review fix: the excess's tax is priced EXACTLY as the next increment of the
-     * year's ordinary stack -- {@code table.incrementalTax(stackedBase, extra)} where
-     * {@code stackedBase} = base income + actual conversion + the traditional spending draw --
-     * replacing the earlier single-point-rate approximation ({@code extra * rateAt(base)}), which
-     * both missed bracket crossings within the excess and ignored the same-year income beneath it.
-     * A {@code null} table (no tax modeling) leaves the forced distribution untaxed, matching the
-     * old {@code marginalRate = 0} behavior.
-     *
-     * @return the forced excess actually distributed (0 when none), so the caller can include it
-     *         in the year's ordinary stack for the remaining tax bills (LTCG floor, gross-ups)
+     * @return the forced amount actually distributed (0 when {@code rmd <= 0} or traditional is
+     *         already exhausted) -- the FIRST ordinary-income stack this trial-year realizes;
+     *         every later pricing call (conversion, spending draw, their gross-ups) stacks on top
+     *         of it.
      */
-    private static double forceRmdExcess(double[] pools, TaxableLots lots, double rmd,
-                                          double traditionalDrawnForSpending,
-                                          OrdinaryTaxTable table, double stackedBase) {
+    private static double forceRmdFirst(double[] pools, TaxableLots lots, double rmd,
+                                         OrdinaryTaxTable table, double base) {
         if (rmd <= 0) {
             return 0;
         }
-        double extra = Math.max(0, rmd - traditionalDrawnForSpending);
-        extra = Math.min(extra, pools[1]);
+        double extra = Math.min(rmd, pools[1]);
         if (extra > 0) {
             pools[1] -= extra;
-            double taxExtra = table != null ? table.incrementalTax(stackedBase, extra) : 0;
+            double taxExtra = table != null ? table.incrementalTax(base, extra) : 0;
             double reinvested = extra - taxExtra;
             pools[0] += reinvested;
             lots.addLot(reinvested);   // after-tax RMD reinvested to taxable at cost

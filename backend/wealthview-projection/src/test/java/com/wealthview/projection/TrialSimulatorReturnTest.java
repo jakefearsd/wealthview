@@ -357,25 +357,24 @@ class TrialSimulatorReturnTest {
     }
 
     @Test
-    void simulateTrial_rmdForcedInCashCoveredDownYear_paysFullExcessWithTaxLeakage() {
+    void simulateTrial_rmdForcedFirstInCashCoveredDownYear_reinvestedRmdCashFundsTaxNoGrossUp() {
+        // T18a-1: the RMD is now forced out of traditional FIRST, before the spending draw is
+        // even resolved -- so its after-tax cash is already sitting in taxable by the time the
+        // withdrawal tax is assessed, unlike the pre-T18a-1 end-of-year forceRmdExcess.
         // Age-75 RMD year, cash reserve fully covers the year's spending draw from a
         // traditional-first ordered portfolio -- the ACTUAL traditional pool draw for spending
-        // is therefore zero, not the theoretical $1000 split. forceRmdExcess must still force
-        // the FULL rmd out of traditional (not rmd-minus-the-phantom-$1000), with tax leakage at
-        // the 20% marginal rate.
+        // is therefore zero, not the theoretical $1000 split.
         // Seed: annualSpending=1000, cashReserveYears=1 -> cash=1000, drawn from traditional
         // (taxable=0) -> traditional 100000-1000=99000. Growth -5% -> 94050 (pools1PreGrowth=
-        // 99000 is the RMD basis). rmd = 99000/24.6 = 4024.390243902439. Withdrawal ($1000) is
-        // fully cash-covered (cashDraw=min(1000,1000)=1000, equityDraw=0) -> pools untouched by
-        // the spending draw; withdrawal tax 1000*0.20=200 (computed on the theoretical
-        // traditional-first split, deducted in full per the fix) -> 94050-200=93850.
-        // forceRmdExcess then forces the FULL rmd (traditionalDrawnForSpending=0, so
-        // extra=rmd-0=rmd) out of the 93850, reinvesting the after-tax remainder to taxable.
-        // Pre-C2: finalBalance = 93850 - rmd*0.20 = 93045.121951... Audit C2: the $200 withdrawal
-        // tax itself drains entirely from traditional (taxable is $0), grossing up by
-        // 200*0.20/0.80 = 50 more -> finalBalance = 93045.121951... - 50 = 92995.121951...
-        // (forceRmdExcess's own leakage is untouched -- it's a direct one-shot computation, not a
-        // deductTaxFromPools drain, so it stays out of C2's scope).
+        // 99000 is the RMD basis). rmd = 99000/24.6 = 4024.390243902439, forced out FIRST:
+        // traditional -> 94050-rmd, taxable gains the after-tax remainder (rmd*0.80).
+        // Withdrawal ($1000) is fully cash-covered (cashDraw=min(1000,1000)=1000, equityDraw=0)
+        // -> pools untouched by the spending draw; withdrawal tax 1000*0.20=200 (computed on the
+        // theoretical traditional-first split) is now funded ENTIRELY by the RMD's own taxable
+        // cash (rmd*0.80 = 3,219.51 comfortably covers $200) -- NO audit-C2 gross-up, unlike the
+        // pre-T18a-1 ordering (which forced only after the $200 tax had already drained/grossed
+        // up traditional, leaving nothing in taxable to absorb it -- see the superseded $50
+        // leakage this test used to pin).
         double[] flatZero = {0.0};
         var config = new TrialSimulator.SimulationConfig(
                 0.0, 100_000.0, 0.0, "traditional_first",
@@ -387,7 +386,12 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{1000.0}, new double[]{0.0}, 1, config);
 
-        assertThat(result.finalBalance()).isEqualTo(92995.12, within(0.01));
+        double rmd = 99_000.0 / 24.6;
+        // (94,050 - rmd) traditional + (rmd - 0.2*rmd) reinvested taxable - 200 tax (fully
+        // taxable-funded, no gross-up) = 93,850 - 0.2*rmd.
+        double finalBalance = 93_850.0 - 0.20 * rmd;
+        assertThat(result.finalBalance()).isEqualTo(finalBalance, within(0.01));
+        assertThat(result.finalBalance()).isEqualTo(93045.12, within(0.01));
     }
 
     // === Audit C5 review fix: the ordinary tax BASE must stack across the year's own income
@@ -429,16 +433,24 @@ class TrialSimulatorReturnTest {
 
     @Test
     void simulateTrial_fullOrdinaryStack_summedTaxEqualsTelescopedTaxAtTotalMinusTaxAtBase() {
-        // COMPOSITION IDENTITY (pins the stacking order permanently): with base income, a Roth
-        // conversion, a traditional spending draw, and a forced RMD excess ALL live in one year,
-        // the summed ordinary tax must telescope EXACTLY:
-        //   convTax + wdTax + rmdTax = taxAt(base+conv+draw+excess) - taxAt(base)
-        // because each component is priced incrementally on top of everything before it.
-        // Fixture: base 60k, conv 50k (crosses 100k mid-conversion), draw 5k (fully in 30%),
-        // excess = rmd - draw (fully in 30%). conversionTaxByYear is supplied as 0 (deliberately
-        // WRONG) to prove the engine reprices the conversion from the table rather than trusting
-        // the precomputed figure -- RED pre-fix on two counts (conversion tax missing entirely AND
-        // draw/excess priced at the base's 10% bracket).
+        // COMPOSITION IDENTITY (pins the stacking order permanently): with base income, a forced
+        // RMD, a Roth conversion, and a traditional spending draw ALL live in one year, the
+        // summed ordinary tax must telescope EXACTLY:
+        //   rmdTax + convTax + wdTax = taxAt(base+rmd+conv+draw) - taxAt(base)
+        // because each component is priced incrementally on top of everything realized before it.
+        // T18a-1: the RMD is now forced out BEFORE the conversion (IRS ordering: the year's RMD
+        // must be distributed before any Roth conversion) -- the coherent stacking order is rmd
+        // on base; conv on base+rmd; draw on base+rmd+conv. (Pre-T18a-1 the order was conv on
+        // base; draw on base+conv; excess=[rmd-draw] on base+conv+draw -- the draw/excess split
+        // canceled to the SAME base+conv+rmd total, since the spend draw's traditional pull
+        // partially "satisfied" the RMD. Under RMD-first ordering the FULL rmd is
+        // force-distributed unconditionally, independent of what the spend draw later does, so
+        // the draw is no longer netted against it -- the total realized ordinary income is
+        // therefore base+rmd+conv+draw, a full $5,000 (the draw) MORE than before.)
+        // Fixture: base 60k, rmd = 200k/24.6 (forced first, fully in 10%), conv 50k (crosses 100k
+        // mid-conversion), draw 5k (fully in 30%). conversionTaxByYear is supplied as 0
+        // (deliberately WRONG) to prove the engine reprices the conversion from the table rather
+        // than trusting the precomputed figure.
         var table = twoBracketTable();
         var config = new TrialSimulator.SimulationConfig(
                 500_000.0, 200_000.0, 0.0, "traditional_first",
@@ -450,20 +462,18 @@ class TrialSimulatorReturnTest {
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{5_000.0}, new double[]{0.0}, 1, config);
 
-        // rmd basis = pre-growth traditional 200k -> rmd = 200,000 / 24.6; spending draw covers
-        // 5,000 of it, excess forced out on top of the full prior stack.
+        // rmd basis = pre-growth traditional 200k -> rmd = 200,000 / 24.6, forced out FIRST and
+        // in full (no netting against the later spending draw).
         double rmd = 200_000.0 / 24.6;
-        double excess = rmd - 5_000.0;
-        double telescopedTax = table.taxAt(60_000.0 + 50_000.0 + 5_000.0 + excess) - table.taxAt(60_000.0);
+        double telescopedTax = table.taxAt(60_000.0 + rmd + 50_000.0 + 5_000.0) - table.taxAt(60_000.0);
         // Portfolio outflows this year = the 5,000 actually spent + every ordinary tax dollar
-        // (conversion moves money internally; the RMD excess reinvests net of its own tax).
+        // (conversion and the forced RMD move money internally, net of their own tax).
         double initTotal = 500_000.0 + 200_000.0;
         assertThat(initTotal - result.finalBalance())
                 .isEqualTo(5_000.0 + telescopedTax, within(1e-6));
         // Sanity on the magnitude: the identity total is dominated by the 30%-bracket segments
-        // (conv crosses 100k; draw + excess sit entirely above it) -- the pre-fix base-anchored
-        // sum (0 conv + 500 draw + 313 excess) is nowhere near it.
-        assertThat(telescopedTax).isEqualTo(9_439.02439024, within(1e-6));
+        // (conv crosses 100k; the draw sits entirely above it).
+        assertThat(telescopedTax).isEqualTo(10_939.02439024, within(1e-4));
     }
 
     @Test
