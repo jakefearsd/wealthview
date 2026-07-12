@@ -44,6 +44,16 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
+            {result.floor_reduced && (
+                <div data-testid="floor-reduced-banner" style={{
+                    background: '#fff8e1', border: '1px solid #ffe082', borderRadius: '8px',
+                    padding: '1rem', marginBottom: '1.5rem', color: '#e65100', fontSize: '0.9rem',
+                }}>
+                    Your essential floor exceeds what the portfolio can sustain at this confidence. Results measure a
+                    REDUCED floor; against your original floor, success is {pct(result.original_floor_success_probability, 0)}.
+                </div>
+            )}
+
             {diagnostics.warnings.length > 0 && (
                 <div data-testid="warning-banner" style={{
                     background: diagnostics.failureRateSeverity === 'danger' ? '#ffebee' : '#fff8e1',
@@ -61,7 +71,11 @@ export default function OptimizerResultsView({
                 </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${result.success_probability_with_rules != null ? 6 : 5}, 1fr)`,
+                gap: '1rem', marginBottom: '1.5rem',
+            }}>
                 <div data-testid="success-probability-card" style={{
                     ...cardStyle, textAlign: 'center',
                     background: '#e8f5e9', border: '1px solid #a5d6a7',
@@ -69,6 +83,19 @@ export default function OptimizerResultsView({
                     <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Success Probability</div>
                     <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.success_probability, 0)}</div>
                 </div>
+                {result.success_probability_with_rules != null && (
+                    <div
+                        data-testid="success-probability-with-rules-card"
+                        title="Success if you follow this profile's spending-cut rule when the portfolio falls behind — the no-adjustment number is the headline."
+                        style={{
+                            ...cardStyle, textAlign: 'center',
+                            background: '#e3f2fd', border: '1px solid #90caf9', cursor: 'help',
+                        }}
+                    >
+                        <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>With Guardrail Cuts</div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{pct(result.success_probability_with_rules, 0)}</div>
+                    </div>
+                )}
                 <div data-testid="failure-rate-card" style={{
                     ...cardStyle, textAlign: 'center',
                     background: failureRateColors[diagnostics.failureRateSeverity],
@@ -119,6 +146,17 @@ export default function OptimizerResultsView({
                     </div>
                 ) : null;
             })()}
+
+            {result.fixed_return_share != null && result.fixed_return_share > 0.5 && (
+                <div data-testid="fixed-return-share-note" style={{
+                    padding: '0.75rem 1rem', marginBottom: '1.5rem',
+                    background: '#e3f2fd', border: '1px solid #90caf9', borderRadius: '6px',
+                    fontSize: '0.8rem', color: '#0d47a1',
+                }}>
+                    {pct(result.fixed_return_share, 0)} of this portfolio uses a fixed expected return and shows no
+                    market variability.
+                </div>
+            )}
 
             <div data-testid="tax-disclaimer" style={{
                 padding: '0.75rem 1rem', marginBottom: '1.5rem',

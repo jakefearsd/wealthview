@@ -101,6 +101,86 @@ describe('OptimizerResultsView', () => {
         expect(screen.getByText(/High failure rate/)).toBeInTheDocument();
     });
 
+    it('renders the with-rules card when success_probability_with_rules is present', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, success_probability_with_rules: 0.97 } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('success-probability-with-rules-card')).toBeInTheDocument();
+        expect(screen.getByText('With Guardrail Cuts')).toBeInTheDocument();
+        expect(screen.getByText('97%')).toBeInTheDocument();
+    });
+
+    it('omits the with-rules card when success_probability_with_rules is null', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, success_probability_with_rules: null } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.queryByTestId('success-probability-with-rules-card')).not.toBeInTheDocument();
+    });
+
+    it('renders the floor-reduced banner with the original floor success probability', () => {
+        render(
+            <OptimizerResultsView
+                result={{
+                    ...baseResult,
+                    floor_reduced: true,
+                    original_floor_success_probability: 0.62,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('floor-reduced-banner')).toBeInTheDocument();
+        expect(screen.getByText(/success is 62%/)).toBeInTheDocument();
+    });
+
+    it('omits the floor-reduced banner when floor_reduced is false', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, floor_reduced: false } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.queryByTestId('floor-reduced-banner')).not.toBeInTheDocument();
+    });
+
+    it('renders the fixed-return-share note when the share exceeds 50%', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, fixed_return_share: 0.75 } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.getByTestId('fixed-return-share-note')).toBeInTheDocument();
+        expect(screen.getByText(/75% of this portfolio uses a fixed expected return/)).toBeInTheDocument();
+    });
+
+    it('omits the fixed-return-share note when the share is at or below 50%', () => {
+        render(
+            <OptimizerResultsView
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                result={{ ...baseResult, fixed_return_share: 0.5 } as any}
+                onReoptimize={vi.fn()}
+                retirementDate="2035-01-01"
+            />
+        );
+        expect(screen.queryByTestId('fixed-return-share-note')).not.toBeInTheDocument();
+    });
+
     it('embeds the expected child charts', () => {
         render(
             <OptimizerResultsView

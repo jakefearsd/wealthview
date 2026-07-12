@@ -283,6 +283,7 @@ export interface GuardrailProfileResponse {
     name: string;
     essential_floor: number;
     terminal_balance_target: number;
+    /** Resolved REAL (inflation-adjusted) return rate used for the simulation, not nominal. */
     return_mean: number;
     trial_count: number;
     confidence_level: number;
@@ -291,6 +292,14 @@ export interface GuardrailProfileResponse {
     median_final_balance: number;
     failure_rate: number;
     success_probability: number;
+    /** Success probability if the guardrail spending-cut rule is followed when the portfolio falls behind. */
+    success_probability_with_rules: number | null;
+    /** True when the requested essential floor exceeded what the portfolio could sustain and was reduced. Never null. */
+    floor_reduced: boolean;
+    /** Success probability against the ORIGINAL (pre-reduction) essential floor, only set when floor_reduced. */
+    original_floor_success_probability: number | null;
+    /** Share of the portfolio (0-1) using a fixed expected return with no simulated market variability. */
+    fixed_return_share: number | null;
     percentile10_final: number;
     stale: boolean;
     created_at: string;
