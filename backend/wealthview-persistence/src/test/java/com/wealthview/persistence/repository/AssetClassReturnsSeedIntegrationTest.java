@@ -14,8 +14,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class AssetClassReturnsSeedIntegrationTest extends AbstractIntegrationTest {
 
-    private static final int FIRST_YEAR = 1972;
+    // Audit C10: 1928-1971 (the optional depression-era window) was appended to the seed
+    // 2026-07-12; the seed's default-filtered row set (year >= 1972, unchanged floor) is
+    // covered separately by CapitalMarketAssumptionsProviderTest / ...ExtendedWindowTest at the
+    // core layer -- this IT exercises the full 98-year re-seed, the point that actually goes
+    // through Testcontainers/Flyway.
+    private static final int FIRST_YEAR = 1928;
     private static final int LAST_YEAR = 2025;
+    private static final int TOTAL_YEARS = LAST_YEAR - FIRST_YEAR + 1;
     private static final List<String> CLASSES = List.of("us_stock", "intl_stock", "bond", "cash");
 
     @Autowired
@@ -32,6 +38,13 @@ class AssetClassReturnsSeedIntegrationTest extends AbstractIntegrationTest {
                     .as("year %d must have all four classes", y)
                     .containsExactlyInAnyOrderElementsOf(CLASSES);
         }
+    }
+
+    @Test
+    void seed_rowCount_isExactlyFourPerYearAcrossFullWindow() {
+        var rows = repository.findAllByOrderByYearAscAssetClassAsc();
+
+        assertThat(rows).hasSize(TOTAL_YEARS * CLASSES.size());
     }
 
     @Test

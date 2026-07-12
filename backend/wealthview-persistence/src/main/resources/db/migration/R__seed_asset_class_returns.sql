@@ -1,7 +1,9 @@
 -- R__seed_asset_class_returns.sql
--- Real (CPI-adjusted) annual total returns per asset class, 1972-2025.
+-- Real (CPI-adjusted) annual total returns per asset class, 1928-2025.
 --
--- Sources (retrieved 2026-07-10):
+-- ============================================================================
+-- 1972-2025 (54 years) -- sources retrieved 2026-07-10, unchanged since:
+-- ============================================================================
 --   us_stock   : backend/wealthview-projection/src/main/resources/historical-returns/
 --                sp500-real-annual-returns.csv (Shiller "ie_data" S&P 500 total return / CPI,
 --                already curated in Task 3/prior work) -- reused verbatim, not re-derived.
@@ -25,10 +27,222 @@
 -- there via Shiller's methodology) -- see task-4-report.md for the full cross-check against
 -- an independently recomputed us_stock series (Damodaran nominal S&P 500 + the same CPI series).
 --
+-- ============================================================================
+-- 1928-1971 (44 years) -- audit C10, added 2026-07-12. See
+-- docs/audits/2026-07-11-projection-accuracy-audit-v2.md item C10 ("Equity tail bounded at
+-- 1974 (-36%)") and .superpowers/sdd/audit2/t17-report.md for the full verification table,
+-- source-agreement cross-checks, and extended-window geometric-mean arithmetic.
+-- ============================================================================
+--   us_stock   : nominal "S&P 500 (includes dividends)" annual return from the SAME Damodaran
+--                NYU Stern page/table cited above (histretSP.html covers 1928-present in one
+--                table), deflated by CPI using the SAME avg/avg method as the bond/cash rows
+--                below. NOTE: unlike the 1972-2025 rows (which reuse a separately-curated
+--                Shiller CSV verbatim), 1928-1971 us_stock is DERIVED here (nominal + CPI) --
+--                Shiller's raw ie_data.xls could not be fetched (binary spreadsheet, no
+--                reachable HTML/CSV mirror); cross-checked against a Shiller-sourced
+--                real-return estimate (officialdata.org, monthly-average methodology) for 1931
+--                and 1933 -- see the t17 report for the numeric comparison and the point-in-time
+--                vs. calendar-average convention gap that explains the residual difference.
+--   bond       : nominal "US T. Bond (10-year)" total return, same Damodaran page, same table,
+--                1928-1971 rows -- identical source/column as the 1972-2025 bond rows.
+--   cash       : nominal "3-month T.Bill" return, same Damodaran page/table -- identical
+--                source/column as the 1972-2025 cash rows.
+--   intl_stock : MSCI EAFE Index (USD) has no published return before 1970 (inception
+--                Dec 31, 1969). 1970 and 1971 use the real MSCI EAFE price return (nominal
+--                -14.13% / +26.14%, cross-referenced via web search against the "Historical
+--                Returns for the MSCI EAFE Index (1970-2010)" series); 1928-1969 (42 years,
+--                marked inline below) PROXY intl_stock with that year's us_stock real return --
+--                a documented simplification (international developed-market equity returns
+--                did not exist as a distinct tracked series that far back), not a claim that
+--                US and international returns were actually identical those years.
+--   inflation  : US CPI-U annual-average-over-prior-annual-average, cross-checked across two
+--                independent calculators (in2013dollars.com, usinflationcalculator.com) at three
+--                spot years (1931: -8.98%/-9.0%; 1933: -5.11%/-5.1%; 1946: 8.33%/8.3%) -- same
+--                avg/avg convention as the 1972-2025 rows above (NOT the more commonly quoted
+--                Dec-over-Dec figure, e.g. 1946's often-cited "18% inflation" is the Dec/Dec
+--                spike; the avg/avg figure used here and matching the existing convention is
+--                8.3%). Same deflation formula as the 1972-2025 block.
+--
 -- Because R__ migrations re-run whenever their checksum changes, this is a truncate-and-reload
 -- so edits re-seed cleanly.
 TRUNCATE TABLE asset_class_returns;
 INSERT INTO asset_class_returns (year, asset_class, real_return) VALUES
+  (1928, 'us_stock', 0.462970),
+  (1928, 'intl_stock', 0.462970), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1928, 'bond', 0.025839),
+  (1928, 'cash', 0.048627),
+  (1929, 'us_stock', -0.083000),
+  (1929, 'intl_stock', -0.083000), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1929, 'bond', 0.042000),
+  (1929, 'cash', 0.031600),
+  (1930, 'us_stock', -0.233572),
+  (1930, 'intl_stock', -0.233572), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1930, 'bond', 0.070010),
+  (1930, 'cash', 0.070113),
+  (1931, 'us_stock', -0.382857),
+  (1931, 'intl_stock', -0.382857), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1931, 'bond', 0.070769),
+  (1931, 'cash', 0.124286),
+  (1932, 'us_stock', 0.013984),
+  (1932, 'intl_stock', 0.013984), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1932, 'bond', 0.207436),
+  (1932, 'cash', 0.121754),
+  (1933, 'us_stock', 0.580400),
+  (1933, 'intl_stock', 0.580400), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1933, 'bond', 0.073340),
+  (1933, 'cash', 0.063857),
+  (1934, 'us_stock', -0.041610),
+  (1934, 'intl_stock', -0.041610), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1934, 'bond', 0.047139),
+  (1934, 'cash', -0.027352),
+  (1935, 'us_stock', 0.435812),
+  (1935, 'intl_stock', 0.435812), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1935, 'bond', 0.022211),
+  (1935, 'cash', -0.019863),
+  (1936, 'us_stock', 0.299901),
+  (1936, 'intl_stock', 0.299901), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1936, 'bond', 0.034680),
+  (1936, 'cash', -0.013103),
+  (1937, 'us_stock', -0.375869),
+  (1937, 'intl_stock', -0.375869), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1937, 'bond', -0.021429),
+  (1937, 'cash', -0.032046),
+  (1938, 'us_stock', 0.320531),
+  (1938, 'intl_stock', 0.320531), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1938, 'bond', 0.064454),
+  (1938, 'cash', 0.022165),
+  (1939, 'us_stock', 0.003043),
+  (1939, 'intl_stock', 0.003043), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1939, 'bond', 0.058925),
+  (1939, 'cash', 0.014706),
+  (1940, 'us_stock', -0.112910),
+  (1940, 'intl_stock', -0.112910), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1940, 'bond', 0.046673),
+  (1940, 'cash', -0.006554),
+  (1941, 'us_stock', -0.169238),
+  (1941, 'intl_stock', -0.169238), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1941, 'bond', -0.066857),
+  (1941, 'cash', -0.046381),
+  (1942, 'us_stock', 0.074572),
+  (1942, 'intl_stock', 0.074572), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1942, 'bond', -0.077638),
+  (1942, 'cash', -0.095221),
+  (1943, 'us_stock', 0.178699),
+  (1943, 'intl_stock', 0.178699), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1943, 'bond', -0.034025),
+  (1943, 'cash', -0.053911),
+  (1944, 'us_stock', 0.170403),
+  (1944, 'intl_stock', 0.170403), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1944, 'bond', 0.008653),
+  (1944, 'cash', -0.012979),
+  (1945, 'us_stock', 0.327664),
+  (1945, 'intl_stock', 0.327664), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1945, 'bond', 0.014663),
+  (1945, 'cash', -0.018768),
+  (1946, 'us_stock', -0.154478),
+  (1946, 'intl_stock', -0.154478), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1946, 'bond', -0.047738),
+  (1946, 'cash', -0.073130),
+  (1947, 'us_stock', -0.080420),
+  (1947, 'intl_stock', -0.080420), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1947, 'bond', -0.117832),
+  (1947, 'cash', -0.120629),
+  (1948, 'us_stock', -0.022202),
+  (1948, 'intl_stock', -0.022202), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1948, 'bond', -0.056892),
+  (1948, 'cash', -0.065217),
+  (1949, 'us_stock', 0.197368),
+  (1949, 'intl_stock', 0.197368), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1949, 'bond', 0.059312),
+  (1949, 'cash', 0.023482),
+  (1950, 'us_stock', 0.291313),
+  (1950, 'intl_stock', 0.291313), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1950, 'bond', -0.008588),
+  (1950, 'cash', -0.000987),
+  (1951, 'us_stock', 0.146247),
+  (1951, 'intl_stock', 0.146247), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1951, 'bond', -0.075996),
+  (1951, 'cash', -0.059129),
+  (1952, 'us_stock', 0.159470),
+  (1952, 'intl_stock', 0.159470), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1952, 'bond', 0.003631),
+  (1952, 'cash', -0.001766),
+  (1953, 'us_stock', -0.019940),
+  (1953, 'intl_stock', -0.019940), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1953, 'bond', 0.033135),
+  (1953, 'cash', 0.010813),
+  (1954, 'us_stock', 0.514995),
+  (1954, 'intl_stock', 0.514995), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1954, 'bond', 0.025720),
+  (1954, 'cash', 0.002383),
+  (1955, 'us_stock', 0.331325),
+  (1955, 'intl_stock', 0.331325), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1955, 'bond', -0.009438),
+  (1955, 'cash', 0.021285),
+  (1956, 'us_stock', 0.058522),
+  (1956, 'intl_stock', 0.058522), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1956, 'bond', -0.037044),
+  (1956, 'cash', 0.011034),
+  (1957, 'us_stock', -0.133204),
+  (1957, 'intl_stock', -0.133204), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1957, 'bond', 0.033882),
+  (1957, 'cash', -0.000774),
+  (1958, 'us_stock', 0.398054),
+  (1958, 'intl_stock', 0.398054), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1958, 'bond', -0.047665),
+  (1958, 'cash', -0.010019),
+  (1959, 'us_stock', 0.112810),
+  (1959, 'intl_stock', 0.112810), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1959, 'bond', -0.033267),
+  (1959, 'cash', 0.026713),
+  (1960, 'us_stock', -0.013373),
+  (1960, 'intl_stock', -0.013373), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1960, 'bond', 0.097738),
+  (1960, 'cash', 0.011504),
+  (1961, 'us_stock', 0.253861),
+  (1961, 'intl_stock', 0.253861), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1961, 'bond', 0.010495),
+  (1961, 'cash', 0.013366),
+  (1962, 'us_stock', -0.097129),
+  (1962, 'intl_stock', -0.097129), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1962, 'bond', 0.046436),
+  (1962, 'cash', 0.017525),
+  (1963, 'us_stock', 0.210365),
+  (1963, 'intl_stock', 0.210365), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1963, 'bond', 0.003751),
+  (1963, 'cash', 0.018361),
+  (1964, 'us_stock', 0.149260),
+  (1964, 'intl_stock', 0.149260), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1964, 'bond', 0.023988),
+  (1964, 'cash', 0.022211),
+  (1965, 'us_stock', 0.106299),
+  (1965, 'intl_stock', 0.106299), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1965, 'bond', -0.008661),
+  (1965, 'cash', 0.023130),
+  (1966, 'us_stock', -0.125073),
+  (1966, 'intl_stock', -0.125073), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1966, 'bond', 0.000097),
+  (1966, 'cash', 0.019048),
+  (1967, 'us_stock', 0.200776),
+  (1967, 'intl_stock', 0.200776), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1967, 'bond', -0.045393),
+  (1967, 'cash', 0.011542),
+  (1968, 'us_stock', 0.063436),
+  (1968, 'intl_stock', 0.063436), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1968, 'bond', -0.008925),
+  (1968, 'cash', 0.010940),
+  (1969, 'us_stock', -0.130237),
+  (1969, 'intl_stock', -0.130237), -- proxy: us_stock real return (MSCI EAFE series begins 1970)
+  (1969, 'bond', -0.099621),
+  (1969, 'cash', 0.011090),
+  (1970, 'us_stock', -0.020246),
+  (1970, 'intl_stock', -0.187606), -- MSCI EAFE (USD) real return
+  (1970, 'bond', 0.104541),
+  (1970, 'cash', 0.006528),
+  (1971, 'us_stock', 0.094061),
+  (1971, 'intl_stock', 0.208238), -- MSCI EAFE (USD) real return
+  (1971, 'bond', 0.051628),
+  (1971, 'cash', -0.000670),
   (1972, 'us_stock', 0.146700),
   (1972, 'intl_stock', 0.332400),
   (1972, 'bond', -0.004379),
