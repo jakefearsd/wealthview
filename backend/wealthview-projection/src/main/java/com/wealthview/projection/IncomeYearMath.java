@@ -1,9 +1,13 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
+import java.util.Objects;
+
+import org.springframework.lang.Nullable;
 
 import com.wealthview.core.common.CompoundGrowth;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
@@ -21,6 +25,26 @@ import static com.wealthview.core.common.Money.SCALE;
 final class IncomeYearMath {
 
     private IncomeYearMath() {
+    }
+
+    /**
+     * Household task 7 (T5-review, spec §1): the age to evaluate {@code source}'s {@code
+     * start_age}/{@code end_age} window (and boundary-year proration) against -- its OWNER's age in
+     * {@code year} when {@code household} is a real two-person household and the source is
+     * spouse-owned, else the uniform {@code primaryAge}. Owner-agnostic for a single-person context
+     * ({@code household == null} or {@code !household.isHousehold()}) and for every primary-owned
+     * source, matching every pre-household call site's behavior exactly. Deliberately does NOT
+     * distinguish the both-alive phase from the survivor phase: {@link SurvivorIncomeAdjuster}
+     * already relabels a surviving deceased-owned source's {@code owner} to the SURVIVOR before this
+     * method ever sees it (spec §4.1), so a single owner-lookup rule is correct in both phases -- see
+     * that class's Javadoc.
+     */
+    static int resolveSourceAge(ProjectionIncomeSourceInput source, int primaryAge,
+                                @Nullable HouseholdContext household, int year) {
+        if (household == null || !household.isHousehold() || !"spouse".equals(source.owner())) {
+            return primaryAge;
+        }
+        return Objects.requireNonNull(household.spouse(), "No spouse in this household context").ageIn(year);
     }
 
     /**

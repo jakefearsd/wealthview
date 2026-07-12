@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -647,6 +648,83 @@ class IncomeSourceProcessorTest {
 
         // Cash inflow is the full amount (deduction only affects taxable income, not cash)
         assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("50000"));
+    }
+
+    // === Household task 7 (T5-review, spec §1): owner-age income windows ===
+    // Primary born 1958, spouse born 1970 -- a 12-year age gap large enough that a source's window
+    // evaluated against the WRONG person's age produces a materially different (and observably
+    // wrong) activation year.
+
+    private static final HouseholdContext AGE_GAP_HOUSEHOLD =
+            HouseholdContext.of(1958, 90, 1970, 90, 2070);
+
+    @Test
+    void process_householdBothAlive_spouseOwnedSourceStartsAtSpouseAge_notPrimaryAge() {
+        // Spouse-owned pension starting at the SPOUSE's age 65. In 2023 the PRIMARY (1958) is 65 but
+        // the SPOUSE (1970) is only 53 -- the source must NOT be active yet.
+        var spouseSource = makeSourceWithOwner(IncomeSourceType.OTHER, new BigDecimal("24000"),
+                65, null, "spouse");
+        int primaryAgeIn2023 = 65;
+
+        var result = processor.process(List.of(spouseSource), primaryAgeIn2023, 1, 2023,
+                BigDecimal.ZERO, FilingStatus.MARRIED_FILING_JOINTLY, BigDecimal.ZERO, BigDecimal.ZERO, 0,
+                BigDecimal.ZERO, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void process_householdNull_sameSpouseOwnedSourceIncorrectlyUsesUniformAge_theT5ReviewGapMadeConcrete() {
+        // RED against the pre-task-7 behavior this fixes: with NO household threaded (every
+        // pre-household call site, including the 9/10-arg overloads), the SAME spouse-owned source
+        // is evaluated against the uniform (primary's) age and wrongly activates at primary-age 66
+        // (well past the source's start_age boundary) even though the spouse -- its actual owner --
+        // is only 54 in the corresponding year. Pinned here specifically to prove the gap existed and
+        // that {@link #process_householdBothAlive_spouseOwnedSourceStartsAtSpouseAge_notPrimaryAge}
+        // is a genuine fix, not a no-op.
+        var spouseSource = makeSourceWithOwner(IncomeSourceType.OTHER, new BigDecimal("24000"),
+                65, null, "spouse");
+
+        var result = processor.process(List.of(spouseSource), 66, 1, 2024,
+                BigDecimal.ZERO, FilingStatus.MARRIED_FILING_JOINTLY, BigDecimal.ZERO, BigDecimal.ZERO, 0);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    @Test
+    void process_householdBothAlive_spouseOwnedSourceActivatesAtSpouseOwnActualStartAge() {
+        // 2036: the spouse (born 1970) is 66 -- past the boundary year, full amount active.
+        var spouseSource = makeSourceWithOwner(IncomeSourceType.OTHER, new BigDecimal("24000"),
+                65, null, "spouse");
+        int primaryAgeIn2036 = 78;
+
+        var result = processor.process(List.of(spouseSource), primaryAgeIn2036, 1, 2036,
+                BigDecimal.ZERO, FilingStatus.MARRIED_FILING_JOINTLY, BigDecimal.ZERO, BigDecimal.ZERO, 0,
+                BigDecimal.ZERO, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    @Test
+    void process_householdBothAlive_primaryOwnedSourceStillEvaluatesAgainstPrimaryAge() {
+        // A primary-owned source is unaffected by threading a household -- it keeps evaluating
+        // against the uniform `age` parameter exactly as before.
+        var primarySource = makeSourceWithOwner(IncomeSourceType.OTHER, new BigDecimal("24000"),
+                65, null, "primary");
+
+        var result = processor.process(List.of(primarySource), 66, 1, 2024,
+                BigDecimal.ZERO, FilingStatus.MARRIED_FILING_JOINTLY, BigDecimal.ZERO, BigDecimal.ZERO, 0,
+                BigDecimal.ZERO, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result.totalCashInflow()).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    private static ProjectionIncomeSourceInput makeSourceWithOwner(
+            IncomeSourceType incomeType, BigDecimal annualAmount, int startAge, Integer endAge, String owner) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), "Test " + incomeType.getValue(), incomeType, annualAmount,
+                startAge, endAge, BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null, null, owner, BigDecimal.ONE);
     }
 
     private static ProjectionIncomeSourceInput makeSource(

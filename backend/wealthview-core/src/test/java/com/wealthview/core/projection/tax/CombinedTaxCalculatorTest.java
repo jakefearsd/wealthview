@@ -11,6 +11,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.testutil.TaxBracketFixtures;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.entity.StateStandardDeductionEntity;
@@ -367,6 +368,58 @@ class CombinedTaxCalculatorTest {
         var resultAge64 = combinedAge64.computeTax(bd("60000"), 2025, FilingStatus.SINGLE);
 
         assertThat(resultAge64.federalTax()).isEqualByComparingTo(resultNoBirthYear.federalTax());
+    }
+
+    // === Household task 7: household-aware age-65 deduction threading (spec §4 step 6) ===
+
+    @Test
+    void computeTax_householdBothSpousesOver65Mfj_appliesDoubleAdder() {
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        anyInt(), eq("married_filing_jointly")))
+                .thenReturn(TaxBracketFixtures.mfj2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        // Primary born 1958 (age 67 in 2025), spouse born 1958 - 2 = 1956 as well over 65 (age 69).
+        var household = HouseholdContext.of(
+                1958, 90, 1956, 90, 2065);
+        var combinedHousehold = new CombinedTaxCalculator(federalCalc, new NullStateTaxCalculator(),
+                BigDecimal.ZERO, BigDecimal.ZERO, null, household);
+        var combinedNoHousehold = buildCombined(new NullStateTaxCalculator(), BigDecimal.ZERO, BigDecimal.ZERO);
+
+        var resultHousehold = combinedHousehold.computeTax(
+                bd("100000"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
+        var resultBaseline = combinedNoHousehold.computeTax(
+                bd("100000"), 2025, FilingStatus.MARRIED_FILING_JOINTLY);
+
+        // The household result must be strictly lower (deduction boosted by 2 * 1,600 = 3,200) than
+        // a baseline with no age-65 addition at all (the shared single2025 fixture stays at 0).
+        assertThat(resultHousehold.federalTax()).isLessThan(resultBaseline.federalTax());
+    }
+
+    @Test
+    void computeTax_householdPostTransitionSurvivorOnly_appliesSingleAdderNotDouble() {
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("1600"))));
+        // Primary (born 1953) dies at 72 in 2025 (both spouses were 65+ at that point); the survivor
+        // (spouse, born 1956) is 69 that year.
+        var household = HouseholdContext.of(
+                1953, 72, 1956, 90, 2065);
+        assertThat(household.transitionYear()).contains(2025);
+        var combinedHousehold = new CombinedTaxCalculator(federalCalc, new NullStateTaxCalculator(),
+                BigDecimal.ZERO, BigDecimal.ZERO, null, household);
+
+        // The transition year files SINGLE (task 5's flip): confirm the wiring reproduces an
+        // independent count-aware oracle call exactly -- and that the second qualifying age is null
+        // (at most ONE adder), even though the now-dead primary would independently qualify by age.
+        assertThat(household.secondFilerAgeIn(2025)).isNull();
+        var actual = combinedHousehold.computeTax(bd("60000"), 2025, FilingStatus.SINGLE).federalTax();
+        var oracle = federalCalc.computeTax(bd("60000"), 2025, FilingStatus.SINGLE,
+                household.filerAgeIn(2025), household.secondFilerAgeIn(2025));
+        assertThat(actual).isEqualByComparingTo(oracle);
     }
 
     @Test

@@ -7,9 +7,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.RentalPropertyYearDetail;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
 import com.wealthview.core.projection.tax.SelfEmploymentTaxCalculator;
@@ -80,7 +83,7 @@ class IncomeSourceProcessor {
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
             BigDecimal scenarioInflationRate, int baseYear) {
         return process(sources, age, yearsFromBase, taxYear, magi, filingStatus,
-                priorSuspendedLoss, scenarioInflationRate, baseYear, BigDecimal.ZERO);
+                priorSuspendedLoss, scenarioInflationRate, baseYear, BigDecimal.ZERO, null);
     }
 
     /**
@@ -106,6 +109,24 @@ class IncomeSourceProcessor {
             List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
             int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
             BigDecimal scenarioInflationRate, int baseYear, BigDecimal additionalProvisionalIncome) {
+        return process(sources, age, yearsFromBase, taxYear, magi, filingStatus, priorSuspendedLoss,
+                scenarioInflationRate, baseYear, additionalProvisionalIncome, null);
+    }
+
+    /**
+     * Household task 7 (T5-review, spec §1): like the 10-arg overload, but when {@code household} is
+     * known, each source's {@code start_age}/{@code end_age} window (and boundary-year 0.5 proration)
+     * is evaluated against ITS OWNER's age in {@code taxYear} rather than the uniform {@code age}
+     * (the primary's, threaded from the engine's single per-year age variable) -- a spouse-owned
+     * source now starts/ends at the SPOUSE's age, not the primary's, while both are alive. {@code
+     * household} {@code null} (every pre-household call site, via the 9- and 10-arg overloads above)
+     * reproduces the age-uniform behavior byte-for-byte. See {@link IncomeYearMath#resolveSourceAge}.
+     */
+    IncomeSourceYearResult process(
+            List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
+            int taxYear, BigDecimal magi, FilingStatus filingStatus, BigDecimal priorSuspendedLoss,
+            BigDecimal scenarioInflationRate, int baseYear, BigDecimal additionalProvisionalIncome,
+            @Nullable HouseholdContext household) {
 
         if (sources == null || sources.isEmpty()) {
             return new IncomeSourceYearResult(
@@ -131,11 +152,12 @@ class IncomeSourceProcessor {
         BigDecimal ssBenefit = BigDecimal.ZERO;
 
         for (var source : sources) {
-            if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+            int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
+            if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                 continue;
             }
 
-            BigDecimal multiplier = transitionMultiplier(source, age);
+            BigDecimal multiplier = transitionMultiplier(source, sourceAge);
             BigDecimal amount = computeRealAmount(source, yearsFromBase, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
             if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY) {
@@ -160,11 +182,12 @@ class IncomeSourceProcessor {
                 : BigDecimal.ZERO;
 
         for (var source : sources) {
-            if (!ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+            int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
+            if (!ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                 continue;
             }
 
-            BigDecimal multiplier = transitionMultiplier(source, age);
+            BigDecimal multiplier = transitionMultiplier(source, sourceAge);
             BigDecimal amount = computeRealAmount(source, yearsFromBase, scenarioInflationRate)
                     .multiply(multiplier).setScale(SCALE, ROUNDING);
 

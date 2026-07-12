@@ -3,7 +3,6 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 import com.wealthview.core.projection.dto.IncomeSourceType;
@@ -29,13 +28,25 @@ import com.wealthview.core.projection.household.PersonId;
  *   <li><b>Survivor-owned sources unchanged.</b></li>
  * </ul>
  *
- * <p><b>Age windows.</b> The engine evaluates every income source's {@code start_age}/{@code end_age}
- * against the PRIMARY member's age (the single age it threads through the year loop). When the
- * survivor is the SPOUSE, a surviving DECEASED-owned source must instead follow the survivor's age
- * (spec §4.1). Rather than fork the processor, its window is re-based into the primary-age frame by a
- * fixed {@code survivorBirthYear − primaryBirthYear} shift, so {@code isActiveForAge(source,
- * primaryAge)} evaluates as if against the survivor's age. Survivor-owned (and joint) sources are
- * left untouched — "unchanged" per spec, and consistent with their pre-transition evaluation frame.
+ * <p><b>Age windows (household task 7 rework).</b> {@link IncomeSourceProcessor} now evaluates every
+ * income source's {@code start_age}/{@code end_age} against its OWNER's age
+ * ({@link IncomeYearMath#resolveSourceAge}), not a single primary-age variable. A surviving
+ * DECEASED-owned source is "survivor-attached" for age windows (spec §4.1 / task 5's brief: its
+ * window is evaluated against the SURVIVOR's age going forward) — this class achieves that simply by
+ * RELABELING the {@code owner} field to the survivor via {@link #relabelToSurvivor}, leaving {@code
+ * start_age}/{@code end_age} untouched. {@link IncomeSourceProcessor}'s owner-age lookup then
+ * naturally resolves the survivor's REAL age against the original (unshifted) window — reproducing
+ * the pre-rework fixed {@code survivorBirthYear − primaryBirthYear} age-shift trick's result exactly,
+ * without needing an age-arithmetic hack. Two cases:
+ * <ul>
+ *   <li><b>Survivor-owned sources</b> (the {@code else} branch below): passed through completely
+ *       unchanged. Their {@code owner} already names the survivor, so owner-age evaluation already
+ *       resolves the survivor's own age both before AND after the transition — an IDENTITY, no
+ *       rework needed.</li>
+ *   <li><b>Deceased-owned sources that survive</b> (kept Social Security or {@code survivor_percent}
+ *       {@literal >} 0): relabeled to the survivor. This is the one place this class still touches a
+ *       record field for age purposes — a fixed OWNERSHIP reassignment, not a per-year age shift.</li>
+ * </ul>
  */
 final class SurvivorIncomeAdjuster {
 
@@ -60,13 +71,6 @@ final class SurvivorIncomeAdjuster {
         }
         PersonId survivor = household.survivor();
         PersonId deceased = survivor == PersonId.PRIMARY ? PersonId.SPOUSE : PersonId.PRIMARY;
-        // adjust() is only ever reached for a two-person household (the engine guards on the
-        // transition year), so the spouse is always present.
-        HouseholdContext.Person spouse = Objects.requireNonNull(household.spouse(),
-                "survivor-phase income adjustment requires a two-person household");
-        int ageShift = survivor == PersonId.PRIMARY
-                ? 0
-                : spouse.birthYear() - household.primary().birthYear();
         int yearsFromBaseAtTransition = Math.max(0, transitionYear - baseYear) + 1;
         UUID keptSsId = keepLargerSocialSecurityId(sources, yearsFromBaseAtTransition, scenarioInflationRate);
 
@@ -77,15 +81,15 @@ final class SurvivorIncomeAdjuster {
                 if (keptSsId == null || !keptSsId.equals(source.id())) {
                     continue; // the smaller Social Security benefit ends
                 }
-                adjusted.add(deceasedOwned ? reframe(source, source.annualAmount(), ageShift) : source);
+                adjusted.add(deceasedOwned ? relabelToSurvivor(source, source.annualAmount(), survivor) : source);
             } else if (deceasedOwned) {
                 BigDecimal pct = source.survivorPercent() != null ? source.survivorPercent() : BigDecimal.ONE;
                 if (pct.signum() <= 0) {
                     continue; // survivor_percent 0 ⇒ the source ends
                 }
-                adjusted.add(reframe(source, source.annualAmount().multiply(pct), ageShift));
+                adjusted.add(relabelToSurvivor(source, source.annualAmount().multiply(pct), survivor));
             } else {
-                adjusted.add(source); // survivor-owned / joint: unchanged
+                adjusted.add(source); // survivor-owned / joint: unchanged (identity, see class Javadoc)
             }
         }
         return adjusted;
@@ -119,18 +123,20 @@ final class SurvivorIncomeAdjuster {
     }
 
     /**
-     * A copy of {@code source} carrying {@code newAmount} and its {@code start_age}/{@code end_age}
-     * shifted by {@code ageShift} (null end age stays null). {@code ageShift} is zero when the survivor
-     * is the primary, so this is an amount-only rewrite in that case.
+     * A copy of {@code source} carrying {@code newAmount} and its {@code owner} reassigned to {@code
+     * survivor} — {@code start_age}/{@code end_age} are left EXACTLY as configured (household task 7:
+     * owner-age evaluation resolves the survivor's real age against them directly; see the class
+     * Javadoc). A no-op reassignment when the source was already survivor-owned (can't happen for a
+     * DECEASED-owned source by construction, but documented for clarity).
      */
-    private static ProjectionIncomeSourceInput reframe(ProjectionIncomeSourceInput source,
-                                                       BigDecimal newAmount, int ageShift) {
-        Integer newEndAge = source.endAge() != null ? source.endAge() + ageShift : null;
+    private static ProjectionIncomeSourceInput relabelToSurvivor(ProjectionIncomeSourceInput source,
+                                                                 BigDecimal newAmount, PersonId survivor) {
+        String survivorOwner = survivor == PersonId.PRIMARY ? "primary" : "spouse";
         return new ProjectionIncomeSourceInput(
                 source.id(), source.name(), source.incomeType(), newAmount,
-                source.startAge() + ageShift, newEndAge, source.inflationRate(), source.oneTime(),
+                source.startAge(), source.endAge(), source.inflationRate(), source.oneTime(),
                 source.taxTreatment(), source.annualOperatingExpenses(), source.annualMortgageInterest(),
                 source.annualMortgagePrincipal(), source.annualPropertyTax(), source.depreciationMethod(),
-                source.depreciationByYear(), source.owner(), source.survivorPercent());
+                source.depreciationByYear(), survivorOwner, source.survivorPercent());
     }
 }

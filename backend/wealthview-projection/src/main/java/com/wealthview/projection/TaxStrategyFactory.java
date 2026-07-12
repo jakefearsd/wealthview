@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.ScenarioParams;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CombinedTaxCalculator;
 import com.wealthview.core.projection.tax.FederalOnlyTaxStrategy;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
@@ -30,8 +31,16 @@ final class TaxStrategyFactory {
         this.stateTaxCalculatorFactory = stateTaxCalculatorFactory;
     }
 
+    /**
+     * Builds the {@link TaxCalculationStrategy} for the scenario's filing status, state, primary
+     * residence deductions, and (household task 7) per-person age-65 threading.
+     *
+     * @param household household task 7: threaded into the built strategy for the per-person age-65
+     *     deduction (spec §4 step 6) -- {@code null} reproduces the pre-household behavior exactly
+     *     (the {@code birthYear}-only single-age adder).
+     */
     @Nullable
-    TaxCalculationStrategy buildTaxStrategy(ScenarioParams params) {
+    TaxCalculationStrategy buildTaxStrategy(ScenarioParams params, @Nullable HouseholdContext household) {
         if (taxCalculator == null) {
             return null;
         }
@@ -46,7 +55,8 @@ final class TaxStrategyFactory {
 
         if (params.state() != null && !params.state().isBlank() && stateTaxCalculatorFactory != null) {
             var stateCalc = stateTaxCalculatorFactory.forState(params.state());
-            return new CombinedTaxCalculator(taxCalculator, stateCalc, propertyTax, mortgageInterest, birthYear);
+            return new CombinedTaxCalculator(
+                    taxCalculator, stateCalc, propertyTax, mortgageInterest, birthYear, household);
         }
 
         // Even without state tax, primary residence deductions may exceed the standard
@@ -54,9 +64,9 @@ final class TaxStrategyFactory {
         // NullStateTaxCalculator so itemized vs standard comparison still happens.
         if (propertyTax.compareTo(BigDecimal.ZERO) > 0 || mortgageInterest.compareTo(BigDecimal.ZERO) > 0) {
             return new CombinedTaxCalculator(taxCalculator, new NullStateTaxCalculator(),
-                    propertyTax, mortgageInterest, birthYear);
+                    propertyTax, mortgageInterest, birthYear, household);
         }
 
-        return new FederalOnlyTaxStrategy(taxCalculator, birthYear);
+        return new FederalOnlyTaxStrategy(taxCalculator, birthYear, household);
     }
 }

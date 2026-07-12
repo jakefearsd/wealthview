@@ -22,6 +22,7 @@ import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
@@ -127,6 +128,104 @@ class OptimizationContextBuilderTest {
         lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
                 .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
         return new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+    }
+
+    // Household task 7 (spec §4 step 6): the per-person age-65 deduction must reach the MC's
+    // exact-tax precompute too -- OptimizationContextBuilder threads HouseholdMcResolver.Resolved's
+    // HouseholdContext into OrdinaryTaxTable#computeAll/LtcgTaxTable#computeAll (T6 deferred this
+    // wiring to T7; both already unit-tested directly). Pinned like the single-filer case above:
+    // MFJ deduction 31,500 base + 1,600 per qualifying (65+) person.
+    @Test
+    void build_household_bothSpousesOver65Mfj_ordinaryTaxTableAppliesDoubledDeduction() {
+        var builderWithTax = new OptimizationContextBuilder(federalTaxCalcMfjWithAge65Addition());
+
+        var bothOver65 = householdInput(1960, 1962);  // ages 70/68 at retirement (2030)
+        var neitherOver65 = householdInput(1990, 1992); // ages 40/38 at retirement (2030)
+
+        var setupBoth = builderWithTax.build(bothOver65, ProjectionTestFixtures.TEST_CMA_MATRIX);
+        var setupNeither = builderWithTax.build(neitherOver65, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        // No income sources -> base taxable income is 0 in year 0 for both; only the deduction
+        // used to tax a $50,000 draw differs (mirrors the single-filer case's incrementalTax trick).
+        // Both 65+: deduction 31,500 + 2*1,600 = 34,700 -> taxable 15,300 -> 10% = 1,530.00
+        // Neither 65+: deduction 31,500 -> taxable 18,500 -> 10% = 1,850.00 (both stay in the first
+        // MFJ bracket, which runs 0-23,850, so this isolates the deduction with no bracket-crossing).
+        double taxBoth = setupBoth.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000);
+        double taxNeither = setupNeither.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000);
+        assertThat(taxBoth).isEqualTo(1530.00, within(1e-6));
+        assertThat(taxNeither).isEqualTo(1850.00, within(1e-6));
+    }
+
+    @Test
+    void build_household_postTransitionSurvivorOnly_ordinaryTaxTableAppliesSingleAdderNotDouble() {
+        var builderWithTax = new OptimizationContextBuilder(federalTaxCalcMfjAndSingleWithAge65Addition());
+
+        // Primary (born 1958) dies at 68 (2026 -- BEFORE the 2030 retirement start, clamping the
+        // transition to year index 0 per HouseholdMcResolver: "the whole retirement is
+        // survivor-phase"); survivor (spouse, born 1962, 65+ throughout) files SINGLE from index 0.
+        // If the (now-dead) primary's age were still counted, the table would wrongly apply a
+        // second adder.
+        var input = householdInputWithDeathAge(1958, 1962, 68);
+        var setup = builderWithTax.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        // Year index 0 (2030) is already fully in the SINGLE (survivor-phase) table. Deduction
+        // 15,750 base + 1*1,600 = 17,350 -> taxable 32,650 -> in the first single bracket (0-11,925
+        // @ 10%, 11,925-48,475 @ 12%): 1,192.50 + 20,725*0.12 = 3,679.50.
+        double tax = setup.taxIncome().ordinaryTaxTableByYear()[0].incrementalTax(0, 50_000);
+        assertThat(tax).isEqualTo(3679.50, within(1e-6));
+    }
+
+    /** MFJ 2025 fixtures with a deduction carrying a nonzero age-65 addition. */
+    private static FederalTaxCalculator federalTaxCalcMfjWithAge65Addition() {
+        var taxBracketRepo = mock(TaxBracketRepository.class);
+        var deductionRepo = mock(StandardDeductionRepository.class);
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        anyInt(), eq("married_filing_jointly")))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        return new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+    }
+
+    /** Like {@link #federalTaxCalcMfjWithAge65Addition} plus single-filer 2025 fixtures (for the
+     * post-transition SINGLE table). */
+    private static FederalTaxCalculator federalTaxCalcMfjAndSingleWithAge65Addition() {
+        var taxBracketRepo = mock(TaxBracketRepository.class);
+        var deductionRepo = mock(StandardDeductionRepository.class);
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        anyInt(), eq("married_filing_jointly")))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        lenient().when(taxBracketRepo.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(deductionRepo.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("1600"))));
+        return new FederalTaxCalculator(taxBracketRepo, deductionRepo);
+    }
+
+    private GuardrailOptimizationInput householdInput(int primaryBirthYear, int spouseBirthYear) {
+        return householdInputWithDeathAge(primaryBirthYear, spouseBirthYear, 95);
+    }
+
+    private GuardrailOptimizationInput householdInputWithDeathAge(int primaryBirthYear, int spouseBirthYear,
+                                                                   int primaryDeathAge) {
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), primaryBirthYear, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
+                List.of(), 42L,
+                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                "married_filing_jointly", null,
+                false, null, null, 5, null, null,
+                null, null, 2030, false, null, false,
+                spouseBirthYear, primaryDeathAge, 95, new BigDecimal("0.75"), false);
     }
 
     private GuardrailOptimizationInput inputWithBirthYear(int birthYear) {

@@ -1,9 +1,12 @@
 package com.wealthview.projection;
 
 import java.util.Arrays;
+import java.util.List;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.HouseholdContext;
+import com.wealthview.core.projection.tax.BracketPoint;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 
@@ -119,10 +122,30 @@ final class OrdinaryTaxTable {
     /** Builds the table for one (taxYear, status) pair. {@code age} follows
      * {@link FederalTaxCalculator#loadStandardDeduction(int, FilingStatus, int)}'s convention: any
      * value below 65 (including a negative "unknown" sentinel) reproduces the age-unaware
-     * deduction. */
+     * deduction. Calls {@code taxCalculator}'s single-age overload DIRECTLY (not routed through the
+     * 5-arg overload below) so a mock stubbing only that overload keeps working unchanged -- the
+     * byte-identical anchor for every pre-household caller. */
     static OrdinaryTaxTable build(FederalTaxCalculator taxCalculator, int taxYear, FilingStatus status, int age) {
         var brackets = taxCalculator.loadOrdinaryBrackets(taxYear, status);
         double deduction = taxCalculator.loadStandardDeduction(taxYear, status, age).doubleValue();
+        return build(brackets, deduction);
+    }
+
+    /** Household task 7 (spec §4 step 6): like {@link #build(FederalTaxCalculator, int,
+     * FilingStatus, int)} but applies the age-65 deduction adder a SECOND time when {@code
+     * secondAge} is non-null and itself 65+ (a household's spouse while both are alive and filing
+     * jointly). Only ever called with a non-null {@code secondAge} OR a real (non-mocked) {@code
+     * taxCalculator} -- see {@link #computeAll(FederalTaxCalculator, int, int, FilingStatus, Integer,
+     * HouseholdContext)}, which calls the 4-arg overload above directly whenever there is no
+     * household, preserving the exact pre-task-7 call path. */
+    static OrdinaryTaxTable build(FederalTaxCalculator taxCalculator, int taxYear, FilingStatus status, int age,
+                                  @Nullable Integer secondAge) {
+        var brackets = taxCalculator.loadOrdinaryBrackets(taxYear, status);
+        double deduction = taxCalculator.loadStandardDeduction(taxYear, status, age, secondAge).doubleValue();
+        return build(brackets, deduction);
+    }
+
+    private static OrdinaryTaxTable build(List<BracketPoint> brackets, double deduction) {
         int n = brackets.size();
         double[] floors = new double[n];
         double[] rates = new double[n];
@@ -148,6 +171,25 @@ final class OrdinaryTaxTable {
      * all-zero rates" fallback). */
     static OrdinaryTaxTable[] computeAll(@Nullable FederalTaxCalculator taxCalculator, int retirementYear,
                                           int years, FilingStatus filingStatus, @Nullable Integer birthYear) {
+        return computeAll(taxCalculator, retirementYear, years, filingStatus, birthYear, null);
+    }
+
+    /**
+     * Household task 7 (spec §4 step 6): like {@link #computeAll(FederalTaxCalculator, int, int,
+     * FilingStatus, Integer)} but, when {@code household} is known, builds each year's table off the
+     * household's OWN per-year filer age(s) instead of a single fixed {@code birthYear} -- the
+     * primary's age while alive (or, from the first-death transition year forward, the survivor's,
+     * mirroring the deterministic engine's {@link com.wealthview.core.projection.household.
+     * HouseholdContext#filerAgeIn}), plus the spouse's age a second time while both are alive AND
+     * {@code filingStatus} is MARRIED_FILING_JOINTLY. {@code household} {@code null} calls the
+     * 4-arg {@link #build(FederalTaxCalculator, int, FilingStatus, int)} overload for EVERY year
+     * (not the household-aware 5-arg one below) -- the exact pre-task-7 call path, so a caller that
+     * mocks {@code taxCalculator} and stubs only its single-age overload keeps working unchanged
+     * (the byte-identical anchor).
+     */
+    static OrdinaryTaxTable[] computeAll(@Nullable FederalTaxCalculator taxCalculator, int retirementYear,
+                                          int years, FilingStatus filingStatus, @Nullable Integer birthYear,
+                                          @Nullable HouseholdContext household) {
         OrdinaryTaxTable[] tables = new OrdinaryTaxTable[years];
         if (taxCalculator == null) {
             Arrays.fill(tables, ZERO);
@@ -155,8 +197,15 @@ final class OrdinaryTaxTable {
         }
         for (int y = 0; y < years; y++) {
             int taxYear = retirementYear + y;
-            int age = birthYear != null ? taxYear - birthYear : -1;
-            tables[y] = build(taxCalculator, taxYear, filingStatus, age);
+            if (household != null) {
+                int age = household.filerAgeIn(taxYear);
+                Integer secondAge = filingStatus == FilingStatus.MARRIED_FILING_JOINTLY
+                        ? household.secondFilerAgeIn(taxYear) : null;
+                tables[y] = build(taxCalculator, taxYear, filingStatus, age, secondAge);
+            } else {
+                int age = birthYear != null ? taxYear - birthYear : -1;
+                tables[y] = build(taxCalculator, taxYear, filingStatus, age);
+            }
         }
         return tables;
     }

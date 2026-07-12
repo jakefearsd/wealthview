@@ -205,7 +205,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 input.endAge() != null ? input.endAge() : 90);
 
         var resolved = resolveProjectionParams(input, params);
-        var taxStrategy = taxStrategyFactory.buildTaxStrategy(params);
+        var taxStrategy = taxStrategyFactory.buildTaxStrategy(params, input.household());
         var pool = buildPoolStrategy(accounts, params, taxStrategy, resolved.inflationRate(),
                 resolved.currentYear());
 
@@ -390,19 +390,31 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // rather than backfilled with a same-year estimate, since a pre-retirement or
         // just-retired-year MAGI figure is not a reliable stand-in for whatever the retiree's
         // ACTUAL income was two years before this projection began. Deterministic engine ONLY --
-        // the Monte Carlo engine (TrialSimulator et al.) is untouched by this item; MC trials do
-        // not model the IRMAA surcharge.
+        // the Monte Carlo engine (TrialSimulator et al.) does not model IRMAA at all (no site to
+        // extend for household task 7 there).
+        //
+        // Household task 7 (spec §4 step 6): the surcharge applies PER Medicare-enrolled household
+        // member -- `medicareQualifyingCount` is the number of currently-alive members 65+ in `year`
+        // (0, 1, or 2 while both are alive; at most 1 once only the survivor remains, post-
+        // transition). Single-person / no-household reproduces the pre-task-7 `age >= MEDICARE_AGE`
+        // gate exactly (count is 0 or 1 from the primary alone).
+        var household = ctx.input().household();
+        int medicareQualifyingCount = household != null
+                ? household.age65QualifyingCount(year)
+                : age >= MEDICARE_AGE ? 1 : 0;
         BigDecimal irmaaSurcharge = BigDecimal.ZERO;
-        if (retired && age >= MEDICARE_AGE && acc.magiYearMinus2() != null && irmaaSurchargeCalculator != null) {
+        if (retired && medicareQualifyingCount > 0 && acc.magiYearMinus2() != null
+                && irmaaSurchargeCalculator != null) {
             irmaaSurcharge = irmaaSurchargeCalculator.computeAnnualSurcharge(
-                    acc.magiYearMinus2(), year, pool.getFilingStatus());
+                            acc.magiYearMinus2(), year, pool.getFilingStatus())
+                    .multiply(BigDecimal.valueOf(medicareQualifyingCount));
         }
 
         var comp = yearFinanceResolver.resolve(new YearFinanceResolver.YearContext(
                 pool, yearIncomeSources, ctx.spendingPlan(), ctx.strategy(), ctx.taxStrategy(),
                 ctx.inflationRate(), year, age, retired, yearsInRetirement, startBalance,
                 ctx.currentYear(), acc.previousWithdrawal(), acc.suspendedLoss(), rmdForced, irmaaSurcharge,
-                yearSurvivorSpendingFactor));
+                yearSurvivorSpendingFactor, household));
 
         BigDecimal suspendedLoss = comp.suspendedLoss();
         BigDecimal conversionAmount = comp.conversionAmount();

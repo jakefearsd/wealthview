@@ -331,35 +331,38 @@ final class OptimizationContextBuilder {
         }
     }
 
-    /** Household task 6: per-year ordinary tax tables — the both-alive filing status before the
-     * transition, SINGLE from it. Single-person / no in-window transition returns the pre-status
+    /** Household task 6 + 7: per-year ordinary tax tables — the both-alive filing status before the
+     * transition, SINGLE from it (task 6), each built off the household's per-year filer age(s) so
+     * the age-65 deduction adder applies per qualifying person while both spouses are alive and
+     * filing jointly (task 7, spec §4 step 6 — see {@link OrdinaryTaxTable#computeAll(
+     * FederalTaxCalculator, int, int, FilingStatus, Integer, com.wealthview.core.projection.
+     * household.HouseholdContext)}). Single-person / no in-window transition returns the pre-status
      * tables unchanged (byte-identical anchor). */
     private OrdinaryTaxTable[] ordinaryTablesByYear(int retirementYear, int years,
             FilingStatus preStatus, HouseholdMcResolver.Resolved household, int birthYear) {
         OrdinaryTaxTable[] pre = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, preStatus, birthYear);
+                taxCalculator, retirementYear, years, preStatus, birthYear, household.context());
         int idx = household.inWindowTransitionIdx();
         if (idx < 0) {
             return pre;
         }
         OrdinaryTaxTable[] post = OrdinaryTaxTable.computeAll(
-                taxCalculator, retirementYear, years, household.postStatus(), birthYear);
+                taxCalculator, retirementYear, years, household.postStatus(), birthYear, household.context());
         return spliceObjects(pre, post, idx);
     }
 
-    /** Household task 6: per-year LTCG tables spliced pre/post the transition (see
-     * {@link #ordinaryTablesByYear}). */
+    /** Household task 6 + 7: per-year LTCG tables spliced pre/post the transition, household-aware
+     * per-person deduction (see {@link #ordinaryTablesByYear}). */
     private LtcgTaxTable[] ltcgTablesByYear(int retirementYear, int years, FilingStatus preStatus,
             double inflationRate, HouseholdMcResolver.Resolved household, int birthYear) {
-        LtcgTaxTable[] pre = LtcgTaxTable.computeAll(
-                capitalGainsTaxCalculator, taxCalculator, retirementYear, years, preStatus, inflationRate, birthYear);
+        LtcgTaxTable[] pre = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator, retirementYear,
+                years, preStatus, inflationRate, birthYear, household.context());
         int idx = household.inWindowTransitionIdx();
         if (idx < 0) {
             return pre;
         }
-        LtcgTaxTable[] post = LtcgTaxTable.computeAll(
-                capitalGainsTaxCalculator, taxCalculator, retirementYear, years,
-                household.postStatus(), inflationRate, birthYear);
+        LtcgTaxTable[] post = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator, retirementYear,
+                years, household.postStatus(), inflationRate, birthYear, household.context());
         return spliceObjects(pre, post, idx);
     }
 

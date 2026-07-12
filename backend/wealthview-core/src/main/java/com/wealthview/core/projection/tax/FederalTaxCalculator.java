@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import com.wealthview.persistence.entity.StandardDeductionEntity;
@@ -16,6 +17,14 @@ import com.wealthview.persistence.repository.TaxBracketRepository;
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
 
+// GodClass: this class already carried the full ordinary-tax surface (bracket loading/fallback,
+// caching, the age-65 deduction seam, and the MC precompute's raw-bracket export) before household
+// task 7; the per-person (count-aware) deduction overloads extend that SAME existing seam with a
+// small, cohesive addition (no new external dependencies -- only the existing repositories/caches).
+// Splitting the deduction logic into a separate class would separate two overloads of the same
+// public method family, hurting readability for a WMC-driven metric rather than a real complexity
+// problem. Mirrors the same documented call elsewhere (e.g. ScenarioCrudService, GuardrailProfileService).
+@SuppressWarnings("PMD.GodClass")
 @Component
 public class FederalTaxCalculator {
 
@@ -53,10 +62,24 @@ public class FederalTaxCalculator {
      * {@link #loadStandardDeduction(int, FilingStatus, int)}.
      */
     public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status, int age) {
+        return computeTax(grossIncome, taxYear, status, age, null);
+    }
+
+    /**
+     * Household task 7 (spec §4 step 6): like {@link #computeTax(BigDecimal, int, FilingStatus, int)}
+     * but applies the age-65+ additional standard deduction PER QUALIFYING PERSON -- {@code age}
+     * always, plus a second time when {@code secondQualifyingAge} is non-null and itself 65+ (a
+     * household's spouse while both are alive, filing jointly; see
+     * {@link com.wealthview.core.projection.household.HouseholdContext#secondFilerAgeIn}). {@code
+     * secondQualifyingAge} {@code null} reproduces {@link #computeTax(BigDecimal, int, FilingStatus,
+     * int)} byte-for-byte -- every pre-household call site passes {@code null} implicitly.
+     */
+    public BigDecimal computeTax(BigDecimal grossIncome, int taxYear, FilingStatus status, int age,
+                                  @Nullable Integer secondQualifyingAge) {
         if (grossIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        BigDecimal deduction = loadStandardDeduction(taxYear, status, age);
+        BigDecimal deduction = loadStandardDeduction(taxYear, status, age, secondQualifyingAge);
         BigDecimal taxableIncome = grossIncome.subtract(deduction).max(BigDecimal.ZERO);
         if (taxableIncome.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
@@ -188,18 +211,35 @@ public class FederalTaxCalculator {
      * Age-aware standard deduction (Tier-3 audit item D): adds the IRS age-65+ additional standard
      * deduction (Pub. 501, {@code StandardDeductionEntity#getAdditionalAge65()}) on top of the base
      * amount when {@code age >= 65} for {@code taxYear}, with the same latest-seeded-year fallback
-     * as the base amount. Per {@code StandardDeductionEntity}'s Javadoc, the seeded amount is per
-     * QUALIFYING PERSON (for MFJ, technically per spouse aged 65+) -- this engine only tracks the
-     * PRIMARY filer's age, so callers apply at most ONE adder even for an MFJ couple where both
-     * spouses are 65+. That's a documented, conservative simplification (understates the true
-     * deduction, i.e. slightly overstates tax) rather than a correctness bug.
+     * as the base amount. Household task 7 supersedes this overload's original single-adder
+     * simplification with {@link #loadStandardDeduction(int, FilingStatus, int, Integer)}, which
+     * applies the true per-QUALIFYING-PERSON amount for an MFJ household where both spouses are
+     * 65+; this 3-arg overload is unchanged (equivalent to passing a {@code null} second age).
      */
     public BigDecimal loadStandardDeduction(int taxYear, FilingStatus status, int age) {
-        String key = taxYear + ":" + status.value() + ":" + (age >= AGE_65);
-        return deductionCache.computeIfAbsent(key, k -> resolveStandardDeduction(taxYear, status, age));
+        return loadStandardDeduction(taxYear, status, age, null);
     }
 
-    private BigDecimal resolveStandardDeduction(int taxYear, FilingStatus status, int age) {
+    /**
+     * Household task 7 (spec §4 step 6): per-QUALIFYING-PERSON age-65 additional standard deduction.
+     * Adds the adder ONCE for {@code age} and a SECOND time when {@code secondQualifyingAge} is
+     * non-null and itself 65+ (a household's spouse, while both are alive and filing jointly -- see
+     * {@link com.wealthview.core.projection.household.HouseholdContext#secondFilerAgeIn}). Per
+     * {@code StandardDeductionEntity}'s Javadoc the seeded amount IS per qualifying person, so this
+     * reproduces the true MFJ-both-65+ adder that {@link #loadStandardDeduction(int, FilingStatus,
+     * int)} previously understated at exactly one adder. {@code secondQualifyingAge} {@code null}
+     * reproduces the single-age overload byte-for-byte -- every pre-household call site passes
+     * {@code null} implicitly via that overload.
+     */
+    public BigDecimal loadStandardDeduction(int taxYear, FilingStatus status, int age,
+                                             @Nullable Integer secondQualifyingAge) {
+        int qualifyingPersons = (age >= AGE_65 ? 1 : 0)
+                + (secondQualifyingAge != null && secondQualifyingAge >= AGE_65 ? 1 : 0);
+        String key = taxYear + ":" + status.value() + ":" + qualifyingPersons;
+        return deductionCache.computeIfAbsent(key, k -> resolveStandardDeduction(taxYear, status, qualifyingPersons));
+    }
+
+    private BigDecimal resolveStandardDeduction(int taxYear, FilingStatus status, int qualifyingPersons) {
         var entity = standardDeductionRepository.findByTaxYearAndFilingStatus(taxYear, status.value());
         if (entity.isEmpty()) {
             Integer maxYear = standardDeductionRepository.findMaxTaxYear();
@@ -207,11 +247,13 @@ public class FederalTaxCalculator {
                     ? standardDeductionRepository.findByTaxYearAndFilingStatus(maxYear, status.value())
                     : Optional.empty();
         }
-        return entity.map(e -> applyAge65Addition(e, age)).orElse(BigDecimal.ZERO);
+        return entity.map(e -> applyAge65Addition(e, qualifyingPersons)).orElse(BigDecimal.ZERO);
     }
 
-    private static BigDecimal applyAge65Addition(StandardDeductionEntity entity, int age) {
-        return age >= AGE_65 ? entity.getAmount().add(entity.getAdditionalAge65()) : entity.getAmount();
+    private static BigDecimal applyAge65Addition(StandardDeductionEntity entity, int qualifyingPersons) {
+        return qualifyingPersons > 0
+                ? entity.getAmount().add(entity.getAdditionalAge65().multiply(BigDecimal.valueOf(qualifyingPersons)))
+                : entity.getAmount();
     }
 
     private List<TaxBracketEntity> loadBrackets(int taxYear, FilingStatus status) {

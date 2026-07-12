@@ -3,8 +3,11 @@ package com.wealthview.projection;
 import java.math.BigDecimal;
 import java.util.List;
 
+import org.springframework.lang.Nullable;
+
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
@@ -25,15 +28,27 @@ class IncomeContributionCalculator {
      */
     BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
                        BigDecimal scenarioInflationRate) {
+        return compute(sources, age, yearsFromBase, scenarioInflationRate, 0, null);
+    }
+
+    /**
+     * Household task 7 (T5-review, spec §1): like the 4-arg overload, but when {@code household} is
+     * known, evaluates each source against ITS OWNER's age in {@code taxYear} rather than the
+     * uniform {@code age} -- see {@link IncomeYearMath#resolveSourceAge}. {@code household} {@code
+     * null} reproduces the 4-arg overload byte-for-byte (every pre-household call site).
+     */
+    BigDecimal compute(List<ProjectionIncomeSourceInput> sources, int age, int yearsFromBase,
+                       BigDecimal scenarioInflationRate, int taxYear, @Nullable HouseholdContext household) {
         if (sources == null || sources.isEmpty()) {
             return BigDecimal.ZERO;
         }
 
         BigDecimal total = BigDecimal.ZERO;
         for (var source : sources) {
-            if (ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+            int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, taxYear);
+            if (ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                 BigDecimal amount = computeAmount(source, yearsFromBase, scenarioInflationRate);
-                if (IncomeYearMath.isBoundaryAge(source, age)) {
+                if (IncomeYearMath.isBoundaryAge(source, sourceAge)) {
                     amount = amount.divide(TWO, SCALE, ROUNDING);
                 }
                 total = total.add(amount);

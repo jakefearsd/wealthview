@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.HouseholdContext;
+
 public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
     // Real-terms note: both SALT cap tiers below are statutorily fixed nominal, so in today's-dollars
@@ -31,18 +33,30 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
      * The primary filer's birth year, used to derive their age for the year-aware standard
      * deduction (audit D age-65+ addition). {@code null} when the caller doesn't track it, in which
      * case this calculator falls back to the age-less {@link FederalTaxCalculator} overloads --
-     * identical to its pre-age65-feature behavior. This engine only tracks the PRIMARY filer's
-     * birth year, so an MFJ household where both spouses are 65+ still gets only ONE age-65 adder;
-     * see {@link FederalTaxCalculator#loadStandardDeduction(int, FilingStatus, int)}.
+     * identical to its pre-age65-feature behavior. Superseded by {@link #household} when that field
+     * is set (household task 7); see its Javadoc.
      */
     @Nullable
     private final Integer birthYear;
+
+    /**
+     * Household task 7 (spec §4 step 6): the household context, when known -- supersedes
+     * {@link #birthYear} for the age-65 deduction seam. Supplies the primary's age while alive (or
+     * the survivor's from the first-death transition year forward, per task 5's filing-status flip)
+     * plus, while both spouses are alive AND filing MARRIED_FILING_JOINTLY, a SECOND qualifying age
+     * for the spouse -- reproducing the true per-QUALIFYING-PERSON adder (IRS Pub. 501) instead of
+     * the single-adder simplification {@link #birthYear} alone implies. {@code null} for every
+     * pre-household call site -- falls back to {@link #birthYear} exactly as before (byte-identical
+     * anchor).
+     */
+    @Nullable
+    private final HouseholdContext household;
 
     public CombinedTaxCalculator(FederalTaxCalculator federal,
                                   StateTaxCalculator state,
                                   BigDecimal primaryResidencePropertyTax,
                                   BigDecimal primaryResidenceMortgageInterest) {
-        this(federal, state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, null);
+        this(federal, state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, null, null);
     }
 
     public CombinedTaxCalculator(FederalTaxCalculator federal,
@@ -50,6 +64,20 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
                                   BigDecimal primaryResidencePropertyTax,
                                   BigDecimal primaryResidenceMortgageInterest,
                                   @Nullable Integer birthYear) {
+        this(federal, state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, birthYear, null);
+    }
+
+    /**
+     * Household task 7: threads the household context for the per-person age-65 deduction (spec §4
+     * step 6). {@code household} {@code null} reproduces the {@code birthYear}-only 5-arg
+     * constructor exactly.
+     */
+    public CombinedTaxCalculator(FederalTaxCalculator federal,
+                                  StateTaxCalculator state,
+                                  BigDecimal primaryResidencePropertyTax,
+                                  BigDecimal primaryResidenceMortgageInterest,
+                                  @Nullable Integer birthYear,
+                                  @Nullable HouseholdContext household) {
         this.federal = federal;
         this.state = state;
         this.primaryResidencePropertyTax = primaryResidencePropertyTax != null
@@ -57,6 +85,7 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
         this.primaryResidenceMortgageInterest = primaryResidenceMortgageInterest != null
                 ? primaryResidenceMortgageInterest : BigDecimal.ZERO;
         this.birthYear = birthYear;
+        this.household = household;
     }
 
     /**
@@ -70,9 +99,18 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
 
     /**
      * The federal standard deduction for (taxYear, status), boosted by the age-65+ addition when
-     * {@link #birthYear} is known and the primary filer turns 65+ in {@code taxYear} (audit D).
+     * {@link #birthYear} is known and the primary filer turns 65+ in {@code taxYear} (audit D) --
+     * or, when {@link #household} is known (household task 7), per the household's per-year filer
+     * age(s): the second qualifying age is only threaded when both spouses are alive AND filing
+     * jointly, so a household filing SINGLE (post-transition, or by explicit user choice) gets at
+     * most one adder just like a single filer.
      */
     private BigDecimal resolveFederalStandardDeduction(int taxYear, FilingStatus status) {
+        if (household != null) {
+            Integer secondAge = status == FilingStatus.MARRIED_FILING_JOINTLY
+                    ? household.secondFilerAgeIn(taxYear) : null;
+            return federal.loadStandardDeduction(taxYear, status, household.filerAgeIn(taxYear), secondAge);
+        }
         return birthYear != null
                 ? federal.loadStandardDeduction(taxYear, status, taxYear - birthYear)
                 : federal.loadStandardDeduction(taxYear, status);

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.household.HouseholdContext;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -238,6 +239,59 @@ class IncomeContributionCalculatorTest {
                 null, null, null, null, null, null);
 
         var result = calculator.compute(List.of(rental), 65, 1, BigDecimal.ZERO);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    // === Household task 7 (T5-review, spec §1): owner-age windows in the accumulation phase ===
+
+    private static final HouseholdContext AGE_GAP_HOUSEHOLD = HouseholdContext.of(1958, 90, 1970, 90, 2070);
+
+    private ProjectionIncomeSourceInput sourceWithOwner(String name, String amount, int startAge,
+                                                        Integer endAge, String owner) {
+        return new ProjectionIncomeSourceInput(
+                UUID.randomUUID(), name, IncomeSourceType.OTHER,
+                new BigDecimal(amount), startAge, endAge, BigDecimal.ZERO, false, "taxable",
+                null, null, null, null, null, null, owner, BigDecimal.ONE);
+    }
+
+    @Test
+    void compute_household_spouseOwnedSourceEvaluatesAgainstSpouseAge_notPrimaryAge() {
+        // Spouse (born 1970) is only 53 in 2023 even though the primary (1958) is 65 -- the
+        // spouse-owned source (start_age 65) must not be active yet.
+        var sources = List.of(sourceWithOwner("Spouse pension", "24000", 65, null, "spouse"));
+
+        var result = calculator.compute(sources, 65, 1, BigDecimal.ZERO, 2023, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @Test
+    void compute_household_spouseOwnedSourceActivatesAtSpouseOwnAge() {
+        var sources = List.of(sourceWithOwner("Spouse pension", "24000", 65, null, "spouse"));
+
+        // 2036: spouse (born 1970) is 66 -- past the boundary, full amount.
+        var result = calculator.compute(sources, 78, 1, BigDecimal.ZERO, 2036, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    @Test
+    void compute_household_primaryOwnedSourceUnaffected() {
+        var sources = List.of(sourceWithOwner("Primary pension", "24000", 65, null, "primary"));
+
+        var result = calculator.compute(sources, 66, 1, BigDecimal.ZERO, 2024, AGE_GAP_HOUSEHOLD);
+
+        assertThat(result).isEqualByComparingTo(new BigDecimal("24000"));
+    }
+
+    @Test
+    void compute_householdNull_spouseOwnedSourceFallsBackToUniformAge() {
+        // No household threaded (household == null) reproduces the pre-task-7, age-uniform
+        // behavior: the source is evaluated against the `age` param regardless of `owner`.
+        var sources = List.of(sourceWithOwner("Spouse pension", "24000", 65, null, "spouse"));
+
+        var result = calculator.compute(sources, 66, 1, BigDecimal.ZERO, 2024, null);
 
         assertThat(result).isEqualByComparingTo(new BigDecimal("24000"));
     }

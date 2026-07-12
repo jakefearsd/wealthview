@@ -5,6 +5,7 @@ import java.util.Arrays;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -131,7 +132,10 @@ final class LtcgTaxTable {
     /** Builds the table for one (taxYear, status) pair. {@code federalTaxCalculator} may be
      * {@code null} (mirrors {@code LtcgRateCalculator}'s ZERO-deduction fallback -- the stacking
      * floor stays gross). {@code age} follows
-     * {@link FederalTaxCalculator#loadStandardDeduction(int, FilingStatus, int)}'s convention. */
+     * {@link FederalTaxCalculator#loadStandardDeduction(int, FilingStatus, int)}'s convention. Calls
+     * {@code federalTaxCalculator}'s single-age overload DIRECTLY (not routed through the 8-arg
+     * overload below) so a mock stubbing only that overload keeps working unchanged -- the
+     * byte-identical anchor for every pre-household caller. */
     static LtcgTaxTable build(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
                                @Nullable FederalTaxCalculator federalTaxCalculator,
                                int taxYear, FilingStatus status, int yearsFromBase,
@@ -139,12 +143,42 @@ final class LtcgTaxTable {
         if (capitalGainsTaxCalculator == null) {
             return ZERO;
         }
-        var brackets = capitalGainsTaxCalculator.loadLtcgBrackets(taxYear, status);
-        double niitThreshold = capitalGainsTaxCalculator
-                .niitThresholdReal(status, yearsFromBase, BigDecimal.valueOf(inflationRate)).doubleValue();
         double deduction = federalTaxCalculator != null
                 ? federalTaxCalculator.loadStandardDeduction(taxYear, status, age).doubleValue()
                 : 0.0;
+        return build(capitalGainsTaxCalculator, taxYear, status, yearsFromBase, inflationRate, deduction);
+    }
+
+    /** Household task 7 (spec §4 step 6): like {@link #build(CapitalGainsTaxCalculator,
+     * FederalTaxCalculator, int, FilingStatus, int, double, int)} but applies the age-65 deduction
+     * adder a SECOND time when {@code secondAge} is non-null and itself 65+ (a household's spouse
+     * while both are alive and filing jointly). Only ever called with a non-null {@code secondAge}
+     * OR a real (non-mocked) {@code federalTaxCalculator} -- see {@link #computeAll(
+     * CapitalGainsTaxCalculator, FederalTaxCalculator, int, int, FilingStatus, double, Integer,
+     * HouseholdContext)}, which calls the 7-arg overload above directly whenever there is no
+     * household, preserving the exact pre-task-7 call path. */
+    static LtcgTaxTable build(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                               @Nullable FederalTaxCalculator federalTaxCalculator,
+                               int taxYear, FilingStatus status, int yearsFromBase,
+                               double inflationRate, int age, @Nullable Integer secondAge) {
+        if (capitalGainsTaxCalculator == null) {
+            return ZERO;
+        }
+        double deduction = federalTaxCalculator != null
+                ? federalTaxCalculator.loadStandardDeduction(taxYear, status, age, secondAge).doubleValue()
+                : 0.0;
+        return build(capitalGainsTaxCalculator, taxYear, status, yearsFromBase, inflationRate, deduction);
+    }
+
+    private static LtcgTaxTable build(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                      int taxYear, FilingStatus status, int yearsFromBase,
+                                      double inflationRate, double deduction) {
+        if (capitalGainsTaxCalculator == null) {
+            return ZERO;
+        }
+        var brackets = capitalGainsTaxCalculator.loadLtcgBrackets(taxYear, status);
+        double niitThreshold = capitalGainsTaxCalculator
+                .niitThresholdReal(status, yearsFromBase, BigDecimal.valueOf(inflationRate)).doubleValue();
 
         int n = brackets.size();
         double[] floors = new double[n];
@@ -165,6 +199,24 @@ final class LtcgTaxTable {
                                       @Nullable FederalTaxCalculator federalTaxCalculator,
                                       int retirementYear, int years, FilingStatus filingStatus,
                                       double inflationRate, @Nullable Integer birthYear) {
+        return computeAll(capitalGainsTaxCalculator, federalTaxCalculator, retirementYear, years,
+                filingStatus, inflationRate, birthYear, null);
+    }
+
+    /**
+     * Household task 7 (spec §4 step 6): like {@link #computeAll(CapitalGainsTaxCalculator,
+     * FederalTaxCalculator, int, int, FilingStatus, double, Integer)} but, when {@code household} is
+     * known, builds each year's table off the household's OWN per-year filer age(s) instead of a
+     * single fixed {@code birthYear} -- mirrors {@link OrdinaryTaxTable#computeAll(FederalTaxCalculator,
+     * int, int, FilingStatus, Integer, com.wealthview.core.projection.household.HouseholdContext)}'s
+     * identical convention. {@code household} {@code null} reproduces the {@code birthYear}-only
+     * 7-arg overload exactly (the byte-identical anchor).
+     */
+    static LtcgTaxTable[] computeAll(@Nullable CapitalGainsTaxCalculator capitalGainsTaxCalculator,
+                                      @Nullable FederalTaxCalculator federalTaxCalculator,
+                                      int retirementYear, int years, FilingStatus filingStatus,
+                                      double inflationRate, @Nullable Integer birthYear,
+                                      @Nullable HouseholdContext household) {
         LtcgTaxTable[] tables = new LtcgTaxTable[years];
         if (capitalGainsTaxCalculator == null) {
             Arrays.fill(tables, ZERO);
@@ -172,9 +224,17 @@ final class LtcgTaxTable {
         }
         for (int y = 0; y < years; y++) {
             int taxYear = retirementYear + y;
-            int age = birthYear != null ? taxYear - birthYear : -1;
-            tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus, y,
-                    inflationRate, age);
+            if (household != null) {
+                int age = household.filerAgeIn(taxYear);
+                Integer secondAge = filingStatus == FilingStatus.MARRIED_FILING_JOINTLY
+                        ? household.secondFilerAgeIn(taxYear) : null;
+                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus, y,
+                        inflationRate, age, secondAge);
+            } else {
+                int age = birthYear != null ? taxYear - birthYear : -1;
+                tables[y] = build(capitalGainsTaxCalculator, federalTaxCalculator, taxYear, filingStatus, y,
+                        inflationRate, age);
+            }
         }
         return tables;
     }

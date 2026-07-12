@@ -43,18 +43,23 @@ final class HouseholdMcResolver {
      *        {@code null} unless there is an in-window transition
      * @param postStatus the filing status from the transition year (SINGLE) — {@code preStatus} when
      *        there is no in-window transition
+     * @param context household task 7 (spec §4 step 6): the resolved two-person
+     *        {@link HouseholdContext}, threaded into the per-year exact tax tables
+     *        ({@link OptimizationContextBuilder#ordinaryTablesByYear}/{@code ltcgTablesByYear}) for
+     *        the per-person age-65 deduction. {@code null} for a single-person input.
      */
     record Resolved(
             @Nullable TrialSimulator.HouseholdSim sim,
             double survivorFactor,
             int inWindowTransitionIdx,
             @Nullable List<ProjectionIncomeSourceInput> survivorSources,
-            FilingStatus postStatus) {}
+            FilingStatus postStatus,
+            @Nullable HouseholdContext context) {}
 
     private HouseholdMcResolver() {}
 
     static Resolved single(FilingStatus preStatus) {
-        return new Resolved(null, 1.0, -1, null, preStatus);
+        return new Resolved(null, 1.0, -1, null, preStatus, null);
     }
 
     static Resolved resolve(GuardrailOptimizationInput input, int retirementYear, int years,
@@ -116,7 +121,7 @@ final class HouseholdMcResolver {
                 blendedStepUpFactor(input.accounts(), survivorIsPrimary, input.communityProperty()),
                 truncateYearIdx);
 
-        return new Resolved(sim, survivorFactor, inWindowTransitionIdx, survivorSources, postStatus);
+        return new Resolved(sim, survivorFactor, inWindowTransitionIdx, survivorSources, postStatus, household);
     }
 
     /**

@@ -8,6 +8,7 @@ import org.springframework.lang.Nullable;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.SpendingPlan;
+import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.strategy.WithdrawalStrategy;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 
@@ -61,6 +62,12 @@ final class YearFinanceResolver {
      * already-computed Medicare IRMAA premium surcharge (Wave-4 IRMAA item, zero when not
      * applicable) -- passed straight through to {@link RetirementWithdrawalProcessor}; see that
      * class's javadoc for why it is not part of the Social Security convergence loop.
+     *
+     * @param household household task 7 (T5-review, spec §1): threaded into income-source
+     *     processing so a source's age window is evaluated against its OWNER's age rather than the
+     *     uniform {@code age} (the primary's) -- see
+     *     {@link IncomeYearMath#resolveSourceAge}. {@code null} reproduces the pre-household,
+     *     age-uniform behavior exactly.
      */
     record YearContext(
             PoolStrategy pool,
@@ -79,7 +86,8 @@ final class YearFinanceResolver {
             BigDecimal suspendedLoss,
             BigDecimal rmdForced,
             BigDecimal irmaaSurcharge,
-            BigDecimal survivorSpendingFactor) {
+            BigDecimal survivorSpendingFactor,
+            @Nullable HouseholdContext household) {
     }
 
     /**
@@ -129,7 +137,7 @@ final class YearFinanceResolver {
         // actually distributed across the streams.
         BigDecimal rmdForced = yc.rmdForced();
 
-        boolean converge = hasActiveSocialSecurity(yc.incomeSources(), yc.age());
+        boolean converge = hasActiveSocialSecurity(yc.incomeSources(), yc.age(), yc.household(), yc.year());
         PoolStrategy.Memento snapshot = converge ? pool.snapshot() : null;
 
         BigDecimal additionalProvisional = BigDecimal.ZERO;
@@ -149,10 +157,12 @@ final class YearFinanceResolver {
         return comp;
     }
 
-    private boolean hasActiveSocialSecurity(List<ProjectionIncomeSourceInput> incomeSources, int age) {
+    private boolean hasActiveSocialSecurity(List<ProjectionIncomeSourceInput> incomeSources, int age,
+                                            @Nullable HouseholdContext household, int year) {
         for (var source : incomeSources) {
+            int sourceAge = IncomeYearMath.resolveSourceAge(source, age, household, year);
             if (source.incomeType() == IncomeSourceType.SOCIAL_SECURITY
-                    && ProjectionIncomeSourceInput.isActiveForAge(source, age)) {
+                    && ProjectionIncomeSourceInput.isActiveForAge(source, sourceAge)) {
                 return true;
             }
         }
@@ -286,12 +296,12 @@ final class YearFinanceResolver {
         if (pool.processIncomeSourcesEveryYear() || yearsInRetirement > 0) {
             incomeSourceResult = incomeSourceProcessor.process(yc.incomeSources(), age, yearsFromBase,
                     year, pool.getMagi(), pool.getFilingStatus(), yc.suspendedLoss(), inflationRate,
-                    yc.baseYear(), additionalProvisionalIncome);
+                    yc.baseYear(), additionalProvisionalIncome, yc.household());
             totalActiveIncome = incomeSourceResult.totalCashInflow();
             taxableActiveIncome = incomeSourceResult.totalTaxableIncome();
         } else {
             totalActiveIncome = incomeContributionCalculator.compute(
-                    yc.incomeSources(), age, yearsFromBase, inflationRate);
+                    yc.incomeSources(), age, yearsFromBase, inflationRate, year, yc.household());
             taxableActiveIncome = totalActiveIncome;
         }
 

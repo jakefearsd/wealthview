@@ -29,6 +29,11 @@ public record HouseholdContext(
         Optional<Integer> secondDeathYear,
         @Nullable PersonId survivor) {
 
+    /** IRS age threshold (Pub. 501 / Medicare eligibility) for the per-person tax-age rules this
+     * class resolves -- household task 7: the age-65 standard-deduction adder and the Medicare
+     * IRMAA surcharge (spec §4 step 6). */
+    private static final int AGE_65 = 65;
+
     /**
      * One household member's fixed-death-age mortality assumption.
      *
@@ -72,6 +77,51 @@ public record HouseholdContext(
             case PRIMARY -> primary;
             case SPOUSE -> Objects.requireNonNull(spouse, "No spouse in this household context");
         };
+    }
+
+    /**
+     * Household task 7 (spec §1 owner-age windows + §4 step 6 per-person thresholds): the age to
+     * evaluate for this household's per-year age-based rules -- the primary's age while the primary
+     * is alive, else the survivor's (spouse's) age from the primary's death year forward. Always the
+     * primary's age for a single-person context (a degenerate {@link #single} context has no spouse,
+     * so {@link #isHousehold()} is false and {@link #isAliveIn} is never consulted here -- the
+     * primary's own life expectancy is irrelevant to this method, matching every pre-household call
+     * site's unconditional {@code age} variable).
+     */
+    public int filerAgeIn(int year) {
+        if (!isHousehold() || isAliveIn(PersonId.PRIMARY, year)) {
+            return primary.ageIn(year);
+        }
+        return Objects.requireNonNull(spouse, "No spouse in this household context").ageIn(year);
+    }
+
+    /**
+     * Household task 7: the spouse's age in {@code year} when BOTH household members are alive --
+     * used to apply a per-person age-based rule (the age-65 deduction adder, IRMAA surcharge) a
+     * SECOND time for a filing-jointly household. {@code null} for a single-person context or once
+     * the household has collapsed to one filer (post-transition), in which case {@link #filerAgeIn}
+     * alone already reflects the sole remaining filer.
+     */
+    @Nullable
+    public Integer secondFilerAgeIn(int year) {
+        return bothAliveIn(year)
+                ? Objects.requireNonNull(spouse, "No spouse in this household context").ageIn(year)
+                : null;
+    }
+
+    /**
+     * Household task 7 (spec §4 step 6): the number of currently-alive household members age 65+ in
+     * {@code year} -- the per-person multiplier for the IRS age-65 standard-deduction adder and the
+     * Medicare IRMAA surcharge. 0, 1, or 2 while both are alive; at most 1 once only one household
+     * member remains (post-transition) or for a single-person context.
+     */
+    public int age65QualifyingCount(int year) {
+        int count = filerAgeIn(year) >= AGE_65 ? 1 : 0;
+        Integer secondAge = secondFilerAgeIn(year);
+        if (secondAge != null && secondAge >= AGE_65) {
+            count++;
+        }
+        return count;
     }
 
     /** Degenerate single-person context: no spouse, no transition, ever. */

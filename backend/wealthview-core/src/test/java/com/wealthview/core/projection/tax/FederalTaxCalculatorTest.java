@@ -442,6 +442,71 @@ class FederalTaxCalculatorTest {
         assertThat(ageAwareTax).isLessThan(agelessTax);
     }
 
+    // === Household task 7: per-person age-65 additional standard deduction (spec §4 step 6) ===
+    // Pinned: MFJ 2025 base 31,500 + 1,600 per qualifying (age 65+) person -- both spouses 65+ get
+    // the adder TWICE (IRS Pub. 501: the amount is per QUALIFYING PERSON, not per return).
+
+    @Test
+    void loadStandardDeduction_mfj2025BothSpousesOver65_addsTwoAdders() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.MARRIED_FILING_JOINTLY, 66, 66);
+
+        // 31,500 + 2 * 1,600 = 34,700
+        assertThat(deduction).isEqualByComparingTo(bd("34700"));
+    }
+
+    @Test
+    void loadStandardDeduction_mfj2025OnlyPrimaryOver65_addsOneAdder() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.MARRIED_FILING_JOINTLY, 66, 63);
+
+        // 31,500 + 1 * 1,600 = 33,100
+        assertThat(deduction).isEqualByComparingTo(bd("33100"));
+    }
+
+    @Test
+    void loadStandardDeduction_mfj2025NeitherOver65_baseAmountOnly() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        var deduction = calculator.loadStandardDeduction(2025, FilingStatus.MARRIED_FILING_JOINTLY, 60, 62);
+
+        assertThat(deduction).isEqualByComparingTo(bd("31500"));
+    }
+
+    @Test
+    void loadStandardDeduction_secondQualifyingAgeNull_reproducesSingleAgeOverloadByteForByte() {
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "single"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+
+        var singleAgeOverload = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE, 66);
+        var countOverloadWithNullSecond = calculator.loadStandardDeduction(2025, FilingStatus.SINGLE, 66, null);
+
+        assertThat(countOverloadWithNullSecond).isEqualByComparingTo(singleAgeOverload)
+                .isEqualByComparingTo(bd("17750"));
+    }
+
+    @Test
+    void computeTax_mfj2025BothSpousesOver65_usesDoubleBoostedDeduction() {
+        when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "married_filing_jointly"))
+                .thenReturn(mfj2025Brackets());
+        when(standardDeductionRepository.findByTaxYearAndFilingStatus(2025, "married_filing_jointly"))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+
+        var bothOver65 = calculator.computeTax(bd("100000"), 2025, FilingStatus.MARRIED_FILING_JOINTLY, 66, 66);
+        var neitherOver65 = calculator.computeTax(bd("100000"), 2025, FilingStatus.MARRIED_FILING_JOINTLY, 60, 62);
+
+        assertThat(bothOver65).isLessThan(neitherOver65);
+    }
+
     @Test
     void computeTax_afterClearCache_stillComputes() {
         when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(2025, "single"))

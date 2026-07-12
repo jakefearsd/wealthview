@@ -20,16 +20,27 @@ import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
+import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.LtcgBracketRepository;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025Irmaa;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025Ltcg;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
+import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Irmaa;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTaxAndIrmaa;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * Household task 5: the first-death transition event and second-death truncation in the deterministic
@@ -171,6 +182,168 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         // Sanity: the single bill is strictly higher than the MFJ bill on the same income.
         assertThat(oracle.computeTax(bd("60000"), TRANSITION_YEAR, FilingStatus.SINGLE))
                 .isGreaterThan(oracle.computeTax(bd("60000"), 2042, FilingStatus.MARRIED_FILING_JOINTLY));
+    }
+
+    // === Task 7 (spec §4 step 6): per-person age-65 standard deduction while both spouses alive ===
+
+    @Test
+    void perPersonDeduction_bothSpousesOver65Mfj_engineMatchesCountAwareOracleThenSingleAdderAfter() {
+        // Nonzero age-65 addition (the shared 2025 fixtures intentionally stay frozen at 0 -- see
+        // CombinedTaxCalculatorTest's note). Primary (1958) is 65+ from 2023; spouse (1966) is 65+
+        // from 2031 -- both well before the 2043 transition.
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        anyInt(), eq("married_filing_jointly")))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("1600"))));
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        var oracle = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+
+        // A single pension (survivor_percent 1.0 -> unaffected by the transition) covers spending,
+        // isolating the deduction/filing-status effects from any income-side change.
+        var pension = pension("60000", 62, "primary", "1.0");
+        var result = engine.run(input(2040, 90, mfjParams("1.0", false),
+                List.of(acct("1000000", "1000000", "roth", "primary")),
+                new SpendingProfileInput(bd("30000"), bd("10000"), null),
+                List.of(pension), household(85, 90)));
+
+        // Pre-transition (2042): both alive, both 65+, MFJ -> deduction 31,500 + 2*1,600 = 34,700.
+        assertThat(yearOf(result.yearlyData(), 2042).taxLiability())
+                .isEqualByComparingTo(oracle.computeTax(bd("60000"), 2042,
+                        FilingStatus.MARRIED_FILING_JOINTLY, 84, 76));
+        // Post-transition (2043): survivor (spouse, 77) only -- SINGLE, exactly ONE adder even
+        // though the now-dead primary would independently qualify by age.
+        assertThat(yearOf(result.yearlyData(), TRANSITION_YEAR).taxLiability())
+                .isEqualByComparingTo(oracle.computeTax(bd("60000"), TRANSITION_YEAR, FilingStatus.SINGLE, 77, null));
+    }
+
+    // === Task 7 (spec §4 step 6): per-person IRMAA surcharge while both spouses are alive ===
+
+    @Test
+    void irmaa_bothSpousesOver65MfjCrossingTier1_surchargeAppliesTwice() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025Irmaa(irmaaTierRepository);
+        var engine = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository, irmaaTierRepository);
+
+        // Static other_income (no portfolio draws needed) keeps MAGI at a stable 240,000 every
+        // year -- inside the MFJ tier-1 band (212,000-266,000, TaxBracketFixtures.mfj2025IrmaaTiers).
+        var params = """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "withdrawal_rate": 0.04,
+                 "withdrawal_order": "taxable_first", "fee_rate": 0, "other_income": 240000,
+                 "survivor_spending_factor": 0.75, "community_property": false}
+                """.formatted(PRIMARY_BIRTH);
+        var result = engine.run(input(2029, 90, params,
+                List.of(acct("100000", "100000", "roth", "primary")),
+                new SpendingProfileInput(bd("1000"), bd("0"), null), List.of(), household(85, 90)));
+
+        // 2031: primary (1958) is 73, spouse (1966) turns 65 -- both alive, both 65+, MFJ. The
+        // 2-year MAGI lookback (year 2029) is already in-horizon by then.
+        var year2031 = yearOf(result.yearlyData(), 2031);
+        assertThat(year2031.irmaaSurcharge()).isEqualByComparingTo(bd("2104.80")); // 2*(74.00+13.70)*12
+    }
+
+    @Test
+    void irmaa_postTransitionSurvivorOnly_surchargeAppliesOnceOnSingleTiers() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        stubSingle2025Irmaa(irmaaTierRepository);
+        var engine = engineWithTaxAndIrmaa(taxBracketRepository, standardDeductionRepository, irmaaTierRepository);
+
+        // 120,000 lands inside the SINGLE tier-1 band (106,000-133,000) but BELOW the MFJ tier-0
+        // ceiling (212,000) -- pre-transition years owe no surcharge at all, isolating the
+        // post-transition single-tier pin from any pre-transition MFJ contribution.
+        var params = """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "withdrawal_rate": 0.04,
+                 "withdrawal_order": "taxable_first", "fee_rate": 0, "other_income": 120000,
+                 "survivor_spending_factor": 0.75, "community_property": false}
+                """.formatted(PRIMARY_BIRTH);
+        var result = engine.run(input(2029, 90, params,
+                List.of(acct("100000", "100000", "roth", "primary")),
+                new SpendingProfileInput(bd("1000"), bd("0"), null), List.of(), household(85, 90)));
+
+        // 2045: primary died 2043 (transition); survivor (spouse, born 1966) is 79 -- alive, 65+,
+        // filing SINGLE. Only the survivor counts (the deceased primary must NOT be double-counted).
+        var year2045 = yearOf(result.yearlyData(), 2045);
+        assertThat(year2045.irmaaSurcharge()).isEqualByComparingTo(bd("1052.40")); // 1*(74.00+13.70)*12
+    }
+
+    // === Task 7: SS convergence combines benefits + MFJ tiers pre-transition, survivor + single after ===
+
+    @Test
+    void socialSecurityTaxability_combinedMfjPreTransition_thenSurvivorSingleAfter() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+        var ssOracle = new SocialSecurityTaxCalculator();
+
+        // A modest static other_income lifts provisional income above the MFJ $32,000 / single
+        // $25,000 no-tax floors so BOTH pinned oracle figures below are strictly positive (a zero
+        // taxable-SS result serializes as null on the DTO -- the "positive-or-null" convention --
+        // which would make this pin vacuous). Spending ($60,000) is set to exceed even the combined
+        // SS cash ($50,000) so the year runs a genuine deficit draw (from the pure-Roth pool, itself
+        // untaxed) rather than a cash surplus -- keeping the SS provisional-income base isolated to
+        // exactly other_income (no surplus-branch base-tax feedback into the fixed point).
+        var params = """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "withdrawal_rate": 0.04,
+                 "withdrawal_order": "taxable_first", "fee_rate": 0, "other_income": 20000,
+                 "survivor_spending_factor": 1.0, "community_property": false}
+                """.formatted(PRIMARY_BIRTH);
+        var primarySs = ss(UUID.randomUUID(), "30000", 62, "primary");
+        var spouseSs = ss(UUID.randomUUID(), "20000", 62, "spouse");
+        var result = engine.run(input(2029, 90, params,
+                List.of(acct("500000", "500000", "roth", "primary")),
+                new SpendingProfileInput(bd("60000"), bd("0"), null),
+                List.of(primarySs, spouseSs), household(85, 90)));
+
+        // Pre-transition (2035): BOTH SS benefits combine into ONE provisional-income computation
+        // against the MFJ tiers (audit B2 / T3-1) -- pinned against an independent oracle call with
+        // the COMBINED benefit and MARRIED_FILING_JOINTLY status. The pure-Roth pool realizes no
+        // portfolio income, so the provisional-income base is just other_income (20,000) aside from
+        // the SS benefit itself.
+        var pre = yearOf(result.yearlyData(), 2035);
+        var preOracle = ssOracle.computeTaxableAmount(
+                bd("50000"), bd("20000"), "married_filing_jointly", 6, ZERO); // 30000+20000, exponent 2035-2029
+        assertThat(pre.socialSecurityTaxable()).isEqualByComparingTo(preOracle);
+
+        // Post-transition (2045): keep-larger already switched the survivor to the primary's larger
+        // 30,000 benefit; taxability now runs SINGLE-status, single-benefit -- pinned against an
+        // independent oracle call with SINGLE status and just the kept 30,000.
+        var post = yearOf(result.yearlyData(), 2045);
+        var postOracle = ssOracle.computeTaxableAmount(
+                bd("30000"), bd("20000"), "single", 16, ZERO); // exponent 2045-2029
+        assertThat(post.socialSecurityTaxable()).isEqualByComparingTo(postOracle);
+
+        // Sanity: the two oracle figures are not coincidentally equal (proves the test actually
+        // isolates the combined-vs-single distinction).
+        assertThat(preOracle).isNotEqualByComparingTo(postOracle);
+    }
+
+    // === Task 7 (T5-review, spec §1): owner-age income windows while both spouses are alive ===
+
+    @Test
+    void ownerAgeWindow_spouseOwnedSource_startsAtSpouseAge_notPrimaryAge() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        // Spouse-owned pension starting at the SPOUSE's age 65 (spouse born 1966 -> turns 65 in
+        // 2031). In 2029 the household is retired and both alive, but the spouse is only 63.
+        var spouseSource = pension("24000", 65, "spouse", "1.0");
+        var result = engine.run(input(2029, 90, mfjParams("1.0", false),
+                List.of(acct("500000", "500000", "roth", "primary")),
+                new SpendingProfileInput(bd("1000"), bd("0"), null),
+                List.of(spouseSource), household(85, 90)));
+
+        // 2029: spouse (1966) is 63 -- not yet active.
+        assertThat(yearOf(result.yearlyData(), 2029).incomeStreamsTotal()).isEqualByComparingTo(ZERO);
+        // 2032: spouse is 66 -- past the boundary, fully active.
+        assertThat(yearOf(result.yearlyData(), 2032).incomeStreamsTotal()).isEqualByComparingTo(bd("24000"));
     }
 
     // === Transition step 3: basis step-up, visible via a later-year capital-gains-tax delta ===
