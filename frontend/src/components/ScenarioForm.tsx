@@ -61,6 +61,8 @@ interface ScenarioFormFields {
     primaryResidencePropertyTax: number;
     primaryResidenceMortgageInterest: number;
     dividendYield: number | null;
+    feeRate: number | null;
+    includeDepressionYears: boolean;
     spendingPlanSelection: string;
 }
 
@@ -114,6 +116,8 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
         primaryResidencePropertyTax: parsedParams.primary_residence_property_tax ?? 0,
         primaryResidenceMortgageInterest: parsedParams.primary_residence_mortgage_interest ?? 0,
         dividendYield: parsedParams.dividend_yield != null ? parsedParams.dividend_yield * 100 : 1.8,
+        feeRate: parsedParams.fee_rate != null ? parsedParams.fee_rate * 100 : 0.25,
+        includeDepressionYears: parsedParams.include_depression_years ?? false,
         spendingPlanSelection,
     };
 }
@@ -167,7 +171,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         annualRothConversion, rothConversionStrategy, targetBracketRate,
         rothConversionStartYear, withdrawalOrder, dynamicSequencingBracketRate,
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
-        dividendYield, spendingPlanSelection,
+        dividendYield, feeRate, includeDepressionYears, spendingPlanSelection,
     } = fields;
 
     function updateAccount(index: number, field: keyof ScenarioAccountInput, value: string | number | null | AllocationInput) {
@@ -241,6 +245,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 primary_residence_property_tax: state ? primaryResidencePropertyTax : null,
                 primary_residence_mortgage_interest: state ? primaryResidenceMortgageInterest : null,
                 dividend_yield: dividendYield != null ? dividendYield / 100 : undefined,
+                fee_rate: feeRate != null ? feeRate / 100 : undefined,
+                include_depression_years: includeDepressionYears,
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({
@@ -291,6 +297,30 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                         max="10"
                         value={dividendYield ?? ''}
                         onChange={e => setField('dividendYield', e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                </FormField>
+                <FormField
+                    label="Investment Fees (%)"
+                    helpText="Annual all-in cost (expense ratios + advisory) subtracted from returns (default 0.25%)"
+                >
+                    <input
+                        style={inputStyle}
+                        type="number"
+                        step="0.05"
+                        min="0"
+                        max="3"
+                        value={feeRate ?? ''}
+                        onChange={e => setField('feeRate', e.target.value === '' ? null : Number(e.target.value))}
+                    />
+                </FormField>
+                <FormField
+                    label="Include 1928–1971 market history"
+                    helpText="Widens the simulated return sample to include the Great Depression and postwar era. Slightly higher average equity returns, materially fatter tails."
+                >
+                    <input
+                        type="checkbox"
+                        checked={includeDepressionYears}
+                        onChange={e => setField('includeDepressionYears', e.target.checked)}
                     />
                 </FormField>
                 <FormField
@@ -440,6 +470,8 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             </div>
             <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.75rem' }}>
                 Each account represents a pool of investments with its own tax treatment, growth rate, and contribution schedule.
+                {' '}Note: comparing Roth vs. Traditional contributions here doesn&apos;t model the pre-tax wage deduction a
+                Traditional contribution provides today — only each account&apos;s own growth and withdrawal taxation.
             </div>
             {accounts.map((acct, idx) => (
                 <div key={idx} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem' }}>

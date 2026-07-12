@@ -106,6 +106,24 @@ function dividendYieldInput(): HTMLInputElement {
     return input as HTMLInputElement;
 }
 
+function feeRateInput(): HTMLInputElement {
+    const label = screen.getByText('Investment Fees (%)');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Investment Fees input not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function includeDepressionYearsCheckbox(): HTMLInputElement {
+    const label = screen.getByText('Include 1928–1971 market history');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Include depression years checkbox not found');
+    }
+    return input as HTMLInputElement;
+}
+
 describe('ScenarioForm', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -116,6 +134,12 @@ describe('ScenarioForm', () => {
         render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
         expect(screen.getByPlaceholderText('Retirement Plan')).toBeInTheDocument();
         expect(screen.getByText('Retirement Date')).toBeInTheDocument();
+    });
+
+    it('shows a caveat that account comparisons do not model the pre-tax wage deduction', () => {
+        setupMocks();
+        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+        expect(screen.getByText(/pre-tax wage deduction/i)).toBeInTheDocument();
     });
 
     it('lists spending profiles in the Spending Plan dropdown', () => {
@@ -282,6 +306,109 @@ describe('ScenarioForm', () => {
         });
         const call = onSubmit.mock.calls[0][0];
         expect(call.dividend_yield).toBeUndefined();
+    });
+
+    it('submits fee_rate converted from percent to decimal', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(feeRateInput(), { target: { value: '0.5' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.fee_rate).toBeCloseTo(0.005);
+    });
+
+    it('defaults fee_rate to 0.25% when no initial value is present', () => {
+        setupMocks();
+        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(feeRateInput().value).toBe('0.25');
+    });
+
+    it('hydrates fee_rate from an existing scenario\'s params_json', () => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ fee_rate: 0.01 });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(feeRateInput().value).toBe('1');
+    });
+
+    it('omits fee_rate when the field is cleared to blank', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(feeRateInput(), { target: { value: '' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.fee_rate).toBeUndefined();
+    });
+
+    it('round-trips a genuine 0% fee_rate override as 0, not dropped', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.change(feeRateInput(), { target: { value: '0' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.fee_rate).toBe(0);
+    });
+
+    it('submits include_depression_years as false by default', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        expect(includeDepressionYearsCheckbox().checked).toBe(false);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.include_depression_years).toBe(false);
+    });
+
+    it('submits include_depression_years as true when checked', async () => {
+        setupMocks();
+        const onSubmit = vi.fn().mockResolvedValue(undefined);
+        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+        fireEvent.click(includeDepressionYearsCheckbox());
+        expect(includeDepressionYearsCheckbox().checked).toBe(true);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+        await waitFor(() => {
+            expect(onSubmit).toHaveBeenCalled();
+        });
+        const call = onSubmit.mock.calls[0][0];
+        expect(call.include_depression_years).toBe(true);
+    });
+
+    it('hydrates include_depression_years from an existing scenario\'s params_json', () => {
+        setupMocks();
+        const scenario = makeScenario({});
+        scenario.params_json = JSON.stringify({ include_depression_years: true });
+        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+        expect(includeDepressionYearsCheckbox().checked).toBe(true);
     });
 
     it('round-trips a genuine 0% expected_return override as 0, not dropped', async () => {
