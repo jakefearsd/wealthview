@@ -119,19 +119,37 @@ export interface SpendingFeasibility {
     required_annual_spending: number;
 }
 
-export interface ProjectionResult {
+/**
+ * Fields common to BOTH `GET /projections/{id}/run` and `POST /projections/compare` (backend:
+ * `ProjectionResultResponse`, wrapped by `ProjectionRunResponse` for `/run` and by
+ * `CompareResponse` for `/compare` -- see those two backend types for the wire-level split this
+ * mirrors).
+ */
+export interface ProjectionCompareResult {
     scenario_id: string;
     yearly_data: ProjectionYear[];
     final_balance: number;
     years_in_retirement: number;
     spending_feasibility: SpendingFeasibility | null;
-    unclassified_symbols: string[] | null;
     final_net_worth: number | null;
+}
+
+/**
+ * `/run`'s response shape: every `ProjectionCompareResult` field plus the two fields ONLY
+ * `ProjectionRunResponse` serializes (`unclassified_symbols`, `warnings`) -- `/compare` results
+ * never carry them (backend `CompareResponse.results` is `ProjectionResultResponse[]`, which has
+ * no such fields at all, not merely null ones). Keeping this name unchanged (rather than
+ * introducing e.g. `ProjectionRunResult`) avoids touching every existing single-scenario
+ * consumer (`ProjectionDetailPage`, `MilestoneStrip`, `ProjectionCacheContext`) that already
+ * relies on it for `/run`.
+ */
+export interface ProjectionResult extends ProjectionCompareResult {
+    unclassified_symbols: string[] | null;
     warnings: string[] | null;
 }
 
 export interface CompareResponse {
-    results: ProjectionResult[];
+    results: ProjectionCompareResult[];
 }
 
 export interface ScenarioAccountInput {

@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BrowserRouter } from 'react-router';
 import ProjectionComparePage from './ProjectionComparePage';
-import type { CompareResponse, ProjectionResult, ProjectionYear, Scenario } from '../types/projection';
+import type { CompareResponse, ProjectionCompareResult, ProjectionYear, Scenario } from '../types/projection';
 
 const hoisted = vi.hoisted(() => ({
     toastError: vi.fn(),
@@ -36,16 +36,14 @@ function year(y: number, age: number, endBalance: number): ProjectionYear {
     return { year: y, age, end_balance: endBalance } as unknown as ProjectionYear;
 }
 
-function result(scenarioId: string, years: ProjectionYear[], final: number): ProjectionResult {
+function result(scenarioId: string, years: ProjectionYear[], final: number): ProjectionCompareResult {
     return {
         scenario_id: scenarioId,
         yearly_data: years,
         final_balance: final,
         years_in_retirement: 20,
         spending_feasibility: null,
-        unclassified_symbols: null,
         final_net_worth: null,
-        warnings: null,
     };
 }
 
