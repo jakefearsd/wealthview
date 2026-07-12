@@ -237,6 +237,47 @@ EOF
     [ ! -d backups ] || [ -z "$(ls -A backups 2>/dev/null)" ]
 }
 
+@test "backup: --dry-run in dev mode does not warn about plaintext backups" {
+    cat > .env <<EOF
+DB_PASSWORD=x
+JWT_SECRET=y
+SUPER_ADMIN_PASSWORD=z
+EOF
+    rm -rf backups
+    run ./wv backup --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"WARN"* ]]
+}
+
+@test "backup: --dry-run in prod mode without --encrypt warns about plaintext backups" {
+    cat > .env <<EOF
+DB_PASSWORD=x
+JWT_SECRET=y
+SUPER_ADMIN_PASSWORD=z
+MFA_ENCRYPTION_KEY=w
+WEALTHVIEW_VERSION=1.0.0
+EOF
+    rm -rf backups
+    run ./wv backup --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"WARN"* ]]
+    [[ "$output" == *"unencrypted"* ]] || [[ "$output" == *"plaintext"* ]]
+}
+
+@test "backup: --dry-run in prod mode with --encrypt does not warn" {
+    cat > .env <<EOF
+DB_PASSWORD=x
+JWT_SECRET=y
+SUPER_ADMIN_PASSWORD=z
+MFA_ENCRYPTION_KEY=w
+WEALTHVIEW_VERSION=1.0.0
+EOF
+    rm -rf backups
+    run ./wv backup --dry-run --encrypt
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"WARN"* ]]
+}
+
 @test "backup: rejects --label with invalid characters" {
     cat > .env <<EOF
 DB_PASSWORD=x

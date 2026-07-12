@@ -51,6 +51,9 @@ USAGE
     if (( dry_run == 1 )); then
         wv_log "[dry-run] Would dump db -> $path"
         (( encrypt == 1 )) && wv_log "[dry-run] Would encrypt to ${path}.age"
+        if (( encrypt == 0 )) && [[ "$(wv_mode)" == "prod" ]]; then
+            wv_log "[dry-run] Would WARN: unencrypted backup in prod mode"
+        fi
         if (( remote == 1 )); then
             local dest="${BACKUP_REMOTE_DEST:-$(wv_env_get BACKUP_REMOTE_DEST)}"
             wv_log "[dry-run] Would push to ${dest:-(unset; --remote would no-op)}"
@@ -66,6 +69,12 @@ USAGE
     local size
     size="$(du -h "$path" | cut -f1)"
     wv_log "Backup written: $path ($size)"
+
+    if (( encrypt == 0 )) && [[ "$(wv_mode)" == "prod" ]]; then
+        wv_warn "Writing an UNENCRYPTED backup in prod mode. Financial data is now sitting in" \
+            "plaintext at $path. Re-run with --encrypt (needs BACKUP_ENCRYPTION_RECIPIENT in" \
+            "$WV_ENV_FILE) or encrypt this file yourself before it leaves this host."
+    fi
 
     if (( encrypt == 1 )); then
         wv_require age
