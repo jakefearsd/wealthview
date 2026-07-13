@@ -71,6 +71,14 @@ final class SurvivorIncomeAdjuster {
         }
         PersonId survivor = household.survivor();
         PersonId deceased = survivor == PersonId.PRIMARY ? PersonId.SPOUSE : PersonId.PRIMARY;
+        // HP3 Part B-1 (investigated, kept as-is): the "+1" here is REQUIRED, not an off-by-one --
+        // it is the exact 1-indexing IncomeYearMath#realAmount's contract expects (steps =
+        // yearsFromBase - 1), the SAME shape YearFinanceResolver uses for every other source's real
+        // amount in calendar year `year` (yearsFromBase = max(0, year - baseYear) + 1). Removing it
+        // would give the keep-larger comparison ONE FEWER compounding step than every other income
+        // computation applies for the SAME transition year -- see
+        // SurvivorIncomeAdjusterTest#keepLargerSocialSecurity_usesTheEstablishedElapsedYearsClock_notTheRawFaceAmount
+        // for a worked counter-example and the direction-verification that removing it is the bug.
         int yearsFromBaseAtTransition = Math.max(0, transitionYear - baseYear) + 1;
         UUID keptSsId = keepLargerSocialSecurityId(sources, yearsFromBaseAtTransition, scenarioInflationRate);
 

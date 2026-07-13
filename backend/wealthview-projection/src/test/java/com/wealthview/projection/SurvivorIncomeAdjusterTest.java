@@ -38,6 +38,12 @@ class SurvivorIncomeAdjusterTest {
                 .orElseThrow(() -> new AssertionError("no " + owner + "-owned source in " + sources));
     }
 
+    private static ProjectionIncomeSourceInput ss(UUID id, String amount, String inflationRate, String owner) {
+        return new ProjectionIncomeSourceInput(id, "SS-" + owner, IncomeSourceType.SOCIAL_SECURITY,
+                new BigDecimal(amount), 62, null, new BigDecimal(inflationRate), false, "taxable",
+                null, null, null, null, null, null, owner, BigDecimal.ONE);
+    }
+
     // === Ordering A: survivor is the SPOUSE (primary dies first) ===
 
     @Test
@@ -143,5 +149,40 @@ class SurvivorIncomeAdjusterTest {
     private static boolean isActive(ProjectionIncomeSourceInput source, HouseholdContext household, int year) {
         int age = IncomeYearMath.resolveSourceAge(source, household.primary().ageIn(year), household, year);
         return ProjectionIncomeSourceInput.isActiveForAge(source, age);
+    }
+
+    // === HP3 Part B-1 investigation: the deflation-clock "+1" in keepLargerSocialSecurityId ===
+    // The household deferred register flagged `yearsFromBaseAtTransition = max(0, transitionYear -
+    // baseYear) + 1` as a possible off-by-one that could flip the keep-larger decision between two
+    // SS sources with DIFFERENT inflation rates. Investigated: the "+1" is CORRECT and must stay --
+    // it is the exact 1-indexing IncomeYearMath#realAmount's documented contract requires (steps =
+    // yearsFromBase - 1; "the base year itself is 1"), the SAME shape YearFinanceResolver uses for
+    // every other source's real amount in calendar year `year` (yearsFromBase = max(0, year -
+    // baseYear) + 1). Removing the "+1" would give SurvivorIncomeAdjuster ONE FEWER compounding step
+    // than every other income computation in the codebase evaluates for the SAME calendar year -- an
+    // off-by-one in the OPPOSITE direction from what the register described.
+    //
+    // Proof by independent elapsed-time counting, not a re-derivation of the production formula: one
+    // calendar year after the base year, exactly ONE year of each source's own inflation has
+    // elapsed, so $20,000 @ 2% must be worth $20,400 and $19,000 @ 8% must be worth $20,520 -- the
+    // 8% source is the larger REAL benefit despite its smaller FACE amount. A "no +1" version would
+    // instead compare the raw, ungrown face values ($20,000 vs $19,000) and pick the WRONG source.
+    // This test pins the CURRENT (correct) behavior and fails if the "+1" is removed -- direction-
+    // verified before any change; no production code was touched.
+    @Test
+    void keepLargerSocialSecurity_usesTheEstablishedElapsedYearsClock_notTheRawFaceAmount() {
+        var household = HouseholdContext.of(PRIMARY_BIRTH, 85, SPOUSE_BIRTH, 95, 2070);
+        var lowerRateHigherFace = ss(UUID.randomUUID(), "20000", "0.02", "primary");  // 20,000 @ 2%
+        var higherRateLowerFace = ss(UUID.randomUUID(), "19000", "0.08", "spouse");   // 19,000 @ 8%
+
+        // transitionYear = baseYear + 1: exactly one elapsed calendar year of compounding.
+        var adjusted = SurvivorIncomeAdjuster.adjust(
+                List.of(lowerRateHigherFace, higherRateLowerFace), household, 2043, 2042, ZERO);
+
+        // The 8%-inflation source (real value 19,000*1.08=20,520) is correctly kept over the
+        // 2%-inflation source (real value 20,000*1.02=20,400), even though its FACE amount is
+        // smaller -- proving the comparison follows the grown real amount, not the raw face value.
+        assertThat(adjusted).hasSize(1);
+        assertThat(adjusted.getFirst().id()).isEqualTo(higherRateLowerFace.id());
     }
 }
