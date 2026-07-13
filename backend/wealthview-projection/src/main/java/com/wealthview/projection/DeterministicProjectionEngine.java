@@ -60,6 +60,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
      */
     private static final BigDecimal DEFAULT_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.75");
 
+    // HP3 Part B-2: ScenarioCrudService.validateSurvivorSpendingFactor enforces this SAME [0.5, 1.0]
+    // range at write time, but a params_json that bypasses that check (a stale persisted value, a
+    // future write path) previously reached the engine's survivor-factor scaling raw -- clamp
+    // defensively here too, mirroring the same guard on the MC seam (HouseholdMcResolver).
+    private static final BigDecimal MIN_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.5");
+    private static final BigDecimal MAX_SURVIVOR_SPENDING_FACTOR = BigDecimal.ONE;
+
     /**
      * Fallback inflation assumption used to convert a user's NOMINAL expected-return override into a
      * REAL return via {@code (1+nominal)/(1+inflationRate)-1} when the scenario itself has no
@@ -214,7 +221,7 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // for a single-person context (no transition ever fires), so the defaults never move a
         // pre-household path.
         BigDecimal survivorSpendingFactor = params.survivorSpendingFactor() != null
-                ? params.survivorSpendingFactor() : DEFAULT_SURVIVOR_SPENDING_FACTOR;
+                ? clampSurvivorSpendingFactor(params.survivorSpendingFactor()) : DEFAULT_SURVIVOR_SPENDING_FACTOR;
         boolean communityProperty = Boolean.TRUE.equals(params.communityProperty());
 
         var ctx = new ProjectionRunContext(input, pool, resolved.strategy(),
@@ -222,6 +229,13 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
                 resolved.inflationRate(), resolved.spendingPlan(), resolved.incomeSources(),
                 resolved.properties(), taxStrategy, survivorSpendingFactor, communityProperty);
         return runProjection(ctx);
+    }
+
+    /** HP3 Part B-2: clamps an explicit override to the documented [0.5, 1.0] range -- see the
+     * field comment above. A no-op for every value {@code ScenarioCrudService} would have accepted
+     * (the byte-identical anchor for the in-range/default paths). */
+    private static BigDecimal clampSurvivorSpendingFactor(BigDecimal factor) {
+        return factor.max(MIN_SURVIVOR_SPENDING_FACTOR).min(MAX_SURVIVOR_SPENDING_FACTOR);
     }
 
     // NPathComplexity: this method resolves many independent parameters, each via a small

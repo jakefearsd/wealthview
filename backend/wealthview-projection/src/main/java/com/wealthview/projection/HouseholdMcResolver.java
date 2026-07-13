@@ -32,6 +32,13 @@ final class HouseholdMcResolver {
     /** Spec §4 default survivor spending factor when a household omits it. */
     private static final double DEFAULT_SURVIVOR_SPENDING_FACTOR = 0.75;
 
+    // HP3 Part B-2: ScenarioCrudService.validateSurvivorSpendingFactor enforces this SAME [0.5, 1.0]
+    // range at write time, but a directly-constructed GuardrailOptimizationInput (tests, a future
+    // write path, a stale persisted value) bypasses that check entirely -- clamp defensively here
+    // too so an out-of-range value can never reach the trial simulator.
+    private static final double MIN_SURVIVOR_SPENDING_FACTOR = 0.5;
+    private static final double MAX_SURVIVOR_SPENDING_FACTOR = 1.0;
+
     /**
      * The resolved Monte Carlo household transition inputs for one optimization run.
      *
@@ -62,6 +69,13 @@ final class HouseholdMcResolver {
         return new Resolved(null, 1.0, -1, null, preStatus, null);
     }
 
+    /** HP3 Part B-2: clamps an explicit override to the documented [0.5, 1.0] range -- see the
+     * field comment above. A no-op for every value {@code ScenarioCrudService} would have accepted
+     * (the byte-identical anchor for the in-range/default paths). */
+    private static double clampSurvivorSpendingFactor(double factor) {
+        return Math.max(MIN_SURVIVOR_SPENDING_FACTOR, Math.min(MAX_SURVIVOR_SPENDING_FACTOR, factor));
+    }
+
     static Resolved resolve(GuardrailOptimizationInput input, int retirementYear, int years,
                             double inflationRate, FilingStatus preStatus) {
         Integer spouseBirthYear = input.spouseBirthYear();
@@ -82,7 +96,8 @@ final class HouseholdMcResolver {
         boolean survivorIsPrimary = household.survivor() == PersonId.PRIMARY;
         BigDecimal survivorFactorOverride = input.survivorSpendingFactor();
         double survivorFactor = survivorFactorOverride != null
-                ? survivorFactorOverride.doubleValue() : DEFAULT_SURVIVOR_SPENDING_FACTOR;
+                ? clampSurvivorSpendingFactor(survivorFactorOverride.doubleValue())
+                : DEFAULT_SURVIVOR_SPENDING_FACTOR;
 
         // The MC year index of the first death; -1 when it falls outside the modeled window (both
         // alive the whole time, or first death at/after the horizon end). A death at/before the

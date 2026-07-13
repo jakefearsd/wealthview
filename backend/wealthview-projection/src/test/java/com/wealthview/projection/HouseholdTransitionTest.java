@@ -409,6 +409,44 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(factorDraw).isEqualByComparingTo(bd("75000")); // 100000 * 0.75
     }
 
+    // === HP3 Part B-2: defensive survivor_spending_factor clamp at the det engine seam ===
+    // ScenarioCrudService enforces [0.5, 1.0] only at write time; a params_json that bypasses that
+    // validation (a stale persisted value, a future write path) previously reached the engine raw.
+
+    @Test
+    void transition_survivorSpendingFactorAboveOne_clampsToOneAtTheEngineSeam() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var spending = new SpendingProfileInput(bd("100000"), bd("0"), null);
+        var outOfRangeRun = engine.run(input(2040, 90, mfjParams("1.5", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")), spending, List.of(), household(85, 90)));
+        var clampedAnchorRun = engine.run(input(2040, 90, mfjParams("1.0", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")), spending, List.of(), household(85, 90)));
+
+        // 1.5 clamps to 1.0 at the seam -- byte-identical to the explicit-1.0 run, NOT a 150,000 draw.
+        assertThat(yearOf(outOfRangeRun.yearlyData(), TRANSITION_YEAR).withdrawals())
+                .isEqualByComparingTo(yearOf(clampedAnchorRun.yearlyData(), TRANSITION_YEAR).withdrawals());
+        assertThat(yearOf(outOfRangeRun.yearlyData(), TRANSITION_YEAR).withdrawals())
+                .isEqualByComparingTo(bd("100000"));
+    }
+
+    @Test
+    void transition_survivorSpendingFactorBelowHalf_clampsToHalfAtTheEngineSeam() {
+        stubSingle2025(taxBracketRepository, standardDeductionRepository);
+        stubMfj2025(taxBracketRepository, standardDeductionRepository);
+        var engine = engineWithTax(taxBracketRepository, standardDeductionRepository);
+
+        var spending = new SpendingProfileInput(bd("100000"), bd("0"), null);
+        var outOfRangeRun = engine.run(input(2040, 90, mfjParams("0.2", false),
+                List.of(acct("3000000", "3000000", "taxable", "joint")), spending, List.of(), household(85, 90)));
+
+        // 0.2 clamps to 0.5 -- draw is 50,000, not 20,000.
+        assertThat(yearOf(outOfRangeRun.yearlyData(), TRANSITION_YEAR).withdrawals())
+                .isEqualByComparingTo(bd("50000"));
+    }
+
     // === Task 8 follow-up (T10 blocker): the viability/feasibility DISCLOSURES scale too ===
     // RetirementWithdrawalProcessor scales the actual draw (pinned above), but
     // SpendingFeasibilityAnalyzer.applyViability resolves the SAME plan through a second,

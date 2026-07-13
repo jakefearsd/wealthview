@@ -113,4 +113,48 @@ class HouseholdMcResolverTest {
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, new BigDecimal("0.75"), false);
     }
+
+    // === HP3 Part B-2: defensive survivor_spending_factor clamp at the engine seam ===
+    // ScenarioCrudService enforces [0.5, 1.0] only at write time (validateSurvivorSpendingFactor);
+    // a directly-constructed GuardrailOptimizationInput (a test, a future write path, a stale
+    // persisted value written before validation existed) bypasses that check entirely and this
+    // resolver previously trusted the caller's raw value. Clamp defensively at the seam too.
+
+    private static GuardrailOptimizationInput householdInputWithFactor(BigDecimal survivorSpendingFactor) {
+        // Same "first death inside the window" shape as resolve_firstDeathInsideRetirementWindow...
+        // above (primary dies 2040, ten years into the 2030 window) -- only the factor varies.
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1962, 90, INFLATION,
+                List.of(), List.of(),
+                new BigDecimal("40000"), BigDecimal.ZERO, null,
+                300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
+                0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
+                false, null, null, 5, null, null, null, null, 2025, false, null, true,
+                1968, 78, 90, survivorSpendingFactor, false);
+    }
+
+    @Test
+    void resolve_survivorSpendingFactorAboveOne_clampsToOne() {
+        var resolved = HouseholdMcResolver.resolve(householdInputWithFactor(new BigDecimal("1.5")),
+                2030, 22, INFLATION.doubleValue(), FilingStatus.MARRIED_FILING_JOINTLY);
+
+        assertThat(resolved.survivorFactor()).isEqualTo(1.0);
+    }
+
+    @Test
+    void resolve_survivorSpendingFactorBelowHalf_clampsToHalf() {
+        var resolved = HouseholdMcResolver.resolve(householdInputWithFactor(new BigDecimal("0.2")),
+                2030, 22, INFLATION.doubleValue(), FilingStatus.MARRIED_FILING_JOINTLY);
+
+        assertThat(resolved.survivorFactor()).isEqualTo(0.5);
+    }
+
+    @Test
+    void resolve_survivorSpendingFactorAtBounds_passesThroughUnclamped() {
+        // Boundary-inclusive: exactly 0.5 or exactly 1.0 must NOT be nudged by the clamp.
+        assertThat(HouseholdMcResolver.resolve(householdInputWithFactor(BigDecimal.ONE), 2030, 22,
+                INFLATION.doubleValue(), FilingStatus.MARRIED_FILING_JOINTLY).survivorFactor()).isEqualTo(1.0);
+        assertThat(HouseholdMcResolver.resolve(householdInputWithFactor(new BigDecimal("0.5")), 2030, 22,
+                INFLATION.doubleValue(), FilingStatus.MARRIED_FILING_JOINTLY).survivorFactor()).isEqualTo(0.5);
+    }
 }
