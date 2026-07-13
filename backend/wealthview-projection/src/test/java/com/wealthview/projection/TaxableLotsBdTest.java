@@ -148,6 +148,25 @@ class TaxableLotsBdTest {
         assertThat(lots.totalValue()).isEqualByComparingTo(valueBefore); // value untouched (conservation)
     }
 
+    /** HP3 Part B-3 (HP1 review Minor): the BigDecimal mirror of
+     * {@link TaxableLotsTest#stepUpByOwner_decedentOwnedLot_retaggedToSurvivor}'s economic
+     * double-death proof, stronger than the snapshot-ordinal-only pin below. The spouse's lot
+     * belongs to the survivor (primary) after the step-up. Probe: re-grow a fresh gain, then name
+     * PRIMARY as a (hypothetical) later decedent -- the lot steps FULLY, which only happens if it
+     * was actually retagged SPOUSE -> PRIMARY (else it would still be the survivor, factor 0.0, and
+     * the fresh gain would stay untouched). */
+    @Test
+    void stepUpByOwner_decedentOwnedLot_retaggedToSurvivor_provenEconomically() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100"), bd("200"), LotOwner.SPOUSE); // gain 100
+
+        lots.stepUpByOwner(LotOwner.SPOUSE, new BigDecimal("0.5")); // basis -> 200 (full), retag SPOUSE->PRIMARY
+        lots.grow(new BigDecimal("0.5"));                           // value 300, basis 200: fresh 100 gain
+        lots.stepUpByOwner(LotOwner.PRIMARY, new BigDecimal("0.5"));
+
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("300")); // stepped fully -> proves retag
+    }
+
     @Test
     void stepUpByOwner_decedentOwnedLot_retaggedToSurvivorAfterStep() {
         var lots = new TaxableLotsBd();
