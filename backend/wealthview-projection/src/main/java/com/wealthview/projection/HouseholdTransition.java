@@ -77,6 +77,12 @@ final class HouseholdTransition {
         return factor;
     }
 
+    // HP3 Part C (T5-review flagged, spec §4 granularity callout): the transition is WHOLE-YEAR,
+    // not prorated to the actual date of death -- `transitionYear` (the calendar year of the first
+    // death) is treated as fully survivor-mode for income, spending, AND filing status for its
+    // ENTIRE year, not just from the death date forward. Consistent with the engine's existing
+    // whole-year `retired` convention (a mid-year retirement is modeled as retired for the whole
+    // year too); keeps the transition a single, clean, atomic step rather than a sub-year blend.
     static SurvivorYear resolveYear(@Nullable HouseholdContext household, PoolStrategy pool, int year,
                                     List<ProjectionIncomeSourceInput> incomeSources, int baseYear,
                                     BigDecimal inflationRate, BigDecimal survivorSpendingFactor,

@@ -111,6 +111,21 @@ final class GuardrailResponseBuilder {
         // successProbability uses the same essential-floor-funded definition as the optimizer's
         // sustainability search (TrialResult.success()), not final-balance depletion, so the
         // reported failure rate is consistent with what the optimizer actually optimized for.
+        //
+        // HP3 Part C: for a household run, "reported success != the gate's success" has TWO
+        // stacked, independently documented causes, not one -- (1) T24: this headline
+        // successProbability is ALWAYS the no-adaptation pass on the final schedule, while the
+        // search's own gate may have certified against the WITH-RULES rate instead when
+        // gateOnAdaptiveRules is set (see resolveGatedOn below, and successProbabilityWithRules for
+        // the with-rules headline). (2) HP2: the search's level-finding
+        // (SustainabilitySearch/allocateSpending, reduceUntilSustainable) validates the candidate
+        // discretionary schedule on the UNSCALED level BEFORE the survivor-factor scaling is
+        // applied, while this headline (and the reported yearly_spending) are always computed on
+        // the FINAL, scaled schedule -- see MonteCarloSpendingOptimizer#allocateAndSmooth's single
+        // scaling seam. Neither gap is a bug: (1) is disclosed via
+        // GuardrailProfileResponse.Disclosure#gatedOn; (2) is the deliberately conservative HP2
+        // design -- the >= confidence guarantee holds by construction because the scaled schedule
+        // draws LESS than what the search certified.
         double successProbability = (double) successCount / ctx.sim().trialCount();
         double failureRate = 1.0 - successProbability;
 

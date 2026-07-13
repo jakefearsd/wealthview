@@ -128,6 +128,9 @@ final class TaxableLots {
         return gain;
     }
 
+    /** HP3 Part C (asymmetry note): a hot-loop safety valve with no {@link TaxableLotsBd} (det
+     * engine) counterpart -- see that class's javadoc for why the asymmetry is intentional, not a
+     * gap. Bounded (fires only above {@code cap}) and unreachable at realistic horizons. */
     void consolidateIfNeeded(int cap) {
         if (lots.size() <= cap) {
             return;

@@ -26,6 +26,17 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * whether or not the first death falls inside the horizon); the income/tax-status/floor transforms
  * ({@link #inWindowTransitionIdx()} {@code >= 0}) apply only when the first death lands inside the
  * modeled retirement window.
+ *
+ * <p><b>Scope note (HP3 Part C, verified present per the feature review):</b> a first death BEFORE
+ * this MC window (i.e. before the retirement-anchored index 0) clamps {@code inWindowTransitionIdx}
+ * to {@code 0} rather than a negative/out-of-window sentinel -- the survivor enters the modeled
+ * window already alone. This deliberately differs from the deterministic engine's wider scope,
+ * which models {@code baseYear..endYear} (including pre-retirement accumulation years) and so CAN
+ * show the transition firing at its true pre-retirement calendar year -- see
+ * {@link HouseholdTransition#resolveYear}. The MC engine never models pre-retirement years at all,
+ * so "died five years before retirement" and "died thirty years before retirement" both collapse to
+ * the same already-survivor starting state; see the clamp site inside {@link #resolve} for the full
+ * rationale and {@code HouseholdMcResolverTest} for the pin.
  */
 final class HouseholdMcResolver {
 

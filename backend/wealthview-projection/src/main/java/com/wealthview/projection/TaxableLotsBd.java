@@ -14,6 +14,13 @@ import java.util.Deque;
  * engine stays golden-file reproducible. It is the same money-type duplication the codebase
  * already carries for {@link PoolTaxCascade} (a {@code double} cascade with a separate
  * BigDecimal counterpart in {@link PoolStrategy}).
+ *
+ * <p>HP3 Part C (asymmetry note): unlike {@link TaxableLots}, this class has NO
+ * {@code consolidateIfNeeded} counterpart. That safety valve exists on the Monte Carlo side because
+ * its per-year lot growth (dividends/interest/RMD-remainder/surplus reinvestments) is re-iterated
+ * on every one of potentially thousands of trials in the hot loop -- a multiplicative cost, not an
+ * absolute-lot-count one. A deterministic run walks the SAME per-year lot growth exactly ONCE, so
+ * even a comparable lot count over one horizon is a one-time, negligible cost. Not an oversight.
  */
 final class TaxableLotsBd {
 

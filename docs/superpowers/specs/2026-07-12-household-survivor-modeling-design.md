@@ -112,6 +112,14 @@ Both engines generalize `{taxable, traditional, roth}` →
 SS provisional-income convergence (B2) runs with combined benefits + MFJ tiers before, survivor
 benefit + single tiers after — through the existing year-context, no new loop.
 
+**Granularity (HP3 Part C, T5-review flagged):** the transition is **whole-year**, not prorated to
+the actual date of death. The `transitionYear` (the calendar year of the first death) is treated as
+FULLY survivor-mode for every step above — income, spending, and filing status all flip for the
+entire year, not just from the death date forward. This is consistent with the engine's existing
+whole-year `retired` convention (a scenario retiring mid-year is modeled as retired for the whole
+year too) and keeps the transition a single, clean, atomic step rather than a sub-year blend. See
+the code comment at the transition site (`HouseholdTransition#resolveYear`) for the same note.
+
 ## 5. Optimizer / guardrails
 Floors scale by the survivor factor from the transition year (search + reporting + corridor).
 Guardrail signature/staleness gains every household field. Seed derivation shape unchanged.
