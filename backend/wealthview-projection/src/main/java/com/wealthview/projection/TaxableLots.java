@@ -3,23 +3,40 @@ package com.wealthview.projection;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
-/** FIFO cost-basis lots for a taxable pool. Each lot is [basis, value]; oldest first. */
+/**
+ * FIFO cost-basis lots for a taxable pool. Each lot is {@code [basis, value, ownerCode]}, oldest
+ * first — {@code ownerCode} is the {@link LotOwner#ordinal()} of the lot's owner tag (HP1),
+ * consumed only by {@link #stepUpByOwner}; every other method touches indices 0/1 only.
+ */
 final class TaxableLots {
 
     private final Deque<double[]> lots = new ArrayDeque<>();
 
-    /** Adds a lot purchased at cost — basis equals value, so it carries no embedded gain. */
+    /** Adds a joint-tagged lot purchased at cost — basis equals value, so it carries no embedded
+     * gain. The default JOINT tag is correct for every household-level reinvested flow (dividends,
+     * interest, RMD after-tax remainder, surplus reinvestment) and for single-person lots. */
     void addLot(double amount) {
         if (amount > 0) {
-            lots.addLast(new double[]{amount, amount});
+            lots.addLast(lot(amount, amount, LotOwner.JOINT));
         }
     }
 
-    /** Seeds a lot with an explicit basis and value; {@code value} may carry an embedded gain. */
+    /** Seeds a joint-tagged lot with an explicit basis and value; {@code value} may carry an
+     * embedded gain. */
     void addLot(double basis, double value) {
+        addLot(basis, value, LotOwner.JOINT);
+    }
+
+    /** HP1: seeds a lot tagged with its source account's {@code owner}; {@code value} may carry an
+     * embedded gain. The tag is metadata read only by {@link #stepUpByOwner}. */
+    void addLot(double basis, double value, LotOwner owner) {
         if (value > 0) {
-            lots.addLast(new double[]{Math.max(0, basis), value});
+            lots.addLast(lot(Math.max(0, basis), value, owner));
         }
+    }
+
+    private static double[] lot(double basis, double value, LotOwner owner) {
+        return new double[]{basis, value, owner.ordinal()};
     }
 
     void grow(double appreciationRate) {
@@ -40,6 +57,34 @@ final class TaxableLots {
     void stepUp(double factor) {
         for (double[] lot : lots) {
             lot[0] += (lot[1] - lot[0]) * factor;
+        }
+    }
+
+    /**
+     * HP1 (first-death basis step-up, EXACT per-owner) — the {@code double} counterpart of
+     * {@link TaxableLotsBd#stepUpByOwner}. Raises each lot's basis by the statutory factor for ITS
+     * owner versus the decedent: a joint lot by {@code jointFactor}
+     * ({@code communityProperty ? 1.0 : 0.5}), a lot owned by the {@code deceased} fully (1.0), a
+     * lot owned by the survivor not at all (0.0). Decedent-owned lots are retagged to the survivor
+     * afterward. Value is untouched; only future realized-gain arithmetic shrinks. Replaces the T6
+     * single-blended-factor approximation so mixed-ownership taxable steps up exactly.
+     */
+    void stepUpByOwner(LotOwner deceased, double jointFactor) {
+        LotOwner survivor = deceased == LotOwner.PRIMARY ? LotOwner.SPOUSE : LotOwner.PRIMARY;
+        for (double[] lot : lots) {
+            LotOwner owner = LotOwner.fromCode((int) lot[2]);
+            double factor;
+            if (owner == LotOwner.JOINT) {
+                factor = jointFactor;
+            } else if (owner == deceased) {
+                factor = 1.0;
+            } else {
+                factor = 0.0;
+            }
+            lot[0] += (lot[1] - lot[0]) * factor;
+            if (owner == deceased) {
+                lot[2] = survivor.ordinal();
+            }
         }
     }
 
@@ -95,6 +140,10 @@ final class TaxableLots {
             basis += lot[0];
             value += lot[1];
         }
-        lots.addFirst(new double[]{basis, value});
+        // HP1: the merged lot is tagged JOINT. This safety valve fires only above `cap` (200) lots —
+        // never at realistic horizons, and always AFTER the retired-year reinvestment lots (all
+        // already JOINT) dominate — so collapsing owner detail here cannot affect a realistic
+        // first-death step-up, which happens well before any consolidation could occur.
+        lots.addFirst(lot(basis, value, LotOwner.JOINT));
     }
 }

@@ -229,14 +229,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
      *   <li><b>Spousal rollover</b> — the deceased owner's traditional and Roth balances transfer in
      *       full to the survivor (treat-as-own); the deceased's slices become zero. No tax, no lot
      *       creation. Total is unchanged (pinned).</li>
-     *   <li><b>Basis step-up</b> — the taxable pool's lots step up (see
-     *       {@link TaxableLotsBd#stepUp}) by a BLENDED factor: joint-held value steps
-     *       {@code communityProperty ? 1.0 : 0.5} of its embedded gain, the deceased's own taxable
-     *       value steps fully (1.0), and the survivor's own taxable value does not step (0.0). Because
-     *       task 4 commingled every taxable account into one owner-agnostic lot set regardless of
-     *       owner, the factor is the initial-balance-weighted average of those three per-owner rates
-     *       applied uniformly to all lots — a documented approximation (see
-     *       {@link MultiPool#blendedStepUpFactor}). Value (and thus the balance) is unchanged.</li>
+     *   <li><b>Basis step-up</b> — the taxable pool's lots step up EXACTLY per owner (HP1, see
+     *       {@link TaxableLotsBd#stepUpByOwner}): each lot steps by its OWN owner's statutory rate —
+     *       joint-held lots by {@code communityProperty ? 1.0 : 0.5} of their embedded gain, the
+     *       decedent's own lots fully (1.0), the survivor's own lots not at all (0.0) — and
+     *       decedent-owned lots then retag to the survivor. Because every lot carries its source
+     *       account's owner tag, mixed-ownership taxable steps up exactly rather than by the earlier
+     *       initial-balance-weighted blended factor applied uniformly. Value (and the balance) is
+     *       unchanged.</li>
      *   <li><b>Filing flip</b> — the pool's filing status becomes {@link FilingStatus#SINGLE} for
      *       this and every later year; all downstream tax bundles (ordinary, LTCG/NIIT, Roth
      *       conversion, Social Security tiers via {@link #getFilingStatus()}, IRMAA) pick it up
@@ -535,17 +535,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    /**
-     * Household task 5: sums the initial balances of the taxable accounts in one owner category
-     * ({@code "primary"} / {@code "spouse"} / {@code "joint"}), the weights for the blended
-     * first-death step-up factor (see {@link MultiPool#applyFirstDeathTransition}). Callers pass an
-     * already taxable-filtered account list. Lives on the interface (like {@link #sumInitialBalances})
-     * to keep {@link MultiPool}'s own complexity down.
-     */
-    static BigDecimal sumTaxableByOwner(List<ProjectionAccountInput> accounts, String category) {
+    /** HP1: annual taxable contribution summed over the accounts in one owner category
+     * ({@code joint}/{@code primary}/{@code spouse}), so each year's contribution enters the
+     * commingled lots tagged by its owner. Lives on the interface (like {@link #sumInitialBalances})
+     * to keep {@link MultiPool}'s own complexity down. */
+    private static BigDecimal sumContribsByOwner(List<ProjectionAccountInput> accounts, String category) {
         return accounts.stream()
                 .filter(account -> ownerCategory(account.owner()).equals(category))
-                .map(ProjectionAccountInput::initialBalance)
+                .map(ProjectionAccountInput::annualContribution)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -561,30 +558,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             return "spouse";
         }
         return "joint".equals(owner) ? "joint" : "primary";
-    }
-
-    /**
-     * Household task 5: the single step-up factor applied uniformly to the (commingled) taxable lots
-     * at first death — the initial-balance-weighted average of the per-owner statutory rates: joint
-     * value steps {@code communityProperty ? 1.0 : 0.5} of its gain, the deceased's own taxable value
-     * steps fully (1.0), the survivor's own taxable value does not step (0.0). Task 4 folded all
-     * taxable accounts into one owner-agnostic lot set, so an exact per-owner step-up is not
-     * recoverable; this blended rate over the whole pool is the documented approximation. For the
-     * common all-joint (or all-deceased-owned) taxable pool it reduces to that owner's own statutory
-     * rate exactly. Returns zero when the taxable pool is empty. Lives on the interface (like
-     * {@link #sumTaxableByOwner}) to keep {@link MultiPool}'s own complexity down.
-     */
-    static BigDecimal blendedStepUpFactor(BigDecimal primaryTaxable, BigDecimal spouseTaxable,
-                                          BigDecimal jointTaxable, PersonId deceased,
-                                          boolean communityProperty) {
-        BigDecimal total = primaryTaxable.add(spouseTaxable).add(jointTaxable);
-        if (total.signum() <= 0) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal jointRate = communityProperty ? BigDecimal.ONE : new BigDecimal("0.5");
-        BigDecimal deceasedTaxable = deceased == PersonId.PRIMARY ? primaryTaxable : spouseTaxable;
-        // deceased value steps at 1.0, joint at jointRate, survivor at 0.0
-        return deceasedTaxable.add(jointTaxable.multiply(jointRate)).divide(total, SCALE + 4, ROUNDING);
     }
 
     /**
@@ -686,7 +659,17 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
 
         private final OwnerPool tradContrib;
         private final OwnerPool rothContrib;
-        private final BigDecimal taxableContrib;
+        /**
+         * HP1: annual taxable contributions split by the contributing account's owner category
+         * ({@code joint}/{@code primary}/{@code spouse}), so each year's contribution enters the
+         * commingled lot set tagged with its owner (the first-death step-up then applies that owner's
+         * exact statutory rate). Single-person scenarios put the whole contribution on
+         * {@link #taxableContribPrimary} (accounts default to {@code primary}), so the tagged lot has
+         * the same value as the pre-HP1 single aggregate contribution lot — byte-identical.
+         */
+        private final BigDecimal taxableContribJoint;
+        private final BigDecimal taxableContribPrimary;
+        private final BigDecimal taxableContribSpouse;
         private final BigDecimal taxableReturn;
         private final BigDecimal traditionalReturn;
         private final BigDecimal rothReturn;
@@ -722,18 +705,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
          * backward-compat anchor for {@link #applyGrowth(boolean)}'s yield split.
          */
         private final BigDecimal taxableEquityShare;
-        /**
-         * Household task 5: the taxable pool's initial balance split by account owner
-         * ({@code "primary"} / {@code "spouse"} / {@code "joint"}), captured once at construction from
-         * the same taxable accounts the lots were seeded from. Used ONLY to weight the blended
-         * first-death step-up factor (see {@link #blendedStepUpFactor}); task 4 commingled all taxable
-         * value into one owner-agnostic lot set, so these fixed initial-balance shares are the
-         * documented proxy for each owner's portion of the commingled pool. All zero for a
-         * single-person or all-joint scenario, in which case the step-up never even runs.
-         */
-        private final BigDecimal taxablePrimaryInitial;
-        private final BigDecimal taxableSpouseInitial;
-        private final BigDecimal taxableJointInitial;
         private final BigDecimal inflationRate;
         private final int baseYear;
         /**
@@ -758,27 +729,27 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
                   BigDecimal weightedReturn,
                   PoolConfig config) {
             // Seed one FIFO lot per taxable account: basis = its cost basis, value = its balance,
-            // so any embedded (unrealized) gain is carried into the projection.
+            // so any embedded (unrealized) gain is carried into the projection. HP1: each lot is
+            // tagged with its source account's owner so the first-death step-up applies the EXACT
+            // per-owner statutory rate (no more single blended factor over the commingled pool).
             this.lots = new TaxableLotsBd();
             var taxableAccounts = grouped.getOrDefault(POOL_TAXABLE, List.of());
             for (var acct : taxableAccounts) {
-                lots.addLot(acct.costBasis(), acct.initialBalance());
+                lots.addLot(acct.costBasis(), acct.initialBalance(),
+                        LotOwner.fromCategory(ownerCategory(acct.owner())));
             }
             // Audit C1: the taxable pool's own allocation-derived equity share, computed once from
             // the same account list the lots above were seeded from.
             this.taxableEquityShare = taxableEquityShare(taxableAccounts);
-            // Household task 5: the same taxable accounts' initial balances split by owner, for the
-            // blended first-death step-up factor. "joint" (and any non-primary/non-spouse value) is
-            // the joint share; "spouse" the spouse's; everything else the primary's.
-            this.taxablePrimaryInitial = sumTaxableByOwner(taxableAccounts, "primary");
-            this.taxableSpouseInitial = sumTaxableByOwner(taxableAccounts, "spouse");
-            this.taxableJointInitial = sumTaxableByOwner(taxableAccounts, "joint");
             this.traditional = OwnerPool.ofBalances(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
             this.roth = OwnerPool.ofBalances(grouped.getOrDefault(POOL_ROTH, List.of()));
 
             this.tradContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_TRADITIONAL, List.of()));
             this.rothContrib = OwnerPool.ofContributions(grouped.getOrDefault(POOL_ROTH, List.of()));
-            this.taxableContrib = sumContribs(grouped.getOrDefault(POOL_TAXABLE, List.of()));
+            // HP1: taxable contributions split by owner so each year's contribution lot is tagged.
+            this.taxableContribJoint = sumContribsByOwner(taxableAccounts, "joint");
+            this.taxableContribPrimary = sumContribsByOwner(taxableAccounts, "primary");
+            this.taxableContribSpouse = sumContribsByOwner(taxableAccounts, "spouse");
 
             this.taxableReturn = taxableReturn;
             this.traditionalReturn = traditionalReturn;
@@ -799,12 +770,6 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this.inflationRate = config.inflationRate();
             this.baseYear = config.baseYear();
             this.federalTaxCalculator = config.federalTaxCalculator();
-        }
-
-        private static BigDecimal sumContribs(List<ProjectionAccountInput> accounts) {
-            return accounts.stream()
-                    .map(ProjectionAccountInput::annualContribution)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
         }
 
         @Override
@@ -843,7 +808,14 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // spouse-owned account grows the spouse's pool only.
             traditional.creditAll(tradContrib);
             roth.creditAll(rothContrib);
-            lots.addLot(taxableContrib);   // new contributions enter at cost (basis = value)
+            // HP1: new contributions enter at cost (basis = value), each tagged by the contributing
+            // account's owner. A zero amount is a no-op (addLot ignores it), so a single-person
+            // scenario adds exactly one primary-tagged lot with the same value as the pre-HP1
+            // aggregate contribution lot — byte-identical.
+            lots.addLot(taxableContribJoint, taxableContribJoint, LotOwner.JOINT);
+            lots.addLot(taxableContribPrimary, taxableContribPrimary, LotOwner.PRIMARY);
+            lots.addLot(taxableContribSpouse, taxableContribSpouse, LotOwner.SPOUSE);
+            BigDecimal taxableContrib = taxableContribJoint.add(taxableContribPrimary).add(taxableContribSpouse);
             return tradContrib.total().add(rothContrib.total()).add(taxableContrib);
         }
 
@@ -1462,9 +1434,12 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             // sees one combined per-owner slice under the survivor.
             traditional.transferAll(deceased, survivor);
             roth.transferAll(deceased, survivor);
-            // Step 3: basis step-up on the (commingled) taxable lots by the blended factor.
-            lots.stepUp(blendedStepUpFactor(taxablePrimaryInitial, taxableSpouseInitial,
-                    taxableJointInitial, deceased, communityProperty));
+            // Step 3: EXACT per-owner basis step-up on the commingled taxable lots (HP1). Each lot
+            // steps by its own owner's statutory rate — joint at the community/common-law rate, the
+            // decedent's own lots fully, the survivor's own lots not at all — and decedent-owned lots
+            // retag to the survivor. Replaces the T5 single initial-balance-weighted blended factor.
+            BigDecimal jointFactor = communityProperty ? BigDecimal.ONE : new BigDecimal("0.5");
+            lots.stepUpByOwner(LotOwner.forPerson(deceased), jointFactor);
             // Step 5: filing status flips to single for this and every later year.
             this.filingStatus = FilingStatus.SINGLE;
         }

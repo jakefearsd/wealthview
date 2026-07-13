@@ -136,6 +136,27 @@ class MultiPoolOwnerTest {
     }
 
     @Test
+    void applyFirstDeathTransition_mixedOwnershipTaxable_stepsUpExactlyPerOwner_notBlended() {
+        // HP1: joint gain-HEAVY (value 100k, basis 20k => 80k gain) seeded first (oldest, sold first)
+        // + spouse-owned gain-LIGHT (value 100k, basis 90k => 10k gain). Spouse predeceases;
+        // common-law joint rate 0.5.
+        //   EXACT per-owner: joint basis 20k+80k*0.5=60k; spouse(decedent) 90k+10k*1.0=100k => 160k
+        //   basis. Selling the whole 200k pool realizes 200k-160k = 40k of gain.
+        //   The retired T5 BLENDED factor (deceased 100k + joint 100k*0.5)/200k = 0.75 applied
+        //   uniformly would leave basis 177.5k and realize only 22.5k -- provably different.
+        var pool = pool(Map.of(PoolStrategy.POOL_TAXABLE, List.of(
+                owned("100000", "20000", "taxable", "joint"),
+                owned("100000", "90000", "taxable", "spouse"))));
+
+        pool.applyFirstDeathTransition(PersonId.SPOUSE, PersonId.PRIMARY, false);
+
+        // Sell the whole pool (taxable-first, no tax calculator wired) and read the realized gain.
+        var result = pool.executeWithdrawals(bd("200000"), 2030, ZERO, ZERO, ZERO, 65);
+        assertThat(result.realizedLtcgIncome()).isEqualByComparingTo(bd("40000"));      // exact oracle
+        assertThat(result.realizedLtcgIncome()).isNotEqualByComparingTo(bd("22500"));   // != blended
+    }
+
+    @Test
     void applyContributions_ownerKeyedAccounts_growsEachOwnersPoolIndependently() {
         var pool = tradPool(List.of(
                 trad("100000", "5000", "primary"),

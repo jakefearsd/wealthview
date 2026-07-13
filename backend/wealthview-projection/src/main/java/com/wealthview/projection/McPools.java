@@ -214,8 +214,10 @@ final class McPools {
      * The first-death transition on the MC pools, mirroring the deterministic
      * {@code PoolStrategy.MultiPool.applyFirstDeathTransition}: the deceased owner's traditional and
      * Roth balances roll into the survivor's own pools (conservation-preserving), then the
-     * joint-taxable lots step up by the pre-computed blended factor. The filing-status flip is handled
-     * at build time via the per-year tax tables, not here.
+     * joint-taxable lots step up EXACTLY per owner (HP1) — each lot by its own owner's statutory rate
+     * (joint at {@code jointStepUpFactor}, the decedent's own lots fully, the survivor's not at all),
+     * with decedent-owned lots retagged to the survivor. The filing-status flip is handled at build
+     * time via the per-year tax tables, not here.
      */
     static void applyFirstDeathTransition(double[] pools, TaxableLots lots, HouseholdSim household) {
         if (household.survivorIsPrimary()) {
@@ -229,6 +231,7 @@ final class McPools {
             pools[ROTH_S] += pools[ROTH_P];
             pools[ROTH_P] = 0.0;
         }
-        lots.stepUp(household.stepUpFactor());
+        LotOwner deceased = household.survivorIsPrimary() ? LotOwner.SPOUSE : LotOwner.PRIMARY;
+        lots.stepUpByOwner(deceased, household.jointStepUpFactor());
     }
 }

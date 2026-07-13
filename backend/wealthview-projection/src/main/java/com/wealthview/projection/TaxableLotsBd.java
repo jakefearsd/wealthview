@@ -22,20 +22,38 @@ final class TaxableLotsBd {
     /** Extra precision for the proportional-basis division before final rounding to {@link #SCALE}. */
     private static final int DIV_SCALE = SCALE + 8;
 
+    /**
+     * Each lot is {@code [basis, value, ownerCode]}, oldest first. {@code ownerCode} is the
+     * {@link LotOwner#ordinal()} of the lot's owner tag (HP1) — consumed only by
+     * {@link #stepUpByOwner}; all other arithmetic touches indices 0/1 only.
+     */
     private final Deque<BigDecimal[]> lots = new ArrayDeque<>();
 
-    /** Adds a lot purchased at cost — basis equals value, so it carries no embedded gain. */
+    /** Adds a joint-tagged lot purchased at cost — basis equals value, so it carries no embedded
+     * gain. The default JOINT tag is correct for every household-level reinvested flow (dividends,
+     * interest, RMD after-tax remainder, surplus reinvestment) and for single-person lots. */
     void addLot(BigDecimal amount) {
         if (amount.signum() > 0) {
-            lots.addLast(new BigDecimal[]{amount, amount});
+            lots.addLast(lot(amount, amount, LotOwner.JOINT));
         }
     }
 
-    /** Seeds a lot with an explicit basis and value; {@code value} may carry an embedded gain. */
+    /** Seeds a joint-tagged lot with an explicit basis and value; {@code value} may carry an
+     * embedded gain. */
     void addLot(BigDecimal basis, BigDecimal value) {
+        addLot(basis, value, LotOwner.JOINT);
+    }
+
+    /** HP1: seeds a lot tagged with its source account's {@code owner}; {@code value} may carry an
+     * embedded gain. The tag is metadata read only by {@link #stepUpByOwner}. */
+    void addLot(BigDecimal basis, BigDecimal value, LotOwner owner) {
         if (value.signum() > 0) {
-            lots.addLast(new BigDecimal[]{basis.max(BigDecimal.ZERO), value});
+            lots.addLast(lot(basis.max(BigDecimal.ZERO), value, owner));
         }
+    }
+
+    private static BigDecimal[] lot(BigDecimal basis, BigDecimal value, LotOwner owner) {
+        return new BigDecimal[]{basis, value, BigDecimal.valueOf(owner.ordinal())};
     }
 
     /**
@@ -50,9 +68,51 @@ final class TaxableLotsBd {
      */
     void stepUp(BigDecimal factor) {
         for (BigDecimal[] lot : lots) {
-            BigDecimal adjustment = lot[1].subtract(lot[0]).multiply(factor).setScale(SCALE, ROUNDING);
-            lot[0] = lot[0].add(adjustment);
+            lot[0] = steppedBasis(lot, factor);
         }
+    }
+
+    /**
+     * HP1 (first-death basis step-up, EXACT per-owner): raises each lot's basis by the statutory
+     * factor for ITS owner versus the decedent — a joint lot by {@code jointFactor}
+     * ({@code communityProperty ? 1.0 : 0.5}), a lot owned by the {@code deceased} fully (1.0), a
+     * lot owned by the survivor not at all (0.0) — via the same per-lot formula as {@link #stepUp}
+     * ({@code basis += (value − basis) × factor}). This replaces the T5 single-blended-factor
+     * approximation: because every lot carries its own owner tag, mixed-ownership taxable with
+     * divergent embedded gains now steps up exactly rather than by an initial-balance-weighted
+     * average rate applied uniformly.
+     *
+     * <p>After the step-up a decedent-owned lot is RETAGGED to the survivor (the survivor now owns
+     * it), so a later same-year re-entry would treat it correctly and the pool's owner composition
+     * reflects the transfer. Value is never touched, so {@link #totalValue()} — and the pool
+     * balance — is unchanged. For an all-joint (or single-owner) taxable pool every lot takes
+     * {@code jointFactor} (or the decedent/survivor rate), reducing exactly to the old blended
+     * result for those cases — the byte-identical anchor.
+     */
+    void stepUpByOwner(LotOwner deceased, BigDecimal jointFactor) {
+        LotOwner survivor = deceased == LotOwner.PRIMARY ? LotOwner.SPOUSE : LotOwner.PRIMARY;
+        for (BigDecimal[] lot : lots) {
+            LotOwner owner = LotOwner.fromCode(lot[2].intValue());
+            BigDecimal factor;
+            if (owner == LotOwner.JOINT) {
+                factor = jointFactor;
+            } else if (owner == deceased) {
+                factor = BigDecimal.ONE;
+            } else {
+                factor = BigDecimal.ZERO;
+            }
+            lot[0] = steppedBasis(lot, factor);
+            if (owner == deceased) {
+                lot[2] = BigDecimal.valueOf(survivor.ordinal());
+            }
+        }
+    }
+
+    /** The lot's basis raised toward its value by {@code factor} of the embedded gain
+     * ({@code basis + (value − basis) × factor}), rounded to {@link #SCALE}. */
+    private static BigDecimal steppedBasis(BigDecimal[] lot, BigDecimal factor) {
+        BigDecimal adjustment = lot[1].subtract(lot[0]).multiply(factor).setScale(SCALE, ROUNDING);
+        return lot[0].add(adjustment);
     }
 
     /** Appreciates each lot's value (not its basis) by {@code appreciationRate}. */
@@ -107,11 +167,12 @@ final class TaxableLotsBd {
         return b;
     }
 
-    /** Deep-copies the lots into a detached list for later {@link #restore(java.util.List)}. */
+    /** Deep-copies the lots (basis, value, owner slot) into a detached list for later
+     * {@link #restore(java.util.List)}. */
     java.util.List<BigDecimal[]> snapshot() {
         var copy = new java.util.ArrayList<BigDecimal[]>(lots.size());
         for (BigDecimal[] lot : lots) {
-            copy.add(new BigDecimal[]{lot[0], lot[1]});
+            copy.add(new BigDecimal[]{lot[0], lot[1], lot[2]});
         }
         return copy;
     }
@@ -120,7 +181,7 @@ final class TaxableLotsBd {
     void restore(java.util.List<BigDecimal[]> snapshot) {
         lots.clear();
         for (BigDecimal[] lot : snapshot) {
-            lots.addLast(new BigDecimal[]{lot[0], lot[1]});
+            lots.addLast(new BigDecimal[]{lot[0], lot[1], lot[2]});
         }
     }
 

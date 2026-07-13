@@ -106,4 +106,38 @@ class TaxableLotsTest {
         assertThat(lots.totalValue()).isEqualTo(vBefore, within(1e-6));
         assertThat(lots.totalBasis()).isEqualTo(bBefore, within(1e-6));
     }
+
+    // === HP1: EXACT per-owner first-death basis step-up (double mirror of TaxableLotsBdTest) ===
+
+    @Test
+    void stepUpByOwner_mixedOwners_stepsEachLotByItsOwnStatutoryFactor() {
+        var lots = new TaxableLots();
+        lots.addLot(100, 300, LotOwner.JOINT);   // gain 200
+        lots.addLot(100, 200, LotOwner.SPOUSE);  // gain 100, decedent-owned
+        lots.addLot(100, 500, LotOwner.PRIMARY); // gain 400, survivor-owned
+        double valueBefore = lots.totalValue();
+
+        // Spouse predeceases; common-law joint rate 0.5.
+        lots.stepUpByOwner(LotOwner.SPOUSE, 0.5);
+
+        // joint 100+200*0.5=200; spouse(decedent) 100+100*1.0=200; primary(survivor) 100+400*0=100
+        assertThat(lots.totalBasis()).isEqualTo(500.0, within(1e-9));
+        assertThat(lots.totalValue()).isEqualTo(valueBefore, within(1e-9)); // conservation
+    }
+
+    @Test
+    void stepUpByOwner_decedentOwnedLot_retaggedToSurvivor() {
+        // The spouse's lot belongs to the survivor (primary) after the step-up. Probe: re-grow a
+        // fresh gain, then name PRIMARY as a (hypothetical) later decedent -- the lot steps FULLY,
+        // which only happens if it was retagged SPOUSE -> PRIMARY (else it would be the survivor,
+        // factor 0.0, and stay put).
+        var lots = new TaxableLots();
+        lots.addLot(100, 200, LotOwner.SPOUSE); // gain 100
+
+        lots.stepUpByOwner(LotOwner.SPOUSE, 0.5); // basis -> 200 (full), retag SPOUSE -> PRIMARY
+        lots.grow(0.5);                           // value 300, basis 200: fresh 100 gain
+        lots.stepUpByOwner(LotOwner.PRIMARY, 0.5);
+
+        assertThat(lots.totalBasis()).isEqualTo(300.0, within(1e-9)); // stepped fully -> proves retag
+    }
 }

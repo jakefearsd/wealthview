@@ -51,7 +51,7 @@ class TrialSimulatorHouseholdTest {
         var household = new TrialSimulator.HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-5, /*spouseRmdStartAge=*/73,
                 /*transitionYearIndex=*/-1, /*survivorIsPrimary=*/true,
-                /*stepUpFactor=*/0.0, /*truncateYearIndex=*/1);
+                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, /*retirementAge=*/80, 0,
@@ -73,7 +73,7 @@ class TrialSimulatorHouseholdTest {
         // spouse stream contributes nothing. Only the primary RMD's tax leaves the portfolio.
         var household = new TrialSimulator.HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-10, /*spouseRmdStartAge=*/73,
-                -1, true, 0.0, 1);
+                -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
                 null, null, 80, 0,
@@ -100,7 +100,7 @@ class TrialSimulatorHouseholdTest {
         var table = twoBracketTable();
         var household = new TrialSimulator.HouseholdSim(
                 100_000.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/73,
-                -1, true, 0.0, 1);
+                -1, true, 0.0, 1, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(500_000.0, 300_000.0, 0.0, "traditional_first",
                 new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
                 new double[]{50_000.0}, new double[]{0.0}, 75, 0,
@@ -131,7 +131,7 @@ class TrialSimulatorHouseholdTest {
         var household = new TrialSimulator.HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/-10, /*spouseRmdStartAge=*/80,
                 /*transitionYearIndex=*/0, /*survivorIsPrimary=*/true,
-                /*stepUpFactor=*/0.0, /*truncateYearIndex=*/2);
+                /*jointStepUpFactor=*/0.0, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
                 new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20), OrdinaryTaxTable.flat(0.20)},
                 new double[]{0.0, 0.0}, null, null, /*retirementAge=*/79, 0,
@@ -154,7 +154,7 @@ class TrialSimulatorHouseholdTest {
         var household = new TrialSimulator.HouseholdSim(
                 50_000.0, 0.0, /*spouseAgeOffset=*/0, /*spouseRmdStartAge=*/80,
                 /*transitionYearIndex=*/0, /*survivorIsPrimary=*/false,
-                0.0, /*truncateYearIndex=*/2);
+                0.0, /*truncateYearIndex=*/2, TrialSimulator.TaxableSeed.EMPTY);
         // Primary below its own RMD start (99) at both years so it never RMDs; spouse age == primary
         // age here (offset 0), reaching its start (80) at year 1.
         var config = cfg(0.0, 150_000.0, 0.0, "taxable_first",
@@ -176,7 +176,8 @@ class TrialSimulatorHouseholdTest {
         // Rollover is conservation-preserving: with no tax table, no spending, no RMD, the transition
         // only shuffles trad/roth between owner slots -- the total is untouched.
         var household = new TrialSimulator.HouseholdSim(
-                50_000.0, 20_000.0, 0, 99, /*transitionYearIndex=*/0, true, 0.0, 1);
+                50_000.0, 20_000.0, 0, 99, /*transitionYearIndex=*/0, true, 0.0, 1,
+                TrialSimulator.TaxableSeed.EMPTY);
         var config = cfg(0.0, 150_000.0, 50_000.0, "taxable_first",
                 null, null, null, null, 60, 0,
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
@@ -188,40 +189,41 @@ class TrialSimulatorHouseholdTest {
         assertThat(result.finalBalance()).isEqualTo(200_000.0, within(1e-6));
     }
 
-    // === First-death transition: joint-taxable basis step-up ===
+    // === First-death transition: EXACT per-owner joint-taxable basis step-up (HP1) ===
 
     @Test
-    void simulateTrial_firstDeathTransition_stepsUpJointTaxableBasisLoweringLaterLtcg() {
-        // Joint taxable 100k with a 50k embedded gain (basis 50k). A 40k spending sale realizes FIFO
-        // gain taxed at a flat 15% LTCG rate. A full step-up (factor 1.0) at the transition zeroes the
-        // embedded gain BEFORE the sale, so no LTCG is realized -- vs. no step-up (factor 0.0), where
-        // the 20k realized gain costs 3k of LTCG tax. The 3k delta proves the step-up fired.
+    void simulateTrial_firstDeathTransition_mixedOwnershipTaxable_stepsUpExactlyPerOwner_notBlended() {
+        // Mixed-ownership taxable: joint gain-HEAVY (value 100k, basis 20k => 80k gain) seeded first
+        // (oldest, sold first) + spouse-owned gain-LIGHT (value 100k, basis 90k => 10k gain). Spouse
+        // predeceases (survivorIsPrimary=true, deceased=SPOUSE); common-law joint rate 0.5.
+        //
+        // EXACT per-owner step-up: the joint lot steps 20k+80k*0.5=60k basis. A 100k spend draw sells
+        // that whole joint lot FIFO -> realizes 100k-60k = 40k gain -> 15% LTCG = 6k. finalBalance =
+        // 200k - 100k spend - 6k LTCG = 94k.
+        //
+        // The retired T5 blended factor (deceased 100k + joint 100k*0.5)/200k = 0.75 applied uniformly
+        // would step the joint lot to 20k+80k*0.75 = 80k basis, realize only 20k, cost 3k LTCG, and
+        // leave 97k -- a provably DIFFERENT result. Pinning 94k (exact) vs 97k (blended) proves the
+        // step-up is exact per owner, not blended.
         var ltcg = new LtcgTaxTable(0,
                 new double[]{0}, new double[]{Double.POSITIVE_INFINITY},
                 new double[]{0.15}, Double.POSITIVE_INFINITY);
-        TrialSimulator.HouseholdSim stepUp = new TrialSimulator.HouseholdSim(
-                0.0, 0.0, 0, 99, /*transitionYearIndex=*/0, true, /*stepUpFactor=*/1.0, 1);
-        TrialSimulator.HouseholdSim noStepUp = new TrialSimulator.HouseholdSim(
-                0.0, 0.0, 0, 99, 0, true, /*stepUpFactor=*/0.0, 1);
+        var seed = new TrialSimulator.TaxableSeed(
+                /*joint*/ 20_000.0, 100_000.0, /*primary*/ 0.0, 0.0, /*spouse*/ 90_000.0, 100_000.0);
+        TrialSimulator.HouseholdSim household = new TrialSimulator.HouseholdSim(
+                0.0, 0.0, 0, 99, /*transitionYearIndex=*/0, /*survivorIsPrimary=*/true,
+                /*jointStepUpFactor=*/0.5, 1, seed);
 
-        var withStepUp = simulator.simulateTrial(
-                new double[]{0.0}, new double[]{0.0}, new double[]{40_000.0}, new double[]{0.0}, 1,
-                cfg(100_000.0, 0.0, 0.0, "taxable_first",
+        var result = simulator.simulateTrial(
+                new double[]{0.0}, new double[]{0.0}, new double[]{100_000.0}, new double[]{0.0}, 1,
+                cfg(200_000.0, 0.0, 0.0, "taxable_first",
                         new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.0)}, new double[]{0.0},
                         null, null, 60, 0,
                         new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
-                        50_000.0, new LtcgTaxTable[]{ltcg}, stepUp));
-        var withoutStepUp = simulator.simulateTrial(
-                new double[]{0.0}, new double[]{0.0}, new double[]{40_000.0}, new double[]{0.0}, 1,
-                cfg(100_000.0, 0.0, 0.0, "taxable_first",
-                        new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.0)}, new double[]{0.0},
-                        null, null, 60, 0,
-                        new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 99,
-                        50_000.0, new LtcgTaxTable[]{ltcg}, noStepUp));
+                        110_000.0, new LtcgTaxTable[]{ltcg}, household));
 
-        assertThat(withStepUp.finalBalance()).isEqualTo(60_000.0, within(1e-4));   // 100k - 40k spend, no LTCG
-        assertThat(withoutStepUp.finalBalance()).isEqualTo(57_000.0, within(1e-4)); // 60k - 3k LTCG
-        assertThat(withStepUp.finalBalance() - withoutStepUp.finalBalance()).isEqualTo(3_000.0, within(1e-4));
+        assertThat(result.finalBalance()).isEqualTo(94_000.0, within(1e-4)); // exact per-owner oracle
+        assertThat(result.finalBalance()).isNotEqualTo(97_000.0);            // != the blended-factor result
     }
 
     // === Second-death truncation ===
@@ -233,7 +235,8 @@ class TrialSimulatorHouseholdTest {
         // truncated run ends at 40k; a full 5-year run would deplete to 0. Tracked year-balances
         // carry the 40k bequest forward across the unsimulated tail.
         var household = new TrialSimulator.HouseholdSim(
-                0.0, 0.0, 0, 99, /*transitionYearIndex=*/-1, true, 0.0, /*truncateYearIndex=*/2);
+                0.0, 0.0, 0, 99, /*transitionYearIndex=*/-1, true, 0.0, /*truncateYearIndex=*/2,
+                TrialSimulator.TaxableSeed.EMPTY);
         double[] zero5 = {0.0, 0.0, 0.0, 0.0, 0.0};
         double[] floors5 = {30_000.0, 30_000.0, 30_000.0, 30_000.0, 30_000.0};
         var config = cfg(100_000.0, 0.0, 0.0, "taxable_first",

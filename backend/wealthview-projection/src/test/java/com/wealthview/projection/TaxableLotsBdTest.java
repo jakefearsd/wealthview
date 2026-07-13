@@ -127,4 +127,63 @@ class TaxableLotsBdTest {
         assertThat(lots.totalBasis()).isEqualByComparingTo(bd("60000"));
         assertThat(lots.totalValue()).isEqualByComparingTo(bd("60000"));
     }
+
+    // === HP1: EXACT per-owner first-death basis step-up ===
+
+    /** Joint + decedent-owned + survivor-owned lots with distinct embedded gains, each stepped by
+     * its OWN statutory factor — not one blended rate applied uniformly. */
+    @Test
+    void stepUpByOwner_mixedOwners_stepsEachLotByItsOwnStatutoryFactor() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100"), bd("300"), LotOwner.JOINT);   // gain 200
+        lots.addLot(bd("100"), bd("200"), LotOwner.SPOUSE);  // gain 100, decedent-owned
+        lots.addLot(bd("100"), bd("500"), LotOwner.PRIMARY); // gain 400, survivor-owned
+        BigDecimal valueBefore = lots.totalValue();
+
+        // Spouse predeceases; common-law joint rate 0.5.
+        lots.stepUpByOwner(LotOwner.SPOUSE, new BigDecimal("0.5"));
+
+        // joint 100+200*0.5=200; spouse(decedent) 100+100*1.0=200; primary(survivor) 100+400*0=100
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("500"));
+        assertThat(lots.totalValue()).isEqualByComparingTo(valueBefore); // value untouched (conservation)
+    }
+
+    @Test
+    void stepUpByOwner_decedentOwnedLot_retaggedToSurvivorAfterStep() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100"), bd("300"), LotOwner.JOINT);
+        lots.addLot(bd("100"), bd("200"), LotOwner.SPOUSE);  // decedent-owned
+        lots.addLot(bd("100"), bd("500"), LotOwner.PRIMARY); // survivor-owned
+
+        lots.stepUpByOwner(LotOwner.SPOUSE, new BigDecimal("0.5"));
+
+        var snap = lots.snapshot(); // owner code is the 3rd slot
+        assertThat(snap.get(1)[2].intValue()).isEqualTo(LotOwner.PRIMARY.ordinal()); // spouse -> survivor
+        assertThat(snap.get(0)[2].intValue()).isEqualTo(LotOwner.JOINT.ordinal());   // joint unchanged
+        assertThat(snap.get(2)[2].intValue()).isEqualTo(LotOwner.PRIMARY.ordinal()); // survivor unchanged
+    }
+
+    /** Community property steps a joint lot fully (1.0) — the exact rate reaches each lot. */
+    @Test
+    void stepUpByOwner_communityPropertyJointFactor_stepsJointLotFully() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("100"), bd("300"), LotOwner.JOINT); // gain 200
+
+        lots.stepUpByOwner(LotOwner.SPOUSE, BigDecimal.ONE); // communityProperty => jointFactor 1.0
+
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("300")); // fully stepped to value
+    }
+
+    /** Reinvested household flows (dividends, interest, RMD after-tax remainder, surplus) enter via
+     * the owner-less addLot overloads and are tagged JOINT — so at first death they step by the joint
+     * rate, not by any account-owner rate. Pins that convention. */
+    @Test
+    void addLot_ownerlessOverloadTagsJoint_soReinvestedLotStepsAtJointRate() {
+        var lots = new TaxableLotsBd();
+        lots.addLot(bd("60"), bd("100")); // reinvested-style lot (40 embedded gain), defaults JOINT
+
+        lots.stepUpByOwner(LotOwner.SPOUSE, new BigDecimal("0.5")); // spouse dies, common-law 0.5
+
+        assertThat(lots.totalBasis()).isEqualByComparingTo(bd("80")); // 60 + 40*0.5 => joint rate applied
+    }
 }

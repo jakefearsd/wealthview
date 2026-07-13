@@ -131,26 +131,27 @@ final class HouseholdMcResolver {
                 RmdCalculator.rmdStartAge(spouseBirthYear),
                 simTransitionIdx,
                 survivorIsPrimary,
-                blendedStepUpFactor(input.accounts(), survivorIsPrimary, input.communityProperty()),
-                truncateYearIdx);
+                // HP1: joint-taxable statutory rate (community/common-law). Decedent- and
+                // survivor-owned rates are applied per-lot inside stepUpByOwner, not baked in here.
+                input.communityProperty() ? 1.0 : 0.5,
+                truncateYearIdx,
+                taxableSeed(input.accounts()));
 
         return new Resolved(sim, survivorFactor, inWindowTransitionIdx, survivorSources, postStatus, household);
     }
 
     /**
-     * The blended joint-taxable basis step-up factor, delegating to the deterministic
-     * {@link PoolStrategy#blendedStepUpFactor} so both engines apply the identical
-     * initial-balance-weighted rate (deceased-owned taxable steps up fully, joint at the community/
-     * common-law rate, survivor-owned not at all).
+     * HP1: the joint-taxable pool's initial seed split by owner (basis + value per
+     * {@code joint}/{@code primary}/{@code spouse}), so the Monte Carlo lots can be seeded with owner
+     * tags for an exact first-death step-up. An all-joint (or single-owner) taxable pool yields a
+     * seed with only that owner's slice, so seeding collapses to one lot — byte-identical to the
+     * pre-HP1 single aggregate lot.
      */
-    private static double blendedStepUpFactor(List<ProjectionAccountInput> accounts,
-                                              boolean survivorIsPrimary, boolean communityProperty) {
-        PersonId deceased = survivorIsPrimary ? PersonId.SPOUSE : PersonId.PRIMARY;
-        BigDecimal primaryTaxable = sumTaxable(accounts, "primary");
-        BigDecimal spouseTaxable = sumTaxable(accounts, "spouse");
-        BigDecimal jointTaxable = sumTaxable(accounts, "joint");
-        return PoolStrategy.blendedStepUpFactor(primaryTaxable, spouseTaxable, jointTaxable,
-                deceased, communityProperty).doubleValue();
+    private static TrialSimulator.TaxableSeed taxableSeed(List<ProjectionAccountInput> accounts) {
+        return new TrialSimulator.TaxableSeed(
+                sumTaxableBasis(accounts, "joint"), sumTaxable(accounts, "joint"),
+                sumTaxableBasis(accounts, "primary"), sumTaxable(accounts, "primary"),
+                sumTaxableBasis(accounts, "spouse"), sumTaxable(accounts, "spouse"));
     }
 
     private static double sumTraditional(List<ProjectionAccountInput> accounts, String owner) {
@@ -161,17 +162,28 @@ final class HouseholdMcResolver {
         return sumByTypeAndOwner(accounts, PoolStrategy.POOL_ROTH, owner).doubleValue();
     }
 
-    private static BigDecimal sumTaxable(List<ProjectionAccountInput> accounts, String owner) {
-        return sumByTypeAndOwner(accounts, PoolStrategy.POOL_TAXABLE, owner);
+    private static double sumTaxable(List<ProjectionAccountInput> accounts, String owner) {
+        return sumByTypeAndOwner(accounts, PoolStrategy.POOL_TAXABLE, owner).doubleValue();
+    }
+
+    /** HP1: cost-basis sum of the taxable accounts in one owner category. */
+    private static double sumTaxableBasis(List<ProjectionAccountInput> accounts, String owner) {
+        double sum = 0.0;
+        for (var account : accounts) {
+            if (PoolStrategy.POOL_TAXABLE.equals(account.accountType())
+                    && owner.equals(PoolStrategy.ownerCategory(account.owner()))) {
+                sum += account.costBasis().doubleValue();
+            }
+        }
+        return sum;
     }
 
     /**
      * Household task 8 (dedup): type-AND-owner-filtered sum, sharing {@link PoolStrategy#ownerCategory}
      * for the owner-partition rule instead of re-deriving it (the pre-task-8 {@code ownerOrPrimary}
-     * duplicate this replaces). Not lifted onto {@link PoolStrategy} itself as a third public
-     * sum-by-owner method — that interface is already near PMD's {@code ExcessivePublicCount}
-     * threshold, and this type-filtered shape is MC-local (the deterministic side always pre-filters
-     * to one type via {@code PoolStrategy.sumTaxableByOwner}).
+     * duplicate this replaces). Not lifted onto {@link PoolStrategy} itself as a public sum-by-owner
+     * method — that interface is already near PMD's {@code ExcessivePublicCount} threshold, and this
+     * type-filtered shape is MC-local (the deterministic side seeds its lots per account directly).
      */
     private static BigDecimal sumByTypeAndOwner(List<ProjectionAccountInput> accounts,
                                                 String type, String owner) {

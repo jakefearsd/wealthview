@@ -90,15 +90,38 @@ final class TrialSimulator {
      * owner's own age ({@code spouseAgeOffset = primaryBirthYear − spouseBirthYear}, so
      * {@code spouseAge = primaryAge + spouseAgeOffset}) and SECURE-2.0 start age. At
      * {@code transitionYearIndex} the deceased's traditional/Roth roll into the survivor's pools and
-     * the joint-taxable lots step up by {@code stepUpFactor} (the SAME deterministically pre-computed
-     * blended factor the deterministic engine uses — never recomputed here). Trials iterate only up to
-     * {@code truncateYearIndex} (= min(horizon, second-death index + 1)).
+     * the joint-taxable lots step up EXACTLY per owner (HP1): {@code taxableSeed} seeds the lots
+     * tagged by owner and {@code jointStepUpFactor} ({@code communityProperty ? 1.0 : 0.5}) drives
+     * the joint lots' rate — the decedent's own lots step fully, the survivor's not at all. When the
+     * taxable pool is all-joint (or single-owner) {@code taxableSeed} carries only a joint (or that
+     * owner's) slice, so seeding collapses to one lot and the step-up equals the old blended factor —
+     * the byte-identical anchor. Trials iterate only up to {@code truncateYearIndex}
+     * (= min(horizon, second-death index + 1)).
      */
     record HouseholdSim(
             double initTraditionalSpouse, double initRothSpouse,
             int spouseAgeOffset, int spouseRmdStartAge,
             int transitionYearIndex, boolean survivorIsPrimary,
-            double stepUpFactor, int truncateYearIndex) {}
+            double jointStepUpFactor, int truncateYearIndex,
+            TaxableSeed taxableSeed) {}
+
+    /**
+     * HP1: the joint-taxable pool's initial seed split by owner (basis + value per
+     * {@code joint}/{@code primary}/{@code spouse}), so the Monte Carlo lots can be seeded with owner
+     * tags for an exact first-death step-up. {@link #EMPTY} (all zero) selects the single-aggregate
+     * seed path in {@link #simulateTrial} — used for single-person and all-joint taxable pools, whose
+     * lots stay a single joint lot (byte-identical). A mixed-ownership pool carries the primary and/or
+     * spouse slices, triggering per-owner tagged seeding.
+     */
+    record TaxableSeed(double jointBasis, double jointValue,
+                       double primaryBasis, double primaryValue,
+                       double spouseBasis, double spouseValue) {
+        static final TaxableSeed EMPTY = new TaxableSeed(0, 0, 0, 0, 0, 0);
+
+        boolean hasOwnedSlices() {
+            return primaryValue > 0 || spouseValue > 0;
+        }
+    }
 
     /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
@@ -310,8 +333,7 @@ final class TrialSimulator {
         // source-of-truth for the intricate cash-reserve/min/final arithmetic; the lots supply only
         // the dividend split and the realized FIFO gain that drive the annual LTCG tax outflow. The
         // initial lot carries the taxable pool's embedded (unrealized) gain: value − basis.
-        TaxableLots lots = new TaxableLots();
-        lots.addLot(config.initTaxableBasis(), config.initTaxable());
+        TaxableLots lots = seedTaxableLots(config, pools, household);
         // Resolve the withdrawal order once per trial (constant for the run) so the
         // per-year splitWithdrawal calls do no String.equals work.
         WithdrawalOrder order = WithdrawalOrder.fromString(config.withdrawalOrder());
@@ -525,6 +547,29 @@ final class TrialSimulator {
                 && (pools[TRAD_P] + pools[TRAD_S]) <= 0;
 
         return new TrialResult(finalBalance, minBalance, yearBalances, traditionalExhausted, essentialFloorMet);
+    }
+
+    /**
+     * Seeds the trial's joint-taxable FIFO lots (HP1). A mixed-ownership household seeds one lot per
+     * owner category (tagged) so the first-death step-up applies the EXACT per-owner rate, re-pinning
+     * {@code pools[JOINT_TAXABLE]} to the lots' total to keep the value invariant
+     * ({@code lots.totalValue() == pools[JOINT_TAXABLE]}) exact; this branch runs only for a
+     * mixed-ownership household, which has no byte-identity anchor. A single-person or all-joint
+     * taxable pool seeds one aggregate joint lot from the config totals — byte-identical to pre-HP1.
+     */
+    private static TaxableLots seedTaxableLots(SimulationConfig config, double[] pools,
+                                               @Nullable HouseholdSim household) {
+        TaxableLots lots = new TaxableLots();
+        if (household != null && household.taxableSeed().hasOwnedSlices()) {
+            var seed = household.taxableSeed();
+            lots.addLot(seed.jointBasis(), seed.jointValue(), LotOwner.JOINT);
+            lots.addLot(seed.primaryBasis(), seed.primaryValue(), LotOwner.PRIMARY);
+            lots.addLot(seed.spouseBasis(), seed.spouseValue(), LotOwner.SPOUSE);
+            pools[JOINT_TAXABLE] = lots.totalValue();
+        } else {
+            lots.addLot(config.initTaxableBasis(), config.initTaxable());
+        }
+        return lots;
     }
 
     /** Household task 6: a truncated household trial (loopYears &lt; years) carries its final bequest
