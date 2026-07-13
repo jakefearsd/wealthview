@@ -76,6 +76,32 @@ class HouseholdMcResolverTest {
         assertThat(resolved.context()).isNull();
     }
 
+    /**
+     * HP2: the household-keyed {@link HouseholdMcResolver#scaleFromTransition(double[],
+     * TrialSimulator.HouseholdSim, double, int)} overload scales from the sim's transition index by
+     * the factor exactly once — a null household is a no-op (single-person, byte-identical anchor).
+     */
+    @Test
+    void scaleFromTransition_householdOverload_appliesFactorFromTransitionExactlyOnce() {
+        var sim = new TrialSimulator.HouseholdSim(0, 0, 0, 75, 2, true, 0.5, 4,
+                TrialSimulator.TaxableSeed.EMPTY);
+        double[] values = {100, 100, 100, 100};
+
+        HouseholdMcResolver.scaleFromTransition(values, sim, 0.75, 4);
+
+        // Pre-transition untouched; from index 2 scaled by 0.75 (once — not 0.5625).
+        assertThat(values).containsExactly(100.0, 100.0, 75.0, 75.0);
+    }
+
+    @Test
+    void scaleFromTransition_householdOverload_nullHousehold_isNoOp() {
+        double[] values = {100, 100, 100, 100};
+
+        HouseholdMcResolver.scaleFromTransition(values, (TrialSimulator.HouseholdSim) null, 0.75, 4);
+
+        assertThat(values).containsExactly(100.0, 100.0, 100.0, 100.0);
+    }
+
     private static GuardrailOptimizationInput householdInput(int primaryBirthYear, int primaryDeathAge,
             int spouseBirthYear, int spouseDeathAge, LocalDate retirementDate, int endAge) {
         return new GuardrailOptimizationInput(

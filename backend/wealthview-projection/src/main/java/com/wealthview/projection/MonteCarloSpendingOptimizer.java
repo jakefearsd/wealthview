@@ -153,6 +153,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             reduceUntilSustainable(discretionaryByYear, searchContext, ctx);
         }
 
+        // HP2: survivor-scale the discretionary schedule from the first-death transition index — the
+        // SINGLE scaling seam, mirroring OptimizationContextBuilder's essential-floor pre-scaling. The
+        // returned array is the ONE schedule GuardrailResponseBuilder both SIMULATES (its terminal +
+        // floor-disclosure + adaptive-rules trial passes) and REPORTS (yearly_spending + corridor), so
+        // the certified success rate now measures the exact schedule shown to the user instead of the
+        // un-scaled draws the search gated on (which over-drew post-transition — a conservative gap).
+        // No-op for single-person / factor 1.0 / no in-window transition (the byte-identical anchor).
+        HouseholdMcResolver.scaleFromTransition(discretionaryByYear, ctx.sim().household(),
+                ctx.sim().survivorSpendingFactor(), ctx.sim().years());
         return discretionaryByYear;
     }
 

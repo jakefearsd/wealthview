@@ -213,4 +213,22 @@ final class HouseholdMcResolver {
             values[y] *= factor;
         }
     }
+
+    /**
+     * HP2 (dedup): survivor-factor scaling keyed off a resolved {@link TrialSimulator.HouseholdSim}.
+     * A {@code null} household (single-person, the byte-identical anchor) is a no-op; otherwise it
+     * scales {@code values[y] *= factor} for {@code y >= household.transitionYearIndex()} via the
+     * primitive {@link #scaleFromTransition(double[], int, double, int)} — the SAME seam that scales
+     * the essential floor in {@link OptimizationContextBuilder}. Shared by
+     * {@link MonteCarloSpendingOptimizer}'s single discretionary pre-scaling (so the search's terminal
+     * pass simulates exactly the schedule reported to the user) and {@link GuardrailResponseBuilder}'s
+     * floor-clamp disclosure, so the two consumers apply the factor identically and exactly once.
+     */
+    static void scaleFromTransition(double[] values, @Nullable TrialSimulator.HouseholdSim household,
+                                    double factor, int years) {
+        if (household == null) {
+            return;
+        }
+        scaleFromTransition(values, household.transitionYearIndex(), factor, years);
+    }
 }

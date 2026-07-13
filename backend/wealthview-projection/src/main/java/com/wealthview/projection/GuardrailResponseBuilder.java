@@ -44,25 +44,20 @@ final class GuardrailResponseBuilder {
                                    double[] conversionByYear,
                                    double[] conversionTaxByYear,
                                    RothConversionOptimizer.RothConversionSchedule convSchedule) {
-        // Household task 8 (T6 deferral): the REPORTED discretionary/recommended schedule and the
-        // corridor derived from it scale by the survivor factor from the transition year forward,
-        // finishing what T6 started on the floors alone. This is a REPORTING-only copy — the
-        // terminal simulation below (and every other trial pass in this class) keeps using the
-        // ORIGINAL, un-scaled `discretionaryByYear` the search actually optimized against, so the
-        // success/failure metrics are untouched (they were already correct: T6's floor-only success
-        // gate doesn't depend on the discretionary level). See #scaleForReporting.
-        double[] reportedDiscretionaryByYear = scaleForReporting(discretionaryByYear, ctx, ctx.sim().years());
-
-        // Compute corridors + corridor smoothing, from the SAME reported (scaled) plan so the
-        // displayed corridor brackets the displayed recommended spending post-transition too.
+        // HP2: {@code discretionaryByYear} arrives ALREADY survivor-scaled from the transition year
+        // (MonteCarloSpendingOptimizer.allocateAndSmooth's single scaling seam, mirroring the
+        // essential-floor pre-scaling in OptimizationContextBuilder). This one array is what every
+        // trial pass below SIMULATES and what the corridor + yearly_spending REPORT, so the certified
+        // success rate measures exactly the schedule shown to the user (T8's earlier reporting-only
+        // clone is gone — no second scaling here, single source of truth). No-op for single-person.
         double[][] corridors = SpendingCorridorCalculator.computeCorridors(
                 ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().adjustedFloors(),
-                reportedDiscretionaryByYear, ctx.sim().years(), ctx.sim().trialCount());
+                discretionaryByYear, ctx.sim().years(), ctx.sim().trialCount());
         SpendingCorridorCalculator.smoothCorridors(corridors[0], corridors[1], ctx.sim().years());
 
         // Clamp corridors to bracket recommended spending (smoothing can overshoot at phase boundaries)
         for (int y = 0; y < ctx.sim().years(); y++) {
-            double recommended = ctx.taxIncome().adjustedFloors()[y] + reportedDiscretionaryByYear[y];
+            double recommended = ctx.taxIncome().adjustedFloors()[y] + discretionaryByYear[y];
             corridors[0][y] = Math.min(corridors[0][y], recommended);
             corridors[1][y] = Math.max(corridors[1][y], recommended);
         }
@@ -138,7 +133,7 @@ final class GuardrailResponseBuilder {
                 poolSetup, conversionByYear, conversionTaxByYear, medianBalanceByYear,
                 input.maxAnnualAdjustmentRate());
 
-        var yearlySpending = buildYearlySpending(ctx, input, reportedDiscretionaryByYear, corridors,
+        var yearlySpending = buildYearlySpending(ctx, input, discretionaryByYear, corridors,
                 medianBalanceByYear, p10BalanceByYear, p25BalanceByYear);
 
         log.info("MC optimization complete: {} trials, {} years, median final balance {}",
@@ -217,32 +212,16 @@ final class GuardrailResponseBuilder {
                 ctx.sim().household());
     }
 
-    /** Household task 6 + 8 (dedup): extracts the transition index + survivor spending factor from
-     * {@code ctx} and scales {@code values} in place via the single shared
-     * {@link HouseholdMcResolver#scaleFromTransition}, mirroring the pre-scaling
-     * {@link OptimizationContextBuilder} applies to the main {@code adjustedFloors}. No-op for a
-     * single-person run (no household). Shared by the floor-clamp disclosure's re-scaled floor (task
-     * 6) and the reported discretionary/corridor plan (task 8, see {@link #scaleForReporting}). */
+    /** Household task 6 (dedup): scales {@code values} in place by the survivor spending factor from
+     * the transition year via the single shared {@link HouseholdMcResolver#scaleFromTransition},
+     * mirroring the pre-scaling {@link OptimizationContextBuilder} applies to {@code adjustedFloors}.
+     * No-op for a single-person run (no household). Used by the floor-clamp disclosure's re-scaled
+     * original-floor array; the discretionary/recommended schedule and its corridor are pre-scaled
+     * ONCE upstream (HP2, {@link MonteCarloSpendingOptimizer#allocateAndSmooth}) so this class no
+     * longer clones-and-scales them here. */
     private static void scaleSurvivorFactor(double[] values, OptimizationSetup ctx, int years) {
-        var household = ctx.sim().household();
-        if (household == null) {
-            return;
-        }
         HouseholdMcResolver.scaleFromTransition(
-                values, household.transitionYearIndex(), ctx.sim().survivorSpendingFactor(), years);
-    }
-
-    /** Household task 8 (T6 deferral): a REPORTING-only scaled copy of {@code discretionaryByYear} —
-     * the discretionary/recommended schedule shown to the user (and the corridor derived from it)
-     * drops by the survivor spending factor from the first-death transition year forward, finishing
-     * what T6 started on the floors alone. Does NOT feed back into any terminal simulation pass in
-     * this class (every {@code trialSimulator.simulateTrial} call keeps the caller's original,
-     * un-scaled array), so the success/failure metrics — already correct per T6's floor-only success
-     * gate — are unaffected by this change; see the {@link #build} call site's javadoc. */
-    private static double[] scaleForReporting(double[] discretionaryByYear, OptimizationSetup ctx, int years) {
-        double[] reported = discretionaryByYear.clone();
-        scaleSurvivorFactor(reported, ctx, years);
-        return reported;
+                values, ctx.sim().household(), ctx.sim().survivorSpendingFactor(), years);
     }
 
     /** {@code true} when {@code adjustedFloors} was clamped below the user's {@code essentialFloor}
