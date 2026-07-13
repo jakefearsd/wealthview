@@ -610,6 +610,124 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(row.discretionaryExpenses()).isEqualByComparingTo(bd("15000"));
     }
 
+    // === HP3 Part A: end-to-end interaction pin -- filing-flip x per-person age-65 deduction AND
+    // the HP1 exact per-owner basis step-up, together, through ONE full projection. Feature-review
+    // gap: golden #6 is all-joint taxable (blended == exact there) and mocks the age-65 adder to
+    // zero, so neither the HP1 exact-vs-blended delta nor the age-65-adder x filing-flip interaction
+    // had ever been proven end-to-end (only via unit tests / the pool-level MultiPoolOwnerTest).
+
+    @Test
+    void householdEndToEnd_filingFlipAgeDeductionAndExactStepUp_composeThroughFullProjection() {
+        // Nonzero age-65 adder (the shared 2025 fixtures stay frozen at 0) -- same stub shape as
+        // perPersonDeduction_bothSpousesOver65Mfj...Test.
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                        anyInt(), eq("married_filing_jointly")))
+                .thenReturn(mfj2025Brackets());
+        lenient().when(taxBracketRepository.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        lenient().when(standardDeductionRepository.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("1600"))));
+        var ltcgRepo = mock(LtcgBracketRepository.class);
+        stubSingle2025Ltcg(ltcgRepo);
+        stubMfj2025Ltcg(ltcgRepo);
+        var federalTaxCalculator = new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository);
+        var engine = new DeterministicProjectionEngine(federalTaxCalculator, null,
+                new CapitalGainsTaxCalculator(ltcgRepo));
+
+        // Spouse predeceases at 70 (dies 2036, primary age 78); primary (survivor) dies at 95 --
+        // beyond the horizon (2048), so exactly one transition and no truncation. Both spouses are
+        // 65+ well before the transition (primary since 2023, spouse since 2031) and the survivor
+        // (primary) stays 65+ after it.
+        int spouseDeathAge = 70;
+        int transitionYear = SPOUSE_BIRTH + spouseDeathAge; // 2036
+        var household = HouseholdContext.of(PRIMARY_BIRTH, 95, SPOUSE_BIRTH, spouseDeathAge, PRIMARY_BIRTH + 90);
+        assertThat(household.transitionYear()).contains(transitionYear);
+        assertThat(household.secondDeathYear()).isEmpty();
+
+        // Mixed-ownership taxable pool (HP1): joint gain-HEAVY (100k value / 20k basis, seeded
+        // first/oldest) + spouse-owned gain-LIGHT (100k value / 90k basis -- the decedent's own
+        // lot). Common-law joint rate 0.5. Zero growth/dividend/interest (below) keeps both lots at
+        // their seeded value until the deliberate full liquidation pinned below.
+        List<ProjectionAccountInput> accounts = List.of(
+                acct("100000", "20000", "taxable", "joint"),
+                acct("100000", "90000", "taxable", "spouse"));
+
+        // Primary-owned (survivor-owned) pension, unaffected by the transition -- deliberately
+        // straddles the MFJ 1-adder (33,100) / 2-adder (34,700) deduction boundary, so a correct
+        // BOTH-alive MFJ deduction taxes it at exactly zero while a (wrong) single-adder deduction
+        // would not -- proving the "2x" per-person count, not just "some deduction applies".
+        var pension = pension("34000", 50, "primary", "1.0");
+
+        // Tiered spending: flat 34,000 (== pension, zero net need) through age 77, then a deliberate
+        // spike to 500,000 from age 78 (primary's age at the 2036 transition) -- the FIRST-EVER draw
+        // on the taxable pool is therefore a single, complete liquidation exactly in the transition
+        // year, realizing the step-up-adjusted gain in one FIFO sweep.
+        var spending = new SpendingProfileInput(bd("999999"), ZERO, """
+                [{"name": "PreTransition", "start_age": 0, "end_age": 77,
+                  "essential_expenses": 34000, "discretionary_expenses": 0},
+                 {"name": "PostTransition", "start_age": 78, "end_age": null,
+                  "essential_expenses": 500000, "discretionary_expenses": 0}]
+                """);
+
+        String params = """
+                {"birth_year": %d, "filing_status": "married_filing_jointly", "withdrawal_rate": 0.04,
+                 "withdrawal_order": "taxable_first", "fee_rate": 0, "dividend_yield": 0,
+                 "interest_yield": 0, "survivor_spending_factor": 1.0, "community_property": false}
+                """.formatted(PRIMARY_BIRTH);
+
+        // Loop starts in 2031 (not earlier) -- the year the SPOUSE first turns 65 (born 1966): before
+        // that, only the primary's single adder would apply (deduction 33,100 < 34,000), owing a
+        // small tax that -- per PoolStrategy#deductFromPools -- draws taxable-first, FIFO, from the
+        // very lot this fixture needs pristine until the deliberate transition-year liquidation.
+        var result = engine.run(input(2031, 90, params, accounts, spending, List.of(pension), household));
+
+        // === Pin 1: age-65 deduction while both alive (MFJ, 2x adder) -- taxes the 34,000 pension
+        // at exactly zero (34,000 <= 31,500 + 2*1,600 = 34,700), and the pool is untouched (no LTCG).
+        var preRow = yearOf(result.yearlyData(), 2033); // primary 75, spouse 67: both alive, both 65+
+        assertThat(nz(preRow.taxLiability()))
+                .isEqualByComparingTo(federalTaxCalculator.computeTax(
+                        bd("34000"), 2033, FilingStatus.MARRIED_FILING_JOINTLY, 75, 67));
+        assertThat(nz(preRow.taxLiability())).isEqualByComparingTo(ZERO);
+        // Discriminates the "2x": with only ONE qualifying age, the SAME income would owe tax
+        // (31,500 + 1*1,600 = 33,100 < 34,000) -- proving the engine applied BOTH adders, not one.
+        assertThat(federalTaxCalculator.computeTax(bd("34000"), 2033, FilingStatus.MARRIED_FILING_JOINTLY, 75, 40))
+                .isGreaterThan(ZERO);
+        assertThat(nz(preRow.capitalGainsTax())).isEqualByComparingTo(ZERO);
+
+        // === Pin 2: filing flip + per-person deduction, survivor phase (SINGLE, 1x adder). Isolate
+        // the ordinary-tax component by subtracting the (already-folded-in) capitalGainsTax -- the
+        // same technique golden #6's sanity review uses to isolate the filing-status bill.
+        var transitionRow = yearOf(result.yearlyData(), transitionYear);
+        BigDecimal ordinaryTax = transitionRow.taxLiability().subtract(nz(transitionRow.capitalGainsTax()));
+        assertThat(ordinaryTax).isEqualByComparingTo(federalTaxCalculator.computeTax(
+                bd("34000"), transitionYear, FilingStatus.SINGLE, 78, null));
+        // Discriminates the "1x" (vs. 0 adders, i.e. under 65): a different bill on the same income.
+        assertThat(ordinaryTax).isNotEqualByComparingTo(federalTaxCalculator.computeTax(
+                bd("34000"), transitionYear, FilingStatus.SINGLE, 40, null));
+
+        // === Pin 3 (HP1 e2e): the realized LTCG reflects the EXACT per-owner step-up (joint 0.5,
+        // spouse-owned-decedent 1.0 -> 40,000 gain), not the retired blended-factor approximation
+        // (0.75 uniformly -> 22,500 gain). Independent oracle: CapitalGainsTaxCalculator, the SAME
+        // primitive the engine itself calls, fed the two candidate gain figures directly -- not the
+        // engine's own annotated output. LTCG stacks on ordinary (34,000 - 15,750 base single
+        // deduction = 18,250 floor; the LTCG stacking floor is base-deduction-only, a documented
+        // pre-existing simplification -- see PoolStrategy#resolveOrdinaryDeduction).
+        var ltcgOracle = new CapitalGainsTaxCalculator(ltcgRepo);
+        BigDecimal exactGainTax = ltcgOracle.computeLtcgTax(bd("18250"), bd("40000"), transitionYear,
+                FilingStatus.SINGLE, transitionYear - 2031, ZERO, bd("74000"));
+        BigDecimal blendedGainTax = ltcgOracle.computeLtcgTax(bd("18250"), bd("22500"), transitionYear,
+                FilingStatus.SINGLE, transitionYear - 2031, ZERO, bd("56500"));
+        assertThat(exactGainTax).isNotEqualByComparingTo(blendedGainTax); // sanity: not coincidentally equal
+        assertThat(exactGainTax).isEqualByComparingTo(bd("1485.00"));     // hand-derived: 30,100@0% + 9,900@15%
+        assertThat(blendedGainTax).isEqualByComparingTo(ZERO);            // hand-derived: 22,500 fully @0%
+
+        assertThat(transitionRow.capitalGainsTax()).isEqualByComparingTo(exactGainTax);
+        assertThat(transitionRow.capitalGainsTax()).isNotEqualByComparingTo(blendedGainTax);
+    }
+
     // === Idempotence: the transition fires exactly once, even across the SS convergence re-runs ===
 
     @Test
