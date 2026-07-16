@@ -146,6 +146,43 @@ class SurvivorIncomeAdjusterTest {
         assertThat(isActive(relabeled, household, 2041)).isFalse();
     }
 
+    // === Sub-project B (stochastic mortality), task 6: explicit-survivor overload emits BOTH identities ===
+    // The fixed-death overload picks household.survivor(); the explicit overload lets the caller force
+    // EITHER identity so OptimizationContextBuilder can precompute both survivor regimes. These pin that
+    // the explicit identity (not the household's fixed survivor) drives the relabel/keep-larger.
+
+    @Test
+    void adjustExplicit_forcesPrimarySurvivor_evenThoughHouseholdFixedSurvivorIsSpouse() {
+        // Household's FIXED survivor is the SPOUSE (primary dies first at 85). Force survivor = PRIMARY.
+        var household = HouseholdContext.of(PRIMARY_BIRTH, 85, SPOUSE_BIRTH, 95, 2070);
+        assertThat(household.survivor()).isEqualTo(PersonId.SPOUSE);
+        var spouseOwned = pension(60, null, "spouse", "0.5"); // now the DECEASED-owned source
+
+        var adjusted = SurvivorIncomeAdjuster.adjust(
+                List.of(spouseOwned), PersonId.PRIMARY, 2043, 2020, ZERO);
+
+        // With PRIMARY forced as survivor, the spouse-owned source is deceased-owned -> relabeled to
+        // primary at survivor_percent, and NO source is left owned by spouse.
+        var result = find(adjusted, "primary");
+        assertThat(result.annualAmount()).isEqualByComparingTo(new BigDecimal("12000")); // 24000 * 0.5
+        assertThat(adjusted.stream().anyMatch(s -> "spouse".equals(s.owner()))).isFalse();
+    }
+
+    @Test
+    void adjustExplicit_forcesSpouseSurvivor_evenThoughHouseholdFixedSurvivorIsPrimary() {
+        // Mirror: household's FIXED survivor is the PRIMARY (spouse dies first at 60). Force SPOUSE.
+        var household = HouseholdContext.of(PRIMARY_BIRTH, 95, SPOUSE_BIRTH, 60, 2070);
+        assertThat(household.survivor()).isEqualTo(PersonId.PRIMARY);
+        var primaryOwned = pension(60, null, "primary", "0.75"); // now the DECEASED-owned source
+
+        var adjusted = SurvivorIncomeAdjuster.adjust(
+                List.of(primaryOwned), PersonId.SPOUSE, 2030, 2020, ZERO);
+
+        var result = find(adjusted, "spouse");
+        assertThat(result.annualAmount()).isEqualByComparingTo(new BigDecimal("18000")); // 24000 * 0.75
+        assertThat(adjusted.stream().anyMatch(s -> "primary".equals(s.owner()))).isFalse();
+    }
+
     private static boolean isActive(ProjectionIncomeSourceInput source, HouseholdContext household, int year) {
         int age = IncomeYearMath.resolveSourceAge(source, household.primary().ageIn(year), household, year);
         return ProjectionIncomeSourceInput.isActiveForAge(source, age);

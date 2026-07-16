@@ -2,6 +2,7 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 
 import org.springframework.lang.Nullable;
@@ -12,6 +13,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.household.HouseholdContext;
+import com.wealthview.core.projection.household.PersonId;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
@@ -59,7 +61,7 @@ final class OptimizationContextBuilder {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null),
+                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null, null));
         }
 
@@ -180,6 +182,15 @@ final class OptimizationContextBuilder {
         double taxableEquityShare = PoolStrategy.taxableEquityShare(
                 taxableAccounts(input.accounts())).doubleValue();
 
+        // Sub-project B (stochastic mortality), task 6: when this run opted into stochastic mortality
+        // (mortalityDraws != null ⇒ a household with a loaded table), additionally assemble the JOINT
+        // (both-alive) arrays + both survivor regimes for the SEPARATE evaluation pass. This is purely
+        // additive: the recommendation flow above is untouched, so toggle-off / single-person / fixed-
+        // death runs are byte-identical (stochasticEval stays null there).
+        StochasticEvalArrays stochasticEval = buildStochasticEvalArrays(input, mortalityDraws,
+                retirementYear, retirementAge, years, retirementYearOffsetFromBase, essentialFloor,
+                inflationRate, filingStatus, withdrawalOrder, portfolioPaths, confidenceLevel, trialCount);
+
         return new OptimizationSetup(
                 new PortfolioSetup(initTaxable, initTraditional, initRoth,
                         initialPortfolio, withdrawalOrder, cashReserveYears, cashReturnRate,
@@ -189,7 +200,7 @@ final class OptimizationContextBuilder {
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
                         returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
                         interestYield, taxableEquityShare, household.survivorFactor(), household.sim(),
-                        mortalityDraws),
+                        mortalityDraws, stochasticEval),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeByYear, taxableIncomeByYear, surplusTaxByYear,
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
@@ -379,6 +390,125 @@ final class OptimizationContextBuilder {
         LtcgTaxTable[] post = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator, retirementYear,
                 years, household.postStatus(), inflationRate, birthYear, household.context());
         return spliceObjects(pre, post, idx);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: assembles the JOINT (both-alive) income/tax arrays
+     * plus BOTH survivor regimes for the separate stochastic evaluation pass. Only called when the run
+     * opted into stochastic mortality (a household with a loaded table), so the fixed-death
+     * recommendation flow above never reaches here and stays byte-identical.
+     *
+     * <p>The JOINT phase uses a context in which both spouses outlive the horizon, so every modeled
+     * year is both-alive (MFJ per-person age-65, both income windows). {@code jointFloors} is the
+     * essential floor UNSCALED — the per-trial splice ({@link TrialSimulator#simulateTrial}) re-applies
+     * the survivor ×factor from each trial's own sampled first-death index. Each survivor regime is
+     * built SINGLE with that survivor's own age (via a context in which the OTHER member died before the
+     * window — {@link #survivorOnlyContext}) and that survivor's keep-larger-SS + survivor-% income.
+     *
+     * <p>Returns {@code null} when {@code mortalityDraws} is {@code null} (a non-stochastic run) — the
+     * guard lives here rather than as a ternary in {@link #build} so build()'s NPath is unchanged.
+     */
+    @Nullable
+    private StochasticEvalArrays buildStochasticEvalArrays(GuardrailOptimizationInput input,
+            @Nullable MortalityDraws mortalityDraws, int retirementYear, int retirementAge, int years,
+            int retirementYearOffsetFromBase, double essentialFloor, double inflationRate,
+            FilingStatus filingStatus, String withdrawalOrder, double[][] portfolioPaths,
+            double confidenceLevel, int trialCount) {
+        if (mortalityDraws == null) {
+            return null;
+        }
+        int primaryBirthYear = input.birthYear();
+        // Non-null by the mortalityDraws gate in build() (stochastic mortality requires a spouse); the
+        // requireNonNull makes that contract explicit for the unboxing here.
+        int spouseBirthYear = Objects.requireNonNull(
+                input.spouseBirthYear(), "stochastic mortality requires a spouse (household)");
+        int horizonEndYear = primaryBirthYear + input.endAge();
+
+        HouseholdContext jointCtx = bothAliveContext(primaryBirthYear, spouseBirthYear, horizonEndYear);
+        var jointPipeline = computeIncomePipeline(input.incomeSources(), filingStatus, retirementAge, years,
+                retirementYearOffsetFromBase, essentialFloor, retirementYear, primaryBirthYear, inflationRate,
+                jointCtx);
+        OrdinaryTaxTable[] jointOrdinary = OrdinaryTaxTable.computeAll(
+                taxCalculator, retirementYear, years, filingStatus, primaryBirthYear, jointCtx);
+        LtcgTaxTable[] jointLtcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
+                retirementYear, years, filingStatus, inflationRate, primaryBirthYear, jointCtx);
+        double[] jointDs = computeDsBracketCeilings(
+                withdrawalOrder, input.dynamicSequencingBracketRate(), years, retirementYear, filingStatus);
+        double[] jointRental = computeRentalIncomeDelta(
+                jointPipeline.rentalAwareTaxableIncome(), jointPipeline.taxableIncomeByYear(), years);
+        // Essential floor UNSCALED by the survivor factor -- the per-trial splice re-applies it.
+        double[] jointFloors = SustainabilitySearch.verifyEssentialFloor(portfolioPaths,
+                jointPipeline.incomeByYear(), essentialFloor, confidenceLevel, years, trialCount);
+
+        var regimes = new TrialSimulator.SurvivorRegime[2];
+        regimes[TrialSimulator.PRIMARY_SURVIVES] = buildSurvivorRegime(input, PersonId.PRIMARY,
+                primaryBirthYear, spouseBirthYear, retirementYear, retirementAge, years,
+                retirementYearOffsetFromBase, essentialFloor, inflationRate, withdrawalOrder, horizonEndYear);
+        regimes[TrialSimulator.SPOUSE_SURVIVES] = buildSurvivorRegime(input, PersonId.SPOUSE,
+                primaryBirthYear, spouseBirthYear, retirementYear, retirementAge, years,
+                retirementYearOffsetFromBase, essentialFloor, inflationRate, withdrawalOrder, horizonEndYear);
+
+        return new StochasticEvalArrays(jointPipeline.incomeByYear(), jointPipeline.surplusTaxByYear(),
+                jointFloors, jointPipeline.rentalAwareTaxableIncome(), jointOrdinary, jointLtcg,
+                jointDs, jointRental, regimes);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: one survivor regime, built SINGLE for the explicit
+     * {@code survivor} identity — that survivor's keep-larger-SS + survivor-% income (via the
+     * transition-year-invariant {@link SurvivorIncomeAdjuster#adjust(java.util.List, PersonId, int, int,
+     * java.math.BigDecimal)}, computed once at {@code retirementYear}) and SINGLE-filer tax tables at
+     * that survivor's own age (via {@link #survivorOnlyContext}, in which the OTHER member is dead
+     * before the modeled window, so {@code filerAgeIn}/{@code age65QualifyingCount} return the
+     * survivor's age for every year). {@code birthYear} stays the primary's — mirroring the fixed-death
+     * survivor pipeline's own convention — because the context supplies the per-owner ages.
+     */
+    private TrialSimulator.SurvivorRegime buildSurvivorRegime(GuardrailOptimizationInput input,
+            PersonId survivor, int primaryBirthYear, int spouseBirthYear, int retirementYear,
+            int retirementAge, int years, int retirementYearOffsetFromBase, double essentialFloor,
+            double inflationRate, String withdrawalOrder, int horizonEndYear) {
+        HouseholdContext ctx = survivorOnlyContext(
+                survivor, primaryBirthYear, spouseBirthYear, retirementYear, horizonEndYear);
+        var sources = SurvivorIncomeAdjuster.adjust(
+                input.incomeSources(), survivor, retirementYear, input.baseYear(),
+                BigDecimal.valueOf(inflationRate));
+        var pipeline = computeIncomePipeline(sources, FilingStatus.SINGLE, retirementAge, years,
+                retirementYearOffsetFromBase, essentialFloor, retirementYear, primaryBirthYear, inflationRate, ctx);
+        OrdinaryTaxTable[] ordinary = OrdinaryTaxTable.computeAll(
+                taxCalculator, retirementYear, years, FilingStatus.SINGLE, primaryBirthYear, ctx);
+        LtcgTaxTable[] ltcg = LtcgTaxTable.computeAll(capitalGainsTaxCalculator, taxCalculator,
+                retirementYear, years, FilingStatus.SINGLE, inflationRate, primaryBirthYear, ctx);
+        double[] ds = computeDsBracketCeilings(
+                withdrawalOrder, input.dynamicSequencingBracketRate(), years, retirementYear, FilingStatus.SINGLE);
+        double[] rental = computeRentalIncomeDelta(
+                pipeline.rentalAwareTaxableIncome(), pipeline.taxableIncomeByYear(), years);
+        return new TrialSimulator.SurvivorRegime(pipeline.incomeByYear(), pipeline.surplusTaxByYear(),
+                pipeline.rentalAwareTaxableIncome(), ordinary, ltcg, ds, rental);
+    }
+
+    /** Task 6: a context in which BOTH spouses outlive the horizon, so every modeled year is both-alive
+     * (joint MFJ per-person age-65 + both income windows) — the JOINT phase for the stochastic pass. */
+    private static HouseholdContext bothAliveContext(int primaryBirthYear, int spouseBirthYear,
+                                                     int horizonEndYear) {
+        int beyond = horizonEndYear + 1;
+        return HouseholdContext.of(primaryBirthYear, beyond - primaryBirthYear,
+                spouseBirthYear, beyond - spouseBirthYear, horizonEndYear);
+    }
+
+    /** Task 6: a context in which the NON-survivor died at the retirement boundary (dead for every
+     * modeled year) and the survivor outlives the horizon, so {@code filerAgeIn}/{@code
+     * age65QualifyingCount} resolve to the survivor's own SINGLE-filer age throughout — used to build
+     * each survivor regime's per-year tax tables/income at that survivor's age. */
+    private static HouseholdContext survivorOnlyContext(PersonId survivor, int primaryBirthYear,
+                                                        int spouseBirthYear, int retirementYear,
+                                                        int horizonEndYear) {
+        int beyond = horizonEndYear + 1;
+        int primaryDeathAge = survivor == PersonId.PRIMARY
+                ? beyond - primaryBirthYear : retirementYear - primaryBirthYear;
+        int spouseDeathAge = survivor == PersonId.SPOUSE
+                ? beyond - spouseBirthYear : retirementYear - spouseBirthYear;
+        return HouseholdContext.of(primaryBirthYear, primaryDeathAge, spouseBirthYear, spouseDeathAge,
+                horizonEndYear);
     }
 
     /** Household task 6: per-year dynamic-sequencing bracket ceilings spliced pre/post the transition.

@@ -66,10 +66,25 @@ final class SurvivorIncomeAdjuster {
     static List<ProjectionIncomeSourceInput> adjust(List<ProjectionIncomeSourceInput> sources,
                                                     HouseholdContext household, int transitionYear,
                                                     int baseYear, BigDecimal scenarioInflationRate) {
+        return adjust(sources, household.survivor(), transitionYear, baseYear, scenarioInflationRate);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: the survivor-phase rewrite for an EXPLICIT survivor
+     * identity, rather than the household's fixed-death survivor ({@link HouseholdContext#survivor()},
+     * which the {@link HouseholdContext}-typed overload above passes). Stochastic mortality lets EITHER
+     * spouse be the survivor, so {@link OptimizationContextBuilder} builds both identities' regimes from
+     * this once — the keep-larger-SS choice is transition-year-invariant (all Social Security amounts
+     * inflate by the same factor, preserving their ordering), so each identity's survivor-source list is
+     * stable across the per-trial year of death and computed a single time. {@code survivor} must be a
+     * real household member ({@code PRIMARY}/{@code SPOUSE}); {@code deceased} is the other.
+     */
+    static List<ProjectionIncomeSourceInput> adjust(List<ProjectionIncomeSourceInput> sources,
+                                                    PersonId survivor, int transitionYear, int baseYear,
+                                                    BigDecimal scenarioInflationRate) {
         if (sources == null || sources.isEmpty()) {
             return sources;
         }
-        PersonId survivor = household.survivor();
         PersonId deceased = survivor == PersonId.PRIMARY ? PersonId.SPOUSE : PersonId.PRIMARY;
         // HP3 Part B-1 (investigated, kept as-is): the "+1" here is REQUIRED, not an off-by-one --
         // it is the exact 1-indexing IncomeYearMath#realAmount's contract expects (steps =

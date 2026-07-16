@@ -53,5 +53,10 @@ record SimulationParameters(
         // DEDICATED rng stream by {@link MortalityDrawGenerator} and threaded here for task 6, which
         // will splice each trial's own {@code transitionIdx}/{@code truncateIdx}/{@code
         // survivorIsPrimary} into the trial loop instead of the single fixed set.
-        @Nullable MortalityDraws mortalityDraws
+        @Nullable MortalityDraws mortalityDraws,
+        // Sub-project B (stochastic mortality), task 6: the JOINT (both-alive) income/tax arrays + both
+        // precomputed survivor regimes for the SEPARATE stochastic evaluation pass
+        // ({@link StochasticMortalityEvaluator}). {@code null} unless the run opted into stochastic
+        // mortality; the recommendation flow never reads it, so the fixed-death engine is byte-identical.
+        @Nullable StochasticEvalArrays stochasticEval
 ) {}

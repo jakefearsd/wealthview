@@ -112,7 +112,24 @@ final class TrialSimulator {
             int spouseAgeOffset, int spouseRmdStartAge,
             int transitionYearIndex, boolean survivorIsPrimary,
             double jointStepUpFactor, int truncateYearIndex,
-            TaxableSeed taxableSeed) {}
+            TaxableSeed taxableSeed) {
+
+        /**
+         * Sub-project B (stochastic mortality), task 6: a copy of this fixed-death {@code HouseholdSim}
+         * with only the three per-trial mortality fields replaced — the trial's own first-death index,
+         * survivor identity, and second-death truncation index (from {@link MortalityDraws}). The six
+         * identity/structure-invariant fields ({@code initTraditionalSpouse}, {@code initRothSpouse},
+         * {@code spouseAgeOffset}, {@code spouseRmdStartAge}, {@code jointStepUpFactor} — the joint
+         * statutory step-up rate, whose DIRECTION is driven by {@code survivorIsPrimary} — and
+         * {@code taxableSeed}) describe the household's starting state and are shared across every trial,
+         * so the stochastic evaluation pass reuses one base {@code HouseholdSim} and withers it per trial.
+         */
+        HouseholdSim withTrialMortality(int transitionYearIndex, boolean survivorIsPrimary,
+                                        int truncateYearIndex) {
+            return new HouseholdSim(initTraditionalSpouse, initRothSpouse, spouseAgeOffset, spouseRmdStartAge,
+                    transitionYearIndex, survivorIsPrimary, jointStepUpFactor, truncateYearIndex, taxableSeed);
+        }
+    }
 
     /**
      * HP1: the joint-taxable pool's initial seed split by owner (basis + value per

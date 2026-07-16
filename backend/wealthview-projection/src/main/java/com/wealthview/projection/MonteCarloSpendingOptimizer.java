@@ -47,6 +47,9 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private final TrialSimulator trialSimulator = new TrialSimulator();
     private final SustainabilitySearch sustainabilitySearch = new SustainabilitySearch(trialSimulator);
     private final GuardrailResponseBuilder responseBuilder = new GuardrailResponseBuilder(trialSimulator);
+    // Sub-project B (stochastic mortality), task 6: the separate longevity-aware evaluation pass.
+    private final StochasticMortalityEvaluator stochasticEvaluator =
+            new StochasticMortalityEvaluator(trialSimulator);
     private final JointConversionSearch jointConversionSearch;
     private final OptimizationContextBuilder contextBuilder;
 
@@ -117,12 +120,42 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             }
 
             var conv = jointConversionSearch.optimize(ctx, input, matrix);
+            // allocateAndSmooth now returns the discretionary schedule UNSCALED by the survivor factor
+            // (sub-project B, task 6); the recommendation scales it at the FIXED-death transition index
+            // exactly as before (byte-identical -- scaleFromTransition is a no-op for single-person /
+            // no in-window transition, so most runs are untouched). The unscaled schedule is what the
+            // stochastic evaluation pass re-splices per trial.
             var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
-            return responseBuilder.build(ctx, input, discretionaryByYear, conv.byYear(), conv.taxByYear(),
+            double[] recommendedDiscretionary = discretionaryByYear.clone();
+            HouseholdMcResolver.scaleFromTransition(recommendedDiscretionary, ctx.sim().household(),
+                    ctx.sim().survivorSpendingFactor(), ctx.sim().years());
+            return responseBuilder.build(ctx, input, recommendedDiscretionary, conv.byYear(), conv.taxByYear(),
                     conv.schedule());
         } finally {
             MDC.remove("operation");
         }
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: runs the SEPARATE longevity-aware evaluation pass
+     * over the fixed-death-optimized schedule and returns the raw per-trial success flags + sampled
+     * death ages ({@link StochasticMortalityEvaluation}). The recommendation is NOT re-derived — this is
+     * the number sub-project B adds BESIDE it. Returns {@code null} when the run did not opt into
+     * stochastic mortality (toggle off / single-person / degenerate horizon), in which case there is no
+     * longevity number to compute. Task 7 calls this and aggregates the result into the user-facing
+     * summary; it is intentionally separate from {@link #optimize} (which stays byte-identical) until
+     * that wiring lands.
+     */
+    @Nullable
+    StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput input) {
+        RealReturnMatrix matrix = matrix(input.includeDepressionYears());
+        var ctx = contextBuilder.build(input, matrix);
+        if (ctx.sim().years() <= 0 || ctx.sim().stochasticEval() == null) {
+            return null;
+        }
+        var conv = jointConversionSearch.optimize(ctx, input, matrix);
+        double[] jointDiscretionary = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
+        return stochasticEvaluator.evaluate(ctx, jointDiscretionary, conv.byYear(), conv.taxByYear());
     }
 
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
@@ -153,15 +186,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             reduceUntilSustainable(discretionaryByYear, searchContext, ctx);
         }
 
-        // HP2: survivor-scale the discretionary schedule from the first-death transition index — the
-        // SINGLE scaling seam, mirroring OptimizationContextBuilder's essential-floor pre-scaling. The
-        // returned array is the ONE schedule GuardrailResponseBuilder both SIMULATES (its terminal +
-        // floor-disclosure + adaptive-rules trial passes) and REPORTS (yearly_spending + corridor), so
-        // the certified success rate now measures the exact schedule shown to the user instead of the
-        // un-scaled draws the search gated on (which over-drew post-transition — a conservative gap).
-        // No-op for single-person / factor 1.0 / no in-window transition (the byte-identical anchor).
-        HouseholdMcResolver.scaleFromTransition(discretionaryByYear, ctx.sim().household(),
-                ctx.sim().survivorSpendingFactor(), ctx.sim().years());
+        // Sub-project B (stochastic mortality), task 6: this method now returns the discretionary
+        // schedule UNSCALED by the survivor factor. HP2's single survivor-scaling seam moved UP to the
+        // caller (optimize scales a clone for the recommendation at the FIXED-death transition index --
+        // byte-identical to before), so this unscaled schedule can also feed the stochastic evaluation
+        // pass, which re-applies the ×factor per trial from each trial's OWN sampled first-death index
+        // (the fixed index is meaningless once death is stochastic).
         return discretionaryByYear;
     }
 
