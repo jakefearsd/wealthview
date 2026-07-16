@@ -72,8 +72,9 @@ import com.wealthview.core.projection.mortality.MortalityTable;
  *         both sexes' qx ({@code MortalityTable.qx}).
  * @param spouseSex the spouse's sex, mirroring {@link #primarySex} for the spouse. {@code null} ⇒
  *         blended qx.
- * @param longevityConditionalAge the age for the "at least one spouse still alive at this age"
- *         longevity-conditional success metric. {@code null} ⇒ {@code 95}.
+ * @param longevityConditionalAge the age for the "the survivor lives to this age" (the last
+ *         surviving spouse reaches it) longevity-conditional success metric. {@code null} ⇒
+ *         {@code 95}.
  * @param mortalityTable the loaded SSA period-life table, resolved by {@code
  *         ProjectionInputBuilder.resolveMortalityTable} ONLY when {@link #stochasticMortality} is
  *         {@code true} — {@code null} otherwise, so a toggle-off run never touches

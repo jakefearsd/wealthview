@@ -423,7 +423,8 @@ public class ScenarioCrudService {
      * spouse-scoped like every other household-only field validated in
      * {@link #validateHouseholdFields}, so it requires {@code spouse_birth_year}.
      * {@code longevity_conditional_age} (when present) must be a plausible SSA-adjacent planning
-     * age for the "at least one spouse still alive at this age" success metric.
+     * age for the "the survivor lives to this age" success metric (i.e. the last surviving spouse
+     * reaches that age -- the metric filters on the survivor's death age).
      */
     private static void validateStochasticMortalityFields(ScenarioParamsSource request) {
         validateSex(request.primarySex(), "primary_sex");

@@ -43,9 +43,10 @@ record StochasticMortalitySummary(
     /**
      * The success rate conditional on the household surviving to a given age.
      *
-     * @param age the age threshold ("at least one spouse alive at this age") that defined the
-     *         subset -- {@code GuardrailOptimizationInput.longevityConditionalAge()}, or the
-     *         engine's default (95) when the request omits it.
+     * @param age the age threshold ("the survivor lives to this age" -- the last surviving spouse
+     *         reaches it, filtering on {@code secondDeathAge}) that defined the subset --
+     *         {@code GuardrailOptimizationInput.longevityConditionalAge()}, or the engine's default
+     *         (95) when the request omits it.
      * @param probability the success rate WITHIN the subset of trials whose survivor reached
      *         {@code age}; {@code 0} (never {@code NaN}) when no trial reached it -- an empty
      *         subset has no successes to divide by, not an undefined rate.

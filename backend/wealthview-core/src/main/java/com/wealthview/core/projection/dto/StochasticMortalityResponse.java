@@ -31,8 +31,8 @@ public record StochasticMortalityResponse(
     /**
      * The success rate conditional on the household surviving to a given age.
      *
-     * @param age the longevity threshold ("at least one spouse alive at this age") the subset was
-     *         conditioned on.
+     * @param age the longevity threshold ("the survivor lives to this age" -- the last surviving
+     *         spouse reaches it) the subset was conditioned on.
      * @param probability the success rate WITHIN the subset of trials whose survivor reached
      *         {@code age}.
      * @param trialFraction what share of ALL trials qualified for the subset -- how much sample

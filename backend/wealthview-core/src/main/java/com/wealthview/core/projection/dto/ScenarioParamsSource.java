@@ -125,7 +125,8 @@ public interface ScenarioParamsSource {
 
     /**
      * The age used for the longevity-conditional success metric: "probability of running out of
-     * money given at least one spouse is still alive at this age." {@code null} resolves to
+     * money given the survivor lives to this age" (i.e. the last surviving spouse reaches that
+     * age -- the metric filters on the survivor's death age). {@code null} resolves to
      * {@code 95}. Only meaningful when {@link #stochasticMortality()} is {@code true}.
      */
     Integer longevityConditionalAge();

@@ -684,7 +684,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                     </FormField>
                                     <FormField
                                         label="Longevity Age"
-                                        helpText="Age threshold (80-110) for the 'at least one spouse still alive at this age' success metric shown beside lifetime success (default 95)."
+                                        helpText="Age threshold (80-110) for the 'the survivor lives to this age' success metric shown beside lifetime success (default 95)."
                                     >
                                         <input
                                             style={inputStyle}

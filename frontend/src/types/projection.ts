@@ -220,9 +220,9 @@ export interface CreateScenarioRequest {
     /** Sub-project B: the spouse's sex, mirroring primary_sex. Requires spouse_birth_year to be set. */
     spouse_sex?: Sex | null;
     /**
-     * Sub-project B: age threshold (80-110) for the "at least one spouse still alive at this age"
-     * longevity-conditional success metric. Null resolves to 95. Only meaningful when
-     * stochastic_mortality is true.
+     * Sub-project B: age threshold (80-110) for the "the survivor lives to this age" (the last
+     * surviving spouse reaches it) longevity-conditional success metric. Null resolves to 95. Only
+     * meaningful when stochastic_mortality is true.
      */
     longevity_conditional_age?: number | null;
     spending_profile_id?: string | null;
@@ -403,7 +403,7 @@ export interface GuardrailProfileResponse {
  * Sub-project B: the success rate conditional on the household surviving to a given age.
  */
 export interface StochasticMortalityLongevityConditional {
-    /** The longevity threshold ("at least one spouse alive at this age") the subset was conditioned on. */
+    /** The longevity threshold ("the survivor lives to this age" -- the last surviving spouse reaches it) the subset was conditioned on. */
     age: number;
     /** The success rate WITHIN the subset of trials whose survivor reached `age`. */
     probability: number;
