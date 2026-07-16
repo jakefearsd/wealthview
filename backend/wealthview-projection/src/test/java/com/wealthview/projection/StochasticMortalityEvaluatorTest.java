@@ -41,6 +41,11 @@ import static org.mockito.Mockito.mock;
  * trials over the fixed-death-optimized schedule with per-trial sampled deaths + the three-regime splice
  * and returns the raw per-trial success + sampled death ages (the task-7 output contract).
  *
+ * <p>Task 7 additions live at the bottom of this class (reusing the same fixtures): pins that {@link
+ * MonteCarloSpendingOptimizer#optimizeInternal} attaches a non-null {@code StochasticMortalitySummary}
+ * for a stochastic household and null for toggle-off, plus the ANCHOR proof that folding the evaluation
+ * into {@code optimizeInternal} does not move the fixed-death recommendation.
+ *
  * <p>A household with SS income for BOTH spouses exercises the survivor keep-larger income splice (the
  * survivor loses the smaller benefit, raising withdrawals), so the joint→survivor regime assembly is
  * economically live even though this optimizer is built without a federal tax calculator.
@@ -130,6 +135,46 @@ class StochasticMortalityEvaluatorTest {
         var input = stochasticInput(42L, 82, 90, null); // null table + toggle off below
 
         assertThat(optimizer.evaluateStochasticMortality(input)).isNull();
+    }
+
+    // === task 7: the folded production path attaches the aggregated summary in the SAME optimizeInternal
+    //     pass, reusing this class's stochastic household fixture (no second evaluate() re-run) ===
+
+    @Test
+    void optimizeInternal_stochasticHousehold_attachesNonNullSummary() {
+        var result = optimizer.optimizeInternal(stochasticInput(42L, 82, 90, stepTable(82, 90)));
+
+        assertThat(result.stochasticMortality()).isNotNull();
+        assertThat(result.stochasticMortality().lifetimeSuccessProbability()).isBetween(0.0, 1.0);
+        assertThat(result.stochasticMortality().secondDeathAge().median()).isEqualTo(90);
+    }
+
+    @Test
+    void optimizeInternal_toggleOff_attachesNullSummary() {
+        var result = optimizer.optimizeInternal(stochasticInput(42L, 82, 90, null));
+
+        assertThat(result.stochasticMortality()).isNull();
+    }
+
+    // === task 7 ANCHOR: folding the evaluation into optimizeInternal must not move the fixed-death
+    //     recommendation -- toggle on vs toggle off (otherwise-identical inputs) must be byte-identical,
+    //     exactly as sub-project B's own "null/false stochasticMortality is byte-identical to A" contract
+    //     already requires. A regression here would mean the read-only evaluation pass leaked back into
+    //     the recommendation, which is the one thing this fold must never do. ===
+
+    @Test
+    void optimize_stochasticToggleOn_recommendationByteIdenticalToToggleOff() {
+        var toggleOff = stochasticInput(42L, 82, 90, null);
+        var toggleOn = stochasticInput(42L, 82, 90, stepTable(82, 90));
+
+        var off = optimizer.optimize(toggleOff);
+        var on = optimizer.optimize(toggleOn);
+
+        assertThat(on.yearlySpending()).isEqualTo(off.yearlySpending());
+        assertThat(on.successProbability()).isEqualByComparingTo(off.successProbability());
+        assertThat(on.medianFinalBalance()).isEqualByComparingTo(off.medianFinalBalance());
+        assertThat(on.failureRate()).isEqualByComparingTo(off.failureRate());
+        assertThat(on.percentile10Final()).isEqualByComparingTo(off.percentile10Final());
     }
 
     // === IMPORTANT: per-identity survivor age drives the age-65 deduction in the RIGHT regime's table ===

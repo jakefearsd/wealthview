@@ -36,6 +36,12 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     private static final Logger log = LoggerFactory.getLogger(MonteCarloSpendingOptimizer.class);
     /** Reduction factor applied per iteration when a smoothed plan fails sustainability. */
     private static final double SUSTAINABILITY_REDUCTION_FACTOR = 0.95;
+    /**
+     * Default longevity-conditional age used when {@link
+     * GuardrailOptimizationInput#longevityConditionalAge()} is {@code null} (sub-project B, task 7)
+     * -- per that field's own javadoc.
+     */
+    private static final int DEFAULT_LONGEVITY_CONDITIONAL_AGE = 95;
 
     private final FederalTaxCalculator taxCalculator;
     @Nullable
@@ -108,6 +114,32 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
               lowCardinalityKeyValues = {"component", "projection"})
     @Override
     public GuardrailProfileResponse optimize(GuardrailOptimizationInput input) {
+        return optimizeInternal(input).response();
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 7: the real {@link #optimize} implementation,
+     * returning the public {@link GuardrailProfileResponse} PLUS the optional {@link
+     * StochasticMortalitySummary} from ONE pass. Folds what task 6 left as a separate {@code
+     * evaluateStochasticMortality} re-run into this flow: {@code ctx}/{@code conv}/{@code
+     * discretionaryByYear} are computed ONCE and reused for both the recommendation and the
+     * stochastic evaluation, instead of re-running the (expensive) context build + Roth-conversion
+     * search + allocation a second time to get the longevity number beside it.
+     *
+     * <p>The fold is strictly READ-ONLY over the recommendation: {@code response} is fully built
+     * from {@code recommendedDiscretionary} (a clone, scaled at the FIXED-death transition index --
+     * unchanged from pre-fold) BEFORE {@link #summarizeStochasticMortality} ever runs, and that
+     * summarization only READS {@code ctx}/{@code discretionaryByYear} (see {@link
+     * StochasticMortalityEvaluator#evaluate}, which never mutates its arguments) — it cannot feed
+     * back into the already-built {@code response}. Toggle off (or single-person / degenerate
+     * horizon) ⇒ {@code stochasticMortality} is {@code null} and this method's observable output is
+     * byte-identical to the pre-fold {@code optimize()} (the anchor).
+     *
+     * <p>Package-private: {@link #optimize} (the {@link SpendingOptimizer} contract) is the only
+     * production entry point and only ever returns {@link OptimizeResult#response}; this is exposed
+     * so task 7/8 can consume the summary directly without building the API response DTO here.
+     */
+    OptimizeResult optimizeInternal(GuardrailOptimizationInput input) {
         MDC.put("operation", "mc-optimize");
         if (meterRegistry != null) {
             meterRegistry.counter("wealthview.projection.runs", "type", "monte_carlo").increment();
@@ -116,7 +148,7 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             RealReturnMatrix matrix = matrix(input.includeDepressionYears());
             var ctx = contextBuilder.build(input, matrix);
             if (ctx.sim().years() <= 0) {
-                return emptyResult(input);
+                return new OptimizeResult(emptyResult(input), null);
             }
 
             var conv = jointConversionSearch.optimize(ctx, input, matrix);
@@ -124,38 +156,100 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             // (sub-project B, task 6); the recommendation scales it at the FIXED-death transition index
             // exactly as before (byte-identical -- scaleFromTransition is a no-op for single-person /
             // no in-window transition, so most runs are untouched). The unscaled schedule is what the
-            // stochastic evaluation pass re-splices per trial.
+            // stochastic evaluation pass re-splices per trial (task 7: reused directly below -- no
+            // second context-build/conversion-search/allocation re-run).
             var discretionaryByYear = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
             double[] recommendedDiscretionary = discretionaryByYear.clone();
             HouseholdMcResolver.scaleFromTransition(recommendedDiscretionary, ctx.sim().household(),
                     ctx.sim().survivorSpendingFactor(), ctx.sim().years());
-            return responseBuilder.build(ctx, input, recommendedDiscretionary, conv.byYear(), conv.taxByYear(),
-                    conv.schedule());
+            GuardrailProfileResponse response = responseBuilder.build(ctx, input, recommendedDiscretionary,
+                    conv.byYear(), conv.taxByYear(), conv.schedule());
+
+            StochasticMortalitySummary stochasticMortality =
+                    summarizeStochasticMortality(ctx, discretionaryByYear, conv, input);
+            return new OptimizeResult(response, stochasticMortality);
         } finally {
             MDC.remove("operation");
         }
     }
 
     /**
-     * Sub-project B (stochastic mortality), task 6: runs the SEPARATE longevity-aware evaluation pass
-     * over the fixed-death-optimized schedule and returns the raw per-trial success flags + sampled
-     * death ages ({@link StochasticMortalityEvaluation}). The recommendation is NOT re-derived — this is
-     * the number sub-project B adds BESIDE it. Returns {@code null} when the run did not opt into
-     * stochastic mortality (toggle off / single-person / degenerate horizon), in which case there is no
-     * longevity number to compute. Task 7 calls this and aggregates the result into the user-facing
-     * summary; it is intentionally separate from {@link #optimize} (which stays byte-identical) until
-     * that wiring lands.
+     * Sub-project B (stochastic mortality), task 7: internal carrier pairing the public {@link
+     * GuardrailProfileResponse} with the optional stochastic-mortality summary computed in the SAME
+     * {@link #optimizeInternal} pass. {@code stochasticMortality} is {@code null} whenever the run
+     * did not opt into stochastic mortality — the byte-identical anchor: {@link #optimize} (the
+     * {@link SpendingOptimizer} contract) only ever returns {@link #response}, so a toggle-off run's
+     * PUBLIC behavior is completely untouched by this type's existence. Deliberately NOT the API
+     * response DTO — wiring the summary into the wire response is task 8's job; this only needs to
+     * make the aggregated summary available internally for it to consume.
+     */
+    record OptimizeResult(GuardrailProfileResponse response, @Nullable StochasticMortalitySummary stochasticMortality) {
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 7: aggregates the stochastic evaluation into the
+     * user-facing {@link StochasticMortalitySummary}, reusing the SAME {@code ctx}/{@code
+     * jointDiscretionary}/{@code conv} the recommendation was just built from in {@link
+     * #optimizeInternal} — no second context-build / conversion-search / allocation (the task-6
+     * reviewer's flagged inefficiency). Returns {@code null} when the run did not opt into
+     * stochastic mortality ({@code ctx.sim().stochasticEval() == null}), the byte-identical anchor.
+     */
+    @Nullable
+    private StochasticMortalitySummary summarizeStochasticMortality(OptimizationSetup ctx,
+            double[] jointDiscretionary, ConversionResult conv,
+            GuardrailOptimizationInput input) {
+        StochasticMortalityEvaluation eval =
+                runStochasticEvaluation(ctx, jointDiscretionary, conv.byYear(), conv.taxByYear());
+        if (eval == null) {
+            return null;
+        }
+        Integer requestedLongevityAge = input.longevityConditionalAge();
+        int longevityAge = requestedLongevityAge != null
+                ? requestedLongevityAge : DEFAULT_LONGEVITY_CONDITIONAL_AGE;
+        return StochasticMortalitySummary.from(
+                eval.success(), eval.firstDeathAge(), eval.secondDeathAge(), longevityAge);
+    }
+
+    /**
+     * Shared evaluation-pass entry point for both {@link #summarizeStochasticMortality} (folded into
+     * {@link #optimizeInternal}) and the standalone {@link #evaluateStochasticMortality} (retained
+     * for direct low-level testing of {@link StochasticMortalityEvaluator} — see {@code
+     * StochasticMortalityEvaluatorTest}). Returns {@code null} when the run did not opt into
+     * stochastic mortality, otherwise runs the trial loop exactly once.
+     */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
+    // argument list — varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    @Nullable
+    private StochasticMortalityEvaluation runStochasticEvaluation(OptimizationSetup ctx,
+            double[] jointDiscretionary, double[] conversionByYear, double[] conversionTaxByYear) {
+        if (ctx.sim().stochasticEval() == null) {
+            return null;
+        }
+        return stochasticEvaluator.evaluate(ctx, jointDiscretionary, conversionByYear, conversionTaxByYear);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: STANDALONE longevity-aware evaluation pass —
+     * rebuilds its own context / conversion schedule / allocation from {@code input} rather than
+     * reusing an already-optimized run's. Retained for direct low-level testing of {@link
+     * StochasticMortalityEvaluator} (see {@code StochasticMortalityEvaluatorTest}'s determinism,
+     * index-0-transition, and fixed-death cross-check pins); production no longer goes through this
+     * path — task 7 folded the SAME evaluation into {@link #optimizeInternal}, which reuses its own
+     * already-built {@code ctx}/{@code conv}/{@code discretionaryByYear} instead of re-deriving them
+     * here, so a caller wanting both the recommendation and the stochastic summary now gets both
+     * from ONE {@link #optimizeInternal} call.
      */
     @Nullable
     StochasticMortalityEvaluation evaluateStochasticMortality(GuardrailOptimizationInput input) {
         RealReturnMatrix matrix = matrix(input.includeDepressionYears());
         var ctx = contextBuilder.build(input, matrix);
-        if (ctx.sim().years() <= 0 || ctx.sim().stochasticEval() == null) {
+        if (ctx.sim().years() <= 0) {
             return null;
         }
         var conv = jointConversionSearch.optimize(ctx, input, matrix);
         double[] jointDiscretionary = allocateAndSmooth(ctx, input, conv.byYear(), conv.taxByYear());
-        return stochasticEvaluator.evaluate(ctx, jointDiscretionary, conv.byYear(), conv.taxByYear());
+        return runStochasticEvaluation(ctx, jointDiscretionary, conv.byYear(), conv.taxByYear());
     }
 
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
