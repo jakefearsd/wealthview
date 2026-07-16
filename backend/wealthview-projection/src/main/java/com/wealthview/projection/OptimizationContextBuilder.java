@@ -59,7 +59,7 @@ final class OptimizationContextBuilder {
             return new OptimizationSetup(
                     new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
                     new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null),
+                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null),
                     new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null, null));
         }
 
@@ -109,6 +109,14 @@ final class OptimizationContextBuilder {
         // the household files SINGLE.
         var household = HouseholdMcResolver.resolve(input, retirementYear, years, inflationRate, filingStatus);
         int transitionIdx = household.inWindowTransitionIdx();
+
+        // Sub-project B (stochastic mortality), task 5: when the toggle is on for a household with a
+        // loaded table, precompute the per-trial sampled death ages and their derived transition/
+        // truncate indices on a DEDICATED rng stream (seed + MORTALITY_SEED_OFFSET), kept fully
+        // separate from the return-path rng above so it never perturbs the return draws. null ⇒
+        // toggle off / single-person, the byte-identical anchor: the fixed-death HouseholdMcResolver
+        // indices above drive every trial unchanged. Task 6 will consume these in the trial loop.
+        MortalityDraws mortalityDraws = resolveMortalityDraws(input, retirementYear, years, trialCount);
 
         // Both-alive income pipeline, spliced with the survivor phase from an in-window first death
         // (extracted so build() stays under the PMD NPath threshold — the no-regression policy).
@@ -180,7 +188,8 @@ final class OptimizationContextBuilder {
                         trialCount, confidenceLevel, inflationRate, portfolioPaths,
                         returnPaths.taxableReturns(), returnPaths.traditionalReturns(),
                         returnPaths.rothReturns(), rmdStartAge, dividendYield, feeRate, returnMean,
-                        interestYield, taxableEquityShare, household.survivorFactor(), household.sim()),
+                        interestYield, taxableEquityShare, household.survivorFactor(), household.sim(),
+                        mortalityDraws),
                 new TaxIncomeContext(filingStatus, essentialFloor,
                         incomeByYear, taxableIncomeByYear, surplusTaxByYear,
                         incomeData, rentalAwareTaxableIncome, adjustedFloors, ordinaryTaxTables,
@@ -492,6 +501,29 @@ final class OptimizationContextBuilder {
         var geoMeans = CapitalMarketAssumptionsProvider.geometricMeansOf(matrix);
         return PoolStrategy.blendedRealReturn(input.accounts(), geoMeans,
                 BigDecimal.valueOf(inflationRate), BigDecimal.valueOf(feeRate)).doubleValue();
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 5: precomputes the per-trial {@link MortalityDraws}
+     * when this run opts into stochastic mortality — {@code stochasticMortality} true AND a mortality
+     * table is loaded AND the run is a household ({@code spouseBirthYear} present). Any of those
+     * absent returns {@code null} (toggle off / single-person, the byte-identical anchor). The
+     * mortality {@link Random} is a SEPARATE object from the return-path rng (see {@link #build}),
+     * seeded {@code input.seed() + MortalityDrawGenerator.MORTALITY_SEED_OFFSET}; a {@code null} seed
+     * yields an unseeded {@code new Random()}, mirroring the return-path rng's null-seed handling.
+     */
+    @Nullable
+    private static MortalityDraws resolveMortalityDraws(GuardrailOptimizationInput input,
+                                                        int retirementYear, int years, int trialCount) {
+        if (!Boolean.TRUE.equals(input.stochasticMortality())
+                || input.mortalityTable() == null
+                || input.spouseBirthYear() == null) {
+            return null;
+        }
+        Random mortRng = input.seed() != null
+                ? new Random(input.seed() + MortalityDrawGenerator.MORTALITY_SEED_OFFSET)
+                : new Random();
+        return MortalityDrawGenerator.generate(input, retirementYear, years, mortRng, trialCount);
     }
 
     private static double sumByType(List<? extends ProjectionAccountInput> accounts, String type) {

@@ -46,5 +46,12 @@ record SimulationParameters(
         // single-person, the byte-identical anchor). Threaded into every
         // {@link TrialSimulator.SimulationConfig} so the search and the terminal/response passes run
         // the identical household economics.
-        @Nullable TrialSimulator.HouseholdSim household
+        @Nullable TrialSimulator.HouseholdSim household,
+        // Sub-project B (stochastic mortality), task 5: the per-trial sampled death-age draws
+        // ({@code null} ⇒ toggle off / single-person, the byte-identical anchor — the fixed-death
+        // {@code household} transition indices above drive every trial then). Precomputed on a
+        // DEDICATED rng stream by {@link MortalityDrawGenerator} and threaded here for task 6, which
+        // will splice each trial's own {@code transitionIdx}/{@code truncateIdx}/{@code
+        // survivorIsPrimary} into the trial loop instead of the single fixed set.
+        @Nullable MortalityDraws mortalityDraws
 ) {}

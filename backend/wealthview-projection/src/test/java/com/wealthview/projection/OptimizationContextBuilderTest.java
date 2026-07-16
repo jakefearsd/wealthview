@@ -2,7 +2,9 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +16,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
+import com.wealthview.core.projection.mortality.MortalityTable;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
@@ -423,6 +426,59 @@ class OptimizationContextBuilderTest {
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         assertThat(setup.sim().taxableEquityShare()).isEqualTo(0.6, within(1e-9));
+    }
+
+    // Sub-project B (stochastic mortality), task 5: the per-trial mortality precompute runs on a
+    // DEDICATED Random (seed + MortalityDrawGenerator.MORTALITY_SEED_OFFSET), never the return-path
+    // rng (new Random(input.seed())). Building the SAME household input twice -- toggle off vs on --
+    // must leave every return matrix byte-identical: the mortality draw is a separate stream. The
+    // null/non-null draws assertion proves the toggle actually changed behavior, so the identical-
+    // returns assertion below is a real guard, not a trivial pass.
+    @Test
+    void build_stochasticMortalityToggle_drawsMortalityWithoutPerturbingReturnPaths() {
+        var toggleOff = mortalityToggleInput(false, null);
+        var toggleOn = mortalityToggleInput(true, constantHazardTable());
+
+        var setupOff = builder.build(toggleOff, ProjectionTestFixtures.TEST_CMA_MATRIX);
+        var setupOn = builder.build(toggleOn, ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        assertThat(setupOff.sim().mortalityDraws()).isNull();
+        assertThat(setupOn.sim().mortalityDraws()).isNotNull();
+        assertThat(setupOn.sim().portfolioPaths()).isDeepEqualTo(setupOff.sim().portfolioPaths());
+        assertThat(setupOn.sim().taxableReturns()).isDeepEqualTo(setupOff.sim().taxableReturns());
+        assertThat(setupOn.sim().traditionalReturns()).isDeepEqualTo(setupOff.sim().traditionalReturns());
+        assertThat(setupOn.sim().rothReturns()).isDeepEqualTo(setupOff.sim().rothReturns());
+    }
+
+    /** A dense constant-hazard (2%/yr) table from age 60 to a forced-terminal 120, valid for both
+     * spouses' retirement-age sampling walks in {@link #mortalityToggleInput}. */
+    private static MortalityTable constantHazardTable() {
+        Map<Integer, Double> qx = new HashMap<>();
+        for (int age = 60; age < 120; age++) {
+            qx.put(age, 0.02);
+        }
+        qx.put(120, 1.0);
+        return new MortalityTable(qx, qx);
+    }
+
+    /** A two-person household otherwise identical between toggle states -- only stochasticMortality
+     * and the (nullable) mortality table vary, so the return paths must not move. */
+    private GuardrailOptimizationInput mortalityToggleInput(boolean stochastic, MortalityTable table) {
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1960, 90, new BigDecimal("0.03"),
+                List.of(new HypotheticalAccountInput(
+                        new BigDecimal("500000"), BigDecimal.ZERO,
+                        new BigDecimal("0.07"), "taxable")),
+                List.of(),
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
+                List.of(), 42L,
+                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                "married_filing_jointly", null,
+                false, null, null, 5, null, null,
+                null, null, 2030, false, null, false,
+                1962, 85, 88, new BigDecimal("0.75"), false,
+                stochastic, "male", "female", null, table);
     }
 
     private GuardrailOptimizationInput inputWithInterestYield(BigDecimal interestYield, AssetAllocation allocation) {
