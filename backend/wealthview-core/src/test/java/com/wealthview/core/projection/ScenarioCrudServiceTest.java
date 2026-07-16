@@ -43,6 +43,7 @@ import com.wealthview.persistence.repository.SpendingProfileRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -1184,6 +1185,32 @@ class ScenarioCrudServiceTest {
         assertThatThrownBy(() -> service.createScenario(tenantId, request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("longevity_conditional_age");
+    }
+
+    @Test
+    void createScenario_longevityConditionalAgeAtMinBoundary_doesNotThrow() {
+        // Pins the INCLUSIVE lower edge: exactly MIN (80) must be ACCEPTED, so a `<`->`<=`
+        // mutation of validateLongevityConditionalAge would be caught (79 is rejected above).
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithStochasticMortality(null, null, null, 80);
+
+        assertThatCode(() -> service.createScenario(tenantId, request)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void createScenario_longevityConditionalAgeAtMaxBoundary_doesNotThrow() {
+        // Pins the INCLUSIVE upper edge: exactly MAX (110) must be ACCEPTED, so a `>`->`>=`
+        // mutation of validateLongevityConditionalAge would be caught (111 is rejected above).
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithStochasticMortality(null, null, null, 110);
+
+        assertThatCode(() -> service.createScenario(tenantId, request)).doesNotThrowAnyException();
     }
 
     @Test
