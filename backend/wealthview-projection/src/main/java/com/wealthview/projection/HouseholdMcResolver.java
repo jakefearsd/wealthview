@@ -35,8 +35,8 @@ import com.wealthview.core.projection.tax.FilingStatus;
  * show the transition firing at its true pre-retirement calendar year -- see
  * {@link HouseholdTransition#resolveYear}. The MC engine never models pre-retirement years at all,
  * so "died five years before retirement" and "died thirty years before retirement" both collapse to
- * the same already-survivor starting state; see the clamp site inside {@link #resolve} for the full
- * rationale and {@code HouseholdMcResolverTest} for the pin.
+ * the same already-survivor starting state; see {@link HouseholdIndexMath#transitionIndex} (the
+ * shared clamp site) for the full rationale and {@code HouseholdMcResolverTest} for the pin.
  */
 final class HouseholdMcResolver {
 
@@ -110,46 +110,28 @@ final class HouseholdMcResolver {
                 ? clampSurvivorSpendingFactor(survivorFactorOverride.doubleValue())
                 : DEFAULT_SURVIVOR_SPENDING_FACTOR;
 
-        // The MC year index of the first death; -1 when it falls outside the modeled window (both
-        // alive the whole time, or first death at/after the horizon end). A death at/before the
-        // retirement start clamps to index 0 (the whole retirement is survivor-phase).
-        int inWindowTransitionIdx = -1;
+        // The MC first-death transition index for the sim loop: the shared helper owns the
+        // retirement-anchoring and the "died before the window -> index 0" clamp (see the full
+        // rationale on HouseholdIndexMath.transitionIndex), keeping this identical to the stochastic
+        // path in MortalityDrawGenerator. `years` is the sentinel meaning "no in-window transition".
+        int simTransitionIdx = HouseholdIndexMath.transitionIndex(household, retirementYear, years);
+        // The MC year index of the first death when it lands inside the modeled window (drives the
+        // income/tax-status splice below); -1 when it falls outside (both alive the whole time, or
+        // first death at/after the horizon end -> the `years` sentinel).
+        int inWindowTransitionIdx = simTransitionIdx < years ? simTransitionIdx : -1;
         List<ProjectionIncomeSourceInput> survivorSources = null;
         FilingStatus postStatus = preStatus;
-        if (household.transitionYear().isPresent()) {
-            int firstDeathIdx = household.transitionYear().get() - retirementYear;
-            // Household task 8 (T6-review): a first death BEFORE the MC's own retirement-anchored
-            // window (index 0 == retirementYear) clamps to index 0 -- the survivor enters the
-            // modeled window already alone, so rollover/step-up/single-filing tables apply from
-            // trial year 0. This is the INTENDED MC behavior, not a bug, and it deliberately
-            // differs from the deterministic engine's scope: the deterministic engine models
-            // baseYear..endYear (which can include pre-retirement accumulation years) and so CAN
-            // show the transition firing at its true pre-retirement calendar year when that falls
-            // inside its wider horizon (see HouseholdTransition#resolveYear). The MC engine never
-            // models pre-retirement years at all, so it cannot distinguish "died five years before
-            // retirement" from "died thirty years before retirement" -- both collapse to the same
-            // already-survivor starting state, which is correct for what the optimizer actually
-            // simulates (by retirement the household genuinely IS single). Pinned in
-            // HouseholdMcResolverTest.
-            if (firstDeathIdx < 0) {
-                firstDeathIdx = 0;
-            }
-            if (firstDeathIdx < years) {
-                inWindowTransitionIdx = firstDeathIdx;
-                survivorSources = SurvivorIncomeAdjuster.adjust(input.incomeSources(), household,
-                        household.transitionYear().get(), input.baseYear(),
-                        BigDecimal.valueOf(inflationRate));
-                postStatus = FilingStatus.SINGLE;
-            }
+        if (inWindowTransitionIdx >= 0) {
+            survivorSources = SurvivorIncomeAdjuster.adjust(input.incomeSources(), household,
+                    household.transitionYear().get(), input.baseYear(),
+                    BigDecimal.valueOf(inflationRate));
+            postStatus = FilingStatus.SINGLE;
         }
 
         // The SIM always exists for a two-person household: the owner-split pools and two RMD streams
         // run every modeled year. transitionYearIndex >= years means the rollover/step-up never fire
         // (first death beyond the window). truncateYearIndex ends the trial at the second death.
-        int simTransitionIdx = inWindowTransitionIdx >= 0 ? inWindowTransitionIdx : years;
-        int truncateYearIdx = household.secondDeathYear()
-                .map(sy -> Math.max(0, Math.min(years, sy - retirementYear + 1)))
-                .orElse(years);
+        int truncateYearIdx = HouseholdIndexMath.truncateIndex(household, retirementYear, years);
         var sim = new TrialSimulator.HouseholdSim(
                 sumTraditional(input.accounts(), "spouse"),
                 sumRoth(input.accounts(), "spouse"),

@@ -18,8 +18,9 @@ import com.wealthview.core.projection.mortality.MortalityTable;
  * {@link HouseholdContext#of} from that trial's sampled death ages (the same call {@code resolve}
  * makes for the fixed death ages) and reads its {@code transitionYear()}/{@code secondDeathYear()}/
  * {@code survivor()} back out — so the min/max-death-year and younger-survives-on-tie rules stay in
- * ONE place. The index math then mirrors {@code resolve} line-for-line (see {@link #transitionIndex}
- * and {@link #truncateIndex}), which keeps the stochastic path spliceable by task 6 exactly like the
+ * ONE place. The index math is the SAME shared {@link HouseholdIndexMath#transitionIndex} /
+ * {@link HouseholdIndexMath#truncateIndex} {@code resolve} calls (a single source of truth, not a
+ * line-for-line copy), which keeps the stochastic path spliceable by task 6 exactly like the
  * fixed-death path.
  *
  * <p>Each spouse is sampled conditional on being alive at their RETIREMENT-year age
@@ -84,8 +85,8 @@ final class MortalityDrawGenerator {
                     spouseBirthYear, spouseDeathAge, horizonEndYear);
             boolean primarySurvives = household.survivor() == PersonId.PRIMARY;
 
-            transitionIdx[t] = transitionIndex(household, retirementYear, years);
-            truncateIdx[t] = truncateIndex(household, retirementYear, years);
+            transitionIdx[t] = HouseholdIndexMath.transitionIndex(household, retirementYear, years);
+            truncateIdx[t] = HouseholdIndexMath.truncateIndex(household, retirementYear, years);
             survivorIsPrimary[t] = primarySurvives;
             // Raw (un-horizon-clamped) sampled ages, mapped by survivor identity: the survivor dies
             // SECOND, so secondDeathAge is the survivor's sampled age and firstDeathAge the other's.
@@ -93,34 +94,5 @@ final class MortalityDrawGenerator {
             firstDeathAge[t] = primarySurvives ? spouseDeathAge : primaryDeathAge;
         }
         return new MortalityDraws(transitionIdx, truncateIdx, survivorIsPrimary, firstDeathAge, secondDeathAge);
-    }
-
-    /**
-     * The MC first-death transition index for the sim loop, reproducing {@code resolve}'s
-     * {@code simTransitionIdx} exactly: {@code years} (the "no in-window transition" sentinel) when
-     * the first death never falls inside the modeled window, else {@code transitionYear -
-     * retirementYear} clamped to {@code [0, years)} (a first death before retirement collapses to
-     * index 0; a first death at/after the horizon end falls back to the {@code years} sentinel).
-     */
-    private static int transitionIndex(HouseholdContext household, int retirementYear, int years) {
-        if (household.transitionYear().isEmpty()) {
-            return years;
-        }
-        int firstDeathIdx = household.transitionYear().get() - retirementYear;
-        if (firstDeathIdx < 0) {
-            firstDeathIdx = 0;
-        }
-        return firstDeathIdx < years ? firstDeathIdx : years;
-    }
-
-    /**
-     * The MC trial truncation index, reproducing {@code resolve}'s {@code truncateYearIdx}: the
-     * survivor's death year index {@code +1} clamped to {@code [0, years]}, or {@code years} when the
-     * second death never falls inside the modeled window.
-     */
-    private static int truncateIndex(HouseholdContext household, int retirementYear, int years) {
-        return household.secondDeathYear()
-                .map(sy -> Math.max(0, Math.min(years, sy - retirementYear + 1)))
-                .orElse(years);
     }
 }
