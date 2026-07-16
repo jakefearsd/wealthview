@@ -42,6 +42,15 @@ final class TrialSimulator {
     private static final int ROTH_P = McPools.ROTH_P;
     private static final int ROTH_S = McPools.ROTH_S;
 
+    // Sub-project B (stochastic mortality), task 6: the two survivor-regime identities indexing
+    // {@link SimulationConfig#survivorRegimes}. Which one is spliced in from a trial's first-death
+    // transition index is selected per trial by {@code household.survivorIsPrimary()} — the SAME flag
+    // that drives the pool rollover/step-up direction, so the income/tax regime and the pool mechanics
+    // always agree on who survived. Named constants (not literals) keep the hot-loop selection self-
+    // documenting.
+    static final int PRIMARY_SURVIVES = 0;
+    static final int SPOUSE_SURVIVES = 1;
+
     /** Per-trial simulation result. */
     record TrialResult(
             double finalBalance,
@@ -124,6 +133,32 @@ final class TrialSimulator {
     }
 
     /**
+     * Sub-project B (stochastic mortality), task 6: one survivor phase's full set of per-year income
+     * and tax arrays, pre-computed ONCE per run for a FIXED survivor identity (see
+     * {@link #PRIMARY_SURVIVES}/{@link #SPOUSE_SURVIVES}). Under stochastic mortality either spouse can
+     * be the survivor and the first death lands at a per-trial year, so — unlike the fixed-death path,
+     * which pre-splices a single survivor phase into the base arrays at one known index — the base
+     * arrays passed to {@link #simulateTrial} carry the JOINT (both-alive) phase and each trial splices
+     * in the regime for its OWN survivor identity from its OWN transition index (three-regime precompute
+     * + per-trial splice, Approach A).
+     *
+     * <p>All arrays are year-indexed over the full horizon; only the {@code [transitionIdx, years)} tail
+     * is ever read for a given trial (the head comes from the joint base). Built SINGLE-filing with that
+     * survivor's own age-65 deduction and keep-larger-SS + survivor-percent income — the survivor phase
+     * the fixed-death engine already builds, generalized to emit BOTH identities. {@code
+     * ltcgTaxTableByYear}/{@code dsBracketCeilingByYear}/{@code rentalIncomeByYear} mirror the config's
+     * own nullability (null ⇒ that mechanism is inactive this run). The survivor spending factor is NOT
+     * folded in here — it stays a cheap in-loop multiply from the transition index (shared with the
+     * fixed-death path via {@link HouseholdMcResolver#scaleFromTransition}), so there is no scaled copy.
+     */
+    record SurvivorRegime(
+            double[] income, double[] surplusTax, double[] ordinaryBaseIncomeByYear,
+            OrdinaryTaxTable[] ordinaryTaxTableByYear,
+            @Nullable LtcgTaxTable[] ltcgTaxTableByYear,
+            @Nullable double[] dsBracketCeilingByYear,
+            @Nullable double[] rentalIncomeByYear) {}
+
+    /**
      * Configuration for one trial. The run-invariant fields (balances, order, tax/conversion
      * arrays, cash config) are shared across trials; the three per-pool real return sequences
      * ({@code taxableReturns}/{@code traditionalReturns}/{@code rothReturns}) vary per trial —
@@ -146,8 +181,51 @@ final class TrialSimulator {
             double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
             GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
             double interestYield, double taxableEquityShare,
-            @Nullable HouseholdSim household
+            @Nullable HouseholdSim household,
+            // Sub-project B (stochastic mortality), task 6: the two survivor-regime income/tax array
+            // sets (indexed by {@link #PRIMARY_SURVIVES}/{@link #SPOUSE_SURVIVES}) and the survivor
+            // spending factor. {@code null} ⇒ the fixed-death / single-person path: {@link
+            // #simulateTrial} then never splices and the base arrays (already pre-spliced at the fixed
+            // index by the fixed-death path) drive every year unchanged — the byte-identical anchor.
+            // Non-null ⇒ stochastic: the base arrays are the JOINT phase and each trial splices in its
+            // own survivor regime from its own {@code household.transitionYearIndex()}, scaling floor +
+            // discretionary by {@code survivorFactor} from that index forward.
+            @Nullable SurvivorRegime[] survivorRegimes,
+            double survivorFactor
     ) {
+        /**
+         * Back-compat constructor (stochastic-mortality task 6): the fixed-death / single-person call
+         * sites (the whole pre-stochastic engine) build a config with no per-trial survivor regimes.
+         * Defaulting {@code survivorRegimes} to {@code null} and {@code survivorFactor} to {@code 1.0}
+         * keeps {@link #simulateTrial} on the byte-identical no-splice path for all of them.
+         */
+        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-stochastic,
+        // household-aware shape) so existing positional call sites keep compiling and behaving
+        // identically.
+        @SuppressWarnings("PMD.ExcessiveParameterList")
+        SimulationConfig(
+                double initTaxable, double initTraditional, double initRoth,
+                String withdrawalOrder,
+                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
+                double[] conversionByYear, double[] conversionTaxByYear,
+                int retirementAge,
+                double[] dsBracketCeilingByYear,
+                int cashReserveYears, double cashReturnRate,
+                boolean trackYearBalances,
+                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
+                int rmdStartAge,
+                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
+                GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
+                double interestYield, double taxableEquityShare,
+                @Nullable HouseholdSim household) {
+            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
+                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
+                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
+                    interestYield, taxableEquityShare, household, null, 1.0);
+        }
+
         /**
          * Back-compat constructor (household task 6): every pre-household call site builds a
          * single-person config with no {@link HouseholdSim}. Defaulting {@code household} to
@@ -338,7 +416,12 @@ final class TrialSimulator {
         // per-year splitWithdrawal calls do no String.equals work.
         WithdrawalOrder order = WithdrawalOrder.fromString(config.withdrawalOrder());
 
-        double cashBalance = seedCashReserve(pools, lots, floors, discretionary, config);
+        // Sub-project B (stochastic mortality), task 6: the survivor spending factor in effect at
+        // year 0 -- non-1.0 only in the rare stochastic trial whose first death lands AT retirement
+        // (transition index 0). 1.0 for the fixed-death / single-person path (survivorRegimes null),
+        // so the seed reads floors[0]+discretionary[0] unchanged (the byte-identical anchor).
+        double seedFactor = regimeAt(config, household, 0) != null ? config.survivorFactor() : 1.0;
+        double cashBalance = seedCashReserve(pools, lots, floors, discretionary, config, seedFactor);
 
         double minBalance = McPools.poolTotal(pools) + cashBalance;
         double[] yearBalances = config.trackYearBalances() ? new double[years] : null;
@@ -354,8 +437,10 @@ final class TrialSimulator {
         // Audit C9: `prevSpending` carries the prior year's adapted total spending so the
         // year-over-year adjustment can be bounded; seeded to year 0's planned total so the first
         // year runs the plan (ratio ~= 1 -> within corridor). Inert (a dead store) on the no-rules
-        // path (config.adaptation() == null), which every pre-C9 caller takes.
-        double prevSpending = floors[0] + discretionary[0];
+        // path (config.adaptation() == null), which every pre-C9 caller takes. Scaled by the year-0
+        // survivor factor (task 6) for the transition-at-retirement stochastic corner; seedFactor is
+        // 1.0 on every other path, so this is floors[0]+discretionary[0] unchanged.
+        double prevSpending = (floors[0] + discretionary[0]) * seedFactor;
 
         for (int y = 0; y < loopYears; y++) {
             double taxableReturn = config.taxableReturns()[y];
@@ -383,23 +468,21 @@ final class TrialSimulator {
             double tradPPreGrowth = pools[TRAD_P];
             double tradSPreGrowth = pools[TRAD_S];
 
-            // This year's exact ordinary tax table (audit C5) and the base ordinary income the
-            // year's income events stack on -- replaces the old flat $50k-chord marginal rate.
-            // Looked up BEFORE growth (pure per-year array reads, no pool dependency) so the
-            // audit-C1 interest-tax pricing below can use them immediately. STACKING ORDER (T18a-1
-            // review fix, audit C1 update): the year's ordinary income accumulates through the loop
-            // body in execution order -- base income, then (audit C1) this year's realized
-            // ordinary-interest income (priced and funded immediately below, since it is realized
-            // as soon as growth runs -- before any of the RMD/conversion/draw machinery), then the
-            // forced RMD (IRS ordering: the year's RMD must be distributed BEFORE any Roth
-            // conversion), then the conversion, then the traditional spending draw -- and every
-            // pricing call stacks its own amount on top of everything realized BEFORE it, so the
-            // year's summed ordinary tax telescopes to exactly taxAt(base+interest+rmd+conv+draw) -
-            // taxAt(base) (pinned by TrialSimulatorReturnTest's composition-identity test). `table`
-            // is null when hasPools is false (no tax modeling this trial), which naturally makes
-            // every pricing and gross-up call a no-op.
-            OrdinaryTaxTable table = hasPools ? config.ordinaryTaxTableByYear()[y] : null;
-            double base = hasPools ? config.ordinaryBaseIncomeByYear()[y] : 0.0;
+            // Sub-project B (stochastic mortality), task 6: this year's spliced regime view. On the
+            // fixed-death / single-person path (config.survivorRegimes() == null) and every year BEFORE
+            // this trial's first-death transition index it carries today's base-array/config values
+            // verbatim (the byte-identical anchor); from the transition index forward it carries the
+            // survivor regime for THIS trial's survivor identity plus the survivor-factor-scaled floor
+            // and discretionary. It also resolves this year's exact ordinary tax `table` and stacking
+            // `base` (audit C5, null/0 when hasPools is false) -- extracted here so simulateTrial's hot
+            // body stays under the PMD NCSS/cognitive-complexity gates. STACKING ORDER (T18a-1 review
+            // fix, audit C1): base income, then realized ordinary interest, then the forced RMD, then
+            // the conversion, then the traditional draw -- each pricing call stacks on everything
+            // realized before it, so the year's summed ordinary tax telescopes to exactly
+            // taxAt(base+interest+rmd+conv+draw) - taxAt(base) (TrialSimulatorReturnTest).
+            YearRegimeView view = resolveYearRegimeView(
+                    config, household, y, hasPools, income, surplusTax, floors, discretionary);
+            OrdinaryTaxTable table = view.table();
 
             // Audit C1: splits the taxable pool's annual distribution by its own equity share --
             // the equity portion stays qualified-dividend income (dividendIncome, unchanged
@@ -410,7 +493,7 @@ final class TrialSimulator {
             // (interest income always 0, baseWithInterest == base).
             var growthResult = applyGrowthAndInterestTax(pools, lots, taxableReturn,
                     config.dividendYield(), config.interestYield(), config.taxableEquityShare(),
-                    table, base);
+                    table, view.base());
             double dividendIncome = growthResult.dividendIncome();
             double baseWithInterest = growthResult.baseWithInterest();
             McPools.growNonTaxablePools(pools, traditionalReturn, rothReturn);
@@ -450,8 +533,8 @@ final class TrialSimulator {
             // differs -- the entire tax/withdrawal/RMD/LTCG year-step below is shared verbatim (no
             // forked tax logic). The chained assignment updates prevSpending in lock-step without
             // adding a statement to this NCSS-capped hot method.
-            double spending = prevSpending = resolveYearSpending(config, y, floors[y],
-                    discretionary[y], trialStartTotal, prevSpending);
+            double spending = prevSpending = resolveYearSpending(config, y, view.floor(),
+                    view.discretionary(), trialStartTotal, prevSpending);
             // A4: tax on this year's base (outside) income is a real obligation every year, not
             // just when income exceeds spending -- fund it from any surplus first; the unfunded
             // remainder drains straight from the pools via the shared tax cascade below
@@ -462,18 +545,20 @@ final class TrialSimulator {
             // like the deterministic engine's extraPoolFundedTax now is. surplusTax[y] is the
             // precomputed full-year tax on this year's taxable base income -- see
             // OptimizationContextBuilder#computeSurplusTax.
-            var funding = resolveSpendingFunding(income[y], spending, surplusTax[y]);
+            var funding = resolveSpendingFunding(view.income(), spending, view.surplusTax());
             double withdrawal = funding.withdrawal();
 
             // Split withdrawal across pools (59.5 rule: taxable only before age 60). aux bundles the
             // remaining per-year array-or-default lookups (dynamic-sequencing ceiling/conversion,
-            // LTCG table, rental income) into one call to keep this NCSS-capped hot method lean.
+            // LTCG table, rental income) into one call to keep this NCSS-capped hot method lean --
+            // regime-aware (task 6): its LTCG/DS/rental reads come from the survivor regime once
+            // spliced, the conversion schedule (survivor-invariant) always from the config.
             boolean preAge595 = hasConversions && age < RetirementAges.EARLY_WITHDRAWAL_AGE;
-            var aux = resolveYearAuxInputs(config, y);
+            var aux = resolveYearAuxInputs(config, view.regime(), y);
             var drawn = splitWithdrawal(pools[JOINT_TAXABLE], pools[TRAD_P] + pools[TRAD_S],
                     pools[ROTH_P] + pools[ROTH_S],
                     withdrawal, order, preAge595,
-                    aux.dsCeiling(), income[y], aux.dsConvAmt(), rmdComputed);
+                    aux.dsCeiling(), view.income(), aux.dsConvAmt(), rmdComputed);
 
             // EXACT incremental tax on the traditional withdrawal (audit C5): the draw stacks on
             // base + interest + the forced RMD + this year's ACTUAL conversion income (T18a-1
@@ -505,8 +590,8 @@ final class TrialSimulator {
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
             // spending resources only -- identical to its pre-A4 shape.
-            double resourcesForSpending = income[y] + drawn.total() + cashDrawn;
-            if (resourcesForSpending < floors[y] - 1e-6) {
+            double resourcesForSpending = view.income() + drawn.total() + cashDrawn;
+            if (resourcesForSpending < view.floor() - 1e-6) {
                 essentialFloorMet = false;
             }
 
@@ -735,15 +820,17 @@ final class TrialSimulator {
      * Seeds the cash-reserve bucket from the first year's spending, drawing it out of the pools in
      * order (taxable, traditional, roth). The taxable draw is mirrored on the lots to keep the value
      * invariant; its gain is a pre-retirement carve-out left untaxed. Returns the initial cash
-     * balance (0 when no cash reserve is configured).
+     * balance (0 when no cash reserve is configured). {@code seedFactor} is the survivor spending
+     * factor at year 0 (task 6) -- 1.0 on every path except the stochastic corner where the first
+     * death lands at retirement, so this is byte-identical to the pre-task-6 seed elsewhere.
      */
     private static double seedCashReserve(double[] pools, TaxableLots lots,
                                            double[] floors, double[] discretionary,
-                                           SimulationConfig config) {
+                                           SimulationConfig config, double seedFactor) {
         if (config.cashReserveYears() <= 0) {
             return 0;
         }
-        double annualSpending = floors[0] + discretionary[0];
+        double annualSpending = (floors[0] + discretionary[0]) * seedFactor;
         double cashBalance = annualSpending * config.cashReserveYears();
         double cashFromTaxable = Math.min(cashBalance, pools[JOINT_TAXABLE]);
         pools[JOINT_TAXABLE] -= cashFromTaxable;
@@ -908,12 +995,72 @@ final class TrialSimulator {
      * income) into a single call, keeping the NCSS-capped hot method lean. */
     private record YearAuxInputs(double dsCeiling, double dsConvAmt, LtcgTaxTable ltcgTable, double rentalIncome) {}
 
-    private static YearAuxInputs resolveYearAuxInputs(SimulationConfig config, int y) {
-        double dsCeiling = config.dsBracketCeilingByYear() != null ? config.dsBracketCeilingByYear()[y] : 0;
+    /** {@code regime} (task 6) supplies the survivor-phase LTCG/DS-ceiling/rental arrays once spliced
+     * ({@code null} ⇒ joint/base phase → read from {@code config}); the Roth conversion schedule is
+     * survivor-invariant, so {@code dsConvAmt} always comes from the config. */
+    private static YearAuxInputs resolveYearAuxInputs(SimulationConfig config,
+                                                      @Nullable SurvivorRegime regime, int y) {
+        double[] dsCeilingArr = regime != null ? regime.dsBracketCeilingByYear() : config.dsBracketCeilingByYear();
+        double dsCeiling = dsCeilingArr != null ? dsCeilingArr[y] : 0;
         double dsConvAmt = config.conversionByYear() != null ? config.conversionByYear()[y] : 0;
-        LtcgTaxTable ltcgTable = config.ltcgTaxTableByYear() != null ? config.ltcgTaxTableByYear()[y] : null;
-        double rentalIncome = config.rentalIncomeByYear() != null ? config.rentalIncomeByYear()[y] : 0.0;
+        LtcgTaxTable[] ltcgArr = regime != null ? regime.ltcgTaxTableByYear() : config.ltcgTaxTableByYear();
+        LtcgTaxTable ltcgTable = ltcgArr != null ? ltcgArr[y] : null;
+        double[] rentalArr = regime != null ? regime.rentalIncomeByYear() : config.rentalIncomeByYear();
+        double rentalIncome = rentalArr != null ? rentalArr[y] : 0.0;
         return new YearAuxInputs(dsCeiling, dsConvAmt, ltcgTable, rentalIncome);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: one trial-year's regime-spliced scalar inputs.
+     * {@code regime} is {@code null} off the stochastic path / before the transition, in which case
+     * every field is today's base-array/config read (the byte-identical anchor); otherwise the income/
+     * surplus-tax/tables come from the survivor regime and {@code floor}/{@code discretionary} are
+     * scaled by the survivor factor. {@code table}/{@code base} are the year's exact ordinary tax
+     * table and stacking base ({@code null}/0 when {@code hasPools} is false).
+     */
+    private record YearRegimeView(
+            @Nullable SurvivorRegime regime, double income, double surplusTax,
+            double floor, double discretionary, @Nullable OrdinaryTaxTable table, double base) {}
+
+    /** Resolves one year's {@link YearRegimeView} (task 6). Extracted from {@link #simulateTrial} so
+     * the per-year regime/base-array selection branches live here rather than inflating the hot
+     * method's NCSS/cognitive-complexity budget. */
+    // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable argument
+    // list -- varargs would change the call contract and invite accidental misuse.
+    @SuppressWarnings("PMD.UseVarargs")
+    private static YearRegimeView resolveYearRegimeView(SimulationConfig config,
+            @Nullable HouseholdSim household, int y, boolean hasPools,
+            double[] income, double[] surplusTax, double[] floors, double[] discretionary) {
+        SurvivorRegime regime = regimeAt(config, household, y);
+        double factor = regime != null ? config.survivorFactor() : 1.0;
+        OrdinaryTaxTable table = null;
+        double base = 0.0;
+        if (hasPools) {
+            table = regime != null ? regime.ordinaryTaxTableByYear()[y] : config.ordinaryTaxTableByYear()[y];
+            base = regime != null ? regime.ordinaryBaseIncomeByYear()[y] : config.ordinaryBaseIncomeByYear()[y];
+        }
+        return new YearRegimeView(regime,
+                regime != null ? regime.income()[y] : income[y],
+                regime != null ? regime.surplusTax()[y] : surplusTax[y],
+                floors[y] * factor, discretionary[y] * factor, table, base);
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 6: this trial-year's spliced survivor regime, or
+     * {@code null} when today's base method-argument arrays / config drive the year unchanged — which
+     * is EVERY year on the fixed-death / single-person path ({@code config.survivorRegimes() == null},
+     * the byte-identical anchor) and every year BEFORE the trial's own first-death transition index on
+     * the stochastic path. From the transition index forward it is the regime for this trial's
+     * survivor identity, selected by the SAME {@code survivorIsPrimary} flag that drives the pool
+     * rollover/step-up direction, so the income/tax regime and the pool mechanics always agree.
+     */
+    @Nullable
+    private static SurvivorRegime regimeAt(SimulationConfig config, @Nullable HouseholdSim household, int y) {
+        SurvivorRegime[] regimes = config.survivorRegimes();
+        if (regimes == null || household == null || y < household.transitionYearIndex()) {
+            return null;
+        }
+        return regimes[household.survivorIsPrimary() ? PRIMARY_SURVIVES : SPOUSE_SURVIVES];
     }
 
     /**
