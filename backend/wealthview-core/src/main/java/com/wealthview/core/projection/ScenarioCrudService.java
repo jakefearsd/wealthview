@@ -65,6 +65,9 @@ public class ScenarioCrudService {
     private static final BigDecimal MIN_SURVIVOR_SPENDING_FACTOR = new BigDecimal("0.5");
     private static final BigDecimal MAX_SURVIVOR_SPENDING_FACTOR = BigDecimal.ONE;
     private static final Set<String> VALID_ACCOUNT_OWNERS = Set.of("primary", "spouse", "joint");
+    private static final Set<String> VALID_SEXES = Set.of("male", "female");
+    private static final int MIN_LONGEVITY_CONDITIONAL_AGE = 80;
+    private static final int MAX_LONGEVITY_CONDITIONAL_AGE = 110;
 
     private final ProjectionScenarioRepository scenarioRepository;
     private final TenantLookup tenantLookup;
@@ -107,6 +110,7 @@ public class ScenarioCrudService {
         validateFeeRate(request.feeRate());
         validateInterestYield(request.interestYield());
         validateHouseholdFields(request);
+        validateStochasticMortalityFields(request);
         validateAccounts(request.accounts());
         var tenant = tenantLookup.requireTenant(tenantId);
 
@@ -155,6 +159,7 @@ public class ScenarioCrudService {
         validateFeeRate(request.feeRate());
         validateInterestYield(request.interestYield());
         validateHouseholdFields(request);
+        validateStochasticMortalityFields(request);
         validateAccounts(request.accounts());
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
@@ -408,6 +413,44 @@ public class ScenarioCrudService {
         if (survivorSpendingFactor.compareTo(MIN_SURVIVOR_SPENDING_FACTOR) < 0
                 || survivorSpendingFactor.compareTo(MAX_SURVIVOR_SPENDING_FACTOR) > 0) {
             throw new IllegalArgumentException("survivor_spending_factor must be between 0.5 and 1.0");
+        }
+    }
+
+    /**
+     * Stochastic-mortality modeling (sub-project B): {@code primary_sex}/{@code spouse_sex} (when
+     * present) must be a recognized value -- a garbled or unsupported sex would silently fall back
+     * to blended qx in {@code MortalityTable.qx}, masking a client bug. {@code spouse_sex} is
+     * spouse-scoped like every other household-only field validated in
+     * {@link #validateHouseholdFields}, so it requires {@code spouse_birth_year}.
+     * {@code longevity_conditional_age} (when present) must be a plausible SSA-adjacent planning
+     * age for the "at least one spouse still alive at this age" success metric.
+     */
+    private static void validateStochasticMortalityFields(ScenarioParamsSource request) {
+        validateSex(request.primarySex(), "primary_sex");
+        validateSex(request.spouseSex(), "spouse_sex");
+        if (request.spouseSex() != null && request.spouseBirthYear() == null) {
+            throw new IllegalArgumentException("spouse_sex requires spouse_birth_year to be set");
+        }
+        validateLongevityConditionalAge(request.longevityConditionalAge());
+    }
+
+    private static void validateSex(String sex, String fieldName) {
+        if (sex == null) {
+            return;
+        }
+        if (!VALID_SEXES.contains(sex)) {
+            throw new IllegalArgumentException(fieldName + " must be one of: " + VALID_SEXES);
+        }
+    }
+
+    private static void validateLongevityConditionalAge(Integer longevityConditionalAge) {
+        if (longevityConditionalAge == null) {
+            return;
+        }
+        if (longevityConditionalAge < MIN_LONGEVITY_CONDITIONAL_AGE
+                || longevityConditionalAge > MAX_LONGEVITY_CONDITIONAL_AGE) {
+            throw new IllegalArgumentException("longevity_conditional_age must be between "
+                    + MIN_LONGEVITY_CONDITIONAL_AGE + " and " + MAX_LONGEVITY_CONDITIONAL_AGE);
         }
     }
 

@@ -57,7 +57,7 @@ class GuardrailHouseholdReportingTest {
                 42L, BigDecimal.ZERO, maxAdjRate, 0, 0, BigDecimal.ZERO,
                 "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, 82, 90, SURVIVOR_FACTOR, false);
+                1968, 82, 90, SURVIVOR_FACTOR, false, null, null, null, null, null);
     }
 
     private static HypotheticalAccountInput account(BigDecimal balance, String type, String owner) {

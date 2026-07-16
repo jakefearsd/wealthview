@@ -6,6 +6,8 @@ import java.util.List;
 
 import org.springframework.lang.Nullable;
 
+import com.wealthview.core.projection.mortality.MortalityTable;
+
 /**
  * All inputs the guardrail/Monte-Carlo spending optimizer needs for one run.
  *
@@ -59,6 +61,23 @@ import org.springframework.lang.Nullable;
  *         {@link GuardrailProfileResponse#successProbabilityWithRules}, which are ALWAYS the
  *         no-adaptation / with-rules rates respectively on the final schedule — only which one
  *         certified the recommendation during the search.
+ * @param stochasticMortality sub-project B: opts this run into the stochastic-mortality Monte
+ *         Carlo mode, which samples each spouse's death year per trial from
+ *         {@link #mortalityTable} instead of using the fixed death ages sub-project A resolves.
+ *         {@code null}/{@code false} ⇒ byte-identical to sub-project A (the anchor); only takes
+ *         effect when a household is present ({@link #spouseBirthYear} set) and
+ *         {@link #mortalityTable} is non-null.
+ * @param primarySex the primary's sex ({@code "male"}/{@code "female"}) used to select the
+ *         sex-specific qx column of {@link #mortalityTable}. {@code null} ⇒ the blended mean of
+ *         both sexes' qx ({@code MortalityTable.qx}).
+ * @param spouseSex the spouse's sex, mirroring {@link #primarySex} for the spouse. {@code null} ⇒
+ *         blended qx.
+ * @param longevityConditionalAge the age for the "at least one spouse still alive at this age"
+ *         longevity-conditional success metric. {@code null} ⇒ {@code 95}.
+ * @param mortalityTable the loaded SSA period-life table, resolved by {@code
+ *         ProjectionInputBuilder.resolveMortalityTable} ONLY when {@link #stochasticMortality} is
+ *         {@code true} — {@code null} otherwise, so a toggle-off run never touches
+ *         {@code mortality_rates} (part of the byte-identical-to-sub-project-A anchor).
  */
 public record GuardrailOptimizationInput(
         LocalDate retirementDate,
@@ -102,7 +121,14 @@ public record GuardrailOptimizationInput(
         @Nullable Integer primaryDeathAge,
         @Nullable Integer spouseDeathAge,
         @Nullable BigDecimal survivorSpendingFactor,
-        boolean communityProperty
+        boolean communityProperty,
+        // Sub-project B (stochastic mortality): null/false-safe raw params -- resolved downstream
+        // by the sampler/context builder, not here (mirrors the household fields above).
+        @Nullable Boolean stochasticMortality,
+        @Nullable String primarySex,
+        @Nullable String spouseSex,
+        @Nullable Integer longevityConditionalAge,
+        @Nullable MortalityTable mortalityTable
 ) {
 
     /**
@@ -135,6 +161,8 @@ public record GuardrailOptimizationInput(
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, dividendYield,
                 feeRate, retirementDate.getYear(), false, null, false,
                 // Household task 6: pre-household callers are single-person (spouse absent).
-                null, null, null, null, false);
+                null, null, null, null, false,
+                // Sub-project B: pre-stochastic-mortality callers keep the toggle off.
+                null, null, null, null, null);
     }
 }

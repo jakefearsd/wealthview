@@ -48,7 +48,7 @@ class MonteCarloHouseholdSmokeTest {
                 "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
                 // Household task 6 fields: spouse present, mid-horizon first death, community-property off.
-                1968, 82, 82, new BigDecimal("0.75"), false);
+                1968, 82, 82, new BigDecimal("0.75"), false, null, null, null, null, null);
     }
 
     private static HypotheticalAccountInput account(BigDecimal balance, BigDecimal basis,

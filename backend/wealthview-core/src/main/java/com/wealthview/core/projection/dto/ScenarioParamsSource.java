@@ -99,4 +99,34 @@ public interface ScenarioParamsSource {
      * set.
      */
     Boolean communityProperty();
+
+    /**
+     * Stochastic-mortality modeling (sub-project B): opts a household into the Monte Carlo mode
+     * that samples each spouse's death year per trial from the SSA period-life table, instead of
+     * the fixed death ages sub-project A uses. {@code null} resolves to {@code false} — the
+     * byte-identical-to-A anchor. Only meaningful when {@link #spouseBirthYear()} is set.
+     */
+    Boolean stochasticMortality();
+
+    /**
+     * The primary's sex ({@code "male"} or {@code "female"}), used to select the sex-specific qx
+     * column of the mortality table when {@link #stochasticMortality()} is on. {@code null}
+     * resolves to the blended mean of both sexes' qx ({@code MortalityTable.qx}). Only meaningful
+     * when {@link #stochasticMortality()} is {@code true}.
+     */
+    String primarySex();
+
+    /**
+     * The spouse's sex ({@code "male"} or {@code "female"}), mirroring {@link #primarySex()} for
+     * the spouse. {@code null} resolves to the blended mean of both sexes' qx. Only meaningful
+     * when {@link #stochasticMortality()} is {@code true} and {@link #spouseBirthYear()} is set.
+     */
+    String spouseSex();
+
+    /**
+     * The age used for the longevity-conditional success metric: "probability of running out of
+     * money given at least one spouse is still alive at this age." {@code null} resolves to
+     * {@code 95}. Only meaningful when {@link #stochasticMortality()} is {@code true}.
+     */
+    Integer longevityConditionalAge();
 }

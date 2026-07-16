@@ -13,6 +13,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import com.wealthview.core.account.AccountService;
@@ -35,6 +36,8 @@ import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.household.LifeExpectancy;
+import com.wealthview.core.projection.mortality.MortalityTable;
+import com.wealthview.core.projection.mortality.MortalityTableProvider;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
@@ -60,6 +63,7 @@ public class ProjectionInputBuilder {
     private final GuardrailSpendingProfileRepository guardrailRepository;
     private final PropertyRepository propertyRepository;
     private final SecurityClassificationService classificationService;
+    private final MortalityTableProvider mortalityTableProvider;
 
     public ProjectionInputBuilder(AccountService accountService,
                                   ExchangeRateService exchangeRateService,
@@ -67,7 +71,8 @@ public class ProjectionInputBuilder {
                                   DepreciationCalculator depreciationCalculator,
                                   GuardrailSpendingProfileRepository guardrailRepository,
                                   PropertyRepository propertyRepository,
-                                  SecurityClassificationService classificationService) {
+                                  SecurityClassificationService classificationService,
+                                  MortalityTableProvider mortalityTableProvider) {
         this.accountService = accountService;
         this.exchangeRateService = exchangeRateService;
         this.scenarioIncomeSourceRepository = scenarioIncomeSourceRepository;
@@ -75,6 +80,20 @@ public class ProjectionInputBuilder {
         this.guardrailRepository = guardrailRepository;
         this.propertyRepository = propertyRepository;
         this.classificationService = classificationService;
+        this.mortalityTableProvider = mortalityTableProvider;
+    }
+
+    /**
+     * Sub-project B (stochastic mortality): resolves the {@link MortalityTable} for a scenario's
+     * params — loads (and caches, via {@link MortalityTableProvider}) ONLY when
+     * {@code stochastic_mortality} is toggled on, else {@code null}. Gated so a toggle-off
+     * scenario never touches {@code mortality_rates} — part of the byte-identical-to-sub-project-A
+     * anchor. Exposed for {@link GuardrailProfileService}, which builds
+     * {@link com.wealthview.core.projection.dto.GuardrailOptimizationInput} directly.
+     */
+    @Nullable
+    public MortalityTable resolveMortalityTable(ScenarioParams params) {
+        return Boolean.TRUE.equals(params.stochasticMortality()) ? mortalityTableProvider.load() : null;
     }
 
     public ProjectionInput build(ProjectionScenarioEntity scenario, UUID tenantId) {

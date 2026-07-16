@@ -40,6 +40,10 @@ public record ScenarioRequest(
         Integer spouseDeathAge,
         BigDecimal survivorSpendingFactor,
         Boolean communityProperty,
+        Boolean stochasticMortality,
+        String primarySex,
+        String spouseSex,
+        Integer longevityConditionalAge,
         List<CreateProjectionAccountRequest> accounts,
         UUID spendingProfileId,
         Boolean useGuardrailProfile,
@@ -69,8 +73,8 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                null, null, null, null, null, null, null, accounts, spendingProfileId, useGuardrailProfile,
-                incomeSources);
+                null, null, null, null, null, null, null, null, null, null, null, accounts, spendingProfileId,
+                useGuardrailProfile, incomeSources);
     }
 
     /**
@@ -97,7 +101,7 @@ public record ScenarioRequest(
                 dynamicCeiling, dynamicFloor, filingStatus, otherIncome, annualRothConversion, withdrawalOrder,
                 dynamicSequencingBracketRate, rothConversionStrategy, targetBracketRate, rothConversionStartYear,
                 state, primaryResidencePropertyTax, primaryResidenceMortgageInterest, dividendYield, feeRate,
-                includeDepressionYears, null, null, null, null, null, null, accounts, spendingProfileId,
-                useGuardrailProfile, incomeSources);
+                includeDepressionYears, null, null, null, null, null, null, null, null, null, null, accounts,
+                spendingProfileId, useGuardrailProfile, incomeSources);
     }
 }

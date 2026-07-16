@@ -75,7 +75,7 @@ class JointConversionSearchPerfTest {
                 phases, 20260712L, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
                 "single", "taxable_first", true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null, null,
                 null, null, 2030, false, null, gateOnAdaptiveRules,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
     }
 
     private void timeOptimize(String label, GuardrailOptimizationInput input) {

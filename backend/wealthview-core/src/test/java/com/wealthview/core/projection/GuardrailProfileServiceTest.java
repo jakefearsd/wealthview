@@ -532,6 +532,40 @@ class GuardrailProfileServiceTest {
         assertThat(captor.getValue().gateOnAdaptiveRules()).isFalse();
     }
 
+    // ---- stochastic mortality (sub-project B, T3): raw params + resolved table flow through
+    // buildOptimizationInput into GuardrailOptimizationInput unchanged ----
+
+    @Test
+    void optimize_stochasticMortalityFieldsSet_passThroughToOptimizationInput() {
+        var stochasticScenario = new ProjectionScenarioEntity(
+                tenant, "Test Scenario", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
+                        + "\"primary_sex\":\"male\",\"spouse_sex\":\"female\","
+                        + "\"longevity_conditional_age\":100}");
+        var table = new com.wealthview.core.projection.mortality.MortalityTable(
+                Map.of(70, 0.02), Map.of(70, 0.01));
+        when(projectionInputBuilder.resolveMortalityTable(any())).thenReturn(table);
+
+        var input = captureOptimizationInput(buildRequest(req -> req), stochasticScenario);
+
+        assertThat(input.stochasticMortality()).isTrue();
+        assertThat(input.primarySex()).isEqualTo("male");
+        assertThat(input.spouseSex()).isEqualTo("female");
+        assertThat(input.longevityConditionalAge()).isEqualTo(100);
+        assertThat(input.mortalityTable()).isSameAs(table);
+    }
+
+    @Test
+    void optimize_stochasticMortalityAbsent_passesNullFieldsAndNullTable() {
+        var input = captureOptimizationInput(buildRequest(req -> req));
+
+        assertThat(input.stochasticMortality()).isNull();
+        assertThat(input.primarySex()).isNull();
+        assertThat(input.spouseSex()).isNull();
+        assertThat(input.longevityConditionalAge()).isNull();
+        assertThat(input.mortalityTable()).isNull();
+    }
+
     @Test
     void reoptimize_notFound_throws() {
         when(guardrailRepository.findByTenant_IdAndScenario_Id(tenantId, scenarioId))
@@ -1223,6 +1257,71 @@ class GuardrailProfileServiceTest {
         var scenarioB = new ProjectionScenarioEntity(
                 tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
                 "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":true}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    // Stochastic mortality (sub-project B, T3): every new field must be part of the guardrail
+    // staleness signature, mirroring the household field tests above.
+
+    @Test
+    void computeScenarioHash_stochasticMortalityToggled_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":false}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_primarySexChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"male\"}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"female\"}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_spouseSexChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
+                        + "\"spouse_sex\":\"male\"}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
+                        + "\"spouse_sex\":\"female\"}");
+
+        var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
+        var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
+
+        assertThat(hashA).isNotEqualTo(hashB);
+    }
+
+    @Test
+    void computeScenarioHash_longevityConditionalAgeChanged_hashChanges() {
+        var scenarioA = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":95}");
+        var scenarioB = new ProjectionScenarioEntity(
+                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
+                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":100}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());

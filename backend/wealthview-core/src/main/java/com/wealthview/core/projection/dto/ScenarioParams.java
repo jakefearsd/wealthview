@@ -53,13 +53,17 @@ public record ScenarioParams(
         Integer primaryDeathAge,
         Integer spouseDeathAge,
         BigDecimal survivorSpendingFactor,
-        Boolean communityProperty) {
+        Boolean communityProperty,
+        Boolean stochasticMortality,
+        String primarySex,
+        String spouseSex,
+        Integer longevityConditionalAge) {
 
     private static final Logger log = LoggerFactory.getLogger(ScenarioParams.class);
 
     public static final ScenarioParams EMPTY = new ScenarioParams(
             null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null);
 
     public static ScenarioParams from(ScenarioParamsSource source) {
         return new ScenarioParams(
@@ -71,7 +75,9 @@ public record ScenarioParams(
                 source.primaryResidencePropertyTax(), source.primaryResidenceMortgageInterest(),
                 source.dividendYield(), source.feeRate(), source.includeDepressionYears(),
                 source.interestYield(), source.spouseBirthYear(), source.primaryDeathAge(),
-                source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty());
+                source.spouseDeathAge(), source.survivorSpendingFactor(), source.communityProperty(),
+                source.stochasticMortality(), source.primarySex(), source.spouseSex(),
+                source.longevityConditionalAge());
     }
 
     /**

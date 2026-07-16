@@ -376,7 +376,9 @@ public class GuardrailProfileService {
      * spouse birth year, both death ages (resolved -- explicit value or the SSA planning default
      * for the respective birth year, since the resolved value is what the engine actually uses),
      * survivor spending factor, community-property flag, each account's owner, and each income
-     * source's owner + survivor_percent.
+     * source's owner + survivor_percent. Stochastic mortality (sub-project B) adds: the toggle
+     * itself, both sexes, and the longevity-conditional age -- each changes the Monte Carlo death-
+     * age sampling (or its reported metric) for an otherwise-identical scenario.
      * Accounts and income sources are sorted by id before hashing — {@code accounts} is an unordered
      * JPA bag ({@code @OrderBy("id")} on the entity keeps normal reads stable too) — so the same
      * scenario always yields the same signature regardless of collection iteration order.
@@ -400,7 +402,11 @@ public class GuardrailProfileService {
                 .append('|').append(resolveDeathAge(hashParams.primaryDeathAge(), hashParams.birthYear()))
                 .append('|').append(resolveDeathAge(hashParams.spouseDeathAge(), hashParams.spouseBirthYear()))
                 .append('|').append(hashParams.survivorSpendingFactor())
-                .append('|').append(Boolean.TRUE.equals(hashParams.communityProperty()));
+                .append('|').append(Boolean.TRUE.equals(hashParams.communityProperty()))
+                .append('|').append(Boolean.TRUE.equals(hashParams.stochasticMortality()))
+                .append('|').append(hashParams.primarySex())
+                .append('|').append(hashParams.spouseSex())
+                .append('|').append(hashParams.longevityConditionalAge());
 
         scenario.getAccounts().stream()
                 .sorted(Comparator.comparing(ProjectionAccountEntity::getId,
@@ -548,7 +554,16 @@ public class GuardrailProfileService {
                 resolveDeathAge(hhParams.primaryDeathAge(), hhParams.birthYear()),
                 resolveDeathAge(hhParams.spouseDeathAge(), hhParams.spouseBirthYear()),
                 hhParams.survivorSpendingFactor(),
-                Boolean.TRUE.equals(hhParams.communityProperty())
+                Boolean.TRUE.equals(hhParams.communityProperty()),
+                // Sub-project B: raw params, unresolved (the sampler/context builder resolve the
+                // null-default false/blended/95 downstream). Table is loaded ONLY when the toggle
+                // is on, gated in ProjectionInputBuilder so a toggle-off run never touches
+                // mortality_rates.
+                hhParams.stochasticMortality(),
+                hhParams.primarySex(),
+                hhParams.spouseSex(),
+                hhParams.longevityConditionalAge(),
+                projectionInputBuilder.resolveMortalityTable(hhParams)
         );
     }
 

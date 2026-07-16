@@ -24,7 +24,10 @@ import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.LinkedAccountInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
+import com.wealthview.core.projection.dto.ScenarioParams;
 import com.wealthview.core.projection.household.LifeExpectancy;
+import com.wealthview.core.projection.mortality.MortalityTable;
+import com.wealthview.core.projection.mortality.MortalityTableProvider;
 import com.wealthview.core.property.DepreciationCalculator;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -38,11 +41,13 @@ import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.GuardrailSpendingProfileRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.ScenarioIncomeSourceRepository;
+import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -68,6 +73,9 @@ class ProjectionInputBuilderTest {
 
     @Mock
     private SecurityClassificationService classificationService;
+
+    @Mock
+    private MortalityTableProvider mortalityTableProvider;
 
     @InjectMocks
     private ProjectionInputBuilder builder;
@@ -977,5 +985,37 @@ class ProjectionInputBuilderTest {
         var result = builder.build(scenario, tenantId);
 
         assertThat(result.guardrailSpending()).isNull();
+    }
+
+    // Stochastic mortality (sub-project B, T3): resolveMortalityTable is gated so a toggle-off
+    // scenario never touches mortality_rates -- part of the byte-identical-to-sub-project-A anchor.
+
+    @Test
+    void resolveMortalityTable_stochasticMortalityTrue_loadsFromProvider() {
+        var table = new MortalityTable(Map.of(70, 0.02), Map.of(70, 0.01));
+        when(mortalityTableProvider.load()).thenReturn(table);
+        var params = ScenarioParams.parseOrEmpty(new ObjectMapper(), "{\"stochastic_mortality\": true}");
+
+        var resolved = builder.resolveMortalityTable(params);
+
+        assertThat(resolved).isSameAs(table);
+    }
+
+    @Test
+    void resolveMortalityTable_stochasticMortalityFalse_returnsNullWithoutTouchingProvider() {
+        var params = ScenarioParams.parseOrEmpty(new ObjectMapper(), "{\"stochastic_mortality\": false}");
+
+        var resolved = builder.resolveMortalityTable(params);
+
+        assertThat(resolved).isNull();
+        verifyNoInteractions(mortalityTableProvider);
+    }
+
+    @Test
+    void resolveMortalityTable_stochasticMortalityAbsent_returnsNullWithoutTouchingProvider() {
+        var resolved = builder.resolveMortalityTable(ScenarioParams.EMPTY);
+
+        assertThat(resolved).isNull();
+        verifyNoInteractions(mortalityTableProvider);
     }
 }

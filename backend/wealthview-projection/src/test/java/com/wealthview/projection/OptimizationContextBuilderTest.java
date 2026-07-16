@@ -225,7 +225,7 @@ class OptimizationContextBuilderTest {
                 "married_filing_jointly", null,
                 false, null, null, 5, null, null,
                 null, null, 2030, false, null, false,
-                spouseBirthYear, primaryDeathAge, 95, new BigDecimal("0.75"), false);
+                spouseBirthYear, primaryDeathAge, 95, new BigDecimal("0.75"), false, null, null, null, null, null);
     }
 
     private GuardrailOptimizationInput inputWithBirthYear(int birthYear) {
@@ -351,7 +351,7 @@ class OptimizationContextBuilderTest {
                 "single", null,
                 false, null, null, 5, null, null,
                 null, null, baseYear, false, null, false,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
     }
 
     private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {
@@ -439,6 +439,6 @@ class OptimizationContextBuilderTest {
                 null, null,
                 false, null, null, 5, null, null,
                 null, null, 2030, false, interestYield, false,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
     }
 }

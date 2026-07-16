@@ -134,6 +134,7 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, interestYield,
                 null, null, null, null, null,
+                null, null, null, null,
                 List.of(), null, null, null);
     }
 
@@ -147,6 +148,21 @@ class ScenarioCrudServiceTest {
                 null, null, null,
                 null, null, null, null,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+                null, null, null, null,
+                List.of(), null, null, null);
+    }
+
+    private ScenarioRequest scenarioRequestWithStochasticMortality(Integer spouseBirthYear, String primarySex,
+                                                                     String spouseSex,
+                                                                     Integer longevityConditionalAge) {
+        return new ScenarioRequest(
+                "Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), null, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, null,
+                spouseBirthYear, null, null, null, null,
+                Boolean.TRUE, primarySex, spouseSex, longevityConditionalAge,
                 List.of(), null, null, null);
     }
 
@@ -1117,6 +1133,92 @@ class ScenarioCrudServiceTest {
     @Test
     void updateScenario_spouseDeathAgeWithoutSpouseBirthYear_throwsIllegalArgument() {
         var request = scenarioRequestWithHousehold(null, null, 88, null, null);
+
+        assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    // Stochastic mortality (sub-project B, T3): mirrors the household validation test pattern above.
+
+    @Test
+    void createScenario_primarySexInvalid_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(null, "unknown", null, null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("primary_sex");
+    }
+
+    @Test
+    void createScenario_spouseSexInvalid_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(1972, null, "unknown", null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_sex");
+    }
+
+    @Test
+    void createScenario_spouseSexWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("spouse_birth_year");
+    }
+
+    @Test
+    void createScenario_longevityConditionalAgeBelowMin_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, 79);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("longevity_conditional_age");
+    }
+
+    @Test
+    void createScenario_longevityConditionalAgeAboveMax_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, 111);
+
+        assertThatThrownBy(() -> service.createScenario(tenantId, request))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("longevity_conditional_age");
+    }
+
+    @Test
+    void createScenario_spouseSexWithValidSpouseBirthYear_doesNotThrow() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithStochasticMortality(1972, "male", "female", 100);
+
+        var result = service.createScenario(tenantId, request);
+
+        assertThat(result.name()).isEqualTo("Plan");
+    }
+
+    @Test
+    void createScenario_stochasticMortalityFieldsWithinRange_persistsInParamsJson() {
+        when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        var request = scenarioRequestWithStochasticMortality(1972, "male", "female", 100);
+
+        service.createScenario(tenantId, request);
+
+        var saved = captureSavedScenario();
+        assertThat(saved.getParamsJson()).contains("\"stochastic_mortality\":true");
+        assertThat(saved.getParamsJson()).contains("\"primary_sex\":\"male\"");
+        assertThat(saved.getParamsJson()).contains("\"spouse_sex\":\"female\"");
+        assertThat(saved.getParamsJson()).contains("\"longevity_conditional_age\":100");
+    }
+
+    @Test
+    void updateScenario_spouseSexWithoutSpouseBirthYear_throwsIllegalArgument() {
+        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
 
         assertThatThrownBy(() -> service.updateScenario(tenantId, scenarioId, request))
                 .isInstanceOf(IllegalArgumentException.class)

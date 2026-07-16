@@ -65,7 +65,7 @@ class MonteCarloSpendingOptimizerCharacterizationTest {
                 // false / interestYield null reproduce the old back-compat-constructor values
                 // byte-identically.
                 null, null, 2030, false, null, false,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
     }
 
     @Test

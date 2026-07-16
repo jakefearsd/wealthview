@@ -113,4 +113,31 @@ class ScenarioParamsParserTest {
 
         assertThat(parser.includeDepressionYears(params)).isFalse();
     }
+
+    // Stochastic mortality (sub-project B, T3): snake_case params_json keys map onto the record's
+    // camelCase fields via ScenarioParams' Jackson SnakeCaseStrategy -- no ScenarioParamsParser
+    // resolution helper needed (mirrors household fields, which are also read raw downstream).
+
+    @Test
+    void parseParams_stochasticMortalityFields_mapSnakeCaseKeysToRecordFields() {
+        var params = parser.parseParams("""
+                {"stochastic_mortality": true, "primary_sex": "male", "spouse_sex": "female",
+                 "longevity_conditional_age": 100}
+                """);
+
+        assertThat(params.stochasticMortality()).isTrue();
+        assertThat(params.primarySex()).isEqualTo("male");
+        assertThat(params.spouseSex()).isEqualTo("female");
+        assertThat(params.longevityConditionalAge()).isEqualTo(100);
+    }
+
+    @Test
+    void parseParams_stochasticMortalityFieldsAbsent_areNull() {
+        var params = parser.parseParams("{}");
+
+        assertThat(params.stochasticMortality()).isNull();
+        assertThat(params.primarySex()).isNull();
+        assertThat(params.spouseSex()).isNull();
+        assertThat(params.longevityConditionalAge()).isNull();
+    }
 }

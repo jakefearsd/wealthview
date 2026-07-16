@@ -44,7 +44,7 @@ class GuardrailAdaptiveGateIntegrationTest {
                 phases, SEED, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
                 null, null, false, null, null, 5, null, null,
                 null, null, 2030, false, null, gateOnAdaptiveRules,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
     }
 
     @Test
@@ -210,7 +210,7 @@ class GuardrailAdaptiveGateIntegrationTest {
                 phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
                 null, null, false, null, null, 5, null, null,
                 null, null, 2030, false, null, true,
-                null, null, null, null, false);   // household task 6: single-person
+                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
         var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailProfileResponse r = optimizer.optimize(noRateInput);

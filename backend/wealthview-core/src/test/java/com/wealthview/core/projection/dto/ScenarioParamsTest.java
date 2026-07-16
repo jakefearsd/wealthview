@@ -21,7 +21,8 @@ class ScenarioParamsTest {
                 null, null, "married_filing_jointly",
                 null, null, "traditional_first",
                 new BigDecimal("0.22"), null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null);
 
         var json = params.toJson(mapper);
 
@@ -48,7 +49,8 @@ class ScenarioParamsTest {
                 new BigDecimal("12000"), new BigDecimal("25000"), "dynamic_sequencing",
                 new BigDecimal("0.24"), "fill_bracket", new BigDecimal("0.22"), 2030,
                 "CA", new BigDecimal("9000"), new BigDecimal("14000"), new BigDecimal("0.021"),
-                new BigDecimal("0.003"), Boolean.TRUE, new BigDecimal("0.045"), null, null, null, null, null);
+                new BigDecimal("0.003"), Boolean.TRUE, new BigDecimal("0.045"), null, null, null, null, null,
+                null, null, null, null);
 
         var parsed = ScenarioParams.parseOrEmpty(mapper, original.toJson(mapper));
 
@@ -59,7 +61,8 @@ class ScenarioParamsTest {
     void toJson_dividendYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, new BigDecimal("0.021"), null, null, null, null, null, null, null, null);
+                null, null, null, new BigDecimal("0.021"), null, null, null, null, null, null, null, null,
+                null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -86,7 +89,8 @@ class ScenarioParamsTest {
     void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, new BigDecimal("0.003"), null, null, null, null, null, null, null);
+                null, null, null, null, new BigDecimal("0.003"), null, null, null, null, null, null, null,
+                null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -115,7 +119,8 @@ class ScenarioParamsTest {
     void toJson_interestYieldPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, new BigDecimal("0.04"), null, null, null, null, null);
+                null, null, null, null, null, null, new BigDecimal("0.04"), null, null, null, null, null,
+                null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -146,6 +151,7 @@ class ScenarioParamsTest {
                 null, null, null,
                 null, null, null, interestYield,
                 null, null, null, null, null,
+                null, null, null, null,
                 List.of(), null, null, null);
     }
 
@@ -153,7 +159,8 @@ class ScenarioParamsTest {
     void toJson_includeDepressionYearsPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, Boolean.TRUE, null, null, null, null, null, null);
+                null, null, null, null, null, Boolean.TRUE, null, null, null, null, null, null,
+                null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -202,7 +209,8 @@ class ScenarioParamsTest {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null,
-                1972, 88, 90, new BigDecimal("0.8"), Boolean.TRUE);
+                1972, 88, 90, new BigDecimal("0.8"), Boolean.TRUE,
+                null, null, null, null);
 
         var node = mapper.readTree(params.toJson(mapper));
 
@@ -293,6 +301,96 @@ class ScenarioParamsTest {
                 null, null, null,
                 null, null, null, null,
                 spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+                null, null, null, null,
+                List.of(), null, null, null);
+    }
+
+    // Stochastic mortality (sub-project B, T3): mirrors the household field test pattern above
+    // exactly for each new field.
+
+    @Test
+    void toJson_stochasticMortalityFieldsPresent_writesSnakeCaseKeys() throws Exception {
+        var params = new ScenarioParams(
+                null, null, null, null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null, null, null, null,
+                null, null, null, null, null,
+                Boolean.TRUE, "male", "female", 100);
+
+        var node = mapper.readTree(params.toJson(mapper));
+
+        assertThat(node.get("stochastic_mortality").asBoolean()).isTrue();
+        assertThat(node.get("primary_sex").asText()).isEqualTo("male");
+        assertThat(node.get("spouse_sex").asText()).isEqualTo("female");
+        assertThat(node.get("longevity_conditional_age").asInt()).isEqualTo(100);
+    }
+
+    @Test
+    void from_stochasticMortalityPresent_passesThrough() {
+        var request = scenarioRequestWithStochasticMortality(Boolean.TRUE, null, null, null);
+
+        assertThat(ScenarioParams.from(request).stochasticMortality()).isTrue();
+    }
+
+    @Test
+    void from_stochasticMortalityNull_staysNullForDefault() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).stochasticMortality()).isNull();
+    }
+
+    @Test
+    void from_primarySexPresent_passesThrough() {
+        var request = scenarioRequestWithStochasticMortality(null, "male", null, null);
+
+        assertThat(ScenarioParams.from(request).primarySex()).isEqualTo("male");
+    }
+
+    @Test
+    void from_primarySexNull_staysNullForDefault() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).primarySex()).isNull();
+    }
+
+    @Test
+    void from_spouseSexPresent_passesThrough() {
+        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
+
+        assertThat(ScenarioParams.from(request).spouseSex()).isEqualTo("female");
+    }
+
+    @Test
+    void from_spouseSexNull_staysNullForDefault() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).spouseSex()).isNull();
+    }
+
+    @Test
+    void from_longevityConditionalAgePresent_passesThrough() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, 100);
+
+        assertThat(ScenarioParams.from(request).longevityConditionalAge()).isEqualTo(100);
+    }
+
+    @Test
+    void from_longevityConditionalAgeNull_staysNullForDefault() {
+        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
+
+        assertThat(ScenarioParams.from(request).longevityConditionalAge()).isNull();
+    }
+
+    private ScenarioRequest scenarioRequestWithStochasticMortality(Boolean stochasticMortality, String primarySex,
+                                                                     String spouseSex,
+                                                                     Integer longevityConditionalAge) {
+        return new ScenarioRequest(
+                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
+                null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, null, null,
+                null, null, null, null, null,
+                stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
                 List.of(), null, null, null);
     }
 

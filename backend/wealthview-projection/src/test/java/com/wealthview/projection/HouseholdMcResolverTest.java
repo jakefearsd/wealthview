@@ -66,7 +66,7 @@ class HouseholdMcResolverTest {
                 300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
                 0, 0, BigDecimal.ZERO, "single", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                null, null, null, null, false);
+                null, null, null, null, false, null, null, null, null, null);
 
         var resolved = HouseholdMcResolver.resolve(input, 2030, 22, INFLATION.doubleValue(), FilingStatus.SINGLE);
 
@@ -111,7 +111,8 @@ class HouseholdMcResolverTest {
                 300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
                 0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                spouseBirthYear, primaryDeathAge, spouseDeathAge, new BigDecimal("0.75"), false);
+                spouseBirthYear, primaryDeathAge, spouseDeathAge, new BigDecimal("0.75"), false,
+                null, null, null, null, null);
     }
 
     // === HP3 Part B-2: defensive survivor_spending_factor clamp at the engine seam ===
@@ -130,7 +131,7 @@ class HouseholdMcResolverTest {
                 300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
                 0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, 78, 90, survivorSpendingFactor, false);
+                1968, 78, 90, survivorSpendingFactor, false, null, null, null, null, null);
     }
 
     @Test

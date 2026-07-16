@@ -73,7 +73,7 @@ class GuardrailHouseholdSimulatedScheduleTest {
                 42L, BigDecimal.ZERO, maxAdjRate, 0, 0, BigDecimal.ZERO,
                 "married_filing_jointly", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, 82, 82, new BigDecimal("0.75"), false);
+                1968, 82, 82, new BigDecimal("0.75"), false, null, null, null, null, null);
     }
 
     /**
@@ -197,7 +197,7 @@ class GuardrailHouseholdSimulatedScheduleTest {
                 "single", "taxable_first",
                 false, null, null, 5, null, null, null, null, 2025, false, null, true,
                 // No spouse: single-person, HP2 scaling is a no-op.
-                null, null, null, null, false);
+                null, null, null, null, false, null, null, null, null, null);
         GuardrailProfileResponse result = optimizer.optimize(input);
 
         // Uniform single-phase schedule, no transition drop anywhere.
