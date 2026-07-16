@@ -69,8 +69,12 @@ import static org.assertj.core.api.Assertions.within;
  *       P(at least one spouse alive at 95) = 1 − (1−0.1192)(1−0.0696) = 0.1805 (independent draws:
  *       female-64→95 survival 0.1192, male-72→95 survival 0.0696) to within MC sampling error,
  *       confirming the sampler draws + spouse independence + the subset logic.</li>
- *   <li>{@code firstDeathAge} p10 72 = the primary's retirement/sampling-floor age (a male sampled
- *       from 72 cannot die earlier); median 80, p90 90.</li>
+ *   <li>{@code firstDeathAge} (own-age of whichever spouse dies first — {@code MortalityDrawGenerator}
+ *       maps it to {@code primarySurvives ? spouseDeathAge : primaryDeathAge}) has a distribution FLOOR
+ *       of 64, the FEMALE spouse's retirement-age sampling floor (2030 − 1966), since the younger
+ *       spouse can be the first to die at her own age 64; ~9% of trials fall below 72. The pinned
+ *       p10 of 72 is therefore a boundary of the male/female mixture, NOT a hard floor. median 80,
+ *       p90 90.</li>
  * </ul>
  */
 class StochasticMortalityGoldenTest {
