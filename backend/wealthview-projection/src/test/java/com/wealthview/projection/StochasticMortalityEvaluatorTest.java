@@ -18,9 +18,21 @@ import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.mortality.MortalityTable;
+import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.persistence.entity.StandardDeductionEntity;
+import com.wealthview.persistence.repository.StandardDeductionRepository;
+import com.wealthview.persistence.repository.TaxBracketRepository;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
+import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
+import static com.wealthview.core.testutil.TaxBracketFixtures.mfj2025Brackets;
+import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 
 /**
  * Sub-project B (stochastic mortality), task 6: end-to-end pins for the SEPARATE stochastic evaluation
@@ -64,6 +76,7 @@ class StochasticMortalityEvaluatorTest {
 
         assertThat(b.success()).isEqualTo(a.success());
         assertThat(b.firstDeathAge()).isEqualTo(a.firstDeathAge());
+        assertThat(b.secondDeathAge()).isEqualTo(a.secondDeathAge());
     }
 
     // === degenerate cross-check: forcing the fixed death ages makes the stochastic success match the
@@ -90,7 +103,8 @@ class StochasticMortalityEvaluatorTest {
     @Test
     void evaluateStochasticMortality_firstDeathAtRetirement_runsWithIndexZeroTransition() {
         // Primary male dies at 68 = his retirement age (2030 = MC year 0) -> transition index 0; spouse
-        // female survives to 90. The whole modeled horizon is survivor-phase from year 0.
+        // female survives to 90. The whole modeled horizon is survivor-phase from year 0, so the year-0
+        // seed/scale path (survivor factor applied at index 0) is exercised.
         var eval = optimizer.evaluateStochasticMortality(
                 stochasticInput(3L, 68, 90, stepTable(68, 90)));
 
@@ -98,6 +112,14 @@ class StochasticMortalityEvaluatorTest {
         assertThat(eval.firstDeathAge()).containsOnly(68);  // primary dies at retirement
         assertThat(eval.secondDeathAge()).containsOnly(90);
         assertThat(eval.success()).hasSize(300); // ran to completion through the index-0 transition
+
+        // Value pin (not just smoke): the index-0 run's success is DISTINCT from an otherwise-identical
+        // run whose first death lands well inside the horizon (primary dies 82 -> transition index 14).
+        // With 14 fewer survivor-phase years (and no year-0 seed scaling) the two success rates diverge,
+        // so a regression in the year-0 transition/seed path would collapse this difference.
+        var laterEval = optimizer.evaluateStochasticMortality(
+                stochasticInput(3L, 82, 90, stepTable(82, 90)));
+        assertThat(countTrue(eval.success())).isNotEqualTo(countTrue(laterEval.success()));
     }
 
     // === guard: a non-stochastic run has no longevity number to produce ===
@@ -110,7 +132,80 @@ class StochasticMortalityEvaluatorTest {
         assertThat(optimizer.evaluateStochasticMortality(input)).isNull();
     }
 
+    // === IMPORTANT: per-identity survivor age drives the age-65 deduction in the RIGHT regime's table ===
+    // Built with a REAL FederalTaxCalculator (age-65 additional standard deduction LIVE, unlike the
+    // all-zero-table optimizer above), through the actual OptimizationContextBuilder regime path. A
+    // copy-paste bug that used the primary's age for the spouse-survivor regime (or vice versa) would
+    // vanish the asserted gap -- verified RED by temporarily swapping the survivor PersonId.
+
+    @Test
+    void buildSurvivorRegime_perIdentityAge_appliesAge65DeductionToTheCorrectSurvivor() {
+        // Age-gap household: primary born 1970 (retires 2030 at 60, so BELOW 65 in year 0), spouse born
+        // 1958 (age 72 in 2030, ABOVE 65). At MC year 0 the age-65 additional deduction ($2,000 single)
+        // applies to the SPOUSE-survivor regime but NOT the PRIMARY-survivor regime.
+        var ctx = new OptimizationContextBuilder(age65AwareCalc(), null)
+                .build(ageGapStochasticInput(), ProjectionTestFixtures.TEST_CMA_MATRIX);
+
+        var arrays = ctx.sim().stochasticEval();
+        assertThat(arrays).isNotNull();
+        OrdinaryTaxTable primaryY0 =
+                arrays.survivorRegimes()[TrialSimulator.PRIMARY_SURVIVES].ordinaryTaxTableByYear()[0];
+        OrdinaryTaxTable spouseY0 =
+                arrays.survivorRegimes()[TrialSimulator.SPOUSE_SURVIVES].ordinaryTaxTableByYear()[0];
+
+        // Probe $60,000: primary (age 60, deduction $15,750) taxable 44,250; spouse (age 72, deduction
+        // $17,750) taxable 42,250 -- both inside the single-2025 12% bracket, so the spouse's extra
+        // $2,000 age-65 deduction saves exactly $2,000 * 12% = $240. Swapping the survivor age makes both
+        // tables use the same age and this gap collapses to $0.
+        double primaryTax = primaryY0.taxAt(60_000);
+        double spouseTax = spouseY0.taxAt(60_000);
+        assertThat(spouseTax).isCloseTo(4831.50, within(1e-6));      // age-65 (age 72) single deduction
+        assertThat(primaryTax - spouseTax).isCloseTo(240.0, within(1e-6)); // ONLY the spouse gets the adder
+    }
+
     // --- fixtures ---
+
+    /** A REAL FederalTaxCalculator over mocked repos with the age-65 additional standard deduction LIVE
+     * (single +$2,000, MFJ +$1,600 per qualifying person) so the survivor's age genuinely moves the
+     * per-year table -- unlike {@code new MonteCarloSpendingOptimizer(null, ...)}, whose null calculator
+     * yields all-zero tables and a dead age path. */
+    private static FederalTaxCalculator age65AwareCalc() {
+        var brackets = mock(TaxBracketRepository.class);
+        var deductions = mock(StandardDeductionRepository.class);
+        lenient().when(brackets.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(anyInt(), eq("single")))
+                .thenReturn(single2025Brackets());
+        lenient().when(brackets.findByTaxYearAndFilingStatusOrderByBracketFloorAsc(
+                anyInt(), eq("married_filing_jointly"))).thenReturn(mfj2025Brackets());
+        lenient().when(deductions.findByTaxYearAndFilingStatus(anyInt(), eq("single")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(2025, "single", bd("15750"), bd("2000"))));
+        lenient().when(deductions.findByTaxYearAndFilingStatus(anyInt(), eq("married_filing_jointly")))
+                .thenReturn(Optional.of(new StandardDeductionEntity(
+                        2025, "married_filing_jointly", bd("31500"), bd("1600"))));
+        return new FederalTaxCalculator(brackets, deductions);
+    }
+
+    /** Age-gap stochastic household: primary born 1970 (retires 2030 at 60), spouse born 1958 (72 in
+     * 2030). No income sources (keeps the surplus-tax path a no-op so the real calculator is exercised
+     * ONLY through the per-year deduction tables). */
+    private static GuardrailOptimizationInput ageGapStochasticInput() {
+        List<ProjectionAccountInput> accounts = List.of(
+                account("300000", "200000", "taxable", "joint"),
+                account("150000", "150000", "traditional", "primary"),
+                account("100000", "100000", "traditional", "spouse"),
+                account("50000", "50000", "roth", "primary"));
+        return new GuardrailOptimizationInput(
+                LocalDate.of(2030, 1, 1), 1970, 90, new BigDecimal("0.03"),
+                accounts, List.of(),
+                new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("0.10"),
+                300, new BigDecimal("0.90"),
+                List.of(new GuardrailPhaseInput("Retirement", 60, null, 1)),
+                42L, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
+                "married_filing_jointly", "taxable_first",
+                false, null, null, 5, null, null, null, null, 2025, false, null, true,
+                1958, 82, 90, new BigDecimal("0.75"), false,
+                Boolean.TRUE, "male", "female", null, stepTable(82, 90));
+    }
+
 
     /** A stochastic-mortality household: primary born 1962 (retires 2030 at 68), spouse born 1968.
      * SS for both spouses (primary $30k > spouse $20k) so the survivor keep-larger splice bites. When
