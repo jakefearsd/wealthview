@@ -53,6 +53,7 @@ function makeProfile(overrides: Partial<GuardrailProfileResponse> = {}): Guardra
         cash_reserve_years: 3,
         cash_return_rate: 0.045,
         conversion_schedule: null,
+        stochastic_mortality: null,
         ...overrides,
     };
 }

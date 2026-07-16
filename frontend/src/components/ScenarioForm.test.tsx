@@ -178,6 +178,42 @@ function communityPropertyCheckbox(): HTMLInputElement {
     return input as HTMLInputElement;
 }
 
+function stochasticMortalityToggle(): HTMLInputElement {
+    const label = screen.getByText('Model Uncertain Lifespans');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Model Uncertain Lifespans toggle not found');
+    }
+    return input as HTMLInputElement;
+}
+
+function primarySexSelect(): HTMLSelectElement {
+    const label = screen.getByText('Primary Sex');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Primary Sex select not found');
+    }
+    return select as HTMLSelectElement;
+}
+
+function spouseSexSelect(): HTMLSelectElement {
+    const label = screen.getByText('Spouse Sex');
+    const select = label.parentElement?.querySelector('select');
+    if (!select) {
+        throw new Error('Spouse Sex select not found');
+    }
+    return select as HTMLSelectElement;
+}
+
+function longevityAgeInput(): HTMLInputElement {
+    const label = screen.getByText('Longevity Age');
+    const input = label.parentElement?.querySelector('input');
+    if (!input) {
+        throw new Error('Longevity Age input not found');
+    }
+    return input as HTMLInputElement;
+}
+
 function ownerSelect(): HTMLSelectElement {
     const label = screen.getByText('Owner');
     const select = label.parentElement?.querySelector('select');
@@ -765,6 +801,204 @@ describe('ScenarioForm', () => {
             expect(ownerSelect().value).toBe('primary');
             const jointOptionAfter = Array.from(ownerSelect().options).find(o => o.value === 'joint');
             expect(jointOptionAfter?.disabled).toBe(true);
+        });
+    });
+
+    describe('stochastic mortality (sub-project B)', () => {
+        it('does not render the "Model Uncertain Lifespans" toggle for a single-person scenario', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.queryByText('Model Uncertain Lifespans')).not.toBeInTheDocument();
+        });
+
+        it('shows the toggle (off, sex/longevity hidden) once a spouse birth year is entered', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+
+            expect(stochasticMortalityToggle().checked).toBe(false);
+            expect(screen.queryByText('Primary Sex')).not.toBeInTheDocument();
+            expect(screen.queryByText('Spouse Sex')).not.toBeInTheDocument();
+            expect(screen.queryByText('Longevity Age')).not.toBeInTheDocument();
+        });
+
+        it('reveals the Sex selects and longevity-age input when the toggle is switched on', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+
+            expect(screen.getByText('Primary Sex')).toBeInTheDocument();
+            expect(screen.getByText('Spouse Sex')).toBeInTheDocument();
+            expect(screen.getByText('Longevity Age')).toBeInTheDocument();
+            expect(longevityAgeInput().value).toBe('95');
+        });
+
+        it('hides the Sex selects and longevity-age input again when the toggle is switched back off', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+            expect(screen.getByText('Primary Sex')).toBeInTheDocument();
+
+            fireEvent.click(stochasticMortalityToggle());
+
+            expect(screen.queryByText('Primary Sex')).not.toBeInTheDocument();
+            expect(screen.queryByText('Spouse Sex')).not.toBeInTheDocument();
+            expect(screen.queryByText('Longevity Age')).not.toBeInTheDocument();
+        });
+
+        it('clears the toggle and dependent fields, hiding them, when spouse birth year is cleared', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '' } });
+
+            expect(screen.queryByText('Model Uncertain Lifespans')).not.toBeInTheDocument();
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1972' } });
+            expect(stochasticMortalityToggle().checked).toBe(false);
+        });
+
+        it('round-trips a Primary Sex selection into the serialized request', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(primarySexSelect(), { target: { value: 'male' } });
+            fireEvent.change(spouseSexSelect(), { target: { value: 'female' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.stochastic_mortality).toBe(true);
+            expect(call.primary_sex).toBe('male');
+            expect(call.spouse_sex).toBe('female');
+        });
+
+        it('submits a custom longevity conditional age', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(longevityAgeInput(), { target: { value: '90' } });
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.longevity_conditional_age).toBe(90);
+        });
+
+        it('omits stochastic_mortality, primary_sex, spouse_sex, and longevity_conditional_age for a single-person scenario', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.stochastic_mortality).toBeUndefined();
+            expect(call.primary_sex).toBeUndefined();
+            expect(call.spouse_sex).toBeUndefined();
+            expect(call.longevity_conditional_age).toBeUndefined();
+        });
+
+        it('omits stochastic_mortality and dependent fields when a household has the toggle left off', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.stochastic_mortality).toBeUndefined();
+            expect(call.primary_sex).toBeUndefined();
+            expect(call.spouse_sex).toBeUndefined();
+            expect(call.longevity_conditional_age).toBeUndefined();
+        });
+
+        it('omits primary_sex/spouse_sex when left unset (blended) but still sends the toggle and longevity age', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.stochastic_mortality).toBe(true);
+            expect(call.primary_sex).toBeUndefined();
+            expect(call.spouse_sex).toBeUndefined();
+            expect(call.longevity_conditional_age).toBe(95);
+        });
+
+        it('hydrates stochastic-mortality fields from an existing scenario\'s params_json and round-trips them unchanged', async () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({
+                spouse_birth_year: 1958,
+                stochastic_mortality: true,
+                primary_sex: 'male',
+                spouse_sex: 'female',
+                longevity_conditional_age: 92,
+            });
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
+
+            expect(stochasticMortalityToggle().checked).toBe(true);
+            expect(primarySexSelect().value).toBe('male');
+            expect(spouseSexSelect().value).toBe('female');
+            expect(longevityAgeInput().value).toBe('92');
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call.stochastic_mortality).toBe(true);
+            expect(call.primary_sex).toBe('male');
+            expect(call.spouse_sex).toBe('female');
+            expect(call.longevity_conditional_age).toBe(92);
+        });
+
+        it('bounds the longevity-age input to 80-110', () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.click(stochasticMortalityToggle());
+
+            expect(longevityAgeInput().min).toBe('80');
+            expect(longevityAgeInput().max).toBe('110');
         });
     });
 });

@@ -16,6 +16,7 @@ import type {
     ScenarioAccountInput,
     ScenarioIncomeSourceInput,
     AllocationInput,
+    Sex,
 } from '../types/projection';
 import { inputStyle } from '../utils/styles';
 import Button from './Button';
@@ -36,6 +37,10 @@ const ACCOUNT_TYPE_HELP: Record<string, string> = {
 const MIN_DEATH_AGE = 50;
 const MAX_DEATH_AGE = 120;
 const DEFAULT_SURVIVOR_SPENDING_FACTOR = 75;
+/** Sub-project B (stochastic mortality): mirrors ScenarioCrudService.MIN/MAX_LONGEVITY_CONDITIONAL_AGE. */
+const MIN_LONGEVITY_CONDITIONAL_AGE = 80;
+const MAX_LONGEVITY_CONDITIONAL_AGE = 110;
+const DEFAULT_LONGEVITY_CONDITIONAL_AGE = 95;
 
 /**
  * Client-side, DISPLAY-ONLY mirror of the backend's SSA 2021 period-life-table planning defaults
@@ -91,6 +96,11 @@ interface ScenarioFormFields {
     spouseDeathAge: number | null;
     survivorSpendingFactor: number;
     communityProperty: boolean;
+    /** Sub-project B (stochastic mortality): opts the guardrail Monte Carlo optimizer into sampled death ages. */
+    stochasticMortality: boolean;
+    primarySex: Sex | null;
+    spouseSex: Sex | null;
+    longevityConditionalAge: number;
 }
 
 function defaultAccount(): ScenarioAccountInput {
@@ -155,6 +165,10 @@ function buildInitialFields(initialValues: Scenario | null | undefined): Scenari
             ? toPercent(parsedParams.survivor_spending_factor)
             : DEFAULT_SURVIVOR_SPENDING_FACTOR,
         communityProperty: parsedParams.community_property ?? false,
+        stochasticMortality: parsedParams.stochastic_mortality ?? false,
+        primarySex: parsedParams.primary_sex ?? null,
+        spouseSex: parsedParams.spouse_sex ?? null,
+        longevityConditionalAge: parsedParams.longevity_conditional_age ?? DEFAULT_LONGEVITY_CONDITIONAL_AGE,
     };
 }
 
@@ -210,6 +224,7 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
         state, primaryResidencePropertyTax, primaryResidenceMortgageInterest,
         dividendYield, feeRate, interestYield, includeDepressionYears, spendingPlanSelection,
         spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
+        stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
     } = fields;
 
     const household = spouseBirthYear != null;
@@ -228,6 +243,10 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 spouseDeathAge: null,
                 survivorSpendingFactor: DEFAULT_SURVIVOR_SPENDING_FACTOR,
                 communityProperty: false,
+                stochasticMortality: false,
+                primarySex: null,
+                spouseSex: null,
+                longevityConditionalAge: DEFAULT_LONGEVITY_CONDITIONAL_AGE,
             } : {}),
         }));
     }
@@ -324,6 +343,14 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 spouse_death_age: household && spouseDeathAge != null ? spouseDeathAge : null,
                 survivor_spending_factor: household ? survivorSpendingFactor / 100 : null,
                 community_property: household ? communityProperty : null,
+                // Sub-project B: omitted (not explicit null) when inactive, so a toggle-off/no-household
+                // request is byte-identical to a pre-Task-9 request — no new keys added.
+                ...(household && stochasticMortality ? {
+                    stochastic_mortality: true,
+                    ...(primarySex ? { primary_sex: primarySex } : {}),
+                    ...(spouseSex ? { spouse_sex: spouseSex } : {}),
+                    longevity_conditional_age: longevityConditionalAge,
+                } : {}),
                 spending_profile_id: (spendingPlanSelection && spendingPlanSelection !== 'guardrail') ? spendingPlanSelection : null,
                 use_guardrail_profile: spendingPlanSelection === 'guardrail' ? true : null,
                 accounts: accounts.map(a => ({
@@ -615,6 +642,61 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                                     onChange={e => setField('communityProperty', e.target.checked)}
                                 />
                             </FormField>
+                            <FormField
+                                label="Model Uncertain Lifespans"
+                                helpText="Samples each spouse's death year per Monte Carlo trial from an SSA mortality table, instead of the fixed death ages above, for a longevity-aware guardrail success rate. Only affects the guardrail optimizer's Monte Carlo results, not the deterministic projection or its recommendation."
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={stochasticMortality}
+                                    onChange={e => setField('stochasticMortality', e.target.checked)}
+                                />
+                            </FormField>
+                            {stochasticMortality && (
+                                <>
+                                    <FormField
+                                        label="Primary Sex"
+                                        helpText="Selects the sex-specific column of the mortality table. Leave unset to use a blended (both-sex) table."
+                                    >
+                                        <select
+                                            style={inputStyle}
+                                            value={primarySex ?? ''}
+                                            onChange={e => setField('primarySex', e.target.value === '' ? null : e.target.value as Sex)}
+                                        >
+                                            <option value="">Blended (unset)</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                        </select>
+                                    </FormField>
+                                    <FormField
+                                        label="Spouse Sex"
+                                        helpText="Selects the sex-specific column of the mortality table. Leave unset to use a blended (both-sex) table."
+                                    >
+                                        <select
+                                            style={inputStyle}
+                                            value={spouseSex ?? ''}
+                                            onChange={e => setField('spouseSex', e.target.value === '' ? null : e.target.value as Sex)}
+                                        >
+                                            <option value="">Blended (unset)</option>
+                                            <option value="male">Male</option>
+                                            <option value="female">Female</option>
+                                        </select>
+                                    </FormField>
+                                    <FormField
+                                        label="Longevity Age"
+                                        helpText="Age threshold (80-110) for the 'at least one spouse still alive at this age' success metric shown beside lifetime success (default 95)."
+                                    >
+                                        <input
+                                            style={inputStyle}
+                                            type="number"
+                                            min={MIN_LONGEVITY_CONDITIONAL_AGE}
+                                            max={MAX_LONGEVITY_CONDITIONAL_AGE}
+                                            value={longevityConditionalAge}
+                                            onChange={e => setField('longevityConditionalAge', Number(e.target.value))}
+                                        />
+                                    </FormField>
+                                </>
+                            )}
                         </>
                     )}
                 </div>

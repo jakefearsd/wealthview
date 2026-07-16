@@ -211,6 +211,62 @@ describe('OptimizerResultsView', () => {
         expect(screen.queryByTestId('fixed-return-share-note')).not.toBeInTheDocument();
     });
 
+    describe('stochastic mortality (sub-project B)', () => {
+        const stochasticMortality = {
+            lifetime_success_probability: 0.94,
+            longevity_conditional: { age: 95, probability: 0.81, trial_fraction: 0.32 },
+            first_death_age: { p10: 78, median: 84, p90: 91 },
+            second_death_age: { p10: 85, median: 90, p90: 96 },
+        };
+
+        it('renders the lifetime and longevity-conditional success labels with the median second-death age', () => {
+            render(
+                <OptimizerResultsView
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    result={{ ...baseResult, stochastic_mortality: stochasticMortality } as any}
+                    onReoptimize={vi.fn()}
+                    retirementDate="2035-01-01"
+                />
+            );
+            expect(screen.getByTestId('stochastic-mortality-card')).toBeInTheDocument();
+            expect(screen.getByText(/Lifetime Success/i)).toBeInTheDocument();
+            expect(screen.getByText(/Longevity-Conditional Success/i)).toBeInTheDocument();
+            expect(screen.getByText(/survivor lives to age 95/i)).toBeInTheDocument();
+            expect(screen.getByText('94%')).toBeInTheDocument();
+            expect(screen.getByText('81%')).toBeInTheDocument();
+            expect(screen.getByText(/Median 90/)).toBeInTheDocument();
+            // The existing fixed-death success number stays visible for comparison.
+            expect(screen.getByTestId('success-probability-card')).toBeInTheDocument();
+            expect(screen.getByText('91%')).toBeInTheDocument();
+        });
+
+        it('renders neither stochastic-mortality label and does not crash when the block is null', () => {
+            render(
+                <OptimizerResultsView
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    result={{ ...baseResult, stochastic_mortality: null } as any}
+                    onReoptimize={vi.fn()}
+                    retirementDate="2035-01-01"
+                />
+            );
+            expect(screen.queryByTestId('stochastic-mortality-card')).not.toBeInTheDocument();
+            expect(screen.queryByText(/Lifetime Success/i)).not.toBeInTheDocument();
+            expect(screen.queryByText(/Longevity-Conditional Success/i)).not.toBeInTheDocument();
+        });
+
+        it('renders neither stochastic-mortality label and does not crash when the field is absent entirely', () => {
+            render(
+                <OptimizerResultsView
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    result={baseResult as any}
+                    onReoptimize={vi.fn()}
+                    retirementDate="2035-01-01"
+                />
+            );
+            expect(screen.queryByTestId('stochastic-mortality-card')).not.toBeInTheDocument();
+        });
+    });
+
     it('embeds the expected child charts', () => {
         render(
             <OptimizerResultsView

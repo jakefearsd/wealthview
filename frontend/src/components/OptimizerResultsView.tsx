@@ -149,6 +149,44 @@ export default function OptimizerResultsView({
                 </div>
             </div>
 
+            {result.stochastic_mortality && (
+                <div data-testid="stochastic-mortality-card" style={{ ...cardStyle, marginBottom: '1.5rem' }}>
+                    <h3 style={{ marginBottom: '0.5rem', marginTop: 0 }}>Longevity-Aware Success (Stochastic Mortality)</h3>
+                    <p style={{ fontSize: '0.85rem', color: '#555', marginBottom: '1rem', lineHeight: 1.5 }}>
+                        Instead of the fixed death ages above, this samples each spouse&apos;s death year per Monte
+                        Carlo trial from an SSA mortality table. The fixed-death Success Probability above stays
+                        for comparison.
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
+                        <div style={{ ...cardStyle, textAlign: 'center', background: '#e8f5e9', border: '1px solid #a5d6a7' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Lifetime Success</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                                {pct(result.stochastic_mortality.lifetime_success_probability, 0)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                Never falls short while either spouse is alive
+                            </div>
+                        </div>
+                        <div style={{ ...cardStyle, textAlign: 'center', background: '#e3f2fd', border: '1px solid #90caf9' }}>
+                            <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '0.25rem' }}>Longevity-Conditional Success</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+                                {pct(result.stochastic_mortality.longevity_conditional.probability, 0)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#888', marginTop: '0.25rem' }}>
+                                If the survivor lives to age {result.stochastic_mortality.longevity_conditional.age}
+                                {' '}({pct(result.stochastic_mortality.longevity_conditional.trial_fraction, 0)} of trials)
+                            </div>
+                        </div>
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: '#555' }}>
+                        <strong>Second death age (sampled):</strong>{' '}
+                        P10 {result.stochastic_mortality.second_death_age.p10} &middot;{' '}
+                        Median {result.stochastic_mortality.second_death_age.median} &middot;{' '}
+                        P90 {result.stochastic_mortality.second_death_age.p90}
+                    </div>
+                </div>
+            )}
+
             {(() => {
                 const lastYear = result.yearly_spending[result.yearly_spending.length - 1];
                 return lastYear && (lastYear.portfolio_balance_p10 != null || lastYear.portfolio_balance_median != null) ? (

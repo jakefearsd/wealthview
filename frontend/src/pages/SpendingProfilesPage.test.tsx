@@ -63,6 +63,7 @@ const mockGuardrailProfile: GuardrailProfileResponse = {
     cash_reserve_years: 2,
     cash_return_rate: 0.04,
     conversion_schedule: null,
+    stochastic_mortality: null,
 };
 
 vi.mock('../api/spendingProfiles', () => ({

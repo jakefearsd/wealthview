@@ -5,6 +5,9 @@ export interface AllocationInput {
     cash: number;
 }
 
+/** Sub-project B (stochastic mortality): the sex used to select a sex-specific SSA mortality table column. */
+export type Sex = 'male' | 'female';
+
 export interface ProjectionAccount {
     id: string;
     linked_account_id: string | null;
@@ -202,6 +205,26 @@ export interface CreateScenarioRequest {
     survivor_spending_factor?: number | null;
     /** Community-property state: steps up 100% of embedded gain on joint taxable accounts at first death instead of the common-law 50%. Only meaningful when spouse_birth_year is set. */
     community_property?: boolean | null;
+    /**
+     * Sub-project B: opts the guardrail Monte Carlo optimizer into sampling each spouse's death
+     * year per trial from an SSA mortality table, instead of the fixed death ages above (which the
+     * deterministic engine and the optimizer's recommendation continue to use unchanged). Null/false
+     * ⇒ byte-identical to fixed-death-age modeling. Only meaningful when spouse_birth_year is set.
+     */
+    stochastic_mortality?: boolean | null;
+    /**
+     * Sub-project B: the primary's sex, used to select the sex-specific column of the mortality
+     * table. Null ⇒ a blended (both-sex) table. Only meaningful when stochastic_mortality is true.
+     */
+    primary_sex?: Sex | null;
+    /** Sub-project B: the spouse's sex, mirroring primary_sex. Requires spouse_birth_year to be set. */
+    spouse_sex?: Sex | null;
+    /**
+     * Sub-project B: age threshold (80-110) for the "at least one spouse still alive at this age"
+     * longevity-conditional success metric. Null resolves to 95. Only meaningful when
+     * stochastic_mortality is true.
+     */
+    longevity_conditional_age?: number | null;
     spending_profile_id?: string | null;
     use_guardrail_profile?: boolean | null;
     accounts: ScenarioAccountInput[];
@@ -366,6 +389,42 @@ export interface GuardrailProfileResponse {
     cash_reserve_years: number;
     cash_return_rate: number;
     conversion_schedule: RothConversionScheduleResponse | null;
+    /**
+     * Sub-project B (stochastic mortality): the optional longevity-aware summary of one
+     * stochastic-mortality Monte Carlo evaluation pass. Present only when the run opted into
+     * stochastic_mortality (this app's `ScenarioForm` only exposes the toggle for household
+     * scenarios). Null for every toggle-off run and every persisted-profile read that predates
+     * this field.
+     */
+    stochastic_mortality: StochasticMortalityResult | null;
+}
+
+/**
+ * Sub-project B: the success rate conditional on the household surviving to a given age.
+ */
+export interface StochasticMortalityLongevityConditional {
+    /** The longevity threshold ("at least one spouse alive at this age") the subset was conditioned on. */
+    age: number;
+    /** The success rate WITHIN the subset of trials whose survivor reached `age`. */
+    probability: number;
+    /** What share of ALL trials qualified for the subset — how much sample weight `probability` carries. */
+    trial_fraction: number;
+}
+
+/** Sub-project B: a percentile summary of a sampled death-age distribution, reported as whole years. */
+export interface StochasticMortalityAgeDistribution {
+    p10: number;
+    median: number;
+    p90: number;
+}
+
+/** Sub-project B: the nested `stochastic_mortality` block on {@link GuardrailProfileResponse}. */
+export interface StochasticMortalityResult {
+    /** Fraction of trials with essential floors funded every year while either spouse was alive. */
+    lifetime_success_probability: number;
+    longevity_conditional: StochasticMortalityLongevityConditional;
+    first_death_age: StochasticMortalityAgeDistribution;
+    second_death_age: StochasticMortalityAgeDistribution;
 }
 
 export interface RentalPropertyYearDetail {
