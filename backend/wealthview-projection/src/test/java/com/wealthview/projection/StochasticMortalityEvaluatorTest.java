@@ -156,6 +156,34 @@ class StochasticMortalityEvaluatorTest {
         assertThat(result.stochasticMortality()).isNull();
     }
 
+    // === task 8: the same summary is ALSO exposed on the wire-facing GuardrailProfileResponse
+    //     itself (stochastic_mortality), reusing this class's stochastic household fixture ===
+
+    @Test
+    void optimize_stochasticHousehold_attachesStochasticMortalityToResponse() {
+        var input = stochasticInput(42L, 82, 90, stepTable(82, 90));
+        var result = optimizer.optimizeInternal(input);
+
+        var wireBlock = result.response().stochasticMortality();
+        assertThat(wireBlock).isNotNull();
+        assertThat(wireBlock.lifetimeSuccessProbability().doubleValue())
+                .isCloseTo(result.stochasticMortality().lifetimeSuccessProbability(), within(1e-4));
+        assertThat(wireBlock.secondDeathAge().median()).isEqualTo(90);
+        assertThat(wireBlock.longevityConditional().age()).isEqualTo(95); // engine default, unset by the fixture
+        assertThat(wireBlock.longevityConditional().trialFraction().doubleValue()).isBetween(0.0, 1.0);
+
+        // The public optimize() entrypoint (the SpendingOptimizer contract) carries the same block.
+        assertThat(optimizer.optimize(input).stochasticMortality()).isEqualTo(wireBlock);
+    }
+
+    @Test
+    void optimize_toggleOff_stochasticMortalityIsNullOnResponse() {
+        // Anchor: a toggle-off run's response has no stochastic_mortality block at all.
+        var input = stochasticInput(42L, 82, 90, null);
+
+        assertThat(optimizer.optimize(input).stochasticMortality()).isNull();
+    }
+
     // === task 7 ANCHOR: folding the evaluation into optimizeInternal must not move the fixed-death
     //     recommendation -- toggle on vs toggle off (otherwise-identical inputs) must be byte-identical,
     //     exactly as sub-project B's own "null/false stochasticMortality is byte-identical to A" contract

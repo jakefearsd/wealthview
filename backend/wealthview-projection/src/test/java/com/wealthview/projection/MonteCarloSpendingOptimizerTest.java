@@ -1801,8 +1801,8 @@ class MonteCarloSpendingOptimizerTest {
         java.util.Arrays.fill(fixedDiscretionary, 20000);
         var isolatedResponseBuilder = new GuardrailResponseBuilder(new TrialSimulator());
 
-        var taxedIsolated = isolatedResponseBuilder.build(ctxTaxed, input, fixedDiscretionary, null, null, null);
-        var noTaxIsolated = isolatedResponseBuilder.build(ctxNoTax, input, fixedDiscretionary, null, null, null);
+        var taxedIsolated = isolatedResponseBuilder.build(ctxTaxed, input, fixedDiscretionary, null, null, null, null);
+        var noTaxIsolated = isolatedResponseBuilder.build(ctxNoTax, input, fixedDiscretionary, null, null, null, null);
 
         // isLessThan (not isLessThanOrEqualTo): a wiring revert that dropped the tax calculator
         // (taxedIsolated == noTaxIsolated) must fail this test, not silently pass it. The real

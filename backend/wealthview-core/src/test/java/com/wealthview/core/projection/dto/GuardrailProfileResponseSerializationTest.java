@@ -43,7 +43,10 @@ class GuardrailProfileResponseSerializationTest {
             "updated_at", "portfolio_floor", "max_annual_adjustment_rate", "phase_blend_years",
             "risk_tolerance", "cash_reserve_years", "cash_return_rate", "conversion_schedule",
             "fixed_return_share", "floor_reduced", "original_floor_success_probability",
-            "success_probability_with_rules", "gated_on");
+            "success_probability_with_rules", "gated_on",
+            // Sub-project B (stochastic mortality), task 8: nested (NOT @JsonUnwrapped) block, so it
+            // is exactly ONE top-level key regardless of whether stochasticMortality is null.
+            "stochastic_mortality");
 
     /** A response with every field populated to a distinct value, so a swapped field is detectable. */
     private GuardrailProfileResponse fullyPopulated() {
@@ -126,5 +129,64 @@ class GuardrailProfileResponseSerializationTest {
         assertThat(t.get("phases").get(0).get("name").asText()).isEqualTo("Go-Go");
         assertThat(t.get("yearly_spending").isArray()).isTrue();
         assertThat(t.get("yearly_spending").get(0).get("phase_name").asText()).isEqualTo("Go-Go");
+    }
+
+    // === Sub-project B (stochastic mortality), task 8 ===
+
+    @Test
+    void serialize_nullStochasticMortality_keyIsNullNotOmitted() throws Exception {
+        // fullyPopulated() predates task 8 (back-compat 25-field constructor) -- stochasticMortality
+        // is implicitly null, exactly the toggle-off/persisted-profile-read shape.
+        JsonNode t = SNAKE.readTree(SNAKE.writeValueAsString(fullyPopulated()));
+
+        assertThat(t.get("stochastic_mortality").isNull()).isTrue();
+    }
+
+    @Test
+    void serialize_stochasticMortalityPresent_nestsAsOneObjectWithSnakeCaseKeys() throws Exception {
+        var stochasticMortality = new StochasticMortalityResponse(
+                new BigDecimal("0.9200"),
+                new StochasticMortalityResponse.LongevityConditionalResponse(
+                        95, new BigDecimal("0.8700"), new BigDecimal("0.3100")),
+                new StochasticMortalityResponse.AgeDistributionResponse(78, 84, 91),
+                new StochasticMortalityResponse.AgeDistributionResponse(85, 90, 96));
+        var disclosure = new GuardrailProfileResponse.Disclosure(
+                new BigDecimal("0.6000"), true, new BigDecimal("0.8200"), new BigDecimal("0.9785"),
+                GuardrailProfileResponse.GATED_ON_WITH_RULES);
+        var response = new GuardrailProfileResponse(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                "Optimized Plan",
+                new BigDecimal("80000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"),
+                500, new BigDecimal("0.95"),
+                List.of(), List.of(),
+                new BigDecimal("1000000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
+                new BigDecimal("500000"),
+                false,
+                OffsetDateTime.parse("2026-01-01T00:00:00Z"), OffsetDateTime.parse("2026-01-02T00:00:00Z"),
+                BigDecimal.ZERO, new BigDecimal("0.10"),
+                2, "moderate", 2, new BigDecimal("0.04"),
+                null,
+                disclosure,
+                stochasticMortality);
+
+        JsonNode t = SNAKE.readTree(SNAKE.writeValueAsString(response));
+
+        assertThat(t.properties()).extracting(Map.Entry::getKey)
+                .containsExactlyInAnyOrderElementsOf(SNAKE_KEYS);
+        JsonNode block = t.get("stochastic_mortality");
+        assertThat(block.get("lifetime_success_probability").decimalValue()).isEqualByComparingTo("0.9200");
+        assertThat(block.get("longevity_conditional").get("age").intValue()).isEqualTo(95);
+        assertThat(block.get("longevity_conditional").get("probability").decimalValue())
+                .isEqualByComparingTo("0.8700");
+        assertThat(block.get("longevity_conditional").get("trial_fraction").decimalValue())
+                .isEqualByComparingTo("0.3100");
+        assertThat(block.get("first_death_age").get("p10").intValue()).isEqualTo(78);
+        assertThat(block.get("first_death_age").get("median").intValue()).isEqualTo(84);
+        assertThat(block.get("first_death_age").get("p90").intValue()).isEqualTo(91);
+        assertThat(block.get("second_death_age").get("p10").intValue()).isEqualTo(85);
+        assertThat(block.get("second_death_age").get("median").intValue()).isEqualTo(90);
+        assertThat(block.get("second_death_age").get("p90").intValue()).isEqualTo(96);
     }
 }

@@ -126,14 +126,17 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * stochastic evaluation, instead of re-running the (expensive) context build + Roth-conversion
      * search + allocation a second time to get the longevity number beside it.
      *
-     * <p>The fold is strictly READ-ONLY over the recommendation: {@code response} is fully built
-     * from {@code recommendedDiscretionary} (a clone, scaled at the FIXED-death transition index --
-     * unchanged from pre-fold) BEFORE {@link #summarizeStochasticMortality} ever runs, and that
-     * summarization only READS {@code ctx}/{@code discretionaryByYear} (see {@link
-     * StochasticMortalityEvaluator#evaluate}, which never mutates its arguments) — it cannot feed
-     * back into the already-built {@code response}. Toggle off (or single-person / degenerate
-     * horizon) ⇒ {@code stochasticMortality} is {@code null} and this method's observable output is
-     * byte-identical to the pre-fold {@code optimize()} (the anchor).
+     * <p>The fold is strictly READ-ONLY over the recommendation: {@code response} is built from
+     * {@code recommendedDiscretionary} (a clone, scaled at the FIXED-death transition index --
+     * unchanged from pre-fold); {@link #summarizeStochasticMortality} only READS {@code ctx}/
+     * {@code discretionaryByYear} (see {@link StochasticMortalityEvaluator#evaluate}, which never
+     * mutates its arguments), so it cannot feed back into {@code response} regardless of call order
+     * -- task 8 runs it FIRST so the resulting {@code stochasticMortality} can be embedded directly
+     * in {@link GuardrailResponseBuilder#build}'s constructor call (mirrors how the {@code
+     * Disclosure} fields are threaded in), rather than copy-constructing a second response
+     * afterward. Toggle off (or single-person / degenerate horizon) ⇒ {@code stochasticMortality} is
+     * {@code null} and this method's observable output is byte-identical to the pre-fold {@code
+     * optimize()} (the anchor).
      *
      * <p>Package-private: {@link #optimize} (the {@link SpendingOptimizer} contract) is the only
      * production entry point and only ever returns {@link OptimizeResult#response}; this is exposed
@@ -162,11 +165,21 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
             double[] recommendedDiscretionary = discretionaryByYear.clone();
             HouseholdMcResolver.scaleFromTransition(recommendedDiscretionary, ctx.sim().household(),
                     ctx.sim().survivorSpendingFactor(), ctx.sim().years());
-            GuardrailProfileResponse response = responseBuilder.build(ctx, input, recommendedDiscretionary,
-                    conv.byYear(), conv.taxByYear(), conv.schedule());
 
+            // Task 8: computed BEFORE responseBuilder.build so it can be embedded directly in the
+            // GuardrailProfileResponse constructor call (mirrors how the Disclosure fields are
+            // threaded in) instead of copy-constructing a second response afterward. Safe to reorder
+            // relative to the pre-task-8 sequencing: summarization only READS ctx/discretionaryByYear/
+            // conv (see summarizeStochasticMortality's own javadoc) and every per-trial return/mortality
+            // draw the two passes consume was already generated once, up front, in contextBuilder.build
+            // -- there is no shared mutable RNG state for call order to perturb, so this is still the
+            // byte-identical anchor (toggle on vs off) task 7 pinned.
             StochasticMortalitySummary stochasticMortality =
                     summarizeStochasticMortality(ctx, discretionaryByYear, conv, input);
+
+            GuardrailProfileResponse response = responseBuilder.build(ctx, input, recommendedDiscretionary,
+                    conv.byYear(), conv.taxByYear(), conv.schedule(), stochasticMortality);
+
             return new OptimizeResult(response, stochasticMortality);
         } finally {
             MDC.remove("operation");
@@ -179,9 +192,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
      * {@link #optimizeInternal} pass. {@code stochasticMortality} is {@code null} whenever the run
      * did not opt into stochastic mortality — the byte-identical anchor: {@link #optimize} (the
      * {@link SpendingOptimizer} contract) only ever returns {@link #response}, so a toggle-off run's
-     * PUBLIC behavior is completely untouched by this type's existence. Deliberately NOT the API
-     * response DTO — wiring the summary into the wire response is task 8's job; this only needs to
-     * make the aggregated summary available internally for it to consume.
+     * PUBLIC behavior is completely untouched by this type's existence. Task 8 wired the same summary
+     * onto {@link GuardrailProfileResponse#stochasticMortality()} too (via {@link
+     * GuardrailResponseBuilder#build}), so this record's own {@code stochasticMortality} component is
+     * now a convenience duplicate — retained so tests (and any other internal caller) can reach it
+     * without unwrapping the response DTO.
      */
     record OptimizeResult(GuardrailProfileResponse response, @Nullable StochasticMortalitySummary stochasticMortality) {
     }

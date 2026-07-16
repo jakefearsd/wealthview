@@ -26,6 +26,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationRequest;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
+import com.wealthview.core.projection.dto.StochasticMortalityResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
@@ -79,6 +80,35 @@ class GuardrailControllerTest {
                 new BigDecimal("100000"),
                 false, OffsetDateTime.now(), OffsetDateTime.now(),
                 BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null);
+    }
+
+    /** Sub-project B (stochastic mortality), task 8: same shape as {@link #sampleResponse()} but
+     * with the {@code stochastic_mortality} block populated -- exercises the full 26-field canonical
+     * constructor (the only overload that can set a non-null {@code stochasticMortality}). */
+    private GuardrailProfileResponse sampleResponseWithStochasticMortality() {
+        var stochasticMortality = new StochasticMortalityResponse(
+                new BigDecimal("0.9200"),
+                new StochasticMortalityResponse.LongevityConditionalResponse(
+                        95, new BigDecimal("0.8700"), new BigDecimal("0.3100")),
+                new StochasticMortalityResponse.AgeDistributionResponse(78, 84, 91),
+                new StochasticMortalityResponse.AgeDistributionResponse(85, 90, 96));
+        return new GuardrailProfileResponse(
+                UUID.randomUUID(), SCENARIO_ID, "Optimized Plan",
+                new BigDecimal("30000"), BigDecimal.ZERO,
+                new BigDecimal("0.10"),
+                5000, new BigDecimal("0.95"),
+                List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
+                List.of(new GuardrailYearlySpending(
+                        2030, 62, new BigDecimal("75000"), new BigDecimal("62000"),
+                        new BigDecimal("91000"), new BigDecimal("30000"),
+                        new BigDecimal("45000"), new BigDecimal("12000"),
+                        new BigDecimal("63000"), "Early")),
+                new BigDecimal("250000"), new BigDecimal("0.05"), new BigDecimal("0.95"),
+                new BigDecimal("100000"),
+                false, OffsetDateTime.now(), OffsetDateTime.now(),
+                BigDecimal.ZERO, null, 0, null, 2, new BigDecimal("0.04"), null,
+                GuardrailProfileResponse.Disclosure.empty(),
+                stochasticMortality);
     }
 
     @Test
@@ -280,6 +310,67 @@ class GuardrailControllerTest {
                 .andExpect(status().isOk());
 
         assertThat(requestCaptor.getValue().gateOnAdaptiveRules()).isFalse();
+    }
+
+    // === Sub-project B (stochastic mortality), task 8: stochastic_mortality wire shape ===
+
+    /** Pins the nested {@code stochastic_mortality} object's snake_case keys through the real
+     * controller + globally configured ObjectMapper path, one level deeper than the T24 pins above
+     * (this block is a nested object, not flattened top-level keys like {@link
+     * GuardrailProfileResponse.Disclosure}). */
+    @Test
+    void optimize_stochasticMortalityPresent_serializesSnakeCaseNestedBlock() throws Exception {
+        when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class)))
+                .thenReturn(sampleResponseWithStochasticMortality());
+
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Optimized Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, null, null,
+                List.of(new GuardrailPhaseInput("Early", 62, 72, 3)),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stochastic_mortality.lifetime_success_probability").value(0.92))
+                .andExpect(jsonPath("$.stochastic_mortality.longevity_conditional.age").value(95))
+                .andExpect(jsonPath("$.stochastic_mortality.longevity_conditional.probability").value(0.87))
+                .andExpect(jsonPath("$.stochastic_mortality.longevity_conditional.trial_fraction").value(0.31))
+                .andExpect(jsonPath("$.stochastic_mortality.first_death_age.p10").value(78))
+                .andExpect(jsonPath("$.stochastic_mortality.first_death_age.median").value(84))
+                .andExpect(jsonPath("$.stochastic_mortality.first_death_age.p90").value(91))
+                .andExpect(jsonPath("$.stochastic_mortality.second_death_age.p10").value(85))
+                .andExpect(jsonPath("$.stochastic_mortality.second_death_age.median").value(90))
+                .andExpect(jsonPath("$.stochastic_mortality.second_death_age.p90").value(96));
+    }
+
+    /** Anchor: a toggle-off run's response (the plain {@link #sampleResponse()} fixture, built via
+     * the pre-task-8 back-compat constructor) has no {@code stochastic_mortality} block -- absent or
+     * JSON {@code null}, both of which {@code doesNotExist()} accepts. */
+    @Test
+    void optimize_stochasticMortalityToggleOff_fieldAbsentOrNull() throws Exception {
+        when(guardrailProfileService.optimize(eq(TENANT_ID), eq(SCENARIO_ID),
+                any(GuardrailOptimizationRequest.class)))
+                .thenReturn(sampleResponse());
+
+        var request = new GuardrailOptimizationRequest(
+                SCENARIO_ID, "Plan", new BigDecimal("30000"),
+                BigDecimal.ZERO, null, null, null, List.of(),
+                null, null, null, null,
+                null, null,
+                null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/v1/projections/{scenarioId}/optimize", SCENARIO_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.stochastic_mortality").doesNotExist());
     }
 
     @Test

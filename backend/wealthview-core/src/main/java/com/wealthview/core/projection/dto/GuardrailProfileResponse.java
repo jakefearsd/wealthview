@@ -31,6 +31,14 @@ import tools.jackson.databind.ObjectMapper;
  *         {@link Disclosure#fixedReturnShare}, {@link Disclosure#originalFloorSuccessProbability},
  *         and {@link Disclosure#successProbabilityWithRules} are nullable. See {@link Disclosure}'s
  *         own javadoc for each field's precise semantics.
+ * @param stochasticMortality Sub-project B (stochastic mortality), task 8: the optional
+ *         longevity-aware summary (task 7's {@code StochasticMortalitySummary}, mapped by {@code
+ *         GuardrailResponseBuilder}) -- present only when the run opted into the stochastic-mortality
+ *         toggle. Unlike {@link #disclosure}, this is a plain nested field (NOT {@code
+ *         @JsonUnwrapped}): it serializes as its own {@code stochastic_mortality} object rather than
+ *         flattening into top-level keys. {@code null} for every toggle-off run, degenerate
+ *         zero-year run, and persisted-profile read (not a persisted column) -- the byte-identical
+ *         pre-task-8 shape.
  */
 public record GuardrailProfileResponse(
         UUID id,
@@ -57,7 +65,8 @@ public record GuardrailProfileResponse(
         int cashReserveYears,
         BigDecimal cashReturnRate,
         RothConversionScheduleResponse conversionSchedule,
-        @JsonUnwrapped Disclosure disclosure
+        @JsonUnwrapped Disclosure disclosure,
+        StochasticMortalityResponse stochasticMortality
 ) {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -180,6 +189,49 @@ public record GuardrailProfileResponse(
                 phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
                 stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
                 riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, Disclosure.empty());
+    }
+
+    /**
+     * Back-compat convenience for callers that predate {@link #stochasticMortality} (sub-project B,
+     * task 8 -- added on top of T23 item 4's {@link Disclosure} grouping): defaults it to {@code
+     * null}, "no stochastic-mortality evaluation for this response", the byte-identical
+     * pre-task-8 shape. Existing positional call sites that already pass a {@link Disclosure} but
+     * have no summary on hand (persisted-profile reads, the degenerate zero-year {@code
+     * emptyResult}, and pre-task-8 tests) keep compiling unchanged.
+     */
+    // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-task-8 shape) so
+    // existing positional call sites keep compiling unchanged; not new incidental complexity.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
+    public GuardrailProfileResponse(
+            UUID id,
+            UUID scenarioId,
+            String name,
+            BigDecimal essentialFloor,
+            BigDecimal terminalBalanceTarget,
+            BigDecimal returnMean,
+            int trialCount,
+            BigDecimal confidenceLevel,
+            List<GuardrailPhaseInput> phases,
+            List<GuardrailYearlySpending> yearlySpending,
+            BigDecimal medianFinalBalance,
+            BigDecimal failureRate,
+            BigDecimal successProbability,
+            BigDecimal percentile10Final,
+            boolean stale,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            BigDecimal portfolioFloor,
+            BigDecimal maxAnnualAdjustmentRate,
+            int phaseBlendYears,
+            String riskTolerance,
+            int cashReserveYears,
+            BigDecimal cashReturnRate,
+            RothConversionScheduleResponse conversionSchedule,
+            Disclosure disclosure) {
+        this(id, scenarioId, name, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                phases, yearlySpending, medianFinalBalance, failureRate, successProbability, percentile10Final,
+                stale, createdAt, updatedAt, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears,
+                riskTolerance, cashReserveYears, cashReturnRate, conversionSchedule, disclosure, null);
     }
 
     // --- Flat delegate accessors (mirrors ProjectionYearDto's grouped-field pattern): preserve

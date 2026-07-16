@@ -8,6 +8,7 @@ import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.lang.Nullable;
 
 import com.wealthview.core.projection.dto.ConversionYearDetail;
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
@@ -15,6 +16,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.RothConversionScheduleResponse;
+import com.wealthview.core.projection.dto.StochasticMortalityResponse;
 
 import static com.wealthview.core.common.Money.ROUNDING;
 import static com.wealthview.core.common.Money.SCALE;
@@ -43,7 +45,8 @@ final class GuardrailResponseBuilder {
                                    double[] discretionaryByYear,
                                    double[] conversionByYear,
                                    double[] conversionTaxByYear,
-                                   RothConversionOptimizer.RothConversionSchedule convSchedule) {
+                                   RothConversionOptimizer.RothConversionSchedule convSchedule,
+                                   @Nullable StochasticMortalitySummary stochasticMortality) {
         // HP2: {@code discretionaryByYear} arrives ALREADY survivor-scaled from the transition year
         // (MonteCarloSpendingOptimizer.allocateAndSmooth's single scaling seam, mirroring the
         // essential-floor pre-scaling in OptimizationContextBuilder). This one array is what every
@@ -178,7 +181,37 @@ final class GuardrailResponseBuilder {
                         successProbabilityWithRules,
                         // T24: which metric actually certified this run's search gate.
                         GuardrailProfileResponse.resolveGatedOn(
-                                input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate())));
+                                input.gateOnAdaptiveRules(), input.maxAnnualAdjustmentRate())),
+                toStochasticMortalityResponse(stochasticMortality));
+    }
+
+    /**
+     * Sub-project B (stochastic mortality), task 8: maps the projection-internal {@link
+     * StochasticMortalitySummary} (task 7's aggregation) onto the wire-facing {@link
+     * StochasticMortalityResponse} -- {@code null} in, {@code null} out, mirroring how {@link
+     * #buildConvScheduleResponse} handles its own optional nested block. No {@code from(...)}
+     * factory lives on {@link StochasticMortalityResponse} itself: it is a core DTO and {@code
+     * StochasticMortalitySummary} is projection-internal, so the mapping happens here, in
+     * projection code that can see both types (module dependency direction is projection -&gt;
+     * core, never the reverse).
+     */
+    @Nullable
+    private static StochasticMortalityResponse toStochasticMortalityResponse(
+            @Nullable StochasticMortalitySummary summary) {
+        if (summary == null) {
+            return null;
+        }
+        var longevity = summary.longevityConditional();
+        var firstDeath = summary.firstDeathAge();
+        var secondDeath = summary.secondDeathAge();
+        return new StochasticMortalityResponse(
+                toBD(summary.lifetimeSuccessProbability()),
+                new StochasticMortalityResponse.LongevityConditionalResponse(
+                        longevity.age(), toBD(longevity.probability()), toBD(longevity.trialFraction())),
+                new StochasticMortalityResponse.AgeDistributionResponse(
+                        firstDeath.p10(), firstDeath.median(), firstDeath.p90()),
+                new StochasticMortalityResponse.AgeDistributionResponse(
+                        secondDeath.p10(), secondDeath.median(), secondDeath.p90()));
     }
 
     /** Pool balances/order the terminal simulation grows and withdraws from (audit C6 extraction). */
