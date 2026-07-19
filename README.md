@@ -143,7 +143,7 @@ The repo is an npm workspaces monorepo with three packages: `frontend/` (web SPA
 | Layer     | Technology                                                |
 |-----------|-----------------------------------------------------------|
 | Frontend  | React 19, TypeScript, Vite, React Router, Recharts, Axios |
-| Backend   | Java 21, Spring Boot 3.5, Spring Security, JPA/Hibernate  |
+| Backend   | Java 25, Spring Boot 4.1, Spring Security, JPA/Hibernate  |
 | Database  | PostgreSQL 16 with Flyway migrations                      |
 | Caching   | Caffeine (balances, holdings, projections)                |
 | Build     | Maven multi-module (backend), npm (frontend)              |

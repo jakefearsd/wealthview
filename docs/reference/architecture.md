@@ -17,8 +17,8 @@ React SPA  <-->  Spring Boot REST API  <-->  PostgreSQL
 
 | Layer     | Technology                                                |
 |-----------|-----------------------------------------------------------|
-| Frontend  | React 18, TypeScript, Vite, React Router, Recharts, Axios |
-| Backend   | Java 21, Spring Boot 3.3, Spring Security, JPA/Hibernate  |
+| Frontend  | React 19, TypeScript, Vite, React Router, Recharts, Axios |
+| Backend   | Java 25, Spring Boot 4.1, Spring Security, JPA/Hibernate  |
 | Database  | PostgreSQL 16 with Flyway migrations                      |
 | Build     | Maven multi-module (backend), npm (frontend)              |
 | Testing   | JUnit 5, Mockito, AssertJ, Testcontainers, Vitest, React Testing Library |

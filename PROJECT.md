@@ -42,11 +42,11 @@ WealthView is a self-hosted, multi-tenant personal finance application focused o
 
 | Layer          | Technology                                              |
 | -------------- | ------------------------------------------------------- |
-| Frontend       | React 18+, Vite, React Router, Recharts/D3 for charts  |
+| Frontend       | React 19, Vite, React Router, Recharts/D3 for charts   |
 | HTTP Client    | Axios                                                   |
-| Backend        | Java 21+, Spring Boot 3.3+, Spring Web MVC              |
+| Backend        | Java 25, Spring Boot 4.1, Spring Web MVC                |
 | Build          | Maven (multi-module)                                    |
-| ORM / DB       | Spring Data JPA (Hibernate 6+), PostgreSQL 16+           |
+| ORM / DB       | Spring Data JPA (Hibernate 7), PostgreSQL 16+            |
 | Auth           | Spring Security, JWT-based session tokens, bcrypt        |
 | Scheduling     | Spring @Scheduled (cron expressions)                    |
 | Price Feed     | Finnhub API (free tier, 60 req/min)                     |
@@ -212,11 +212,11 @@ All `id` columns are **UUID**. All tables except `tenants` and `prices` include 
 
 ### Phase 4 — Polish & Operations
 
-- [ ] **Multi-tenant admin panel** — Manage tenants, view usage stats, disable accounts.
-- [ ] **Audit log** — Record all data mutations per tenant for debugging and compliance.
-- [ ] **Data export** — Full tenant data export as JSON or CSV.
-- [ ] **Notifications** — Email alerts for large transactions, sync failures, or projection milestones.
-- [ ] **HTTPS & hardening** — TLS via Let's Encrypt, rate limiting, CSRF protection, Content-Security-Policy headers.
+- [x] **Multi-tenant admin panel** — Manage tenants, view usage stats, disable accounts.
+- [x] **Audit log** — Record all data mutations per tenant for debugging and compliance.
+- [x] **Data export** — Full tenant data export as JSON or CSV.
+- [x] **Notifications** — Email alerts for large transactions, sync failures, or projection milestones.
+- [x] **HTTPS & hardening** — TLS via Let's Encrypt, rate limiting, CSRF protection, Content-Security-Policy headers.
 
 ---
 
@@ -365,8 +365,8 @@ Use Flyway, applied automatically on application startup. Migration files live i
 
 | # | Decision | Status | Notes |
 |---|----------|--------|-------|
-| 1 | ORM choice: Spring Data JPA + Hibernate | **Decided** | Battle-tested, familiar; Hibernate 6+ auto-configured via Spring Boot |
-| 2 | Application framework: Spring Boot 3.3+ | **Decided** | Replaces raw servlet/Tomcat approach; auto-config for JPA, Security, Scheduling; fat JAR deployment |
+| 1 | ORM choice: Spring Data JPA + Hibernate | **Decided** | Battle-tested, familiar; Hibernate auto-configured via Spring Boot |
+| 2 | Application framework: Spring Boot | **Decided** | Replaces raw servlet/Tomcat approach; auto-config for JPA, Security, Scheduling; fat JAR deployment |
 | 3 | Price data provider: Finnhub | **Decided** | Free tier (60 req/min) more than sufficient; no licensing restrictions for multi-tenant display |
 | 4 | Bank/brokerage data ingestion: CSV + OFX file import | **Decided** | No Plaid — avoids cost, complexity, and production review process; OFX4J for standardized parsing; CSV with user-defined column mappings. Plaid can be revisited if the app scales beyond friends & family |
 | 5 | Primary keys: UUID | **Decided** | Prevents information leakage in URLs; simplifies data portability and future imports |
@@ -393,7 +393,7 @@ Use Flyway, applied automatically on application startup. Migration files live i
 ## Getting Started (Dev)
 
 ```bash
-# Prerequisites: Java 21+, Maven 3.9+, Node 20+, Docker
+# Prerequisites: Java 25, Maven 3.9+, Node 20+, Docker
 
 # Start Postgres
 docker compose up -d db
