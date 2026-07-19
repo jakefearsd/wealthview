@@ -6,7 +6,43 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-Nothing yet — next entry will be cut at the 1.0.0 tag.
+Nothing yet.
+
+## [1.2.1] — 2026-07-19
+
+Consolidates everything since v1.2.0. (Releases 1.1.0, 1.1.1, and 1.2.0 were
+tagged without changelog entries; their highlights live in the annotated tag
+messages.)
+
+### Platform
+- Migrated the backend to Java 25 / Spring Boot 4.1 / Jackson 3 / Hibernate 7.
+- Release tags are now fully integration-test-gated in CI: the tag pipeline runs
+  unit tests + quality gates, the full Testcontainers HTTP integration suite,
+  and the Docker image build as separate jobs.
+
+### Retirement projections
+- Projection accuracy audit v2 remediation: taxable-pool yield split by
+  allocation (bond interest taxed as ordinary income), scenario-level
+  investment fee drag, accumulation-phase cost-basis tracking, optimizer
+  gating on adaptive spending rules (default on), and joint-optimum arm
+  scoring.
+- Household/survivor modeling: two-person households with owner-aware account
+  pools in both engines, per-owner RMD streams, and an atomic first-death
+  transition (Social Security keep-larger, spousal rollover, basis step-up,
+  survivor spending factor, MFJ-to-single filing flip).
+- Stochastic mortality (opt-in): the Monte Carlo optimizer can sample each
+  spouse's death year from sex-specific SSA life tables, reporting lifetime
+  and longevity-conditional success probabilities plus death-age percentiles.
+- Scenario form: per-account allocation reset no longer echoes a removed
+  override as the "derived from holdings" mix.
+
+### Fixed
+- Unknown API paths now return the standard 404 NOT_FOUND envelope instead of
+  a 500 with an ERROR-level stack trace.
+
+### Database
+- Migrations through V080 (accounts.owner, income-source owner and survivor
+  percent, mortality_rates with SSA 2021 life-table seed).
 
 ## [1.0.0] — 2026-04
 
