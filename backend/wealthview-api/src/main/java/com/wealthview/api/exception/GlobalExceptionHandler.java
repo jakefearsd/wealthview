@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import com.wealthview.api.dto.ErrorResponse;
 import com.wealthview.core.exception.DuplicateEntityException;
@@ -91,6 +92,17 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleNotFound(
             EntityNotFoundException ex, HttpServletRequest request) {
         return respond(ex, request, HttpStatus.NOT_FOUND, "NOT_FOUND", "Entity not found", ex.getMessage());
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(
+            NoResourceFoundException ex, HttpServletRequest request) {
+        // A path with no controller mapping falls through to the static-resource handler; without
+        // this it lands in the 500 catch-all with an ERROR stack trace. The body message is fixed
+        // ("Resource not found") — the exception text talks about "static resources", which would
+        // mislead API callers.
+        return respond(ex, request, HttpStatus.NOT_FOUND, "NOT_FOUND", "No mapping for path",
+                ex.getMessage(), "Resource not found");
     }
 
     @ExceptionHandler(InvalidSessionException.class)

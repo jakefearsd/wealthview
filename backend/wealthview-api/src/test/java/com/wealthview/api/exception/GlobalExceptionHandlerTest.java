@@ -9,6 +9,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.mock.http.MockHttpInputMessage;
@@ -19,6 +20,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -216,6 +218,21 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.PAYLOAD_TOO_LARGE);
         assertThat(response.getBody().status()).isEqualTo(413);
         assertCounter("MaxUploadSizeExceededException", "413", 1);
+    }
+
+    @Test
+    void handleNoResourceFound_returns404AndRecordsMetric() {
+        // A request to a path with no mapping (e.g. a mistyped API URL) falls through to the
+        // static-resource handler and must surface as a clean 404, not the 500 catch-all.
+        var ex = new NoResourceFoundException(HttpMethod.GET, "api/v1/scenarios", null);
+
+        var response = handler.handleNoResourceFound(ex, request);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().status()).isEqualTo(404);
+        assertThat(response.getBody().error()).isEqualTo("NOT_FOUND");
+        assertThat(response.getBody().message()).isEqualTo("Resource not found");
+        assertCounter("NoResourceFoundException", "404", 1);
     }
 
     @Test
