@@ -597,6 +597,36 @@ describe('ScenarioForm', () => {
         expect(call.accounts[0].expected_return).toBe(0);
     });
 
+    describe('allocation derived summary', () => {
+        it('shows the derived mix in the summary for a non-override account', () => {
+            setupMocks();
+            const scenario = makeScenario({
+                allocation: { us_stock: 55, intl_stock: 25, bond: 15, cash: 5 },
+                allocation_is_override: false,
+            });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            expect(screen.getByText(/Derived from holdings/)).toBeInTheDocument();
+            expect(screen.getByText(/55\.0% US \/ 25\.0% Intl \/ 15\.0% Bond \/ 5\.0% Cash/)).toBeInTheDocument();
+        });
+
+        it('does not echo a former override as the derived mix after reset-to-derived', () => {
+            setupMocks();
+            const scenario = makeScenario({
+                allocation: { us_stock: 61, intl_stock: 19, bond: 12, cash: 8 },
+                allocation_is_override: true,
+            });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
+
+            fireEvent.click(screen.getByText(/reset to derived/i));
+
+            // The true holdings-derived mix is unknown until a projection run, so the summary
+            // must not present the just-removed override values as if they were derived.
+            expect(screen.getByText(/Derived from holdings/)).toBeInTheDocument();
+            expect(screen.queryByText(/61\.0% US/)).not.toBeInTheDocument();
+        });
+    });
+
     describe('household / survivor modeling', () => {
         it('hides household death-age, survivor, and community-property fields by default (no spouse)', () => {
             setupMocks();

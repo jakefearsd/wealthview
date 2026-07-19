@@ -202,11 +202,13 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
             owner: a.owner || 'primary',
         })) ?? [defaultAccount()]
     );
-    // Parallel-indexed with `accounts`: the effective (derived-or-override) mix the backend last
-    // reported per account, used to render the "Derived from holdings" summary and to seed the
-    // editor with a sensible starting point when the user opts into customizing.
+    // Parallel-indexed with `accounts`: the holdings-derived mix the backend last reported per
+    // account, used to render the "Derived from holdings" summary and to seed the editor with a
+    // sensible starting point when the user opts into customizing. When the response allocation
+    // is a user override, the true derived mix is unknown (it needs a projection run), so seed
+    // null rather than letting a later reset-to-derived echo the removed override as "derived".
     const [derivedAllocations, setDerivedAllocations] = useState<(AllocationInput | null)[]>(
-        initialValues?.accounts?.map(a => a.allocation ?? null) ?? [null]
+        initialValues?.accounts?.map(a => a.allocation_is_override ? null : (a.allocation ?? null)) ?? [null]
     );
     const [selectedIncomeSources, setSelectedIncomeSources] = useState<ScenarioIncomeSourceInput[]>(
         initialValues?.income_sources?.map(is => ({
