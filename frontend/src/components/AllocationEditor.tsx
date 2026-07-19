@@ -1,4 +1,5 @@
 import type { AllocationInput } from '../types/projection';
+import { allocationSum, isAllocationValid } from '../utils/allocation';
 import { labelStyle, inputFieldStyle } from '../utils/styles';
 
 interface AllocationEditorProps {
@@ -18,20 +19,6 @@ const FIELDS: { key: keyof AllocationInput; label: string }[] = [
     { key: 'bond', label: 'Bonds' },
     { key: 'cash', label: 'Cash' },
 ];
-
-const ALLOCATION_SUM_TOLERANCE = 0.01;
-const ALLOCATION_TARGET_SUM = 100;
-
-export function allocationSum(value: AllocationInput): number {
-    return value.us_stock + value.intl_stock + value.bond + value.cash;
-}
-
-export function isAllocationValid(value: AllocationInput | null): boolean {
-    if (value === null) {
-        return true;
-    }
-    return Math.abs(allocationSum(value) - ALLOCATION_TARGET_SUM) <= ALLOCATION_SUM_TOLERANCE;
-}
 
 const rowStyle: React.CSSProperties = {
     display: 'grid',

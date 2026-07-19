@@ -1,6 +1,6 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import AllocationEditor, { isAllocationValid } from './AllocationEditor';
+import AllocationEditor from './AllocationEditor';
 
 describe('AllocationEditor', () => {
     it('shows the running total and flags a non-100 sum', () => {
@@ -52,23 +52,5 @@ describe('AllocationEditor', () => {
         expect(container.querySelector('#allocation-us_stock')).toBeNull();
         // getByLabelText still resolves the label via the prefixed htmlFor/id pair.
         expect(screen.getByLabelText(/US Stocks/i)).toBe(container.querySelector('#acct-1-allocation-us_stock'));
-    });
-
-    describe('isAllocationValid', () => {
-        it('treats null as valid (derive from holdings)', () => {
-            expect(isAllocationValid(null)).toBe(true);
-        });
-
-        it('treats a sum of 100 as valid', () => {
-            expect(isAllocationValid({ us_stock: 60, intl_stock: 20, bond: 15, cash: 5 })).toBe(true);
-        });
-
-        it('treats a sum within 0.01 of 100 as valid', () => {
-            expect(isAllocationValid({ us_stock: 60.005, intl_stock: 20, bond: 15, cash: 5 })).toBe(true);
-        });
-
-        it('treats a sum far from 100 as invalid', () => {
-            expect(isAllocationValid({ us_stock: 60, intl_stock: 20, bond: 15, cash: 10 })).toBe(false);
-        });
     });
 });

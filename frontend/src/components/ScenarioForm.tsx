@@ -8,7 +8,8 @@ import CurrencyInput from './CurrencyInput';
 import FormField from './FormField';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
-import AllocationEditor, { isAllocationValid } from './AllocationEditor';
+import AllocationEditor from './AllocationEditor';
+import { isAllocationValid } from '../utils/allocation';
 import type { Account } from '../types/account';
 import type {
     Scenario,
