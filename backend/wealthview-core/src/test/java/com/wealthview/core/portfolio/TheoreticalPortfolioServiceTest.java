@@ -220,6 +220,32 @@ class TheoreticalPortfolioServiceTest {
     }
 
     @Test
+    void computeHistory_duplicateSymbolRows_mergesQuantitiesInsteadOfThrowing() {
+        // The DB has uq_holdings_account_symbol, so duplicates should be impossible —
+        // but a bad import or manual fix-up must degrade to a merged quantity, not a 500.
+        when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
+                .thenReturn(Optional.of(brokerageAccount));
+
+        var first = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("10"), BigDecimal.ZERO);
+        var second = new HoldingEntity(brokerageAccount, tenant, "AAPL",
+                new BigDecimal("5"), BigDecimal.ZERO);
+        when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
+                .thenReturn(List.of(first, second));
+
+        var friday = LocalDate.now().with(java.time.temporal.TemporalAdjusters.previous(DayOfWeek.FRIDAY));
+        when(priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
+                eq(List.of("AAPL")), any(LocalDate.class), any(LocalDate.class)))
+                .thenReturn(List.of(new PriceEntity("AAPL", friday, new BigDecimal("150.0000"), "seed")));
+
+        var result = service.computeHistory(tenantId, accountId, 12);
+
+        var lastPoint = result.dataPoints().get(result.dataPoints().size() - 1);
+        // 15 shares total x $150
+        assertThat(lastPoint.totalValue()).isEqualByComparingTo(new BigDecimal("2250"));
+    }
+
+    @Test
     void computeHistory_singleHoldingWithPrices_computesWeeklyValues() {
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(brokerageAccount));

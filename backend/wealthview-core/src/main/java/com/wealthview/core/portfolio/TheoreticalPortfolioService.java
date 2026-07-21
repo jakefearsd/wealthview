@@ -77,11 +77,11 @@ public class TheoreticalPortfolioService {
                 .distinct().sorted().toList();
 
         var moneyMarketTotal = moneyMarketHoldings.stream()
-                .map(h -> h.getQuantity().multiply(BigDecimal.ONE))
+                .map(HoldingEntity::getQuantity)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         var quantityBySymbol = holdings.stream()
-                .collect(Collectors.toMap(HoldingEntity::getSymbol, HoldingEntity::getQuantity));
+                .collect(Collectors.toMap(HoldingEntity::getSymbol, HoldingEntity::getQuantity, BigDecimal::add));
 
         var endDate = LocalDate.now();
         var startDate = endDate.minusMonths(clampedMonths);
