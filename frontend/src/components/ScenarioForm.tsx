@@ -3,12 +3,19 @@ import { useApiQuery } from '../hooks/useApiQuery';
 import { listAccounts } from '../api/accounts';
 import { listSpendingProfiles } from '../api/spendingProfiles';
 import { listIncomeSources } from '../api/incomeSources';
-import { formatCurrency, toPercent } from '../utils/format';
-import CurrencyInput from './CurrencyInput';
-import FormField from './FormField';
+import { toPercent } from '../utils/format';
 import WithdrawalStrategySection from './WithdrawalStrategySection';
 import RothConversionSection from './RothConversionSection';
-import AllocationEditor from './AllocationEditor';
+import ScenarioBasicsSection from './scenario/ScenarioBasicsSection';
+import ScenarioIncomeSourcesSection from './scenario/ScenarioIncomeSourcesSection';
+import ScenarioTaxSection from './scenario/ScenarioTaxSection';
+import ScenarioHouseholdSection from './scenario/ScenarioHouseholdSection';
+import ScenarioAccountsSection from './scenario/ScenarioAccountsSection';
+import {
+    DEFAULT_SURVIVOR_SPENDING_FACTOR,
+    DEFAULT_LONGEVITY_CONDITIONAL_AGE,
+    type ScenarioFormFields,
+} from './scenario/scenarioFormFields';
 import { isAllocationValid } from '../utils/allocation';
 import type { Account } from '../types/account';
 import type {
@@ -17,91 +24,16 @@ import type {
     ScenarioAccountInput,
     ScenarioIncomeSourceInput,
     AllocationInput,
-    Sex,
 } from '../types/projection';
-import { inputStyle } from '../utils/styles';
 import Button from './Button';
 
 /** Neutral starting point when a user opts into a custom allocation with no prior mix to seed from. */
 const DEFAULT_ALL_US_ALLOCATION: AllocationInput = { us_stock: 100, intl_stock: 0, bond: 0, cash: 0 };
 
-function formatAllocationSummary(a: AllocationInput): string {
-    return `${a.us_stock.toFixed(1)}% US / ${a.intl_stock.toFixed(1)}% Intl / ${a.bond.toFixed(1)}% Bond / ${a.cash.toFixed(1)}% Cash`;
-}
-
-const ACCOUNT_TYPE_HELP: Record<string, string> = {
-    taxable: 'Regular brokerage account. After-tax contributions, growth taxed as capital gains.',
-    traditional: 'Pre-tax contributions reduce taxable income now. Withdrawals in retirement taxed as ordinary income.',
-    roth: 'After-tax contributions. Growth and qualified withdrawals in retirement are completely tax-free.',
-};
-
-const MIN_DEATH_AGE = 50;
-const MAX_DEATH_AGE = 120;
-const DEFAULT_SURVIVOR_SPENDING_FACTOR = 75;
-/** Sub-project B (stochastic mortality): mirrors ScenarioCrudService.MIN/MAX_LONGEVITY_CONDITIONAL_AGE. */
-const MIN_LONGEVITY_CONDITIONAL_AGE = 80;
-const MAX_LONGEVITY_CONDITIONAL_AGE = 110;
-const DEFAULT_LONGEVITY_CONDITIONAL_AGE = 95;
-
-/**
- * Client-side, DISPLAY-ONLY mirror of the backend's SSA 2021 period-life-table planning defaults
- * (com.wealthview.core.projection.household.LifeExpectancy#cohortDeathAge). Used only to render a
- * placeholder hint on the death-age inputs before first save — the server does not echo resolved
- * defaults in params_json until a death age is actually set. Keep in sync manually if the backend
- * cohort table changes.
- */
-function ssaDefaultDeathAge(birthYear: number): number {
-    if (birthYear <= 1940) return 84;
-    if (birthYear <= 1950) return 85;
-    if (birthYear <= 1960) return 86;
-    if (birthYear <= 1970) return 87;
-    if (birthYear <= 1980) return 88;
-    if (birthYear <= 1990) return 89;
-    return 90;
-}
-
 interface ScenarioFormProps {
     initialValues?: Scenario | null;
     onSubmit: (data: CreateScenarioRequest) => Promise<void>;
     submitLabel: string;
-}
-
-interface ScenarioFormFields {
-    name: string;
-    retirementDate: string;
-    endAge: number;
-    inflationRate: number;
-    birthYear: number;
-    withdrawalRate: number;
-    withdrawalStrategy: string;
-    dynamicCeiling: number;
-    dynamicFloor: number;
-    filingStatus: string;
-    otherIncome: number;
-    annualRothConversion: number;
-    rothConversionStrategy: string;
-    targetBracketRate: number;
-    rothConversionStartYear: number | null;
-    withdrawalOrder: string;
-    dynamicSequencingBracketRate: number;
-    state: string;
-    primaryResidencePropertyTax: number;
-    primaryResidenceMortgageInterest: number;
-    dividendYield: number | null;
-    feeRate: number | null;
-    interestYield: number | null;
-    includeDepressionYears: boolean;
-    spendingPlanSelection: string;
-    spouseBirthYear: number | null;
-    primaryDeathAge: number | null;
-    spouseDeathAge: number | null;
-    survivorSpendingFactor: number;
-    communityProperty: boolean;
-    /** Sub-project B (stochastic mortality): opts the guardrail Monte Carlo optimizer into sampled death ages. */
-    stochasticMortality: boolean;
-    primarySex: Sex | null;
-    spouseSex: Sex | null;
-    longevityConditionalAge: number;
 }
 
 function defaultAccount(): ScenarioAccountInput {
@@ -376,147 +308,18 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
 
     return (
         <div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <FormField label="Name">
-                    <input style={inputStyle} value={name} onChange={e => setField('name', e.target.value)} placeholder="Retirement Plan" />
-                </FormField>
-                <FormField label="Retirement Date">
-                    <input style={inputStyle} type="date" value={retirementDate} onChange={e => setField('retirementDate', e.target.value)} />
-                </FormField>
-                <FormField label="Birth Year" helpText="Used to calculate your age at each projection year.">
-                    <input style={inputStyle} type="number" value={birthYear} onChange={e => setField('birthYear', Number(e.target.value))} />
-                </FormField>
-                <FormField label="End Age" helpText="Age at which the projection ends. Plan beyond your expected lifespan for safety.">
-                    <input style={inputStyle} type="number" value={endAge} onChange={e => setField('endAge', Number(e.target.value))} />
-                </FormField>
-                <FormField label="Inflation Rate (%)" helpText="Annual rate of price increases. 3 = 3%, the historical U.S. average.">
-                    <input style={inputStyle} type="number" step="0.1" value={inflationRate || ''} onChange={e => setField('inflationRate', Number(e.target.value))} />
-                </FormField>
-                <FormField label="Withdrawal Rate (%)" helpText="Percentage of portfolio to withdraw annually in retirement. 4 = 4%.">
-                    <input style={inputStyle} type="number" step="0.1" value={withdrawalRate || ''} onChange={e => setField('withdrawalRate', Number(e.target.value))} />
-                </FormField>
-                <FormField label="Dividend Yield (%)" helpText="Annual qualified-dividend drag on taxable accounts (default 1.8%)">
-                    <input
-                        style={inputStyle}
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        value={dividendYield ?? ''}
-                        onChange={e => setField('dividendYield', e.target.value === '' ? null : Number(e.target.value))}
-                    />
-                </FormField>
-                <FormField
-                    label="Bond Interest Yield (%)"
-                    helpText="Nominal coupon assumption for the bond portion of taxable accounts — taxed annually as ordinary income (bonds are tax-inefficient). Only affects accounts with a bond allocation."
-                >
-                    <input
-                        style={inputStyle}
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        max="10"
-                        value={interestYield ?? ''}
-                        onChange={e => setField('interestYield', e.target.value === '' ? null : Number(e.target.value))}
-                    />
-                </FormField>
-                <FormField
-                    label="Investment Fees (%)"
-                    helpText="Annual all-in cost (expense ratios + advisory) subtracted from returns (default 0.25%)"
-                >
-                    <input
-                        style={inputStyle}
-                        type="number"
-                        step="0.05"
-                        min="0"
-                        max="3"
-                        value={feeRate ?? ''}
-                        onChange={e => setField('feeRate', e.target.value === '' ? null : Number(e.target.value))}
-                    />
-                </FormField>
-                <FormField
-                    label="Include 1928–1971 market history"
-                    helpText="Widens the simulated return sample to include the Great Depression and postwar era. Slightly higher average equity returns, materially fatter tails."
-                >
-                    <input
-                        type="checkbox"
-                        checked={includeDepressionYears}
-                        onChange={e => setField('includeDepressionYears', e.target.checked)}
-                    />
-                </FormField>
-                <FormField
-                    label="Spending Plan"
-                    helpText="Choose a spending profile (user-defined tiers) or guardrail profile (Monte Carlo optimized). When linked, the projection withdraws what you need each year, minus non-portfolio income."
-                >
-                    <select style={inputStyle} value={spendingPlanSelection} onChange={e => setField('spendingPlanSelection', e.target.value)}>
-                        <option value="">None (use withdrawal rate)</option>
-                        {profiles?.map(p => (
-                            <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                        {initialValues?.guardrail_profile && (
-                            <option value="guardrail">
-                                &#9881; {initialValues.guardrail_profile.name}{initialValues.guardrail_profile.stale ? ' (stale)' : ''}{!initialValues.guardrail_profile.active ? ' (inactive)' : ''}
-                            </option>
-                        )}
-                    </select>
-                    {spendingPlanSelection === 'guardrail' && !initialValues?.guardrail_profile && (
-                        <div style={{ fontSize: '0.8rem', color: '#e65100', marginTop: '0.25rem' }}>
-                            Guardrail profile no longer available. Please select another spending plan.
-                        </div>
-                    )}
-                </FormField>
-            </div>
+            <ScenarioBasicsSection
+                fields={fields}
+                setField={setField}
+                profiles={profiles}
+                guardrailProfile={initialValues?.guardrail_profile ?? null}
+            />
 
-            {availableIncomeSources && availableIncomeSources.length > 0 && (
-                <div style={{ marginBottom: '1rem' }}>
-                    <h4 style={{ marginBottom: '0.5rem' }}>Income Sources</h4>
-                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.75rem' }}>
-                        Select income sources (Social Security, pensions, rental income, etc.) to include in this projection. You can optionally override the annual amount per scenario.
-                    </div>
-                    {availableIncomeSources.map(is => {
-                        const selected = selectedIncomeSources.find(s => s.income_source_id === is.id);
-                        return (
-                            <div key={is.id} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '0.75rem', marginBottom: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={!!selected}
-                                        onChange={e => {
-                                            if (e.target.checked) {
-                                                setSelectedIncomeSources(prev => [...prev, { income_source_id: is.id, override_annual_amount: null }]);
-                                            } else {
-                                                setSelectedIncomeSources(prev => prev.filter(s => s.income_source_id !== is.id));
-                                            }
-                                        }}
-                                    />
-                                    <div style={{ flex: 1 }}>
-                                        <strong>{is.name}</strong>
-                                        <span style={{ color: '#666', marginLeft: '0.5rem', fontSize: '0.85rem' }}>
-                                            ({is.income_type.replace(/_/g, ' ')}) — {formatCurrency(is.annual_amount)}/yr
-                                        </span>
-                                    </div>
-                                    {selected && (
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <label style={{ fontSize: '0.85rem', color: '#666' }}>Override:</label>
-                                            <CurrencyInput
-                                                style={{ ...inputStyle, width: '140px' }}
-                                                placeholder="Use default"
-                                                value={selected.override_annual_amount != null ? selected.override_annual_amount : ''}
-                                                onChange={v => {
-                                                    const val = v ? Number(v) || null : null;
-                                                    setSelectedIncomeSources(prev => prev.map(s =>
-                                                        s.income_source_id === is.id ? { ...s, override_annual_amount: val } : s
-                                                    ));
-                                                }}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
+            <ScenarioIncomeSourcesSection
+                availableIncomeSources={availableIncomeSources}
+                selectedIncomeSources={selectedIncomeSources}
+                onSelectedIncomeSourcesChange={setSelectedIncomeSources}
+            />
 
             <WithdrawalStrategySection
                 withdrawalStrategy={withdrawalStrategy}
@@ -546,307 +349,25 @@ export default function ScenarioForm({ initialValues, onSubmit, submitLabel }: S
                 onOtherIncomeChange={v => setField('otherIncome', v)}
             />
 
-            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
-                <h4 style={{ marginBottom: '0.75rem' }}>Tax Configuration</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                    <FormField label="State" helpText="State income tax applied to projections. Enables SALT deduction and itemized vs standard deduction comparison.">
-                        <select style={inputStyle} value={state} onChange={e => setField('state', e.target.value)}>
-                            <option value="">None (federal only)</option>
-                            <option value="AZ">AZ - Arizona</option>
-                            <option value="CA">CA - California</option>
-                            <option value="NV">NV - Nevada (no income tax)</option>
-                            <option value="OR">OR - Oregon</option>
-                            <option value="WA">WA - Washington (no income tax)</option>
-                        </select>
-                    </FormField>
-                    {state && (
-                        <>
-                            <FormField label="Primary Residence Property Tax" helpText="Annual property tax on your primary residence. Feeds SALT deduction (capped at $10K with state income tax).">
-                                <CurrencyInput
-                                    style={inputStyle}
-                                    value={primaryResidencePropertyTax || ''}
-                                    onChange={v => setField('primaryResidencePropertyTax', Number(v) || 0)}
-                                />
-                            </FormField>
-                            <FormField label="Primary Residence Mortgage Interest" helpText="Annual mortgage interest on your primary residence. Added to SALT for itemized deduction comparison.">
-                                <CurrencyInput
-                                    style={inputStyle}
-                                    value={primaryResidenceMortgageInterest || ''}
-                                    onChange={v => setField('primaryResidenceMortgageInterest', Number(v) || 0)}
-                                />
-                            </FormField>
-                        </>
-                    )}
-                </div>
-            </div>
+            <ScenarioTaxSection fields={fields} setField={setField} />
 
-            <div style={{ background: '#fff', padding: '1.5rem', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', marginBottom: '1rem' }}>
-                <h4 style={{ marginBottom: '0.75rem' }}>Spouse / Household</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-                    <FormField label="Spouse Birth Year" helpText="Leave blank for a single-person household. Set to model a spouse, survivor transitions, and joint accounts.">
-                        <input
-                            style={inputStyle}
-                            type="number"
-                            value={spouseBirthYear ?? ''}
-                            onChange={e => handleSpouseBirthYearChange(e.target.value)}
-                        />
-                    </FormField>
-                    {household && (
-                        <>
-                            <FormField
-                                label="Primary Death Age"
-                                helpText="Assumed planning age at which the primary passes away (50-120). Blank uses the SSA planning default."
-                            >
-                                <input
-                                    style={inputStyle}
-                                    type="number"
-                                    min={MIN_DEATH_AGE}
-                                    max={MAX_DEATH_AGE}
-                                    placeholder={`SSA default (~${ssaDefaultDeathAge(birthYear)})`}
-                                    value={primaryDeathAge ?? ''}
-                                    onChange={e => setField('primaryDeathAge', e.target.value === '' ? null : Number(e.target.value))}
-                                />
-                            </FormField>
-                            <FormField
-                                label="Spouse Death Age"
-                                helpText="Assumed planning age at which the spouse passes away (50-120). Blank uses the SSA planning default."
-                            >
-                                <input
-                                    style={inputStyle}
-                                    type="number"
-                                    min={MIN_DEATH_AGE}
-                                    max={MAX_DEATH_AGE}
-                                    placeholder={`SSA default (~${ssaDefaultDeathAge(spouseBirthYear)})`}
-                                    value={spouseDeathAge ?? ''}
-                                    onChange={e => setField('spouseDeathAge', e.target.value === '' ? null : Number(e.target.value))}
-                                />
-                            </FormField>
-                            <FormField
-                                label="Survivor Spending Factor (%)"
-                                helpText="Share of pre-transition spending the survivor keeps from the first death forward (50-100%, default 75%)."
-                            >
-                                <input
-                                    style={inputStyle}
-                                    type="number"
-                                    step="1"
-                                    min="50"
-                                    max="100"
-                                    value={survivorSpendingFactor}
-                                    onChange={e => setField('survivorSpendingFactor', Number(e.target.value))}
-                                />
-                            </FormField>
-                            <FormField
-                                label="Community Property State"
-                                helpText="Steps up 100% of embedded gain on joint taxable accounts at first death, instead of the common-law 50%."
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={communityProperty}
-                                    onChange={e => setField('communityProperty', e.target.checked)}
-                                />
-                            </FormField>
-                            <FormField
-                                label="Model Uncertain Lifespans"
-                                helpText="Samples each spouse's death year per Monte Carlo trial from an SSA mortality table, instead of the fixed death ages above, for a longevity-aware guardrail success rate. Only affects the guardrail optimizer's Monte Carlo results, not the deterministic projection or its recommendation."
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={stochasticMortality}
-                                    onChange={e => setField('stochasticMortality', e.target.checked)}
-                                />
-                            </FormField>
-                            {stochasticMortality && (
-                                <>
-                                    <FormField
-                                        label="Primary Sex"
-                                        helpText="Selects the sex-specific column of the mortality table. Leave unset to use a blended (both-sex) table."
-                                    >
-                                        <select
-                                            style={inputStyle}
-                                            value={primarySex ?? ''}
-                                            onChange={e => setField('primarySex', e.target.value === '' ? null : e.target.value as Sex)}
-                                        >
-                                            <option value="">Blended (unset)</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                        </select>
-                                    </FormField>
-                                    <FormField
-                                        label="Spouse Sex"
-                                        helpText="Selects the sex-specific column of the mortality table. Leave unset to use a blended (both-sex) table."
-                                    >
-                                        <select
-                                            style={inputStyle}
-                                            value={spouseSex ?? ''}
-                                            onChange={e => setField('spouseSex', e.target.value === '' ? null : e.target.value as Sex)}
-                                        >
-                                            <option value="">Blended (unset)</option>
-                                            <option value="male">Male</option>
-                                            <option value="female">Female</option>
-                                        </select>
-                                    </FormField>
-                                    <FormField
-                                        label="Longevity Age"
-                                        helpText="Age threshold (80-110) for the 'the survivor lives to this age' success metric shown beside lifetime success (default 95)."
-                                    >
-                                        <input
-                                            style={inputStyle}
-                                            type="number"
-                                            min={MIN_LONGEVITY_CONDITIONAL_AGE}
-                                            max={MAX_LONGEVITY_CONDITIONAL_AGE}
-                                            value={longevityConditionalAge}
-                                            onChange={e => setField('longevityConditionalAge', Number(e.target.value))}
-                                        />
-                                    </FormField>
-                                </>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
+            <ScenarioHouseholdSection
+                fields={fields}
+                setField={setField}
+                onSpouseBirthYearChange={handleSpouseBirthYearChange}
+            />
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                <h4>Accounts</h4>
-                <button
-                    onClick={addAccount}
-                    style={{ padding: '0.25rem 0.75rem', background: '#4caf50', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                    + Add Account
-                </button>
-            </div>
-            <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.75rem' }}>
-                Each account represents a pool of investments with its own tax treatment, growth rate, and contribution schedule.
-                {' '}Note: comparing Roth vs. Traditional contributions here doesn&apos;t model the pre-tax wage deduction a
-                Traditional contribution provides today — only each account&apos;s own growth and withdrawal taxation.
-            </div>
-            {accounts.map((acct, idx) => (
-                <div key={idx} style={{ border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1rem', marginBottom: '0.75rem' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '1rem', marginBottom: '0.75rem', alignItems: 'end' }}>
-                        <FormField
-                            label="Link Existing Account"
-                            helpText={acct.linked_account_id
-                                ? 'Balance updates automatically each time the projection runs.'
-                                : 'Enter values manually, or select an existing account above.'}
-                        >
-                            <select
-                                style={inputStyle}
-                                value={acct.linked_account_id ?? ''}
-                                onChange={e => linkAccount(idx, e.target.value)}
-                            >
-                                <option value="">Manual Entry</option>
-                                {existingAccounts.map(a => (
-                                    <option key={a.id} value={a.id}>
-                                        {a.name} ({a.institution ?? a.type}) — {formatCurrency(a.balance)}
-                                    </option>
-                                ))}
-                            </select>
-                        </FormField>
-                        <div>
-                            {accounts.length > 1 && (
-                                <Button
-                                    onClick={() => removeAccount(idx)}
-                                    variant="danger"
-                                    size="sm"
-                                    style={{ background: 'none', border: '1px solid #d32f2f', color: '#d32f2f' }}
-                                >
-                                    Remove
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: household ? '1fr 1fr 1fr 1fr 1fr' : '1fr 1fr 1fr 1fr', gap: '1rem', alignItems: 'start' }}>
-                        <FormField label="Account Type" helpText={ACCOUNT_TYPE_HELP[acct.account_type || 'taxable']}>
-                            <select style={inputStyle} value={acct.account_type || 'taxable'} onChange={e => updateAccount(idx, 'account_type', e.target.value)}>
-                                <option value="taxable">Taxable</option>
-                                <option value="traditional">Traditional (Pre-tax)</option>
-                                <option value="roth">Roth</option>
-                            </select>
-                        </FormField>
-                        {household && (
-                            <FormField label="Owner" helpText="Whose account this is. Joint ownership is only available for taxable accounts.">
-                                <select style={inputStyle} value={acct.owner || 'primary'} onChange={e => updateAccount(idx, 'owner', e.target.value)}>
-                                    <option value="primary">Primary</option>
-                                    <option value="spouse">Spouse</option>
-                                    <option
-                                        value="joint"
-                                        disabled={(acct.account_type || 'taxable') !== 'taxable'}
-                                        title={(acct.account_type || 'taxable') !== 'taxable' ? 'Joint ownership is only available for taxable accounts.' : undefined}
-                                    >
-                                        Joint
-                                    </option>
-                                </select>
-                            </FormField>
-                        )}
-                        <FormField label={`Initial Balance${acct.linked_account_id ? ' (live)' : ''}`}>
-                            <CurrencyInput
-                                style={{ ...inputStyle, ...(acct.linked_account_id ? { background: '#f5f5f5' } : {}) }}
-                                value={acct.initial_balance || ''}
-                                onChange={v => updateAccount(idx, 'initial_balance', Number(v) || 0)}
-                                readOnly={!!acct.linked_account_id}
-                            />
-                        </FormField>
-                        <FormField label="Annual Contribution">
-                            <CurrencyInput style={inputStyle} value={acct.annual_contribution || ''} onChange={v => updateAccount(idx, 'annual_contribution', Number(v) || 0)} />
-                        </FormField>
-                        <FormField label="Override Return (%)" helpText="Blank uses the allocation-derived return.">
-                            <input
-                                style={inputStyle}
-                                type="number"
-                                step="0.1"
-                                value={acct.expected_return ?? ''}
-                                onChange={e => updateAccount(idx, 'expected_return', e.target.value === '' ? null : Number(e.target.value))}
-                            />
-                        </FormField>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 3fr', gap: '1rem', marginTop: '0.75rem', alignItems: 'start' }}>
-                        <FormField
-                            label="Cost Basis"
-                            helpText={acct.linked_account_id
-                                ? 'Derived from the linked account\'s holdings.'
-                                : 'Total dollars invested, used for capital-gains tax calculations.'}
-                        >
-                            {!acct.linked_account_id ? (
-                                <CurrencyInput
-                                    style={inputStyle}
-                                    value={acct.cost_basis ?? ''}
-                                    onChange={v => updateAccount(idx, 'cost_basis', v ? Number(v) : null)}
-                                />
-                            ) : (
-                                <div style={{ ...inputStyle, background: '#f5f5f5' }}>
-                                    {acct.cost_basis != null ? formatCurrency(acct.cost_basis) : 'Available after first run'}
-                                </div>
-                            )}
-                        </FormField>
-                        <FormField
-                            label="Allocation"
-                            helpText="US/Intl stocks, bonds, and cash drive the account's projected return. Leave derived to use the linked holdings' actual mix."
-                        >
-                            {acct.allocation == null ? (
-                                <div>
-                                    <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '0.4rem' }}>
-                                        Derived from holdings
-                                        {derivedAllocations[idx] && ` (${formatAllocationSummary(derivedAllocations[idx] as AllocationInput)})`}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => customizeAllocation(idx)}
-                                        style={{ padding: '0.25rem 0.6rem', background: 'none', border: '1px solid #1976d2', color: '#1976d2', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                                    >
-                                        Customize allocation
-                                    </button>
-                                </div>
-                            ) : (
-                                <AllocationEditor
-                                    idPrefix={`acct-${idx}-`}
-                                    value={acct.allocation}
-                                    onChange={a => updateAccount(idx, 'allocation', a)}
-                                    onReset={() => updateAccount(idx, 'allocation', null)}
-                                />
-                            )}
-                        </FormField>
-                    </div>
-                </div>
-            ))}
+            <ScenarioAccountsSection
+                accounts={accounts}
+                derivedAllocations={derivedAllocations}
+                existingAccounts={existingAccounts}
+                household={household}
+                onAddAccount={addAccount}
+                onLinkAccount={linkAccount}
+                onRemoveAccount={removeAccount}
+                onUpdateAccount={updateAccount}
+                onCustomizeAllocation={customizeAllocation}
+            />
 
             <Button
                 onClick={handleSubmit}
