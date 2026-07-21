@@ -26,12 +26,18 @@ class TrialSimulatorHouseholdTest {
             double[] conv, double[] convTax, int retirementAge, int cashReserveYears,
             double[] taxRet, double[] tradRet, double[] rothRet, int rmdStartAge,
             double initTaxableBasis, LtcgTaxTable[] ltcg, TrialSimulator.HouseholdSim household) {
-        return new TrialSimulator.SimulationConfig(
-                initTaxable, initTraditional, initRoth, order,
-                tables, base, conv, convTax, retirementAge, null,
-                cashReserveYears, 0.0, true,
-                taxRet, tradRet, rothRet, rmdStartAge,
-                initTaxableBasis, ltcg, 0.0, null, null, 0.0, 1.0, household);
+        return TrialSimulator.SimulationConfig.builder(initTaxable, initTraditional, initRoth, order)
+                .taxTables(tables, base)
+                .conversions(conv, convTax)
+                .retirementAge(retirementAge)
+                .cashReserve(cashReserveYears, 0.0)
+                .trackYearBalances(true)
+                .returns(taxRet, tradRet, rothRet)
+                .rmdStartAge(rmdStartAge)
+                .taxableBasis(initTaxableBasis)
+                .ltcgTaxTableByYear(ltcg)
+                .household(household)
+                .build();
     }
 
     /** Two real brackets, no deduction beyond the $10k standard: [0,100k) @10%, [100k,inf) @30%. */
@@ -257,14 +263,17 @@ class TrialSimulatorHouseholdTest {
     @Test
     void simulateTrial_nullHousehold_matchesPreHouseholdThreePoolRunExactly() {
         double[] r = {0.10};
-        var preHousehold = new TrialSimulator.SimulationConfig(
-                100.0, 200.0, 50.0, "taxable_first", null, null, null, null, 62, null,
-                0, 0.0, false, r, new double[]{0.02}, new double[]{0.08}, Integer.MAX_VALUE,
-                100.0, null, 0.0);
-        var canonicalNull = new TrialSimulator.SimulationConfig(
-                100.0, 200.0, 50.0, "taxable_first", null, null, null, null, 62, null,
-                0, 0.0, false, r, new double[]{0.02}, new double[]{0.08}, Integer.MAX_VALUE,
-                100.0, null, 0.0, null, null, 0.0, 1.0, null);
+        var preHousehold = TrialSimulator.SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
+                .retirementAge(62)
+                .returns(r, new double[]{0.02}, new double[]{0.08})
+                .taxableBasis(100.0)
+                .build();
+        var canonicalNull = TrialSimulator.SimulationConfig.builder(100.0, 200.0, 50.0, "taxable_first")
+                .retirementAge(62)
+                .returns(r, new double[]{0.02}, new double[]{0.08})
+                .taxableBasis(100.0)
+                .household(null)
+                .build();
 
         var a = simulator.simulateTrial(new double[]{0}, new double[]{0},
                 new double[]{0}, new double[]{0}, 1, preHousehold);

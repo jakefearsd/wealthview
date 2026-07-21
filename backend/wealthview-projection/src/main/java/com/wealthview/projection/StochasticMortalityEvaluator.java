@@ -73,15 +73,24 @@ final class StochasticMortalityEvaluator {
         for (int t = 0; t < trialCount; t++) {
             TrialSimulator.HouseholdSim household = baseHousehold.withTrialMortality(
                     draws.transitionIdx()[t], draws.survivorIsPrimary()[t], draws.truncateIdx()[t]);
-            var config = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order,
-                    ordinaryTables, ordinaryBase, conversionByYear, conversionTaxByYear,
-                    sim.retirementAge(), arrays.jointDsCeiling(),
-                    portfolio.cashReserveYears(), portfolio.cashReturnRate(), false,
-                    sim.taxableReturns()[t], sim.traditionalReturns()[t], sim.rothReturns()[t],
-                    sim.rmdStartAge(), portfolio.initTaxableBasis(), ltcgTables, sim.dividendYield(),
-                    null, rental, sim.interestYield(), sim.taxableEquityShare(), household,
-                    arrays.survivorRegimes(), sim.survivorSpendingFactor());
+            var config = TrialSimulator.SimulationConfig
+                    .builder(initTaxable, initTraditional, initRoth, order)
+                    .taxTables(ordinaryTables, ordinaryBase)
+                    .conversions(conversionByYear, conversionTaxByYear)
+                    .retirementAge(sim.retirementAge())
+                    .rmdStartAge(sim.rmdStartAge())
+                    .dsBracketCeilingByYear(arrays.jointDsCeiling())
+                    .cashReserve(portfolio.cashReserveYears(), portfolio.cashReturnRate())
+                    .returns(sim.taxableReturns()[t], sim.traditionalReturns()[t], sim.rothReturns()[t])
+                    .taxableBasis(portfolio.initTaxableBasis())
+                    .ltcgTaxTableByYear(ltcgTables)
+                    .dividendYield(sim.dividendYield())
+                    .rentalIncomeByYear(rental)
+                    .interestYield(sim.interestYield())
+                    .taxableEquityShare(sim.taxableEquityShare())
+                    .household(household)
+                    .survivorRegimes(arrays.survivorRegimes(), sim.survivorSpendingFactor())
+                    .build();
             var result = trialSimulator.simulateTrial(arrays.jointIncome(), arrays.jointSurplusTax(),
                     arrays.jointFloors(), jointDiscretionary, years, config);
             success[t] = result.success();

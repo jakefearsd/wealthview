@@ -408,16 +408,25 @@ final class SustainabilitySearch {
             // Pool case: fixed starting balances from the tax context. Non-pool case: the whole
             // portfolio sits in the taxable pool, starting balance varies per trial via paths[t][0].
             double initTaxable = hasPools ? taxCtx.initTaxable() : paths[t][0];
-            var trialConfig = new TrialSimulator.SimulationConfig(
-                    initTaxable, initTraditional, initRoth, order,
-                    ordinaryTaxTables, ordinaryBaseIncomeByYear,
-                    ctx.conversionByYear(), ctx.conversionTaxByYear(), ctx.retirementAge(),
-                    ctx.dsBracketCeilingByYear(), ctx.cashReserveYears(), ctx.cashReturnRate(),
-                    trackYearBalances,
-                    ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t],
-                    ctx.rmdStartAge(),
-                    ctx.initTaxableBasis(), ctx.ltcgTaxTableByYear(), ctx.dividendYield(), adaptation,
-                    rentalIncomeByYear, ctx.interestYield(), ctx.taxableEquityShare(), ctx.household());
+            var trialConfig = TrialSimulator.SimulationConfig
+                    .builder(initTaxable, initTraditional, initRoth, order)
+                    .taxTables(ordinaryTaxTables, ordinaryBaseIncomeByYear)
+                    .conversions(ctx.conversionByYear(), ctx.conversionTaxByYear())
+                    .retirementAge(ctx.retirementAge())
+                    .rmdStartAge(ctx.rmdStartAge())
+                    .dsBracketCeilingByYear(ctx.dsBracketCeilingByYear())
+                    .cashReserve(ctx.cashReserveYears(), ctx.cashReturnRate())
+                    .trackYearBalances(trackYearBalances)
+                    .returns(ctx.taxableReturns()[t], ctx.traditionalReturns()[t], ctx.rothReturns()[t])
+                    .taxableBasis(ctx.initTaxableBasis())
+                    .ltcgTaxTableByYear(ctx.ltcgTaxTableByYear())
+                    .dividendYield(ctx.dividendYield())
+                    .adaptation(adaptation)
+                    .rentalIncomeByYear(rentalIncomeByYear)
+                    .interestYield(ctx.interestYield())
+                    .taxableEquityShare(ctx.taxableEquityShare())
+                    .household(ctx.household())
+                    .build();
 
             var result = trialSimulator.simulateTrial(ctx.income(), ctx.surplusTax(),
                     floors, discretionary, years, trialConfig);

@@ -598,10 +598,11 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         assertThat(yearOf(det.yearlyData(), 2044).withdrawals()).isEqualByComparingTo(bd("15000"));
 
         var simulator = new TrialSimulator();
-        var config = new TrialSimulator.SimulationConfig(
-                3_000_000.0, 0.0, 0.0, "taxable_first", null, null, null, null, 78, null,
-                0, 0.0, false, new double[]{0.0}, new double[]{0.0}, new double[]{0.0},
-                Integer.MAX_VALUE, 3_000_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(3_000_000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(78)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(3_000_000.0)
+                .build();
         var trial = simulator.simulateTrial(new double[]{30_000.0}, new double[]{0.0},
                 new double[]{45_000.0}, new double[]{0.0}, 1, config);
         assertThat(trial.finalBalance()).isEqualTo(3_000_000.0 - 15_000.0, within(1e-6));

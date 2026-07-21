@@ -211,185 +211,173 @@ final class TrialSimulator {
             double survivorFactor
     ) {
         /**
-         * Back-compat constructor (stochastic-mortality task 6): the fixed-death / single-person call
-         * sites (the whole pre-stochastic engine) build a config with no per-trial survivor regimes.
-         * Defaulting {@code survivorRegimes} to {@code null} and {@code survivorFactor} to {@code 1.0}
-         * keeps {@link #simulateTrial} on the byte-identical no-splice path for all of them.
+         * Entry point for building a config fluently. The four arguments are the pool base every
+         * simulation needs; every other knob defaults to its documented byte-identical no-op value
+         * (see {@link Builder}) so a builder chain only names the mechanisms a run actually uses.
+         * Replaces the former telescoping back-compat constructors, which grew by one ~25-parameter
+         * overload per feature.
          */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-stochastic,
-        // household-aware shape) so existing positional call sites keep compiling and behaving
-        // identically.
-        @SuppressWarnings("PMD.ExcessiveParameterList")
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-                GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
-                double interestYield, double taxableEquityShare,
-                @Nullable HouseholdSim household) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
-                    interestYield, taxableEquityShare, household, null, 1.0);
+        static Builder builder(double initTaxable, double initTraditional, double initRoth,
+                               String withdrawalOrder) {
+            return new Builder(initTaxable, initTraditional, initRoth, withdrawalOrder);
         }
 
         /**
-         * Back-compat constructor (household task 6): every pre-household call site builds a
-         * single-person config with no {@link HouseholdSim}. Defaulting {@code household} to
-         * {@code null} keeps {@link #simulateTrial} on the byte-identical 3-pool path for all of them.
+         * Fluent builder. Defaults are the no-op anchors the old back-compat constructor chain
+         * documented per feature: null tax/conversion/rental arrays (mechanism inactive), no cash
+         * reserve, no tracking, {@code rmdStartAge = Integer.MAX_VALUE} (no RMDs), zero dividend
+         * and interest yield, {@code taxableEquityShare = 1.0} (pre-C1 all-equity path), no
+         * household, no survivor regimes, {@code survivorFactor = 1.0}.
          */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-household shape)
-        // so existing positional call sites keep compiling and behaving identically.
-        @SuppressWarnings("PMD.ExcessiveParameterList")
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-                GuardrailAdaptation adaptation, double[] rentalIncomeByYear,
-                double interestYield, double taxableEquityShare) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
-                    interestYield, taxableEquityShare, null);
-        }
+        // TooManyFields: one field per SimulationConfig component is the nature of a builder
+        // for a 27-component record; splitting the builder would defeat its purpose.
+        // ArrayIsStoredDirectly: the per-year arrays are engine-internal schedules shared
+        // by design across trials (same contract as the record components they feed, which
+        // store them directly too); a defensive copy per trial in the MC hot path would be
+        // pure waste.
+        // UseVarargs: every array parameter is a per-year indexed schedule, not a variable
+        // argument list — varargs would change the call contract and invite accidental misuse.
+        @SuppressWarnings({"PMD.TooManyFields", "PMD.ArrayIsStoredDirectly", "PMD.UseVarargs"})
+        static final class Builder {
+            private final double initTaxable;
+            private final double initTraditional;
+            private final double initRoth;
+            private final String withdrawalOrder;
+            private OrdinaryTaxTable[] ordinaryTaxTableByYear;
+            private double[] ordinaryBaseIncomeByYear;
+            private double[] conversionByYear;
+            private double[] conversionTaxByYear;
+            private int retirementAge;
+            private double[] dsBracketCeilingByYear;
+            private int cashReserveYears;
+            private double cashReturnRate;
+            private boolean trackYearBalances;
+            private double[] taxableReturns;
+            private double[] traditionalReturns;
+            private double[] rothReturns;
+            private int rmdStartAge = Integer.MAX_VALUE;
+            private double initTaxableBasis;
+            private LtcgTaxTable[] ltcgTaxTableByYear;
+            private double dividendYield;
+            private GuardrailAdaptation adaptation;
+            private double[] rentalIncomeByYear;
+            private double interestYield;
+            private double taxableEquityShare = 1.0;
+            private HouseholdSim household;
+            private SurvivorRegime[] survivorRegimes;
+            private double survivorFactor = 1.0;
 
-        /**
-         * Back-compat constructor predating audit C1: no bond-sleeve interest yield or taxable-pool
-         * equity share to split it by -- {@code interestYield} defaults to 0 and {@code
-         * taxableEquityShare} to 1.0 (100% equity, ALL_US-equivalent), the byte-identical anchor
-         * that makes {@link #growTaxableWithDividendAndInterest} take the same code path as the
-         * pre-C1 single-dividendYield {@code growTaxableWithDividend}.
-         */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-C1 shape) so
-        // existing positional call sites keep compiling and behaving identically.
-        // UseVarargs: rentalIncomeByYear is a per-year indexed array, not a variable argument
-        // list -- varargs would change the call contract and invite accidental misuse.
-        @SuppressWarnings({"PMD.ExcessiveParameterList", "PMD.UseVarargs"})
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-                GuardrailAdaptation adaptation, double[] rentalIncomeByYear) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, rentalIncomeByYear,
-                    0.0, 1.0);
-        }
+            private Builder(double initTaxable, double initTraditional, double initRoth,
+                            String withdrawalOrder) {
+                this.initTaxable = initTaxable;
+                this.initTraditional = initTraditional;
+                this.initRoth = initRoth;
+                this.withdrawalOrder = withdrawalOrder;
+            }
 
-        /**
-         * Back-compat constructor predating T18a-3: no per-year net rental income to thread into
-         * the NIIT Net Investment Income base (null -- every year contributes zero rental to NII,
-         * byte-identical to pre-fix behavior).
-         */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-rental shape)
-        // so existing positional call sites keep compiling and behaving identically.
-        @SuppressWarnings("PMD.ExcessiveParameterList")
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-                GuardrailAdaptation adaptation) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, adaptation, null);
-        }
+            Builder taxTables(OrdinaryTaxTable[] tablesByYear, double[] baseIncomeByYear) {
+                this.ordinaryTaxTableByYear = tablesByYear;
+                this.ordinaryBaseIncomeByYear = baseIncomeByYear;
+                return this;
+            }
 
-        /**
-         * Back-compat constructor for audit-C1 callers/tests that need {@code interestYield}/
-         * {@code taxableEquityShare} but predate the guardrail-adaptation (audit C9) and rental
-         * (T18a-3) knobs -- defaults both of those to their own byte-identical no-op values.
-         */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-adaptation,
-        // pre-rental, C1-aware shape) so these call sites keep compiling and behaving identically.
-        @SuppressWarnings("PMD.ExcessiveParameterList")
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-                double interestYield, double taxableEquityShare) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, null, null,
-                    interestYield, taxableEquityShare);
-        }
+            Builder conversions(double[] conversionByYear, double[] conversionTaxByYear) {
+                this.conversionByYear = conversionByYear;
+                this.conversionTaxByYear = conversionTaxByYear;
+                return this;
+            }
 
-        /**
-         * Back-compat constructor (audit C9): every pre-C9 call site (the sustainability search, the
-         * headline terminal pass, and the unit tests) builds a fixed-schedule config with no
-         * simulated guardrail rule and no rental income. Defaulting {@code adaptation} to
-         * {@code null} keeps {@link #simulateTrial} on the byte-identical no-rules path for all of
-         * them.
-         */
-        // ExcessiveParameterList: mirrors the record's own canonical constructor (pre-adaptation
-        // shape) so existing positional call sites keep compiling and behaving identically.
-        @SuppressWarnings("PMD.ExcessiveParameterList")
-        SimulationConfig(
-                double initTaxable, double initTraditional, double initRoth,
-                String withdrawalOrder,
-                OrdinaryTaxTable[] ordinaryTaxTableByYear, double[] ordinaryBaseIncomeByYear,
-                double[] conversionByYear, double[] conversionTaxByYear,
-                int retirementAge,
-                double[] dsBracketCeilingByYear,
-                int cashReserveYears, double cashReturnRate,
-                boolean trackYearBalances,
-                double[] taxableReturns, double[] traditionalReturns, double[] rothReturns,
-                int rmdStartAge,
-                double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield) {
-            this(initTaxable, initTraditional, initRoth, withdrawalOrder,
-                    ordinaryTaxTableByYear, ordinaryBaseIncomeByYear, conversionByYear, conversionTaxByYear,
-                    retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
-                    trackYearBalances, taxableReturns, traditionalReturns, rothReturns, rmdStartAge,
-                    initTaxableBasis, ltcgTaxTableByYear, dividendYield, null);
+            Builder retirementAge(int retirementAge) {
+                this.retirementAge = retirementAge;
+                return this;
+            }
+
+            Builder rmdStartAge(int rmdStartAge) {
+                this.rmdStartAge = rmdStartAge;
+                return this;
+            }
+
+            Builder dsBracketCeilingByYear(double[] dsBracketCeilingByYear) {
+                this.dsBracketCeilingByYear = dsBracketCeilingByYear;
+                return this;
+            }
+
+            Builder cashReserve(int cashReserveYears, double cashReturnRate) {
+                this.cashReserveYears = cashReserveYears;
+                this.cashReturnRate = cashReturnRate;
+                return this;
+            }
+
+            Builder trackYearBalances(boolean trackYearBalances) {
+                this.trackYearBalances = trackYearBalances;
+                return this;
+            }
+
+            Builder returns(double[] taxableReturns, double[] traditionalReturns,
+                            double[] rothReturns) {
+                this.taxableReturns = taxableReturns;
+                this.traditionalReturns = traditionalReturns;
+                this.rothReturns = rothReturns;
+                return this;
+            }
+
+            Builder taxableBasis(double initTaxableBasis) {
+                this.initTaxableBasis = initTaxableBasis;
+                return this;
+            }
+
+            Builder ltcgTaxTableByYear(LtcgTaxTable[] ltcgTaxTableByYear) {
+                this.ltcgTaxTableByYear = ltcgTaxTableByYear;
+                return this;
+            }
+
+            Builder dividendYield(double dividendYield) {
+                this.dividendYield = dividendYield;
+                return this;
+            }
+
+            Builder adaptation(@Nullable GuardrailAdaptation adaptation) {
+                this.adaptation = adaptation;
+                return this;
+            }
+
+            Builder rentalIncomeByYear(double[] rentalIncomeByYear) {
+                this.rentalIncomeByYear = rentalIncomeByYear;
+                return this;
+            }
+
+            Builder interestYield(double interestYield) {
+                this.interestYield = interestYield;
+                return this;
+            }
+
+            Builder taxableEquityShare(double taxableEquityShare) {
+                this.taxableEquityShare = taxableEquityShare;
+                return this;
+            }
+
+            Builder household(@Nullable HouseholdSim household) {
+                this.household = household;
+                return this;
+            }
+
+            Builder survivorRegimes(@Nullable SurvivorRegime[] survivorRegimes,
+                                    double survivorFactor) {
+                this.survivorRegimes = survivorRegimes;
+                this.survivorFactor = survivorFactor;
+                return this;
+            }
+
+            SimulationConfig build() {
+                return new SimulationConfig(initTaxable, initTraditional, initRoth, withdrawalOrder,
+                        ordinaryTaxTableByYear, ordinaryBaseIncomeByYear,
+                        conversionByYear, conversionTaxByYear,
+                        retirementAge, dsBracketCeilingByYear, cashReserveYears, cashReturnRate,
+                        trackYearBalances, taxableReturns, traditionalReturns, rothReturns,
+                        rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
+                        adaptation, rentalIncomeByYear, interestYield, taxableEquityShare,
+                        household, survivorRegimes, survivorFactor);
+            }
         }
     }
 

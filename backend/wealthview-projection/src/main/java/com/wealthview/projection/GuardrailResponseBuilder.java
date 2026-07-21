@@ -241,23 +241,31 @@ final class GuardrailResponseBuilder {
                                                             double[] conversionByYear, double[] conversionTaxByYear,
                                                             boolean trackYearBalances,
                                                             TrialSimulator.GuardrailAdaptation adaptation) {
-        return new TrialSimulator.SimulationConfig(
-                poolSetup.initTaxable(), poolSetup.initTraditional(), poolSetup.initRoth(), poolSetup.order(),
-                poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
-                poolSetup.simPools() ? ctx.taxIncome().rentalAwareTaxableIncome() : null,
-                conversionByYear, conversionTaxByYear, ctx.sim().retirementAge(),
-                ctx.taxIncome().dsBracketCeilingByYear(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), trackYearBalances,
-                ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t], ctx.sim().rothReturns()[t],
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), adaptation,
+        return TrialSimulator.SimulationConfig
+                .builder(poolSetup.initTaxable(), poolSetup.initTraditional(), poolSetup.initRoth(),
+                        poolSetup.order())
+                .taxTables(poolSetup.simPools() ? ctx.taxIncome().ordinaryTaxTableByYear() : null,
+                        poolSetup.simPools() ? ctx.taxIncome().rentalAwareTaxableIncome() : null)
+                .conversions(conversionByYear, conversionTaxByYear)
+                .retirementAge(ctx.sim().retirementAge())
+                .rmdStartAge(ctx.sim().rmdStartAge())
+                .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
+                .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
+                .trackYearBalances(trackYearBalances)
+                .returns(ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t],
+                        ctx.sim().rothReturns()[t])
+                .taxableBasis(ctx.portfolio().initTaxableBasis())
+                .ltcgTaxTableByYear(ctx.taxIncome().ltcgTaxTableByYear())
+                .dividendYield(ctx.sim().dividendYield())
+                .adaptation(adaptation)
                 // T18a-3: threaded into the LTCG/NIIT bundle's Net Investment Income base.
-                poolSetup.simPools() ? ctx.taxIncome().rentalIncomeByYear() : null,
-                ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                .rentalIncomeByYear(poolSetup.simPools() ? ctx.taxIncome().rentalIncomeByYear() : null)
+                .interestYield(ctx.sim().interestYield())
+                .taxableEquityShare(ctx.sim().taxableEquityShare())
                 // Household task 6: the terminal/response passes run the same household economics as
                 // the search (per-owner RMD streams, first-death transition, second-death truncation).
-                ctx.sim().household());
+                .household(ctx.sim().household())
+                .build();
     }
 
     /** Household task 6 (dedup): scales {@code values} in place by the survivor spending factor from

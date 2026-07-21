@@ -191,16 +191,21 @@ class GuardrailRulesTaxDynamicsMonotonicityTest {
     /** Mirrors {@code GuardrailResponseBuilder.buildSimConfig} for the pool-bearing case. */
     private static TrialSimulator.SimulationConfig config(OptimizationSetup ctx, int t,
                                                           TrialSimulator.GuardrailAdaptation adaptation) {
-        return new TrialSimulator.SimulationConfig(
-                ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(), ctx.portfolio().initRoth(),
-                ctx.portfolio().withdrawalOrder(),
-                ctx.taxIncome().ordinaryTaxTableByYear(), ctx.taxIncome().rentalAwareTaxableIncome(),
-                null, null, ctx.sim().retirementAge(),
-                ctx.taxIncome().dsBracketCeilingByYear(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(), true,
-                ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t], ctx.sim().rothReturns()[t],
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), adaptation);
+        return TrialSimulator.SimulationConfig.builder(
+                        ctx.portfolio().initTaxable(), ctx.portfolio().initTraditional(),
+                        ctx.portfolio().initRoth(), ctx.portfolio().withdrawalOrder())
+                .taxTables(ctx.taxIncome().ordinaryTaxTableByYear(), ctx.taxIncome().rentalAwareTaxableIncome())
+                .retirementAge(ctx.sim().retirementAge())
+                .dsBracketCeilingByYear(ctx.taxIncome().dsBracketCeilingByYear())
+                .cashReserve(ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate())
+                .trackYearBalances(true)
+                .returns(ctx.sim().taxableReturns()[t], ctx.sim().traditionalReturns()[t],
+                        ctx.sim().rothReturns()[t])
+                .rmdStartAge(ctx.sim().rmdStartAge())
+                .taxableBasis(ctx.portfolio().initTaxableBasis())
+                .ltcgTaxTableByYear(ctx.taxIncome().ltcgTaxTableByYear())
+                .dividendYield(ctx.sim().dividendYield())
+                .adaptation(adaptation)
+                .build();
     }
 }

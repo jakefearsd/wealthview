@@ -18,12 +18,12 @@ class TrialSimulatorReturnTest {
             double initTaxable, double initTraditional, double initRoth,
             int cashReserveYears,
             double[] taxableReturns, double[] traditionalReturns, double[] rothReturns) {
-        return new TrialSimulator.SimulationConfig(
-                initTaxable, initTraditional, initRoth,
-                "taxable_first", null, null, null, null, 62, null,
-                cashReserveYears, 0.0, false,
-                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                initTaxable, null, 0.0);
+        return TrialSimulator.SimulationConfig.builder(initTaxable, initTraditional, initRoth, "taxable_first")
+                .retirementAge(62)
+                .cashReserve(cashReserveYears, 0.0)
+                .returns(taxableReturns, traditionalReturns, rothReturns)
+                .taxableBasis(initTaxable)
+                .build();
     }
 
     @Test
@@ -73,11 +73,11 @@ class TrialSimulatorReturnTest {
         var sim = new TrialSimulator();
         // Tiny portfolio, no income, a floor larger than the portfolio can ever supply → shortfall.
         double[] flatNoReturn = {0.0, 0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                100.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
-                100.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(100.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(60)
+                .returns(flatNoReturn, flatNoReturn, flatNoReturn)
+                .taxableBasis(100.0)
+                .build();
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {80.0, 80.0};        // year 2 floor (80) unfundable: only ~20 left
@@ -92,11 +92,11 @@ class TrialSimulatorReturnTest {
     void simulateTrial_floorFundedEveryYear_marksSuccess() {
         var sim = new TrialSimulator();
         double[] flatNoReturn = {0.0, 0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 60, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
-                1000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(60)
+                .returns(flatNoReturn, flatNoReturn, flatNoReturn)
+                .taxableBasis(1000.0)
+                .build();
         double[] income = {0.0, 0.0};
         double[] zero = {0.0, 0.0};
         double[] floors = {50.0, 50.0};
@@ -114,11 +114,12 @@ class TrialSimulatorReturnTest {
         // = 200. LTCG rate 0.15 -> tax 30, paid taxable-first. Final = (1000 - 500) - 30 = 470
         // (vs 500 with no LTCG tax: the 30 is exactly the extra cash the capital-gains tax removes).
         double[] flatNoReturn = {0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 62, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, Integer.MAX_VALUE,
-                600.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(62)
+                .returns(flatNoReturn, flatNoReturn, flatNoReturn)
+                .taxableBasis(600.0)
+                .ltcgTaxTableByYear(new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)})
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{500}, new double[]{0}, 1, config);
@@ -131,11 +132,13 @@ class TrialSimulatorReturnTest {
         // 1 year, taxable +10%, dividend yield 2%, no withdrawal. The pool still grows to 1100
         // (dividend booked as residual), but the 2% dividend (20) is qualified-dividend income taxed
         // at the 0.15 LTCG rate -> 3 leaves the portfolio. Final = 1100 - 3 = 1097 (dividend drag).
-        var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 62, null, 0, 0.0, false,
-                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                1000.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.02);
+        var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(62)
+                .returns(new double[]{0.10}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(1000.0)
+                .ltcgTaxTableByYear(new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)})
+                .dividendYield(0.02)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
@@ -154,12 +157,14 @@ class TrialSimulatorReturnTest {
         // interest (dividendYield is 0). A flat 20% ORDINARY table taxes it: 16*0.20 = 3.20 ->
         // final = 1100 - 3.20 = 1096.80. No LTCG table is wired at all, proving the interest never
         // touches the LTCG path.
-        var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 62, null, 0, 0.0, false,
-                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                1000.0, null, 0.0, 0.04, 0.6);
+        var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(62)
+                .returns(new double[]{0.10}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(1000.0)
+                .interestYield(0.04)
+                .taxableEquityShare(0.6)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
@@ -169,15 +174,17 @@ class TrialSimulatorReturnTest {
 
     @Test
     void simulateTrial_interestYieldTaxableEquityShareDefault_isOneAndByteIdenticalToPreC1() {
-        // Back-compat anchor: a SimulationConfig built through the pre-C1 constructor (no
-        // interestYield/taxableEquityShare args) must default taxableEquityShare to 1.0 (ALL_US
+        // Back-compat anchor: a SimulationConfig built without naming interestYield/
+        // taxableEquityShare must default taxableEquityShare to 1.0 (ALL_US
         // equivalent) -- bit-identical to simulateTrial_dividendYield_drainsQualifiedDividendTax
         // above, even though this fixture doesn't pass interestYield/taxableEquityShare at all.
-        var config = new TrialSimulator.SimulationConfig(
-                1000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 62, null, 0, 0.0, false,
-                new double[]{0.10}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                1000.0, new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)}, 0.02);
+        var config = TrialSimulator.SimulationConfig.builder(1000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(62)
+                .returns(new double[]{0.10}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(1000.0)
+                .ltcgTaxTableByYear(new LtcgTaxTable[]{LtcgTaxTable.flat(0.15)})
+                .dividendYield(0.02)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
@@ -194,18 +201,22 @@ class TrialSimulatorReturnTest {
         // precomputed schedule. No growth (taxableReturn 0) isolates the interest distribution:
         // blendedYield = 0.4 * 0.04 = 0.016 (60/40 split, dividendYield 0) -> distribution =
         // balance * 0.016 (residual booking against zero growth), taxed at a flat 25% ordinary rate.
-        var configSmallBalance = new TrialSimulator.SimulationConfig(
-                100_000.0, 0.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0},
-                null, null, 62, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                100_000.0, null, 0.0, 0.04, 0.6);
-        var configLargeBalance = new TrialSimulator.SimulationConfig(
-                500_000.0, 0.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0},
-                null, null, 62, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                500_000.0, null, 0.0, 0.04, 0.6);
+        var configSmallBalance = TrialSimulator.SimulationConfig.builder(100_000.0, 0.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0})
+                .retirementAge(62)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(100_000.0)
+                .interestYield(0.04)
+                .taxableEquityShare(0.6)
+                .build();
+        var configLargeBalance = TrialSimulator.SimulationConfig.builder(500_000.0, 0.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.25)}, new double[]{0.0})
+                .retirementAge(62)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(500_000.0)
+                .interestYield(0.04)
+                .taxableEquityShare(0.6)
+                .build();
 
         var resultSmall = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, configSmallBalance);
@@ -231,12 +242,12 @@ class TrialSimulatorReturnTest {
         // finalBalance = (100000 - rmd) + (rmd - taxExtra) = 100000 - taxExtra ~= 99186.99
         // (the tax on the forced distribution is the only amount that leaves the portfolio).
         double[] flatNoReturn = {0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 75, null, 0, 0.0, false,
-                flatNoReturn, flatNoReturn, flatNoReturn, 75,
-                0.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(0.0, 100_000.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(75)
+                .returns(flatNoReturn, flatNoReturn, flatNoReturn)
+                .rmdStartAge(75)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0}, new double[]{0}, new double[]{0}, new double[]{0}, 1, config);
@@ -405,12 +416,13 @@ class TrialSimulatorReturnTest {
         // (post-growth) - 400 (equity draw) - 57 (tax) = 208 pre-C2; audit C2 grosses up the
         // $25.3333 traditional slice of the tax by 25.3333*0.20/0.80 = 6.3333 more, so finalBalance
         // = 208 - 6.3333 = 201.6667, cash fully drained.
-        var config = new TrialSimulator.SimulationConfig(
-                300.0, 300.0, 300.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 62, null, 1, 0.0, false,
-                new double[]{-0.05}, new double[]{-0.05}, new double[]{-0.05}, Integer.MAX_VALUE,
-                300.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(300.0, 300.0, 300.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(62)
+                .cashReserve(1, 0.0)
+                .returns(new double[]{-0.05}, new double[]{-0.05}, new double[]{-0.05})
+                .taxableBasis(300.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{-400.0}, new double[]{0.0}, new double[]{200.0}, new double[]{0.0}, 1, config);
@@ -426,12 +438,13 @@ class TrialSimulatorReturnTest {
         // reaches traditional/roth) -> the equity pools must be debited NOTHING, exactly like
         // the no-tax final-response path. taxable 500 -> (seed 100) 400 -> (*0.9) 360;
         // traditional 200 -> 180; roth 100 -> 90; cash 100 -> 0 (drained by the draw).
-        var config = new TrialSimulator.SimulationConfig(
-                500.0, 200.0, 100.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 62, null, 1, 0.0, false,
-                new double[]{-0.10}, new double[]{-0.10}, new double[]{-0.10}, Integer.MAX_VALUE,
-                500.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(500.0, 200.0, 100.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(62)
+                .cashReserve(1, 0.0)
+                .returns(new double[]{-0.10}, new double[]{-0.10}, new double[]{-0.10})
+                .taxableBasis(500.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{100.0}, new double[]{0.0}, 1, config);
@@ -459,12 +472,13 @@ class TrialSimulatorReturnTest {
         // up traditional, leaving nothing in taxable to absorb it -- see the superseded $50
         // leakage this test used to pin).
         double[] flatZero = {0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 75, null, 1, 0.0, false,
-                flatZero, new double[]{-0.05}, flatZero, 75,
-                0.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(0.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(75)
+                .cashReserve(1, 0.0)
+                .returns(flatZero, new double[]{-0.05}, flatZero)
+                .rmdStartAge(75)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{1000.0}, new double[]{0.0}, 1, config);
@@ -498,12 +512,13 @@ class TrialSimulatorReturnTest {
         // conversionTaxByYear is supplied as the EXACT table figure for the uncapped conversion
         // (taxAt(90k) - taxAt(10k) = 8,000) so the conversion-tax repricing is a no-op here and the
         // pin isolates the withdrawal-tax stacking bug.
-        var config = new TrialSimulator.SimulationConfig(
-                500_000.0, 200_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0},
-                new double[]{80_000.0}, new double[]{8_000.0}, 62, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                500_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(500_000.0, 200_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0})
+                .conversions(new double[]{80_000.0}, new double[]{8_000.0})
+                .retirementAge(62)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(500_000.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{30_000.0}, new double[]{0.0}, 1, config);
@@ -535,12 +550,14 @@ class TrialSimulatorReturnTest {
         // (deliberately WRONG) to prove the engine reprices the conversion from the table rather
         // than trusting the precomputed figure.
         var table = twoBracketTable();
-        var config = new TrialSimulator.SimulationConfig(
-                500_000.0, 200_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
-                new double[]{50_000.0}, new double[]{0.0}, 75, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
-                500_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(500_000.0, 200_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{table}, new double[]{60_000.0})
+                .conversions(new double[]{50_000.0}, new double[]{0.0})
+                .retirementAge(75)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(500_000.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{5_000.0}, new double[]{0.0}, 1, config);
@@ -572,12 +589,16 @@ class TrialSimulatorReturnTest {
         // taxAt(base+interest+rmd+conv+draw) - taxAt(base): total is order-invariant even though
         // the interest tax is now attributed to its own separate pricing call.
         var table = twoBracketTable();
-        var config = new TrialSimulator.SimulationConfig(
-                500_000.0, 200_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{table}, new double[]{60_000.0},
-                new double[]{50_000.0}, new double[]{0.0}, 75, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
-                500_000.0, null, 0.0, 0.04, 0.6);
+        var config = TrialSimulator.SimulationConfig.builder(500_000.0, 200_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{table}, new double[]{60_000.0})
+                .conversions(new double[]{50_000.0}, new double[]{0.0})
+                .retirementAge(75)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(500_000.0)
+                .interestYield(0.04)
+                .taxableEquityShare(0.6)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{5_000.0}, new double[]{0.0}, 1, config);
@@ -602,12 +623,13 @@ class TrialSimulatorReturnTest {
         // scaling of a CONVEX tax that overstates the capped amount's true tax. Exact:
         // taxAt(10k + 60k) - taxAt(10k) = 7,000 - 1,000 = 6,000 (the target's 18,000 included
         // 30%-bracket dollars the capped conversion never reaches).
-        var config = new TrialSimulator.SimulationConfig(
-                500_000.0, 60_000.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0},
-                new double[]{120_000.0}, new double[]{18_000.0}, 62, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, Integer.MAX_VALUE,
-                500_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(500_000.0, 60_000.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{twoBracketTable()}, new double[]{10_000.0})
+                .conversions(new double[]{120_000.0}, new double[]{18_000.0})
+                .retirementAge(62)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .taxableBasis(500_000.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 1, config);
@@ -627,12 +649,14 @@ class TrialSimulatorReturnTest {
         var ltcgTable = new LtcgTaxTable(0,
                 new double[]{0, 50_000}, new double[]{50_000, Double.POSITIVE_INFINITY},
                 new double[]{0.0, 0.15}, Double.POSITIVE_INFINITY);
-        var config = new TrialSimulator.SimulationConfig(
-                100_000.0, 300_000.0, 0.0, "taxable_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{40_000.0},
-                null, null, 75, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
-                50_000.0, new LtcgTaxTable[]{ltcgTable}, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(100_000.0, 300_000.0, 0.0, "taxable_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{40_000.0})
+                .retirementAge(75)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(50_000.0)
+                .ltcgTaxTableByYear(new LtcgTaxTable[]{ltcgTable})
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{0.0}, new double[]{0.0}, new double[]{10_000.0}, new double[]{0.0}, 1, config);
@@ -652,12 +676,13 @@ class TrialSimulatorReturnTest {
         // penalty from the C2 gross-up fixed point. Traditional-first order draws the $10,000
         // spend need entirely from traditional. rmdStartAge (75) is far above either retirement
         // age tested, so no RMD ever enters the picture.
-        return new TrialSimulator.SimulationConfig(
-                50_000.0, 100_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0},
-                null, null, retirementAge, null, 0, 0.0, false,
-                new double[]{0.0}, new double[]{0.0}, new double[]{0.0}, 75,
-                50_000.0, null, 0.0);
+        return TrialSimulator.SimulationConfig.builder(50_000.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.10)}, new double[]{0.0})
+                .retirementAge(retirementAge)
+                .returns(new double[]{0.0}, new double[]{0.0}, new double[]{0.0})
+                .rmdStartAge(75)
+                .taxableBasis(50_000.0)
+                .build();
     }
 
     @Test
@@ -699,11 +724,11 @@ class TrialSimulatorReturnTest {
         // (nothing to compound), 2 years is a flat $6,000 lower final balance than the pre-fix
         // $80,000.
         double[] flatZero = {0.0, 0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                100_000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 62, null, 0, 0.0, false,
-                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
-                100_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(100_000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(62)
+                .returns(flatZero, flatZero, flatZero)
+                .taxableBasis(100_000.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{20_000.0, 20_000.0}, new double[]{3_000.0, 3_000.0},
@@ -723,11 +748,11 @@ class TrialSimulatorReturnTest {
         // 17,000, exactly matching what the pre-fix `netSurplus = max(0, grossSurplus - surplusTax)`
         // formula already produced for this case.
         double[] flatZero = {0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                100_000.0, 0.0, 0.0, "taxable_first", null, null,
-                null, null, 62, null, 0, 0.0, false,
-                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
-                100_000.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(100_000.0, 0.0, 0.0, "taxable_first")
+                .retirementAge(62)
+                .returns(flatZero, flatZero, flatZero)
+                .taxableBasis(100_000.0)
+                .build();
 
         var result = simulator.simulateTrial(
                 new double[]{50_000.0}, new double[]{3_000.0},
@@ -754,12 +779,11 @@ class TrialSimulatorReturnTest {
         // $3,000 base tax, unlike the pre-C2 pin, because the base-tax funding draw is no longer
         // tax-free.
         double[] flatZero = {0.0};
-        var config = new TrialSimulator.SimulationConfig(
-                0.0, 100_000.0, 0.0, "traditional_first",
-                new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0},
-                null, null, 62, null, 0, 0.0, false,
-                flatZero, flatZero, flatZero, Integer.MAX_VALUE,
-                0.0, null, 0.0);
+        var config = TrialSimulator.SimulationConfig.builder(0.0, 100_000.0, 0.0, "traditional_first")
+                .taxTables(new OrdinaryTaxTable[]{OrdinaryTaxTable.flat(0.20)}, new double[]{0.0})
+                .retirementAge(62)
+                .returns(flatZero, flatZero, flatZero)
+                .build();
 
         var withBaseTax = simulator.simulateTrial(
                 new double[]{20_000.0}, new double[]{3_000.0},
