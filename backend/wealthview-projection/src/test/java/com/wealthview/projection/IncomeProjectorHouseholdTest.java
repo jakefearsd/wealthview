@@ -38,7 +38,8 @@ class IncomeProjectorHouseholdTest {
         // overload below is a genuine fix, not a no-op.
         var spouseSource = ownedSource(65, null, "spouse");
 
-        var result = IncomeProjector.computeDeterministic(List.of(spouseSource), 66, 1, 0, 0.0);
+        var result = IncomeProjector.computeDeterministic(List.of(spouseSource),
+                IncomeProjector.Context.singlePerson(66, 1, 0, 0.0));
 
         assertThat(result[0].totalIncome()).isEqualTo(24_000.0, within(0.01));
     }
@@ -50,8 +51,8 @@ class IncomeProjectorHouseholdTest {
         // spouse age = 2024 - 1970 = 54) — below start_age 65 — so the source must NOT be active.
         var spouseSource = ownedSource(65, null, "spouse");
 
-        var result = IncomeProjector.computeDeterministic(List.of(spouseSource), 66, 1, 0, 0.0,
-                1958, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.computeDeterministic(List.of(spouseSource),
+                new IncomeProjector.Context(66, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         assertThat(result[0].totalIncome()).isZero();
         assertThat(result[0].taxableIncome()).isZero();
@@ -63,8 +64,8 @@ class IncomeProjectorHouseholdTest {
         // start_age boundary — full amount active.
         var spouseSource = ownedSource(65, null, "spouse");
 
-        var result = IncomeProjector.computeDeterministic(List.of(spouseSource), 78, 1, 0, 0.0,
-                1958, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.computeDeterministic(List.of(spouseSource),
+                new IncomeProjector.Context(78, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         assertThat(result[0].totalIncome()).isEqualTo(24_000.0, within(0.01));
         assertThat(result[0].taxableIncome()).isEqualTo(24_000.0, within(0.01));
@@ -76,8 +77,8 @@ class IncomeProjectorHouseholdTest {
         // against the uniform retirement-anchored age exactly as before.
         var primarySource = ownedSource(65, null, "primary");
 
-        var result = IncomeProjector.computeDeterministic(List.of(primarySource), 66, 1, 0, 0.0,
-                1958, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.computeDeterministic(List.of(primarySource),
+                new IncomeProjector.Context(66, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         assertThat(result[0].totalIncome()).isEqualTo(24_000.0, within(0.01));
     }
@@ -88,8 +89,8 @@ class IncomeProjectorHouseholdTest {
     void socialSecurityBenefitByYear_householdBothAlive_spouseOwnedBenefitNotYetActiveAtSpouseRealAge() {
         var spouseSs = ownedSource(65, null, "spouse", IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("18000"));
 
-        var result = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs), 66, 1, 0, 0.0,
-                1958, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs),
+                new IncomeProjector.Context(66, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         assertThat(result[0]).isZero();
     }
@@ -98,22 +99,23 @@ class IncomeProjectorHouseholdTest {
     void socialSecurityBenefitByYear_householdBothAlive_spouseOwnedBenefitActivatesAtSpouseOwnRealAge() {
         var spouseSs = ownedSource(65, null, "spouse", IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("18000"));
 
-        var result = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs), 78, 1, 0, 0.0,
-                1958, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs),
+                new IncomeProjector.Context(78, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         assertThat(result[0]).isEqualTo(18_000.0, within(0.01));
     }
 
     @Test
-    void socialSecurityBenefitByYear_householdNull_matchesUniformAgeBehaviorOfFiveArgOverload() {
+    void socialSecurityBenefitByYear_householdNull_usesUniformRetirementAnchoredAge() {
         var spouseSs = ownedSource(65, null, "spouse", IncomeSourceType.SOCIAL_SECURITY, new BigDecimal("18000"));
 
-        double[] fiveArg = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs), 66, 1, 0, 0.0);
-        double[] sevenArgNullHousehold = IncomeProjector.socialSecurityBenefitByYear(
-                List.of(spouseSs), 66, 1, 0, 0.0, 1958, null);
+        double[] singlePerson = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs),
+                IncomeProjector.Context.singlePerson(66, 1, 0, 0.0));
+        double[] explicitNullHousehold = IncomeProjector.socialSecurityBenefitByYear(List.of(spouseSs),
+                new IncomeProjector.Context(66, 1, 0, 0.0, 1958, null));
 
-        assertThat(sevenArgNullHousehold).containsExactly(fiveArg);
-        assertThat(fiveArg[0]).isEqualTo(18_000.0, within(0.01)); // uniform primary-age 66 >= start_age 65
+        assertThat(explicitNullHousehold).containsExactly(singlePerson);
+        assertThat(singlePerson[0]).isEqualTo(18_000.0, within(0.01)); // uniform primary-age 66 >= start_age 65
     }
 
     // === computeRentalAwareTaxable ===
@@ -123,8 +125,8 @@ class IncomeProjectorHouseholdTest {
         var spouseRental = ownedSource(65, null, "spouse", IncomeSourceType.RENTAL_PROPERTY, new BigDecimal("12000"));
         double[] baseTaxableIncome = {5_000.0};
 
-        var result = IncomeProjector.computeRentalAwareTaxable(
-                baseTaxableIncome, List.of(spouseRental), 66, 1958, 1, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.computeRentalAwareTaxable(baseTaxableIncome, List.of(spouseRental),
+                new IncomeProjector.Context(66, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         // Spouse (54) hasn't reached start_age 65 yet -- no rental adjustment applied, base unchanged.
         assertThat(result[0]).isEqualTo(5_000.0, within(0.01));
@@ -135,8 +137,8 @@ class IncomeProjectorHouseholdTest {
         var spouseRental = ownedSource(65, null, "spouse", IncomeSourceType.RENTAL_PROPERTY, new BigDecimal("12000"));
         double[] baseTaxableIncome = {5_000.0};
 
-        var result = IncomeProjector.computeRentalAwareTaxable(
-                baseTaxableIncome, List.of(spouseRental), 78, 1958, 1, AGE_GAP_HOUSEHOLD);
+        var result = IncomeProjector.computeRentalAwareTaxable(baseTaxableIncome, List.of(spouseRental),
+                new IncomeProjector.Context(78, 1, 0, 0.0, 1958, AGE_GAP_HOUSEHOLD));
 
         // Spouse (66) is past start_age 65 -- the rental's net taxable income (no expenses/depreciation
         // configured, so the full 12,000 gross) is added on top of the base.

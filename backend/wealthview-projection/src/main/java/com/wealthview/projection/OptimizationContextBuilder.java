@@ -252,15 +252,11 @@ final class OptimizationContextBuilder {
      */
     private IncomeYearData[] applySocialSecurityTaxableShare(
             IncomeYearData[] incomeData, List<ProjectionIncomeSourceInput> sources,
-            int retirementAge, int years, double essentialFloor, FilingStatus filingStatus,
-            double inflationRate, int retirementYearOffsetFromBase, int birthYear,
-            @Nullable HouseholdContext household) {
-        double[] ssBenefitByYear = IncomeProjector.socialSecurityBenefitByYear(
-                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate,
-                birthYear, household);
-        BigDecimal inflationBd = BigDecimal.valueOf(inflationRate);
-        IncomeYearData[] adjusted = new IncomeYearData[years];
-        for (int y = 0; y < years; y++) {
+            double essentialFloor, FilingStatus filingStatus, IncomeProjector.Context ctx) {
+        double[] ssBenefitByYear = IncomeProjector.socialSecurityBenefitByYear(sources, ctx);
+        BigDecimal inflationBd = BigDecimal.valueOf(ctx.scenarioInflationRate());
+        IncomeYearData[] adjusted = new IncomeYearData[ctx.years()];
+        for (int y = 0; y < ctx.years(); y++) {
             double ssBenefit = ssBenefitByYear[y];
             if (ssBenefit <= 0) {
                 adjusted[y] = incomeData[y];
@@ -270,7 +266,7 @@ final class OptimizationContextBuilder {
             double nonSsTaxable = Math.max(0, incomeData[y].taxableIncome() - ssBenefit);
             double expectedDraw = Math.max(0, essentialFloor - total);
             double provisionalOther = nonSsTaxable + expectedDraw;
-            int yearsFromBase = Math.max(0, retirementYearOffsetFromBase + y);
+            int yearsFromBase = Math.max(0, ctx.retirementYearOffsetFromBase() + y);
             double ssTaxable = SS_TAX_CALCULATOR.computeTaxableAmount(
                     BigDecimal.valueOf(ssBenefit), BigDecimal.valueOf(provisionalOther),
                     filingStatus.value(), yearsFromBase, inflationBd).doubleValue();
@@ -330,14 +326,15 @@ final class OptimizationContextBuilder {
             FilingStatus status, int retirementAge, int years, int retirementYearOffsetFromBase,
             double essentialFloor, int retirementYear, int birthYear, double inflationRate,
             @Nullable HouseholdContext household) {
-        IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(
-                sources, retirementAge, years, retirementYearOffsetFromBase, inflationRate,
-                birthYear, household);
-        incomeData = applySocialSecurityTaxableShare(incomeData, sources, retirementAge, years,
-                essentialFloor, status, inflationRate, retirementYearOffsetFromBase, birthYear, household);
+        // ONE clock/household context for all three precomputes — their arrays are combined
+        // below, so sharing the context is what keeps their activation windows in lockstep.
+        var ctx = new IncomeProjector.Context(retirementAge, years, retirementYearOffsetFromBase,
+                inflationRate, birthYear, household);
+        IncomeYearData[] incomeData = IncomeProjector.computeDeterministic(sources, ctx);
+        incomeData = applySocialSecurityTaxableShare(incomeData, sources, essentialFloor, status, ctx);
         var arrays = computeIncomeArrays(incomeData, years, retirementYear, status);
         double[] rentalAware = IncomeProjector.computeRentalAwareTaxable(
-                arrays.taxableIncomeByYear(), sources, retirementAge, birthYear, years, household);
+                arrays.taxableIncomeByYear(), sources, ctx);
         return new IncomePipeline(incomeData, arrays.incomeByYear(), arrays.taxableIncomeByYear(),
                 arrays.surplusTaxByYear(), rentalAware);
     }
