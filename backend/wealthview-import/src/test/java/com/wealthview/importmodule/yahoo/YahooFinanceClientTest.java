@@ -235,4 +235,53 @@ class YahooFinanceClientTest {
         assertThat(result).isEmpty();
         mockServer.verify();
     }
+
+    @Test
+    void fetchHistory_missingQuoteIndicators_returnsNoPriceDataFailure() {
+        // A result entry without indicators.quote must parse as "no data", not
+        // trip an internal NPE that gets reported as an unexpected format.
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {
+                            "chart": {
+                                "result": [{
+                                    "timestamp": [1704196200]
+                                }],
+                                "error": null
+                            }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var result = client.fetchHistory("AAPL",
+                LocalDate.of(2024, 1, 2), LocalDate.of(2024, 1, 3));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.errorReason()).contains("no price data");
+        mockServer.verify();
+    }
+
+    @Test
+    void fetchHistory_emptyQuoteArray_returnsNoPriceDataFailure() {
+        mockServer.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {
+                            "chart": {
+                                "result": [{
+                                    "timestamp": [1704196200],
+                                    "indicators": {
+                                        "quote": []
+                                    }
+                                }],
+                                "error": null
+                            }
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var result = client.fetchHistory("AAPL",
+                LocalDate.of(2024, 1, 2), LocalDate.of(2024, 1, 3));
+
+        assertThat(result.failed()).isTrue();
+        assertThat(result.errorReason()).contains("no price data");
+        mockServer.verify();
+    }
 }

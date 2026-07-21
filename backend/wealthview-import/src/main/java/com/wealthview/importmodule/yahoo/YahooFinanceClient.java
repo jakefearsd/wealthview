@@ -116,7 +116,7 @@ public class YahooFinanceClient implements YahooPriceClient {
 
         var result = resultArray.get(0);
         var timestamps = result.path("timestamp");
-        var closeArray = result.path("indicators").path("quote").get(0).path("close");
+        var closeArray = result.path("indicators").path("quote").path(0).path("close");
 
         if (!timestamps.isArray() || !closeArray.isArray()) {
             return Collections.emptyList();
