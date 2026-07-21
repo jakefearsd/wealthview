@@ -1,16 +1,13 @@
 package com.wealthview.core.portfolio;
 
 import java.math.BigDecimal;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableMap;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -23,8 +20,8 @@ import com.wealthview.core.common.Entities;
 import com.wealthview.core.exchangerate.ExchangeRateService;
 import com.wealthview.core.portfolio.dto.PortfolioDataPointDto;
 import com.wealthview.core.portfolio.dto.PortfolioHistoryResponse;
+import com.wealthview.core.price.PriceHistorySupport;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
@@ -95,11 +92,8 @@ public class TheoreticalPortfolioService {
             return emptyResponse(accountId);
         }
 
-        var dataPointDates = generateFridays(startDate, endDate);
-        // Always include today so the chart extends to the current date
-        if (dataPointDates.isEmpty() || !dataPointDates.getLast().equals(endDate)) {
-            dataPointDates.add(endDate);
-        }
+        // Weekly Fridays plus today, so the chart extends to the current date
+        var dataPointDates = PriceHistorySupport.weeklyFridaysWithEndDate(startDate, endDate);
         var hasMoneyMarket = !moneyMarketHoldings.isEmpty();
         var dataPoints = computeWeeklyValuesWithMoneyMarket(
                 dataPointDates, pricedSymbols, quantityBySymbol, priceMap, moneyMarketTotal);
@@ -143,7 +137,7 @@ public class TheoreticalPortfolioService {
         }
         var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
                 regularSymbols, startDate, endDate);
-        var priceMap = buildPriceMap(prices);
+        var priceMap = PriceHistorySupport.buildPriceMap(prices);
         var pricedSymbols = regularSymbols.stream().filter(priceMap::containsKey).toList();
 
         if (pricedSymbols.size() < regularSymbols.size()) {
@@ -163,15 +157,6 @@ public class TheoreticalPortfolioService {
         }
         allSymbols.sort(String::compareTo);
         return allSymbols;
-    }
-
-    private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
-        Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
-        for (var price : prices) {
-            priceMap.computeIfAbsent(price.getSymbol(), k -> new TreeMap<>())
-                    .put(price.getDate(), price.getClosePrice());
-        }
-        return priceMap;
     }
 
     private List<PortfolioDataPointDto> computeWeeklyValuesWithMoneyMarket(
@@ -215,13 +200,4 @@ public class TheoreticalPortfolioService {
         return Optional.of(totalValue);
     }
 
-    private List<LocalDate> generateFridays(LocalDate start, LocalDate end) {
-        var fridays = new ArrayList<LocalDate>();
-        var friday = start.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
-        while (!friday.isAfter(end)) {
-            fridays.add(friday);
-            friday = friday.plusWeeks(1);
-        }
-        return fridays;
-    }
 }

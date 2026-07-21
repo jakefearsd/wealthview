@@ -2,10 +2,8 @@ package com.wealthview.core.dashboard;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -25,10 +23,10 @@ import com.wealthview.core.common.Money;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioDataPointDto;
 import com.wealthview.core.dashboard.dto.CombinedPortfolioHistoryResponse;
 import com.wealthview.core.exchangerate.ExchangeRateService;
+import com.wealthview.core.price.PriceHistorySupport;
 import com.wealthview.core.property.PropertyFinance;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyValuationEntity;
 import com.wealthview.persistence.repository.AccountRepository;
@@ -96,15 +94,8 @@ public class CombinedPortfolioHistoryService {
             return new CombinedPortfolioHistoryResponse(List.of(), 0, 0, 0);
         }
 
-        var dataPointDates = generateFridays(startDate, endDate);
-        // Always include today so the chart extends to the current date
-        if (dataPointDates.isEmpty() || !dataPointDates.getLast().equals(endDate)) {
-            dataPointDates.add(endDate);
-        }
-        if (dataPointDates.isEmpty()) {
-            return new CombinedPortfolioHistoryResponse(List.of(), 0,
-                    investmentAccounts.size(), properties.size());
-        }
+        // Weekly Fridays plus today, so the chart extends to the current date
+        var dataPointDates = PriceHistorySupport.weeklyFridaysWithEndDate(startDate, endDate);
 
         // Build investment data structures
         var investmentAccountIds = investmentAccounts.stream()
@@ -149,9 +140,23 @@ public class CombinedPortfolioHistoryService {
         if (!regularSymbols.isEmpty()) {
             var prices = priceRepository.findBySymbolInAndDateBetweenOrderBySymbolAscDateAsc(
                     regularSymbols, startDate, endDate);
-            priceMap = buildPriceMap(prices);
+            priceMap = PriceHistorySupport.buildPriceMap(prices);
         } else {
             priceMap = new HashMap<>();
+        }
+
+        // Per-currency quantity maps and priced symbol lists are date-independent —
+        // precompute them once instead of rebuilding inside the per-Friday loop.
+        var currencyHoldings = new HashMap<String, CurrencyHoldings>();
+        for (var entry : holdingsByCurrency.entrySet()) {
+            var qtyBySymbol = new HashMap<String, BigDecimal>();
+            for (var h : entry.getValue()) {
+                qtyBySymbol.merge(h.getSymbol(), h.getQuantity(), BigDecimal::add);
+            }
+            var symbols = qtyBySymbol.keySet().stream()
+                    .filter(priceMap::containsKey)
+                    .sorted().toList();
+            currencyHoldings.put(entry.getKey(), new CurrencyHoldings(symbols, qtyBySymbol));
         }
 
         // Build property valuation maps
@@ -163,20 +168,13 @@ public class CombinedPortfolioHistoryService {
         for (var friday : dataPointDates) {
             var investmentValue = BigDecimal.ZERO;
 
-            for (var entry : holdingsByCurrency.entrySet()) {
-                var currency = entry.getKey();
+            for (var entry : currencyHoldings.entrySet()) {
                 var holdings = entry.getValue();
-                var qtyBySymbol = new HashMap<String, BigDecimal>();
-                for (var h : holdings) {
-                    qtyBySymbol.merge(h.getSymbol(), h.getQuantity(), BigDecimal::add);
-                }
-                var symbols = qtyBySymbol.keySet().stream()
-                        .filter(priceMap::containsKey)
-                        .sorted().toList();
                 var currencyValue = computeInvestmentValue(
-                        friday, symbols, qtyBySymbol, priceMap, BigDecimal.ZERO);
+                        friday, holdings.pricedSymbols(), holdings.quantityBySymbol(), priceMap,
+                        BigDecimal.ZERO);
                 investmentValue = investmentValue.add(
-                        exchangeRateService.convertToUsd(currencyValue, currency, tenantId));
+                        exchangeRateService.convertToUsd(currencyValue, entry.getKey(), tenantId));
             }
 
             for (var mmEntry : mmTotalByCurrency.entrySet()) {
@@ -196,6 +194,9 @@ public class CombinedPortfolioHistoryService {
         return new CombinedPortfolioHistoryResponse(dataPoints, dataPoints.size(),
                 investmentAccounts.size(), properties.size());
     }
+
+    /** A currency's date-independent valuation inputs, precomputed once per history request. */
+    private record CurrencyHoldings(List<String> pricedSymbols, Map<String, BigDecimal> quantityBySymbol) {}
 
     private BigDecimal computeInvestmentValue(LocalDate date, List<String> pricedSymbols,
                                                Map<String, BigDecimal> quantityBySymbol,
@@ -274,22 +275,4 @@ public class CombinedPortfolioHistoryService {
         return PropertyFinance.mortgageBalanceAsOf(property, date);
     }
 
-    private Map<String, NavigableMap<LocalDate, BigDecimal>> buildPriceMap(List<PriceEntity> prices) {
-        Map<String, NavigableMap<LocalDate, BigDecimal>> priceMap = new HashMap<>();
-        for (var price : prices) {
-            priceMap.computeIfAbsent(price.getSymbol(), k -> new TreeMap<>())
-                    .put(price.getDate(), price.getClosePrice());
-        }
-        return priceMap;
-    }
-
-    private List<LocalDate> generateFridays(LocalDate start, LocalDate end) {
-        var fridays = new ArrayList<LocalDate>();
-        var friday = start.with(TemporalAdjusters.nextOrSame(DayOfWeek.FRIDAY));
-        while (!friday.isAfter(end)) {
-            fridays.add(friday);
-            friday = friday.plusWeeks(1);
-        }
-        return fridays;
-    }
 }
