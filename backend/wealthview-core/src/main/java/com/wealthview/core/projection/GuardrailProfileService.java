@@ -89,7 +89,6 @@ public class GuardrailProfileService {
             var params = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
             int birthYear = params.birthYear() != null
                     ? params.birthYear() : java.time.LocalDate.now().getYear() - 35;
-            String filingStatus = params.filingStatus();
             String withdrawalOrder = params.withdrawalOrder() != null
                     ? params.withdrawalOrder() : "taxable_first";
             // Audit C7 / T7-M3: same default the deterministic engine applies
@@ -99,11 +98,11 @@ public class GuardrailProfileService {
             int baseYear = projectionInput.referenceYear() != null
                     ? projectionInput.referenceYear() : java.time.LocalDate.now().getYear();
 
-            BigDecimal confidence = resolveConfidence(request);
+            var resolved = new ResolvedDefaults(
+                    birthYear, baseYear, resolveConfidence(request), withdrawalOrder);
 
-            var optimizationInput = buildOptimizationInput(scenario, projectionInput, request,
-                    birthYear, confidence, filingStatus, withdrawalOrder, params.dividendYield(),
-                    params.feeRate(), baseYear, params.includeDepressionYears(), params.interestYield());
+            var optimizationInput = buildOptimizationInput(
+                    scenario, projectionInput, request, params, resolved);
 
             var optimizerResult = spendingOptimizer.optimize(optimizationInput);
             var fixedReturnShare = computeFixedReturnShare(projectionInput.accounts());
@@ -475,6 +474,15 @@ public class GuardrailProfileService {
         }
     }
 
+    /**
+     * The handful of optimization inputs that need resolution logic beyond a plain
+     * null-coalesced read of the scenario params or request — computed once in
+     * {@link #optimize} and passed down so {@link #buildOptimizationInput} reads
+     * everything else straight from the already-parsed {@link ScenarioParams}.
+     */
+    private record ResolvedDefaults(int birthYear, int baseYear, BigDecimal confidence,
+                                    String withdrawalOrder) {}
+
     // NPathComplexity: this method maps many independent optional request fields, each guarded
     // by a small null/default check. The path count is multiplicative across those guards but
     // every branch is trivial; collapsing it into helpers would only scatter straight-line mapping.
@@ -482,21 +490,12 @@ public class GuardrailProfileService {
     private GuardrailOptimizationInput buildOptimizationInput(ProjectionScenarioEntity scenario,
                                                                ProjectionInput projectionInput,
                                                                GuardrailOptimizationRequest request,
-                                                               int birthYear,
-                                                               BigDecimal confidence,
-                                                               String filingStatus,
-                                                               String withdrawalOrder,
-                                                               BigDecimal dividendYield,
-                                                               BigDecimal feeRate,
-                                                               int baseYear,
-                                                               Boolean includeDepressionYears,
-                                                               BigDecimal interestYield) {
+                                                               ScenarioParams params,
+                                                               ResolvedDefaults resolved) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
-        // Household task 6: the scenario's household fields for the Monte Carlo first-death transition.
-        var hhParams = ScenarioParams.parseOrEmpty(MAPPER, scenario.getParamsJson());
         return new GuardrailOptimizationInput(
                 scenario.getRetirementDate(),
-                birthYear,
+                resolved.birthYear(),
                 scenario.getEndAge() != null ? scenario.getEndAge() : 90,
                 scenario.getInflationRate() != null ? scenario.getInflationRate() : DEFAULT_INFLATION_RATE,
                 projectionInput.accounts(),
@@ -510,7 +509,7 @@ public class GuardrailProfileService {
                 // and reintroduce the nominal-vs-constant-real-bracket frame mismatch.
                 request.returnMean(),
                 request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
-                confidence,
+                resolved.confidence(),
                 request.phases() != null ? request.phases() : List.of(),
                 deriveSeed(scenarioSignature(scenario, incomeSourceSignatures)),
                 request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
@@ -522,8 +521,8 @@ public class GuardrailProfileService {
                         ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
                 request.cashReturnRate() != null
                         ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE,
-                filingStatus,
-                withdrawalOrder,
+                params.filingStatus(),
+                resolved.withdrawalOrder(),
                 request.optimizeConversions() != null && request.optimizeConversions(),
                 request.conversionBracketRate(),
                 request.rmdTargetBracketRate(),
@@ -532,11 +531,11 @@ public class GuardrailProfileService {
                 request.rmdBracketHeadroom() != null
                         ? request.rmdBracketHeadroom() : new BigDecimal("0.10"),
                 request.dynamicSequencingBracketRate(),
-                dividendYield,
-                feeRate,
-                baseYear,
-                Boolean.TRUE.equals(includeDepressionYears),
-                interestYield,
+                params.dividendYield(),
+                params.feeRate(),
+                resolved.baseYear(),
+                Boolean.TRUE.equals(params.includeDepressionYears()),
+                params.interestYield(),
                 // T24 default-to-on (user decision, V077): an absent/null gate_on_adaptive_rules
                 // resolves TRUE -- new optimizations gate on the with-rules metric by default.
                 // Explicit false is fully honored: it is the conservative anchor and the
@@ -550,20 +549,20 @@ public class GuardrailProfileService {
                 // transitions at the same years the deterministic engine does. Null spouseBirthYear ⇒
                 // single-person, byte-identical to pre-household. Survivor factor / community-property
                 // defaults (0.75 / statutory 0.5) are resolved engine-side.
-                hhParams.spouseBirthYear(),
-                resolveDeathAge(hhParams.primaryDeathAge(), hhParams.birthYear()),
-                resolveDeathAge(hhParams.spouseDeathAge(), hhParams.spouseBirthYear()),
-                hhParams.survivorSpendingFactor(),
-                Boolean.TRUE.equals(hhParams.communityProperty()),
+                params.spouseBirthYear(),
+                resolveDeathAge(params.primaryDeathAge(), params.birthYear()),
+                resolveDeathAge(params.spouseDeathAge(), params.spouseBirthYear()),
+                params.survivorSpendingFactor(),
+                Boolean.TRUE.equals(params.communityProperty()),
                 // Sub-project B: raw params, unresolved (the sampler/context builder resolve the
                 // null-default false/blended/95 downstream). Table is loaded ONLY when the toggle
                 // is on, gated in ProjectionInputBuilder so a toggle-off run never touches
                 // mortality_rates.
-                hhParams.stochasticMortality(),
-                hhParams.primarySex(),
-                hhParams.spouseSex(),
-                hhParams.longevityConditionalAge(),
-                projectionInputBuilder.resolveMortalityTable(hhParams)
+                params.stochasticMortality(),
+                params.primarySex(),
+                params.spouseSex(),
+                params.longevityConditionalAge(),
+                projectionInputBuilder.resolveMortalityTable(params)
         );
     }
 
