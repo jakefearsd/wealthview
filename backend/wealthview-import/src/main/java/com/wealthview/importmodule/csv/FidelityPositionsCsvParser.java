@@ -93,8 +93,12 @@ public class FidelityPositionsCsvParser implements ImportParser {
                     BigDecimal quantity = parseAmount(quantityStr);
                     BigDecimal costBasis;
 
-                    if (costBasisStr == null || costBasisStr.isBlank() || costBasisStr.equals("--")) {
-                        costBasis = quantity.multiply(BigDecimal.ONE);
+                    if (isMissing(costBasisStr)) {
+                        // Fidelity reports "--" for positions without basis (e.g. money markets).
+                        // Approximate with the snapshot market value; fall back to quantity only
+                        // when that is missing too (correct for $1-NAV money market funds).
+                        var currentValueStr = record.get("Current Value");
+                        costBasis = isMissing(currentValueStr) ? quantity : parseAmount(currentValueStr);
                     } else {
                         costBasis = parseAmount(costBasisStr);
                     }
@@ -168,6 +172,10 @@ public class FidelityPositionsCsvParser implements ImportParser {
         }
         log.warn("No date found in footer, falling back to today");
         return LocalDate.now();
+    }
+
+    private boolean isMissing(String raw) {
+        return raw == null || raw.isBlank() || raw.equals("--");
     }
 
     private BigDecimal parseAmount(String raw) {

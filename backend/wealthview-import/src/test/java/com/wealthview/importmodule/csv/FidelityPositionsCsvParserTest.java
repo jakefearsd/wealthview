@@ -79,7 +79,36 @@ class FidelityPositionsCsvParserTest {
     }
 
     @Test
-    void parse_moneyMarketDashCostBasis_usesQuantityAsAmount() throws IOException {
+    void parse_stockWithDashCostBasis_usesCurrentValueAsAmount() throws IOException {
+        var csv = """
+                Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+                X12345678,INDIVIDUAL,AMZN,AMAZON.COM INC,50,$185.50,+$1.25,"$9,275.00",+$62.50,+0.68%,+$1275.00,+15.93%,25.00%,--,--,Cash
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        var amzn = result.transactions().get(0);
+        assertThat(amzn.symbol()).isEqualTo("AMZN");
+        assertThat(amzn.quantity()).isEqualByComparingTo(new BigDecimal("50"));
+        assertThat(amzn.amount()).isEqualByComparingTo(new BigDecimal("9275.00"));
+    }
+
+    @Test
+    void parse_dashCostBasisAndDashCurrentValue_fallsBackToQuantity() throws IOException {
+        var csv = """
+                Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
+                X12345678,INDIVIDUAL,SPAXX,FIDELITY GOVERNMENT MONEY MARKET,"2,500.00",$1.00,$0.00,--,$0.00,0.00%,$0.00,0.00%,10.00%,--,$1.00,Cash
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("2500.00"));
+    }
+
+    @Test
+    void parse_moneyMarketDashCostBasis_usesCurrentValueAsAmount() throws IOException {
         var csv = """
                 Account Number,Account Name,Symbol,Description,Quantity,Last Price,Last Price Change,Current Value,Today's Gain/Loss Dollar,Today's Gain/Loss Percent,Total Gain/Loss Dollar,Total Gain/Loss Percent,Percent Of Account,Cost Basis Total,Average Cost Basis,Type
                 X12345678,INDIVIDUAL,SPAXX,FIDELITY GOVERNMENT MONEY MARKET,"2,500.00",$1.00,$0.00,"$2,500.00",$0.00,0.00%,$0.00,0.00%,10.00%,--,$1.00,Cash
