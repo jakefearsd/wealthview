@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import com.wealthview.core.common.Money;
 import com.wealthview.core.property.dto.CostSegAllocation;
@@ -98,14 +97,8 @@ class DepreciationScheduleBuilder {
             List<CostSegAllocation> allocations, BigDecimal bonusRate) {
         var breakdowns = new ArrayList<DepreciationScheduleResult.ClassBreakdown>();
         for (var alloc : allocations) {
-            var lifeYears = switch (alloc.assetClass()) {
-                case "5yr" -> new BigDecimal("5");
-                case "7yr" -> new BigDecimal("7");
-                case "15yr" -> new BigDecimal("15");
-                case "27_5yr" -> new BigDecimal("27.5");
-                default -> BigDecimal.ZERO;
-            };
-            boolean isBonusEligible = Set.of("5yr", "7yr", "15yr").contains(alloc.assetClass());
+            var lifeYears = DepreciationCalculator.classLifeYears(alloc.assetClass());
+            boolean isBonusEligible = DepreciationCalculator.isBonusEligible(alloc.assetClass());
             var bonusAmount = isBonusEligible
                     ? alloc.allocation().multiply(bonusRate).setScale(Money.SCALE, Money.ROUNDING)
                     : BigDecimal.ZERO;

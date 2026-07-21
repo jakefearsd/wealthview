@@ -337,4 +337,27 @@ class DepreciationCalculatorTest {
         // bonus schedule exactly.
         assertThat(withEqualStudyYear).isEqualTo(withNullStudyYear);
     }
+
+    @Test
+    void classLifeYears_knownClasses_returnsRecoveryPeriod() {
+        assertThat(DepreciationCalculator.classLifeYears("5yr")).isEqualByComparingTo("5");
+        assertThat(DepreciationCalculator.classLifeYears("7yr")).isEqualByComparingTo("7");
+        assertThat(DepreciationCalculator.classLifeYears("15yr")).isEqualByComparingTo("15");
+        assertThat(DepreciationCalculator.classLifeYears("27_5yr")).isEqualByComparingTo("27.5");
+    }
+
+    @Test
+    void classLifeYears_unknownClass_throwsIllegalArgument() {
+        assertThatThrownBy(() -> DepreciationCalculator.classLifeYears("39yr"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("39yr");
+    }
+
+    @Test
+    void isBonusEligible_structuralClassIsNot_shortLifeClassesAre() {
+        assertThat(DepreciationCalculator.isBonusEligible("5yr")).isTrue();
+        assertThat(DepreciationCalculator.isBonusEligible("7yr")).isTrue();
+        assertThat(DepreciationCalculator.isBonusEligible("15yr")).isTrue();
+        assertThat(DepreciationCalculator.isBonusEligible("27_5yr")).isFalse();
+    }
 }

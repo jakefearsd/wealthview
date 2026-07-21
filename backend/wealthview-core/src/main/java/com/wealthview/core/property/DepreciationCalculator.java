@@ -27,6 +27,24 @@ public class DepreciationCalculator {
             "27_5yr", new BigDecimal("27.5"));
 
     /**
+     * Recovery period in years for a cost-segregation asset class.
+     *
+     * @throws IllegalArgumentException for an unknown asset class
+     */
+    static BigDecimal classLifeYears(String assetClass) {
+        var lifeYears = CLASS_LIFE_YEARS.get(assetClass);
+        if (lifeYears == null) {
+            throw new IllegalArgumentException("Invalid asset class: " + assetClass);
+        }
+        return lifeYears;
+    }
+
+    /** Whether an asset class qualifies for bonus depreciation (5yr/7yr/15yr; structural does not). */
+    static boolean isBonusEligible(String assetClass) {
+        return BONUS_ELIGIBLE_CLASSES.contains(assetClass);
+    }
+
+    /**
      * Computes a straight-line depreciation schedule using IRS mid-month convention.
      * First year is prorated based on the month placed in service.
      * Last partial year gets the remainder so total equals depreciable basis.
@@ -91,12 +109,8 @@ public class DepreciationCalculator {
         boolean hasCatchUp = studyYear != null && studyYear > inServiceDate.getYear();
 
         for (var alloc : allocations) {
-            var lifeYears = CLASS_LIFE_YEARS.get(alloc.assetClass());
-            if (lifeYears == null) {
-                throw new IllegalArgumentException("Invalid asset class: " + alloc.assetClass());
-            }
-
-            boolean isBonusEligible = BONUS_ELIGIBLE_CLASSES.contains(alloc.assetClass());
+            var lifeYears = classLifeYears(alloc.assetClass());
+            boolean isBonusEligible = isBonusEligible(alloc.assetClass());
 
             if (isBonusEligible && hasCatchUp) {
                 applyCatchUpSchedule(alloc, lifeYears, bonusRate, inServiceDate, studyYear, schedule);
