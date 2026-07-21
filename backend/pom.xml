@@ -78,11 +78,11 @@
         <jsoup.version>1.22.2</jsoup.version>
         <caffeine.version>3.2.4</caffeine.version>
         <samstevens-totp.version>1.7.1</samstevens-totp.version>
-        <guava.version>33.4.8-jre</guava.version>
+        <guava.version>33.6.0-jre</guava.version>
         <jsonassert.version>1.5.3</jsonassert.version>
-        <logstash-logback-encoder.version>8.0</logstash-logback-encoder.version>
+        <logstash-logback-encoder.version>9.0</logstash-logback-encoder.version>
         <!-- Quality tool versions -->
-        <spotbugs-maven-plugin.version>4.10.2.0</spotbugs-maven-plugin.version>
+        <spotbugs-maven-plugin.version>4.10.3.0</spotbugs-maven-plugin.version>
         <checkstyle-plugin.version>3.6.0</checkstyle-plugin.version>
         <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
         <pmd-plugin.version>3.28.0</pmd-plugin.version>
@@ -97,7 +97,7 @@
              ignored - but forcing PMD core 7.26.0 surfaced 4 new rule violations
              that 7.17.0 doesn't flag, so the override was reverted rather than
              fixing unrelated findings as a side effect of a build-tooling commit.) -->
-        <checkstyle.core.version>13.7.0</checkstyle.core.version>
+        <checkstyle.core.version>13.8.0</checkstyle.core.version>
         <!-- Site tool versions -->
         <maven-site-plugin.version>4.0.0-M16</maven-site-plugin.version>
         <project-info-reports-plugin.version>3.9.0</project-info-reports-plugin.version>
@@ -359,7 +359,7 @@
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>1.25.6</version>
+                    <version>1.25.8</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
