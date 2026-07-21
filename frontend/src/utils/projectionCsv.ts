@@ -7,55 +7,79 @@ export interface ProjectionCsvOptions {
     computeTotalSpending: (y: ProjectionYear) => number | null;
 }
 
-export function buildProjectionCsv(yearlyData: ProjectionYear[], options: ProjectionCsvOptions): string {
+interface CsvColumn {
+    header: string;
+    value: (y: ProjectionYear) => string | number;
+}
+
+/**
+ * Each header and its row extractor live in one spec entry, so a column can never
+ * be added or reordered in the header list without its value moving in lockstep.
+ */
+function buildColumns(yearlyData: ProjectionYear[], options: ProjectionCsvOptions): CsvColumn[] {
     const { hasPoolData, hasSpendingData, hasSurplusReinvested, computeTotalSpending } = options;
     const csvHasStateTax = yearlyData.some(y => y.state_tax != null);
 
-    const headers = ['Year', 'Age', 'Start', 'Contributions', 'Growth', 'Withdrawals', 'Income', 'Total Spending', 'End', 'Status'];
+    const columns: CsvColumn[] = [
+        { header: 'Year', value: y => y.year },
+        { header: 'Age', value: y => y.age },
+        { header: 'Start', value: y => y.start_balance },
+        { header: 'Contributions', value: y => y.contributions },
+        { header: 'Growth', value: y => y.growth },
+        { header: 'Withdrawals', value: y => y.withdrawals },
+        { header: 'Income', value: y => y.income_streams_total ?? '' },
+        { header: 'Total Spending', value: y => computeTotalSpending(y) ?? '' },
+        { header: 'End', value: y => y.end_balance },
+        { header: 'Status', value: y => (y.retired ? 'Retired' : 'Working') },
+    ];
     if (hasPoolData) {
-        headers.push('Traditional', 'Roth', 'Taxable', 'Conversion', 'Tax');
-        headers.push('Trad Growth', 'Roth Growth', 'Taxable Growth',
-            'Tax from Taxable', 'Tax from Trad', 'Tax from Roth',
-            'WD from Taxable', 'WD from Trad', 'WD from Roth');
+        columns.push(
+            { header: 'Traditional', value: y => y.traditional_balance ?? '' },
+            { header: 'Roth', value: y => y.roth_balance ?? '' },
+            { header: 'Taxable', value: y => y.taxable_balance ?? '' },
+            { header: 'Conversion', value: y => y.roth_conversion_amount ?? '' },
+            { header: 'Tax', value: y => y.tax_liability ?? '' },
+            { header: 'Trad Growth', value: y => y.traditional_growth ?? '' },
+            { header: 'Roth Growth', value: y => y.roth_growth ?? '' },
+            { header: 'Taxable Growth', value: y => y.taxable_growth ?? '' },
+            { header: 'Tax from Taxable', value: y => y.tax_paid_from_taxable ?? '' },
+            { header: 'Tax from Trad', value: y => y.tax_paid_from_traditional ?? '' },
+            { header: 'Tax from Roth', value: y => y.tax_paid_from_roth ?? '' },
+            { header: 'WD from Taxable', value: y => y.withdrawal_from_taxable ?? '' },
+            { header: 'WD from Trad', value: y => y.withdrawal_from_traditional ?? '' },
+            { header: 'WD from Roth', value: y => y.withdrawal_from_roth ?? '' },
+        );
     }
     if (csvHasStateTax) {
-        headers.push('Federal Tax', 'State Tax', 'SALT', 'Deduction Type');
+        columns.push(
+            { header: 'Federal Tax', value: y => y.federal_tax ?? '' },
+            { header: 'State Tax', value: y => y.state_tax ?? '' },
+            { header: 'SALT', value: y => y.salt_deduction ?? '' },
+            {
+                header: 'Deduction Type',
+                value: y => (y.used_itemized_deduction != null
+                    ? (y.used_itemized_deduction ? 'Itemized' : 'Standard')
+                    : ''),
+            },
+        );
     }
     if (hasSpendingData) {
-        headers.push('Essential', 'Discretionary', 'Net Need', 'Surplus/Deficit');
-        if (hasSurplusReinvested) headers.push('Surplus Reinvested');
+        columns.push(
+            { header: 'Essential', value: y => y.essential_expenses ?? '' },
+            { header: 'Discretionary', value: y => y.discretionary_after_cuts ?? y.discretionary_expenses ?? '' },
+            { header: 'Net Need', value: y => y.net_spending_need ?? '' },
+            { header: 'Surplus/Deficit', value: y => y.spending_surplus ?? '' },
+        );
+        if (hasSurplusReinvested) {
+            columns.push({ header: 'Surplus Reinvested', value: y => y.surplus_reinvested ?? '' });
+        }
     }
+    return columns;
+}
 
-    const rows = yearlyData.map(y => {
-        const vals: (string | number)[] = [
-            y.year, y.age, y.start_balance, y.contributions, y.growth, y.withdrawals,
-            y.income_streams_total ?? '', computeTotalSpending(y) ?? '',
-            y.end_balance, y.retired ? 'Retired' : 'Working',
-        ];
-        if (hasPoolData) {
-            vals.push(
-                y.traditional_balance ?? '', y.roth_balance ?? '', y.taxable_balance ?? '',
-                y.roth_conversion_amount ?? '', y.tax_liability ?? '',
-                y.traditional_growth ?? '', y.roth_growth ?? '', y.taxable_growth ?? '',
-                y.tax_paid_from_taxable ?? '', y.tax_paid_from_traditional ?? '', y.tax_paid_from_roth ?? '',
-                y.withdrawal_from_taxable ?? '', y.withdrawal_from_traditional ?? '', y.withdrawal_from_roth ?? '',
-            );
-        }
-        if (csvHasStateTax) {
-            vals.push(
-                y.federal_tax ?? '', y.state_tax ?? '', y.salt_deduction ?? '',
-                y.used_itemized_deduction != null ? (y.used_itemized_deduction ? 'Itemized' : 'Standard') : '',
-            );
-        }
-        if (hasSpendingData) {
-            vals.push(
-                y.essential_expenses ?? '', y.discretionary_after_cuts ?? y.discretionary_expenses ?? '',
-                y.net_spending_need ?? '', y.spending_surplus ?? '',
-            );
-            if (hasSurplusReinvested) vals.push(y.surplus_reinvested ?? '');
-        }
-        return vals.join(',');
-    });
-
-    return [headers.join(','), ...rows].join('\n');
+export function buildProjectionCsv(yearlyData: ProjectionYear[], options: ProjectionCsvOptions): string {
+    const columns = buildColumns(yearlyData, options);
+    const headerLine = columns.map(c => c.header).join(',');
+    const rows = yearlyData.map(y => columns.map(c => c.value(y)).join(','));
+    return [headerLine, ...rows].join('\n');
 }
