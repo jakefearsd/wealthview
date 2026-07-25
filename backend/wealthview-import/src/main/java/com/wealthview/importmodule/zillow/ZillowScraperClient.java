@@ -36,6 +36,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
             "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?"
             + "\"address\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
             + "\"zestimate\"\\s*:\\s*(\\d+)");
+    private static final Pattern CARD_ZPID_PATTERN = Pattern.compile("/(\\d+)_zpid");
     private static final Pattern SEARCH_RESULT_ALT_PATTERN = Pattern.compile(
             "\"zpid\"\\s*:\\s*\"?(\\d+)\"?[^}]*?"
             + "\"streetAddress\"\\s*:\\s*\"([^\"]+)\"[^}]*?"
@@ -52,15 +53,10 @@ public class ZillowScraperClient implements PropertyValuationClient {
     @Override
     public Optional<PropertyValuationResult> getValuation(String address) {
         try {
-            var url = ZILLOW_BASE_URL + formatAddressForUrl(address) + "_rb/";
+            var url = addressSearchUrl(address);
             log.debug("Fetching Zillow page: {}", url);
 
-            var doc = Jsoup.connect(url)
-                    .userAgent(USER_AGENT)
-                    .timeout(timeoutMs)
-                    .get();
-
-            return extractZestimate(doc);
+            return extractZestimate(fetch(url));
         } catch (IOException e) {
             log.warn("Failed to fetch Zillow valuation for address '{}'", address, e);
             return Optional.empty();
@@ -73,12 +69,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
             var url = ZILLOW_PROPERTY_URL + zpid + "_zpid/";
             log.debug("Fetching Zillow property by zpid: {}", url);
 
-            var doc = Jsoup.connect(url)
-                    .userAgent(USER_AGENT)
-                    .timeout(timeoutMs)
-                    .get();
-
-            return extractZestimate(doc);
+            return extractZestimate(fetch(url));
         } catch (IOException e) {
             log.warn("Failed to fetch Zillow valuation for zpid '{}'", zpid, e);
             return Optional.empty();
@@ -88,19 +79,26 @@ public class ZillowScraperClient implements PropertyValuationClient {
     @Override
     public List<ZillowSearchResult> searchProperties(String address) {
         try {
-            var url = ZILLOW_BASE_URL + formatAddressForUrl(address) + "_rb/";
+            var url = addressSearchUrl(address);
             log.debug("Searching Zillow for address: {}", url);
 
-            var doc = Jsoup.connect(url)
-                    .userAgent(USER_AGENT)
-                    .timeout(timeoutMs)
-                    .get();
-
-            return extractSearchResults(doc);
+            return extractSearchResults(fetch(url));
         } catch (IOException e) {
             log.warn("Failed to search Zillow for address '{}'", address, e);
             return Collections.emptyList();
         }
+    }
+
+    /** The one place the outbound request is shaped — user agent and timeout apply to every fetch. */
+    private Document fetch(String url) throws IOException {
+        return Jsoup.connect(url)
+                .userAgent(USER_AGENT)
+                .timeout(timeoutMs)
+                .get();
+    }
+
+    private String addressSearchUrl(String address) {
+        return ZILLOW_BASE_URL + formatAddressForUrl(address) + "_rb/";
     }
 
     Optional<PropertyValuationResult> extractZestimate(Document doc) {
@@ -184,7 +182,7 @@ public class ZillowScraperClient implements PropertyValuationClient {
 
                 if (link != null && priceEl != null) {
                     var href = link.attr("href");
-                    var zpidMatch = Pattern.compile("/(\\d+)_zpid").matcher(href);
+                    var zpidMatch = CARD_ZPID_PATTERN.matcher(href);
                     var priceMatch = PRICE_PATTERN.matcher(priceEl.text());
 
                     if (zpidMatch.find() && priceMatch.find()) {

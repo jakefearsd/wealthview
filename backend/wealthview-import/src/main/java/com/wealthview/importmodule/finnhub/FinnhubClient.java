@@ -40,11 +40,7 @@ public class FinnhubClient implements PriceFeedClient {
     @Override
     public QuoteResult getQuote(String symbol) {
         try {
-            var dto = restClient.get()
-                    .uri("/api/v1/quote?symbol={symbol}", symbol)
-                    .header(TOKEN_HEADER, apiKey)
-                    .retrieve()
-                    .body(FinnhubQuoteDto.class);
+            var dto = getWithToken(FinnhubQuoteDto.class, "/api/v1/quote?symbol={symbol}", symbol);
 
             if (dto == null || dto.c() == null || dto.c().compareTo(BigDecimal.ZERO) == 0) {
                 log.warn("No valid quote data for symbol {}", symbol);
@@ -74,12 +70,9 @@ public class FinnhubClient implements PriceFeedClient {
             long fromUnix = from.atStartOfDay(NY_ZONE).toEpochSecond();
             long toUnix = to.atTime(23, 59, 59).atZone(NY_ZONE).toEpochSecond();
 
-            var dto = restClient.get()
-                    .uri("/api/v1/stock/candle?symbol={symbol}&resolution=D&from={from}&to={to}",
-                            symbol, fromUnix, toUnix)
-                    .header(TOKEN_HEADER, apiKey)
-                    .retrieve()
-                    .body(FinnhubCandleDto.class);
+            var dto = getWithToken(FinnhubCandleDto.class,
+                    "/api/v1/stock/candle?symbol={symbol}&resolution=D&from={from}&to={to}",
+                    symbol, fromUnix, toUnix);
 
             if (dto == null || !"ok".equals(dto.s())) {
                 log.warn("No candle data for symbol {}", symbol);
@@ -99,6 +92,18 @@ public class FinnhubClient implements PriceFeedClient {
             log.warn("Failed to fetch candles for symbol {}", symbol, e);
             return Optional.empty();
         }
+    }
+
+    /**
+     * The one place the API token is attached, so a new endpoint cannot be added without it.
+     * Returns {@code null} when Finnhub replies with an empty body; every caller null-checks.
+     */
+    private <T> T getWithToken(Class<T> type, String uriTemplate, Object... uriVariables) {
+        return restClient.get()
+                .uri(uriTemplate, uriVariables)
+                .header(TOKEN_HEADER, apiKey)
+                .retrieve()
+                .body(type);
     }
 
     record FinnhubQuoteDto(BigDecimal c) {}
