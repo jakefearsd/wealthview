@@ -8,6 +8,36 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 Nothing yet.
 
+## [1.2.2] — 2026-07-21
+
+Consolidates 13 commits since v1.2.1 — a code-quality pass plus a dependency
+currency sweep. No schema changes (still V080).
+
+### Fixed
+- Fidelity positions import: a row whose cost basis is `--` now falls back to
+  the snapshot market value instead of importing a zero cost basis.
+- Theoretical portfolio history: duplicate-symbol holdings rows are merged
+  rather than one silently overwriting the other.
+- Yahoo chart parsing: a quote block missing its indicators is treated as
+  no-data instead of throwing.
+- Depreciation: asset-class life and bonus-eligibility metadata is now derived
+  from one source, removing a drift risk between the calculator and the
+  schedule builder.
+
+### Internal
+- Behavior-preserving refactors: `SimulationConfig.builder(...)` replaced five
+  telescoping constructors across 30 call sites; `IncomeProjector.Context`
+  made the three-precompute lockstep structural; shared price-history
+  date-grid/price-map plumbing extracted; projection CSV export driven from a
+  single column spec; `ScenarioForm` split from 865 lines into section
+  components.
+- Maven reactor now builds in parallel (`-T1C`), cutting build time ~15-20%.
+
+### Dependencies
+- Backend build tooling and the logstash encoder (9.x); npm minors across all
+  workspaces plus react-router 8 and `@testing-library/jest-dom` 7. `npm audit`
+  clean; all quality gates green.
+
 ## [1.2.1] — 2026-07-19
 
 Consolidates everything since v1.2.0. (Releases 1.1.0, 1.1.1, and 1.2.0 were
