@@ -254,6 +254,80 @@ class RateLimitFilterTest {
     }
 
     @Test
+    void expiredWindows_areEvictedOnceSweepIntervalElapses() throws ServletException, IOException {
+        // Own registry: the tracked-keys gauge is registered under a fixed name, so sharing
+        // meterRegistry with the setUp() filter would read that filter's map instead.
+        var registry = new SimpleMeterRegistry();
+        var clock = new MutableClock(0L);
+        var sweepingFilter = new RateLimitFilter(registry,
+                new com.wealthview.api.common.ClientIpResolver(List.of()), clock);
+
+        // 500 distinct auth clients, each seen exactly once inside the first window.
+        for (int i = 0; i < 500; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("203.0.113." + i);
+            sweepingFilter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+        }
+        assertThat(trackedKeys(registry)).isEqualTo(500);
+
+        // Every one of those windows has now expired, and the sweep interval has elapsed.
+        clock.advance(120_000);
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setRemoteAddr("198.51.100.1");
+        sweepingFilter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+
+        assertThat(trackedKeys(registry)).isEqualTo(1);
+    }
+
+    @Test
+    void unexpiredWindows_surviveSweepAndKeepEnforcingTheLimit() throws ServletException, IOException {
+        var clock = new MutableClock(0L);
+        var sweepingFilter = new RateLimitFilter(meterRegistry,
+                new com.wealthview.api.common.ClientIpResolver(List.of()), clock);
+
+        // Burn the whole auth budget for one IP, then land exactly on the boundary where a sweep
+        // is due (now - lastSweep >= 60s) but this window has NOT yet expired (now - start is not
+        // yet > 60s). The sweep must leave it alone and the limit must still bite.
+        for (int i = 0; i <= 60; i++) {
+            var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.setRemoteAddr("192.0.2.5");
+            sweepingFilter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
+        }
+        clock.advance(60_000);
+
+        var request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.setRemoteAddr("192.0.2.5");
+        var response = new MockHttpServletResponse();
+        sweepingFilter.doFilterInternal(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(429);
+    }
+
+    private double trackedKeys(SimpleMeterRegistry registry) {
+        var gauge = registry.find("wealthview.ratelimit.tracked_keys").gauge();
+        assertThat(gauge).isNotNull();
+        return gauge.value();
+    }
+
+    /** Hand-cranked millisecond source so window expiry is testable without sleeping. */
+    private static final class MutableClock implements java.util.function.LongSupplier {
+        private long millis;
+
+        MutableClock(long millis) {
+            this.millis = millis;
+        }
+
+        void advance(long delta) {
+            millis += delta;
+        }
+
+        @Override
+        public long getAsLong() {
+            return millis;
+        }
+    }
+
+    @Test
     void rateLimitExceeded_responseBodyIsJson() throws ServletException, IOException {
         for (int i = 0; i <= 300; i++) {
             var req = new MockHttpServletRequest("GET", "/api/v1/test");
