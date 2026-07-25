@@ -8,6 +8,54 @@ and the project adheres to [Semantic Versioning](https://semver.org/).
 
 Nothing yet.
 
+## [1.2.3] — 2026-07-25
+
+Consolidates 17 commits since v1.2.2 — one memory-leak fix, a repaired mobile
+lint gate, the remaining code-quality backlog, and a dependency sweep that took
+four majors. No schema changes (still V080).
+
+### Fixed
+- Rate limiting no longer leaks memory. The filter tracked one entry per
+  distinct client key (source IP for auth paths, principal or IP elsewhere) and
+  never removed any, so the map grew for the lifetime of the process — slowly
+  under organic traffic, quickly under a burst from many source IPs. Expired
+  windows are now swept out, bounding the map to clients seen in the last
+  window, and the tracked-key count is exposed as the
+  `wealthview.ratelimit.tracked_keys` gauge.
+
+### Internal
+- Mobile `npm run lint` was failing outright rather than reporting: a missing
+  `eslint-plugin-jest` meant the shared React Native config referenced a Jest
+  environment that did not exist, aborting config validation before any file was
+  linted. With the linter running again, all 25 findings it had been hiding are
+  resolved, including a dead constant in the portfolio screen. Mobile lint is now
+  a working gate.
+- Closed the remaining code-quality backlog: a `hasStateTax()` capability check
+  replaces an `instanceof` test against the no-state-tax null object; holdings
+  aggregation returns a named record instead of a two-element `BigDecimal[]`;
+  the degenerate optimization setup is built by named factories instead of three
+  positional argument lists of zeros and nulls; the four production-secret guards
+  share one helper; the Zillow and Finnhub clients shape their outbound requests
+  in one place each; and the monthly-interpolation helper reads its three
+  retirement pools all-or-nothing, removing eleven non-null assertions.
+- Added test coverage for the property income chart (12 tests over category
+  ordering, trailing-window totals, inflation compounding, and depreciation) and
+  removed dead scaffolding from the test suites, including an anonymous-class
+  hook that silently overrode nothing.
+
+### Dependencies
+- Vite 8 with `@vitejs/plugin-react` 6 and Vitest 4.1.10. Vite 8 builds with
+  rolldown, which rejects the object form of `manualChunks`; the chunk split is
+  preserved (vendor-charts 436 kB vs 439 kB).
+- React Native 0.86.0 with the matching `@react-native/*` 0.86.0 set, verified by
+  an Android debug build. React 19.2.8.
+- `@testing-library/react-native` 14, whose `render` is now async — every mobile
+  test call site was migrated. Prettier 3.
+- `typescript-eslint` 8.65. TypeScript stays on 5.9: typescript-eslint caps its
+  peer at `<6.1.0`, so TypeScript 7 cannot be adopted without an unsupported
+  dependency resolution.
+- Backend dependencies were already at latest stable; nothing moved.
+
 ## [1.2.2] — 2026-07-21
 
 Consolidates 13 commits since v1.2.1 — a code-quality pass plus a dependency
