@@ -31,13 +31,6 @@ interface DataState {
 
 const EMPTY: DataState = { summary: null, accounts: [] };
 
-const CHIP_TYPES: Array<{ key: string; label: string }> = [
-    { key: 'investment', label: 'Investments' },
-    { key: 'cash', label: 'Cash' },
-    { key: 'property', label: 'Property' },
-    { key: 'retirement', label: 'Retirement' },
-];
-
 /**
  * Aggregates allocation entries from the dashboard summary into the
  * coarse buckets we display as category chips. Brokerage/ira/401k/roth
