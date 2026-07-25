@@ -217,7 +217,7 @@ public class CombinedTaxCalculator implements TaxCalculationStrategy {
         // (standard or itemized, whichever the filer would use at that income level).
         // State tax is a cost of the conversion, not a gating factor for how much to convert.
 
-        if (state instanceof NullStateTaxCalculator) {
+        if (!state.hasStateTax()) {
             return federal.computeMaxIncomeForBracket(targetRate, taxYear, status);
         }
 

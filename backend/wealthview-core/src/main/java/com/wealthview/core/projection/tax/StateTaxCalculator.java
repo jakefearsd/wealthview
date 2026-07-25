@@ -13,6 +13,16 @@ public interface StateTaxCalculator {
     boolean taxesCapitalGainsAsOrdinaryIncome();
 
     /**
+     * Whether this state levies an income tax at all. {@code false} only for
+     * {@link NullStateTaxCalculator}, the null object used when a scenario has no state tax. Lets
+     * callers branch on the capability rather than on the concrete implementation type, so a future
+     * second no-tax implementation gets the same treatment for free.
+     */
+    default boolean hasStateTax() {
+        return true;
+    }
+
+    /**
      * Whether this state fully exempts Social Security benefits from its own taxable base, so the
      * {@code CombinedTaxCalculator} seam should subtract the year's federally-taxed Social Security
      * amount from the state base before computing state tax (audit C3). Defaults to {@code true} --
