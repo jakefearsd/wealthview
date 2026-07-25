@@ -87,14 +87,19 @@ public class HoldingsComputationService {
         }
 
         var transactions = transactionRepository.findByAccount_IdAndSymbol(account.getId(), symbol);
-        var aggregated = aggregateTransactions(transactions);
-        var netQuantity = aggregated[0];
-        var totalCost = aggregated[1];
+        var position = aggregateTransactions(transactions);
 
-        saveOrUpdateHolding(existingHolding, account, tenant, symbol, netQuantity, totalCost);
+        saveOrUpdateHolding(existingHolding, account, tenant, symbol,
+                position.netQuantity(), position.totalCost());
     }
 
-    private BigDecimal[] aggregateTransactions(List<TransactionEntity> transactions) {
+    /** The net position implied by a symbol's transaction history: quantity held and its cost basis. */
+    private record AggregatedPosition(BigDecimal netQuantity, BigDecimal totalCost) {
+        private static final AggregatedPosition FLAT =
+                new AggregatedPosition(BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    private AggregatedPosition aggregateTransactions(List<TransactionEntity> transactions) {
         var netQuantity = BigDecimal.ZERO;
         var totalCost = BigDecimal.ZERO;
 
@@ -118,10 +123,9 @@ public class HoldingsComputationService {
         }
 
         if (netQuantity.compareTo(BigDecimal.ZERO) <= 0) {
-            netQuantity = BigDecimal.ZERO;
-            totalCost = BigDecimal.ZERO;
+            return AggregatedPosition.FLAT;
         }
-        return new BigDecimal[]{netQuantity, totalCost};
+        return new AggregatedPosition(netQuantity, totalCost);
     }
 
     private void saveOrUpdateHolding(java.util.Optional<HoldingEntity> existingHolding,
