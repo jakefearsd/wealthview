@@ -103,7 +103,8 @@ class MfaIT extends AbstractApiIntegrationTest {
 
     @Test
     void loginWithMfaEnabled_returnsMfaRequired_notTokens_bearer() {
-        var secret = enableMfaOnAdmin();
+        // Called for its effect only — this test asserts the challenge response, not a TOTP code.
+        enableMfaOnAdmin();
 
         var resp = restTemplate.exchange("/api/v1/auth/token/login",
                 HttpMethod.POST,

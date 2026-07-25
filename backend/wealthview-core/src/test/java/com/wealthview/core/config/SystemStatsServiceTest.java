@@ -123,8 +123,6 @@ class SystemStatsServiceTest {
 
     @Test
     void getStats_countsUniqueSymbolsFromPriceRepository() {
-        var tenant = new TenantEntity("Tenant");
-
         when(userRepository.count()).thenReturn(0L);
         when(userRepository.findAll()).thenReturn(List.of());
         when(tenantRepository.count()).thenReturn(0L);

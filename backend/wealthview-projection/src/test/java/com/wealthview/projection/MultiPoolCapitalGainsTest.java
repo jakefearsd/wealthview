@@ -76,12 +76,7 @@ class MultiPoolCapitalGainsTest {
                 PoolStrategy.POOL_ROTH, List.of(roth));
     }
 
-    private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
-                                                   CapitalGainsTaxCalculator cg) {
-        return config(dividendYield, order, cg, null);
-    }
-
-    /** Overload that also threads a standard-deduction source for the LTCG-floor netting fix. */
+    /** Threads a standard-deduction source for the LTCG-floor netting fix. */
     private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
                                                    CapitalGainsTaxCalculator cg,
                                                    FederalTaxCalculator federalTaxCalculator) {

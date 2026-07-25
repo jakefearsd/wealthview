@@ -153,10 +153,8 @@ class StockSplitIT extends AbstractApiIntegrationTest {
         // Bootstrap tenant 2 with their own AAPL position
         authHelper.bootstrapSecondTenant(restTemplate);
         var t2Token = authHelper.tenant2Token();
-        var t2Helper = new TestDataHelper(restTemplate, authHelper) {
-            String overrideToken() { return t2Token; }
-        };
-        // Direct API call with tenant 2 token
+        // Direct API call with tenant 2 token — TestDataHelper always uses tenant 1's token and
+        // exposes no seam to swap it, so tenant 2's setup is driven through restTemplate here.
         var t2Account = restTemplate.exchange("/api/v1/accounts", HttpMethod.POST,
                 authHelper.authEntity(Map.of("name", "T2 Brokerage", "type", "brokerage"), t2Token),
                 MAP_TYPE);

@@ -26,8 +26,8 @@ class UserControllerIT extends AbstractApiIntegrationTest {
     @Test
     void updateRole_asAdmin_returns200() {
         var inviteCode = authHelper.createInviteCode();
-        var memberToken = authHelper.registerAndGetToken(restTemplate,
-                "member@test.com", "mytestpass", inviteCode);
+        // Registers the member whose role is updated below; the token itself is not needed.
+        authHelper.registerAndGetToken(restTemplate, "member@test.com", "mytestpass", inviteCode);
 
         var users = restTemplate.exchange("/api/v1/tenant/users",
                 HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);

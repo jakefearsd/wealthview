@@ -1615,8 +1615,6 @@ class GuardrailProfileServiceTest {
         private BigDecimal conversionBracketRate;
         private BigDecimal rmdTargetBracketRate;
         private Integer buffer;
-        private BigDecimal rmdBracketHeadroom;
-        private BigDecimal dynamicSequencingBracketRate;
         private Boolean gateOnAdaptiveRules;
 
         RequestBuilder(UUID scenarioId) { this.scenarioId = scenarioId; }
@@ -1643,7 +1641,10 @@ class GuardrailProfileServiceTest {
                     portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, riskTolerance,
                     cashReserveYears, cashReturnRate, optimizeConversions,
                     conversionBracketRate, rmdTargetBracketRate, buffer,
-                    rmdBracketHeadroom, dynamicSequencingBracketRate, gateOnAdaptiveRules);
+                    // rmdBracketHeadroom and dynamicSequencingBracketRate are always absent here:
+                    // this builder covers GuardrailProfileService's own wiring, while those two are
+                    // exercised against real values in RothConversionOptimizerTest.
+                    null, null, gateOnAdaptiveRules);
         }
     }
 }

@@ -36,8 +36,9 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
 
     @Test
     void listSessions_afterMultipleLogins_returnsAllActive() {
-        var s1 = tokenLogin();
-        var s2 = tokenLogin();
+        // First two logins exist only to create additional active sessions.
+        tokenLogin();
+        tokenLogin();
         var s3 = tokenLogin();
 
         var resp = listSessions((String) s3.get("access_token"));
@@ -47,7 +48,8 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
 
     @Test
     void listSessions_marksCurrentSession() {
-        var s1 = tokenLogin();
+        // A second active session must exist so "current" is a meaningful distinction.
+        tokenLogin();
         var s2 = tokenLogin();
         var s2Access = (String) s2.get("access_token");
 

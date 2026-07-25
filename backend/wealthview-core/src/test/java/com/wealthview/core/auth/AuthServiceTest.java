@@ -128,25 +128,12 @@ class AuthServiceTest {
         return ((com.wealthview.core.auth.dto.LoginOutcome.Tokens) outcome).result();
     }
 
-    private com.wealthview.core.auth.dto.AuthResult login(LoginRequest request, String ip, String transport) {
-        var outcome = authService.loginInitiate(request, new AuthRequestContext(transport, ip, null, null));
-        return ((com.wealthview.core.auth.dto.LoginOutcome.Tokens) outcome).result();
-    }
-
     private com.wealthview.core.auth.dto.AuthResult register(RegisterRequest request) {
         return authService.register(request, AuthRequestContext.cookie(null));
     }
 
-    private com.wealthview.core.auth.dto.AuthResult register(RegisterRequest request, String transport) {
-        return authService.register(request, new AuthRequestContext(transport, null, null, null));
-    }
-
     private com.wealthview.core.auth.dto.AuthResult refresh(String refreshToken) {
         return authService.refresh(refreshToken, AuthRequestContext.cookie(null));
-    }
-
-    private com.wealthview.core.auth.dto.AuthResult refresh(String refreshToken, String transport) {
-        return authService.refresh(refreshToken, new AuthRequestContext(transport, null, null, null));
     }
 
     @Test
