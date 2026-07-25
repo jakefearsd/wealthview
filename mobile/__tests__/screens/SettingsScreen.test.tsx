@@ -45,25 +45,25 @@ beforeEach(() => {
 });
 
 describe('SettingsScreen', () => {
-    it('shows the current server URL pre-populated and a logout button when authenticated', () => {
-        const { getByTestId } = render(<SettingsScreen />);
+    it('shows the current server URL pre-populated and a logout button when authenticated', async () => {
+        const { getByTestId } = await render(<SettingsScreen />);
         expect(getByTestId('server-url-input').props.value).toBe(
             'https://wealthview.example.com',
         );
         expect(getByTestId('logout-button')).toBeTruthy();
     });
 
-    it('hides the logout button when unauthenticated', () => {
+    it('hides the logout button when unauthenticated', async () => {
         mockAuthState.status = 'unauthenticated';
-        const { queryByTestId } = render(<SettingsScreen />);
+        const { queryByTestId } = await render(<SettingsScreen />);
         expect(queryByTestId('logout-button')).toBeNull();
     });
 
     it('rejects an invalid URL on save', async () => {
-        const { getByTestId, queryByText } = render(<SettingsScreen />);
-        fireEvent.changeText(getByTestId('server-url-input'), 'not-a-url');
+        const { getByTestId, queryByText } = await render(<SettingsScreen />);
+        await fireEvent.changeText(getByTestId('server-url-input'), 'not-a-url');
         await act(async () => {
-            fireEvent.press(getByTestId('save-server-button'));
+            await fireEvent.press(getByTestId('save-server-button'));
         });
         expect(queryByText(/valid url/i)).toBeTruthy();
         expect(mockSetServerUrl).not.toHaveBeenCalled();
@@ -71,11 +71,11 @@ describe('SettingsScreen', () => {
 
     it('asks for confirmation before changing the URL while authenticated', async () => {
         const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-        const { getByTestId } = render(<SettingsScreen />);
+        const { getByTestId } = await render(<SettingsScreen />);
 
-        fireEvent.changeText(getByTestId('server-url-input'), 'https://other.example.com');
+        await fireEvent.changeText(getByTestId('server-url-input'), 'https://other.example.com');
         await act(async () => {
-            fireEvent.press(getByTestId('save-server-button'));
+            await fireEvent.press(getByTestId('save-server-button'));
         });
 
         expect(alertSpy).toHaveBeenCalled();
@@ -87,11 +87,11 @@ describe('SettingsScreen', () => {
 
     it('skips confirmation when the user is unauthenticated', async () => {
         mockAuthState.status = 'unauthenticated';
-        const { getByTestId } = render(<SettingsScreen />);
+        const { getByTestId } = await render(<SettingsScreen />);
 
-        fireEvent.changeText(getByTestId('server-url-input'), 'https://other.example.com');
+        await fireEvent.changeText(getByTestId('server-url-input'), 'https://other.example.com');
         await act(async () => {
-            fireEvent.press(getByTestId('save-server-button'));
+            await fireEvent.press(getByTestId('save-server-button'));
         });
 
         await waitFor(() => {
@@ -100,26 +100,26 @@ describe('SettingsScreen', () => {
     });
 
     it('triggers logout when the logout button is pressed', async () => {
-        const { getByTestId } = render(<SettingsScreen />);
+        const { getByTestId } = await render(<SettingsScreen />);
         await act(async () => {
-            fireEvent.press(getByTestId('logout-button'));
+            await fireEvent.press(getByTestId('logout-button'));
         });
         await waitFor(() => {
             expect(mockLogout).toHaveBeenCalled();
         });
     });
 
-    it('displays the signed-in identity (email, role, tenant id) when authenticated', () => {
-        const { queryByText } = render(<SettingsScreen />);
+    it('displays the signed-in identity (email, role, tenant id) when authenticated', async () => {
+        const { queryByText } = await render(<SettingsScreen />);
         expect(queryByText('demo@wealthview.local')).toBeTruthy();
         expect(queryByText(/admin/)).toBeTruthy();
         expect(queryByText('aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee')).toBeTruthy();
     });
 
-    it('omits the Account card when unauthenticated', () => {
+    it('omits the Account card when unauthenticated', async () => {
         mockAuthState.status = 'unauthenticated';
         mockAuthState.identity = null;
-        const { queryByText } = render(<SettingsScreen />);
+        const { queryByText } = await render(<SettingsScreen />);
         expect(queryByText('demo@wealthview.local')).toBeNull();
     });
 });

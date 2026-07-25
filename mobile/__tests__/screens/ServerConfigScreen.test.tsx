@@ -23,18 +23,18 @@ beforeEach(() => {
 });
 
 describe('ServerConfigScreen', () => {
-    it('renders the URL input and continue button', () => {
-        const { getByTestId } = render(<ServerConfigScreen />);
+    it('renders the URL input and continue button', async () => {
+        const { getByTestId } = await render(<ServerConfigScreen />);
         expect(getByTestId('server-url-input')).toBeTruthy();
         expect(getByTestId('continue-button')).toBeTruthy();
     });
 
     it('rejects an obviously invalid URL with an inline error', async () => {
-        const { getByTestId, queryByText } = render(<ServerConfigScreen />);
+        const { getByTestId, queryByText } = await render(<ServerConfigScreen />);
 
-        fireEvent.changeText(getByTestId('server-url-input'), 'not-a-url');
+        await fireEvent.changeText(getByTestId('server-url-input'), 'not-a-url');
         await act(async () => {
-            fireEvent.press(getByTestId('continue-button'));
+            await fireEvent.press(getByTestId('continue-button'));
         });
 
         await waitFor(() => {
@@ -44,14 +44,14 @@ describe('ServerConfigScreen', () => {
     });
 
     it('saves and continues when the URL is valid', async () => {
-        const { getByTestId } = render(<ServerConfigScreen />);
+        const { getByTestId } = await render(<ServerConfigScreen />);
 
-        fireEvent.changeText(
+        await fireEvent.changeText(
             getByTestId('server-url-input'),
             'https://wealthview.example.com',
         );
         await act(async () => {
-            fireEvent.press(getByTestId('continue-button'));
+            await fireEvent.press(getByTestId('continue-button'));
         });
 
         await waitFor(() => {
@@ -60,14 +60,14 @@ describe('ServerConfigScreen', () => {
     });
 
     it('strips trailing slashes from the saved URL', async () => {
-        const { getByTestId } = render(<ServerConfigScreen />);
+        const { getByTestId } = await render(<ServerConfigScreen />);
 
-        fireEvent.changeText(
+        await fireEvent.changeText(
             getByTestId('server-url-input'),
             'http://192.168.1.50/',
         );
         await act(async () => {
-            fireEvent.press(getByTestId('continue-button'));
+            await fireEvent.press(getByTestId('continue-button'));
         });
 
         await waitFor(() => {

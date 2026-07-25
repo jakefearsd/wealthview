@@ -101,34 +101,34 @@ describe('PortfolioScreen', () => {
         mockGetSummary.mockReturnValue(new Promise(() => {}));
         mockListAccounts.mockReturnValue(new Promise(() => {}));
 
-        const { getByTestId } = render(<PortfolioScreen />);
+        const { getByTestId } = await render(<PortfolioScreen />);
         expect(getByTestId('portfolio-loading')).toBeTruthy();
     });
 
     it('renders the net worth headline once data loads', async () => {
-        const { findByText } = render(<PortfolioScreen />);
+        const { findByText } = await render(<PortfolioScreen />);
         const headline = await findByText(/\$1,234,567\.89/);
         expect(headline).toBeTruthy();
     });
 
     it('renders an account row for each account from the API', async () => {
-        const { findByText } = render(<PortfolioScreen />);
+        const { findByText } = await render(<PortfolioScreen />);
         expect(await findByText('Fidelity Brokerage')).toBeTruthy();
         expect(await findByText('Chase Checking')).toBeTruthy();
     });
 
     it('renders a section header per category present in the data', async () => {
-        const { findByText } = render(<PortfolioScreen />);
+        const { findByText } = await render(<PortfolioScreen />);
         // Section headers are uppercased by the Section component.
         expect(await findByText('INVESTMENT ACCOUNTS')).toBeTruthy();
         expect(await findByText('CASH')).toBeTruthy();
     });
 
     it('navigates to AccountDetail when a row is tapped', async () => {
-        const { findByTestId } = render(<PortfolioScreen />);
+        const { findByTestId } = await render(<PortfolioScreen />);
         const row = await findByTestId(`account-row-${ACCOUNT_BROKERAGE.id}`);
 
-        fireEvent.press(row);
+        await fireEvent.press(row);
 
         expect(mockNavigate).toHaveBeenCalledWith('AccountDetail', {
             account: ACCOUNT_BROKERAGE,
@@ -138,7 +138,7 @@ describe('PortfolioScreen', () => {
     it('shows an error card with retry when the API fails, then refetches on retry', async () => {
         mockGetSummary.mockRejectedValueOnce(new Error('boom'));
 
-        const { findByTestId, findByText } = render(<PortfolioScreen />);
+        const { findByTestId, findByText } = await render(<PortfolioScreen />);
         const retry = await findByTestId('portfolio-retry');
         expect(await findByText(/couldn.t load/i)).toBeTruthy();
 
@@ -147,7 +147,7 @@ describe('PortfolioScreen', () => {
         mockListAccounts.mockResolvedValue(ACCOUNTS_PAGE);
 
         await act(async () => {
-            fireEvent.press(retry);
+            await fireEvent.press(retry);
         });
 
         await waitFor(() => {
@@ -158,7 +158,7 @@ describe('PortfolioScreen', () => {
     it('shows an empty state when the accounts list is empty', async () => {
         mockListAccounts.mockResolvedValue({ ...ACCOUNTS_PAGE, data: [], total: 0 });
 
-        const { findByText } = render(<PortfolioScreen />);
+        const { findByText } = await render(<PortfolioScreen />);
         expect(await findByText(/no accounts yet/i)).toBeTruthy();
     });
 });

@@ -88,9 +88,9 @@ function Probe() {
     );
 }
 
-function renderProbe(serverUrl: string | null = 'https://api.example.com') {
+async function renderProbe(serverUrl: string | null = 'https://api.example.com') {
     mockServerUrlStorage.get.mockResolvedValue(serverUrl);
-    return render(
+    return await render(
         <AuthProvider>
             <Probe />
         </AuthProvider>,
@@ -115,7 +115,7 @@ beforeEach(() => {
 
 describe('AuthContext', () => {
     it('starts in restoring state and falls through to needs_server when no URL is configured', async () => {
-        const { getByTestId } = renderProbe(null);
+        const { getByTestId } = await renderProbe(null);
 
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('needs_server');
@@ -123,7 +123,7 @@ describe('AuthContext', () => {
     });
 
     it('falls through to unauthenticated when server is configured but no refresh token exists', async () => {
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
 
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
@@ -146,7 +146,7 @@ describe('AuthContext', () => {
             role: 'member',
         });
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
 
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('authenticated');
@@ -178,7 +178,7 @@ describe('AuthContext', () => {
         });
         mockAuthApi.refresh.mockResolvedValue(SAMPLE_TOKENS);
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
 
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('authenticated');
@@ -192,7 +192,7 @@ describe('AuthContext', () => {
         mockAuthApi.getCurrentUser.mockRejectedValue({ response: { status: 401 } });
         mockAuthApi.refresh.mockRejectedValue(new Error('refresh down'));
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
 
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
@@ -203,7 +203,7 @@ describe('AuthContext', () => {
     it('login() persists tokens, populates identity, and transitions to authenticated', async () => {
         mockAuthApi.login.mockResolvedValue({ type: 'tokens', tokens: SAMPLE_TOKENS });
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
         });
@@ -227,7 +227,7 @@ describe('AuthContext', () => {
             },
         });
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
         });
@@ -245,7 +245,7 @@ describe('AuthContext', () => {
     it('login() with mfa_required surfaces a friendly "not supported" error', async () => {
         mockAuthApi.login.mockResolvedValue({ type: 'mfa_required', mfa_token: 'mfa-jwt' });
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
         });
@@ -264,7 +264,7 @@ describe('AuthContext', () => {
         mockAuthApi.login.mockResolvedValue({ type: 'tokens', tokens: SAMPLE_TOKENS });
         mockAuthApi.logout.mockResolvedValue(undefined);
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
         });
@@ -291,7 +291,7 @@ describe('AuthContext', () => {
         mockAuthApi.login.mockResolvedValue({ type: 'tokens', tokens: SAMPLE_TOKENS });
         mockAuthApi.logout.mockRejectedValue(new Error('network'));
 
-        const { getByTestId } = renderProbe('https://api.example.com');
+        const { getByTestId } = await renderProbe('https://api.example.com');
         await waitFor(() => {
             expect(getByTestId('status').props.children).toBe('unauthenticated');
         });

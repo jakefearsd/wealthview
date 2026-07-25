@@ -57,11 +57,11 @@ beforeEach(() => {
 });
 
 describe('MainTabsNavigator', () => {
-    it('mounts and lands on the Portfolio tab by default', () => {
+    it('mounts and lands on the Portfolio tab by default', async () => {
         // The jest.setup.js stub for bottom-tabs renders only the first
         // configured tab, so finding the portfolio loading indicator (the
         // first frame of PortfolioScreen) confirms the default tab.
-        const { getByTestId } = render(<MainTabsNavigator />);
+        const { getByTestId } = await render(<MainTabsNavigator />);
         expect(getByTestId('portfolio-loading')).toBeTruthy();
     });
 });

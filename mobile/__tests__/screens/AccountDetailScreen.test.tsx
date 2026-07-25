@@ -32,13 +32,13 @@ beforeEach(() => {
 });
 
 describe('AccountDetailScreen', () => {
-    it('renders the account name as the title', () => {
-        const { queryByText } = render(<AccountDetailScreen />);
+    it('renders the account name as the title', async () => {
+        const { queryByText } = await render(<AccountDetailScreen />);
         expect(queryByText('Fidelity Brokerage')).toBeTruthy();
     });
 
-    it('shows the institution, type label, and currency', () => {
-        const { queryAllByText, queryByText } = render(<AccountDetailScreen />);
+    it('shows the institution, type label, and currency', async () => {
+        const { queryAllByText, queryByText } = await render(<AccountDetailScreen />);
         // "Fidelity" appears in both the title ("Fidelity Brokerage") and the
         // institution row, so use queryAllByText for that one.
         expect(queryAllByText(/Fidelity/).length).toBeGreaterThanOrEqual(2);
@@ -46,19 +46,19 @@ describe('AccountDetailScreen', () => {
         expect(queryByText(/USD/)).toBeTruthy();
     });
 
-    it('renders the formatted balance', () => {
-        const { queryByText } = render(<AccountDetailScreen />);
+    it('renders the formatted balance', async () => {
+        const { queryByText } = await render(<AccountDetailScreen />);
         expect(queryByText(/\$456,789\.00/)).toBeTruthy();
     });
 
-    it('shows a "more details coming soon" placeholder', () => {
-        const { queryByText } = render(<AccountDetailScreen />);
+    it('shows a "more details coming soon" placeholder', async () => {
+        const { queryByText } = await render(<AccountDetailScreen />);
         expect(queryByText(/coming soon/i)).toBeTruthy();
     });
 
-    it('calls navigation.goBack when the back button is pressed', () => {
-        const { getByTestId } = render(<AccountDetailScreen />);
-        fireEvent.press(getByTestId('back-button'));
+    it('calls navigation.goBack when the back button is pressed', async () => {
+        const { getByTestId } = await render(<AccountDetailScreen />);
+        await fireEvent.press(getByTestId('back-button'));
         expect(mockGoBack).toHaveBeenCalled();
     });
 });

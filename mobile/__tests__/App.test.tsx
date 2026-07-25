@@ -11,7 +11,7 @@ describe('App', () => {
     // The default jest.setup.js stub returns `false` for getGenericPassword,
     // so the AuthProvider sees no server URL and the navigator routes to
     // ServerConfigScreen on first frame.
-    const { findByTestId } = render(<App />);
+    const { findByTestId } = await render(<App />);
 
     await waitFor(async () => {
       expect(await findByTestId('server-url-input')).toBeTruthy();
