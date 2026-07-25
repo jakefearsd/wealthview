@@ -14,6 +14,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,6 +48,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final ConcurrentMap<String, RateWindow> windows = new ConcurrentHashMap<>();
     private final AtomicLong lastSweepAt;
 
+    // Explicit @Autowired: with the testing constructor below there are two candidates, so the
+    // single-constructor implicit rule no longer applies and Spring needs to be told which to use.
+    @Autowired
     public RateLimitFilter(MeterRegistry meterRegistry, ClientIpResolver clientIpResolver) {
         this(meterRegistry, clientIpResolver, System::currentTimeMillis);
     }
