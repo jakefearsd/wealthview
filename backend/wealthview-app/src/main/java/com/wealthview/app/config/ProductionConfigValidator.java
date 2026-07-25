@@ -73,37 +73,38 @@ public class ProductionConfigValidator {
     @EventListener(ApplicationReadyEvent.class)
     public void validate() {
         validateNoDevSeedProfileWithProd();
-        if (jwtSecret == null || jwtSecret.length() < MIN_JWT_SECRET_LENGTH
-                || KNOWN_DEFAULT_JWT_SECRETS.contains(jwtSecret)
-                || jwtSecret.startsWith(LOCAL_DEV_SENTINEL_PREFIX)) {
-            throw new IllegalStateException(
-                    "SECURITY: JWT_SECRET must be set to a unique value of at least "
-                            + MIN_JWT_SECRET_LENGTH + " characters in production. "
-                            + "Do not use any of the development defaults.");
-        }
-        if (superAdminPassword == null || superAdminPassword.isBlank()
-                || KNOWN_DEFAULT_SUPER_ADMIN_PASSWORDS.contains(superAdminPassword)
-                || superAdminPassword.startsWith(LOCAL_DEV_SENTINEL_PREFIX)) {
-            throw new IllegalStateException(
-                    "SECURITY: SUPER_ADMIN_PASSWORD must be set to a unique value in production. "
-                            + "Do not use any of the development defaults.");
-        }
-        if (dbPassword == null || dbPassword.isBlank()
-                || KNOWN_DEFAULT_DB_PASSWORDS.contains(dbPassword)
-                || dbPassword.startsWith(LOCAL_DEV_SENTINEL_PREFIX)) {
-            throw new IllegalStateException(
-                    "SECURITY: DB_PASSWORD must be set to a unique value in production. "
-                            + "Do not use any of the development defaults.");
-        }
-        if (mfaEncryptionKey == null || mfaEncryptionKey.isBlank()
-                || KNOWN_DEFAULT_MFA_KEYS.contains(mfaEncryptionKey)
-                || mfaEncryptionKey.startsWith(LOCAL_DEV_SENTINEL_PREFIX)) {
-            throw new IllegalStateException(
-                    "SECURITY: MFA_ENCRYPTION_KEY must be set to a unique base64-encoded "
-                            + "32-byte value in production. Generate via `openssl rand -base64 32`.");
-        }
+        requireProductionSecret(jwtSecret, KNOWN_DEFAULT_JWT_SECRETS, MIN_JWT_SECRET_LENGTH,
+                "SECURITY: JWT_SECRET must be set to a unique value of at least "
+                        + MIN_JWT_SECRET_LENGTH + " characters in production. "
+                        + "Do not use any of the development defaults.");
+        requireProductionSecret(superAdminPassword, KNOWN_DEFAULT_SUPER_ADMIN_PASSWORDS, 1,
+                "SECURITY: SUPER_ADMIN_PASSWORD must be set to a unique value in production. "
+                        + "Do not use any of the development defaults.");
+        requireProductionSecret(dbPassword, KNOWN_DEFAULT_DB_PASSWORDS, 1,
+                "SECURITY: DB_PASSWORD must be set to a unique value in production. "
+                        + "Do not use any of the development defaults.");
+        requireProductionSecret(mfaEncryptionKey, KNOWN_DEFAULT_MFA_KEYS, 1,
+                "SECURITY: MFA_ENCRYPTION_KEY must be set to a unique base64-encoded "
+                        + "32-byte value in production. Generate via `openssl rand -base64 32`.");
         validateCorsOrigins();
         log.info("Production security configuration validated successfully");
+    }
+
+    /**
+     * Fail-fast guard shared by every env-driven secret: rejects absent, blank, too-short,
+     * known-default, and {@code LOCAL_DEV_*}-sentinel values. {@code minLength} of 1 means
+     * "non-blank" (no length rule beyond that).
+     *
+     * <p>The message is passed in rather than derived from a variable name so each secret keeps its
+     * own operator-facing remediation hint.
+     */
+    private static void requireProductionSecret(String value, Set<String> knownDefaults,
+                                                 int minLength, String message) {
+        if (value == null || value.isBlank() || value.length() < minLength
+                || knownDefaults.contains(value)
+                || value.startsWith(LOCAL_DEV_SENTINEL_PREFIX)) {
+            throw new IllegalStateException(message);
+        }
     }
 
     /**
