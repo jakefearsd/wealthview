@@ -19,4 +19,11 @@ record TaxIncomeContext(
         double[] dsBracketCeilingByYear,
         LtcgTaxTable[] ltcgTaxTableByYear,
         double[] rentalIncomeByYear
-) {}
+) {
+
+    /** No filing status and no per-year arrays — for a run with no years to simulate. */
+    static TaxIncomeContext empty() {
+        return new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null,
+                null, null, null);
+    }
+}

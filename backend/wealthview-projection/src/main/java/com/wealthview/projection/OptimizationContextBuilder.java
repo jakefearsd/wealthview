@@ -58,11 +58,8 @@ final class OptimizationContextBuilder {
         int rmdStartAge = RmdCalculator.rmdStartAge(input.birthYear());
 
         if (years <= 0) {
-            return new OptimizationSetup(
-                    new PortfolioSetup(0, 0, 0, 0, null, 0, 0, 0, 0, 0),
-                    new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
-                            null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null),
-                    new TaxIncomeContext(null, 0, null, null, null, null, null, null, null, null, null, null, null));
+            return OptimizationSetup.emptyHorizon(retirementYear, retirementAge, endAge, years,
+                    rmdStartAge);
         }
 
         int trialCount = input.trialCount();

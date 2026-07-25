@@ -59,4 +59,17 @@ record SimulationParameters(
         // ({@link StochasticMortalityEvaluator}). {@code null} unless the run opted into stochastic
         // mortality; the recommendation flow never reads it, so the fixed-death engine is byte-identical.
         @Nullable StochasticEvalArrays stochasticEval
-) {}
+) {
+
+    /**
+     * Horizon figures only, for a run with no years to simulate: no trials, no return paths, and no
+     * household/mortality wiring. {@code taxableEquityShare} and {@code survivorSpendingFactor}
+     * default to 1 (all-equity, no survivor haircut) rather than 0, matching what a single-person
+     * run with nothing to scale would carry.
+     */
+    static SimulationParameters emptyHorizon(int retirementYear, int retirementAge, int endAge,
+                                             int years, int rmdStartAge) {
+        return new SimulationParameters(retirementYear, retirementAge, endAge, years, 0, 0, 0,
+                null, null, null, null, rmdStartAge, 0, 0, 0, 0, 1, 1.0, null, null, null);
+    }
+}
