@@ -155,7 +155,9 @@ class OfxTransactionParserTest {
         var envelope = new StringBuilder(OFX_HEADER);
         envelope.append(tranList);
         if (!secList.isEmpty()) {
-            envelope.append("<SECLISTMSGSRSV1>\n<SECLIST>\n").append(secList).append("</SECLIST>\n</SECLISTMSGSRSV1>\n");
+            envelope.append("<SECLISTMSGSRSV1>\n<SECLIST>\n")
+                    .append(secList)
+                    .append("</SECLIST>\n</SECLISTMSGSRSV1>\n");
         }
         envelope.append("</OFX>\n");
         return envelope.toString();
