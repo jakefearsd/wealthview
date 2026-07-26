@@ -194,25 +194,19 @@ final class JointConversionSearch {
      * under the SAME objective the discretionary search will ultimately gate on -- see the T26
      * note on {@link #jointSearch}. (The pre-T26 {@code UseVarargs} suppression is gone: the
      * trailing parameter is now a scalar, so the rule no longer fires here.)
+     *
+     * <p>Task 13: {@code searchPaths} and {@code searchTrials}/{@code searchTaxCtx} are this
+     * search's genuine overrides of what {@code ctx} (threaded through as {@code setup}) carries —
+     * see the {@code SearchContext} javadoc for the full mapping.
      */
     private double evalSearchSpending(PortfolioReturnPaths searchPaths, OptimizationSetup ctx,
                                       double[] searchFloors, int searchTrials, TaxContext searchTaxCtx,
                                       double[] conversionByYear, double[] conversionTaxByYear,
                                       boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate) {
         var searchContext = new SustainabilitySearch.SearchContext(
-                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(), ctx.taxIncome().surplusTaxByYear(),
-                ctx.portfolio().terminalTarget(), ctx.sim().retirementAge(), ctx.sim().years(),
-                searchTrials, ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                searchTaxCtx, conversionByYear, conversionTaxByYear,
-                ctx.taxIncome().dsBracketCeilingByYear(),
-                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                gateOnAdaptiveRules, maxAnnualAdjustmentRate,
-                // Household task 6: the conversion search runs the same household economics.
-                ctx.sim().household());
+                ctx, searchPaths, searchTrials, searchTaxCtx,
+                conversionByYear, conversionTaxByYear,
+                gateOnAdaptiveRules, maxAnnualAdjustmentRate);
         return sustainabilitySearch.evaluateSustainableSpending(searchContext, searchFloors);
     }
 }

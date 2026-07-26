@@ -130,18 +130,11 @@ class GuardrailAdaptiveGateIntegrationTest {
         var contextBuilder = new OptimizationContextBuilder(null, null);
         var ctx = contextBuilder.build(stressedInput(true), ProjectionTestFixtures.TEST_CMA_MATRIX);
         int years = ctx.sim().years();
+        var returnPaths = new PortfolioReturnPaths(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(),
+                ctx.sim().rothReturns(), ctx.sim().portfolioPaths());
         var searchContext = new SustainabilitySearch.SearchContext(
-                ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
-                ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
-                ctx.sim().retirementAge(), years, ctx.sim().trialCount(),
-                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                ctx.taxIncome().taxCtx(), null, null, ctx.taxIncome().dsBracketCeilingByYear(),
-                ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                true, 0.10, null);   // household task 6: single-person
+                ctx, returnPaths, ctx.sim().trialCount(), ctx.taxIncome().taxCtx(), null, null,
+                true, 0.10);
         var search = new SustainabilitySearch(new TrialSimulator());
         double[] floors = ctx.taxIncome().adjustedFloors();
 

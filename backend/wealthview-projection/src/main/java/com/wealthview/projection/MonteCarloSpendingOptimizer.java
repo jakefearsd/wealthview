@@ -329,6 +329,11 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
     /**
      * Builds the {@link SustainabilitySearch.SearchContext} for the main optimization run
      * from the pre-computed {@link OptimizationSetup} and the chosen conversion schedule.
+     *
+     * <p>Task 13: {@code ctx} is threaded straight through as {@code setup} — every component the
+     * search context needs beyond the genuine per-run overrides (paths, trial count, tax context,
+     * conversion schedule, adaptive-gate toggle) delegates to it. See the {@code SearchContext}
+     * javadoc for the full component-by-component mapping.
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable
     // argument list — varargs would change the call contract and invite accidental misuse.
@@ -339,24 +344,15 @@ public class MonteCarloSpendingOptimizer implements SpendingOptimizer {
                                                                  double[] conversionTaxByYear) {
         double maxAdjRate = input.maxAnnualAdjustmentRate() != null
                 ? input.maxAnnualAdjustmentRate().doubleValue() : 0.0;
+        var returnPaths = new PortfolioReturnPaths(ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(),
+                ctx.sim().rothReturns(), ctx.sim().portfolioPaths());
         return new SustainabilitySearch.SearchContext(
-                ctx.sim().portfolioPaths(), ctx.taxIncome().incomeByYear(),
-                ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
-                ctx.sim().retirementAge(), ctx.sim().years(), ctx.sim().trialCount(),
-                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                ctx.taxIncome().taxCtx(),
-                conversionByYear, conversionTaxByYear, ctx.taxIncome().dsBracketCeilingByYear(),
-                ctx.sim().taxableReturns(), ctx.sim().traditionalReturns(), ctx.sim().rothReturns(),
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
+                ctx, returnPaths, ctx.sim().trialCount(), ctx.taxIncome().taxCtx(),
+                conversionByYear, conversionTaxByYear,
                 // T24: the search gate honors the profile's toggle. T26: JointConversionSearch's own
                 // conversion-fraction scoring search resolves the SAME toggle independently (see its
                 // SearchContext construction), so both stages score/gate under one objective.
-                input.gateOnAdaptiveRules(), maxAdjRate,
-                // Household task 6: the search runs the same household economics as the terminal pass.
-                ctx.sim().household());
+                input.gateOnAdaptiveRules(), maxAdjRate);
     }
 
     /**

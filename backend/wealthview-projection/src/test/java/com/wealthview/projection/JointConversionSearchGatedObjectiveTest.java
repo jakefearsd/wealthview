@@ -269,18 +269,8 @@ class JointConversionSearchGatedObjectiveTest {
                                         TaxContext searchTaxCtx,
                                         double[] conversionByYear, double[] conversionTaxByYear) {
         var searchContext = new SustainabilitySearch.SearchContext(
-                searchPaths.portfolioPaths(), ctx.taxIncome().incomeByYear(),
-                ctx.taxIncome().surplusTaxByYear(), ctx.portfolio().terminalTarget(),
-                ctx.sim().retirementAge(), ctx.sim().years(), searchTrials,
-                ctx.sim().confidenceLevel(), ctx.portfolio().portfolioFloor(),
-                ctx.portfolio().cashReserveYears(), ctx.portfolio().cashReturnRate(),
-                searchTaxCtx, conversionByYear, conversionTaxByYear,
-                ctx.taxIncome().dsBracketCeilingByYear(),
-                searchPaths.taxableReturns(), searchPaths.traditionalReturns(), searchPaths.rothReturns(),
-                ctx.sim().rmdStartAge(),
-                ctx.portfolio().initTaxableBasis(), ctx.taxIncome().ltcgTaxTableByYear(),
-                ctx.sim().dividendYield(), ctx.sim().interestYield(), ctx.sim().taxableEquityShare(),
-                true, 0.40, null);   // household task 6: single-person
+                ctx, searchPaths, searchTrials, searchTaxCtx, conversionByYear, conversionTaxByYear,
+                true, 0.40);   // household task 6: single-person
         return search.evaluateSustainableSpending(searchContext, searchFloors);
     }
 

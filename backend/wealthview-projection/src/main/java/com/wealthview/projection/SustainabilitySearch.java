@@ -35,8 +35,31 @@ final class SustainabilitySearch {
     }
 
     /**
-     * Simulation-invariant inputs to a sustainability search run. Bundling them as a
-     * single parameter object keeps the recursive search call sites concise.
+     * Simulation-invariant inputs to a sustainability search run.
+     *
+     * <p>Task 13: recomposed over {@link OptimizationSetup} + {@link PortfolioReturnPaths} instead
+     * of flattening both field-by-field (28 components, re-flattened identically at both
+     * construction sites). Comparing {@link MonteCarloSpendingOptimizer#searchContextFor} and
+     * {@link JointConversionSearch#evalSearchSpending} shows only these components genuinely differ
+     * between the two call sites — everything else is read straight off {@code setup} at both:
+     * <ul>
+     *   <li>{@code returnPaths} — the optimizer wraps {@code setup.sim()}'s own return arrays; the
+     *       joint search passes a DIFFERENT {@link PortfolioReturnPaths} (its own arm-set paths).
+     *   <li>{@code trialCount} — the optimizer uses {@code setup.sim().trialCount()}; the joint
+     *       search uses its own (possibly smaller) {@code searchTrials}.
+     *   <li>{@code taxCtx} — the optimizer uses {@code setup.taxIncome().taxCtx()}; the joint search
+     *       builds its own arm-set {@link TaxContext}.
+     *   <li>{@code conversionByYear} / {@code conversionTaxByYear} — {@link OptimizationSetup} does
+     *       not carry a conversion schedule at all; both sites pass one in per candidate.
+     *   <li>{@code gateOnAdaptiveRules} / {@code maxAnnualAdjustmentRate} — resolved from the
+     *       request's toggle at each site, not carried on {@code setup}.
+     * </ul>
+     * Every other accessor below (income, surplusTax, terminalTarget, retirementAge, years,
+     * confidenceLevel, portfolioFloor, cashReserveYears, cashReturnRate, dsBracketCeilingByYear,
+     * the per-pool return arrays, rmdStartAge, initTaxableBasis, ltcgTaxTableByYear, dividendYield,
+     * interestYield, taxableEquityShare, household) delegates to {@code setup}/{@code returnPaths}
+     * and is named identically to the pre-Task-13 flattened accessor so the rest of this class did
+     * not need to change.
      *
      * @param gateOnAdaptiveRules T24: when {@code true} (and {@code maxAnnualAdjustmentRate} is
      *         positive), {@link #isSustainable} evaluates each candidate schedule WITH the audit-C9
@@ -58,20 +81,96 @@ final class SustainabilitySearch {
      *         gate even when {@code gateOnAdaptiveRules} is {@code true}.
      */
     record SearchContext(
-            double[][] paths, double[] income, double[] surplusTax,
-            double terminalTarget, int retirementAge, int years, int trialCount,
-            double confidenceLevel, double portfolioFloor,
-            int cashReserveYears, double cashReturnRate,
+            OptimizationSetup setup, PortfolioReturnPaths returnPaths, int trialCount,
             TaxContext taxCtx, double[] conversionByYear, double[] conversionTaxByYear,
-            double[] dsBracketCeilingByYear,
-            double[][] taxableReturns, double[][] traditionalReturns, double[][] rothReturns,
-            int rmdStartAge,
-            double initTaxableBasis, LtcgTaxTable[] ltcgTaxTableByYear, double dividendYield,
-            double interestYield, double taxableEquityShare,
-            boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate,
-            // Household task 6: first-death transition params, threaded into each trial config
-            // ({@code null} ⇒ single-person). See {@link TrialSimulator.HouseholdSim}.
-            @Nullable TrialSimulator.HouseholdSim household) {}
+            boolean gateOnAdaptiveRules, double maxAnnualAdjustmentRate) {
+
+        double[][] paths() {
+            return returnPaths.portfolioPaths();
+        }
+
+        double[] income() {
+            return setup.taxIncome().incomeByYear();
+        }
+
+        double[] surplusTax() {
+            return setup.taxIncome().surplusTaxByYear();
+        }
+
+        double terminalTarget() {
+            return setup.portfolio().terminalTarget();
+        }
+
+        int retirementAge() {
+            return setup.sim().retirementAge();
+        }
+
+        int years() {
+            return setup.sim().years();
+        }
+
+        double confidenceLevel() {
+            return setup.sim().confidenceLevel();
+        }
+
+        double portfolioFloor() {
+            return setup.portfolio().portfolioFloor();
+        }
+
+        int cashReserveYears() {
+            return setup.portfolio().cashReserveYears();
+        }
+
+        double cashReturnRate() {
+            return setup.portfolio().cashReturnRate();
+        }
+
+        double[] dsBracketCeilingByYear() {
+            return setup.taxIncome().dsBracketCeilingByYear();
+        }
+
+        double[][] taxableReturns() {
+            return returnPaths.taxableReturns();
+        }
+
+        double[][] traditionalReturns() {
+            return returnPaths.traditionalReturns();
+        }
+
+        double[][] rothReturns() {
+            return returnPaths.rothReturns();
+        }
+
+        int rmdStartAge() {
+            return setup.sim().rmdStartAge();
+        }
+
+        double initTaxableBasis() {
+            return setup.portfolio().initTaxableBasis();
+        }
+
+        LtcgTaxTable[] ltcgTaxTableByYear() {
+            return setup.taxIncome().ltcgTaxTableByYear();
+        }
+
+        double dividendYield() {
+            return setup.sim().dividendYield();
+        }
+
+        double interestYield() {
+            return setup.sim().interestYield();
+        }
+
+        double taxableEquityShare() {
+            return setup.sim().taxableEquityShare();
+        }
+
+        // Household task 6: first-death transition params, threaded into each trial config
+        // ({@code null} ⇒ single-person). See {@link TrialSimulator.HouseholdSim}.
+        @Nullable TrialSimulator.HouseholdSim household() {
+            return setup.sim().household();
+        }
+    }
 
     /**
      * Verifies the essential floor against portfolio capacity at the required confidence level,

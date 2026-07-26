@@ -35,16 +35,11 @@ class SustainabilitySearchTest {
         double[] income = new double[years];
         double[] surplusTax = new double[years];
 
+        var setup = searchContextSetup(years, trialCount, 65, 0.90, income, surplusTax,
+                paths, taxableReturns, traditionalReturns, rothReturns);
+        var returnPaths = new PortfolioReturnPaths(taxableReturns, traditionalReturns, rothReturns, paths);
         return new SustainabilitySearch.SearchContext(
-                paths, income, surplusTax,
-                0.0, 65, years, trialCount,
-                0.90, 0.0,
-                0, 0.0,
-                null, null, null,
-                null,
-                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, null, 0.0, 0.0, 1.0,
-                false, 0.0, null);   // household task 6: single-person
+                setup, returnPaths, trialCount, null, null, null, false, 0.0);   // household task 6: single-person
     }
 
     private static double[] bracketingFloors() {
@@ -93,16 +88,33 @@ class SustainabilitySearchTest {
         double[] income = new double[years];
         double[] surplusTax = new double[years];
 
+        var setup = searchContextSetup(years, trialCount, 65, 0.80, income, surplusTax,
+                paths, taxableReturns, traditionalReturns, rothReturns);
+        var returnPaths = new PortfolioReturnPaths(taxableReturns, traditionalReturns, rothReturns, paths);
         return new SustainabilitySearch.SearchContext(
-                paths, income, surplusTax,
-                0.0, 65, years, trialCount,
-                0.80, 0.0,
-                0, 0.0,
-                null, null, null,
-                null,
-                taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
-                0.0, null, 0.0, 0.0, 1.0,
-                gateOnAdaptiveRules, maxAdjRate, null);   // household task 6: single-person
+                setup, returnPaths, trialCount, null, null, null,
+                gateOnAdaptiveRules, maxAdjRate);   // household task 6: single-person
+    }
+
+    /**
+     * Builds the {@link OptimizationSetup} shared by both fixtures above: only the fields
+     * {@code SearchContext}'s accessors actually read are populated (essential floor,
+     * withdrawal order, and other purely-deterministic-engine fields stay at their zero/null
+     * defaults since {@code isSustainable} never touches them).
+     */
+    private static OptimizationSetup searchContextSetup(int years, int trialCount, int retirementAge,
+                                                         double confidenceLevel, double[] income,
+                                                         double[] surplusTax, double[][] paths,
+                                                         double[][] taxableReturns,
+                                                         double[][] traditionalReturns,
+                                                         double[][] rothReturns) {
+        var portfolio = new PortfolioSetup(0.0, 0.0, 0.0, 0.0, null, 0, 0.0, 0.0, 0.0, 0.0);
+        var sim = new SimulationParameters(0, retirementAge, 0, years, trialCount, confidenceLevel, 0.0,
+                paths, taxableReturns, traditionalReturns, rothReturns, Integer.MAX_VALUE,
+                0.0, 0.0, 0.0, 0.0, 1.0, 1.0, null, null, null);
+        var taxIncome = new TaxIncomeContext(null, 0.0, income, null, surplusTax, null, null, null,
+                null, null, null, null, null);
+        return new OptimizationSetup(portfolio, sim, taxIncome);
     }
 
     private static double[] crashMinorityFloors() {
