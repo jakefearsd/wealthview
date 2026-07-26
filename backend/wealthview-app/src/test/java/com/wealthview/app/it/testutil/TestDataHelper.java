@@ -11,9 +11,15 @@ import com.wealthview.app.it.AuthHelper;
 /**
  * Shared helper for creating test entities via the REST API in integration tests.
  * Eliminates duplicated private helper methods across IT classes. All calls go
- * through {@link ApiClient} as the bootstrapped admin; creator methods return the
- * response body map so callers can pull whatever field they need (usually "id")
- * or ignore the result entirely.
+ * through {@link ApiClient}; creator methods return the response body map so
+ * callers can pull whatever field they need (usually "id") or ignore the result
+ * entirely.
+ *
+ * <p>Defaults to the bootstrapped admin token. Use {@link #as(String)} to get a
+ * token-bound instance for a different user/tenant (e.g. a second tenant's
+ * admin in cross-tenant isolation tests) — every creator method below then
+ * routes through {@link ApiClient}'s {@code *As} family instead of its
+ * bootstrapped-admin family, with no per-method duplication.
  */
 public class TestDataHelper {
 
@@ -23,15 +29,38 @@ public class TestDataHelper {
             ApiClient.LIST_MAP_TYPE;
 
     private final ApiClient api;
+    private final String token;
 
     public TestDataHelper(TestRestTemplate restTemplate, AuthHelper authHelper) {
-        this.api = new ApiClient(restTemplate, authHelper);
+        this(new ApiClient(restTemplate, authHelper), null);
+    }
+
+    private TestDataHelper(ApiClient api, String token) {
+        this.api = api;
+        this.token = token;
+    }
+
+    /** Returns a token-bound copy of this helper; all its creator calls act as {@code token}. */
+    public TestDataHelper as(String token) {
+        return new TestDataHelper(api, token);
+    }
+
+    private Map<String, Object> post(String url, Object body) {
+        return token == null ? api.post(url, body) : api.postAs(token, url, body);
+    }
+
+    private Map<String, Object> get(String url) {
+        return token == null ? api.get(url) : api.getAs(token, url);
+    }
+
+    private List<Map<String, Object>> getList(String url) {
+        return token == null ? api.getList(url) : api.getListAs(token, url);
     }
 
     // ── Accounts ─────────────────────────────────────────────────────────
 
     public Map<String, Object> createAccount(String name, String type) {
-        return api.post("/api/v1/accounts", Map.of("name", name, "type", type));
+        return post("/api/v1/accounts", Map.of("name", name, "type", type));
     }
 
     public String createBrokerageAccountAndGetId() {
@@ -48,7 +77,7 @@ public class TestDataHelper {
                 "quantity", quantity,
                 "amount", amount
         );
-        return api.post("/api/v1/accounts/" + accountId + "/transactions", body);
+        return post("/api/v1/accounts/" + accountId + "/transactions", body);
     }
 
     public void addTransaction(String accountId, String type, String symbol,
@@ -59,7 +88,7 @@ public class TestDataHelper {
                 "symbol", symbol,
                 "quantity", quantity,
                 "amount", amount);
-        api.post("/api/v1/accounts/" + accountId + "/transactions", body);
+        post("/api/v1/accounts/" + accountId + "/transactions", body);
     }
 
     public String createBuyTransactionOnDateAndGetId(String accountId, String date, String symbol,
@@ -70,19 +99,19 @@ public class TestDataHelper {
                 "symbol", symbol,
                 "quantity", quantity,
                 "amount", amount);
-        return (String) api.post("/api/v1/accounts/" + accountId + "/transactions", body).get("id");
+        return (String) post("/api/v1/accounts/" + accountId + "/transactions", body).get("id");
     }
 
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> getTransactions(String accountId) {
-        var response = api.get("/api/v1/accounts/" + accountId + "/transactions");
+        var response = get("/api/v1/accounts/" + accountId + "/transactions");
         return (List<Map<String, Object>>) response.get("data");
     }
 
     // ── Holdings ─────────────────────────────────────────────────────────
 
     public List<Map<String, Object>> getHoldings(String accountId) {
-        return api.getList("/api/v1/accounts/" + accountId + "/holdings");
+        return getList("/api/v1/accounts/" + accountId + "/holdings");
     }
 
     // ── Properties ───────────────────────────────────────────────────────
@@ -95,7 +124,7 @@ public class TestDataHelper {
                 "current_value", 350000,
                 "mortgage_balance", 200000
         );
-        return (String) api.post("/api/v1/properties", body).get("id");
+        return (String) post("/api/v1/properties", body).get("id");
     }
 
     public String createPropertyWithLoanAndGetId() {
@@ -110,7 +139,7 @@ public class TestDataHelper {
                 "loan_start_date", "2020-01-01",
                 "use_computed_balance", false
         );
-        return (String) api.post("/api/v1/properties", body).get("id");
+        return (String) post("/api/v1/properties", body).get("id");
     }
 
     // ── Scenarios ────────────────────────────────────────────────────────
@@ -134,18 +163,18 @@ public class TestDataHelper {
     }
 
     public Map<String, Object> createScenario(String name) {
-        return api.post("/api/v1/projections", scenarioBody(name));
+        return post("/api/v1/projections", scenarioBody(name));
     }
 
     // ── Exchange Rates ──────────────────────────────────────────────────
 
     public void createExchangeRate(String currencyCode, double rateToUsd) {
-        api.post("/api/v1/exchange-rates", Map.of("currency_code", currencyCode, "rate_to_usd", rateToUsd));
+        post("/api/v1/exchange-rates", Map.of("currency_code", currencyCode, "rate_to_usd", rateToUsd));
     }
 
     public String createAccountWithCurrencyAndGetId(String name, String type, String currency) {
         var body = Map.of("name", name, "type", type, "currency", currency);
-        return (String) api.post("/api/v1/accounts", body).get("id");
+        return (String) post("/api/v1/accounts", body).get("id");
     }
 
     // ── Spending Profiles ────────────────────────────────────────────────
@@ -159,6 +188,6 @@ public class TestDataHelper {
     }
 
     public Map<String, Object> createSpendingProfile(String name) {
-        return api.post("/api/v1/spending-profiles", spendingProfileBody(name));
+        return post("/api/v1/spending-profiles", spendingProfileBody(name));
     }
 }

@@ -49,39 +49,15 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
         authHelper.bootstrapSecondTenant(restTemplate);
 
         // Create resources owned by tenant 2 — tenant 1 must never observe these.
-        var t2Token = authHelper.tenant2Token();
-        var t2Acct = api.postForEntityAs(t2Token, "/api/v1/accounts",
-                Map.of("name", "T2 Account", "type", "brokerage"));
-        tenant2AccountId = (String) t2Acct.getBody().get("id");
-
-        var t2Prop = api.postForEntityAs(t2Token, "/api/v1/properties", Map.of(
-                        "address", "T2 Address",
-                        "purchase_price", 100000,
-                        "purchase_date", "2020-01-01",
-                        "current_value", 110000,
-                        "mortgage_balance", 50000));
-        tenant2PropertyId = (String) t2Prop.getBody().get("id");
-
-        var t2Scen = api.postForEntityAs(t2Token, "/api/v1/projections", Map.of(
-                        "name", "T2 Scenario",
-                        "retirement_date", "2050-01-01",
-                        "end_age", 90,
-                        "inflation_rate", 0.03,
-                        "birth_year", 1990,
-                        "withdrawal_rate", 0.04,
-                        "withdrawal_strategy", "fixed",
-                        "accounts", java.util.List.of(Map.of(
-                                "initial_balance", 1000,
-                                "annual_contribution", 100,
-                                "expected_return", 0.07,
-                                "account_type", "taxable"))));
-        tenant2ScenarioId = (String) t2Scen.getBody().get("id");
-
-        var t2Txn = api.postForEntityAs(t2Token,
-                "/api/v1/accounts/" + tenant2AccountId + "/transactions", Map.of(
-                        "date", "2024-01-15", "type", "buy",
-                        "symbol", "AAPL", "quantity", 1, "amount", 100));
-        tenant2TransactionId = (String) t2Txn.getBody().get("id");
+        // Property/scenario field values differ from TestDataHelper's canned
+        // defaults, but only the "id" is ever read below, so the substitution
+        // is assertion-safe.
+        var t2 = data.as(authHelper.tenant2Token());
+        tenant2AccountId = (String) t2.createAccount("T2 Account", "brokerage").get("id");
+        tenant2PropertyId = t2.createPropertyAndGetId();
+        tenant2ScenarioId = (String) t2.createScenario("T2 Scenario").get("id");
+        tenant2TransactionId = t2.createBuyTransactionOnDateAndGetId(
+                tenant2AccountId, "2024-01-15", "AAPL", 1, 100);
     }
 
     @Test
