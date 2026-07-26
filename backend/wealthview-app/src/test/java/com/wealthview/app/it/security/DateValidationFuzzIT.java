@@ -7,11 +7,9 @@ import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -45,10 +43,8 @@ class DateValidationFuzzIT extends AbstractApiIntegrationTest {
     void createTransaction_withFuzzedDateValues_neverCrashes() {
         FuzzSupport.samples(this::randomTransactionWithFuzzedDate, ITERATIONS, 0xDA1L)
                 .forEach(body -> {
-                    var resp = restTemplate.exchange(
-                            "/api/v1/accounts/" + accountId + "/transactions",
-                            HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()),
-                            MAP_TYPE);
+                    var resp = api.postForEntity(
+                            "/api/v1/accounts/" + accountId + "/transactions", body);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("create-txn date=%s produced 5xx", body.get("date"))
@@ -65,8 +61,7 @@ class DateValidationFuzzIT extends AbstractApiIntegrationTest {
                     // The cashflow endpoint returns a JSON array on success;
                     // 4xx returns a JSON error envelope. Use String.class so
                     // both shapes deserialize without RestTemplate erroring.
-                    var resp = restTemplate.exchange(path, HttpMethod.GET,
-                            authHelper.authEntity(authHelper.adminToken()), String.class);
+                    var resp = api.getForEntity(path, String.class);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("cashflow ?from=%s&to=%s produced 5xx", ym, ym)

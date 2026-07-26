@@ -5,11 +5,9 @@ import java.util.Random;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -47,8 +45,7 @@ class PaginationFuzzIT extends AbstractApiIntegrationTest {
         FuzzSupport.samples(this::randomPagingQuery, ITERATIONS, 0xE1L)
                 .forEach(query -> {
                     var path = "/api/v1/accounts" + query;
-                    var resp = restTemplate.exchange(path, HttpMethod.GET,
-                            authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+                    var resp = api.getForEntity(path);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("GET %s produced 5xx", path)
@@ -61,8 +58,7 @@ class PaginationFuzzIT extends AbstractApiIntegrationTest {
         FuzzSupport.samples(this::randomPagingQuery, ITERATIONS, 0xE2L)
                 .forEach(query -> {
                     var path = "/api/v1/accounts/" + accountId + "/transactions" + query;
-                    var resp = restTemplate.exchange(path, HttpMethod.GET,
-                            authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+                    var resp = api.getForEntity(path);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("GET %s produced 5xx", path)
@@ -90,8 +86,7 @@ class PaginationFuzzIT extends AbstractApiIntegrationTest {
         };
 
         for (var query : payloads) {
-            var resp = restTemplate.exchange("/api/v1/accounts" + query,
-                    HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+            var resp = api.getForEntity("/api/v1/accounts" + query);
             assertThat(resp.getStatusCode().is5xxServerError())
                     .as("GET /api/v1/accounts%s produced 5xx", query)
                     .isFalse();

@@ -7,7 +7,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
@@ -51,26 +50,19 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
 
         // Create resources owned by tenant 2 — tenant 1 must never observe these.
         var t2Token = authHelper.tenant2Token();
-        var t2Acct = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST,
-                authHelper.authEntity(Map.of("name", "T2 Account", "type", "brokerage"), t2Token),
-                MAP_TYPE);
+        var t2Acct = api.postForEntityAs(t2Token, "/api/v1/accounts",
+                Map.of("name", "T2 Account", "type", "brokerage"));
         tenant2AccountId = (String) t2Acct.getBody().get("id");
 
-        var t2Prop = restTemplate.exchange("/api/v1/properties",
-                HttpMethod.POST,
-                authHelper.authEntity(Map.of(
+        var t2Prop = api.postForEntityAs(t2Token, "/api/v1/properties", Map.of(
                         "address", "T2 Address",
                         "purchase_price", 100000,
                         "purchase_date", "2020-01-01",
                         "current_value", 110000,
-                        "mortgage_balance", 50000), t2Token),
-                MAP_TYPE);
+                        "mortgage_balance", 50000));
         tenant2PropertyId = (String) t2Prop.getBody().get("id");
 
-        var t2Scen = restTemplate.exchange("/api/v1/projections",
-                HttpMethod.POST,
-                authHelper.authEntity(Map.of(
+        var t2Scen = api.postForEntityAs(t2Token, "/api/v1/projections", Map.of(
                         "name", "T2 Scenario",
                         "retirement_date", "2050-01-01",
                         "end_age", 90,
@@ -82,17 +74,13 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
                                 "initial_balance", 1000,
                                 "annual_contribution", 100,
                                 "expected_return", 0.07,
-                                "account_type", "taxable"))), t2Token),
-                MAP_TYPE);
+                                "account_type", "taxable"))));
         tenant2ScenarioId = (String) t2Scen.getBody().get("id");
 
-        var t2Txn = restTemplate.exchange(
-                "/api/v1/accounts/" + tenant2AccountId + "/transactions",
-                HttpMethod.POST,
-                authHelper.authEntity(Map.of(
+        var t2Txn = api.postForEntityAs(t2Token,
+                "/api/v1/accounts/" + tenant2AccountId + "/transactions", Map.of(
                         "date", "2024-01-15", "type", "buy",
-                        "symbol", "AAPL", "quantity", 1, "amount", 100), t2Token),
-                MAP_TYPE);
+                        "symbol", "AAPL", "quantity", 1, "amount", 100));
         tenant2TransactionId = (String) t2Txn.getBody().get("id");
     }
 
@@ -108,8 +96,7 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
         probeUuidEndpoint("/api/v1/accounts/", HttpMethod.DELETE, tenant2AccountId);
 
         // Verify tenant 2's resource is intact.
-        var afterFuzz = restTemplate.exchange("/api/v1/accounts/" + tenant2AccountId,
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()), MAP_TYPE);
+        var afterFuzz = api.getForEntityAs(authHelper.tenant2Token(), "/api/v1/accounts/" + tenant2AccountId);
         assertThat(afterFuzz.getStatusCode())
                 .as("tenant 2's account was deleted by tenant 1's fuzzed DELETE")
                 .isEqualTo(HttpStatus.OK);
@@ -124,8 +111,7 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
     void deletePropertyById_underRandomUuid_neverDeletesCrossTenant() {
         probeUuidEndpoint("/api/v1/properties/", HttpMethod.DELETE, tenant2PropertyId);
 
-        var afterFuzz = restTemplate.exchange("/api/v1/properties/" + tenant2PropertyId,
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()), MAP_TYPE);
+        var afterFuzz = api.getForEntityAs(authHelper.tenant2Token(), "/api/v1/properties/" + tenant2PropertyId);
         assertThat(afterFuzz.getStatusCode())
                 .as("tenant 2's property was deleted by tenant 1's fuzzed DELETE")
                 .isEqualTo(HttpStatus.OK);
@@ -140,9 +126,8 @@ class TenantIsolationFuzzIT extends AbstractApiIntegrationTest {
     void deleteTransactionById_underRandomUuid_neverDeletesCrossTenant() {
         probeUuidEndpoint("/api/v1/transactions/", HttpMethod.DELETE, tenant2TransactionId);
 
-        var listResp = restTemplate.exchange(
-                "/api/v1/accounts/" + tenant2AccountId + "/transactions",
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()), MAP_TYPE);
+        var listResp = api.getForEntityAs(authHelper.tenant2Token(),
+                "/api/v1/accounts/" + tenant2AccountId + "/transactions");
         @SuppressWarnings("unchecked")
         var data = (java.util.List<Map<String, Object>>) listResp.getBody().get("data");
         assertThat(data)

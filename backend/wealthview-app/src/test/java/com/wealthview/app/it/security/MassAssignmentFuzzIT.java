@@ -7,12 +7,10 @@ import java.util.Random;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -39,9 +37,7 @@ class MassAssignmentFuzzIT extends AbstractApiIntegrationTest {
     void createAccount_withExtraFields_isAcceptedButFieldsAreNotPersistedAsTenantOverride() {
         FuzzSupport.samples(this::randomAccountBodyWithExtras, ITERATIONS, 0xD4L)
                 .forEach(body -> {
-                    var resp = restTemplate.exchange("/api/v1/accounts",
-                            HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()),
-                            MAP_TYPE);
+                    var resp = api.postForEntity("/api/v1/accounts", body);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("create with extras=%s produced 5xx", body)
@@ -78,10 +74,8 @@ class MassAssignmentFuzzIT extends AbstractApiIntegrationTest {
 
         FuzzSupport.samples(this::randomTransactionBodyWithExtras, ITERATIONS, 0xD5L)
                 .forEach(body -> {
-                    var resp = restTemplate.exchange(
-                            "/api/v1/accounts/" + accountId + "/transactions",
-                            HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()),
-                            MAP_TYPE);
+                    var resp = api.postForEntity(
+                            "/api/v1/accounts/" + accountId + "/transactions", body);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("create-txn with extras=%s produced 5xx", body)
@@ -113,23 +107,17 @@ class MassAssignmentFuzzIT extends AbstractApiIntegrationTest {
         body.put("type", "brokerage");
         body.put("tenant_id", fakeTenantId);
 
-        var createResp = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()),
-                MAP_TYPE);
+        var createResp = api.postForEntity("/api/v1/accounts", body);
         assertThat(createResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var createdId = (String) createResp.getBody().get("id");
 
         // Tenant 2 must NOT see this account; tenant 1 MUST see it.
-        var tenant2View = restTemplate.exchange("/api/v1/accounts/" + createdId,
-                HttpMethod.GET, authHelper.authEntity(authHelper.tenant2Token()),
-                MAP_TYPE);
+        var tenant2View = api.getForEntityAs(authHelper.tenant2Token(), "/api/v1/accounts/" + createdId);
         assertThat(tenant2View.getStatusCode())
                 .as("body-supplied tenant_id leaked the new account into tenant 2")
                 .isEqualTo(HttpStatus.NOT_FOUND);
 
-        var tenant1View = restTemplate.exchange("/api/v1/accounts/" + createdId,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                MAP_TYPE);
+        var tenant1View = api.getForEntity("/api/v1/accounts/" + createdId);
         assertThat(tenant1View.getStatusCode())
                 .as("account ownership lost — caller tenant cannot see its own account")
                 .isEqualTo(HttpStatus.OK);

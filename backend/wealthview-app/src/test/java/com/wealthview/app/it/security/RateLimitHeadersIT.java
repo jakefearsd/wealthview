@@ -6,16 +6,11 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -36,11 +31,8 @@ class RateLimitHeadersIT extends AbstractApiIntegrationTest {
     @Test
     @Order(1)
     void headers_presentOnSuccessfulLogin() {
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getHeaders().getFirst("X-RateLimit-Limit")).isNotNull();
@@ -51,18 +43,12 @@ class RateLimitHeadersIT extends AbstractApiIntegrationTest {
     @Test
     @Order(2)
     void remaining_decrementsAcrossRequests() {
-        var first = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var first = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var firstRemaining = Integer.parseInt(first.getHeaders().getFirst("X-RateLimit-Remaining"));
 
-        var second = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var second = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var secondRemaining = Integer.parseInt(second.getHeaders().getFirst("X-RateLimit-Remaining"));
 
         assertThat(secondRemaining).isLessThan(firstRemaining);
@@ -71,11 +57,8 @@ class RateLimitHeadersIT extends AbstractApiIntegrationTest {
     @Test
     @Order(3)
     void resetHeader_isFutureUnixTimestamp() {
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
 
         long reset = Long.parseLong(resp.getHeaders().getFirst("X-RateLimit-Reset"));
         long now = System.currentTimeMillis() / 1000L;
@@ -88,11 +71,8 @@ class RateLimitHeadersIT extends AbstractApiIntegrationTest {
         // Auth endpoints get 60 requests per IP per minute. Burn through the budget.
         org.springframework.http.ResponseEntity<Map<String, Object>> last = null;
         for (int i = 0; i < 65; i++) {
-            last = restTemplate.exchange("/api/v1/auth/token/login",
-                    HttpMethod.POST,
-                    new HttpEntity<>(Map.of("email", "nobody-" + i + "@x.test", "password", "pw"),
-                            jsonHeaders()),
-                    MAP_TYPE);
+            last = api.postAnonForEntity("/api/v1/auth/token/login",
+                    Map.of("email", "nobody-" + i + "@x.test", "password", "pw"));
             if (last.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                 break;
             }
@@ -101,11 +81,5 @@ class RateLimitHeadersIT extends AbstractApiIntegrationTest {
         assertThat(last.getHeaders().getFirst("X-RateLimit-Limit")).isNotNull();
         assertThat(last.getHeaders().getFirst("X-RateLimit-Remaining")).isEqualTo("0");
         assertThat(last.getHeaders().getFirst("X-RateLimit-Reset")).isNotNull();
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        return h;
     }
 }

@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -55,8 +54,7 @@ class ExportEndpointFuzzIT extends AbstractApiIntegrationTest {
             body.put("name", name);
             body.put("type", FuzzSupport.choose(random,
                     "brokerage", "ira", "401k", "roth", "bank"));
-            restTemplate.exchange("/api/v1/accounts",
-                    HttpMethod.POST, authHelper.authEntity(body, t2Token), MAP_TYPE);
+            api.postForEntityAs(t2Token, "/api/v1/accounts", body);
         }
     }
 
@@ -125,9 +123,7 @@ class ExportEndpointFuzzIT extends AbstractApiIntegrationTest {
 
     @Test
     void exportAccountsCsv_doesNotIncludeTenant2Data() {
-        var resp = restTemplate.exchange("/api/v1/export/csv/accounts",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                String.class);
+        var resp = api.getForEntity("/api/v1/export/csv/accounts", String.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var body = resp.getBody() == null ? "" : resp.getBody();
