@@ -78,7 +78,7 @@ public class CombinedPortfolioHistoryService {
         // Load all accounts and filter out bank accounts
         var allAccounts = accountRepository.findByTenant_Id(tenantId, Pageable.unpaged()).getContent();
         var investmentAccounts = allAccounts.stream()
-                .filter(a -> !"bank".equals(a.getType()))
+                .filter(a -> !a.isBank())
                 .toList();
 
         // Load holdings and group by account

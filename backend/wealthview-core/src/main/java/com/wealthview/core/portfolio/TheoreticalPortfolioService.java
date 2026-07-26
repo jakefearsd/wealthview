@@ -54,7 +54,7 @@ public class TheoreticalPortfolioService {
         var account = accountRepository.findByTenant_IdAndId(tenantId, accountId)
                 .orElseThrow(Entities.notFound("Account"));
 
-        if ("bank".equals(account.getType())) {
+        if (account.isBank()) {
             return emptyResponse(accountId);
         }
 

@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Branches covered:
  *   - AccountEntity(TenantEntity, String, String, String, String): null-currency else-branch
+ *   - AccountEntity.isBank(): true and false paths
  *   - SpendingProfileEntity(TenantEntity, String, BigDecimal, BigDecimal, String): null-tiers else-branch
  *   - ProjectionAccountEntity(…, String accountType): null-accountType else-branch
  *   - InviteCodeEntity.isConsumed(): true and false paths
@@ -37,6 +38,24 @@ class EntityBranchCoverageTest {
         var account = new AccountEntity(null, "Savings", "investment", "Fidelity", "EUR");
 
         assertThat(account.getCurrency()).isEqualTo("EUR");
+    }
+
+    // -------------------------------------------------------------------------
+    // AccountEntity.isBank() — both branches
+    // -------------------------------------------------------------------------
+
+    @Test
+    void accountEntity_isBank_typeBank_returnsTrue() {
+        var account = new AccountEntity(null, "Checking", "bank", "Chase");
+
+        assertThat(account.isBank()).isTrue();
+    }
+
+    @Test
+    void accountEntity_isBank_typeBrokerage_returnsFalse() {
+        var account = new AccountEntity(null, "Brokerage", "brokerage", "Fidelity");
+
+        assertThat(account.isBank()).isFalse();
     }
 
     // -------------------------------------------------------------------------

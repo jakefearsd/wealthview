@@ -294,7 +294,7 @@ class SnapshotProjectionServiceTest {
         var account = mock(AccountEntity.class);
         var id = UUID.randomUUID();
         lenient().when(account.getId()).thenReturn(id);
-        when(account.getType()).thenReturn(type);
+        when(account.isBank()).thenReturn("bank".equals(type));
         return account;
     }
 

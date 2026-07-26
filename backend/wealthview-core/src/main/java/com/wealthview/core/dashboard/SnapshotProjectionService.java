@@ -66,7 +66,7 @@ public class SnapshotProjectionService {
         var balances = accountService.computeAllBalances(tenantId);
         var accountProjections = new ArrayList<AccountProjection>();
         for (var account : accounts) {
-            if ("bank".equals(account.getType())) {
+            if (account.isBank()) {
                 var balance = balances.getOrDefault(account.getId(), BigDecimal.ZERO);
                 accountProjections.add(new AccountProjection(balance, BigDecimal.ZERO));
             } else {

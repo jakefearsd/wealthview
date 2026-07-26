@@ -80,6 +80,15 @@ public class AccountEntity extends Auditable {
         this.type = type;
     }
 
+    /**
+     * Whether this account's type is the "bank" account type -- a cash-balance account
+     * (balance computed from transactions) rather than a holdings-based investment account.
+     * Not to be confused with a transaction's type.
+     */
+    public boolean isBank() {
+        return "bank".equals(type);
+    }
+
     public String getInstitution() {
         return institution;
     }

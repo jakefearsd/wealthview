@@ -63,7 +63,7 @@ public class DashboardService {
             var accountBalanceUsd = exchangeRateService.convertToUsd(
                     nativeBalance, account.getCurrency(), tenantId);
 
-            if ("bank".equals(account.getType())) {
+            if (account.isBank()) {
                 totalCash = totalCash.add(accountBalanceUsd);
             } else {
                 totalInvestments = totalInvestments.add(accountBalanceUsd);

@@ -361,6 +361,7 @@ class CombinedPortfolioHistoryServiceTest {
         var id = UUID.randomUUID();
         lenient().when(account.getId()).thenReturn(id);
         lenient().when(account.getType()).thenReturn(type);
+        lenient().when(account.isBank()).thenReturn("bank".equals(type));
         lenient().when(account.getName()).thenReturn(type + " account");
         lenient().when(account.getCurrency()).thenReturn("USD");
         return account;

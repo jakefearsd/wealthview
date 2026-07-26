@@ -118,7 +118,7 @@ public class AccountService {
 
         var result = new HashMap<UUID, BigDecimal>();
         for (var account : accounts) {
-            if ("bank".equals(account.getType())) {
+            if (account.isBank()) {
                 result.put(account.getId(), bankBalances.getOrDefault(account.getId(), BigDecimal.ZERO));
             } else {
                 var holdings = holdingsByAccount.getOrDefault(account.getId(), List.of());
@@ -130,7 +130,7 @@ public class AccountService {
 
     private Map<UUID, BigDecimal> bulkBankBalances(UUID tenantId, List<AccountEntity> accounts) {
         var bankAccountIds = accounts.stream()
-                .filter(a -> "bank".equals(a.getType()))
+                .filter(AccountEntity::isBank)
                 .map(AccountEntity::getId)
                 .toList();
         var balances = new HashMap<UUID, BigDecimal>();
@@ -165,7 +165,7 @@ public class AccountService {
     }
 
     public BigDecimal computeBalance(AccountEntity account, UUID tenantId) {
-        if ("bank".equals(account.getType())) {
+        if (account.isBank()) {
             return computeBankBalance(account, tenantId);
         }
         return computeInvestmentValue(account, tenantId);
@@ -177,7 +177,7 @@ public class AccountService {
      * character, so a bank account's basis is its balance (no embedded gain).
      */
     public BigDecimal computeCostBasis(AccountEntity account, UUID tenantId) {
-        if ("bank".equals(account.getType())) {
+        if (account.isBank()) {
             return computeBankBalance(account, tenantId);
         }
         var holdings = holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId);
