@@ -21,13 +21,12 @@ import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.common.Money;
 import com.wealthview.core.common.PageResponse;
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 @Service
@@ -39,17 +38,17 @@ public class AccountService {
     private final TenantLookup tenantLookup;
     private final HoldingRepository holdingRepository;
     private final TransactionRepository transactionRepository;
-    private final PriceRepository priceRepository;
+    private final LatestPriceLookup latestPriceLookup;
     private final ApplicationEventPublisher eventPublisher;
 
     public AccountService(AccountRepository accountRepository, TenantLookup tenantLookup,
                           HoldingRepository holdingRepository, TransactionRepository transactionRepository,
-                          PriceRepository priceRepository, ApplicationEventPublisher eventPublisher) {
+                          LatestPriceLookup latestPriceLookup, ApplicationEventPublisher eventPublisher) {
         this.accountRepository = accountRepository;
         this.tenantLookup = tenantLookup;
         this.holdingRepository = holdingRepository;
         this.transactionRepository = transactionRepository;
-        this.priceRepository = priceRepository;
+        this.latestPriceLookup = latestPriceLookup;
         this.eventPublisher = eventPublisher;
     }
 
@@ -148,11 +147,7 @@ public class AccountService {
                 .map(HoldingEntity::getSymbol)
                 .distinct()
                 .toList();
-        if (symbols.isEmpty()) {
-            return Map.of();
-        }
-        return priceRepository.findLatestBySymbolIn(symbols).stream()
-                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+        return latestPriceLookup.latestFor(symbols);
     }
 
     private BigDecimal valueHoldings(List<HoldingEntity> holdings, Map<String, BigDecimal> latestPrices) {
@@ -203,24 +198,7 @@ public class AccountService {
             return BigDecimal.ZERO;
         }
 
-        var symbols = holdings.stream()
-                .map(HoldingEntity::getSymbol)
-                .distinct()
-                .toList();
-
-        var latestPrices = priceRepository.findLatestBySymbolIn(symbols).stream()
-                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
-
-        var value = BigDecimal.ZERO;
-        for (var holding : holdings) {
-            var price = latestPrices.get(holding.getSymbol());
-            if (price != null) {
-                value = value.add(holding.getQuantity().multiply(price)
-                        .setScale(Money.SCALE, Money.ROUNDING));
-            } else {
-                value = value.add(holding.getCostBasis());
-            }
-        }
-        return value;
+        var latestPrices = bulkLatestPrices(holdings);
+        return valueHoldings(holdings, latestPrices);
     }
 }

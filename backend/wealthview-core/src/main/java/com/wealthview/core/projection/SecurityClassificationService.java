@@ -10,18 +10,16 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.SecurityClassOverrideEntity;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.SecurityAssetClassRepository;
 import com.wealthview.persistence.repository.SecurityClassOverrideRepository;
 
@@ -37,16 +35,16 @@ public class SecurityClassificationService {
     private final SecurityAssetClassRepository seedRepository;
     private final SecurityClassOverrideRepository overrideRepository;
     private final HoldingRepository holdingRepository;
-    private final PriceRepository priceRepository;
+    private final LatestPriceLookup latestPriceLookup;
 
     public SecurityClassificationService(SecurityAssetClassRepository seedRepository,
                                          SecurityClassOverrideRepository overrideRepository,
                                          HoldingRepository holdingRepository,
-                                         PriceRepository priceRepository) {
+                                         LatestPriceLookup latestPriceLookup) {
         this.seedRepository = seedRepository;
         this.overrideRepository = overrideRepository;
         this.holdingRepository = holdingRepository;
-        this.priceRepository = priceRepository;
+        this.latestPriceLookup = latestPriceLookup;
     }
 
     /**
@@ -162,8 +160,7 @@ public class SecurityClassificationService {
 
     private Map<String, BigDecimal> latestPricesBySymbol(List<HoldingEntity> holdings) {
         var symbols = holdings.stream().map(HoldingEntity::getSymbol).distinct().toList();
-        return priceRepository.findLatestBySymbolIn(symbols).stream()
-                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+        return latestPriceLookup.latestFor(symbols);
     }
 
     /**

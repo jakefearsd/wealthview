@@ -1,11 +1,9 @@
 package com.wealthview.core.holding;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,11 +15,10 @@ import com.wealthview.core.audit.AuditEvent;
 import com.wealthview.core.common.Entities;
 import com.wealthview.core.holding.dto.HoldingRequest;
 import com.wealthview.core.holding.dto.HoldingResponse;
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 
 @Service
 public class HoldingService {
@@ -30,14 +27,14 @@ public class HoldingService {
 
     private final HoldingRepository holdingRepository;
     private final AccountRepository accountRepository;
-    private final PriceRepository priceRepository;
+    private final LatestPriceLookup latestPriceLookup;
     private final ApplicationEventPublisher eventPublisher;
 
     public HoldingService(HoldingRepository holdingRepository, AccountRepository accountRepository,
-                          PriceRepository priceRepository, ApplicationEventPublisher eventPublisher) {
+                          LatestPriceLookup latestPriceLookup, ApplicationEventPublisher eventPublisher) {
         this.holdingRepository = holdingRepository;
         this.accountRepository = accountRepository;
-        this.priceRepository = priceRepository;
+        this.latestPriceLookup = latestPriceLookup;
         this.eventPublisher = eventPublisher;
     }
 
@@ -49,8 +46,7 @@ public class HoldingService {
         }
 
         var symbols = holdings.stream().map(HoldingEntity::getSymbol).distinct().toList();
-        Map<String, BigDecimal> prices = priceRepository.findLatestBySymbolIn(symbols).stream()
-                .collect(Collectors.toMap(PriceEntity::getSymbol, PriceEntity::getClosePrice));
+        var prices = latestPriceLookup.latestFor(symbols);
 
         return holdings.stream()
                 .map(h -> HoldingResponse.from(h, prices.get(h.getSymbol())))

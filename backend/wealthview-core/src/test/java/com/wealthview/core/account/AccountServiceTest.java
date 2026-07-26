@@ -1,8 +1,8 @@
 package com.wealthview.core.account;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,14 +19,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.account.dto.AccountRequest;
 import com.wealthview.core.exception.EntityNotFoundException;
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -34,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -53,7 +53,7 @@ class AccountServiceTest {
     private TransactionRepository transactionRepository;
 
     @Mock
-    private PriceRepository priceRepository;
+    private LatestPriceLookup latestPriceLookup;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
@@ -206,9 +206,8 @@ class AccountServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
                 .thenReturn(List.of(holding));
 
-        var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
-        when(priceRepository.findLatestBySymbolIn(List.of("AAPL")))
-                .thenReturn(List.of(price));
+        when(latestPriceLookup.latestFor(List.of("AAPL")))
+                .thenReturn(Map.of("AAPL", new BigDecimal("200.00")));
 
         var result = accountService.get(tenantId, accountId);
 
@@ -229,17 +228,15 @@ class AccountServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
                 .thenReturn(List.of(holdingAapl, holdingGoog));
 
-        var priceAapl = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
-        var priceGoog = new PriceEntity("GOOG", LocalDate.of(2025, 3, 1), new BigDecimal("150.00"), "manual");
-        when(priceRepository.findLatestBySymbolIn(List.of("AAPL", "GOOG")))
-                .thenReturn(List.of(priceAapl, priceGoog));
+        when(latestPriceLookup.latestFor(List.of("AAPL", "GOOG")))
+                .thenReturn(Map.of("AAPL", new BigDecimal("200.00"), "GOOG", new BigDecimal("150.00")));
 
         var result = accountService.get(tenantId, accountId);
 
         // AAPL: 10 * 200 = 2000, GOOG: 5 * 150 = 750, total = 2750
         assertThat(result.balance()).isEqualByComparingTo(new BigDecimal("2750.00"));
-        // Should NOT call findFirstBySymbolOrderByDateDesc (the N+1 method)
-        verify(priceRepository, never()).findFirstBySymbolOrderByDateDesc(any());
+        // Should batch-fetch once via LatestPriceLookup, not once per holding
+        verify(latestPriceLookup, times(1)).latestFor(List.of("AAPL", "GOOG"));
     }
 
     @Test
@@ -270,8 +267,8 @@ class AccountServiceTest {
         when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
                 .thenReturn(List.of(holding));
 
-        when(priceRepository.findLatestBySymbolIn(List.of("XYZ")))
-                .thenReturn(List.of());
+        when(latestPriceLookup.latestFor(List.of("XYZ")))
+                .thenReturn(Map.of());
 
         var result = accountService.get(tenantId, accountId);
 
@@ -318,9 +315,8 @@ class AccountServiceTest {
                 new BigDecimal("10"), new BigDecimal("1500.00"));
         when(holdingRepository.findByTenant_Id(tenantId))
                 .thenReturn(List.of(holding));
-        var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
-        when(priceRepository.findLatestBySymbolIn(List.of("AAPL")))
-                .thenReturn(List.of(price));
+        when(latestPriceLookup.latestFor(List.of("AAPL")))
+                .thenReturn(Map.of("AAPL", new BigDecimal("200.00")));
 
         var result = accountService.computeAllBalances(tenantId);
 
@@ -380,9 +376,8 @@ class AccountServiceTest {
                 new BigDecimal("100"), new BigDecimal("777.00"));
         when(holdingRepository.findByAccount_IdAndTenant_Id(account.getId(), tenantId))
                 .thenReturn(List.of(priced, unpriced));
-        var price = new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("200.00"), "manual");
-        when(priceRepository.findLatestBySymbolIn(List.of("AAPL", "SPAXX")))
-                .thenReturn(List.of(price));
+        when(latestPriceLookup.latestFor(List.of("AAPL", "SPAXX")))
+                .thenReturn(Map.of("AAPL", new BigDecimal("200.00")));
 
         var result = accountService.get(tenantId, accountId);
 
@@ -452,8 +447,8 @@ class AccountServiceTest {
                 new BigDecimal("10"), new BigDecimal("1500.00"));
         when(holdingRepository.findByTenant_Id(tenantId))
                 .thenReturn(List.of(holding));
-        when(priceRepository.findLatestBySymbolIn(List.of("XYZ")))
-                .thenReturn(List.of());
+        when(latestPriceLookup.latestFor(List.of("XYZ")))
+                .thenReturn(Map.of());
 
         var result = accountService.computeAllBalances(tenantId);
 

@@ -1,8 +1,8 @@
 package com.wealthview.core.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -13,13 +13,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.persistence.entity.HoldingEntity;
-import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.SecurityAssetClassEntity;
 import com.wealthview.persistence.entity.SecurityClassOverrideEntity;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.SecurityAssetClassRepository;
 import com.wealthview.persistence.repository.SecurityClassOverrideRepository;
 
@@ -48,7 +47,7 @@ class SecurityClassificationServiceTest {
     private HoldingRepository holdingRepository;
 
     @Mock
-    private PriceRepository priceRepository;
+    private LatestPriceLookup latestPriceLookup;
 
     @InjectMocks
     private SecurityClassificationService service;
@@ -132,11 +131,10 @@ class SecurityClassificationServiceTest {
         // $6000 BND (seeded as bond), $4000 ZZZZ (no override/seed -> us_stock, flagged unclassified)
         var bnd = holding("BND", "60");
         var zzzz = holding("ZZZZ", "40");
-        var bndPrice = price("BND", "100");
-        var zzzzPrice = price("ZZZZ", "100");
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId))
                 .thenReturn(List.of(bnd, zzzz));
-        when(priceRepository.findLatestBySymbolIn(anyList())).thenReturn(List.of(bndPrice, zzzzPrice));
+        when(latestPriceLookup.latestFor(anyList()))
+                .thenReturn(Map.of("BND", new BigDecimal("100"), "ZZZZ", new BigDecimal("100")));
         when(overrideRepository.findByTenantIdAndSymbol(eq(tenantId), any())).thenReturn(Optional.empty());
         when(seedRepository.findBySymbol("BND"))
                 .thenReturn(Optional.of(new SecurityAssetClassEntity("BND", "bond")));
@@ -152,9 +150,8 @@ class SecurityClassificationServiceTest {
     @Test
     void deriveAllocation_moneyMarketHolding_classifiesAsCashAndNotFlaggedUnclassified() {
         var spaxx = moneyMarketHolding("SPAXX", "500");
-        var spaxxPrice = price("SPAXX", "1");
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)).thenReturn(List.of(spaxx));
-        when(priceRepository.findLatestBySymbolIn(anyList())).thenReturn(List.of(spaxxPrice));
+        when(latestPriceLookup.latestFor(anyList())).thenReturn(Map.of("SPAXX", new BigDecimal("1")));
 
         var result = service.deriveAllocation(tenantId, accountId);
 
@@ -172,7 +169,7 @@ class SecurityClassificationServiceTest {
         // classified as CASH regardless of price data.
         var spaxx = moneyMarketHolding("SPAXX", "500");
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)).thenReturn(List.of(spaxx));
-        when(priceRepository.findLatestBySymbolIn(anyList())).thenReturn(List.of());
+        when(latestPriceLookup.latestFor(anyList())).thenReturn(Map.of());
 
         var result = service.deriveAllocation(tenantId, accountId);
 
@@ -187,7 +184,7 @@ class SecurityClassificationServiceTest {
     void deriveAllocation_holdingWithNoPrice_excludedFromAllocationTotal() {
         var unpriced = unpricedHolding("UNPRICED");
         when(holdingRepository.findByAccount_IdAndTenant_Id(accountId, tenantId)).thenReturn(List.of(unpriced));
-        when(priceRepository.findLatestBySymbolIn(anyList())).thenReturn(List.of());
+        when(latestPriceLookup.latestFor(anyList())).thenReturn(Map.of());
 
         var result = service.deriveAllocation(tenantId, accountId);
 
@@ -220,9 +217,5 @@ class SecurityClassificationServiceTest {
         when(h.getQuantity()).thenReturn(new BigDecimal(qty));
         when(h.isMoneyMarket()).thenReturn(true);
         return h;
-    }
-
-    private static PriceEntity price(String symbol, String closePrice) {
-        return new PriceEntity(symbol, LocalDate.now(), new BigDecimal(closePrice), "test");
     }
 }

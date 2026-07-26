@@ -15,12 +15,12 @@ import org.springframework.context.ApplicationEventPublisher;
 
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.dto.HoldingRequest;
+import com.wealthview.core.price.LatestPriceLookup;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.HoldingRepository;
-import com.wealthview.persistence.repository.PriceRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -37,7 +37,7 @@ class HoldingServiceTest {
     private AccountRepository accountRepository;
 
     @Mock
-    private PriceRepository priceRepository;
+    private LatestPriceLookup latestPriceLookup;
 
     @Mock
     private ApplicationEventPublisher eventPublisher;
