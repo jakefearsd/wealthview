@@ -5,6 +5,10 @@ import java.io.StringReader;
 
 import org.junit.jupiter.api.Test;
 
+import com.wealthview.core.importservice.dto.ParsedTransaction;
+
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.OPENING_BALANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class CsvTransactionParserTest {
@@ -93,6 +97,54 @@ class CsvTransactionParserTest {
 
         assertThat(result.transactions()).hasSize(2);
         assertThat(result.errors()).hasSize(1);
+    }
+
+    @Test
+    void parse_openingBalanceType_parsesSuccessfully() throws IOException {
+        var csv = """
+                date,type,symbol,quantity,amount
+                2025-01-15,opening_balance,VTI,42.5,10000.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement()
+                .extracting(ParsedTransaction::type)
+                .isEqualTo(OPENING_BALANCE);
+    }
+
+    @Test
+    void parse_uppercaseType_isCaseTolerant() throws IOException {
+        var csv = """
+                date,type,symbol,quantity,amount
+                2025-01-15,BUY,AAPL,10,1500.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.errors()).isEmpty();
+        assertThat(result.transactions()).singleElement()
+                .extracting(ParsedTransaction::type)
+                .isEqualTo(BUY);
+    }
+
+    @Test
+    void parse_unknownType_reportsRowErrorAndKeepsOtherRows() throws IOException {
+        var csv = """
+                date,type,symbol,quantity,amount
+                2025-01-15,teleport,AAPL,10,1500.00
+                2025-01-16,buy,AAPL,10,1500.00
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).hasSize(1);
+        assertThat(result.errors()).singleElement()
+                .satisfies(error -> {
+                    assertThat(error.rowNumber()).isEqualTo(2);
+                    assertThat(error.message()).isEqualTo("Invalid transaction type: teleport");
+                });
     }
 
     @Test

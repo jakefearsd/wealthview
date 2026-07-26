@@ -63,18 +63,13 @@ public class CsvTransactionParser implements ImportParser {
                         continue;
                     }
 
-                    // Validate through TransactionType.fromValue (case-tolerant). An unknown
-                    // token stays a per-row error rather than failing the whole file.
-                    // opening_balance is still rejected here to preserve existing behavior;
-                    // accepting it is a separate behavior change.
+                    // TransactionType.fromValue is the single source of truth for the closed set
+                    // (it is case-tolerant, so the former toLowerCase is no longer needed). An
+                    // unknown token stays a per-row error rather than failing the whole file.
                     TransactionType type;
                     try {
                         type = TransactionType.fromValue(typeStr);
                     } catch (IllegalArgumentException e) {
-                        errors.add(new CsvRowError(rowNum, "Invalid transaction type: " + typeStr));
-                        continue;
-                    }
-                    if (type == TransactionType.OPENING_BALANCE) {
                         errors.add(new CsvRowError(rowNum, "Invalid transaction type: " + typeStr));
                         continue;
                     }
