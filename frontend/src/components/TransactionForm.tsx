@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { createTransaction, updateTransaction } from '../api/transactions';
+import { useApiMutation } from '../hooks/useApiMutation';
 import CurrencyInput from './CurrencyInput';
 import type { Transaction, TransactionRequest } from '../types/transaction';
-import toast from 'react-hot-toast';
 
 interface Props {
     accountId: string;
@@ -18,7 +18,17 @@ export default function TransactionForm({ accountId, onSuccess, onCancel, initia
     const [txnQuantity, setTxnQuantity] = useState(initialValues?.quantity != null ? String(initialValues.quantity) : '');
     const [txnAmount, setTxnAmount] = useState(initialValues ? String(initialValues.amount) : '');
 
-    async function handleSubmit() {
+    const saveMutation = useApiMutation(
+        (request: TransactionRequest) => (
+            initialValues ? updateTransaction(initialValues.id, request) : createTransaction(accountId, request)
+        ),
+        {
+            successMessage: initialValues ? 'Transaction updated' : 'Transaction added',
+            onSuccess: () => onSuccess(),
+        },
+    );
+
+    function handleSubmit() {
         const request: TransactionRequest = {
             date: txnDate,
             type: txnType,
@@ -26,18 +36,7 @@ export default function TransactionForm({ accountId, onSuccess, onCancel, initia
             quantity: txnQuantity ? parseFloat(txnQuantity) : undefined,
             amount: parseFloat(txnAmount),
         };
-        try {
-            if (initialValues) {
-                await updateTransaction(initialValues.id, request);
-                toast.success('Transaction updated');
-            } else {
-                await createTransaction(accountId, request);
-                toast.success('Transaction added');
-            }
-            onSuccess();
-        } catch {
-            toast.error(initialValues ? 'Failed to update transaction' : 'Failed to add transaction');
-        }
+        void saveMutation.mutate(request);
     }
 
     return (

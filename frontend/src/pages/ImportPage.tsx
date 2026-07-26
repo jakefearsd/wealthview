@@ -2,11 +2,11 @@ import { useState, type ChangeEvent } from 'react';
 import { useParams, Link } from 'react-router';
 import { importCsv, importOfx, importPositions, listImportJobs } from '../api/import';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import Button from '../components/Button';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import { tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
-import toast from 'react-hot-toast';
 
 type TabType = 'transactions' | 'positions';
 
@@ -16,47 +16,50 @@ export default function ImportPage() {
     const [file, setFile] = useState<File | null>(null);
     const [txnFormat, setTxnFormat] = useState('generic');
     const [posFormat, setPosFormat] = useState('fidelityPositions');
-    const [uploading, setUploading] = useState(false);
     const { data: jobs, loading, refetch } = useApiQuery(listImportJobs);
 
     function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
         setFile(e.target.files?.[0] || null);
     }
 
-    async function handleUploadTransactions() {
+    const uploadTxnMutation = useApiMutation(
+        () => (
+            txnFormat === 'ofx'
+                ? importOfx(accountId!, file!)
+                : importCsv(accountId!, file!, txnFormat === 'generic' ? undefined : txnFormat)
+        ),
+        {
+            successMessage: (result) => `Imported: ${result.successful_rows} successful, ${result.failed_rows} failed`,
+            onSuccess: () => {
+                setFile(null);
+                refetch();
+            },
+        },
+    );
+
+    function handleUploadTransactions() {
         if (!file || !accountId) return;
-        setUploading(true);
-        try {
-            const isOfx = txnFormat === 'ofx';
-            const result = isOfx
-                ? await importOfx(accountId, file)
-                : await importCsv(accountId, file, txnFormat === 'generic' ? undefined : txnFormat);
-            toast.success(`Imported: ${result.successful_rows} successful, ${result.failed_rows} failed`);
-            setFile(null);
-            refetch();
-        } catch {
-            toast.error('Import failed');
-        } finally {
-            setUploading(false);
-        }
+        void uploadTxnMutation.mutate(undefined);
     }
 
-    async function handleUploadPositions() {
+    const uploadPosMutation = useApiMutation(
+        () => importPositions(accountId!, file!, posFormat),
+        {
+            successMessage: (result) => `Imported: ${result.successful_rows} positions`,
+            onSuccess: () => {
+                setFile(null);
+                refetch();
+            },
+        },
+    );
+    const uploading = uploadTxnMutation.loading || uploadPosMutation.loading;
+
+    function handleUploadPositions() {
         if (!file || !accountId) return;
         if (!window.confirm('This will delete all existing transactions and holdings for this account. This cannot be undone. Continue?')) {
             return;
         }
-        setUploading(true);
-        try {
-            const result = await importPositions(accountId, file, posFormat);
-            toast.success(`Imported: ${result.successful_rows} positions`);
-            setFile(null);
-            refetch();
-        } catch {
-            toast.error('Position import failed');
-        } finally {
-            setUploading(false);
-        }
+        void uploadPosMutation.mutate(undefined);
     }
 
     const tabStyle = (tab: TabType) => ({

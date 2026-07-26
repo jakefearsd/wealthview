@@ -4,13 +4,13 @@ import { getAccount } from '../api/accounts';
 import { listTransactions, deleteTransaction } from '../api/transactions';
 import { listHoldings, updateHolding } from '../api/holdings';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
-import toast from 'react-hot-toast';
 import TheoreticalPortfolioChart from '../components/TheoreticalPortfolioChart';
 import TransactionForm from '../components/TransactionForm';
 import Button from '../components/Button';
@@ -30,14 +30,16 @@ export default function AccountDetailPage() {
     const [editQty, setEditQty] = useState('');
     const [editCostBasis, setEditCostBasis] = useState('');
 
-    async function handleDeleteTxn(txnId: string) {
-        try {
-            await deleteTransaction(txnId);
-            toast.success('Transaction deleted');
-            refetchTxns();
-        } catch {
-            toast.error('Failed to delete transaction');
-        }
+    const deleteTxnMutation = useApiMutation(
+        (txnId: string) => deleteTransaction(txnId),
+        {
+            successMessage: 'Transaction deleted',
+            onSuccess: () => refetchTxns(),
+        },
+    );
+
+    function handleDeleteTxn(txnId: string) {
+        void deleteTxnMutation.mutate(txnId);
     }
 
     function startEditHolding(h: { id: string; quantity: number; cost_basis: number }) {
@@ -46,20 +48,24 @@ export default function AccountDetailPage() {
         setEditCostBasis(String(h.cost_basis));
     }
 
-    async function handleSaveHolding(holdingId: string, symbol: string) {
-        try {
-            await updateHolding(holdingId, {
-                account_id: id!,
-                symbol,
-                quantity: parseFloat(editQty),
-                cost_basis: parseFloat(editCostBasis),
-            });
-            toast.success('Holding updated');
-            setEditingHoldingId(null);
-            refetchHoldings();
-        } catch {
-            toast.error('Failed to update holding');
-        }
+    const saveHoldingMutation = useApiMutation(
+        (input: { holdingId: string; symbol: string }) => updateHolding(input.holdingId, {
+            account_id: id!,
+            symbol: input.symbol,
+            quantity: parseFloat(editQty),
+            cost_basis: parseFloat(editCostBasis),
+        }),
+        {
+            successMessage: 'Holding updated',
+            onSuccess: () => {
+                setEditingHoldingId(null);
+                refetchHoldings();
+            },
+        },
+    );
+
+    function handleSaveHolding(holdingId: string, symbol: string) {
+        void saveHoldingMutation.mutate({ holdingId, symbol });
     }
 
     if (acctLoading || holdLoading || txnLoading) return <LoadingState message="Loading account details..." />;

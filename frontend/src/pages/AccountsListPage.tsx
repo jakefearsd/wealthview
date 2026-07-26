@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { listAccounts, createAccount, updateAccount, deleteAccount } from '../api/accounts';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import type { Account, AccountRequest } from '../types/account';
 import { cardStyle, inputFieldStyle, selectStyle } from '../utils/styles';
@@ -11,7 +12,6 @@ import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import StatTile from '../components/StatTile';
-import toast from 'react-hot-toast';
 
 export default function AccountsListPage() {
     const { role } = useAuth();
@@ -42,37 +42,40 @@ export default function AccountsListPage() {
         setShowForm(true);
     }
 
-    async function handleSave() {
+    const saveMutation = useApiMutation(
+        (input: { id: string | null; request: AccountRequest }) => (
+            input.id ? updateAccount(input.id, input.request) : createAccount(input.request)
+        ),
+        {
+            successMessage: (_result, input) => (input.id ? 'Account updated' : 'Account created'),
+            onSuccess: () => {
+                resetForm();
+                refetch();
+            },
+        },
+    );
+
+    function handleSave() {
         const request: AccountRequest = {
             name,
             type,
             institution: institution || undefined,
             currency: currency || 'USD',
         };
-        try {
-            if (editingId) {
-                await updateAccount(editingId, request);
-                toast.success('Account updated');
-            } else {
-                await createAccount(request);
-                toast.success('Account created');
-            }
-            resetForm();
-            refetch();
-        } catch {
-            toast.error(editingId ? 'Failed to update account' : 'Failed to create account');
-        }
+        void saveMutation.mutate({ id: editingId, request });
     }
 
-    async function handleDelete(id: string) {
+    const deleteMutation = useApiMutation(
+        (id: string) => deleteAccount(id),
+        {
+            successMessage: 'Account deleted',
+            onSuccess: () => refetch(),
+        },
+    );
+
+    function handleDelete(id: string) {
         if (!confirm('Delete this account?')) return;
-        try {
-            await deleteAccount(id);
-            toast.success('Account deleted');
-            refetch();
-        } catch {
-            toast.error('Failed to delete account');
-        }
+        void deleteMutation.mutate(id);
     }
 
     if (loading) return <LoadingState message="Loading accounts..." />;

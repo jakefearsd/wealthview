@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { createPrice, listLatestPrices } from '../api/prices';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
@@ -9,7 +10,6 @@ import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import Button from '../components/Button';
-import toast from 'react-hot-toast';
 import type { Price } from '../types/price';
 
 export default function PricesPage() {
@@ -23,22 +23,22 @@ export default function PricesPage() {
     const { data, loading, error, refetch } = useApiQuery<Price[]>(listLatestPrices);
     const latestPrices = data ?? [];
 
-    async function handleAddPrice() {
-        try {
-            const result = await createPrice({
-                symbol: symbol.toUpperCase(),
-                date,
-                close_price: parseFloat(price),
-            });
-            toast.success(`Price for ${result.symbol} saved`);
-            setRecentPrices([result, ...recentPrices]);
-            setSymbol('');
-            setDate('');
-            setPrice('');
-            refetch();
-        } catch {
-            toast.error('Failed to save price');
-        }
+    const addPriceMutation = useApiMutation(
+        (input: { symbol: string; date: string; close_price: number }) => createPrice(input),
+        {
+            successMessage: (result) => `Price for ${result.symbol} saved`,
+            onSuccess: (result) => {
+                setRecentPrices((prev) => [result, ...prev]);
+                setSymbol('');
+                setDate('');
+                setPrice('');
+                refetch();
+            },
+        },
+    );
+
+    function handleAddPrice() {
+        void addPriceMutation.mutate({ symbol: symbol.toUpperCase(), date, close_price: parseFloat(price) });
     }
 
     return (

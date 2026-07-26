@@ -1,23 +1,20 @@
-import { useState } from 'react';
 import { downloadJson, downloadCsv } from '../api/export';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle } from '../utils/styles';
-import toast from 'react-hot-toast';
 
 const csvEntities = ['accounts', 'transactions', 'holdings', 'properties'] as const;
 
 export default function DataExportPage() {
-    const [loading, setLoading] = useState<string | null>(null);
+    const downloadMutation = useApiMutation(
+        (type: string) => (type === 'JSON' ? downloadJson() : downloadCsv(type as (typeof csvEntities)[number])),
+        {
+            successMessage: (_result, type) => `${type} export downloaded`,
+        },
+    );
+    const loading = downloadMutation.pendingInput;
 
-    async function handleDownload(type: string, fn: () => Promise<void>) {
-        setLoading(type);
-        try {
-            await fn();
-            toast.success(`${type} export downloaded`);
-        } catch {
-            toast.error(`Failed to export ${type}`);
-        } finally {
-            setLoading(null);
-        }
+    function handleDownload(type: string) {
+        void downloadMutation.mutate(type);
     }
 
     return (
@@ -30,7 +27,7 @@ export default function DataExportPage() {
                     Download all your data (accounts, transactions, holdings, properties) as a single JSON file.
                 </p>
                 <button
-                    onClick={() => handleDownload('JSON', downloadJson)}
+                    onClick={() => handleDownload('JSON')}
                     disabled={loading !== null}
                     style={{
                         padding: '0.5rem 1rem',
@@ -54,7 +51,7 @@ export default function DataExportPage() {
                     {csvEntities.map((entity) => (
                         <button
                             key={entity}
-                            onClick={() => handleDownload(entity, () => downloadCsv(entity))}
+                            onClick={() => handleDownload(entity)}
                             disabled={loading !== null}
                             style={{
                                 padding: '0.5rem 1rem',

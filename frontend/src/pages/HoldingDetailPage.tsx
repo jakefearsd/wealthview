@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router';
 import { getHolding, updateHolding } from '../api/holdings';
 import { listTransactions } from '../api/transactions';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/format';
 import CurrencyInput from '../components/CurrencyInput';
@@ -12,7 +13,6 @@ import EmptyState from '../components/EmptyState';
 import Button from '../components/Button';
 import RecentStockSplits from '../components/RecentStockSplits';
 import type { Transaction } from '../types/transaction';
-import toast from 'react-hot-toast';
 
 export default function HoldingDetailPage() {
     const { id } = useParams<{ id: string }>();
@@ -43,21 +43,31 @@ export default function HoldingDetailPage() {
         setEditing(true);
     }
 
-    async function handleSave() {
+    const saveMutation = useApiMutation(
+        (input: { holdingId: string; accountId: string; symbol: string; quantity: number; costBasis: number }) => updateHolding(input.holdingId, {
+            account_id: input.accountId,
+            symbol: input.symbol,
+            quantity: input.quantity,
+            cost_basis: input.costBasis,
+        }),
+        {
+            successMessage: 'Holding updated',
+            onSuccess: () => {
+                setEditing(false);
+                refetchHolding();
+            },
+        },
+    );
+
+    function handleSave() {
         if (!holding) return;
-        try {
-            await updateHolding(holding.id, {
-                account_id: holding.account_id,
-                symbol: holding.symbol,
-                quantity: parseFloat(editQty),
-                cost_basis: parseFloat(editCostBasis),
-            });
-            toast.success('Holding updated');
-            setEditing(false);
-            refetchHolding();
-        } catch {
-            toast.error('Failed to update holding');
-        }
+        void saveMutation.mutate({
+            holdingId: holding.id,
+            accountId: holding.account_id,
+            symbol: holding.symbol,
+            quantity: parseFloat(editQty),
+            costBasis: parseFloat(editCostBasis),
+        });
     }
 
     if (holdingLoading) return <LoadingState message="Loading holding..." />;
