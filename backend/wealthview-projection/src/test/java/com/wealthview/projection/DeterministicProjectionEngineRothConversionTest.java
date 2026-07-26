@@ -22,6 +22,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -124,7 +125,7 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single", "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000.0000", "0", "0.0500", "traditional"),
                         acct("100000.0000", "0", "0.0500", "roth")),
@@ -146,7 +147,7 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single", "other_income": 10000, "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.12}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000.0000", "0", "0.0500", "traditional"),
                         acct("100000.0000", "0", "0.0500", "roth")),
@@ -417,7 +418,7 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        int birthYear = LocalDate.now().getYear() - 66;
+        int birthYear = retiredAt66BirthYear();
         int currentYear = LocalDate.now().getYear();
 
         // Guardrail spending with a conversion schedule: $25,000 conversion in year 1, $0 in year 2
@@ -464,7 +465,7 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        int birthYear = LocalDate.now().getYear() - 66;
+        int birthYear = retiredAt66BirthYear();
         int currentYear = LocalDate.now().getYear();
 
         var guardrailYears = List.of(
@@ -501,7 +502,7 @@ class DeterministicProjectionEngineRothConversionTest extends DeterministicProje
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        int birthYear = LocalDate.now().getYear() - 66;
+        int birthYear = retiredAt66BirthYear();
         int currentYear = LocalDate.now().getYear();
 
         // Guardrail spending with conversion schedule — optimizer already validated sustainability

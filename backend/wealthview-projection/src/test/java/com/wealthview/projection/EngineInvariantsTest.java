@@ -19,6 +19,7 @@ import com.wealthview.core.projection.dto.AssetAllocation;
 import com.wealthview.core.projection.dto.AssetClass;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.IncomeSourceType;
+import com.wealthview.core.projection.dto.PoolType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
@@ -814,7 +815,7 @@ class EngineInvariantsTest {
 
     private BigDecimal initialTraditionalBalance(ScenarioCase sc) {
         return accountsFor(sc.accountMix()).stream()
-                .filter(a -> "traditional".equals(a.accountType()))
+                .filter(a -> a.poolType() == PoolType.TRADITIONAL)
                 .map(ProjectionAccountInput::initialBalance)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }

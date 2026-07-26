@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
-import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66Input;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -35,11 +35,11 @@ class DeterministicProjectionEngineBackCompatTest extends DeterministicProjectio
 
         // Already-retired scenario (retirement date one year in the past) so year 1 has zero
         // contributions and growth applies directly to startBalance, isolating the return math.
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 90, scenarioInflation,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.03}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("500000.0000", "0", "0.0600")));
 
         var result = engine.run(input);

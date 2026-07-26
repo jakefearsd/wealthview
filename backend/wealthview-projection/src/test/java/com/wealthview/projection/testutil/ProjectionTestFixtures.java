@@ -14,6 +14,7 @@ import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
 import com.wealthview.core.projection.dto.ProjectionPropertyInput;
+import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.IrmaaSurchargeCalculator;
@@ -80,6 +81,38 @@ public final class ProjectionTestFixtures {
                                                BigDecimal inflation, String paramsJson,
                                                List<ProjectionAccountInput> accounts) {
         return createInput(retDate, endAge, inflation, paramsJson, accounts, null, List.of());
+    }
+
+    /**
+     * Birth year for someone who turns 66 today. Extracted from the "retired at 66" arrange that
+     * recurred 87 times (as the literal expression {@code LocalDate.now().getYear() - 66}) across
+     * the {@code DeterministicProjectionEngine*Test} suite (Task 22 audit). A method, not a cached
+     * constant, so it re-evaluates {@link LocalDate#now()} exactly as each inlined call site did --
+     * byte-identical to the expression it replaces (day-granularity, so stable for the run's duration).
+     */
+    public static int retiredAt66BirthYear() {
+        return LocalDate.now().getYear() - 66;
+    }
+
+    /**
+     * Convenience overload of {@link #createInput(LocalDate, int, BigDecimal, String, List)} for the
+     * common "retired at 66" fixture shape: {@code paramsJsonTemplate} is a {@code %d}-templated
+     * params-JSON text block (birth_year not yet substituted), formatted with
+     * {@link #retiredAt66BirthYear()} before delegating.
+     */
+    public static ProjectionInput retiredAt66Input(LocalDate retDate, int endAge, BigDecimal inflation,
+                                                    String paramsJsonTemplate,
+                                                    List<ProjectionAccountInput> accounts) {
+        return createInput(retDate, endAge, inflation, paramsJsonTemplate.formatted(retiredAt66BirthYear()), accounts);
+    }
+
+    /** Like {@link #retiredAt66Input(LocalDate, int, BigDecimal, String, List)}, plus a spending profile. */
+    public static ProjectionInput retiredAt66Input(LocalDate retDate, int endAge, BigDecimal inflation,
+                                                    String paramsJsonTemplate,
+                                                    List<ProjectionAccountInput> accounts,
+                                                    SpendingProfileInput spendingProfile) {
+        return createInput(retDate, endAge, inflation, paramsJsonTemplate.formatted(retiredAt66BirthYear()), accounts,
+                spendingProfile);
     }
 
     public static ProjectionInput createInput(LocalDate retDate, int endAge,
@@ -180,6 +213,21 @@ public final class ProjectionTestFixtures {
         return new ProjectionInput(UUID.randomUUID(), "Test",
                 LocalDate.now().minusYears(1), 95, BigDecimal.ZERO, paramsJson,
                 accounts, null);
+    }
+
+    /**
+     * The single yearly row for the given calendar year. Moved from a private helper duplicated
+     * only in {@code HouseholdTransitionTest} (Task 22 audit) -- the ~200 remaining positional
+     * {@code .yearlyData().get(n)} lookups elsewhere are NOT migrated to this; adopt only where a
+     * test already filters by calendar year or age, not by churning every index-based lookup.
+     */
+    public static ProjectionYearDto yearOf(List<ProjectionYearDto> rows, int year) {
+        return rows.stream().filter(r -> r.year() == year).findFirst().orElseThrow();
+    }
+
+    /** Like {@link #yearOf}, but looks up by the household member's age instead of calendar year. */
+    public static ProjectionYearDto atAge(List<ProjectionYearDto> rows, int age) {
+        return rows.stream().filter(r -> r.age() == age).findFirst().orElseThrow();
     }
 
     public static DeterministicProjectionEngine engineWithTax(TaxBracketRepository taxBracketRepo,

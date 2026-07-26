@@ -19,6 +19,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProjectionEngineTestSupport {
@@ -29,7 +30,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Social Security", "20000", 60, null, "0")));
@@ -47,7 +48,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Social Security", "24000", 67, null, "0")));
@@ -68,7 +69,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Part-time", "30000", 66, 68, "0")));
@@ -97,7 +98,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("10000"), null),
                 List.of(incomeSource("Social Security", "20000", 60, null, "0.02")));
@@ -117,7 +118,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("10000"), null),
                 List.of(incomeSource("Social Security", "20000", 60, null, "0")));
@@ -134,7 +135,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("10000"), null),
                 List.of(
@@ -158,7 +159,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Social Security", "20000", 60, null, "0")));
@@ -176,7 +177,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("500000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("10000"), bd("5000"), null),
                 List.of(incomeSource("Social Security", "40000", 60, null, "0")));
@@ -192,7 +193,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     void run_withIncomeSource_endBalanceHigherThanWithout() {
         String params = """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66);
+                """.formatted(retiredAt66BirthYear());
 
         var inputWithout = createInput(
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO, params,
@@ -216,7 +217,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);
@@ -231,7 +232,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Social Security", "24000", 67, null, "0")));
@@ -253,7 +254,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Part-time", "20000", 66, 68, "0")));
@@ -275,7 +276,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("1000000.0000", "0", "0.0500")),
                 new SpendingProfileInput(bd("30000"), bd("15000"), null),
                 List.of(incomeSource("Social Security", "20000", 60, null, "0")));
@@ -301,7 +302,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000.0000", "0", "0.0500", "traditional"),
                         acct("500000.0000", "0", "0.0500", "roth")),
@@ -314,7 +315,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000.0000", "0", "0.0500", "traditional"),
                         acct("500000.0000", "0", "0.0500", "roth")));
@@ -332,7 +333,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
 
         String params = """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single"}
-                """.formatted(LocalDate.now().getYear() - 66);
+                """.formatted(retiredAt66BirthYear());
 
         var inputWithout = createInput(
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO, params,
@@ -363,7 +364,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000.0000", "0", "0.0500", "traditional"),
                         acct("500000.0000", "0", "0.0500", "roth")),
@@ -488,7 +489,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     @Test
     void run_withOneTimeIncomeSource_firesOnlyAtStartAge() {
         // Person is already retired at age 66, one-time income at age 67
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
@@ -580,7 +581,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     void run_withSpendingProfile_incomeExceedsSpending_depositsGrossSurplus() {
         // No tax calculator: gross surplus is deposited in full.
         // Spending = $30k, Income = $50k (mid-range age, full amount) → surplus = $20k
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
                 """
@@ -599,7 +600,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
 
     @Test
     void run_withSpendingProfile_incomeUnderSpending_surplusReinvestedIsNull() {
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
                 """
@@ -619,7 +620,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     @Test
     void run_withSpendingProfile_incomeEqualsSpending_surplusReinvestedIsNull() {
         // Income exactly covers spending: no surplus deposited, no withdrawal
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
                 """
@@ -648,7 +649,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
                 """
@@ -674,7 +675,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     void run_withSpendingProfile_pensionRefundSpike_surplusReinvestedOnlyInSpikeYear() {
         // One-time pension refund at age 67: $100k income vs $30k spending → $70k surplus (year 2).
         // All other years: no surplus (income = 0 < spending).
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 70, BigDecimal.ZERO,
                 """
@@ -702,7 +703,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
     @Test
     void run_withoutSpendingProfile_incomeSource_noSurplusReinvested() {
         // On the withdrawal-strategy path (no spending profile), surplus is never deposited.
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         var input = createInput(
                 LocalDate.now().minusYears(1), 68, BigDecimal.ZERO,
                 """
@@ -721,7 +722,7 @@ class DeterministicProjectionEngineIncomeSourceTest extends DeterministicProject
         // Surplus deposited in year 2 compounds into subsequent years.
         // Without surplus: balance grows from portfolio alone.
         // With surplus: balance in year 3+ is higher by at least the deposited amount.
-        var birthYear = LocalDate.now().getYear() - 66;
+        var birthYear = retiredAt66BirthYear();
         String params = """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
                 """.formatted(birthYear);

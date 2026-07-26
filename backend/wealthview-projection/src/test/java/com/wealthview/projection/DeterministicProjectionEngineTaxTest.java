@@ -26,6 +26,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.stubMfj2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Irmaa;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.atAge;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
@@ -33,6 +34,7 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWi
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.oneTimeIncomeSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.property;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.socialSecuritySource;
 import static com.wealthview.projection.testutil.TierJsonBuilder.tiers;
@@ -51,7 +53,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("500000.0000", "0", "0.0500", "roth")));
 
         var result = engineTax.run(input);
@@ -360,7 +362,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -392,7 +394,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -422,7 +424,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
                  "withdrawal_order": "traditional_first", "state": "CA"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -467,7 +469,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "withdrawal_order": "traditional_first", "state": "CA", "dividend_yield": 0}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(acct("500000", "0", "0.00", "traditional"), acct("100000", "0", "0.00", "taxable")),
                 null, List.of(socialSecuritySource("30000", 62)));
 
@@ -524,7 +526,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "withdrawal_order": "traditional_first", "state": "CA"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("300000", "0", "0.00", "taxable")),
@@ -617,7 +619,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("300000", "0", "0.00", "taxable")));
@@ -676,7 +678,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 20000, "annual_roth_conversion": 30000,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -705,7 +707,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                  "other_income": 20000, "annual_roth_conversion": 30000,
                  "withdrawal_order": "traditional_first", "state": "CA",
                  "primary_residence_property_tax": 5000}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -768,7 +770,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                  "primary_residence_property_tax": 12000,
                  "primary_residence_mortgage_interest": 25000,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth")));
@@ -847,7 +849,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "filing_status": "single",
                  "roth_conversion_strategy": "fill_bracket", "target_bracket_rate": 0.22,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("1000000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth"),
@@ -1311,9 +1313,9 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         var result = engineTax.run(input);
 
-        var age64Year = result.yearlyData().stream().filter(y -> y.age() == 64).findFirst().orElseThrow();
-        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
-        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
+        var age64Year = atAge(result.yearlyData(), 64);
+        var age65Year = atAge(result.yearlyData(), 65);
+        var age66Year = atAge(result.yearlyData(), 66);
 
         // Ages 60-64 (pre-Medicare) never owe the surcharge, regardless of MAGI.
         assertThat(age64Year.irmaaWarning()).isNull();
@@ -1382,7 +1384,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         var result = engineTax.run(input);
 
-        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age65Year = atAge(result.yearlyData(), 65);
 
         assertThat(age65Year.irmaaWarning()).isNull();
         assertThat(age65Year.irmaaSurcharge()).isNull();
@@ -1410,7 +1412,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         var result = engineTax.run(input);
 
-        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age65Year = atAge(result.yearlyData(), 65);
 
         assertThat(age65Year.irmaaWarning()).isNull();
         assertThat(age65Year.irmaaSurcharge()).isNull();
@@ -1445,8 +1447,8 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 createInput(LocalDate.of(birthYear, 1, 1), 70, BigDecimal.ZERO, paramsJson, accounts,
                         spendingProfile));
 
-        var age65Without = withoutIrmaa.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
-        var age65With = withIrmaa.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
+        var age65Without = atAge(withoutIrmaa.yearlyData(), 65);
+        var age65With = atAge(withIrmaa.yearlyData(), 65);
 
         assertThat(age65With.irmaaSurcharge()).isNotNull();
         assertThat(age65With.irmaaSurcharge()).isGreaterThan(BigDecimal.ZERO);
@@ -1465,7 +1467,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.05", "traditional"),
                         acct("100000", "0", "0.05", "roth")));
@@ -1492,7 +1494,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "other_income": 50000, "state": "CA",
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth")));
@@ -1524,7 +1526,7 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
                  "primary_residence_property_tax": 8000,
                  "primary_residence_mortgage_interest": 10000,
                  "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("500000", "0", "0.00", "traditional"),
                         acct("100000", "0", "0.00", "roth")));
@@ -1569,9 +1571,9 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         var result = engineTax.run(input);
 
-        var age64Year = result.yearlyData().stream().filter(y -> y.age() == 64).findFirst().orElseThrow();
-        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
-        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
+        var age64Year = atAge(result.yearlyData(), 64);
+        var age65Year = atAge(result.yearlyData(), 65);
+        var age66Year = atAge(result.yearlyData(), 66);
 
         assertThat(age64Year.irmaaWarning()).as("Y+1: lookback = age 62's baseline MAGI").isNull();
         assertThat(age65Year.irmaaWarning()).as("Y+2: lookback = age 63's spiked MAGI").isTrue();
@@ -1605,9 +1607,9 @@ class DeterministicProjectionEngineTaxTest extends DeterministicProjectionEngine
 
         var result = engineTax.run(input);
 
-        var age65Year = result.yearlyData().stream().filter(y -> y.age() == 65).findFirst().orElseThrow();
-        var age66Year = result.yearlyData().stream().filter(y -> y.age() == 66).findFirst().orElseThrow();
-        var age67Year = result.yearlyData().stream().filter(y -> y.age() == 67).findFirst().orElseThrow();
+        var age65Year = atAge(result.yearlyData(), 65);
+        var age66Year = atAge(result.yearlyData(), 66);
+        var age67Year = atAge(result.yearlyData(), 67);
 
         assertThat(age65Year.irmaaWarning()).as("1st simulated year: no in-horizon lookback data").isNull();
         assertThat(age66Year.irmaaWarning()).as("2nd simulated year: still no in-horizon lookback data").isNull();

@@ -31,6 +31,8 @@ import static com.wealthview.projection.testutil.ProjectionTestFixtures.createIn
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createRetiredInput;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.incomeSource;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66BirthYear;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66Input;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.selfEmploymentSource;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -39,11 +41,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
     @Test
     void run_dynamicPercentageStrategy_withdrawsPercentOfCurrentBalance() {
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 90, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "dynamic_percentage"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);
@@ -64,11 +66,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
     @Test
     void run_vanguardStrategy_capsIncreasesAndFloorsDecreases() {
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 80, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "withdrawal_strategy": "vanguard_dynamic_spending", "dynamic_ceiling": 0.05, "dynamic_floor": -0.025}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);
@@ -88,11 +90,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
 
     @Test
     void run_noStrategySpecified_defaultsToFixedPercentage() {
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 90, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);
@@ -112,11 +114,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "taxable_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("200000.0000", "0", "0.0500", "traditional"),
@@ -138,11 +140,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "traditional_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("200000.0000", "0", "0.0500", "traditional"),
@@ -162,11 +164,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "roth_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("200000.0000", "0", "0.0500", "traditional"),
@@ -188,11 +190,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "pro_rata"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("200000.0000", "0", "0.0500", "traditional"),
@@ -212,11 +214,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
         // Use larger balances so traditional portion exceeds standard deduction
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.10, "filing_status": "single", "withdrawal_order": "pro_rata"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("500000.0000", "0", "0.0500", "traditional"),
@@ -234,11 +236,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single", "withdrawal_order": "taxable_first"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "taxable"),
                         acct("200000.0000", "0", "0.0500", "traditional"),
@@ -259,11 +261,11 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         stubSingle2025(taxBracketRepository, standardDeductionRepository);
         var engineTax = engineWithTax(taxBracketRepository, standardDeductionRepository);
 
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "filing_status": "single", "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(
                         acct("300000.0000", "0", "0.0500", "traditional"),
                         acct("100000.0000", "0", "0.0500", "roth"),
@@ -291,7 +293,7 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04, "filing_status": "single",
                  "withdrawal_order": "pro_rata"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """.formatted(retiredAt66BirthYear()),
                 List.of(
                         acct("333000", "0", "0.00", "traditional"),
                         acct("222000", "0", "0.00", "roth"),
@@ -325,13 +327,13 @@ class DeterministicProjectionEngineWithdrawalTest extends DeterministicProjectio
         // Year 1: $1M * 0.6975 = $697,500. Raw = * 0.04 = $27,900.
         // Year 2 raw collapses far below the floor, so the floor binds:
         // floor = $27,900 * (1 - 0.025) = $27,202.50 → withdrawal capped UP to the floor.
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 75, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04,
                  "withdrawal_strategy": "vanguard_dynamic_spending",
                  "dynamic_ceiling": 0.05, "dynamic_floor": -0.025}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000", "0", "-0.30")));
 
         var result = engine.run(input);

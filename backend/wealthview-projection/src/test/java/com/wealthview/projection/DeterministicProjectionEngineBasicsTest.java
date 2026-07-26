@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.acct;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.createInput;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.retiredAt66Input;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEngineTestSupport {
@@ -44,11 +45,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
 
     @Test
     void run_postRetirement_withdrawsConstantRealNoNominalEscalation() {
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 90, bd("0.0300"),
                 """
                 {"birth_year": %d, "withdrawal_rate": 0.04}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);
@@ -116,11 +117,11 @@ class DeterministicProjectionEngineBasicsTest extends DeterministicProjectionEng
 
     @Test
     void run_withMalformedNumericInParamsJson_usesDefaults() {
-        var input = createInput(
+        var input = retiredAt66Input(
                 LocalDate.now().minusYears(1), 90, BigDecimal.ZERO,
                 """
                 {"birth_year": %d, "withdrawal_rate": "abc"}
-                """.formatted(LocalDate.now().getYear() - 66),
+                """,
                 List.of(acct("1000000.0000", "0", "0.0500")));
 
         var result = engine.run(input);

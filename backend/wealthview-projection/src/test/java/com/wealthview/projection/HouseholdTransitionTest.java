@@ -17,7 +17,6 @@ import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.dto.ProjectionInput;
-import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.dto.SpendingProfileInput;
 import com.wealthview.core.projection.household.HouseholdContext;
 import com.wealthview.core.projection.tax.CapitalGainsTaxCalculator;
@@ -38,6 +37,7 @@ import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Irma
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025Ltcg;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTax;
 import static com.wealthview.projection.testutil.ProjectionTestFixtures.engineWithTaxAndIrmaa;
+import static com.wealthview.projection.testutil.ProjectionTestFixtures.yearOf;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -90,10 +90,6 @@ class HouseholdTransitionTest extends DeterministicProjectionEngineTestSupport {
         return new ProjectionInput(UUID.randomUUID(), "Household transition",
                 LocalDate.of(2020, 1, 1), endAge, ZERO, paramsJson, accounts, spending,
                 referenceYear, incomeSources, null, List.of(), household);
-    }
-
-    private static ProjectionYearDto yearOf(List<ProjectionYearDto> rows, int year) {
-        return rows.stream().filter(r -> r.year() == year).findFirst().orElseThrow();
     }
 
     /** Coalesces a nullable DTO money field (the "positive-or-null" convention) to zero. */
