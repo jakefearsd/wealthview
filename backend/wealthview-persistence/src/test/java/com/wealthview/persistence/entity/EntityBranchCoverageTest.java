@@ -87,6 +87,84 @@ class EntityBranchCoverageTest {
     }
 
     // -------------------------------------------------------------------------
+    // ProjectionScenarioEntity — spending-plan XOR invariant mutators
+    // -------------------------------------------------------------------------
+
+    @Test
+    void activateSpendingProfile_withActiveGuardrail_clearsGuardrailAndSetsSpending() {
+        var scenario = new ProjectionScenarioEntity(
+                null, "Plan", LocalDate.of(2055, 1, 1), 90, BigDecimal.TEN, null);
+        var guardrail = new GuardrailSpendingProfileEntity(null, scenario, "Guardrail", BigDecimal.TEN);
+        scenario.activateGuardrailProfile(guardrail);
+        var spending = new SpendingProfileEntity(null, "Basic", BigDecimal.TEN, BigDecimal.ONE, null);
+
+        scenario.activateSpendingProfile(spending);
+
+        assertThat(scenario.getSpendingProfile()).isEqualTo(spending);
+        assertThat(scenario.getGuardrailProfile()).isNull();
+    }
+
+    @Test
+    void activateSpendingProfile_withNullProfile_clearsBothFields() {
+        var scenario = new ProjectionScenarioEntity(
+                null, "Plan", LocalDate.of(2055, 1, 1), 90, BigDecimal.TEN, null);
+        var guardrail = new GuardrailSpendingProfileEntity(null, scenario, "Guardrail", BigDecimal.TEN);
+        scenario.activateGuardrailProfile(guardrail);
+
+        // A resolved-but-missing spending profile id (repository lookup miss) still activates
+        // the "spending is the intended plan" branch, so the guardrail is cleared even though
+        // the spending profile itself ends up null.
+        scenario.activateSpendingProfile(null);
+
+        assertThat(scenario.getSpendingProfile()).isNull();
+        assertThat(scenario.getGuardrailProfile()).isNull();
+    }
+
+    @Test
+    void activateGuardrailProfile_withActiveSpending_clearsSpendingAndSetsGuardrail() {
+        var scenario = new ProjectionScenarioEntity(
+                null, "Plan", LocalDate.of(2055, 1, 1), 90, BigDecimal.TEN, null);
+        var spending = new SpendingProfileEntity(null, "Basic", BigDecimal.TEN, BigDecimal.ONE, null);
+        scenario.activateSpendingProfile(spending);
+        var guardrail = new GuardrailSpendingProfileEntity(null, scenario, "Guardrail", BigDecimal.TEN);
+
+        scenario.activateGuardrailProfile(guardrail);
+
+        assertThat(scenario.getGuardrailProfile()).isEqualTo(guardrail);
+        assertThat(scenario.getSpendingProfile()).isNull();
+    }
+
+    @Test
+    void clearSpendingProfile_withActiveGuardrail_leavesGuardrailUntouched() {
+        var scenario = new ProjectionScenarioEntity(
+                null, "Plan", LocalDate.of(2055, 1, 1), 90, BigDecimal.TEN, null);
+        var spending = new SpendingProfileEntity(null, "Basic", BigDecimal.TEN, BigDecimal.ONE, null);
+        scenario.activateSpendingProfile(spending);
+        var guardrail = new GuardrailSpendingProfileEntity(null, scenario, "Guardrail", BigDecimal.TEN);
+        scenario.setGuardrailProfile(guardrail);
+
+        scenario.clearSpendingProfile();
+
+        assertThat(scenario.getSpendingProfile()).isNull();
+        assertThat(scenario.getGuardrailProfile()).isEqualTo(guardrail);
+    }
+
+    @Test
+    void clearGuardrailProfile_withActiveSpending_leavesSpendingUntouched() {
+        var scenario = new ProjectionScenarioEntity(
+                null, "Plan", LocalDate.of(2055, 1, 1), 90, BigDecimal.TEN, null);
+        var spending = new SpendingProfileEntity(null, "Basic", BigDecimal.TEN, BigDecimal.ONE, null);
+        scenario.activateSpendingProfile(spending);
+        var guardrail = new GuardrailSpendingProfileEntity(null, scenario, "Guardrail", BigDecimal.TEN);
+        scenario.setGuardrailProfile(guardrail);
+
+        scenario.clearGuardrailProfile();
+
+        assertThat(scenario.getGuardrailProfile()).isNull();
+        assertThat(scenario.getSpendingProfile()).isEqualTo(spending);
+    }
+
+    // -------------------------------------------------------------------------
     // InviteCodeEntity.isConsumed() — both branches
     // -------------------------------------------------------------------------
 
