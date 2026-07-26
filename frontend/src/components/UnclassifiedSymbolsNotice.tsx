@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import toast from 'react-hot-toast';
 import { setClassification } from '../api/securities';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { extractErrorMessage } from '../utils/errorMessage';
 import { selectStyle } from '../utils/styles';
 
@@ -26,8 +26,16 @@ const ASSET_CLASS_OPTIONS: { value: string; label: string }[] = [
  */
 export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: Props) {
     const [selections, setSelections] = useState<Record<string, string>>({});
-    const [applying, setApplying] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const applyMutation = useApiMutation(
+        (chosen: string[]) => Promise.all(chosen.map(symbol => setClassification(symbol, selections[symbol]))),
+        {
+            onSuccess: () => onReclassified(),
+            onError: (err) => setError(extractErrorMessage(err)),
+        },
+    );
+    const applying = applyMutation.loading;
 
     const chosenSymbols = symbols.filter(symbol => selections[symbol]);
     const canApply = !applying && chosenSymbols.length > 0;
@@ -36,21 +44,10 @@ export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: P
         setSelections(prev => ({ ...prev, [symbol]: assetClass }));
     };
 
-    const handleApply = async () => {
+    const handleApply = () => {
         if (chosenSymbols.length === 0) return;
-
-        setApplying(true);
         setError(null);
-        try {
-            await Promise.all(chosenSymbols.map(symbol => setClassification(symbol, selections[symbol])));
-            onReclassified();
-        } catch (err) {
-            const message = extractErrorMessage(err);
-            setError(message);
-            toast.error(message);
-        } finally {
-            setApplying(false);
-        }
+        void applyMutation.mutate(chosenSymbols);
     };
 
     return (
@@ -84,7 +81,7 @@ export default function UnclassifiedSymbolsNotice({ symbols, onReclassified }: P
             )}
             <button
                 type="button"
-                onClick={() => void handleApply()}
+                onClick={handleApply}
                 disabled={!canApply}
                 style={{
                     marginTop: '0.75rem', padding: '0.5rem 1rem', borderRadius: '4px', border: 'none',

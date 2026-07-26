@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { listScenarios, compareScenarios } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { formatCurrency, formatCompactCurrency } from '../utils/format';
 import { cardStyle, inputStyle, labelStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import { findPeakBalance, findDepletionYear } from '../utils/projectionCalcs';
 import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../utils/errorMessage';
 import type { CompareResponse } from '../types/projection';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -20,7 +20,14 @@ export default function ProjectionComparePage() {
     const { data: scenarios, loading } = useApiQuery(listScenarios);
     const [selectedIds, setSelectedIds] = useState<(string | '')[]>(['', '', '']);
     const [result, setResult] = useState<CompareResponse | null>(null);
-    const [running, setRunning] = useState(false);
+
+    const compareMutation = useApiMutation(
+        (ids: string[]) => compareScenarios(ids),
+        {
+            onSuccess: (data) => setResult(data),
+        },
+    );
+    const running = compareMutation.loading;
 
     function handleSelect(index: number, value: string) {
         const next = [...selectedIds];
@@ -28,21 +35,13 @@ export default function ProjectionComparePage() {
         setSelectedIds(next);
     }
 
-    async function handleCompare() {
+    function handleCompare() {
         const ids = selectedIds.filter(id => id !== '');
         if (ids.length < 2) {
             toast.error('Select at least 2 scenarios to compare');
             return;
         }
-        setRunning(true);
-        try {
-            const data = await compareScenarios(ids);
-            setResult(data);
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        } finally {
-            setRunning(false);
-        }
+        void compareMutation.mutate(ids);
     }
 
     if (loading) return <LoadingState message="Loading scenarios..." />;

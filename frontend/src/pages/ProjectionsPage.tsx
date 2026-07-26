@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { listScenarios, createScenario, deleteScenario } from '../api/projections';
 import { useApiQuery } from '../hooks/useApiQuery';
+import { useApiMutation } from '../hooks/useApiMutation';
 import { cardStyle } from '../utils/styles';
 import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
-import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../utils/errorMessage';
 import type { CreateScenarioRequest } from '../types/projection';
 import ScenarioForm from '../components/ScenarioForm';
 import Button from '../components/Button';
@@ -16,25 +15,31 @@ export default function ProjectionsPage() {
     const { data: scenarios, loading, refetch } = useApiQuery(listScenarios);
     const [showForm, setShowForm] = useState(false);
 
+    const createMutation = useApiMutation(
+        (data: CreateScenarioRequest) => createScenario(data),
+        {
+            successMessage: 'Scenario created',
+            onSuccess: () => {
+                setShowForm(false);
+                refetch();
+            },
+        },
+    );
+
     async function handleCreate(data: CreateScenarioRequest) {
-        try {
-            await createScenario(data);
-            toast.success('Scenario created');
-            setShowForm(false);
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        }
+        await createMutation.mutate(data);
     }
 
-    async function handleDelete(id: string) {
-        try {
-            await deleteScenario(id);
-            toast.success('Scenario deleted');
-            refetch();
-        } catch (err: unknown) {
-            toast.error(extractErrorMessage(err));
-        }
+    const deleteMutation = useApiMutation(
+        (id: string) => deleteScenario(id),
+        {
+            successMessage: 'Scenario deleted',
+            onSuccess: () => refetch(),
+        },
+    );
+
+    function handleDelete(id: string) {
+        void deleteMutation.mutate(id);
     }
 
     if (loading) return <LoadingState message="Loading scenarios..." />;

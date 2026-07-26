@@ -11,7 +11,6 @@ import LoadingState from '../components/LoadingState';
 import EmptyState from '../components/EmptyState';
 import CurrencyInput from '../components/CurrencyInput';
 import HelpText from '../components/HelpText';
-import toast from 'react-hot-toast';
 import Button from '../components/Button';
 import LinkButton from '../components/LinkButton';
 import StatTile from '../components/StatTile';
@@ -74,15 +73,17 @@ export default function SpendingProfilesPage() {
         void reoptimizeMutation.mutate(scenarioId);
     }
 
-    async function handleDeleteGuardrail(scenarioId: string) {
+    const deleteGuardrailMutation = useApiMutation(
+        (scenarioId: string) => deleteGuardrailProfile(scenarioId),
+        {
+            successMessage: 'Guardrail profile deleted',
+            onSuccess: () => loadGuardrails(),
+        },
+    );
+
+    function handleDeleteGuardrail(scenarioId: string) {
         if (!confirm('Delete this guardrail profile? The scenario will revert to its spending profile for projections.')) return;
-        try {
-            await deleteGuardrailProfile(scenarioId);
-            toast.success('Guardrail profile deleted');
-            loadGuardrails();
-        } catch {
-            toast.error('Failed to delete guardrail profile');
-        }
+        void deleteGuardrailMutation.mutate(scenarioId);
     }
 
     const onSuccess = useCallback(() => {
