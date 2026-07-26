@@ -243,6 +243,27 @@ class VanguardCsvParserTest {
         assertThat(result.errors().get(0).message()).contains("Error parsing row");
     }
 
+    /**
+     * Verifies that when a row is malformed in both transaction type (unknown token)
+     * and amount (non-numeric), the error reported is the generic row-level parse error.
+     * This pins the shared row template's precedence: amount parsing occurs before action mapping.
+     * Fidelity and Schwab already followed this ordering; Vanguard adopted it in the
+     * Template Method consolidation.
+     */
+    @Test
+    void parse_unknownTypeAndMalformedAmount_reportsGenericRowError() throws IOException {
+        var csv = """
+                Trade Date,Transaction Type,Investment Name,Symbol,Shares,Share Price,Net Amount
+                01/10/2025,Teleport,TEST FUND,TEST,1.000,$100.00,abc
+                """;
+
+        var result = parser.parse(new StringReader(csv));
+
+        assertThat(result.transactions()).isEmpty();
+        assertThat(result.errors()).hasSize(1);
+        assertThat(result.errors().get(0).message()).startsWith("Error parsing row");
+    }
+
     @Test
     void parse_sweepIn_mapsToDeposit() throws IOException {
         var csv = """

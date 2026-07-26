@@ -89,6 +89,9 @@ public abstract class AbstractBrokerCsvParser implements ImportParser {
      * <p>This default implementation is the shared row prologue: date guard (with the bad-date policy
      * from {@link #handleInvalidDate}), amount + action lookup, action mapping, then
      * {@link #addTransaction}. Override only when a broker's row shape doesn't fit this shape.
+     * Amount parsing deliberately precedes action mapping, so a row malformed in both ways reports
+     * the row-level parse error; Schwab and Fidelity always behaved this way, and Vanguard adopted
+     * this ordering in the consolidation.
      */
     protected void extractRow(CSVRecord record, int rowNum,
                               List<ParsedTransaction> transactions, List<CsvRowError> errors) {
