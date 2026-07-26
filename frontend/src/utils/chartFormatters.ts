@@ -6,3 +6,8 @@ export const formatDollarTooltip = (value: number): string =>
     `$${value.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 
 export const formatPercentAxis = (value: number): string => `${value}%`;
+
+/** Three-letter month abbreviations, 0-indexed (Jan = index 0). */
+export const MONTH_ABBREVIATIONS = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];

@@ -3,9 +3,8 @@ import {
     Legend, CartesianGrid, ReferenceLine,
 } from 'recharts';
 import { formatCurrency, formatCompactCurrency } from '../utils/format';
-import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear, ScenarioIncomeSourceResponse } from '../types/projection';
-import type { RechartsTooltipProps } from '../types/recharts';
+import ChartTooltip from './ChartTooltip';
 
 const COLORS = [
     '#1976d2', '#2e7d32', '#e65100', '#6a1b9a', '#c62828',
@@ -43,40 +42,39 @@ export default function IncomeStreamsChart({ data, incomeSources, retirementYear
         sourceNames[s.income_source_id] = s.name;
     }
 
-    const IncomeTooltipContent = ({ active, payload, label }: RechartsTooltipProps) => {
-        if (!active || !payload?.length) return null;
-        const d = retiredYears.find(y => y.year === label);
-        const visibleItems = payload.filter((p) => (p.value ?? 0) > 0);
-        const total = visibleItems.reduce((sum, p) => sum + (p.value ?? 0), 0);
-        return (
-            <div style={tooltipStyle}>
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                    {d ? `${label} (age ${d.age})` : label}
-                </div>
-                {visibleItems.map((p) => (
-                    <div key={String(p.dataKey)} style={{ color: p.color }}>
-                        {sourceNames[String(p.dataKey)] ?? p.name}: {formatCurrency(Number(p.value ?? 0))}
-                    </div>
-                ))}
-                {visibleItems.length > 1 && (
-                    <>
-                        <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
-                        <div style={{ fontWeight: 600, color: '#555' }}>
-                            Total: {formatCurrency(total)}
-                        </div>
-                    </>
-                )}
-            </div>
-        );
-    };
-
     return (
         <ResponsiveContainer width="100%" height={450}>
             <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="year" tick={{ fontSize: 12 }} />
                 <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 12 }} width={70} />
-                <Tooltip content={<IncomeTooltipContent />} />
+                <Tooltip content={
+                    <ChartTooltip renderContent={(label, payload) => {
+                        const d = retiredYears.find(y => y.year === label);
+                        const visibleItems = payload.filter((p) => (p.value ?? 0) > 0);
+                        const total = visibleItems.reduce((sum, p) => sum + (p.value ?? 0), 0);
+                        return (
+                            <>
+                                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                    {d ? `${label} (age ${d.age})` : label}
+                                </div>
+                                {visibleItems.map((p) => (
+                                    <div key={String(p.dataKey)} style={{ color: p.color }}>
+                                        {sourceNames[String(p.dataKey)] ?? p.name}: {formatCurrency(Number(p.value ?? 0))}
+                                    </div>
+                                ))}
+                                {visibleItems.length > 1 && (
+                                    <>
+                                        <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
+                                        <div style={{ fontWeight: 600, color: '#555' }}>
+                                            Total: {formatCurrency(total)}
+                                        </div>
+                                    </>
+                                )}
+                            </>
+                        );
+                    }} />
+                } />
                 <Legend />
                 {retirementYear && <ReferenceLine x={retirementYear} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
                 {incomeSources.map((source, i) => (

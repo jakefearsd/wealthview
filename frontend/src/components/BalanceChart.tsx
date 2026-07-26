@@ -4,12 +4,11 @@ import {
     ReferenceLine, ReferenceArea, Legend, CartesianGrid,
 } from 'recharts';
 import { formatCurrency } from '../utils/format';
-import { formatDollarAxis } from '../utils/chartFormatters';
+import { formatDollarAxis, MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
 import { findDepletionYear, findCrossoverYear } from '../utils/projectionCalcs';
 import { interpolateMonthly } from '../utils/monthlyInterpolation';
-import { tooltipStyle } from '../utils/styles';
 import type { ProjectionYear } from '../types/projection';
-import type { RechartsTooltipProps } from '../types/recharts';
+import ChartTooltip from './ChartTooltip';
 
 interface BalanceChartProps {
     data: ProjectionYear[];
@@ -120,40 +119,6 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
     const crossoverLabel = crossover ? `${crossover.year}-01` : null;
     const lastLabel = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1].label : null;
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-    const BalanceTooltipContent = ({ active, payload, label }: RechartsTooltipProps) => {
-        if (!active || !payload?.length) return null;
-        const pt = monthlyData.find(d => d.label === label);
-        if (!pt) return null;
-        const monthName = monthNames[pt.month - 1];
-        const annualRow = filteredData.find(d => d.year === pt.year);
-        return (
-            <div style={tooltipStyle}>
-                <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
-                    {monthName} {pt.year} (age {pt.age})
-                </div>
-                {payload.map((p) => (
-                    <div key={p.name} style={{ color: p.color }}>
-                        {p.name}: {formatCurrency(Number(p.value ?? 0))}
-                    </div>
-                ))}
-                {annualRow?.retired && annualRow.essential_expenses != null && pt.month === 12 && (
-                    <>
-                        <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
-                        <div style={{ color: '#555' }}>Spending Need: {formatCurrency(annualRow.net_spending_need!)}</div>
-                        <div style={{ color: '#555' }}>Growth: {formatCurrency(annualRow.growth)}</div>
-                        {annualRow.withdrawals > annualRow.growth && (
-                            <div style={{ color: '#d32f2f', fontWeight: 600 }}>
-                                Annual Drain: {formatCurrency(annualRow.growth - annualRow.withdrawals)}
-                            </div>
-                        )}
-                    </>
-                )}
-            </div>
-        );
-    };
-
     // Check if retirement line is within the visible window
     const retireLabelVisible = retireLabel && monthlyData.some(d => d.label === retireLabel);
     const depletionLabelVisible = depletionLabel && monthlyData.some(d => d.label === depletionLabel);
@@ -205,7 +170,38 @@ export default function BalanceChart({ data, retirementYear }: BalanceChartProps
                         interval={xTickInterval}
                     />
                     <YAxis tickFormatter={formatDollarAxis} tick={{ fontSize: 12 }} width={70} />
-                    <Tooltip content={<BalanceTooltipContent />} />
+                    <Tooltip content={
+                        <ChartTooltip renderContent={(label, payload) => {
+                            const pt = monthlyData.find(d => d.label === label);
+                            if (!pt) return null;
+                            const monthName = MONTH_ABBREVIATIONS[pt.month - 1];
+                            const annualRow = filteredData.find(d => d.year === pt.year);
+                            return (
+                                <>
+                                    <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>
+                                        {monthName} {pt.year} (age {pt.age})
+                                    </div>
+                                    {payload.map((p) => (
+                                        <div key={p.name} style={{ color: p.color }}>
+                                            {p.name}: {formatCurrency(Number(p.value ?? 0))}
+                                        </div>
+                                    ))}
+                                    {annualRow?.retired && annualRow.essential_expenses != null && pt.month === 12 && (
+                                        <>
+                                            <hr style={{ margin: '0.5rem 0', border: 'none', borderTop: '1px solid #e0e0e0' }} />
+                                            <div style={{ color: '#555' }}>Spending Need: {formatCurrency(annualRow.net_spending_need!)}</div>
+                                            <div style={{ color: '#555' }}>Growth: {formatCurrency(annualRow.growth)}</div>
+                                            {annualRow.withdrawals > annualRow.growth && (
+                                                <div style={{ color: '#d32f2f', fontWeight: 600 }}>
+                                                    Annual Drain: {formatCurrency(annualRow.growth - annualRow.withdrawals)}
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </>
+                            );
+                        }} />
+                    } />
                     <Legend />
                     {retireLabelVisible && <ReferenceLine x={retireLabel!} stroke="#ff9800" strokeDasharray="5 5" label="Retire" />}
                     {depletionLabelVisible && <ReferenceLine x={depletionLabel!} stroke="#d32f2f" strokeDasharray="5 5" label="Depleted" />}

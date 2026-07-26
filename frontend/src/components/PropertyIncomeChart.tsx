@@ -7,10 +7,12 @@ import { getCashFlowDetail, getDepreciationSchedule, getProperty } from '../api/
 import { useApiQuery } from '../hooks/useApiQuery';
 import { trailingTwelveMonthRange } from '../utils/dateRange';
 import { formatCurrency } from '../utils/format';
+import { MONTH_ABBREVIATIONS } from '../utils/chartFormatters';
 import { cardStyle } from '../utils/styles';
 import StatTile from './StatTile';
+import ChartTooltip from './ChartTooltip';
 import type { MonthlyCashFlowDetailEntry, DepreciationScheduleResponse, Property } from '../types/property';
-import type { RechartsTooltipProps } from '../types/recharts';
+import type { RechartsTooltipEntry } from '../types/recharts';
 
 const CATEGORY_CONFIG: Record<string, { label: string; color: string }> = {
     mortgage: { label: 'Mortgage', color: '#1976d2' },
@@ -79,8 +81,7 @@ function buildTrailingData(entries: MonthlyCashFlowDetailEntry[], monthlyRent: n
 
 function formatMonthLabel(month: string): string {
     const [year, m] = month.split('-');
-    const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    return `${names[parseInt(m) - 1]} '${year.slice(2)}`;
+    return `${MONTH_ABBREVIATIONS[parseInt(m) - 1]} '${year.slice(2)}`;
 }
 
 function collectCategories(entries: MonthlyCashFlowDetailEntry[]): string[] {
@@ -154,10 +155,13 @@ function buildForwardData(
 }
 
 // --- Tooltips ---
+//
+// Both tooltips previously hand-rolled their own wrapper div with a divergent style
+// (border-radius 6 / #ddd border / no box-shadow) instead of the shared tooltipStyle used
+// everywhere else. Adopting ChartTooltip converges them onto the standard look — an
+// intentional visual change for consistency, not just a refactor.
 
-function TrailingTooltip({ active, payload, label }: RechartsTooltipProps) {
-    if (!active || !payload) return null;
-
+function trailingTooltipContent(label: string | number | undefined, payload: Array<RechartsTooltipEntry>) {
     const income = payload.find(p => p.name === 'Rent Estimate');
     const netEntry = payload.find(p => p.name === 'Net Cash Flow');
     const expenses = payload.filter(p => p.name !== 'Rent Estimate' && p.name !== 'Net Cash Flow');
@@ -165,7 +169,7 @@ function TrailingTooltip({ active, payload, label }: RechartsTooltipProps) {
     const net = netEntry?.value ?? ((income?.value ?? 0) - totalExpenses);
 
     return (
-        <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 6, padding: '0.75rem', fontSize: '0.85rem' }}>
+        <>
             <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{label}</div>
             {income && (
                 <div style={{ color: '#2e7d32', marginBottom: '0.25rem' }}>
@@ -187,18 +191,16 @@ function TrailingTooltip({ active, payload, label }: RechartsTooltipProps) {
                     </div>
                 </>
             )}
-        </div>
+        </>
     );
 }
 
-function ForwardTooltip({ active, payload, label }: RechartsTooltipProps<ForwardRow>) {
-    if (!active || !payload) return null;
-
+function forwardTooltipContent(label: string | number | undefined, payload: Array<RechartsTooltipEntry<ForwardRow>>) {
     const row = payload[0]?.payload;
     if (!row) return null;
 
     return (
-        <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: 6, padding: '0.75rem', fontSize: '0.85rem', minWidth: 200 }}>
+        <>
             <div style={{ fontWeight: 600, marginBottom: '0.5rem' }}>{label}</div>
             <div style={{ color: '#2e7d32', marginBottom: '0.15rem' }}>
                 Rental Income: {formatCurrency(row.income)}
@@ -220,7 +222,7 @@ function ForwardTooltip({ active, payload, label }: RechartsTooltipProps<Forward
                     {row.netTaxable < 0 && <span style={{ color: '#2e7d32', fontWeight: 400 }}> (tax loss)</span>}
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
@@ -355,7 +357,7 @@ function TrailingView({ data, monthlyRent }: { data: MonthlyCashFlowDetailEntry[
                         tick={{ fontSize: 11 }}
                         tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(1)}k`}
                     />
-                    <Tooltip content={<TrailingTooltip />} />
+                    <Tooltip content={<ChartTooltip renderContent={trailingTooltipContent} />} />
                     <Legend />
                     <ReferenceLine y={0} stroke="#999" strokeWidth={1} />
                     <Bar dataKey="income" name="Rent Estimate" fill="#2e7d32" stackId="pos" />
@@ -436,7 +438,7 @@ function ForwardView({
                         tick={{ fontSize: 11 }}
                         tickFormatter={(v: number) => `$${Math.abs(v / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip content={<ForwardTooltip />} />
+                    <Tooltip content={<ChartTooltip<ForwardRow> renderContent={forwardTooltipContent} />} />
                     <Legend />
                     <ReferenceLine y={0} stroke="#999" strokeWidth={1} />
                     <Bar dataKey="income" name="Rental Income" fill="#2e7d32" stackId="pos" />
