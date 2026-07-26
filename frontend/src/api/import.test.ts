@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+};
 
 import { importCsv, importOfx, importPositions, listImportJobs } from './import';
 import type { ImportJob } from '../types/import';
@@ -32,8 +29,7 @@ function sampleFile(name: string): File {
 
 describe('api/import', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
+        vi.clearAllMocks();
     });
 
     it('importCsv posts multipart form data with the accountId param', async () => {
@@ -47,8 +43,11 @@ describe('api/import', () => {
         expect(url).toBe('/import/csv');
         expect(body).toBeInstanceOf(FormData);
         expect((body as FormData).get('file')).toBeInstanceOf(File);
-        expect(config.params).toEqual({ accountId: 'a1' });
-        expect(config.headers['Content-Type']).toBe('multipart/form-data');
+        // Non-null assertions: mocks.post's config param is now typed from the real
+        // AxiosInstance signature (optional 3rd arg) via vi.mocked(client.post); at
+        // runtime it's always present because importCsv always passes one.
+        expect(config!.params).toEqual({ accountId: 'a1' });
+        expect(config!.headers!['Content-Type']).toBe('multipart/form-data');
     });
 
     it('importCsv includes the format param when supplied', async () => {
@@ -57,7 +56,7 @@ describe('api/import', () => {
         await importCsv('a1', sampleFile('txns.csv'), 'fidelity');
 
         const config = mocks.post.mock.calls[0][2];
-        expect(config.params).toEqual({ accountId: 'a1', format: 'fidelity' });
+        expect(config!.params).toEqual({ accountId: 'a1', format: 'fidelity' });
     });
 
     it('importOfx posts to the ofx endpoint', async () => {
@@ -68,7 +67,7 @@ describe('api/import', () => {
         expect(result.source).toBe('ofx');
         const [url, , config] = mocks.post.mock.calls[0];
         expect(url).toBe('/import/ofx');
-        expect(config.params).toEqual({ accountId: 'a1' });
+        expect(config!.params).toEqual({ accountId: 'a1' });
     });
 
     it('importPositions posts to the positions endpoint with format', async () => {
@@ -78,7 +77,7 @@ describe('api/import', () => {
 
         const [url, , config] = mocks.post.mock.calls[0];
         expect(url).toBe('/import/positions');
-        expect(config.params).toEqual({ accountId: 'a1', format: 'schwab' });
+        expect(config!.params).toEqual({ accountId: 'a1', format: 'schwab' });
     });
 
     it('listImportJobs returns the array body', async () => {

@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+};
 
 import { downloadBlob, downloadJson, downloadCsv } from './export';
 
@@ -18,7 +16,7 @@ describe('api/export', () => {
     let clickSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-        mocks.get.mockReset();
+        vi.clearAllMocks();
         createObjectURL = vi.fn<(obj: Blob | MediaSource) => string>(() => 'blob:mock-url');
         revokeObjectURL = vi.fn<(url: string) => void>();
         URL.createObjectURL = createObjectURL;

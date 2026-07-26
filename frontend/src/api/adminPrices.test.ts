@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+};
 
 import {
     getPriceStatus,
@@ -41,8 +38,7 @@ const CSV: CsvImportResult = { imported: 3, errors: [] };
 
 describe('api/adminPrices', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getPriceStatus GETs the status endpoint', async () => {
@@ -107,7 +103,9 @@ describe('api/adminPrices', () => {
         expect(url).toBe('/admin/prices/csv');
         expect(body).toBeInstanceOf(FormData);
         expect((body as FormData).get('file')).toBeInstanceOf(File);
-        expect(config.headers['Content-Type']).toBe('multipart/form-data');
+        // Non-null assertion: config's type now comes from the real AxiosInstance
+        // signature via vi.mocked(client.post); at runtime it's always present.
+        expect(config!.headers!['Content-Type']).toBe('multipart/form-data');
     });
 
     it('propagates server errors', async () => {

@@ -3,11 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 // auth.ts uses both a private axios instance (via axios.create) for /auth
 // endpoints that don't need auto-refresh, AND the shared `client` for the
 // authenticated routes. Mock both edges so we can assert URLs/methods/bodies
-// without touching the network.
-const mocks = vi.hoisted(() => ({
+// without touching the network. The axios factory needs its `vi.fn()` via
+// vi.hoisted (factories run before imports); the './client' edge instead
+// uses the shared automock (src/api/__mocks__/client.ts) via a factory-less
+// vi.mock, same as the other api/*.test.ts files.
+const hoisted = vi.hoisted(() => ({
     authPost: vi.fn(),
-    clientPost: vi.fn(),
-    clientGet: vi.fn(),
 }));
 
 vi.mock('axios', async () => {
@@ -17,18 +18,21 @@ vi.mock('axios', async () => {
         default: {
             ...actual.default,
             create: vi.fn(() => ({
-                post: mocks.authPost,
+                post: hoisted.authPost,
             })),
         },
     };
 });
 
-vi.mock('./client', () => ({
-    default: {
-        post: mocks.clientPost,
-        get: mocks.clientGet,
-    },
-}));
+vi.mock('./client');
+
+import client from './client';
+
+const mocks = {
+    authPost: hoisted.authPost,
+    clientPost: vi.mocked(client.post),
+    clientGet: vi.mocked(client.get),
+};
 
 import { login, register, refresh, logout, getCurrentUser } from './auth';
 import type { AuthResponse, CurrentUserResponse } from '../types/auth';
@@ -49,9 +53,7 @@ const SAMPLE_USER: CurrentUserResponse = {
 
 describe('api/auth', () => {
     beforeEach(() => {
-        mocks.authPost.mockReset();
-        mocks.clientPost.mockReset();
-        mocks.clientGet.mockReset();
+        vi.clearAllMocks();
     });
 
     describe('login', () => {

@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+};
 
 import {
     getDashboardSummary,
@@ -47,7 +45,7 @@ const SNAPSHOT: SnapshotProjection = {
 
 describe('api/dashboard', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getDashboardSummary GETs the summary endpoint', async () => {

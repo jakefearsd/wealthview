@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-        put: mocks.put,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+    put: vi.mocked(client.put),
+};
 
 import { getHolding, listHoldings, createHolding, updateHolding } from './holdings';
 import type { Holding, HoldingRequest } from '../types/holding';
@@ -41,9 +37,7 @@ const REQUEST: HoldingRequest = {
 
 describe('api/holdings', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
-        mocks.put.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getHolding embeds the id in the path', async () => {

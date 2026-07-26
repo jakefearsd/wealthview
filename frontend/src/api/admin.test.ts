@@ -1,18 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-        put: mocks.put,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+    put: vi.mocked(client.put),
+};
 
 import { listTenantDetails, getTenantDetail, createTenant, setTenantActive } from './admin';
 import type { TenantDetail } from '../types/admin';
@@ -28,9 +24,7 @@ const TENANT: TenantDetail = {
 
 describe('api/admin', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
-        mocks.put.mockReset();
+        vi.clearAllMocks();
     });
 
     it('listTenantDetails GETs the details endpoint', async () => {

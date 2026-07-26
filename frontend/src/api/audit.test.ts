@@ -1,14 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+};
 
 import { getAuditLogs } from './audit';
 import type { AuditLogEntry } from '../types/audit';
@@ -27,7 +25,7 @@ const ENTRY: AuditLogEntry = {
 
 describe('api/audit', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getAuditLogs uses the default page/size params', async () => {

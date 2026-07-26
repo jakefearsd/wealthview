@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    put: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        put: mocks.put,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    put: vi.mocked(client.put),
+};
 
 import {
     getSystemStats,
@@ -50,8 +47,7 @@ const CONFIG: SystemConfig = {
 
 describe('api/adminSystem', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.put.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getSystemStats GETs the system-stats endpoint', async () => {

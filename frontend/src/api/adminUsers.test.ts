@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    put: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        put: mocks.put,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    put: vi.mocked(client.put),
+};
 
 import { getAllUsers, resetPassword, setUserActive, type AdminUser } from './adminUsers';
 
@@ -26,8 +23,7 @@ const USER: AdminUser = {
 
 describe('api/adminUsers', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.put.mockReset();
+        vi.clearAllMocks();
     });
 
     it('getAllUsers GETs the admin users endpoint', async () => {

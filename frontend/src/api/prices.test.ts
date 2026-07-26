@@ -1,16 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+};
 
 import { createPrice, getLatestPrice, listLatestPrices } from './prices';
 import type { Price, PriceRequest } from '../types/price';
@@ -30,8 +27,7 @@ const REQUEST: PriceRequest = {
 
 describe('api/prices', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
+        vi.clearAllMocks();
     });
 
     it('createPrice POSTs the request body', async () => {

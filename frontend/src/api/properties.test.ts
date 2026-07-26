@@ -1,20 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-    get: vi.fn(),
-    post: vi.fn(),
-    put: vi.fn(),
-    del: vi.fn(),
-}));
+import client from './client';
 
-vi.mock('./client', () => ({
-    default: {
-        get: mocks.get,
-        post: mocks.post,
-        put: mocks.put,
-        delete: mocks.del,
-    },
-}));
+vi.mock('./client');
+
+const mocks = {
+    get: vi.mocked(client.get),
+    post: vi.mocked(client.post),
+    put: vi.mocked(client.put),
+    del: vi.mocked(client.delete),
+};
 
 import {
     listProperties,
@@ -80,10 +75,7 @@ const ROI = { property_id: 'p1' } as unknown as RoiAnalysisResponse;
 
 describe('api/properties', () => {
     beforeEach(() => {
-        mocks.get.mockReset();
-        mocks.post.mockReset();
-        mocks.put.mockReset();
-        mocks.del.mockReset();
+        vi.clearAllMocks();
     });
 
     it('listProperties returns the array body', async () => {
