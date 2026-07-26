@@ -10,6 +10,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
@@ -18,7 +19,6 @@ import static org.assertj.core.data.Offset.offset;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 /**
@@ -59,21 +59,11 @@ class RothConversionAuditC4BiasDirectionTest {
     private static final double PRE_FIX_TAX_SAVINGS = 34013.1453;
 
     private FederalTaxCalculator flatRateTaxCalculator() {
-        var calc = mock(FederalTaxCalculator.class);
-        when(calc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    return income.compareTo(BigDecimal.ZERO) <= 0
-                            ? BigDecimal.ZERO
-                            : income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
-                });
-        when(calc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class), anyInt()))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    return income.compareTo(BigDecimal.ZERO) <= 0
-                            ? BigDecimal.ZERO
-                            : income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
-                });
+        // Scaled shape (setScale(4, HALF_UP) + the 4-arg age-aware overload) -- see FlatTaxStubs
+        // javadoc; this fixture's PRE_FIX_* pinned literals depend on this EXACT arithmetic, so the
+        // abbreviated 4-tier bracket-ceiling table below (distinct from the shared 6-tier one) stays
+        // inline rather than switching to FlatTaxStubs.stubBracketCeilings.
+        var calc = FlatTaxStubs.flatRateScaled("0.20");
         org.mockito.stubbing.Answer<BigDecimal> bracketAnswer = inv -> {
             double r = ((BigDecimal) inv.getArgument(0)).doubleValue();
             if (r <= 0.10) return new BigDecimal("45000");

@@ -13,6 +13,7 @@ import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,36 +29,10 @@ class RothConversionOptimizerTest {
 
     @BeforeEach
     void setUp() {
-        taxCalculator = mock(FederalTaxCalculator.class);
-
-        // Flat 20% tax: computeTax(income, year, status) → income * 0.20
-        when(taxCalculator.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(invocation -> {
-                    BigDecimal income = invocation.getArgument(0);
-                    if (income.compareTo(BigDecimal.ZERO) <= 0) {
-                        return BigDecimal.ZERO;
-                    }
-                    return income.multiply(new BigDecimal("0.20"));
-                });
-
-        // Bracket ceiling: scales with rate. 22% → $100K, 10% → $45K, 12% → $55K, etc.
-        // Stub both 3-arg and 4-arg overloads (4-arg adds inflation indexing).
-        org.mockito.stubbing.Answer<BigDecimal> bracketAnswer = invocation -> {
-            BigDecimal rate = invocation.getArgument(0);
-            double r = rate.doubleValue();
-            if (r <= 0.10) return new BigDecimal("45000");
-            if (r <= 0.12) return new BigDecimal("55000");
-            if (r <= 0.22) return new BigDecimal("100000");
-            if (r <= 0.24) return new BigDecimal("190000");
-            if (r <= 0.32) return new BigDecimal("245000");
-            return new BigDecimal("600000");
-        };
-        when(taxCalculator.computeMaxIncomeForBracket(
-                any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(bracketAnswer);
-        when(taxCalculator.computeMaxIncomeForBracket(
-                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
-                .thenAnswer(bracketAnswer);
+        // Flat 20% tax + the shared bracket-ceiling table -- see FlatTaxStubs javadoc for which
+        // call sites this exact (unscaled) shape matches.
+        taxCalculator = FlatTaxStubs.flat20();
+        FlatTaxStubs.stubBracketCeilings(taxCalculator);
     }
 
     private class OptimizerTestBuilder {

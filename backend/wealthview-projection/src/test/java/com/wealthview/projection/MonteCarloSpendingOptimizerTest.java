@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
@@ -16,9 +14,10 @@ import com.wealthview.core.projection.dto.IncomeSourceType;
 import com.wealthview.core.projection.dto.ProjectionIncomeSourceInput;
 import com.wealthview.core.projection.tax.BracketPoint;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
+import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
-import com.wealthview.core.projection.tax.FilingStatus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -1629,23 +1628,13 @@ class MonteCarloSpendingOptimizerTest {
     // === Withdrawal tax modeling ===
 
     private MonteCarloSpendingOptimizer taxAwareOptimizer() {
-        var taxCalc = mock(FederalTaxCalculator.class);
         // Simple 20% flat tax for test predictability (both age-unaware and age-aware overloads --
         // audit D; GuardrailOptimizationInput#birthYear() is always non-null, so
         // MarginalRateCalculator always calls the 4-arg overload for the guardrail/MC path).
-        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
-                    return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
-                });
-        when(taxCalc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class), anyInt()))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    if (income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
-                    return income.multiply(new BigDecimal("0.20")).setScale(4, java.math.RoundingMode.HALF_UP);
-                });
-        // Bracket ceiling for RothConversionOptimizer (both 3-arg and 4-arg overloads)
+        // Scaled shape -- see FlatTaxStubs javadoc.
+        var taxCalc = FlatTaxStubs.flatRateScaled("0.20");
+        // Bracket ceiling for RothConversionOptimizer (both 3-arg and 4-arg overloads): a flat
+        // $100K regardless of rate, unlike the shared 6-tier table -- kept inline.
         when(taxCalc.computeMaxIncomeForBracket(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
                 .thenReturn(new BigDecimal("100000"));
         when(taxCalc.computeMaxIncomeForBracket(

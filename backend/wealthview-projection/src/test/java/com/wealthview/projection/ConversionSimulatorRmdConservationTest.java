@@ -1,6 +1,5 @@
 package com.wealthview.projection;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -8,13 +7,10 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.RentalLossCalculator;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Audit C4 (RMD proceeds vanishing): a forced RMD must debit traditional by the gross amount,
@@ -34,15 +30,10 @@ class ConversionSimulatorRmdConservationTest {
     private static final int RETIREMENT_AGE = 73; // == rmdStartAge: first sim year IS an RMD year
 
     private FederalTaxCalculator flatRateTaxCalculator() {
-        var calc = mock(FederalTaxCalculator.class);
-        when(calc.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    return income.compareTo(BigDecimal.ZERO) <= 0
-                            ? BigDecimal.ZERO
-                            : income.multiply(new BigDecimal("0.20"));
-                });
-        return calc;
+        // Only the 3-arg computeTax overload is exercised here (conversions are blocked, so no
+        // bracket-ceiling lookup happens) -- FlatTaxStubs.flat20() reproduces the original unscaled
+        // formula exactly; see its javadoc for which shape matches which call site.
+        return FlatTaxStubs.flat20();
     }
 
     private SimResult simulateOneYear() {

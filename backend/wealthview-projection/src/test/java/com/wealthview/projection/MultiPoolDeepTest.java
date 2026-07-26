@@ -17,6 +17,7 @@ import com.wealthview.core.projection.tax.FilingStatus;
 import com.wealthview.core.projection.tax.TaxCalculationStrategy;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static com.wealthview.core.testutil.TaxBracketFixtures.stubSingle2025;
@@ -105,27 +106,6 @@ class MultiPoolDeepTest {
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
                 ZERO, config);
-    }
-
-    private static TaxCalculationStrategy flatTaxCalc(String rate) {
-        BigDecimal r = bd(rate);
-        return new TaxCalculationStrategy() {
-            @Override
-            public BigDecimal computeTotalTax(BigDecimal gross, int yr, FilingStatus fs) {
-                return gross.multiply(r);
-            }
-
-            @Override
-            public BigDecimal computeMaxIncomeForTargetRate(BigDecimal targetRate, int yr, FilingStatus fs) {
-                return bd("100000");
-            }
-
-            @Override
-            public CombinedTaxResult computeDetailedTax(BigDecimal gross, int yr, FilingStatus fs) {
-                BigDecimal total = gross.multiply(r);
-                return new CombinedTaxResult(total, bd("0"), total, bd("0"), bd("0"), false);
-            }
-        };
     }
 
     // ---- factory method ----
@@ -353,7 +333,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("200", "500", "100", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.DYNAMIC_SEQUENCING, flatTaxCalc("0.22"), bd("0.22")));
+                        WithdrawalOrder.DYNAMIC_SEQUENCING, FlatTaxStubs.flatTaxStrategy("0.22"), bd("0.22")));
 
         // Bracket ceiling = 100000 from flatTaxCalc; all need fits, pulls from traditional up to bracket
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
@@ -385,7 +365,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
 
         // need 100 from traditional; base tax = 100 * 0.20 = 20. Taxable is $0, so that $20 itself
         // must be paid from traditional -- audit C2 gross-up, warm-started (T10 review): bill0=20;
@@ -404,7 +384,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
 
         // Conversion of 50 already taxed. Additional withdrawal 100 from traditional.
         // Base bill: detailed tax on (100+50)=30; base tax on (50)=10; marginal=30-10=20. Taxable is
@@ -433,7 +413,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "10", "1000", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("1.0"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0"), null));
 
         // Withdrawal = 10 from traditional, tax = 10 * 1.0 = 10.
         // taxable (0) < 10 → take 0. traditional (now 0 after withdrawal) < 10 → take 0. roth: -10 (unconditional subtract).
@@ -449,7 +429,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_fillBracket_withinSpace_fillsUpToCeiling() {
-        var tax = flatTaxCalc("0.20");
+        var tax = FlatTaxStubs.flatTaxStrategy("0.20");
         var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
 
         // bracketCeiling = 100000; effectiveOtherIncome = 20000; space = 80000; traditional min = 500000
@@ -461,7 +441,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_fillBracket_rmdReducesBracketHeadroom() {
-        var tax = flatTaxCalc("0.20");
+        var tax = FlatTaxStubs.flatTaxStrategy("0.20");
         var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
 
         // bracketCeiling = 100000; effectiveOtherIncome = 20000; rmdAmount = 30000 already claims
@@ -473,7 +453,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_fillBracket_otherIncomeAboveCeiling_returnsZero() {
-        var tax = flatTaxCalc("0.20");
+        var tax = FlatTaxStubs.flatTaxStrategy("0.20");
         var p = poolWithConversion("0", "500000", "0", "0", "fill_bracket", "0.24", null, tax);
 
         var r = p.executeRothConversion(YEAR, bd("150000"), ZERO);
@@ -483,7 +463,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_fixedStrategy_limitedByTraditional() {
-        var tax = flatTaxCalc("0.20");
+        var tax = FlatTaxStubs.flatTaxStrategy("0.20");
         var p = poolWithConversion("0", "30", "0", "100", "fixed", null, null, tax);
 
         var r = p.executeRothConversion(YEAR, ZERO, ZERO);
@@ -493,7 +473,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_beforeStartYear_returnsZero() {
-        var p = poolWithConversion("0", "500000", "0", "5000", "fixed", null, 2040, flatTaxCalc("0.20"));
+        var p = poolWithConversion("0", "500000", "0", "5000", "fixed", null, 2040, FlatTaxStubs.flatTaxStrategy("0.20"));
 
         var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
@@ -503,7 +483,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversion_emptyTraditional_returnsZero() {
-        var p = poolWithConversion("0", "0", "0", "5000", "fixed", null, null, flatTaxCalc("0.20"));
+        var p = poolWithConversion("0", "0", "0", "5000", "fixed", null, null, FlatTaxStubs.flatTaxStrategy("0.20"));
 
         var r = p.executeRothConversion(YEAR, ZERO, ZERO);
 
@@ -524,7 +504,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversionOverride_positiveAmount_appliesOverride() {
-        var p = poolWithConversion("0", "200", "10", "5000", "fixed", null, null, flatTaxCalc("0.10"));
+        var p = poolWithConversion("0", "200", "10", "5000", "fixed", null, null, FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var r = p.executeRothConversionOverride(YEAR, ZERO, bd("120"), ZERO);
 
@@ -534,7 +514,7 @@ class MultiPoolDeepTest {
 
     @Test
     void executeRothConversionOverride_zeroAmount_returnsZero() {
-        var p = poolWithConversion("0", "200", "0", "5000", "fixed", null, null, flatTaxCalc("0.20"));
+        var p = poolWithConversion("0", "200", "0", "5000", "fixed", null, null, FlatTaxStubs.flatTaxStrategy("0.20"));
 
         var r = p.executeRothConversionOverride(YEAR, ZERO, ZERO, ZERO);
 
@@ -640,7 +620,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
@@ -710,7 +690,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
 
         // taxable being $0, audit C2 grosses the $100 traditional draw's own 20% tax up to the exact
         // fixed point 25 (100 need + tax = taxableIncome; tax = 0.20*(100+tax) => tax = 25) -- same
@@ -743,7 +723,7 @@ class MultiPoolDeepTest {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
                 ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.20"), null));
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
@@ -805,7 +785,7 @@ class MultiPoolDeepTest {
         // Taxable ($50,000) comfortably funds the ordinary tax AND the penalty, so gross-up never
         // triggers -- isolates the penalty math from audit C2's fixed point.
         var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST,
-                flatTaxCalc("0.10"));
+                FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY,
                 ZERO, ZERO, ZERO);
@@ -824,7 +804,7 @@ class MultiPoolDeepTest {
     @Test
     void executeWithdrawals_traditionalDrawAtOrAfterAge60_noPenalty() {
         var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST,
-                flatTaxCalc("0.10"));
+                FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO,
                 RetirementAges.EARLY_WITHDRAWAL_AGE, ZERO, ZERO, ZERO);
@@ -838,7 +818,7 @@ class MultiPoolDeepTest {
         // Taxable-first order with a small draw fully covered by taxable -- zero traditional
         // distribution, so no penalty applies even though age is under 60.
         var pool = poolWithOrderAndTax("50000", "100000", "0", WithdrawalOrder.TAXABLE_FIRST,
-                flatTaxCalc("0.10"));
+                FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var result = pool.executeWithdrawals(bd("10000"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY,
                 ZERO, ZERO, ZERO);
@@ -853,7 +833,7 @@ class MultiPoolDeepTest {
         // to Roth, they are not withdrawn to the household, so the 10% penalty never applies to a
         // conversion regardless of age. (executeRothConversion has no age parameter at all --
         // this test documents that the penalty logic lives entirely in executeWithdrawals.)
-        var tax = flatTaxCalc("0.20");
+        var tax = FlatTaxStubs.flatTaxStrategy("0.20");
         var p = poolWithConversion("0", "500000", "0", "50000", "fixed", null, null, tax);
 
         var r = p.executeRothConversion(YEAR, ZERO, ZERO);
@@ -872,7 +852,7 @@ class MultiPoolDeepTest {
         // order keeps the $1,000 spend draw off the taxable pool entirely, isolating "does the TAX
         // payment itself touch traditional" as the only variable.
         var pool = poolWithOrderAndTax("5000", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST,
-                flatTaxCalc("0.10"));
+                FlatTaxStubs.flatTaxStrategy("0.10"));
 
         var result = pool.executeWithdrawals(bd("1000"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED,
                 ZERO, ZERO, ZERO);
@@ -893,7 +873,7 @@ class MultiPoolDeepTest {
         // audit-C2 gross-up is needed. Pre-T18a-1, only a $100 RMD "excess" reached taxable
         // BEFORE the tax cascade ran (see the fixed-point test below), forcing a small gross-up;
         // RMD-first ordering makes the FULL RMD's cash available up front, eliminating it here.
-        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
+        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.10"));
         var forced = pool.forceRmd(bd("8100"));
 
         var result = pool.executeWithdrawals(bd("8000"), YEAR, ZERO, ZERO, forced, AGE_RETIRED,
@@ -924,7 +904,7 @@ class MultiPoolDeepTest {
         assertThat(slice).isEqualByComparingTo(bd("788.88888889"));
         assertThat(bill).isEqualByComparingTo(bd("888.888888889"));
 
-        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, flatTaxCalc("0.10"));
+        var pool = poolWithOrderAndTax("0", "100000", "0", WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.10"));
         var forced = pool.forceRmd(bd("100"));
         assertThat(forced).isEqualByComparingTo(bd("100"));
 

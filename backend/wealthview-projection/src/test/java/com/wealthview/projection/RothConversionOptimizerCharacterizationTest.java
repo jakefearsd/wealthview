@@ -1,20 +1,14 @@
 package com.wealthview.projection;
 
-import java.math.BigDecimal;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.FlatTaxStubs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.nullable;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 /**
  * Golden-master characterization test for {@link RothConversionOptimizer}.
@@ -56,30 +50,11 @@ class RothConversionOptimizerCharacterizationTest {
 
     @BeforeEach
     void setUp() {
-        taxCalculator = mock(FederalTaxCalculator.class);
-        when(taxCalculator.computeTax(any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(inv -> {
-                    BigDecimal income = inv.getArgument(0);
-                    if (income.compareTo(BigDecimal.ZERO) <= 0) {
-                        return BigDecimal.ZERO;
-                    }
-                    return income.multiply(new BigDecimal("0.20"));
-                });
-        org.mockito.stubbing.Answer<BigDecimal> bracketAnswer = inv -> {
-            double r = ((BigDecimal) inv.getArgument(0)).doubleValue();
-            if (r <= 0.10) return new BigDecimal("45000");
-            if (r <= 0.12) return new BigDecimal("55000");
-            if (r <= 0.22) return new BigDecimal("100000");
-            if (r <= 0.24) return new BigDecimal("190000");
-            if (r <= 0.32) return new BigDecimal("245000");
-            return new BigDecimal("600000");
-        };
-        when(taxCalculator.computeMaxIncomeForBracket(
-                any(BigDecimal.class), anyInt(), any(FilingStatus.class)))
-                .thenAnswer(bracketAnswer);
-        when(taxCalculator.computeMaxIncomeForBracket(
-                any(BigDecimal.class), anyInt(), any(FilingStatus.class), nullable(BigDecimal.class)))
-                .thenAnswer(bracketAnswer);
+        // Flat 20% tax + the shared bracket-ceiling table -- see FlatTaxStubs javadoc for which
+        // call sites this exact (unscaled) shape matches. This golden fixture's pinned values
+        // (see class javadoc) depend on this EXACT arithmetic -- do not swap shapes.
+        taxCalculator = FlatTaxStubs.flat20();
+        FlatTaxStubs.stubBracketCeilings(taxCalculator);
     }
 
     private static final double TOL = 1e-6;
