@@ -1,38 +1,41 @@
 import { useState } from 'react';
 import { listTenantDetails, createTenant, setTenantActive } from '../../api/admin';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import Button from '../Button';
-import toast from 'react-hot-toast';
 
 export default function TenantsSection() {
     const { data: tenants, loading, refetch } = useApiQuery(listTenantDetails);
     const [newName, setNewName] = useState('');
-    const [creating, setCreating] = useState(false);
 
-    async function handleCreate() {
+    const createMutation = useApiMutation(
+        (name: string) => createTenant(name),
+        {
+            successMessage: 'Tenant created',
+            onSuccess: () => {
+                setNewName('');
+                refetch();
+            },
+        },
+    );
+    const creating = createMutation.loading;
+
+    function handleCreate() {
         if (!newName.trim()) return;
-        setCreating(true);
-        try {
-            await createTenant(newName.trim());
-            toast.success('Tenant created');
-            setNewName('');
-            refetch();
-        } catch {
-            toast.error('Failed to create tenant');
-        } finally {
-            setCreating(false);
-        }
+        void createMutation.mutate(newName.trim());
     }
 
-    async function handleToggleActive(id: string, currentActive: boolean) {
-        try {
-            await setTenantActive(id, !currentActive);
-            toast.success(currentActive ? 'Tenant disabled' : 'Tenant enabled');
-            refetch();
-        } catch {
-            toast.error('Failed to update tenant');
-        }
+    const toggleActiveMutation = useApiMutation(
+        (input: { id: string; nextActive: boolean }) => setTenantActive(input.id, input.nextActive),
+        {
+            successMessage: (_result, input) => (input.nextActive ? 'Tenant enabled' : 'Tenant disabled'),
+            onSuccess: () => refetch(),
+        },
+    );
+
+    function handleToggleActive(id: string, currentActive: boolean) {
+        void toggleActiveMutation.mutate({ id, nextActive: !currentActive });
     }
 
     if (loading) return <div>Loading...</div>;

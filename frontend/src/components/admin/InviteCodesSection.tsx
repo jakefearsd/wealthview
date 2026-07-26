@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { listInviteCodes, generateInviteCodeWithExpiry, revokeInviteCode, deleteUsedCodes } from '../../api/tenant';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import Button from '../Button';
 import LinkButton from '../LinkButton';
@@ -33,44 +34,44 @@ function getStatusColor(status: string): { background: string; color: string } {
 export default function InviteCodesSection() {
     const { data: codes, refetch } = useApiQuery(listInviteCodes);
     const [expiryDays, setExpiryDays] = useState(7);
-    const [generating, setGenerating] = useState(false);
-    const [deleting, setDeleting] = useState(false);
 
-    async function handleGenerate() {
-        setGenerating(true);
-        try {
-            await generateInviteCodeWithExpiry(expiryDays);
-            toast.success('Invite code generated');
-            refetch();
-        } catch {
-            toast.error('Failed to generate invite code');
-        } finally {
-            setGenerating(false);
-        }
+    const generateMutation = useApiMutation(
+        (days: number) => generateInviteCodeWithExpiry(days),
+        {
+            successMessage: 'Invite code generated',
+            onSuccess: () => refetch(),
+        },
+    );
+    const generating = generateMutation.loading;
+
+    function handleGenerate() {
+        void generateMutation.mutate(expiryDays);
     }
 
-    async function handleRevoke(id: string) {
-        try {
-            await revokeInviteCode(id);
-            toast.success('Invite code revoked');
-            refetch();
-        } catch {
-            toast.error('Failed to revoke invite code');
-        }
+    const revokeMutation = useApiMutation(
+        (id: string) => revokeInviteCode(id),
+        {
+            successMessage: 'Invite code revoked',
+            onSuccess: () => refetch(),
+        },
+    );
+
+    function handleRevoke(id: string) {
+        void revokeMutation.mutate(id);
     }
 
-    async function handleDeleteUsed() {
+    const deleteUsedMutation = useApiMutation(
+        () => deleteUsedCodes(),
+        {
+            successMessage: (result) => `Deleted ${result.deleted} used codes`,
+            onSuccess: () => refetch(),
+        },
+    );
+    const deleting = deleteUsedMutation.loading;
+
+    function handleDeleteUsed() {
         if (!confirm('Delete all used invite codes? This cannot be undone.')) return;
-        setDeleting(true);
-        try {
-            const result = await deleteUsedCodes();
-            toast.success(`Deleted ${result.deleted} used codes`);
-            refetch();
-        } catch {
-            toast.error('Failed to delete used codes');
-        } finally {
-            setDeleting(false);
-        }
+        void deleteUsedMutation.mutate(undefined);
     }
 
     function handleCopy(code: string) {

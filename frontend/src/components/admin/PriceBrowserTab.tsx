@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import client from '../../api/client';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import { formatCurrency } from '../../utils/format';
 import Button from '../Button';
@@ -29,38 +30,41 @@ export default function PriceBrowserTab() {
     const [fromDate, setFromDate] = useState(thirtyDaysAgoStr());
     const [toDate, setToDate] = useState(todayStr());
     const [prices, setPrices] = useState<PriceRecord[]>([]);
-    const [loading, setLoading] = useState(false);
 
-    async function handleSearch() {
+    const searchMutation = useApiMutation(
+        (input: { symbol: string; from: string; to: string }) => client
+            .get<PriceRecord[]>(`/admin/prices/${input.symbol}/history`, { params: { from: input.from, to: input.to } })
+            .then((r) => r.data),
+        {
+            onSuccess: (data) => {
+                setPrices(data);
+                if (data.length === 0) toast('No price data found for that range');
+            },
+        },
+    );
+    const loading = searchMutation.loading;
+
+    function handleSearch() {
         const sym = symbol.trim().toUpperCase();
         if (!sym) {
             toast.error('Enter a symbol');
             return;
         }
-        setLoading(true);
-        try {
-            const { data } = await client.get<PriceRecord[]>(`/admin/prices/${sym}/history`, {
-                params: { from: fromDate, to: toDate },
-            });
-            setPrices(data);
-            if (data.length === 0) toast('No price data found for that range');
-        } catch {
-            toast.error('Failed to fetch prices');
-        } finally {
-            setLoading(false);
-        }
+        void searchMutation.mutate({ symbol: sym, from: fromDate, to: toDate });
     }
 
-    async function handleDelete(date: string) {
+    const deleteMutation = useApiMutation(
+        (date: string) => client.delete(`/admin/prices/${symbol.trim().toUpperCase()}/${date}`),
+        {
+            successMessage: 'Price deleted',
+            onSuccess: (_result, date) => setPrices((prev) => prev.filter((p) => p.date !== date)),
+        },
+    );
+
+    function handleDelete(date: string) {
         const sym = symbol.trim().toUpperCase();
         if (!confirm(`Delete price for ${sym} on ${date}?`)) return;
-        try {
-            await client.delete(`/admin/prices/${sym}/${date}`);
-            toast.success('Price deleted');
-            setPrices((prev) => prev.filter((p) => p.date !== date));
-        } catch {
-            toast.error('Failed to delete price');
-        }
+        void deleteMutation.mutate(date);
     }
 
     const chartData = prices.map((p) => ({ date: p.date, price: p.close_price }));

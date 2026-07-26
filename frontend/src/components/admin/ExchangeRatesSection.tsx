@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { listExchangeRates, createExchangeRate, updateExchangeRate, deleteExchangeRate } from '../../api/exchangeRates';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, inputFieldStyle } from '../../utils/styles';
 import { extractErrorMessage } from '../../utils/errorMessage';
 import Button from '../Button';
@@ -12,7 +13,6 @@ export default function ExchangeRatesSection() {
     const [showAdd, setShowAdd] = useState(false);
     const [newCode, setNewCode] = useState('');
     const [newRate, setNewRate] = useState('');
-    const [saving, setSaving] = useState(false);
 
     const { data, loading, error, refetch } = useApiQuery(listExchangeRates);
     const rates = data ?? [];
@@ -21,53 +21,55 @@ export default function ExchangeRatesSection() {
         if (error) toast.error(`Failed to load exchange rates: ${error}`);
     }, [error]);
 
-    async function handleAdd() {
+    const addMutation = useApiMutation(
+        (input: { currency_code: string; rate_to_usd: number }) => createExchangeRate(input),
+        {
+            successMessage: (_result, input) => `${input.currency_code} rate added`,
+            errorMessage: (err) => `Failed to add exchange rate: ${extractErrorMessage(err)}`,
+            onSuccess: () => {
+                setShowAdd(false);
+                setNewCode('');
+                setNewRate('');
+                refetch();
+            },
+        },
+    );
+
+    function handleAdd() {
         if (!newCode || !newRate) return;
-        setSaving(true);
-        try {
-            await createExchangeRate({
-                currency_code: newCode.toUpperCase(),
-                rate_to_usd: parseFloat(newRate),
-            });
-            toast.success(`${newCode.toUpperCase()} rate added`);
-            setShowAdd(false);
-            setNewCode('');
-            setNewRate('');
-            refetch();
-        } catch (err) {
-            toast.error(`Failed to add exchange rate: ${extractErrorMessage(err)}`);
-        } finally {
-            setSaving(false);
-        }
+        void addMutation.mutate({ currency_code: newCode.toUpperCase(), rate_to_usd: parseFloat(newRate) });
     }
 
-    async function handleUpdate(currencyCode: string) {
+    const updateMutation = useApiMutation(
+        (currencyCode: string) => updateExchangeRate(currencyCode, { currency_code: currencyCode, rate_to_usd: parseFloat(editRate) }),
+        {
+            successMessage: (_result, currencyCode) => `${currencyCode} rate updated`,
+            errorMessage: (err) => `Failed to update exchange rate: ${extractErrorMessage(err)}`,
+            onSuccess: () => {
+                setEditingCode(null);
+                refetch();
+            },
+        },
+    );
+    const saving = addMutation.loading || updateMutation.loading;
+
+    function handleUpdate(currencyCode: string) {
         if (!editRate) return;
-        setSaving(true);
-        try {
-            await updateExchangeRate(currencyCode, {
-                currency_code: currencyCode,
-                rate_to_usd: parseFloat(editRate),
-            });
-            toast.success(`${currencyCode} rate updated`);
-            setEditingCode(null);
-            refetch();
-        } catch (err) {
-            toast.error(`Failed to update exchange rate: ${extractErrorMessage(err)}`);
-        } finally {
-            setSaving(false);
-        }
+        void updateMutation.mutate(currencyCode);
     }
 
-    async function handleDelete(currencyCode: string) {
+    const deleteMutation = useApiMutation(
+        (currencyCode: string) => deleteExchangeRate(currencyCode),
+        {
+            successMessage: (_result, currencyCode) => `${currencyCode} rate deleted`,
+            errorMessage: (err) => `Failed to delete — accounts may still use this currency (${extractErrorMessage(err)})`,
+            onSuccess: () => refetch(),
+        },
+    );
+
+    function handleDelete(currencyCode: string) {
         if (!confirm(`Delete ${currencyCode} exchange rate?`)) return;
-        try {
-            await deleteExchangeRate(currencyCode);
-            toast.success(`${currencyCode} rate deleted`);
-            refetch();
-        } catch (err) {
-            toast.error(`Failed to delete — accounts may still use this currency (${extractErrorMessage(err)})`);
-        }
+        void deleteMutation.mutate(currencyCode);
     }
 
     if (loading) return <div>Loading exchange rates...</div>;

@@ -1,11 +1,9 @@
-import { useState } from 'react';
 import { getSystemStats, getLoginActivity } from '../../api/adminSystem';
 import { syncFinnhub, syncYahoo } from '../../api/adminPrices';
 import type { SystemStats, LoginActivity } from '../../api/adminSystem';
-import type { YahooSyncResult } from '../../api/adminPrices';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
-import toast from 'react-hot-toast';
 
 const statCardStyle = {
     ...cardStyle,
@@ -28,30 +26,24 @@ export default function DashboardSection() {
     const { data: activity, loading: activityLoading } = useApiQuery<LoginActivity[]>(
         () => getLoginActivity(50)
     );
-    const [syncing, setSyncing] = useState<'finnhub' | 'yahoo' | null>(null);
+    const finnhubMutation = useApiMutation(
+        () => syncFinnhub(),
+        { successMessage: 'Finnhub sync complete' },
+    );
 
-    async function handleSyncFinnhub() {
-        setSyncing('finnhub');
-        try {
-            await syncFinnhub();
-            toast.success('Finnhub sync complete');
-        } catch {
-            toast.error('Finnhub sync failed');
-        } finally {
-            setSyncing(null);
-        }
+    const yahooMutation = useApiMutation(
+        () => syncYahoo(),
+        { successMessage: (result) => `Yahoo sync: ${result.inserted} inserted, ${result.updated} updated` },
+    );
+
+    const anySyncing = finnhubMutation.loading || yahooMutation.loading;
+
+    function handleSyncFinnhub() {
+        void finnhubMutation.mutate(undefined);
     }
 
-    async function handleSyncYahoo() {
-        setSyncing('yahoo');
-        try {
-            const result: YahooSyncResult = await syncYahoo();
-            toast.success(`Yahoo sync: ${result.inserted} inserted, ${result.updated} updated`);
-        } catch {
-            toast.error('Yahoo sync failed');
-        } finally {
-            setSyncing(null);
-        }
+    function handleSyncYahoo() {
+        void yahooMutation.mutate(undefined);
     }
 
     if (statsLoading) return <div>Loading dashboard...</div>;
@@ -82,33 +74,33 @@ export default function DashboardSection() {
                 <div style={{ ...statCardStyle, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <button
                         onClick={handleSyncFinnhub}
-                        disabled={syncing !== null}
+                        disabled={anySyncing}
                         style={{
                             padding: '0.4rem 0.8rem',
-                            background: syncing === 'finnhub' ? '#999' : '#1976d2',
+                            background: finnhubMutation.loading ? '#999' : '#1976d2',
                             color: '#fff',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: syncing !== null ? 'default' : 'pointer',
+                            cursor: anySyncing ? 'default' : 'pointer',
                             fontSize: '0.85rem',
                         }}
                     >
-                        {syncing === 'finnhub' ? 'Syncing...' : 'Sync Finnhub'}
+                        {finnhubMutation.loading ? 'Syncing...' : 'Sync Finnhub'}
                     </button>
                     <button
                         onClick={handleSyncYahoo}
-                        disabled={syncing !== null}
+                        disabled={anySyncing}
                         style={{
                             padding: '0.4rem 0.8rem',
-                            background: syncing === 'yahoo' ? '#999' : '#2e7d32',
+                            background: yahooMutation.loading ? '#999' : '#2e7d32',
                             color: '#fff',
                             border: 'none',
                             borderRadius: '4px',
-                            cursor: syncing !== null ? 'default' : 'pointer',
+                            cursor: anySyncing ? 'default' : 'pointer',
                             fontSize: '0.85rem',
                         }}
                     >
-                        {syncing === 'yahoo' ? 'Syncing...' : 'Sync Yahoo'}
+                        {yahooMutation.loading ? 'Syncing...' : 'Sync Yahoo'}
                     </button>
                 </div>
             </div>

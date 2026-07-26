@@ -7,10 +7,10 @@ import {
 } from '../../api/stockSplits';
 import type { StockSplit } from '../../api/stockSplits';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, inputStyle, tableStyle, thStyle, tdStyle } from '../../utils/styles';
 import Button from '../Button';
 import toast from 'react-hot-toast';
-import { extractErrorMessage } from '../../utils/errorMessage';
 
 const sourceLabel: Record<StockSplit['source'], string> = {
     finnhub: 'Finnhub',
@@ -27,11 +27,19 @@ export default function StockSplitsSection() {
         numerator: '4',
         denominator: '1',
     });
-    const [submitting, setSubmitting] = useState(false);
-    const [syncing, setSyncing] = useState(false);
-    const [unapplyingId, setUnapplyingId] = useState<string | null>(null);
+    const createMutation = useApiMutation(
+        (input: { symbol: string; effective_date: string; numerator: number; denominator: number }) => createStockSplit(input),
+        {
+            successMessage: (_result, input) => `Split applied for ${input.symbol}`,
+            onSuccess: () => {
+                setForm({ symbol: '', effective_date: '', numerator: '4', denominator: '1' });
+                refetch();
+            },
+        },
+    );
+    const submitting = createMutation.loading;
 
-    async function handleCreate(e: React.FormEvent) {
+    function handleCreate(e: React.FormEvent) {
         e.preventDefault();
         const num = Number(form.numerator);
         const den = Number(form.denominator);
@@ -39,51 +47,41 @@ export default function StockSplitsSection() {
             toast.error('Fill every field');
             return;
         }
-        setSubmitting(true);
-        try {
-            await createStockSplit({
-                symbol: form.symbol.trim().toUpperCase(),
-                effective_date: form.effective_date,
-                numerator: num,
-                denominator: den,
-            });
-            toast.success(`Split applied for ${form.symbol.toUpperCase()}`);
-            setForm({ symbol: '', effective_date: '', numerator: '4', denominator: '1' });
-            refetch();
-        } catch (e) {
-            toast.error(extractErrorMessage(e));
-        } finally {
-            setSubmitting(false);
-        }
+        void createMutation.mutate({
+            symbol: form.symbol.trim().toUpperCase(),
+            effective_date: form.effective_date,
+            numerator: num,
+            denominator: den,
+        });
     }
 
-    async function handleUnapply(id: string, symbol: string, date: string) {
+    const unapplyMutation = useApiMutation(
+        (id: string) => unapplyStockSplit(id),
+        {
+            successMessage: 'Split unapplied',
+            onSuccess: () => refetch(),
+        },
+    );
+    const unapplyingId = unapplyMutation.pendingInput;
+
+    function handleUnapply(id: string, symbol: string, date: string) {
         if (!confirm(`Un-apply ${symbol} split on ${date}? Transactions and prices will be restored to their pre-split values.`)) {
             return;
         }
-        setUnapplyingId(id);
-        try {
-            await unapplyStockSplit(id);
-            toast.success('Split unapplied');
-            refetch();
-        } catch (e) {
-            toast.error(extractErrorMessage(e));
-        } finally {
-            setUnapplyingId(null);
-        }
+        void unapplyMutation.mutate(id);
     }
 
-    async function handleSync() {
-        setSyncing(true);
-        try {
-            const result = await syncStockSplits();
-            toast.success(`Sync complete: ${result.splits_applied} new of ${result.splits_discovered} discovered (${result.symbols_scanned} symbols scanned)`);
-            refetch();
-        } catch (e) {
-            toast.error(extractErrorMessage(e));
-        } finally {
-            setSyncing(false);
-        }
+    const syncMutation = useApiMutation(
+        () => syncStockSplits(),
+        {
+            successMessage: (result) => `Sync complete: ${result.splits_applied} new of ${result.splits_discovered} discovered (${result.symbols_scanned} symbols scanned)`,
+            onSuccess: () => refetch(),
+        },
+    );
+    const syncing = syncMutation.loading;
+
+    function handleSync() {
+        void syncMutation.mutate(undefined);
     }
 
     return (

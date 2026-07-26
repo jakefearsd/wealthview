@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getConfig, setConfig } from '../../api/adminSystem';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle } from '../../utils/styles';
 import Button from '../Button';
 import toast from 'react-hot-toast';
@@ -26,7 +27,6 @@ const CONFIG_SECTIONS: { title: string; keys: string[] }[] = [
 export default function SystemConfigSection() {
     const [editingKey, setEditingKey] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
-    const [saving, setSaving] = useState(false);
     const [revealedKeys, setRevealedKeys] = useState<Set<string>>(new Set());
 
     const { data, loading, error, refetch } = useApiQuery(getConfig);
@@ -66,34 +66,27 @@ export default function SystemConfigSection() {
         setEditValue(getConfigValue(key));
     }
 
-    async function handleSave() {
+    const saveConfigMutation = useApiMutation(
+        (input: { key: string; value: string }) => setConfig(input.key, input.value),
+        {
+            successMessage: 'Config updated',
+            onSuccess: () => {
+                setEditingKey(null);
+                refetch();
+            },
+        },
+    );
+    const saving = saveConfigMutation.loading;
+
+    function handleSave() {
         if (!editingKey) return;
-        setSaving(true);
-        try {
-            await setConfig(editingKey, editValue);
-            toast.success('Config updated');
-            setEditingKey(null);
-            refetch();
-        } catch {
-            toast.error('Failed to save config');
-        } finally {
-            setSaving(false);
-        }
+        void saveConfigMutation.mutate({ key: editingKey, value: editValue });
     }
 
-    async function handleBooleanToggle(key: string) {
+    function handleBooleanToggle(key: string) {
         const current = getConfigValue(key);
         const newVal = current === 'true' ? 'false' : 'true';
-        setSaving(true);
-        try {
-            await setConfig(key, newVal);
-            toast.success('Config updated');
-            refetch();
-        } catch {
-            toast.error('Failed to save config');
-        } finally {
-            setSaving(false);
-        }
+        void saveConfigMutation.mutate({ key, value: newVal });
     }
 
     if (loading) return <div>Loading config...</div>;

@@ -5,9 +5,9 @@ import { listUsers, updateUserRole, deleteUser } from '../../api/tenant';
 import type { AdminUser } from '../../api/adminUsers';
 import type { TenantUser } from '../../types/tenant';
 import { useApiQuery } from '../../hooks/useApiQuery';
+import { useApiMutation } from '../../hooks/useApiMutation';
 import { cardStyle, tableStyle, thStyle, tdStyle, trHoverStyle } from '../../utils/styles';
 import Button from '../Button';
-import toast from 'react-hot-toast';
 
 export default function UsersSection() {
     const { role } = useAuth();
@@ -18,55 +18,66 @@ export default function UsersSection() {
 
     const [resetModal, setResetModal] = useState<{ userId: string; email: string } | null>(null);
     const [newPassword, setNewPassword] = useState('');
-    const [resetting, setResetting] = useState(false);
 
     const users = isSuperAdmin ? adminUsers : null;
     const loading = isSuperAdmin ? adminLoading : tenantLoading;
 
-    async function handleResetPassword() {
+    function refetchUsers() {
+        if (isSuperAdmin) refetchAdmin(); else refetchTenant();
+    }
+
+    const resetPasswordMutation = useApiMutation(
+        (input: { userId: string; email: string; password: string }) => resetPassword(input.userId, input.password),
+        {
+            successMessage: (_result, input) => `Password reset for ${input.email}`,
+            onSuccess: () => {
+                setResetModal(null);
+                setNewPassword('');
+            },
+        },
+    );
+    const resetting = resetPasswordMutation.loading;
+
+    function handleResetPassword() {
         if (!resetModal || !newPassword.trim()) return;
-        setResetting(true);
-        try {
-            await resetPassword(resetModal.userId, newPassword.trim());
-            toast.success(`Password reset for ${resetModal.email}`);
-            setResetModal(null);
-            setNewPassword('');
-        } catch {
-            toast.error('Failed to reset password');
-        } finally {
-            setResetting(false);
-        }
+        void resetPasswordMutation.mutate({ userId: resetModal.userId, email: resetModal.email, password: newPassword.trim() });
     }
 
-    async function handleToggleActive(userId: string, email: string, currentActive: boolean) {
-        try {
-            await setUserActive(userId, !currentActive);
-            toast.success(`${email} ${currentActive ? 'deactivated' : 'activated'}`);
-            refetchAdmin();
-        } catch {
-            toast.error('Failed to update user');
-        }
+    const toggleActiveMutation = useApiMutation(
+        (input: { userId: string; email: string; nextActive: boolean }) => setUserActive(input.userId, input.nextActive),
+        {
+            successMessage: (_result, input) => `${input.email} ${input.nextActive ? 'activated' : 'deactivated'}`,
+            onSuccess: () => refetchAdmin(),
+        },
+    );
+
+    function handleToggleActive(userId: string, email: string, currentActive: boolean) {
+        void toggleActiveMutation.mutate({ userId, email, nextActive: !currentActive });
     }
 
-    async function handleRoleChange(userId: string, newRole: string) {
-        try {
-            await updateUserRole(userId, newRole);
-            toast.success('Role updated');
-            if (isSuperAdmin) refetchAdmin(); else refetchTenant();
-        } catch {
-            toast.error('Failed to update role');
-        }
+    const roleChangeMutation = useApiMutation(
+        (input: { userId: string; role: string }) => updateUserRole(input.userId, input.role),
+        {
+            successMessage: 'Role updated',
+            onSuccess: () => refetchUsers(),
+        },
+    );
+
+    function handleRoleChange(userId: string, newRole: string) {
+        void roleChangeMutation.mutate({ userId, role: newRole });
     }
 
-    async function handleDelete(userId: string) {
+    const deleteUserMutation = useApiMutation(
+        (userId: string) => deleteUser(userId),
+        {
+            successMessage: 'User removed',
+            onSuccess: () => refetchUsers(),
+        },
+    );
+
+    function handleDelete(userId: string) {
         if (!confirm('Remove this user? This cannot be undone.')) return;
-        try {
-            await deleteUser(userId);
-            toast.success('User removed');
-            if (isSuperAdmin) refetchAdmin(); else refetchTenant();
-        } catch {
-            toast.error('Failed to remove user');
-        }
+        void deleteUserMutation.mutate(userId);
     }
 
     if (loading) return <div>Loading...</div>;
