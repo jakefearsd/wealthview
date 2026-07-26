@@ -25,6 +25,7 @@ import com.wealthview.core.projection.dto.CreateProjectionAccountRequest;
 import com.wealthview.core.projection.dto.ScenarioRequest;
 import com.wealthview.core.projection.dto.ScenarioIncomeSourceInput;
 import com.wealthview.core.tenant.TenantLookup;
+import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.core.testutil.ScenarioRequestBuilder;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
@@ -304,9 +305,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_manualAccountWithAllocationOverride_responseExposesOverridePercentages() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -328,9 +327,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_manualAccountNoOverride_responseAllocationIsAllUsStock() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -351,9 +348,7 @@ class ScenarioCrudServiceTest {
     @Test
     void getScenario_linkedAccountNoOverride_responseAllocationFromDerivedMix() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "taxable");
@@ -381,9 +376,7 @@ class ScenarioCrudServiceTest {
     @Test
     void getScenario_linkedAccount_responseCostBasisFromComputeCostBasis() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "taxable");
@@ -405,9 +398,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_manualAccountWithStoredCostBasis_responseUsesStoredCostBasis() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -424,9 +415,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_manualAccountNullCostBasis_responseFallsBackToInitialBalance() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -442,9 +431,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_accountWithStoredOverride_responseAllocationIsOverrideTrue() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -463,9 +450,7 @@ class ScenarioCrudServiceTest {
     @Test
     void getScenario_linkedAccountNoOverride_responseAllocationIsOverrideFalse() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "taxable");
@@ -578,9 +563,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_exists_returnsScenario() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -600,9 +583,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withHypotheticalAccount_usesStoredBalance() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
@@ -620,9 +601,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void listScenarios_returnsList() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdOrderByCreatedAtDesc(tenantId))
                 .thenReturn(List.of(scenario));
 
@@ -634,9 +613,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void deleteScenario_exists_deletes() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -1263,9 +1240,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_accountOwner_echoedInResponse() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var acct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "traditional");
@@ -1293,9 +1268,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_replacesAccounts() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var oldAccount = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
@@ -1323,9 +1296,7 @@ class ScenarioCrudServiceTest {
     void getScenario_withLinkedAccount_resolvesCurrentBalance() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
 
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
@@ -1349,9 +1320,7 @@ class ScenarioCrudServiceTest {
     void listScenarios_withLinkedAccount_resolvesCurrentBalance() {
         var linkedAccount = new AccountEntity(tenant, "401k", "401k", "Fidelity");
 
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional");
@@ -1427,9 +1396,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_replacesIncomeSources() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
@@ -1461,9 +1428,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void toScenarioResponse_includesIncomeSources() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Social Security", "social_security",
@@ -1559,9 +1524,7 @@ class ScenarioCrudServiceTest {
     // its single account stays identical — only the allocation weights change.
     @Test
     void updateScenario_allocationEdited_marksExistingProfileStale() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1990}");
         var existingAccount = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"), BigDecimal.ZERO,
                 new BigDecimal("0.07"), "taxable");
@@ -1603,9 +1566,8 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_spouseDeathAgeEdited_marksExistingProfileStale() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"spouse_birth_year\":1992,\"spouse_death_age\":88}");
+        var scenario = ScenarioMother.scenarioWithParams(
+                tenant, "{\"spouse_birth_year\":1992,\"spouse_death_age\":88}");
         var guardrailProfile = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
         guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
@@ -1632,9 +1594,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_accountOwnerEdited_marksExistingProfileStale() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{}");
         var existingAccount = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"), new BigDecimal("5000"),
                 new BigDecimal("0.07"), "taxable");
@@ -1664,9 +1624,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_withGuardrailProfile_doesNotMarkStaleWhenHashUnchanged() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1990}");
         var guardrailProfile = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
 
@@ -1693,9 +1651,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_withGuardrailProfile_irrelevantParamsDoNotTriggerStaleness() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1990}");
         var guardrailProfile = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
 
@@ -1726,9 +1682,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withGuardrailProfileButSimpleSpendingActive_includesInactiveGuardrail() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         // Scenario has a spending profile set (guardrail FK is null on the scenario)
         var spendingProfile = new SpendingProfileEntity(
                 tenant, "Basic Plan", new BigDecimal("40000"), new BigDecimal("20000"), null);
@@ -1757,9 +1711,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void updateScenario_noGuardrailProfile_doesNotInteractWithGuardrailRepo() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
@@ -1788,9 +1740,7 @@ class ScenarioCrudServiceTest {
     // paired-setter code too.
     @Test
     void updateScenario_nullSpendingProfileId_preservesExistingGuardrailProfile() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var guardrailProfile = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
         scenario.setGuardrailProfile(guardrailProfile);
@@ -1815,9 +1765,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withRentalPropertyIncomeSource_populatesNetCashFlow() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(
                 tenant, "123 Main St", new BigDecimal("400000"),
@@ -1853,9 +1801,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withNonRentalIncomeSource_netCashFlowIsNull() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Pension", "pension",
@@ -1876,9 +1822,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withLinkedIncomeSource_returnsIncomeSourceData() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Pension", "pension",
@@ -1906,9 +1850,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void getScenario_withRentalPropertyNoLinkedProperty_netCashFlowIsNull() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Hypothetical Rental", "rental_property",
@@ -1930,8 +1872,7 @@ class ScenarioCrudServiceTest {
 
     @Test
     void deleteScenario_incrementsScenariosCounterWithDeleteAction() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 

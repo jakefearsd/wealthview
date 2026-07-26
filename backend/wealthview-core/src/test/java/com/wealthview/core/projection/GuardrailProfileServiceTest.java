@@ -24,6 +24,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.ProjectionAccountEntity;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
@@ -66,9 +67,7 @@ class GuardrailProfileServiceTest {
         tenantId = UUID.randomUUID();
         scenarioId = UUID.randomUUID();
         tenant = new TenantEntity("Test");
-        scenario = new ProjectionScenarioEntity(
-                tenant, "Test Scenario", LocalDate.of(2030, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        scenario = ScenarioMother.guardrailScenario(tenant, "Test Scenario", "{\"birth_year\":1968}");
     }
 
     @Test
@@ -364,13 +363,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_irrelevantParamsDoNotChangeHash() {
-        var scenarioMinimal = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2030, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1968}");
-        var scenarioWithExtras = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2030, 1, 1), 90,
-                new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\",\"filing_status\":\"married_filing_jointly\"}");
+        var scenarioMinimal = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968}");
+        var scenarioWithExtras = ScenarioMother.guardrailScenario(tenant, "Plan", "{\"birth_year\":1968,\"withdrawal_strategy\":\"vanguard_dynamic_spending\",\"filing_status\":\"married_filing_jointly\"}");
 
         var hash1 = GuardrailProfileService.computeScenarioHash(scenarioMinimal, List.of());
         var hash2 = GuardrailProfileService.computeScenarioHash(scenarioWithExtras, List.of());
@@ -537,11 +531,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_stochasticMortalityFieldsSet_passThroughToOptimizationInput() {
-        var stochasticScenario = new ProjectionScenarioEntity(
-                tenant, "Test Scenario", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
-                        + "\"primary_sex\":\"male\",\"spouse_sex\":\"female\","
-                        + "\"longevity_conditional_age\":100}");
+        var stochasticScenario = ScenarioMother.guardrailScenario(tenant, "Test Scenario", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true," + "\"primary_sex\":\"male\",\"spouse_sex\":\"female\"," + "\"longevity_conditional_age\":100}");
         var table = new com.wealthview.core.projection.mortality.MortalityTable(
                 Map.of(70, 0.02), Map.of(70, 0.01));
         when(projectionInputBuilder.resolveMortalityTable(any())).thenReturn(table);
@@ -879,10 +869,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_paramsJsonWithFilingStatusAndWithdrawalOrder_propagatesToInput() {
-        var scenarioRich = new ProjectionScenarioEntity(
-                tenant, "Rich", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"filing_status\":\"married_filing_jointly\"," +
-                        "\"withdrawal_order\":\"traditional_first\"}");
+        var scenarioRich = ScenarioMother.guardrailScenario(tenant, "Rich", "{\"birth_year\":1968,\"filing_status\":\"married_filing_jointly\"," + "\"withdrawal_order\":\"traditional_first\"}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioRich);
         assertThat(input.filingStatus()).isEqualTo("married_filing_jointly");
         assertThat(input.withdrawalOrder()).isEqualTo("traditional_first");
@@ -894,9 +881,7 @@ class GuardrailProfileServiceTest {
     // default (see OptimizationContextBuilderTest).
     @Test
     void optimize_paramsJsonWithDividendYield_propagatesToInput() {
-        var scenarioWithYield = new ProjectionScenarioEntity(
-                tenant, "Yield", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"dividend_yield\":0.032}");
+        var scenarioWithYield = ScenarioMother.guardrailScenario(tenant, "Yield", "{\"birth_year\":1968,\"dividend_yield\":0.032}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithYield);
         assertThat(input.dividendYield()).isEqualByComparingTo("0.032");
     }
@@ -912,9 +897,7 @@ class GuardrailProfileServiceTest {
     // OptimizationContextBuilder applies the 0.0025 default (see OptimizationContextBuilderTest).
     @Test
     void optimize_paramsJsonWithFeeRate_propagatesToInput() {
-        var scenarioWithFee = new ProjectionScenarioEntity(
-                tenant, "Fee", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"fee_rate\":0.008}");
+        var scenarioWithFee = ScenarioMother.guardrailScenario(tenant, "Fee", "{\"birth_year\":1968,\"fee_rate\":0.008}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithFee);
         assertThat(input.feeRate()).isEqualByComparingTo("0.008");
     }
@@ -931,9 +914,7 @@ class GuardrailProfileServiceTest {
     // ScenarioParamsParserTest / OptimizationContextBuilderTest).
     @Test
     void optimize_paramsJsonWithInterestYield_propagatesToInput() {
-        var scenarioWithInterest = new ProjectionScenarioEntity(
-                tenant, "Interest", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"interest_yield\":0.05}");
+        var scenarioWithInterest = ScenarioMother.guardrailScenario(tenant, "Interest", "{\"birth_year\":1968,\"interest_yield\":0.05}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioWithInterest);
         assertThat(input.interestYield()).isEqualByComparingTo("0.05");
     }
@@ -946,8 +927,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_paramsJsonNull_birthYearDefaultsFromCurrentYear() {
-        var scenarioSansParams = new ProjectionScenarioEntity(
-                tenant, "None", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), null);
+        var scenarioSansParams = ScenarioMother.guardrailScenario(tenant, "None", null);
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioSansParams);
         assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
         assertThat(input.withdrawalOrder()).isEqualTo("taxable_first");
@@ -956,25 +936,21 @@ class GuardrailProfileServiceTest {
 
     @Test
     void optimize_paramsJsonBlank_birthYearDefaultsFromCurrentYear() {
-        var scenarioBlank = new ProjectionScenarioEntity(
-                tenant, "Blank", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "   ");
+        var scenarioBlank = ScenarioMother.guardrailScenario(tenant, "Blank", " ");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioBlank);
         assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
     }
 
     @Test
     void optimize_paramsJsonMissingBirthYear_fallsBack() {
-        var scenarioNoBy = new ProjectionScenarioEntity(
-                tenant, "NoBy", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"filing_status\":\"single\"}");
+        var scenarioNoBy = ScenarioMother.guardrailScenario(tenant, "NoBy", "{\"filing_status\":\"single\"}");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioNoBy);
         assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
     }
 
     @Test
     void optimize_paramsJsonMalformed_fallsBackQuietly() {
-        var scenarioBad = new ProjectionScenarioEntity(
-                tenant, "Bad", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{not-json");
+        var scenarioBad = ScenarioMother.guardrailScenario(tenant, "Bad", "{not-json");
         var input = captureOptimizationInput(buildRequest(req -> req), scenarioBad);
         assertThat(input.birthYear()).isEqualTo(java.time.LocalDate.now().getYear() - 35);
         assertThat(input.filingStatus()).isNull();
@@ -1041,13 +1017,11 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_includesAccountDetails() {
-        var scenarioWithAccount = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenarioWithAccount = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
         scenarioWithAccount.addAccount(new com.wealthview.persistence.entity.ProjectionAccountEntity(
                 scenarioWithAccount, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
-        var scenarioWithDifferentAccount = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenarioWithDifferentAccount = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
         scenarioWithDifferentAccount.addAccount(new com.wealthview.persistence.entity.ProjectionAccountEntity(
                 scenarioWithDifferentAccount, null, new BigDecimal("200000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));
@@ -1069,8 +1043,7 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_malformedParamsJson_hashesWithoutBirthYear() {
-        var scenarioBadJson = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{broken");
+        var scenarioBadJson = ScenarioMother.guardrailScenario(tenant, "x", "{broken");
 
         var hash = GuardrailProfileService.computeScenarioHash(scenarioBadJson, List.of());
 
@@ -1109,12 +1082,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_dividendYieldChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"dividend_yield\":0.018}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"dividend_yield\":0.03}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"dividend_yield\":0.018}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"dividend_yield\":0.03}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1126,12 +1095,8 @@ class GuardrailProfileServiceTest {
     // that must stale-out an existing guardrail profile on edit, exactly like dividend_yield.
     @Test
     void computeScenarioHash_feeRateChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"fee_rate\":0.0025}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"fee_rate\":0.01}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"fee_rate\":0.0025}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"fee_rate\":0.01}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1144,12 +1109,8 @@ class GuardrailProfileServiceTest {
     // dividend_yield/fee_rate.
     @Test
     void computeScenarioHash_interestYieldChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"interest_yield\":0.04}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"interest_yield\":0.06}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"interest_yield\":0.04}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"interest_yield\":0.06}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1187,12 +1148,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_spouseBirthYearChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1972}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1972}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1202,12 +1159,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_primaryDeathAgeChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"primary_death_age\":85}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"primary_death_age\":95}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"primary_death_age\":85}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"primary_death_age\":95}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1221,12 +1174,8 @@ class GuardrailProfileServiceTest {
     // identically. LifeExpectancy.defaultDeathAge(1968) == 87.
     @Test
     void computeScenarioHash_explicitDeathAgeMatchingSsaDefault_hashesSameAsUnset() {
-        var scenarioUnset = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968}");
-        var scenarioExplicitDefault = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"primary_death_age\":87}");
+        var scenarioUnset = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
+        var scenarioExplicitDefault = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"primary_death_age\":87}");
 
         var hashUnset = GuardrailProfileService.computeScenarioHash(scenarioUnset, List.of());
         var hashExplicit = GuardrailProfileService.computeScenarioHash(scenarioExplicitDefault, List.of());
@@ -1236,12 +1185,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_survivorSpendingFactorChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.75}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.9}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.75}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"survivor_spending_factor\":0.9}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1251,12 +1196,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_communityPropertyChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":false}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":true}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":false}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"community_property\":true}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1269,12 +1210,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_stochasticMortalityToggled_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":false}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":false}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1284,12 +1221,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_primarySexChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"male\"}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"female\"}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"male\"}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"stochastic_mortality\":true,\"primary_sex\":\"female\"}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1299,14 +1232,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_spouseSexChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
-                        + "\"spouse_sex\":\"male\"}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true,"
-                        + "\"spouse_sex\":\"female\"}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true," + "\"spouse_sex\":\"male\"}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"spouse_birth_year\":1970,\"stochastic_mortality\":true," + "\"spouse_sex\":\"female\"}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1316,12 +1243,8 @@ class GuardrailProfileServiceTest {
 
     @Test
     void computeScenarioHash_longevityConditionalAgeChanged_hashChanges() {
-        var scenarioA = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":95}");
-        var scenarioB = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":100}");
+        var scenarioA = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":95}");
+        var scenarioB = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968,\"stochastic_mortality\":true,\"longevity_conditional_age\":100}");
 
         var hashA = GuardrailProfileService.computeScenarioHash(scenarioA, List.of());
         var hashB = GuardrailProfileService.computeScenarioHash(scenarioB, List.of());
@@ -1380,15 +1303,13 @@ class GuardrailProfileServiceTest {
         var idOne = UUID.fromString("00000000-0000-0000-0000-000000000001");
         var idTwo = UUID.fromString("00000000-0000-0000-0000-000000000002");
 
-        var scenarioForward = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenarioForward = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
         var acctOneForward = accountWithId(scenarioForward, idOne, "100000", "traditional");
         var acctTwoForward = accountWithId(scenarioForward, idTwo, "200000", "taxable");
         scenarioForward.addAccount(acctOneForward);
         scenarioForward.addAccount(acctTwoForward);
 
-        var scenarioReversed = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenarioReversed = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
         var acctTwoReversed = accountWithId(scenarioReversed, idTwo, "200000", "taxable");
         var acctOneReversed = accountWithId(scenarioReversed, idOne, "100000", "traditional");
         scenarioReversed.addAccount(acctTwoReversed);
@@ -1401,8 +1322,7 @@ class GuardrailProfileServiceTest {
     }
 
     private ProjectionScenarioEntity scenarioWithSingleAccount() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "x", LocalDate.of(2030, 1, 1), 90, new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenario = ScenarioMother.guardrailScenario(tenant, "x", "{\"birth_year\":1968}");
         scenario.addAccount(new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional"));

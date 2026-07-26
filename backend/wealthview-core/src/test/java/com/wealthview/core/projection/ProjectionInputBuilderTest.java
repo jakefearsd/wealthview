@@ -29,6 +29,7 @@ import com.wealthview.core.projection.household.LifeExpectancy;
 import com.wealthview.core.projection.mortality.MortalityTable;
 import com.wealthview.core.projection.mortality.MortalityTableProvider;
 import com.wealthview.core.property.DepreciationCalculator;
+import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.GuardrailSpendingProfileEntity;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
@@ -97,9 +98,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withHypotheticalAccount_usesStoredBalance() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
@@ -119,9 +118,7 @@ class ProjectionInputBuilderTest {
     @Test
     void build_withLinkedAccount_resolvesCurrentBalance() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("10000"), new BigDecimal("0.07"), "taxable");
@@ -144,9 +141,7 @@ class ProjectionInputBuilderTest {
     @Test
     void toAccountInput_linkedNoStoredAllocation_derivesFromHoldings() {
         var linkedAccount = new AccountEntity(tenant, "Bond Fund", "brokerage", "Vanguard");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "traditional");
@@ -171,9 +166,7 @@ class ProjectionInputBuilderTest {
     @Test
     void toAccountInput_linked_costBasisSumsHoldingsCostBasis() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("10000"), null, "taxable");
@@ -194,9 +187,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_hypothetical_noStoredCostBasis_defaultsToInitialBalance() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
@@ -214,9 +205,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_hypothetical_storedCostBasis_usesStoredValue() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
@@ -233,9 +222,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_expectedReturnPresent_setsOverride() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
@@ -252,9 +239,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_hypotheticalWithStoredAllocation_parsesAllocation() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("0"), null, "taxable");
@@ -277,9 +262,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withIncomeSources_resolvesFromLinks() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Social Security", "social_security",
@@ -300,9 +283,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withNoIncomeSources_returnsEmptyList() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -314,9 +295,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withRentalPropertyStraightLine_computesDepreciation() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "123 Main St",
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
@@ -350,9 +329,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withSpendingProfile_includesSpendingInput() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var profile = new SpendingProfileEntity(tenant, "Standard",
                 new BigDecimal("40000"), new BigDecimal("20000"), null);
         scenario.setSpendingProfile(profile);
@@ -371,9 +348,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_rentalWithProperty_populatesExpenses() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "123 Main St",
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
@@ -405,9 +380,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_rentalWithLoan_populatesMortgageInterest() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "456 Oak Ave",
                 new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
@@ -439,9 +412,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withMortgagedProperty_setsMortgagePrincipalOnIncomeSource() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "456 Oak Ave",
                 new BigDecimal("400000"), LocalDate.of(2020, 1, 1),
@@ -478,9 +449,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_rentalNoProperty_expensesRemainNull() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Hypothetical Rental", "rental_property",
@@ -504,9 +473,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_nonRentalWithProperty_expensesRemainNull() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "789 Elm St",
                 new BigDecimal("500000"), LocalDate.of(2020, 1, 1),
@@ -557,9 +524,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withoutSpouseBirthYear_buildsSingleHousehold() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1968}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"birth_year\":1968}");
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -573,9 +538,8 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withSpouseBirthYear_buildsTwoPersonHousehold() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+        var scenario = ScenarioMother.scenarioWithParams(
+                tenant, "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -589,8 +553,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withExplicitDeathAges_usesExplicitValues() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
+        var scenario = ScenarioMother.scenarioWithParams(tenant,
                 "{\"birth_year\":1968,\"spouse_birth_year\":1970,"
                         + "\"primary_death_age\":88,\"spouse_death_age\":92}");
 
@@ -605,9 +568,8 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withoutExplicitDeathAges_usesSsaDefaults() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
-                "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
+        var scenario = ScenarioMother.scenarioWithParams(
+                tenant, "{\"birth_year\":1968,\"spouse_birth_year\":1970}");
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -625,8 +587,7 @@ class ProjectionInputBuilderTest {
         // endAge=90, birthYear=1968 -> horizonEndYear = 2058. Primary dies at 80 (2048, within
         // horizon, the first death -> transitionYear). Spouse (born 2000) dies at 90 (2090, well
         // beyond the horizon) -> secondDeathYear is clamped to empty per HouseholdContext#of.
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90, new BigDecimal("0.03"),
+        var scenario = ScenarioMother.scenarioWithParams(tenant,
                 "{\"birth_year\":1968,\"spouse_birth_year\":2000,\"spouse_death_age\":90,"
                         + "\"primary_death_age\":80}");
 
@@ -641,9 +602,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_ownerPersisted_passesThroughToInput() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "traditional");
@@ -660,9 +619,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toAccountInput_ownerNotSet_defaultsToPrimary() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, null, new BigDecimal("100000"),
                 new BigDecimal("5000"), new BigDecimal("0.07"), "taxable");
@@ -678,9 +635,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toIncomeSourceInput_ownerAndSurvivorPercentPersisted_passesThrough() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var incomeSource = new IncomeSourceEntity(
                 tenant, "Pension", "pension",
@@ -704,9 +659,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withGuardrailProfile_loadsGuardrailSpending() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var guardrailEntity = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
@@ -735,9 +688,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withoutGuardrailProfile_returnsNullGuardrailSpending() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         // No guardrail profile set
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
@@ -750,9 +701,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withGuardrailProfileButRepoReturnsEmpty_returnsNullGuardrailSpending() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var guardrailEntity = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));
@@ -772,9 +721,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withProperties_populatesPropertyInputs() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -808,9 +755,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withNoProperties_returnsEmptyPropertyList() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -824,9 +769,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void toIncomeSourceInput_costSegProperty_populatesDepreciationByYear() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var property = new PropertyEntity(tenant, "Beryl St",
                 new BigDecimal("500000"), LocalDate.of(2021, 7, 1),
@@ -873,9 +816,7 @@ class ProjectionInputBuilderTest {
     @Test
     void buildWithMetadata_linkedAccountWithUnknownSymbol_returnsNonEmptyUnclassifiedSymbols() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "taxable");
@@ -897,9 +838,7 @@ class ProjectionInputBuilderTest {
     @Test
     void buildWithMetadata_allSymbolsClassified_returnsEmptyUnclassifiedSymbols() {
         var linkedAccount = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct = new ProjectionAccountEntity(
                 scenario, linkedAccount, null,
                 new BigDecimal("0"), null, "taxable");
@@ -919,9 +858,7 @@ class ProjectionInputBuilderTest {
     void buildWithMetadata_multipleLinkedAccounts_unionsAndDedupesUnclassifiedSymbols() {
         var linkedAccount1 = new AccountEntity(tenant, "Brokerage", "brokerage", "Fidelity");
         var linkedAccount2 = new AccountEntity(tenant, "IRA", "ira", "Vanguard");
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         var projAcct1 = new ProjectionAccountEntity(
                 scenario, linkedAccount1, null,
                 new BigDecimal("0"), null, "taxable");
@@ -951,9 +888,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_delegatesToWithMetadata_returnsSameInput() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         when(scenarioIncomeSourceRepository.findByScenario_Id(scenario.getId()))
                 .thenReturn(List.of());
@@ -966,9 +901,7 @@ class ProjectionInputBuilderTest {
 
     @Test
     void build_withMalformedGuardrailJson_returnsNullGuardrailSpending() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
 
         var guardrailEntity = new GuardrailSpendingProfileEntity(
                 tenant, scenario, "Guardrail", new BigDecimal("30000"));

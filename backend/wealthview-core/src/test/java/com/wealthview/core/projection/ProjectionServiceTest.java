@@ -20,6 +20,7 @@ import com.wealthview.core.projection.dto.ProjectionInputResult;
 import com.wealthview.core.projection.dto.ProjectionResultResponse;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.tax.StateTaxCalculatorFactory;
+import com.wealthview.core.testutil.ScenarioMother;
 import com.wealthview.persistence.entity.ProjectionScenarioEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.repository.ProjectionScenarioRepository;
@@ -102,9 +103,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_exists_delegatesToEngine() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -130,9 +129,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_delegatesToInputBuilder() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -152,9 +149,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_unclassifiedSymbolsFromBuilder_surfacedInResult() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -175,9 +170,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_unsupportedState_surfacesWarningOnResult() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"state\": \"NY\"}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"state\": \"NY\"}");
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -198,9 +191,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_supportedState_noWarningsOnResult() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), "{\"state\": \"CA\"}");
+        var scenario = ScenarioMother.scenarioWithParams(tenant, "{\"state\": \"CA\"}");
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
@@ -220,9 +211,7 @@ class ProjectionServiceTest {
 
     @Test
     void runProjection_noParams_noWarningsOnResult() {
-        var scenario = new ProjectionScenarioEntity(
-                tenant, "Plan", LocalDate.of(2055, 1, 1), 90,
-                new BigDecimal("0.03"), null);
+        var scenario = ScenarioMother.scenario(tenant);
         when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
                 .thenReturn(Optional.of(scenario));
 
