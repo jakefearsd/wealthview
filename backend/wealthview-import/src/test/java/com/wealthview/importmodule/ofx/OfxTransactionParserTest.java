@@ -8,6 +8,11 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class OfxTransactionParserTest {
@@ -256,7 +261,7 @@ class OfxTransactionParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("buy");
+        assertThat(txn.type()).isEqualTo(BUY);
         assertThat(txn.symbol()).isEqualTo("AAPL");
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 10));
         assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("10"));
@@ -270,7 +275,7 @@ class OfxTransactionParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("sell");
+        assertThat(txn.type()).isEqualTo(SELL);
         assertThat(txn.symbol()).isEqualTo("AAPL");
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 12));
         assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("5"));
@@ -283,7 +288,7 @@ class OfxTransactionParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.type()).isEqualTo(DIVIDEND);
         assertThat(txn.symbol()).isEqualTo("AAPL");
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 20));
         assertThat(txn.quantity()).isNull();
@@ -297,13 +302,13 @@ class OfxTransactionParserTest {
         assertThat(result.transactions()).hasSize(2);
 
         var deposit = result.transactions().get(0);
-        assertThat(deposit.type()).isEqualTo("deposit");
+        assertThat(deposit.type()).isEqualTo(DEPOSIT);
         assertThat(deposit.date()).isEqualTo(LocalDate.of(2025, 1, 5));
         assertThat(deposit.amount()).isEqualByComparingTo(new BigDecimal("5000.00"));
         assertThat(deposit.symbol()).isNull();
 
         var withdrawal = result.transactions().get(1);
-        assertThat(withdrawal.type()).isEqualTo("withdrawal");
+        assertThat(withdrawal.type()).isEqualTo(WITHDRAWAL);
         assertThat(withdrawal.date()).isEqualTo(LocalDate.of(2025, 1, 10));
         assertThat(withdrawal.amount()).isEqualByComparingTo(new BigDecimal("500.00"));
     }

@@ -28,6 +28,8 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.OPENING_BALANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -73,7 +75,7 @@ class PositionImportServiceTest {
         setupAccountMock();
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2026, 3, 5), "opening_balance", "AMZN",
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), OPENING_BALANCE, "AMZN",
                         new BigDecimal("1100"), new BigDecimal("112324.74")));
         var parseResult = new ImportParseResult(transactions, List.of());
         when(importService.resolveParser("generic")).thenReturn(is -> parseResult);
@@ -96,9 +98,9 @@ class PositionImportServiceTest {
         setupAccountMock();
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2026, 3, 5), "opening_balance", "AMZN",
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), OPENING_BALANCE, "AMZN",
                         new BigDecimal("1100"), new BigDecimal("112324.74")),
-                new ParsedTransaction(LocalDate.of(2026, 3, 5), "deposit", null,
+                new ParsedTransaction(LocalDate.of(2026, 3, 5), DEPOSIT, null,
                         null, new BigDecimal("704.82")));
         var parseResult = new ImportParseResult(transactions, List.of());
         when(importService.resolveParser("fidelityPositions")).thenReturn(is -> parseResult);

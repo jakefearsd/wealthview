@@ -13,6 +13,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 
 public interface TransactionRepository extends JpaRepository<TransactionEntity, UUID> {
 
@@ -40,18 +41,30 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
                                          @Param("accountId") UUID accountId,
                                          @Param("hashes") Set<String> hashes);
 
+    /**
+     * Net cash balance of an account: deposits add, every other transaction type subtracts.
+     * The {@code creditType} parameter exists only so the sign convention is expressed with
+     * {@link TransactionType#DEPOSIT} rather than a JPQL string literal that no compiler
+     * checks — callers use the two-argument overload below.
+     */
     @Query("""
             SELECT COALESCE(
-                SUM(CASE WHEN t.type = 'deposit' THEN t.amount ELSE -t.amount END),
+                SUM(CASE WHEN t.type = :creditType THEN t.amount ELSE -t.amount END),
                 0)
             FROM TransactionEntity t
             WHERE t.account.id = :accountId AND t.tenant.id = :tenantId
             """)
-    BigDecimal computeBalance(@Param("accountId") UUID accountId, @Param("tenantId") UUID tenantId);
+    BigDecimal computeBalance(@Param("accountId") UUID accountId, @Param("tenantId") UUID tenantId,
+                              @Param("creditType") TransactionType creditType);
 
+    default BigDecimal computeBalance(UUID accountId, UUID tenantId) {
+        return computeBalance(accountId, tenantId, TransactionType.DEPOSIT);
+    }
+
+    /** Batch form of {@link #computeBalance}; see that method for the sign convention. */
     @Query("""
             SELECT t.account.id, COALESCE(
-                SUM(CASE WHEN t.type = 'deposit' THEN t.amount ELSE -t.amount END),
+                SUM(CASE WHEN t.type = :creditType THEN t.amount ELSE -t.amount END),
                 0)
             FROM TransactionEntity t
             WHERE t.tenant.id = :tenantId
@@ -59,7 +72,12 @@ public interface TransactionRepository extends JpaRepository<TransactionEntity, 
             GROUP BY t.account.id
             """)
     List<Object[]> computeBalancesByAccountIds(@Param("tenantId") UUID tenantId,
-                                               @Param("accountIds") List<UUID> accountIds);
+                                               @Param("accountIds") List<UUID> accountIds,
+                                               @Param("creditType") TransactionType creditType);
+
+    default List<Object[]> computeBalancesByAccountIds(UUID tenantId, List<UUID> accountIds) {
+        return computeBalancesByAccountIds(tenantId, accountIds, TransactionType.DEPOSIT);
+    }
 
     void deleteByAccount_IdAndTenant_Id(UUID accountId, UUID tenantId);
 

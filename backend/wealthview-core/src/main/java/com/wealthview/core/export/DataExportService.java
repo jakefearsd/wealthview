@@ -80,7 +80,7 @@ public class DataExportService {
                         String.valueOf(t.getId()),
                         String.valueOf(t.getAccountId()),
                         String.valueOf(t.getDate()),
-                        csvEscape(t.getType()),
+                        csvEscape(t.getType().value()),
                         t.getSymbol() != null ? t.getSymbol() : "",
                         t.getQuantity() != null ? t.getQuantity().toString() : "",
                         t.getAmount().toString(),

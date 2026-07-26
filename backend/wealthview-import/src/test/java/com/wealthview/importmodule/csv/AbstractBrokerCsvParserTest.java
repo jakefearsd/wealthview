@@ -14,7 +14,10 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -45,7 +48,7 @@ class AbstractBrokerCsvParserTest {
                 return;
             }
 
-            var type = record.get("Type");
+            var type = TransactionType.fromValue(record.get("Type"));
             var symbol = parseOptionalSymbol(record.get("Symbol"));
             var amount = parseOptionalAmount(record.get("Amount"));
             transactions.add(new ParsedTransaction(date, type, symbol, null, amount));
@@ -283,13 +286,13 @@ class AbstractBrokerCsvParserTest {
 
         var first = result.transactions().get(0);
         assertThat(first.date()).isEqualTo(LocalDate.of(2025, 1, 15));
-        assertThat(first.type()).isEqualTo("buy");
+        assertThat(first.type()).isEqualTo(BUY);
         assertThat(first.symbol()).isEqualTo("AAPL");
         assertThat(first.amount()).isEqualByComparingTo(new BigDecimal("1500.00"));
 
         var second = result.transactions().get(1);
         assertThat(second.date()).isEqualTo(LocalDate.of(2025, 2, 20));
-        assertThat(second.type()).isEqualTo("sell");
+        assertThat(second.type()).isEqualTo(SELL);
         assertThat(second.symbol()).isEqualTo("GOOG");
         assertThat(second.amount()).isEqualByComparingTo(new BigDecimal("2000.00"));
     }
@@ -375,7 +378,7 @@ class AbstractBrokerCsvParserTest {
     void parse_emptyAmountField_returnsNullAmount() throws IOException {
         var csv = """
                 Date,Type,Symbol,Amount
-                01/15/2025,fee,AAPL,
+                01/15/2025,dividend,AAPL,
                 """;
 
         var result = parser.parse(new StringReader(csv));

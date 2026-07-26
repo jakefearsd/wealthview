@@ -9,6 +9,8 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.OPENING_BALANCE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FidelityPositionsCsvParserTest {
@@ -35,7 +37,7 @@ class FidelityPositionsCsvParserTest {
 
         var amzn = result.transactions().get(0);
         assertThat(amzn.symbol()).isEqualTo("AMZN");
-        assertThat(amzn.type()).isEqualTo("opening_balance");
+        assertThat(amzn.type()).isEqualTo(OPENING_BALANCE);
         assertThat(amzn.quantity()).isEqualByComparingTo(new BigDecimal("50"));
         assertThat(amzn.amount()).isEqualByComparingTo(new BigDecimal("8000.00"));
         assertThat(amzn.date()).isEqualTo(LocalDate.of(2026, 3, 5));
@@ -73,7 +75,7 @@ class FidelityPositionsCsvParserTest {
         assertThat(result.transactions()).hasSize(2);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("AMZN");
         var fcash = result.transactions().get(1);
-        assertThat(fcash.type()).isEqualTo("deposit");
+        assertThat(fcash.type()).isEqualTo(DEPOSIT);
         assertThat(fcash.symbol()).isNull();
         assertThat(fcash.amount()).isEqualByComparingTo(new BigDecimal("1500.00"));
     }
@@ -163,7 +165,7 @@ class FidelityPositionsCsvParserTest {
         assertThat(result.transactions()).hasSize(6);
 
         var fcash = result.transactions().stream()
-                .filter(t -> t.type().equals("deposit")).findFirst().orElseThrow();
+                .filter(t -> t.type() == DEPOSIT).findFirst().orElseThrow();
         assertThat(fcash.symbol()).isNull();
         assertThat(fcash.quantity()).isNull();
         assertThat(fcash.amount()).isEqualByComparingTo(new BigDecimal("704.82"));
@@ -171,13 +173,13 @@ class FidelityPositionsCsvParserTest {
 
         var amzn = result.transactions().stream()
                 .filter(t -> "AMZN".equals(t.symbol())).findFirst().orElseThrow();
-        assertThat(amzn.type()).isEqualTo("opening_balance");
+        assertThat(amzn.type()).isEqualTo(OPENING_BALANCE);
         assertThat(amzn.quantity()).isEqualByComparingTo(new BigDecimal("1100"));
         assertThat(amzn.amount()).isEqualByComparingTo(new BigDecimal("112324.74"));
 
         var spaxx = result.transactions().stream()
                 .filter(t -> "SPAXX".equals(t.symbol())).findFirst().orElseThrow();
-        assertThat(spaxx.type()).isEqualTo("opening_balance");
+        assertThat(spaxx.type()).isEqualTo(OPENING_BALANCE);
         assertThat(spaxx.quantity()).isEqualByComparingTo(new BigDecimal("196049.86"));
         assertThat(spaxx.amount()).isEqualByComparingTo(new BigDecimal("196049.86"));
 
@@ -199,7 +201,7 @@ class FidelityPositionsCsvParserTest {
 
         assertThat(result.transactions()).hasSize(2);
         var deposit = result.transactions().get(0);
-        assertThat(deposit.type()).isEqualTo("deposit");
+        assertThat(deposit.type()).isEqualTo(DEPOSIT);
         assertThat(deposit.symbol()).isNull();
         assertThat(deposit.quantity()).isNull();
         assertThat(deposit.amount()).isEqualByComparingTo(new BigDecimal("1500.00"));

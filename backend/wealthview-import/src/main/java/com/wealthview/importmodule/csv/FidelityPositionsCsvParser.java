@@ -26,6 +26,7 @@ import com.wealthview.core.importservice.ImportParser;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 
 @Component("fidelityPositionsCsvParser")
 public class FidelityPositionsCsvParser implements ImportParser {
@@ -82,7 +83,8 @@ public class FidelityPositionsCsvParser implements ImportParser {
                         var currentValueStr = record.get("Current Value");
                         if (currentValueStr != null && !currentValueStr.isBlank()) {
                             BigDecimal cashAmount = parseAmount(currentValueStr);
-                            transactions.add(new ParsedTransaction(snapshotDate, "deposit", null, null, cashAmount));
+                            transactions.add(new ParsedTransaction(
+                                    snapshotDate, TransactionType.DEPOSIT, null, null, cashAmount));
                         }
                         continue;
                     }
@@ -104,7 +106,7 @@ public class FidelityPositionsCsvParser implements ImportParser {
                     }
 
                     transactions.add(new ParsedTransaction(
-                            snapshotDate, "opening_balance", symbol, quantity, costBasis));
+                            snapshotDate, TransactionType.OPENING_BALANCE, symbol, quantity, costBasis));
 
                 } catch (Exception e) {
                     errors.add(new CsvRowError(rowNum, "Error parsing row: " + e.getMessage()));

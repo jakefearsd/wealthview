@@ -97,35 +97,41 @@ public class HoldingsComputationService {
     private record AggregatedPosition(BigDecimal netQuantity, BigDecimal totalCost) {
         private static final AggregatedPosition FLAT =
                 new AggregatedPosition(BigDecimal.ZERO, BigDecimal.ZERO);
+
+        private AggregatedPosition acquire(BigDecimal quantity, BigDecimal cost) {
+            return new AggregatedPosition(netQuantity.add(quantity), totalCost.add(cost));
+        }
+
+        /** Average-cost disposal: the remaining basis follows the remaining share count. */
+        private AggregatedPosition dispose(BigDecimal quantity) {
+            if (netQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+                return this;
+            }
+            var avgCost = totalCost.divide(netQuantity, 4, RoundingMode.HALF_UP);
+            var remaining = netQuantity.subtract(quantity);
+            return new AggregatedPosition(remaining,
+                    remaining.multiply(avgCost).setScale(Money.SCALE, Money.ROUNDING));
+        }
     }
 
     private AggregatedPosition aggregateTransactions(List<TransactionEntity> transactions) {
-        var netQuantity = BigDecimal.ZERO;
-        var totalCost = BigDecimal.ZERO;
+        var position = AggregatedPosition.FLAT;
 
         for (var txn : transactions) {
-            switch (txn.getType()) {
-                case "buy", "opening_balance" -> {
-                    netQuantity = netQuantity.add(txn.getQuantity());
-                    totalCost = totalCost.add(txn.getAmount());
-                }
-                case "sell" -> {
-                    if (netQuantity.compareTo(BigDecimal.ZERO) > 0) {
-                        var avgCost = totalCost.divide(netQuantity, 4, RoundingMode.HALF_UP);
-                        netQuantity = netQuantity.subtract(txn.getQuantity());
-                        totalCost = netQuantity.multiply(avgCost).setScale(Money.SCALE, Money.ROUNDING);
-                    }
-                }
-                default -> {
-                    // dividend, deposit, withdrawal don't affect quantity
-                }
-            }
+            // Exhaustive over TransactionType with no default branch: adding a constant to the
+            // enum becomes a compile error here instead of silently falling into "ignore".
+            position = switch (txn.getType()) {
+                case BUY, OPENING_BALANCE -> position.acquire(txn.getQuantity(), txn.getAmount());
+                case SELL -> position.dispose(txn.getQuantity());
+                // Cash-only movements change the account balance, never the share count.
+                case DIVIDEND, DEPOSIT, WITHDRAWAL -> position;
+            };
         }
 
-        if (netQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+        if (position.netQuantity().compareTo(BigDecimal.ZERO) <= 0) {
             return AggregatedPosition.FLAT;
         }
-        return new AggregatedPosition(netQuantity, totalCost);
+        return position;
     }
 
     private void saveOrUpdateHolding(java.util.Optional<HoldingEntity> existingHolding,

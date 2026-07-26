@@ -21,9 +21,14 @@ import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.HoldingEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.OPENING_BALANCE;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -59,7 +64,7 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_singleBuy_setsQuantityAndCostBasis() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -76,9 +81,9 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_buyThenSell_calculatesNetQuantity() {
-        var buy = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var buy = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
-        var sell = new TransactionEntity(account, tenant, LocalDate.now(), "sell", "AAPL",
+        var sell = new TransactionEntity(account, tenant, LocalDate.now(), SELL, "AAPL",
                 new BigDecimal("3"), new BigDecimal("600.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -94,9 +99,9 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_multipleBuysAtDifferentPrices_calculatesAverageCostBasis() {
-        var buy1 = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var buy1 = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1000.0000"));
-        var buy2 = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var buy2 = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("2000.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -113,9 +118,9 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_allSold_setsQuantityToZero() {
-        var buy = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var buy = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
-        var sell = new TransactionEntity(account, tenant, LocalDate.now(), "sell", "AAPL",
+        var sell = new TransactionEntity(account, tenant, LocalDate.now(), SELL, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1800.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -142,9 +147,9 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_dividendTransaction_doesNotAffectQuantity() {
-        var buy = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var buy = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
-        var div = new TransactionEntity(account, tenant, LocalDate.now(), "dividend", "AAPL",
+        var div = new TransactionEntity(account, tenant, LocalDate.now(), DIVIDEND, "AAPL",
                 null, new BigDecimal("50.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -168,7 +173,7 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeForAccountAndSymbol_newHolding_publishesEvent() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -184,7 +189,7 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeHoldings_withOpeningBalance_calculatesQuantityAndCostBasis() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "opening_balance", "VOO",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), OPENING_BALANCE, "VOO",
                 new BigDecimal("20"), new BigDecimal("9000.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -201,7 +206,7 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeForAccountAndSymbol_moneyMarketSymbol_setsMoneyMarketFlag() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "opening_balance", "SPAXX",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), OPENING_BALANCE, "SPAXX",
                 new BigDecimal("196049.86"), new BigDecimal("196049.86"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -218,7 +223,7 @@ class HoldingsComputationServiceTest {
 
     @Test
     void recomputeForAccountAndSymbol_regularSymbol_moneyMarketFlagFalse() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
         when(holdingRepository.findByAccount_IdAndSymbol(any(), any())).thenReturn(Optional.empty());
@@ -242,9 +247,9 @@ class HoldingsComputationServiceTest {
         ReflectionTestUtils.setField(account2, "id", account2Id);
 
         // Three transactions across two accounts — `account` appears twice.
-        var txnA1 = txWithAccount(account, tenant, "buy", "AAPL");
-        var txnA2 = txWithAccount(account, tenant, "buy", "AAPL");
-        var txnB1 = txWithAccount(account2, tenant, "buy", "AAPL");
+        var txnA1 = txWithAccount(account, tenant, BUY, "AAPL");
+        var txnA2 = txWithAccount(account, tenant, BUY, "AAPL");
+        var txnB1 = txWithAccount(account2, tenant, BUY, "AAPL");
 
         when(transactionRepository.findByTenant_IdAndSymbol(tenantId, "AAPL"))
                 .thenReturn(List.of(txnA1, txnA2, txnB1));
@@ -272,14 +277,14 @@ class HoldingsComputationServiceTest {
     }
 
     private TransactionEntity txWithAccount(AccountEntity acct, TenantEntity tnt,
-                                            String type, String symbol) {
+                                            TransactionType type, String symbol) {
         return new TransactionEntity(acct, tnt, LocalDate.now(), type, symbol,
                 new BigDecimal("1"), new BigDecimal("100.0000"));
     }
 
     @Test
     void recomputeForAccountAndSymbol_existingHolding_doesNotPublishEvent() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500.0000"));
 
         var existing = new HoldingEntity(account, tenant, "AAPL",

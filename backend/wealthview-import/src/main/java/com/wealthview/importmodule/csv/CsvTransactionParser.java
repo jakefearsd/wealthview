@@ -9,8 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Set;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -20,13 +18,11 @@ import com.wealthview.core.importservice.ImportParser;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 
 @Component
 @org.springframework.context.annotation.Primary
 public class CsvTransactionParser implements ImportParser {
-
-    private static final Set<String> VALID_TYPES = Set.of(
-            "buy", "sell", "dividend", "deposit", "withdrawal");
 
     @Override
     public ImportParseResult parse(InputStream inputStream) throws IOException {
@@ -49,7 +45,7 @@ public class CsvTransactionParser implements ImportParser {
                 rowNum++;
                 try {
                     var dateStr = record.get("date");
-                    var type = record.get("type").toLowerCase(Locale.US);
+                    var typeStr = record.get("type");
                     var symbol = record.get("symbol");
                     var quantityStr = record.get("quantity");
                     var amountStr = record.get("amount");
@@ -67,8 +63,19 @@ public class CsvTransactionParser implements ImportParser {
                         continue;
                     }
 
-                    if (!VALID_TYPES.contains(type)) {
-                        errors.add(new CsvRowError(rowNum, "Invalid transaction type: " + type));
+                    // Validate through TransactionType.fromValue (case-tolerant). An unknown
+                    // token stays a per-row error rather than failing the whole file.
+                    // opening_balance is still rejected here to preserve existing behavior;
+                    // accepting it is a separate behavior change.
+                    TransactionType type;
+                    try {
+                        type = TransactionType.fromValue(typeStr);
+                    } catch (IllegalArgumentException e) {
+                        errors.add(new CsvRowError(rowNum, "Invalid transaction type: " + typeStr));
+                        continue;
+                    }
+                    if (type == TransactionType.OPENING_BALANCE) {
+                        errors.add(new CsvRowError(rowNum, "Invalid transaction type: " + typeStr));
                         continue;
                     }
 

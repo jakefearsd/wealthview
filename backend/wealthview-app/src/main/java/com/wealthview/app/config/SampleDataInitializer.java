@@ -20,6 +20,7 @@ import com.wealthview.app.config.DemoDataSeeder.IncomeSpec;
 import com.wealthview.app.config.DemoDataSeeder.TxnSpec;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.TransactionType;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.TenantRepository;
 import com.wealthview.persistence.repository.UserRepository;
@@ -83,7 +84,7 @@ public class SampleDataInitializer implements ApplicationRunner {
                 buyTxn("2023-09-12", "GOOG", "50", "6700.00"),
                 buyTxn("2022-11-01", "VOO", "20", "7200.00"),
                 buyTxn("2024-04-15", "VOO", "10", "4950.00"),
-                new TxnSpec(LocalDate.parse("2025-01-08"), "sell", "GOOG",
+                new TxnSpec(LocalDate.parse("2025-01-08"), TransactionType.SELL, "GOOG",
                         new BigDecimal("20"), new BigDecimal("3900.00"))));
     }
 
@@ -102,20 +103,20 @@ public class SampleDataInitializer implements ApplicationRunner {
 
     private void seedBankAccount(TenantEntity tenant) {
         demoDataSeeder.seedAccount(tenant, "Chase Checking", "bank", "Chase", List.of(
-                cashTxn("2025-01-01", "deposit", "8500.00"),
-                cashTxn("2025-01-15", "deposit", "8500.00"),
-                cashTxn("2025-02-01", "deposit", "8500.00"),
-                cashTxn("2025-02-15", "deposit", "8500.00"),
-                cashTxn("2025-01-05", "withdrawal", "3200.00"),
-                cashTxn("2025-02-05", "withdrawal", "3200.00")));
+                cashTxn("2025-01-01", TransactionType.DEPOSIT, "8500.00"),
+                cashTxn("2025-01-15", TransactionType.DEPOSIT, "8500.00"),
+                cashTxn("2025-02-01", TransactionType.DEPOSIT, "8500.00"),
+                cashTxn("2025-02-15", TransactionType.DEPOSIT, "8500.00"),
+                cashTxn("2025-01-05", TransactionType.WITHDRAWAL, "3200.00"),
+                cashTxn("2025-02-05", TransactionType.WITHDRAWAL, "3200.00")));
     }
 
     private static TxnSpec buyTxn(String date, String symbol, String quantity, String amount) {
-        return new TxnSpec(LocalDate.parse(date), "buy", symbol,
+        return new TxnSpec(LocalDate.parse(date), TransactionType.BUY, symbol,
                 new BigDecimal(quantity), new BigDecimal(amount));
     }
 
-    private static TxnSpec cashTxn(String date, String type, String amount) {
+    private static TxnSpec cashTxn(String date, TransactionType type, String amount) {
         return new TxnSpec(LocalDate.parse(date), type, null, null, new BigDecimal(amount));
     }
 

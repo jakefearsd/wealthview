@@ -37,6 +37,15 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- Annotations only (no databind): TransactionType carries @JsonValue/@JsonCreator so
+             the enum owns its wire format for every module that serialises it. Jackson 3 keeps
+             annotations at the 2.x com.fasterxml.jackson.core coordinates (tools.jackson.core
+             is the databind/core split), and the Boot BOM manages the version. This does NOT
+             make persistence depend on a serialisation runtime. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
         <!-- Boot 4 moved the @DataJpaTest slice (plus @AutoConfigureTestDatabase
              and TestEntityManager) out of spring-boot-starter-test into dedicated
              test-slice modules. This starter restores them for the repository

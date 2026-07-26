@@ -23,6 +23,7 @@ import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
@@ -59,7 +60,7 @@ class DataExportServiceTest {
     void exportAsJson_returnsAllTenantData() {
         var holding = new HoldingEntity(account, tenant, "AAPL", new BigDecimal("10"), new BigDecimal("1500"));
         var transaction = new TransactionEntity(account, tenant, LocalDate.of(2024, 1, 15),
-                "buy", "AAPL", new BigDecimal("10"), new BigDecimal("1500"));
+                BUY, "AAPL", new BigDecimal("10"), new BigDecimal("1500"));
         var property = new PropertyEntity(tenant, "123 Main St",
                 new BigDecimal("300000"), LocalDate.of(2020, 6, 1),
                 new BigDecimal("350000"), new BigDecimal("200000"));
@@ -109,7 +110,7 @@ class DataExportServiceTest {
     @Test
     void exportTransactionsCsv_containsHeaderAndData() {
         var transaction = new TransactionEntity(account, tenant, LocalDate.of(2024, 1, 15),
-                "buy", "AAPL", new BigDecimal("10"), new BigDecimal("1500"));
+                BUY, "AAPL", new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(transaction));
 
         String csv = dataExportService.exportTransactionsCsv(tenantId);

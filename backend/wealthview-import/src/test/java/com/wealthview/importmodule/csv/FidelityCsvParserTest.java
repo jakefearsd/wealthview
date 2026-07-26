@@ -9,6 +9,10 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class FidelityCsvParserTest {
@@ -39,7 +43,7 @@ class FidelityCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("AAPL");
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
     }
 
     @Test
@@ -52,7 +56,7 @@ class FidelityCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("VTI");
         assertThat(result.transactions().get(0).quantity()).isEqualByComparingTo(new BigDecimal("0.5"));
     }
@@ -81,9 +85,9 @@ class FidelityCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(2);
-        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DEPOSIT);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("5000.00"));
-        assertThat(result.transactions().get(1).type()).isEqualTo("withdrawal");
+        assertThat(result.transactions().get(1).type()).isEqualTo(WITHDRAWAL);
         assertThat(result.transactions().get(1).amount()).isEqualByComparingTo(new BigDecimal("3000.00"));
     }
 
@@ -97,7 +101,7 @@ class FidelityCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DIVIDEND);
         assertThat(result.transactions().get(0).quantity()).isNull();
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("24.50"));
     }

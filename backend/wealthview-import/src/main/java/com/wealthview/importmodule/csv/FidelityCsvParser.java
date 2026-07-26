@@ -13,17 +13,18 @@ import org.springframework.stereotype.Component;
 
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 
 @Component("fidelityCsvParser")
 public class FidelityCsvParser extends AbstractBrokerCsvParser {
 
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("MM/dd/yyyy");
     private static final String HEADER_MARKER = "Run Date";
-    private static final Map<String, String> ACTION_MAP = Map.of(
-            "YOU BOUGHT", "buy",
-            "REINVESTMENT", "buy",
-            "YOU SOLD", "sell",
-            "DIVIDEND RECEIVED", "dividend"
+    private static final Map<String, TransactionType> ACTION_MAP = Map.of(
+            "YOU BOUGHT", TransactionType.BUY,
+            "REINVESTMENT", TransactionType.BUY,
+            "YOU SOLD", TransactionType.SELL,
+            "DIVIDEND RECEIVED", TransactionType.DIVIDEND
     );
 
     @Override
@@ -62,7 +63,7 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
         addTransaction(date, type, amount, record, transactions);
     }
 
-    String mapAction(String action, BigDecimal amount) {
+    TransactionType mapAction(String action, BigDecimal amount) {
         if (action == null) {
             return null;
         }
@@ -74,7 +75,8 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
         }
 
         if ("ELECTRONIC FUNDS TRANSFER".equals(upper)) {
-            return (amount != null && amount.compareTo(BigDecimal.ZERO) < 0) ? "withdrawal" : "deposit";
+            return (amount != null && amount.compareTo(BigDecimal.ZERO) < 0)
+                    ? TransactionType.WITHDRAWAL : TransactionType.DEPOSIT;
         }
 
         return null;

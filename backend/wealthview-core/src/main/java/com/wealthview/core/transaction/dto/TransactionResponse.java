@@ -6,12 +6,13 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 
 public record TransactionResponse(
         UUID id,
         UUID accountId,
         LocalDate date,
-        String type,
+        TransactionType type,
         String symbol,
         BigDecimal quantity,
         BigDecimal amount,

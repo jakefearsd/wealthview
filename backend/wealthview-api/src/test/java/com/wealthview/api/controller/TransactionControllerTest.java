@@ -28,6 +28,7 @@ import com.wealthview.core.transaction.dto.TransactionResponse;
 import tools.jackson.databind.ObjectMapper;
 
 import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
+import static com.wealthview.persistence.entity.TransactionType.BUY;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -65,7 +66,7 @@ class TransactionControllerTest {
 
     private TransactionResponse sampleResponse() {
         return new TransactionResponse(TXN_ID, ACCOUNT_ID, LocalDate.of(2025, 1, 15),
-                "buy", "AAPL", new BigDecimal("10"), new BigDecimal("1500.00"), OffsetDateTime.now());
+                BUY, "AAPL", new BigDecimal("10"), new BigDecimal("1500.00"), OffsetDateTime.now());
     }
 
     @Test

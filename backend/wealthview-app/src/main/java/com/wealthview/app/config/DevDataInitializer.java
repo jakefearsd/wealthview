@@ -23,6 +23,7 @@ import com.wealthview.persistence.entity.InviteCodeEntity;
 import com.wealthview.persistence.entity.PriceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.TenantEntity;
+import com.wealthview.persistence.entity.TransactionType;
 import com.wealthview.persistence.entity.UserEntity;
 import com.wealthview.persistence.repository.InviteCodeRepository;
 import com.wealthview.persistence.repository.PriceRepository;
@@ -90,9 +91,9 @@ public class DevDataInitializer implements ApplicationRunner {
         demoDataSeeder.seedAccount(demoTenant, "Fidelity Brokerage", "brokerage", "Fidelity", List.of(
                 buyTxn("2025-01-10", "AAPL", "20", "3400.00"),
                 buyTxn("2025-02-15", "MSFT", "10", "4200.00"),
-                new TxnSpec(LocalDate.parse("2025-03-01"), "sell", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-03-01"), TransactionType.SELL, "AAPL",
                         new BigDecimal("5"), new BigDecimal("950.00")),
-                new TxnSpec(LocalDate.parse("2025-04-10"), "dividend", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-04-10"), TransactionType.DIVIDEND, "AAPL",
                         null, new BigDecimal("25.00"))));
 
         demoDataSeeder.seedAccount(demoTenant, "Vanguard IRA", "ira", "Vanguard", List.of(
@@ -110,11 +111,11 @@ public class DevDataInitializer implements ApplicationRunner {
                 buyTxn("2025-02-20", "MSFT", "8", "3360.00")));
 
         demoDataSeeder.seedAccount(demoTenant, "Chase Checking", "bank", "Chase", List.of(
-                cashTxn("2025-01-01", "deposit", "5000.00"),
-                cashTxn("2025-02-01", "deposit", "5000.00"),
-                cashTxn("2025-01-15", "withdrawal", "2000.00"),
-                cashTxn("2025-02-15", "withdrawal", "1500.00"),
-                cashTxn("2025-03-01", "deposit", "5000.00")));
+                cashTxn("2025-01-01", TransactionType.DEPOSIT, "5000.00"),
+                cashTxn("2025-02-01", TransactionType.DEPOSIT, "5000.00"),
+                cashTxn("2025-01-15", TransactionType.WITHDRAWAL, "2000.00"),
+                cashTxn("2025-02-15", TransactionType.WITHDRAWAL, "1500.00"),
+                cashTxn("2025-03-01", TransactionType.DEPOSIT, "5000.00")));
 
         // Prices
         priceRepository.save(new PriceEntity("AAPL", LocalDate.of(2025, 3, 1), new BigDecimal("185.50"), "manual"));
@@ -154,11 +155,11 @@ public class DevDataInitializer implements ApplicationRunner {
     }
 
     private static TxnSpec buyTxn(String date, String symbol, String quantity, String amount) {
-        return new TxnSpec(LocalDate.parse(date), "buy", symbol,
+        return new TxnSpec(LocalDate.parse(date), TransactionType.BUY, symbol,
                 new BigDecimal(quantity), new BigDecimal(amount));
     }
 
-    private static TxnSpec cashTxn(String date, String type, String amount) {
+    private static TxnSpec cashTxn(String date, TransactionType type, String amount) {
         return new TxnSpec(LocalDate.parse(date), type, null, null, new BigDecimal(amount));
     }
 

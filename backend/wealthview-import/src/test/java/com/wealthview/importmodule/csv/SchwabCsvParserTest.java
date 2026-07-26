@@ -9,6 +9,11 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SchwabCsvParserTest {
@@ -24,10 +29,10 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(8);
         assertThat(result.errors()).isEmpty();
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("AAPL");
-        assertThat(result.transactions().get(2).type()).isEqualTo("dividend");
-        assertThat(result.transactions().get(6).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(2).type()).isEqualTo(DIVIDEND);
+        assertThat(result.transactions().get(6).type()).isEqualTo(DEPOSIT);
     }
 
     @Test
@@ -43,7 +48,7 @@ class SchwabCsvParserTest {
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
         assertThat(txn.symbol()).isEqualTo("AAPL");
-        assertThat(txn.type()).isEqualTo("buy");
+        assertThat(txn.type()).isEqualTo(BUY);
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 10));
     }
 
@@ -57,7 +62,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("AAPL");
         assertThat(result.transactions().get(0).quantity()).isEqualByComparingTo(new BigDecimal("10"));
     }
@@ -73,7 +78,7 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("sell");
+        assertThat(txn.type()).isEqualTo(SELL);
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 15));
         assertThat(txn.symbol()).isEqualTo("MSFT");
         assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("5"));
@@ -102,7 +107,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DIVIDEND);
         assertThat(result.transactions().get(0).quantity()).isNull();
     }
 
@@ -117,7 +122,7 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.type()).isEqualTo(DIVIDEND);
         assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("24.50"));
         assertThat(txn.quantity()).isNull();
         assertThat(txn.symbol()).isEqualTo("AAPL");
@@ -133,7 +138,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).quantity()).isEqualByComparingTo(new BigDecimal("0.5"));
     }
 
@@ -148,7 +153,7 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("buy");
+        assertThat(txn.type()).isEqualTo(BUY);
         assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("0.1"));
         assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("25.20"));
     }
@@ -164,7 +169,7 @@ class SchwabCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.type()).isEqualTo(DIVIDEND);
         assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("3.75"));
         assertThat(txn.symbol()).isNull();
     }
@@ -179,7 +184,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DEPOSIT);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("5000.00"));
     }
 
@@ -193,7 +198,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("withdrawal");
+        assertThat(result.transactions().get(0).type()).isEqualTo(WITHDRAWAL);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("2000.00"));
     }
 
@@ -307,7 +312,7 @@ class SchwabCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DEPOSIT);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("10000.00"));
     }
 }

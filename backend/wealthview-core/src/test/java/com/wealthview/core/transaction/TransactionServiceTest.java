@@ -28,6 +28,9 @@ import com.wealthview.persistence.entity.TransactionEntity;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -75,7 +78,7 @@ class TransactionServiceTest {
 
     @Test
     void create_buyTransaction_triggersRecompute() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -91,7 +94,7 @@ class TransactionServiceTest {
 
     @Test
     void create_adjustsForSplitsBeforeRecomputingHoldings() {
-        var request = new TransactionRequest(LocalDate.of(2019, 1, 1), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.of(2019, 1, 1), BUY, "AAPL",
                 new BigDecimal("100"), new BigDecimal("8000"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -108,7 +111,7 @@ class TransactionServiceTest {
 
     @Test
     void create_depositTransaction_triggersRecomputeWithNull() {
-        var request = new TransactionRequest(LocalDate.now(), "deposit", null,
+        var request = new TransactionRequest(LocalDate.now(), DEPOSIT, null,
                 null, new BigDecimal("5000"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -123,7 +126,7 @@ class TransactionServiceTest {
 
     @Test
     void delete_existingTransaction_recomputesHoldings() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByIdAndTenant_Id(any(), eq(tenantId)))
                 .thenReturn(Optional.of(txn));
@@ -148,19 +151,19 @@ class TransactionServiceTest {
     @Test
     void update_existingTransaction_updatesFieldsAndRecomputes() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId))
                 .thenReturn(Optional.of(txn));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), "sell", "AAPL",
+        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), SELL, "AAPL",
                 new BigDecimal("5"), new BigDecimal("800"));
 
         var result = transactionService.update(tenantId, txnId, request);
 
-        assertThat(result.type()).isEqualTo("sell");
+        assertThat(result.type()).isEqualTo(SELL);
         assertThat(result.quantity()).isEqualByComparingTo(new BigDecimal("5"));
         assertThat(result.amount()).isEqualByComparingTo(new BigDecimal("800"));
         verify(holdingsComputationService).recomputeForAccountAndSymbol(eq(account), eq(tenant), eq("AAPL"));
@@ -169,14 +172,14 @@ class TransactionServiceTest {
     @Test
     void update_symbolChanged_recomputesBothSymbols() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId))
                 .thenReturn(Optional.of(txn));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), "buy", "GOOG",
+        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), BUY, "GOOG",
                 new BigDecimal("5"), new BigDecimal("800"));
 
         transactionService.update(tenantId, txnId, request);
@@ -188,14 +191,14 @@ class TransactionServiceTest {
     @Test
     void update_symbolUnchanged_recomputesOnlyOnce() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 10), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId))
                 .thenReturn(Optional.of(txn));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), BUY, "AAPL",
                 new BigDecimal("20"), new BigDecimal("3000"));
 
         transactionService.update(tenantId, txnId, request);
@@ -210,7 +213,7 @@ class TransactionServiceTest {
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId))
                 .thenReturn(Optional.empty());
 
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
 
         assertThatThrownBy(() -> transactionService.update(tenantId, txnId, request))
@@ -219,7 +222,7 @@ class TransactionServiceTest {
 
     @Test
     void create_accountNotFound_throwsAndSavesNothing() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.empty());
@@ -234,7 +237,7 @@ class TransactionServiceTest {
 
     @Test
     void create_buyTransaction_publishesAuditEventWithSymbolAndType() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -256,7 +259,7 @@ class TransactionServiceTest {
 
     @Test
     void create_depositTransaction_auditDetailsOmitNullSymbol() {
-        var request = new TransactionRequest(LocalDate.now(), "deposit", null,
+        var request = new TransactionRequest(LocalDate.now(), DEPOSIT, null,
                 null, new BigDecimal("5000"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -274,7 +277,7 @@ class TransactionServiceTest {
 
     @Test
     void createWithHash_persistsImportHashAndRecomputes() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "GOOG",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "GOOG",
                 new BigDecimal("3"), new BigDecimal("900"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -293,7 +296,7 @@ class TransactionServiceTest {
 
     @Test
     void createWithHash_accountNotFound_throws() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.empty());
@@ -307,7 +310,7 @@ class TransactionServiceTest {
 
     @Test
     void createWithHashNoRecompute_persistsHashAndSkipsRecompute() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "GOOG",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "GOOG",
                 new BigDecimal("3"), new BigDecimal("900"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.of(account));
@@ -326,7 +329,7 @@ class TransactionServiceTest {
 
     @Test
     void createWithHashNoRecompute_accountNotFound_throws() {
-        var request = new TransactionRequest(LocalDate.now(), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         when(accountRepository.findByTenant_IdAndId(tenantId, accountId))
                 .thenReturn(Optional.empty());
@@ -340,7 +343,7 @@ class TransactionServiceTest {
 
     @Test
     void listByAccount_mapsPageToResponses() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         var pageable = PageRequest.of(0, 10);
         when(transactionRepository.findByAccount_IdAndTenant_Id(accountId, tenantId, pageable))
@@ -355,7 +358,7 @@ class TransactionServiceTest {
 
     @Test
     void listByAccountAndSymbol_filtersBySymbolAndMapsPage() {
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), "sell", "MSFT",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), SELL, "MSFT",
                 new BigDecimal("2"), new BigDecimal("500"));
         var pageable = PageRequest.of(0, 5);
         when(transactionRepository.findByAccount_IdAndTenant_IdAndSymbol(accountId, tenantId, "MSFT", pageable))
@@ -370,12 +373,12 @@ class TransactionServiceTest {
     @Test
     void update_oldSymbolNull_recomputesOnlyNewSymbol() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), "deposit", null,
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), DEPOSIT, null,
                 null, new BigDecimal("500"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId)).thenReturn(Optional.of(txn));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
-        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), "buy", "AAPL",
+        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("150"));
 
         transactionService.update(tenantId, txnId, request);
@@ -387,12 +390,12 @@ class TransactionServiceTest {
     @Test
     void update_publishesUpdateAuditEventWithSymbol() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.of(2025, 1, 1), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId)).thenReturn(Optional.of(txn));
         when(transactionRepository.save(any(TransactionEntity.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
-        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), "sell", "AAPL",
+        var request = new TransactionRequest(LocalDate.of(2025, 2, 1), SELL, "AAPL",
                 new BigDecimal("1"), new BigDecimal("120"));
 
         transactionService.update(tenantId, txnId, request);
@@ -408,7 +411,7 @@ class TransactionServiceTest {
     @Test
     void delete_publishesDeleteAuditEventWithSymbol() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "buy", "AAPL",
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), BUY, "AAPL",
                 new BigDecimal("1"), new BigDecimal("100"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId)).thenReturn(Optional.of(txn));
 
@@ -423,7 +426,7 @@ class TransactionServiceTest {
     @Test
     void delete_nullSymbol_publishesEmptyDetailsMap() {
         var txnId = UUID.randomUUID();
-        var txn = new TransactionEntity(account, tenant, LocalDate.now(), "deposit", null,
+        var txn = new TransactionEntity(account, tenant, LocalDate.now(), DEPOSIT, null,
                 null, new BigDecimal("250"));
         when(transactionRepository.findByIdAndTenant_Id(txnId, tenantId)).thenReturn(Optional.of(txn));
 

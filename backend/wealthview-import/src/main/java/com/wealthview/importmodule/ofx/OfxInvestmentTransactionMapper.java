@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseBuyInvestmentTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseInvestmentTransaction;
 import com.webcohesion.ofx4j.domain.data.investment.transactions.BaseSellInvestmentTransaction;
@@ -25,14 +26,14 @@ final class OfxInvestmentTransactionMapper {
     static ParsedTransaction map(BaseInvestmentTransaction invTxn, Map<String, String> tickerMap) {
         return switch (invTxn) {
             case BaseBuyInvestmentTransaction buy -> buildBuyOrSell(buy.getSecurityId(), tickerMap,
-                    tradeDateAsInstant(buy), "buy", buy.getUnits(), buy.getTotal());
+                    tradeDateAsInstant(buy), TransactionType.BUY, buy.getUnits(), buy.getTotal());
             case BaseSellInvestmentTransaction sell -> buildBuyOrSell(sell.getSecurityId(), tickerMap,
-                    tradeDateAsInstant(sell), "sell", sell.getUnits(), sell.getTotal());
+                    tradeDateAsInstant(sell), TransactionType.SELL, sell.getUnits(), sell.getTotal());
             case ReinvestIncomeTransaction reinvest -> buildBuyOrSell(reinvest.getSecurityId(), tickerMap,
-                    tradeDateAsInstant(reinvest), "buy", reinvest.getUnits(), reinvest.getTotal());
+                    tradeDateAsInstant(reinvest), TransactionType.BUY, reinvest.getUnits(), reinvest.getTotal());
             case IncomeTransaction income -> new ParsedTransaction(
                     OfxDateUtils.toLocalDate(tradeDateAsInstant(income)),
-                    "dividend",
+                    TransactionType.DIVIDEND,
                     resolveSymbol(income.getSecurityId(), tickerMap),
                     null,
                     absOrNull(income.getTotal()));
@@ -41,7 +42,7 @@ final class OfxInvestmentTransactionMapper {
     }
 
     private static ParsedTransaction buildBuyOrSell(SecurityId secId, Map<String, String> tickerMap,
-                                                    Instant tradeDate, String type,
+                                                    Instant tradeDate, TransactionType type,
                                                     Double units, Double total) {
         return new ParsedTransaction(
                 OfxDateUtils.toLocalDate(tradeDate),

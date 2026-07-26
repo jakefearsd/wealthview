@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -35,8 +36,9 @@ public class TransactionEntity extends Auditable {
     @Column(nullable = false)
     private LocalDate date;
 
+    @Convert(converter = TransactionTypeConverter.class)
     @Column(nullable = false)
-    private String type;
+    private TransactionType type;
 
     private String symbol;
 
@@ -53,7 +55,7 @@ public class TransactionEntity extends Auditable {
     }
 
     public TransactionEntity(AccountEntity account, TenantEntity tenant, LocalDate date,
-                             String type, String symbol, BigDecimal quantity, BigDecimal amount) {
+                             TransactionType type, String symbol, BigDecimal quantity, BigDecimal amount) {
         this.account = account;
         this.tenant = tenant;
         this.date = date;
@@ -91,11 +93,11 @@ public class TransactionEntity extends Auditable {
         this.date = date;
     }
 
-    public String getType() {
+    public TransactionType getType() {
         return type;
     }
 
-    public void setType(String type) {
+    public void setType(TransactionType type) {
         this.type = type;
     }
 

@@ -21,6 +21,7 @@ import com.wealthview.core.importservice.ImportParser;
 import com.wealthview.core.importservice.dto.CsvRowError;
 import com.wealthview.core.importservice.dto.ImportParseResult;
 import com.wealthview.core.importservice.dto.ParsedTransaction;
+import com.wealthview.persistence.entity.TransactionType;
 
 /**
  * Shared base class for broker-specific CSV transaction parsers.
@@ -142,7 +143,7 @@ public abstract class AbstractBrokerCsvParser implements ImportParser {
      * normalises {@code amount} to its absolute value, then appends a {@link ParsedTransaction}.
      * Call this after the broker-specific amount and type have been resolved.
      */
-    protected void addTransaction(LocalDate date, String type, BigDecimal amount,
+    protected void addTransaction(LocalDate date, TransactionType type, BigDecimal amount,
                                    CSVRecord record,
                                    List<ParsedTransaction> transactions) {
         var quantity = parseOptionalAmount(record.get("Quantity"));

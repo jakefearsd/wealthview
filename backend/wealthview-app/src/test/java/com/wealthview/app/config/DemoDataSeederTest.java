@@ -22,6 +22,11 @@ import com.wealthview.persistence.repository.PropertyIncomeRepository;
 import com.wealthview.persistence.repository.PropertyRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -66,11 +71,11 @@ class DemoDataSeederTest {
         var tenant = new TenantEntity("Demo Family");
 
         seeder.seedAccount(tenant, "Brokerage", "brokerage", "Fidelity", List.of(
-                new TxnSpec(LocalDate.parse("2025-01-10"), "buy", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-01-10"), BUY, "AAPL",
                         new BigDecimal("20"), new BigDecimal("3400.00")),
-                new TxnSpec(LocalDate.parse("2025-03-01"), "sell", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-03-01"), SELL, "AAPL",
                         new BigDecimal("5"), new BigDecimal("950.00")),
-                new TxnSpec(LocalDate.parse("2025-04-10"), "dividend", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-04-10"), DIVIDEND, "AAPL",
                         null, new BigDecimal("25.00"))));
 
         verify(transactionRepository, times(3)).save(any(TransactionEntity.class));
@@ -81,11 +86,11 @@ class DemoDataSeederTest {
         var tenant = new TenantEntity("Demo Family");
 
         seeder.seedAccount(tenant, "Brokerage", "brokerage", "Fidelity", List.of(
-                new TxnSpec(LocalDate.parse("2025-01-10"), "buy", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-01-10"), BUY, "AAPL",
                         new BigDecimal("20"), new BigDecimal("3400.00")),
-                new TxnSpec(LocalDate.parse("2025-02-15"), "buy", "MSFT",
+                new TxnSpec(LocalDate.parse("2025-02-15"), BUY, "MSFT",
                         new BigDecimal("10"), new BigDecimal("4200.00")),
-                new TxnSpec(LocalDate.parse("2025-03-01"), "sell", "AAPL",
+                new TxnSpec(LocalDate.parse("2025-03-01"), SELL, "AAPL",
                         new BigDecimal("5"), new BigDecimal("950.00"))));
 
         // One recompute per distinct symbol — AAPL appears twice but is computed once.
@@ -100,8 +105,8 @@ class DemoDataSeederTest {
         var tenant = new TenantEntity("Demo Family");
 
         seeder.seedAccount(tenant, "Chase Checking", "bank", "Chase", List.of(
-                new TxnSpec(LocalDate.parse("2025-01-01"), "deposit", null, null, new BigDecimal("5000.00")),
-                new TxnSpec(LocalDate.parse("2025-01-15"), "withdrawal", null, null, new BigDecimal("2000.00"))));
+                new TxnSpec(LocalDate.parse("2025-01-01"), DEPOSIT, null, null, new BigDecimal("5000.00")),
+                new TxnSpec(LocalDate.parse("2025-01-15"), WITHDRAWAL, null, null, new BigDecimal("2000.00"))));
 
         verify(holdingsComputationService, never())
                 .recomputeForAccountAndSymbol(any(), any(), any());

@@ -15,7 +15,11 @@ import com.wealthview.persistence.AbstractIntegrationTest;
 import com.wealthview.persistence.entity.AccountEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
@@ -48,9 +52,9 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void computeBalance_depositsAndWithdrawals_returnsNetBalance() {
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("5000.00")));
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("3000.00")));
-        transactionRepository.save(tx(accountA, tenantA, "withdrawal", null, new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("5000.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("3000.00")));
+        transactionRepository.save(tx(accountA, tenantA, WITHDRAWAL, null, new BigDecimal("1000.00")));
 
         var balance = transactionRepository.computeBalance(accountA.getId(), tenantA.getId());
 
@@ -66,8 +70,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void computeBalance_isolatesTenants() {
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("10000.00")));
-        transactionRepository.save(tx(accountB, tenantB, "deposit", null, new BigDecimal("99999.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("10000.00")));
+        transactionRepository.save(tx(accountB, tenantB, DEPOSIT, null, new BigDecimal("99999.00")));
 
         var balanceA = transactionRepository.computeBalance(accountA.getId(), tenantA.getId());
 
@@ -82,8 +86,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
     @Test
     void computeBalancesByAccountIds_returnsBalancesForMultipleAccounts() {
         var accountA2 = accountRepository.save(new AccountEntity(tenantA, "Portfolio A2", "brokerage", "Vanguard"));
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("5000.00")));
-        transactionRepository.save(tx(accountA2, tenantA, "deposit", null, new BigDecimal("3000.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("5000.00")));
+        transactionRepository.save(tx(accountA2, tenantA, DEPOSIT, null, new BigDecimal("3000.00")));
 
         var results = transactionRepository.computeBalancesByAccountIds(
                 tenantA.getId(), List.of(accountA.getId(), accountA2.getId()));
@@ -104,11 +108,11 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findExistingImportHashes_returnsOnlyMatchingHashes() {
-        var t = tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1500.00"));
+        var t = tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1500.00"));
         t.setImportHash("hash-abc");
         transactionRepository.save(t);
 
-        var t2 = tx(accountA, tenantA, "buy", "MSFT", new BigDecimal("800.00"));
+        var t2 = tx(accountA, tenantA, BUY, "MSFT", new BigDecimal("800.00"));
         t2.setImportHash("hash-xyz");
         transactionRepository.save(t2);
 
@@ -129,7 +133,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findExistingImportHashes_isolatesTenants() {
-        var t = tx(accountB, tenantB, "buy", "AAPL", new BigDecimal("1500.00"));
+        var t = tx(accountB, tenantB, BUY, "AAPL", new BigDecimal("1500.00"));
         t.setImportHash("hash-b");
         transactionRepository.save(t);
 
@@ -146,7 +150,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void existsByTenantIdAndAccountIdAndImportHash_exists_returnsTrue() {
-        var t = tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1500.00"));
+        var t = tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1500.00"));
         t.setImportHash("check-hash");
         transactionRepository.save(t);
 
@@ -162,7 +166,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void existsByTenantIdAndAccountIdAndImportHash_wrongTenant_returnsFalse() {
-        var t = tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1500.00"));
+        var t = tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1500.00"));
         t.setImportHash("shared-hash");
         transactionRepository.save(t);
 
@@ -177,10 +181,10 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findDistinctSymbolsAcrossAllTenants_returnsDeduplicatedSymbols() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1500.00")));
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1500.00"))); // duplicate
-        transactionRepository.save(tx(accountB, tenantB, "buy", "MSFT", new BigDecimal("800.00")));
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("100.00"))); // null symbol
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1500.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1500.00"))); // duplicate
+        transactionRepository.save(tx(accountB, tenantB, BUY, "MSFT", new BigDecimal("800.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("100.00"))); // null symbol
 
         var symbols = transactionRepository.findDistinctSymbolsAcrossAllTenants();
 
@@ -190,7 +194,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findDistinctSymbolsAcrossAllTenants_noSymbols_returnsEmpty() {
-        transactionRepository.save(tx(accountA, tenantA, "deposit", null, new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, DEPOSIT, null, new BigDecimal("1000.00")));
 
         var symbols = transactionRepository.findDistinctSymbolsAcrossAllTenants();
 
@@ -203,11 +207,11 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findBySymbolAndDateOnOrBefore_returnsTransactionsUpToDate() {
-        transactionRepository.save(txOnDate(accountA, tenantA, "buy", "AAPL",
+        transactionRepository.save(txOnDate(accountA, tenantA, BUY, "AAPL",
                 LocalDate.of(2024, 1, 1), new BigDecimal("1000.00")));
-        transactionRepository.save(txOnDate(accountA, tenantA, "buy", "AAPL",
+        transactionRepository.save(txOnDate(accountA, tenantA, BUY, "AAPL",
                 LocalDate.of(2024, 6, 15), new BigDecimal("2000.00")));
-        transactionRepository.save(txOnDate(accountB, tenantB, "buy", "AAPL",
+        transactionRepository.save(txOnDate(accountB, tenantB, BUY, "AAPL",
                 LocalDate.of(2025, 1, 1), new BigDecimal("3000.00"))); // after cutoff
 
         var result = transactionRepository.findBySymbolAndDateOnOrBefore("AAPL", LocalDate.of(2024, 12, 31));
@@ -230,11 +234,11 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findEarliestDateBySymbol_multipleTransactions_returnsMinDate() {
-        transactionRepository.save(txOnDate(accountA, tenantA, "buy", "VOO",
+        transactionRepository.save(txOnDate(accountA, tenantA, BUY, "VOO",
                 LocalDate.of(2020, 3, 15), new BigDecimal("300.00")));
-        transactionRepository.save(txOnDate(accountA, tenantA, "buy", "VOO",
+        transactionRepository.save(txOnDate(accountA, tenantA, BUY, "VOO",
                 LocalDate.of(2019, 7, 1), new BigDecimal("300.00")));
-        transactionRepository.save(txOnDate(accountA, tenantA, "buy", "VOO",
+        transactionRepository.save(txOnDate(accountA, tenantA, BUY, "VOO",
                 LocalDate.of(2022, 1, 10), new BigDecimal("300.00")));
 
         var earliest = transactionRepository.findEarliestDateBySymbol("VOO");
@@ -256,8 +260,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findDistinctTenantIdsBySymbol_returnsAllTenantsHoldingSymbol() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
-        transactionRepository.save(tx(accountB, tenantB, "buy", "AAPL", new BigDecimal("2000.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountB, tenantB, BUY, "AAPL", new BigDecimal("2000.00")));
 
         var tenantIds = transactionRepository.findDistinctTenantIdsBySymbol("AAPL");
 
@@ -277,8 +281,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByAccountIdAndTenantId_paginated_isolatesTenants() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
-        transactionRepository.save(tx(accountB, tenantB, "buy", "MSFT", new BigDecimal("500.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountB, tenantB, BUY, "MSFT", new BigDecimal("500.00")));
 
         var pageA = transactionRepository.findByAccount_IdAndTenant_Id(
                 accountA.getId(), tenantA.getId(), PageRequest.of(0, 10));
@@ -289,7 +293,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByAccountIdAndTenantId_wrongTenant_returnsEmpty() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
 
         var page = transactionRepository.findByAccount_IdAndTenant_Id(
                 accountA.getId(), tenantB.getId(), PageRequest.of(0, 10));
@@ -303,9 +307,9 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByTenantIdAndSymbol_returnsOnlyMatchingSymbolForTenant() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("2000.00")));
-        transactionRepository.save(tx(accountA, tenantA, "buy", "MSFT", new BigDecimal("500.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("2000.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "MSFT", new BigDecimal("500.00")));
 
         var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "AAPL");
 
@@ -315,8 +319,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByTenantIdAndSymbol_isolatesTenants() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
-        transactionRepository.save(tx(accountB, tenantB, "buy", "AAPL", new BigDecimal("9999.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountB, tenantB, BUY, "AAPL", new BigDecimal("9999.00")));
 
         var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "AAPL");
 
@@ -326,7 +330,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByTenantIdAndSymbol_symbolNotHeld_returnsEmpty() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
 
         var result = transactionRepository.findByTenant_IdAndSymbol(tenantA.getId(), "GOOG");
 
@@ -339,7 +343,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByIdAndTenantId_correctTenant_returnsTransaction() {
-        var saved = transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        var saved = transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
 
         var found = transactionRepository.findByIdAndTenant_Id(saved.getId(), tenantA.getId());
 
@@ -348,7 +352,7 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void findByIdAndTenantId_wrongTenant_returnsEmpty() {
-        var saved = transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
+        var saved = transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
 
         var found = transactionRepository.findByIdAndTenant_Id(saved.getId(), tenantB.getId());
 
@@ -368,8 +372,8 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void deleteByAccountIdAndTenantId_deletesOnlyTargetTenantTransactions() {
-        transactionRepository.save(tx(accountA, tenantA, "buy", "AAPL", new BigDecimal("1000.00")));
-        transactionRepository.save(tx(accountB, tenantB, "buy", "MSFT", new BigDecimal("500.00")));
+        transactionRepository.save(tx(accountA, tenantA, BUY, "AAPL", new BigDecimal("1000.00")));
+        transactionRepository.save(tx(accountB, tenantB, BUY, "MSFT", new BigDecimal("500.00")));
 
         transactionRepository.deleteByAccount_IdAndTenant_Id(accountA.getId(), tenantA.getId());
 
@@ -382,12 +386,13 @@ class TransactionRepositoryIntegrationTest extends AbstractIntegrationTest {
     // -------------------------------------------------------------------------
 
     private static TransactionEntity tx(AccountEntity account, TenantEntity tenant,
-                                         String type, String symbol, BigDecimal amount) {
+                                         TransactionType type, String symbol, BigDecimal amount) {
         return txOnDate(account, tenant, type, symbol, LocalDate.of(2024, 6, 1), amount);
     }
 
     private static TransactionEntity txOnDate(AccountEntity account, TenantEntity tenant,
-                                               String type, String symbol, LocalDate date, BigDecimal amount) {
+                                               TransactionType type, String symbol,
+                                               LocalDate date, BigDecimal amount) {
         return new TransactionEntity(account, tenant, date, type, symbol,
                 symbol != null ? new BigDecimal("1.0000") : null, amount);
     }

@@ -14,6 +14,7 @@ import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 import com.wealthview.persistence.repository.AccountRepository;
 import com.wealthview.persistence.repository.PropertyExpenseRepository;
 import com.wealthview.persistence.repository.PropertyIncomeRepository;
@@ -109,7 +110,7 @@ public class DemoDataSeeder {
     }
 
     /** A transaction fixture. {@code symbol} and {@code quantity} are null for cash entries. */
-    public record TxnSpec(LocalDate date, String type, String symbol,
+    public record TxnSpec(LocalDate date, TransactionType type, String symbol,
                           BigDecimal quantity, BigDecimal amount) {
     }
 

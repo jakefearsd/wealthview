@@ -9,6 +9,11 @@ import java.time.LocalDate;
 
 import org.junit.jupiter.api.Test;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.DIVIDEND;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class VanguardCsvParserTest {
@@ -24,9 +29,9 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(10);
         assertThat(result.errors()).isEmpty();
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("VTSAX");
-        assertThat(result.transactions().get(7).type()).isEqualTo("withdrawal");
+        assertThat(result.transactions().get(7).type()).isEqualTo(WITHDRAWAL);
     }
 
     @Test
@@ -39,7 +44,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("VTSAX");
         assertThat(result.transactions().get(0).quantity()).isEqualByComparingTo(new BigDecimal("5.000"));
     }
@@ -55,7 +60,7 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("sell");
+        assertThat(txn.type()).isEqualTo(SELL);
         assertThat(txn.date()).isEqualTo(LocalDate.of(2025, 1, 20));
         assertThat(txn.symbol()).isEqualTo("AAPL");
         assertThat(txn.quantity()).isEqualByComparingTo(new BigDecimal("10.000"));
@@ -72,7 +77,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DIVIDEND);
         assertThat(result.transactions().get(0).quantity()).isNull();
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("48.50"));
     }
@@ -87,7 +92,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).quantity()).isEqualByComparingTo(new BigDecimal("0.200"));
     }
 
@@ -101,7 +106,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("dividend");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DIVIDEND);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("VFIAX");
     }
 
@@ -116,7 +121,7 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("dividend");
+        assertThat(txn.type()).isEqualTo(DIVIDEND);
         assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("32.10"));
         assertThat(txn.quantity()).isNull();
     }
@@ -131,7 +136,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DEPOSIT);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("5000.00"));
     }
 
@@ -146,7 +151,7 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         var txn = result.transactions().get(0);
-        assertThat(txn.type()).isEqualTo("withdrawal");
+        assertThat(txn.type()).isEqualTo(WITHDRAWAL);
         assertThat(txn.amount()).isEqualByComparingTo(new BigDecimal("2000.00"));
         assertThat(txn.symbol()).isNull();
     }
@@ -248,7 +253,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("deposit");
+        assertThat(result.transactions().get(0).type()).isEqualTo(DEPOSIT);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("500.00"));
     }
 
@@ -262,7 +267,7 @@ class VanguardCsvParserTest {
         var result = parser.parse(new StringReader(csv));
 
         assertThat(result.transactions()).hasSize(1);
-        assertThat(result.transactions().get(0).type()).isEqualTo("withdrawal");
+        assertThat(result.transactions().get(0).type()).isEqualTo(WITHDRAWAL);
         assertThat(result.transactions().get(0).amount()).isEqualByComparingTo(new BigDecimal("300.00"));
     }
 
@@ -279,7 +284,7 @@ class VanguardCsvParserTest {
 
         assertThat(result.transactions()).hasSize(1);
         assertThat(result.errors()).isEmpty();
-        assertThat(result.transactions().get(0).type()).isEqualTo("buy");
+        assertThat(result.transactions().get(0).type()).isEqualTo(BUY);
         assertThat(result.transactions().get(0).symbol()).isEqualTo("TEST");
     }
 }

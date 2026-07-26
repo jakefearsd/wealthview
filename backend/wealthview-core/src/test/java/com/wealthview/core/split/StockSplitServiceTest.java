@@ -22,6 +22,7 @@ import com.wealthview.persistence.entity.StockSplitAdjustmentEntity;
 import com.wealthview.persistence.entity.StockSplitEntity;
 import com.wealthview.persistence.entity.TenantEntity;
 import com.wealthview.persistence.entity.TransactionEntity;
+import com.wealthview.persistence.entity.TransactionType;
 import com.wealthview.persistence.repository.HoldingRepository;
 import com.wealthview.persistence.repository.PriceRepository;
 import com.wealthview.persistence.repository.StockSplitAdjustmentRepository;
@@ -30,6 +31,7 @@ import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -92,7 +94,7 @@ class StockSplitServiceTest {
     @Test
     void applySplit_singleTransaction_quantityScaledAmountUnchanged() {
         var txnId = UUID.randomUUID();
-        var txn = txn(txnId, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn = txn(txnId, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("100"), new BigDecimal("8000.0000"));
 
         when(stockSplitRepository.findBySymbolAndEffectiveDate("AAPL", LocalDate.of(2020, 8, 31)))
@@ -113,7 +115,7 @@ class StockSplitServiceTest {
     @Test
     void applySplit_recordsAdjustmentRowsForTransactions() {
         var txnId = UUID.randomUUID();
-        var txn = txn(txnId, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn = txn(txnId, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("100"), new BigDecimal("8000.0000"));
 
         when(stockSplitRepository.findBySymbolAndEffectiveDate(any(), any())).thenReturn(Optional.empty());
@@ -152,12 +154,12 @@ class StockSplitServiceTest {
         // 1:3 reverse split of 300 shares lands on exactly 100.0000 under both the
         // old pre-divided-ratio math and the new SplitMath (300 is a multiple of 3,
         // so the two roundings happen to agree) — pinned here as a regression guard.
-        var evenTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "ABC",
+        var evenTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), BUY, "ABC",
                 new BigDecimal("300"), new BigDecimal("3000"));
         // 5003 shares is where the old scale-8 pre-divided ratio (1/3 rounded to
         // 0.33333333) actually drifts: 5003 * 0.33333333 rounds to 1667.6666,
         // one cent short of the exact 1667.6667 that SplitMath.adjustShares produces.
-        var oddTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 2), "buy", "ABC",
+        var oddTxn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 2), BUY, "ABC",
                 new BigDecimal("5003"), new BigDecimal("50030"));
 
         when(stockSplitRepository.findBySymbolAndEffectiveDate("ABC", LocalDate.of(2020, 8, 31)))
@@ -178,7 +180,7 @@ class StockSplitServiceTest {
     @Test
     void applySplit_compoundsCorrectlyOverTwoSplits() {
         // 2:1 forward then 1:2 reverse should restore original quantity.
-        var txn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "FOO",
+        var txn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), BUY, "FOO",
                 new BigDecimal("10"), new BigDecimal("1000"));
 
         when(stockSplitRepository.findBySymbolAndEffectiveDate(any(), any())).thenReturn(Optional.empty());
@@ -196,7 +198,7 @@ class StockSplitServiceTest {
 
     @Test
     void applySplit_skipsManualOverrideHolding_logsWarning() {
-        var txn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1000"));
         var manualHolding = new HoldingEntity(account, tenant, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1000"));
@@ -268,7 +270,7 @@ class StockSplitServiceTest {
         var txnId = UUID.randomUUID();
         var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
         var splitId = UUID.randomUUID();
-        var txn = txn(txnId, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn = txn(txnId, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("400"), new BigDecimal("8000.0000"));
         var adj = new StockSplitAdjustmentEntity(split, tenantId, "transactions", txnId,
                 "quantity", new BigDecimal("100"), new BigDecimal("400"));
@@ -287,7 +289,7 @@ class StockSplitServiceTest {
     @Test
     void unapplySplit_thenReapply_endsAtSameState() {
         var txnId = UUID.randomUUID();
-        var txn = txn(txnId, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn = txn(txnId, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("100"), new BigDecimal("8000.0000"));
 
         when(stockSplitRepository.findBySymbolAndEffectiveDate(any(), any())).thenReturn(Optional.empty());
@@ -313,7 +315,7 @@ class StockSplitServiceTest {
 
     @Test
     void listForTenant_filtersBySymbolsTenantHasTransactedIn() {
-        var t = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var t = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(t));
         var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
@@ -341,9 +343,9 @@ class StockSplitServiceTest {
     void listForTenant_withSymbolFilter_returnsOnlyMatchingSymbolCaseInsensitively() {
         // The symbol filter predicate must keep only splits whose symbol equals
         // the requested one (ignoring case) and drop the rest.
-        var t1 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var t1 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
-        var t2 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "MSFT",
+        var t2 = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), BUY, "MSFT",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(t1, t2));
         var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
@@ -358,7 +360,7 @@ class StockSplitServiceTest {
 
     @Test
     void listForTenant_blankSymbolFilter_returnsAllSplits() {
-        var t = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var t = new TransactionEntity(account, tenant, LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findByTenant_Id(tenantId)).thenReturn(List.of(t));
         var aaplSplit = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "finnhub");
@@ -481,9 +483,9 @@ class StockSplitServiceTest {
         // query instead of one SELECT per adjustment row.
         var split = new StockSplitEntity("AAPL", LocalDate.of(2020, 8, 31), 4, 1, "manual");
         var splitId = UUID.randomUUID();
-        var txn1 = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), "buy", "AAPL",
+        var txn1 = txn(UUID.randomUUID(), LocalDate.of(2020, 1, 1), BUY, "AAPL",
                 new BigDecimal("400"), new BigDecimal("8000.0000"));
-        var txn2 = txn(UUID.randomUUID(), LocalDate.of(2020, 2, 1), "buy", "AAPL",
+        var txn2 = txn(UUID.randomUUID(), LocalDate.of(2020, 2, 1), BUY, "AAPL",
                 new BigDecimal("40"), new BigDecimal("900.0000"));
         var adj1 = new StockSplitAdjustmentEntity(split, tenantId, "transactions", txn1.getId(),
                 "quantity", new BigDecimal("100"), new BigDecimal("400"));
@@ -506,7 +508,7 @@ class StockSplitServiceTest {
                 ("price:" + symbol + ":" + date).getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    private TransactionEntity txn(UUID id, LocalDate date, String type, String symbol,
+    private TransactionEntity txn(UUID id, LocalDate date, TransactionType type, String symbol,
                                   BigDecimal qty, BigDecimal amount) {
         var t = new TransactionEntity(account, tenant, date, type, symbol, qty, amount);
         // tests need a stable id; entity uses field-level @GeneratedValue so we

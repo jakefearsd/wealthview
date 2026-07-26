@@ -34,6 +34,8 @@ import com.wealthview.persistence.repository.ImportJobRepository;
 import com.wealthview.persistence.repository.TransactionRepository;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -100,9 +102,9 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")),
-                new ParsedTransaction(LocalDate.of(2024, 1, 16), "sell", "GOOG",
+                new ParsedTransaction(LocalDate.of(2024, 1, 16), SELL, "GOOG",
                         new BigDecimal("5"), new BigDecimal("750")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -119,13 +121,13 @@ class ImportServiceTest {
         setupAccountAndJobMocks();
 
         var hash = TransactionHashUtil.computeHash(
-                LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                LocalDate.of(2024, 1, 15), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
                 .thenReturn(Set.of(hash));
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -142,19 +144,19 @@ class ImportServiceTest {
         setupAccountAndJobMocks();
 
         var buyHash = TransactionHashUtil.computeHash(
-                LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                LocalDate.of(2024, 1, 15), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         var sellHash = TransactionHashUtil.computeHash(
-                LocalDate.of(2024, 1, 16), "sell", "GOOG",
+                LocalDate.of(2024, 1, 16), SELL, "GOOG",
                 new BigDecimal("5"), new BigDecimal("750"));
 
         when(transactionRepository.findExistingImportHashes(eq(tenantId), eq(accountId), any()))
                 .thenReturn(Set.of(buyHash));
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")),
-                new ParsedTransaction(LocalDate.of(2024, 1, 16), "sell", "GOOG",
+                new ParsedTransaction(LocalDate.of(2024, 1, 16), SELL, "GOOG",
                         new BigDecimal("5"), new BigDecimal("750")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -173,7 +175,7 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -184,7 +186,7 @@ class ImportServiceTest {
                 eq(tenantId), eq(accountId), any(TransactionRequest.class), hashCaptor.capture());
 
         var expectedHash = TransactionHashUtil.computeHash(
-                LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                LocalDate.of(2024, 1, 15), BUY, "AAPL",
                 new BigDecimal("10"), new BigDecimal("1500"));
         assertThat(hashCaptor.getValue()).isEqualTo(expectedHash);
     }
@@ -196,11 +198,11 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")),
-                new ParsedTransaction(LocalDate.of(2024, 1, 16), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 16), BUY, "AAPL",
                         new BigDecimal("5"), new BigDecimal("750")),
-                new ParsedTransaction(LocalDate.of(2024, 1, 17), "sell", "GOOG",
+                new ParsedTransaction(LocalDate.of(2024, 1, 17), SELL, "GOOG",
                         new BigDecimal("3"), new BigDecimal("450")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -255,7 +257,7 @@ class ImportServiceTest {
     void importCsv_defaultParser_delegatesToProcessImport() throws IOException {
         setupAccountAndJobMocks();
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
         when(csvParser.parse(any())).thenReturn(parseResult);
@@ -280,7 +282,7 @@ class ImportServiceTest {
                 cacheManager);
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
         when(fidelityParser.parse(any())).thenReturn(parseResult);
@@ -305,7 +307,7 @@ class ImportServiceTest {
                 cacheManager);
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
         when(ofxParser.parse(any())).thenReturn(parseResult);
@@ -355,7 +357,7 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseErrors = List.of(new CsvRowError(2, "invalid date"), new CsvRowError(5, "missing symbol"));
         var parseResult = new ImportParseResult(transactions, parseErrors);
@@ -373,7 +375,7 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseResult = new ImportParseResult(transactions, List.of());
 
@@ -392,7 +394,7 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var transactions = List.of(
-                new ParsedTransaction(LocalDate.of(2024, 1, 15), "buy", "AAPL",
+                new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
                         new BigDecimal("10"), new BigDecimal("1500")));
         var parseErrors = List.of(new CsvRowError(2, "invalid date"));
         var parseResult = new ImportParseResult(transactions, parseErrors);

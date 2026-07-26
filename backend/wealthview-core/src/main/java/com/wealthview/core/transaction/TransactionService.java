@@ -160,7 +160,8 @@ public class TransactionService {
 
     private Map<String, Object> txnDetails(TransactionRequest request) {
         var details = new java.util.HashMap<String, Object>();
-        details.put("type", request.type());
+        // .value(): audit details land in a jsonb column, so store the wire token, not name().
+        details.put("type", request.type().value());
         if (request.symbol() != null) {
             details.put("symbol", request.symbol());
         }

@@ -37,6 +37,9 @@ import com.wealthview.persistence.repository.UserRepository;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
+import static com.wealthview.persistence.entity.TransactionType.BUY;
+import static com.wealthview.persistence.entity.TransactionType.SELL;
+
 /**
  * Profile-gated bulk data seeder for the isolated load-test stack.
  *
@@ -159,14 +162,14 @@ public class LoadTestDataSeeder implements ApplicationRunner {
         for (int i = 0; i < txnsPerTenant; i++) {
             var account = accounts.get(rng.nextInt(accounts.size()));
             String symbol = SYMBOLS[rng.nextInt(SYMBOLS.length)];
-            String type = rng.nextInt(10) == 0 ? "sell" : "buy";
+            var type = rng.nextInt(10) == 0 ? SELL : BUY;
             BigDecimal quantity = BigDecimal.valueOf(1 + rng.nextInt(20));
             BigDecimal pricePerShare = BigDecimal.valueOf(50 + rng.nextInt(400));
             BigDecimal amount = quantity.multiply(pricePerShare).setScale(4, RoundingMode.HALF_UP);
             LocalDate date = LocalDate.of(2018, 1, 1).plusDays(rng.nextInt(2900));
             batch.add(new Object[]{
                     UUID.randomUUID(), account.getId(), tenantId,
-                    Date.valueOf(date), type, symbol, quantity, amount
+                    Date.valueOf(date), type.value(), symbol, quantity, amount
             });
         }
         jdbcTemplate.batchUpdate(

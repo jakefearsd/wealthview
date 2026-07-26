@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import com.webcohesion.ofx4j.domain.data.common.Transaction;
 import com.webcohesion.ofx4j.domain.data.common.TransactionType;
 
+import static com.wealthview.persistence.entity.TransactionType.DEPOSIT;
+import static com.wealthview.persistence.entity.TransactionType.WITHDRAWAL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -30,7 +32,7 @@ class OfxBankTransactionMapperTest {
         var parsed = OfxBankTransactionMapper.map(txn);
 
         assertThat(parsed.date()).isEqualTo(LocalDate.of(2024, 3, 15));
-        assertThat(parsed.type()).isEqualTo("deposit");
+        assertThat(parsed.type()).isEqualTo(DEPOSIT);
         assertThat(parsed.amount()).isEqualByComparingTo("250.00");
     }
 
@@ -43,7 +45,7 @@ class OfxBankTransactionMapperTest {
 
         var parsed = OfxBankTransactionMapper.map(txn);
 
-        assertThat(parsed.type()).isEqualTo("withdrawal");
+        assertThat(parsed.type()).isEqualTo(WITHDRAWAL);
         assertThat(parsed.amount()).isEqualByComparingTo("42.50");
     }
 
@@ -62,7 +64,7 @@ class OfxBankTransactionMapperTest {
         when(txn.getBigDecimalAmount()).thenReturn(new BigDecimal("100.00"));
         when(txn.getTransactionType()).thenReturn(null);
 
-        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo("deposit");
+        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo(DEPOSIT);
     }
 
     @Test
@@ -71,7 +73,7 @@ class OfxBankTransactionMapperTest {
         when(txn.getBigDecimalAmount()).thenReturn(new BigDecimal("-100.00"));
         when(txn.getTransactionType()).thenReturn(null);
 
-        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo("withdrawal");
+        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo(WITHDRAWAL);
     }
 
     @Test
@@ -80,7 +82,7 @@ class OfxBankTransactionMapperTest {
         when(txn.getBigDecimalAmount()).thenReturn(new BigDecimal("-30.00"));
         when(txn.getTransactionType()).thenReturn(TransactionType.OTHER);
 
-        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo("withdrawal");
+        assertThat(OfxBankTransactionMapper.map(txn).type()).isEqualTo(WITHDRAWAL);
     }
 
     @Test
