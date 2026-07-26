@@ -1,11 +1,16 @@
 package com.wealthview.core.projection.dto;
 
 import java.math.BigDecimal;
-import java.util.List;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
+import com.wealthview.core.testutil.ScenarioRequestBuilder;
 import tools.jackson.databind.ObjectMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,22 +75,6 @@ class ScenarioParamsTest {
     }
 
     @Test
-    void from_dividendYieldPresent_passesThrough() {
-        var request = scenarioRequestWith(new BigDecimal("0.021"), null);
-
-        var params = ScenarioParams.from(request);
-
-        assertThat(params.dividendYield()).isEqualByComparingTo("0.021");
-    }
-
-    @Test
-    void from_dividendYieldNull_staysNullForDefault() {
-        var request = scenarioRequestWith(null, null);
-
-        assertThat(ScenarioParams.from(request).dividendYield()).isNull();
-    }
-
-    @Test
     void toJson_feeRatePresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
@@ -95,22 +84,6 @@ class ScenarioParamsTest {
         var node = mapper.readTree(params.toJson(mapper));
 
         assertThat(node.get("fee_rate").decimalValue()).isEqualByComparingTo("0.003");
-    }
-
-    @Test
-    void from_feeRatePresent_passesThrough() {
-        var request = scenarioRequestWith(null, new BigDecimal("0.003"));
-
-        var params = ScenarioParams.from(request);
-
-        assertThat(params.feeRate()).isEqualByComparingTo("0.003");
-    }
-
-    @Test
-    void from_feeRateNull_staysNullForDefault() {
-        var request = scenarioRequestWith(null, null);
-
-        assertThat(ScenarioParams.from(request).feeRate()).isNull();
     }
 
     // C1 (2026-07-12 audit): bond-sleeve interest yield -- mirrors the feeRate tests above exactly.
@@ -128,34 +101,6 @@ class ScenarioParamsTest {
     }
 
     @Test
-    void from_interestYieldPresent_passesThrough() {
-        var request = scenarioRequestWithInterestYield(new BigDecimal("0.04"));
-
-        var params = ScenarioParams.from(request);
-
-        assertThat(params.interestYield()).isEqualByComparingTo("0.04");
-    }
-
-    @Test
-    void from_interestYieldNull_staysNullForDefault() {
-        var request = scenarioRequestWithInterestYield(null);
-
-        assertThat(ScenarioParams.from(request).interestYield()).isNull();
-    }
-
-    private ScenarioRequest scenarioRequestWithInterestYield(BigDecimal interestYield) {
-        return new ScenarioRequest(
-                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, interestYield,
-                null, null, null, null, null,
-                null, null, null, null,
-                List.of(), null, null, null);
-    }
-
-    @Test
     void toJson_includeDepressionYearsPresent_writesSnakeCaseKey() throws Exception {
         var params = new ScenarioParams(
                 null, null, null, null, null, null, null, null, null, null, null, null, null,
@@ -165,40 +110,6 @@ class ScenarioParamsTest {
         var node = mapper.readTree(params.toJson(mapper));
 
         assertThat(node.get("include_depression_years").asBoolean()).isTrue();
-    }
-
-    @Test
-    void from_includeDepressionYearsPresent_passesThrough() {
-        var request = scenarioRequestWithIncludeDepressionYears(Boolean.TRUE);
-
-        var params = ScenarioParams.from(request);
-
-        assertThat(params.includeDepressionYears()).isTrue();
-    }
-
-    @Test
-    void from_includeDepressionYearsNull_staysNullForDefault() {
-        var request = scenarioRequestWithIncludeDepressionYears(null);
-
-        assertThat(ScenarioParams.from(request).includeDepressionYears()).isNull();
-    }
-
-    private ScenarioRequest scenarioRequestWith(BigDecimal dividendYield, BigDecimal feeRate) {
-        return new ScenarioRequest(
-                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                dividendYield, feeRate, null, null, null, null);
-    }
-
-    private ScenarioRequest scenarioRequestWithIncludeDepressionYears(Boolean includeDepressionYears) {
-        return new ScenarioRequest(
-                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, includeDepressionYears, null, null, null, null);
     }
 
     // Household/survivor modeling (sub-project A, T3): mirrors the interestYield/
@@ -221,90 +132,6 @@ class ScenarioParamsTest {
         assertThat(node.get("community_property").asBoolean()).isTrue();
     }
 
-    @Test
-    void from_spouseBirthYearPresent_passesThrough() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).spouseBirthYear()).isEqualTo(1972);
-    }
-
-    @Test
-    void from_spouseBirthYearNull_staysNullForDefault() {
-        var request = scenarioRequestWithHousehold(null, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).spouseBirthYear()).isNull();
-    }
-
-    @Test
-    void from_primaryDeathAgePresent_passesThrough() {
-        var request = scenarioRequestWithHousehold(1972, 88, null, null, null);
-
-        assertThat(ScenarioParams.from(request).primaryDeathAge()).isEqualTo(88);
-    }
-
-    @Test
-    void from_primaryDeathAgeNull_staysNullForDefault() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).primaryDeathAge()).isNull();
-    }
-
-    @Test
-    void from_spouseDeathAgePresent_passesThrough() {
-        var request = scenarioRequestWithHousehold(1972, null, 90, null, null);
-
-        assertThat(ScenarioParams.from(request).spouseDeathAge()).isEqualTo(90);
-    }
-
-    @Test
-    void from_spouseDeathAgeNull_staysNullForDefault() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).spouseDeathAge()).isNull();
-    }
-
-    @Test
-    void from_survivorSpendingFactorPresent_passesThrough() {
-        var request = scenarioRequestWithHousehold(1972, null, null, new BigDecimal("0.8"), null);
-
-        assertThat(ScenarioParams.from(request).survivorSpendingFactor()).isEqualByComparingTo("0.8");
-    }
-
-    @Test
-    void from_survivorSpendingFactorNull_staysNullForDefault() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).survivorSpendingFactor()).isNull();
-    }
-
-    @Test
-    void from_communityPropertyPresent_passesThrough() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, Boolean.TRUE);
-
-        assertThat(ScenarioParams.from(request).communityProperty()).isTrue();
-    }
-
-    @Test
-    void from_communityPropertyNull_staysNullForDefault() {
-        var request = scenarioRequestWithHousehold(1972, null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).communityProperty()).isNull();
-    }
-
-    private ScenarioRequest scenarioRequestWithHousehold(Integer spouseBirthYear, Integer primaryDeathAge,
-                                                          Integer spouseDeathAge, BigDecimal survivorSpendingFactor,
-                                                          Boolean communityProperty) {
-        return new ScenarioRequest(
-                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, null,
-                spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor, communityProperty,
-                null, null, null, null,
-                List.of(), null, null, null);
-    }
-
     // Stochastic mortality (sub-project B, T3): mirrors the household field test pattern above
     // exactly for each new field.
 
@@ -324,74 +151,85 @@ class ScenarioParamsTest {
         assertThat(node.get("longevity_conditional_age").asInt()).isEqualTo(100);
     }
 
-    @Test
-    void from_stochasticMortalityPresent_passesThrough() {
-        var request = scenarioRequestWithStochasticMortality(Boolean.TRUE, null, null, null);
+    // The from_XPresent_passesThrough / from_XNull_staysNullForDefault family below used to be 26
+    // hand-written tests (13 fields x 2), each differing only in which ScenarioRequestBuilder with*
+    // call it exercised and which ScenarioParams accessor it read back. Collapsed into two
+    // parameterized tests sharing one case list -- every field the deleted tests covered still gets
+    // its own "present" and "null" execution (26 total), see the Task 19 report for the mapping.
 
-        assertThat(ScenarioParams.from(request).stochasticMortality()).isTrue();
+    private record PassThroughCase(
+            String fieldName,
+            UnaryOperator<ScenarioRequestBuilder> withValue,
+            Object sampleValue,
+            Function<ScenarioParams, Object> extractor) {
+
+        @Override
+        public String toString() {
+            return fieldName;
+        }
     }
 
-    @Test
-    void from_stochasticMortalityNull_staysNullForDefault() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).stochasticMortality()).isNull();
+    private static Stream<PassThroughCase> passThroughFields() {
+        return Stream.of(
+                new PassThroughCase("dividendYield",
+                        b -> b.withDividendYield(new BigDecimal("0.021")),
+                        new BigDecimal("0.021"), ScenarioParams::dividendYield),
+                new PassThroughCase("feeRate",
+                        b -> b.withFeeRate(new BigDecimal("0.003")),
+                        new BigDecimal("0.003"), ScenarioParams::feeRate),
+                new PassThroughCase("interestYield",
+                        b -> b.withInterestYield(new BigDecimal("0.04")),
+                        new BigDecimal("0.04"), ScenarioParams::interestYield),
+                new PassThroughCase("includeDepressionYears",
+                        b -> b.withIncludeDepressionYears(Boolean.TRUE),
+                        Boolean.TRUE, ScenarioParams::includeDepressionYears),
+                new PassThroughCase("spouseBirthYear",
+                        b -> b.withSpouseBirthYear(1972),
+                        1972, ScenarioParams::spouseBirthYear),
+                new PassThroughCase("primaryDeathAge",
+                        b -> b.withPrimaryDeathAge(88),
+                        88, ScenarioParams::primaryDeathAge),
+                new PassThroughCase("spouseDeathAge",
+                        b -> b.withSpouseDeathAge(90),
+                        90, ScenarioParams::spouseDeathAge),
+                new PassThroughCase("survivorSpendingFactor",
+                        b -> b.withSurvivorSpendingFactor(new BigDecimal("0.8")),
+                        new BigDecimal("0.8"), ScenarioParams::survivorSpendingFactor),
+                new PassThroughCase("communityProperty",
+                        b -> b.withCommunityProperty(Boolean.TRUE),
+                        Boolean.TRUE, ScenarioParams::communityProperty),
+                new PassThroughCase("stochasticMortality",
+                        b -> b.withStochasticMortality(Boolean.TRUE),
+                        Boolean.TRUE, ScenarioParams::stochasticMortality),
+                new PassThroughCase("primarySex",
+                        b -> b.withPrimarySex("male"),
+                        "male", ScenarioParams::primarySex),
+                new PassThroughCase("spouseSex",
+                        b -> b.withSpouseSex("female"),
+                        "female", ScenarioParams::spouseSex),
+                new PassThroughCase("longevityConditionalAge",
+                        b -> b.withLongevityConditionalAge(100),
+                        100, ScenarioParams::longevityConditionalAge));
     }
 
-    @Test
-    void from_primarySexPresent_passesThrough() {
-        var request = scenarioRequestWithStochasticMortality(null, "male", null, null);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passThroughFields")
+    void from_fieldPresent_passesThrough(PassThroughCase testCase) {
+        var request = testCase.withValue().apply(ScenarioRequestBuilder.builder()).build();
 
-        assertThat(ScenarioParams.from(request).primarySex()).isEqualTo("male");
+        var actual = testCase.extractor().apply(ScenarioParams.from(request));
+
+        assertThat(actual).isEqualTo(testCase.sampleValue());
     }
 
-    @Test
-    void from_primarySexNull_staysNullForDefault() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("passThroughFields")
+    void from_fieldNull_staysNullForDefault(PassThroughCase testCase) {
+        var request = ScenarioRequestBuilder.builder().build();
 
-        assertThat(ScenarioParams.from(request).primarySex()).isNull();
-    }
+        var actual = testCase.extractor().apply(ScenarioParams.from(request));
 
-    @Test
-    void from_spouseSexPresent_passesThrough() {
-        var request = scenarioRequestWithStochasticMortality(null, null, "female", null);
-
-        assertThat(ScenarioParams.from(request).spouseSex()).isEqualTo("female");
-    }
-
-    @Test
-    void from_spouseSexNull_staysNullForDefault() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).spouseSex()).isNull();
-    }
-
-    @Test
-    void from_longevityConditionalAgePresent_passesThrough() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, 100);
-
-        assertThat(ScenarioParams.from(request).longevityConditionalAge()).isEqualTo(100);
-    }
-
-    @Test
-    void from_longevityConditionalAgeNull_staysNullForDefault() {
-        var request = scenarioRequestWithStochasticMortality(null, null, null, null);
-
-        assertThat(ScenarioParams.from(request).longevityConditionalAge()).isNull();
-    }
-
-    private ScenarioRequest scenarioRequestWithStochasticMortality(Boolean stochasticMortality, String primarySex,
-                                                                     String spouseSex,
-                                                                     Integer longevityConditionalAge) {
-        return new ScenarioRequest(
-                "Plan", null, 90, new BigDecimal("0.03"), 1970, null,
-                null, null, null,
-                null, null, null, null, null, null, null, null,
-                null, null, null,
-                null, null, null, null,
-                null, null, null, null, null,
-                stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
-                List.of(), null, null, null);
+        assertThat(actual).isNull();
     }
 
     @Test
