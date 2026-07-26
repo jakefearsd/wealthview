@@ -272,11 +272,12 @@ class TrialSimulatorReturnTest {
         double[] pools = {95.0, 285.0, 0.0, 285.0, 0.0};
         TaxableLots lots = new TaxableLots();
         lots.addLot(95.0, 95.0);
+        TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(95.0, 285.0, 220.0);
 
         // marginalRate=0 isolates the A1 pool-scaling fix from audit C2's gross-up (pinned
         // separately below in applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM).
-        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
                 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05,
                 OrdinaryTaxTable.flat(0.0), 0.0);
 
@@ -301,11 +302,12 @@ class TrialSimulatorReturnTest {
         double[] pools = {360.0, 180.0, 0.0, 90.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(360.0, 360.0);
+        TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(100.0, 0.0, 0.0);
 
         // marginalRate=0.20 (nonzero, to prove it's IRRELEVANT here): taxable ($360) fully covers
         // the $30 tax, so traditional is never touched and there is nothing to gross up (audit C2).
-        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
                 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
@@ -326,9 +328,10 @@ class TrialSimulatorReturnTest {
         // taxable-first order) -- total traditional debit for the tax = 57 + 14.25 = 71.25.
         double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
+        TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0); // no spending draw this call -- isolates the tax
 
-        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
                 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
@@ -346,9 +349,10 @@ class TrialSimulatorReturnTest {
         double[] pools = {500.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(500.0, 500.0);
+        TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
-        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+        var outcome = TrialSimulator.applyTrialWithdrawals(tp,
                 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
@@ -375,9 +379,10 @@ class TrialSimulatorReturnTest {
         double base = 90.0;
         double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
+        TrialPools tp = new TrialPools(pools, lots);
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
-        TrialSimulator.applyTrialWithdrawals(pools, lots,
+        TrialSimulator.applyTrialWithdrawals(tp,
                 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
 
         double expectedGrossUp = 57.0 * 0.30 / 0.70;
