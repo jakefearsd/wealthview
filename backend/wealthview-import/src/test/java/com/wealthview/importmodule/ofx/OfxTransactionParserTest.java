@@ -19,7 +19,11 @@ class OfxTransactionParserTest {
 
     private final OfxTransactionParser parser = new OfxTransactionParser();
 
-    private static final String OFX_INVESTMENT_BUY = """
+    /**
+     * Common OFX 1.x header + SIGNONMSGSRSV1 prologue shared by every fixture in this class.
+     * Every real-world sample (investment statement or bank statement) starts here.
+     */
+    private static final String OFX_HEADER = """
             OFXHEADER:100
             DATA:OFXSGML
             VERSION:102
@@ -38,16 +42,19 @@ class OfxTransactionParserTest {
             <LANGUAGE>ENG
             </SONRS>
             </SIGNONMSGSRSV1>
-            <INVSTMTMSGSRSV1>
-            <INVSTMTTRNRS>
-            <TRNUID>0
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <INVSTMTRS>
-            <DTASOF>20250115
-            <CURDEF>USD
-            <INVTRANLIST>
-            <DTSTART>20240101
-            <DTEND>20250115
+            """;
+
+    private static final String STOCK_SECLIST = """
+            <STOCKINFO>
+            <SECINFO>
+            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
+            <SECNAME>APPLE INC
+            <TICKER>AAPL
+            </SECINFO>
+            </STOCKINFO>
+            """;
+
+    private static final String BUYSTOCK_XML = """
             <BUYSTOCK>
             <INVBUY>
             <INVTRAN>
@@ -63,53 +70,9 @@ class OfxTransactionParserTest {
             </INVBUY>
             <BUYTYPE>BUY
             </BUYSTOCK>
-            </INVTRANLIST>
-            </INVSTMTRS>
-            </INVSTMTTRNRS>
-            </INVSTMTMSGSRSV1>
-            <SECLISTMSGSRSV1>
-            <SECLIST>
-            <STOCKINFO>
-            <SECINFO>
-            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
-            <SECNAME>APPLE INC
-            <TICKER>AAPL
-            </SECINFO>
-            </STOCKINFO>
-            </SECLIST>
-            </SECLISTMSGSRSV1>
-            </OFX>
             """;
 
-    private static final String OFX_INVESTMENT_SELL = """
-            OFXHEADER:100
-            DATA:OFXSGML
-            VERSION:102
-            SECURITY:NONE
-            ENCODING:USASCII
-            CHARSET:1252
-            COMPRESSION:NONE
-            OLDFILEUID:NONE
-            NEWFILEUID:NONE
-
-            <OFX>
-            <SIGNONMSGSRSV1>
-            <SONRS>
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <DTSERVER>20250115
-            <LANGUAGE>ENG
-            </SONRS>
-            </SIGNONMSGSRSV1>
-            <INVSTMTMSGSRSV1>
-            <INVSTMTTRNRS>
-            <TRNUID>0
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <INVSTMTRS>
-            <DTASOF>20250115
-            <CURDEF>USD
-            <INVTRANLIST>
-            <DTSTART>20240101
-            <DTEND>20250115
+    private static final String SELLSTOCK_XML = """
             <SELLSTOCK>
             <INVSELL>
             <INVTRAN>
@@ -125,53 +88,9 @@ class OfxTransactionParserTest {
             </INVSELL>
             <SELLTYPE>SELL
             </SELLSTOCK>
-            </INVTRANLIST>
-            </INVSTMTRS>
-            </INVSTMTTRNRS>
-            </INVSTMTMSGSRSV1>
-            <SECLISTMSGSRSV1>
-            <SECLIST>
-            <STOCKINFO>
-            <SECINFO>
-            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
-            <SECNAME>APPLE INC
-            <TICKER>AAPL
-            </SECINFO>
-            </STOCKINFO>
-            </SECLIST>
-            </SECLISTMSGSRSV1>
-            </OFX>
             """;
 
-    private static final String OFX_INVESTMENT_INCOME = """
-            OFXHEADER:100
-            DATA:OFXSGML
-            VERSION:102
-            SECURITY:NONE
-            ENCODING:USASCII
-            CHARSET:1252
-            COMPRESSION:NONE
-            OLDFILEUID:NONE
-            NEWFILEUID:NONE
-
-            <OFX>
-            <SIGNONMSGSRSV1>
-            <SONRS>
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <DTSERVER>20250115
-            <LANGUAGE>ENG
-            </SONRS>
-            </SIGNONMSGSRSV1>
-            <INVSTMTMSGSRSV1>
-            <INVSTMTTRNRS>
-            <TRNUID>0
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <INVSTMTRS>
-            <DTASOF>20250115
-            <CURDEF>USD
-            <INVTRANLIST>
-            <DTSTART>20240101
-            <DTEND>20250115
+    private static final String INCOME_XML = """
             <INCOME>
             <INVTRAN>
             <FITID>11111
@@ -183,43 +102,9 @@ class OfxTransactionParserTest {
             <SUBACCTSEC>CASH
             <SUBACCTFUND>CASH
             </INCOME>
-            </INVTRANLIST>
-            </INVSTMTRS>
-            </INVSTMTTRNRS>
-            </INVSTMTMSGSRSV1>
-            <SECLISTMSGSRSV1>
-            <SECLIST>
-            <STOCKINFO>
-            <SECINFO>
-            <SECID><UNIQUEID>037833100<UNIQUEIDTYPE>CUSIP</SECID>
-            <SECNAME>APPLE INC
-            <TICKER>AAPL
-            </SECINFO>
-            </STOCKINFO>
-            </SECLIST>
-            </SECLISTMSGSRSV1>
-            </OFX>
             """;
 
-    private static final String OFX_BANK_STATEMENT = """
-            OFXHEADER:100
-            DATA:OFXSGML
-            VERSION:102
-            SECURITY:NONE
-            ENCODING:USASCII
-            CHARSET:1252
-            COMPRESSION:NONE
-            OLDFILEUID:NONE
-            NEWFILEUID:NONE
-
-            <OFX>
-            <SIGNONMSGSRSV1>
-            <SONRS>
-            <STATUS><CODE>0<SEVERITY>INFO</STATUS>
-            <DTSERVER>20250115
-            <LANGUAGE>ENG
-            </SONRS>
-            </SIGNONMSGSRSV1>
+    private static final String BANK_TRANLIST_XML = """
             <BANKMSGSRSV1>
             <STMTTRNRS>
             <TRNUID>0
@@ -252,8 +137,53 @@ class OfxTransactionParserTest {
             </STMTRS>
             </STMTTRNRS>
             </BANKMSGSRSV1>
-            </OFX>
             """;
+
+    private static final String OFX_INVESTMENT_BUY = ofxEnvelope(investmentTranList(BUYSTOCK_XML), STOCK_SECLIST);
+    private static final String OFX_INVESTMENT_SELL = ofxEnvelope(investmentTranList(SELLSTOCK_XML), STOCK_SECLIST);
+    private static final String OFX_INVESTMENT_INCOME = ofxEnvelope(investmentTranList(INCOME_XML), STOCK_SECLIST);
+    private static final String OFX_BANK_STATEMENT = ofxEnvelope(BANK_TRANLIST_XML, "");
+
+    /**
+     * Template method assembling a full OFX 1.x document: the shared header/signon prologue,
+     * followed by the caller-supplied message-set body ({@code tranList} — either an
+     * {@code INVSTMTMSGSRSV1} investment statement or a {@code BANKMSGSRSV1} bank statement),
+     * followed by an optional {@code SECLISTMSGSRSV1} security list (omitted entirely when
+     * {@code secList} is empty, as for the bank-statement fixture which has no securities).
+     */
+    private static String ofxEnvelope(String tranList, String secList) {
+        var envelope = new StringBuilder(OFX_HEADER);
+        envelope.append(tranList);
+        if (!secList.isEmpty()) {
+            envelope.append("<SECLISTMSGSRSV1>\n<SECLIST>\n").append(secList).append("</SECLIST>\n</SECLISTMSGSRSV1>\n");
+        }
+        envelope.append("</OFX>\n");
+        return envelope.toString();
+    }
+
+    /**
+     * Wraps a single investment-transaction element (BUYSTOCK/SELLSTOCK/INCOME) in the
+     * INVSTMTMSGSRSV1/INVTRANLIST scaffolding shared by all three investment fixtures.
+     */
+    private static String investmentTranList(String instrumentXml) {
+        return """
+                <INVSTMTMSGSRSV1>
+                <INVSTMTTRNRS>
+                <TRNUID>0
+                <STATUS><CODE>0<SEVERITY>INFO</STATUS>
+                <INVSTMTRS>
+                <DTASOF>20250115
+                <CURDEF>USD
+                <INVTRANLIST>
+                <DTSTART>20240101
+                <DTEND>20250115
+                """ + instrumentXml + """
+                </INVTRANLIST>
+                </INVSTMTRS>
+                </INVSTMTTRNRS>
+                </INVSTMTMSGSRSV1>
+                """;
+    }
 
     @Test
     void parse_investmentBuy_extractsBuyTransaction() throws IOException {
