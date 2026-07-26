@@ -8,10 +8,10 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.wealthview.api.security.TenantUserPrincipal;
+import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.split.StockSplitService;
 import com.wealthview.core.split.StockSplitSyncService;
 import com.wealthview.core.split.dto.SplitSyncResult;
@@ -33,20 +34,26 @@ import com.wealthview.core.split.dto.StockSplitResponse;
  *  - {@code /api/v1/admin/stock-splits/**} requires SUPER_ADMIN
  *  - {@code GET /api/v1/stock-splits} requires authentication only (any role)
  *
- * <p>The sync endpoint is conditional on the bean being present; it returns
- * 503 if Finnhub isn't configured.
+ * <p>The sync endpoint is conditional on the bean being present; when Finnhub
+ * isn't configured it throws {@link ServiceUnavailableException}, which
+ * {@code GlobalExceptionHandler} maps to 503 with the standard error
+ * envelope.
  */
 @RestController
 @RequestMapping("/api/v1")
 public class StockSplitController {
 
+    private static final String SYNC_UNAVAILABLE_MESSAGE =
+            "Stock split sync is not configured. Set app.finnhub.api-key in your environment.";
+
     private final StockSplitService stockSplitService;
-    private final ObjectProvider<StockSplitSyncService> stockSplitSyncServiceProvider;
+    @Nullable
+    private final StockSplitSyncService stockSplitSyncService;
 
     public StockSplitController(StockSplitService stockSplitService,
-                                ObjectProvider<StockSplitSyncService> stockSplitSyncServiceProvider) {
+                                @Nullable StockSplitSyncService stockSplitSyncService) {
         this.stockSplitService = stockSplitService;
-        this.stockSplitSyncServiceProvider = stockSplitSyncServiceProvider;
+        this.stockSplitSyncService = stockSplitSyncService;
     }
 
     @GetMapping("/stock-splits")
@@ -78,11 +85,10 @@ public class StockSplitController {
 
     @PostMapping("/admin/stock-splits/sync")
     public ResponseEntity<SplitSyncResult> sync() {
-        var svc = stockSplitSyncServiceProvider.getIfAvailable();
-        if (svc == null) {
-            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        if (stockSplitSyncService == null) {
+            throw new ServiceUnavailableException(SYNC_UNAVAILABLE_MESSAGE);
         }
-        return ResponseEntity.ok(svc.syncAll());
+        return ResponseEntity.ok(stockSplitSyncService.syncAll());
     }
 
     public record CreateSplitRequest(

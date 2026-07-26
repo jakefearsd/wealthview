@@ -45,6 +45,9 @@ import com.wealthview.core.property.dto.ValuationRefreshResponse;
 @RequestMapping("/api/v1/properties")
 public class PropertyController {
 
+    private static final String VALUATION_SYNC_UNAVAILABLE_MESSAGE =
+            "Property valuation sync is not configured. Set the Zillow scraper settings in your environment.";
+
     private final PropertyService propertyService;
     private final PropertyValuationService valuationService;
     private final PropertyAnalyticsService analyticsService;
@@ -181,8 +184,7 @@ public class PropertyController {
             @AuthenticationPrincipal TenantUserPrincipal principal,
             @PathVariable UUID id) {
         if (syncService == null) {
-            throw new ServiceUnavailableException(
-                    "Property valuation sync is not configured. Set the Zillow scraper settings in your environment.");
+            throw new ServiceUnavailableException(VALUATION_SYNC_UNAVAILABLE_MESSAGE);
         }
         var result = syncService.refreshProperty(principal.tenantId(), id);
         return ResponseEntity.ok(result);
@@ -202,8 +204,7 @@ public class PropertyController {
             @PathVariable UUID id,
             @Valid @RequestBody SelectZpidRequest request) {
         if (syncService == null) {
-            throw new ServiceUnavailableException(
-                    "Property valuation sync is not configured. Set the Zillow scraper settings in your environment.");
+            throw new ServiceUnavailableException(VALUATION_SYNC_UNAVAILABLE_MESSAGE);
         }
         var result = syncService.selectZpid(principal.tenantId(), id, request.zpid());
         return ResponseEntity.ok(result);
