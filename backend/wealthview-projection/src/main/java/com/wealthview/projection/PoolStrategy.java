@@ -70,11 +70,83 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     GrowthResult applyGrowth(boolean retired);
 
     /**
+     * Task 14: parameter object for {@link #executeWithdrawals(WithdrawalCycleInputs)}, replacing the
+     * former 6/8/9/10-arg telescoping overload chain (8 adjacent {@code BigDecimal} parameters was an
+     * adjacent-same-type hazard at every call site). Component order/names are taken verbatim from the
+     * former canonical 10-arg method's parameter list, so every positional overload below can build
+     * one of these with a straight name-for-name mapping.
+     *
+     * <p>{@link #of(BigDecimal, int, int)} seeds the three fields every overload always supplied
+     * ({@code need}/{@code year}/{@code age}) with the remaining seven defaulted to {@link
+     * BigDecimal#ZERO} -- the same zero-fill the old telescoping overloads used one field at a time.
+     * The {@code with*} methods let a caller override one field at a time from there, mirroring the
+     * one-field-per-call shape of {@code TrialSimulator.SimulationConfig.Builder} without needing a
+     * separate mutable builder class for a 10-component record.
+     */
+    record WithdrawalCycleInputs(
+            BigDecimal need,
+            int year,
+            BigDecimal effectiveOtherIncome,
+            BigDecimal conversionAmount,
+            BigDecimal rmdAmount,
+            int age,
+            BigDecimal alreadyChargedBaseTax,
+            BigDecimal extraPoolFundedTax,
+            BigDecimal federallyTaxedSocialSecurity,
+            BigDecimal netRentalIncome) {
+
+        /** Seeds the always-supplied {@code need}/{@code year}/{@code age} trio; every other field
+         * defaults to {@link BigDecimal#ZERO} (byte-identical to the old 6-arg overload's zero-fill). */
+        // ShortMethodName: 'of' is the conventional JDK-style static factory method name (same
+        // suppression as HouseholdContext.of).
+        @SuppressWarnings("PMD.ShortMethodName")
+        static WithdrawalCycleInputs of(BigDecimal need, int year, int age) {
+            return new WithdrawalCycleInputs(need, year, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, age,
+                    BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO);
+        }
+
+        WithdrawalCycleInputs withEffectiveOtherIncome(BigDecimal effectiveOtherIncome) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withConversionAmount(BigDecimal conversionAmount) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withRmdAmount(BigDecimal rmdAmount) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withAlreadyChargedBaseTax(BigDecimal alreadyChargedBaseTax) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withExtraPoolFundedTax(BigDecimal extraPoolFundedTax) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withFederallyTaxedSocialSecurity(BigDecimal federallyTaxedSocialSecurity) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+
+        WithdrawalCycleInputs withNetRentalIncome(BigDecimal netRentalIncome) {
+            return new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount, rmdAmount, age,
+                    alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity, netRentalIncome);
+        }
+    }
+
+    /**
      * Back-compat overload: no explicit signal that this year's base-income tax was already
      * charged elsewhere, and no additional tax obligation to fund from the pool cascade. Callers
      * that don't participate in {@link RetirementWithdrawalProcessor}'s surplus-tax bookkeeping
-     * (audit A4) keep their exact pre-fix behavior via this overload -- see the 9-arg method's
-     * javadoc for the full contract.
+     * (audit A4) keep their exact pre-fix behavior via this overload -- see {@link
+     * #executeWithdrawals(WithdrawalCycleInputs)}'s javadoc for the full contract.
      */
     default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                                     BigDecimal conversionAmount, BigDecimal rmdAmount, int age) {
@@ -96,47 +168,10 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     }
 
     /**
-     * Executes the year's withdrawal/RMD/tax cascade.
-     *
-     * <p>MultiPool grosses up any traditional slice of the resulting tax bill (audit C2): once the
-     * taxable pool can no longer fund the bill, the traditional distribution that pays it is ITSELF
-     * ordinary income, so it must fund its own tax too. That extra draw is debited from traditional
-     * like any other distribution, folded into the returned ordinary-income reporting (so the
-     * Social Security provisional-income convergence and the tax-liability/DTO breakdown all agree),
-     * and counts toward RMD satisfaction. See {@code PoolStrategy.MultiPool#growTraditionalGrossUp}
-     * for the fixed-point search.
-     *
-     * @param rmdAmount (T18a-1) the amount of this year's RMD ALREADY forced out of traditional by
-     *     a prior {@link #forceRmd} call — this method itself no longer forces anything out of the
-     *     pool for RMD purposes. It is folded straight into the year's traditional-sourced ordinary
-     *     income for tax attribution, exactly like the spend draw's own traditional portion. Zero
-     *     when no RMD applies this year.
-     * @param alreadyChargedBaseTax the dollar amount of ordinary tax on {@code (effectiveOtherIncome
-     *     + conversionAmount)} that {@link RetirementWithdrawalProcessor}'s spending-plan surplus
-     *     branch has ALREADY charged this year (whether funded from surplus cash or left for
-     *     {@code extraPoolFundedTax} below) -- an EXPLICIT signal that replaces the old
-     *     {@code totalNeed <= 0} ("noSpendDraw") proxy (audit A4 / T2 review). The old proxy
-     *     assumed {@code totalNeed<=0 ⟺ the surplus branch charged tax}, which holds for
-     *     {@code TierBasedSpendingPlan} (its resolved {@code portfolioWithdrawal} is derived from
-     *     the SAME {@code spendingNeed - activeIncome} quantities that decide the surplus branch)
-     *     but NOT for {@code GuardrailSpendingInput}, whose {@code resolveYear} returns a
-     *     pre-computed {@code portfolioWithdrawal} that ignores live income entirely -- so its
-     *     sign can disagree with whether the surplus branch actually ran. Zero when no such
-     *     charge exists (deficit years, no spending plan, or the Guardrail-mismatch case): the
-     *     caller has NOT pre-charged anything, so the bundle below must charge it in full.
-     *     IMPORTANT (audit C3): when non-zero, the caller must have computed it with the SAME
-     *     state-base adjustments this method applies (same {@code federallyTaxedSocialSecurity},
-     *     zero LTCG income) so the marginal subtraction below nets exactly and stays monotone.
-     * @param extraPoolFundedTax additional tax obligation (the surplus branch's tax remainder once
-     *     the year's surplus was insufficient to cover it, and/or self-employment tax, which has
-     *     no bundle of its own anywhere else this year) that must be funded from the SAME pool
-     *     cascade as the withdrawal-tax bundle, on top of it -- audit A4's "route the unfunded
-     *     remainder through deductFromPools" fix. Zero when nothing is outstanding.
-     * @param federallyTaxedSocialSecurity the year's converged federally-taxable Social Security
-     *     amount (audit B2's fixed point), threaded into the ordinary-tax bundle's state-base
-     *     computation so states that exempt Social Security don't tax it (audit C3). The realized
-     *     LTCG/dividend state addition needs no parameter -- it is computed internally from the
-     *     FIFO sale and the year's booked dividend. Zero when no Social Security is taxable.
+     * Back-compat overload predating the T18a-3 rental-income NIIT threading: no net rental income to
+     * add to the LTCG/NIIT bundle's Net Investment Income base (zero -- behavior identical for every
+     * caller that doesn't thread it). See {@link #executeWithdrawals(WithdrawalCycleInputs)}'s javadoc
+     * for the full contract.
      */
     default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
@@ -147,16 +182,76 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
     }
 
     /**
-     * As the 9-arg {@link #executeWithdrawals(BigDecimal, int, BigDecimal, BigDecimal, BigDecimal,
-     * int, BigDecimal, BigDecimal, BigDecimal)}, additionally threading {@code netRentalIncome}
-     * (T18a-3) into the year's LTCG/NIIT bundle's Net Investment Income base -- see
-     * {@code CapitalGainsTaxCalculator#computeLtcgTax}'s rental overload for the mechanics. Zero
-     * when no rental income sources are active.
+     * Positional back-compat overload carrying the full argument list -- thin delegate to {@link
+     * #executeWithdrawals(WithdrawalCycleInputs)}, the single abstract method every implementation
+     * now provides. See that method's javadoc for the full contract (RMD-forcing order, the audit-C2
+     * traditional gross-up, the audit-C3 state-base adjustments, and the T18a-3 NIIT rental threading).
      */
-    WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
+    default WithdrawalTaxResult executeWithdrawals(BigDecimal need, int year, BigDecimal effectiveOtherIncome,
                                            BigDecimal conversionAmount, BigDecimal rmdAmount, int age,
                                            BigDecimal alreadyChargedBaseTax, BigDecimal extraPoolFundedTax,
-                                           BigDecimal federallyTaxedSocialSecurity, BigDecimal netRentalIncome);
+                                           BigDecimal federallyTaxedSocialSecurity, BigDecimal netRentalIncome) {
+        return executeWithdrawals(new WithdrawalCycleInputs(need, year, effectiveOtherIncome, conversionAmount,
+                rmdAmount, age, alreadyChargedBaseTax, extraPoolFundedTax, federallyTaxedSocialSecurity,
+                netRentalIncome));
+    }
+
+    /**
+     * Executes the year's withdrawal/RMD/tax cascade.
+     *
+     * <p>MultiPool grosses up any traditional slice of the resulting tax bill (audit C2): once the
+     * taxable pool can no longer fund the bill, the traditional distribution that pays it is ITSELF
+     * ordinary income, so it must fund its own tax too. That extra draw is debited from traditional
+     * like any other distribution, folded into the returned ordinary-income reporting (so the
+     * Social Security provisional-income convergence and the tax-liability/DTO breakdown all agree),
+     * and counts toward RMD satisfaction. See {@code PoolStrategy.MultiPool#growTraditionalGrossUp}
+     * for the fixed-point search.
+     *
+     * <p>{@code inputs.}{@link WithdrawalCycleInputs#netRentalIncome() netRentalIncome} (T18a-3) is
+     * additionally threaded into the year's LTCG/NIIT bundle's Net Investment Income base -- see
+     * {@code CapitalGainsTaxCalculator#computeLtcgTax}'s rental overload for the mechanics. Zero when
+     * no rental income sources are active.
+     *
+     * @param inputs the withdrawal cycle's inputs; see the individual accessors below for the
+     *     contract of each field.
+     *     <ul>
+     *     <li>{@link WithdrawalCycleInputs#rmdAmount() rmdAmount} (T18a-1) the amount of this year's
+     *     RMD ALREADY forced out of traditional by a prior {@link #forceRmd} call — this method
+     *     itself no longer forces anything out of the pool for RMD purposes. It is folded straight
+     *     into the year's traditional-sourced ordinary income for tax attribution, exactly like the
+     *     spend draw's own traditional portion. Zero when no RMD applies this year.
+     *     <li>{@link WithdrawalCycleInputs#alreadyChargedBaseTax() alreadyChargedBaseTax} the dollar
+     *     amount of ordinary tax on {@code (effectiveOtherIncome + conversionAmount)} that {@link
+     *     RetirementWithdrawalProcessor}'s spending-plan surplus branch has ALREADY charged this year
+     *     (whether funded from surplus cash or left for {@code extraPoolFundedTax} below) -- an
+     *     EXPLICIT signal that replaces the old {@code totalNeed <= 0} ("noSpendDraw") proxy (audit
+     *     A4 / T2 review). The old proxy assumed {@code totalNeed<=0 ⟺ the surplus branch charged
+     *     tax}, which holds for {@code TierBasedSpendingPlan} (its resolved {@code
+     *     portfolioWithdrawal} is derived from the SAME {@code spendingNeed - activeIncome}
+     *     quantities that decide the surplus branch) but NOT for {@code GuardrailSpendingInput},
+     *     whose {@code resolveYear} returns a pre-computed {@code portfolioWithdrawal} that ignores
+     *     live income entirely -- so its sign can disagree with whether the surplus branch actually
+     *     ran. Zero when no such charge exists (deficit years, no spending plan, or the
+     *     Guardrail-mismatch case): the caller has NOT pre-charged anything, so the bundle below must
+     *     charge it in full. IMPORTANT (audit C3): when non-zero, the caller must have computed it
+     *     with the SAME state-base adjustments this method applies (same {@code
+     *     federallyTaxedSocialSecurity}, zero LTCG income) so the marginal subtraction below nets
+     *     exactly and stays monotone.
+     *     <li>{@link WithdrawalCycleInputs#extraPoolFundedTax() extraPoolFundedTax} additional tax
+     *     obligation (the surplus branch's tax remainder once the year's surplus was insufficient to
+     *     cover it, and/or self-employment tax, which has no bundle of its own anywhere else this
+     *     year) that must be funded from the SAME pool cascade as the withdrawal-tax bundle, on top
+     *     of it -- audit A4's "route the unfunded remainder through deductFromPools" fix. Zero when
+     *     nothing is outstanding.
+     *     <li>{@link WithdrawalCycleInputs#federallyTaxedSocialSecurity() federallyTaxedSocialSecurity}
+     *     the year's converged federally-taxable Social Security amount (audit B2's fixed point),
+     *     threaded into the ordinary-tax bundle's state-base computation so states that exempt Social
+     *     Security don't tax it (audit C3). The realized LTCG/dividend state addition needs no
+     *     parameter -- it is computed internally from the FIFO sale and the year's booked dividend.
+     *     Zero when no Social Security is taxable.
+     *     </ul>
+     */
+    WithdrawalTaxResult executeWithdrawals(WithdrawalCycleInputs inputs);
 
     /** Back-compat overload predating the audit-C3 state-base adjustment (zero taxable SS). */
     default ConversionResult executeRothConversion(int year, BigDecimal effectiveOtherIncome,
@@ -423,6 +518,105 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
             this(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy, targetBracketRate,
                     rothConversionStartYear, withdrawalOrder, taxCalculator, dynamicSequencingBracketRate,
                     geoMeans, inflationRate, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0, null);
+        }
+
+        /**
+         * Entry point for building a config fluently, mirroring {@code
+         * TrialSimulator.SimulationConfig.Builder}'s pattern. The nine arguments are the
+         * tax/withdrawal-strategy core every pool needs (the same nine the smallest back-compat
+         * constructor above takes); the allocation-driven and capital-gains-taxation knobs default to
+         * the documented byte-identical no-op values the back-compat constructors already encode
+         * (empty capital-market map, zero inflation/dividend/interest/fee, no LTCG or federal-deduction
+         * calculator) so a builder chain only names the mechanisms a caller actually uses.
+         */
+        static Builder builder(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
+                               String rothConversionStrategy, BigDecimal targetBracketRate,
+                               Integer rothConversionStartYear, WithdrawalOrder withdrawalOrder,
+                               TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
+            return new Builder(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy,
+                    targetBracketRate, rothConversionStartYear, withdrawalOrder, taxCalculator,
+                    dynamicSequencingBracketRate);
+        }
+
+        /** Fluent builder. Defaults are the same no-op anchors the back-compat constructors above
+         * document: empty capital-market map, zero inflation, no LTCG calculator, zero dividend/
+         * interest/fee, base year 0, no federal-deduction source. */
+        static final class Builder {
+            private final FilingStatus filingStatus;
+            private final BigDecimal otherIncome;
+            private final BigDecimal annualRothConversion;
+            private final String rothConversionStrategy;
+            private final BigDecimal targetBracketRate;
+            private final Integer rothConversionStartYear;
+            private final WithdrawalOrder withdrawalOrder;
+            private final TaxCalculationStrategy taxCalculator;
+            private final BigDecimal dynamicSequencingBracketRate;
+            private Map<AssetClass, Double> geoMeans = Map.of();
+            private BigDecimal inflationRate = BigDecimal.ZERO;
+            private CapitalGainsTaxCalculator capitalGainsTaxCalculator;
+            private BigDecimal dividendYield = BigDecimal.ZERO;
+            private BigDecimal interestYield = BigDecimal.ZERO;
+            private BigDecimal feeRate = BigDecimal.ZERO;
+            private int baseYear;
+            private FederalTaxCalculator federalTaxCalculator;
+
+            private Builder(FilingStatus filingStatus, BigDecimal otherIncome, BigDecimal annualRothConversion,
+                            String rothConversionStrategy, BigDecimal targetBracketRate,
+                            Integer rothConversionStartYear, WithdrawalOrder withdrawalOrder,
+                            TaxCalculationStrategy taxCalculator, BigDecimal dynamicSequencingBracketRate) {
+                this.filingStatus = filingStatus;
+                this.otherIncome = otherIncome;
+                this.annualRothConversion = annualRothConversion;
+                this.rothConversionStrategy = rothConversionStrategy;
+                this.targetBracketRate = targetBracketRate;
+                this.rothConversionStartYear = rothConversionStartYear;
+                this.withdrawalOrder = withdrawalOrder;
+                this.taxCalculator = taxCalculator;
+                this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
+            }
+
+            Builder capitalMarketAssumptions(Map<AssetClass, Double> geoMeans, BigDecimal inflationRate) {
+                this.geoMeans = geoMeans;
+                this.inflationRate = inflationRate;
+                return this;
+            }
+
+            Builder capitalGainsTaxCalculator(CapitalGainsTaxCalculator capitalGainsTaxCalculator) {
+                this.capitalGainsTaxCalculator = capitalGainsTaxCalculator;
+                return this;
+            }
+
+            Builder dividendYield(BigDecimal dividendYield) {
+                this.dividendYield = dividendYield;
+                return this;
+            }
+
+            Builder interestYield(BigDecimal interestYield) {
+                this.interestYield = interestYield;
+                return this;
+            }
+
+            Builder feeRate(BigDecimal feeRate) {
+                this.feeRate = feeRate;
+                return this;
+            }
+
+            Builder baseYear(int baseYear) {
+                this.baseYear = baseYear;
+                return this;
+            }
+
+            Builder federalTaxCalculator(FederalTaxCalculator federalTaxCalculator) {
+                this.federalTaxCalculator = federalTaxCalculator;
+                return this;
+            }
+
+            PoolConfig build() {
+                return new PoolConfig(filingStatus, otherIncome, annualRothConversion, rothConversionStrategy,
+                        targetBracketRate, rothConversionStartYear, withdrawalOrder, taxCalculator,
+                        dynamicSequencingBracketRate, geoMeans, inflationRate, capitalGainsTaxCalculator,
+                        dividendYield, interestYield, feeRate, baseYear, federalTaxCalculator);
+            }
         }
     }
 
@@ -910,14 +1104,18 @@ sealed interface PoolStrategy permits PoolStrategy.MultiPool {
         }
 
         @Override
-        public WithdrawalTaxResult executeWithdrawals(BigDecimal totalNeed, int year,
-                                                      BigDecimal effectiveOtherIncome,
-                                                      BigDecimal conversionAmount,
-                                                      BigDecimal rmdAmount, int age,
-                                                      BigDecimal alreadyChargedBaseTax,
-                                                      BigDecimal extraPoolFundedTax,
-                                                      BigDecimal federallyTaxedSocialSecurity,
-                                                      BigDecimal netRentalIncome) {
+        public WithdrawalTaxResult executeWithdrawals(WithdrawalCycleInputs inputs) {
+            BigDecimal totalNeed = inputs.need();
+            int year = inputs.year();
+            BigDecimal effectiveOtherIncome = inputs.effectiveOtherIncome();
+            BigDecimal conversionAmount = inputs.conversionAmount();
+            BigDecimal rmdAmount = inputs.rmdAmount();
+            int age = inputs.age();
+            BigDecimal alreadyChargedBaseTax = inputs.alreadyChargedBaseTax();
+            BigDecimal extraPoolFundedTax = inputs.extraPoolFundedTax();
+            BigDecimal federallyTaxedSocialSecurity = inputs.federallyTaxedSocialSecurity();
+            BigDecimal netRentalIncome = inputs.netRentalIncome();
+
             // A fully income-covered year (totalNeed <= 0, e.g. pension/rental/SS covers spending)
             // still owes the RMD force-out and this year's dividend/LTCG tax below -- required
             // distributions and portfolio income are due regardless of whether the retiree needed

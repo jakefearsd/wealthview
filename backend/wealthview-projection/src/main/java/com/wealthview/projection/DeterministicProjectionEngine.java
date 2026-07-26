@@ -290,16 +290,21 @@ public class DeterministicProjectionEngine implements ProjectionEngine {
         // constant only if the scenario itself has no rate (resolveProjectionParams already defaults
         // it, so this fallback is effectively unreachable in practice).
         BigDecimal inflationRate = scenarioInflationRate != null ? scenarioInflationRate : CMA_INFLATION_RATE;
-        var config = new PoolStrategy.PoolConfig(
+        var config = PoolStrategy.PoolConfig.builder(
                 params.filingStatus() != null ? FilingStatus.fromString(params.filingStatus()) : FilingStatus.SINGLE,
                 params.otherIncome() != null ? params.otherIncome() : BigDecimal.ZERO,
                 params.annualRothConversion() != null ? params.annualRothConversion() : BigDecimal.ZERO,
                 params.rothConversionStrategy(), params.targetBracketRate(),
                 params.rothConversionStartYear(), params.resolvedWithdrawalOrder(), taxStrategy,
-                params.dynamicSequencingBracketRate(),
-                geoMeans, inflationRate,
-                capitalGainsTaxCalculator, paramsParser.dividendYield(params), paramsParser.interestYield(params),
-                paramsParser.feeRate(params), baseYear, federalTaxCalculator);
+                params.dynamicSequencingBracketRate())
+                .capitalMarketAssumptions(geoMeans, inflationRate)
+                .capitalGainsTaxCalculator(capitalGainsTaxCalculator)
+                .dividendYield(paramsParser.dividendYield(params))
+                .interestYield(paramsParser.interestYield(params))
+                .feeRate(paramsParser.feeRate(params))
+                .baseYear(baseYear)
+                .federalTaxCalculator(federalTaxCalculator)
+                .build();
         return PoolStrategy.create(accounts, config);
     }
 
