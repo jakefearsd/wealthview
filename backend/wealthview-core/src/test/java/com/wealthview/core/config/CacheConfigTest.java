@@ -12,8 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CacheConfigTest {
 
     private static final String[] EXPECTED_CACHES = {
-            "accountBalances", "latestPrices", "exchangeRates", "exchangeRateConversions",
-            "taxBrackets", "standardDeductions"
+            "accountBalances", "latestPrices", "exchangeRates", "exchangeRateConversions"
     };
 
     private static CacheManager initialised(CacheManager manager) {
