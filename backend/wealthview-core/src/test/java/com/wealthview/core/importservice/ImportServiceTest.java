@@ -254,7 +254,7 @@ class ImportServiceTest {
     }
 
     @Test
-    void importCsv_defaultParser_delegatesToProcessImport() throws IOException {
+    void importCsv_nullFormat_delegatesToDefaultParser() throws IOException {
         setupAccountAndJobMocks();
         var transactions = List.of(
                 new ParsedTransaction(LocalDate.of(2024, 1, 15), BUY, "AAPL",
@@ -265,7 +265,7 @@ class ImportServiceTest {
                 .thenReturn(Set.of());
 
         var input = new ByteArrayInputStream("test".getBytes(StandardCharsets.UTF_8));
-        var result = importService.importCsv(tenantId, accountId, input);
+        var result = importService.importCsv(tenantId, accountId, input, null);
 
         verify(csvParser).parse(any());
         assertThat(result.successfulRows()).isEqualTo(1);

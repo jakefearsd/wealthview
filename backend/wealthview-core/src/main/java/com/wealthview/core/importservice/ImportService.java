@@ -38,6 +38,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 public class ImportService {
 
     private static final Logger log = LoggerFactory.getLogger(ImportService.class);
+    private static final String PARSER_SUFFIX = "CsvParser";
+    private static final String OFX_PARSER_BEAN = "ofxParser";
 
     private final ImportJobRepository importJobRepository;
     private final AccountRepository accountRepository;
@@ -70,12 +72,6 @@ public class ImportService {
     }
 
     @Transactional
-    public ImportJobResponse importCsv(UUID tenantId, UUID accountId, InputStream inputStream) throws IOException {
-        var parseResult = csvParser.parse(inputStream);
-        return processCsvImport(tenantId, accountId, parseResult);
-    }
-
-    @Transactional
     public ImportJobResponse importCsv(UUID tenantId, UUID accountId,
             InputStream inputStream, String format) throws IOException {
         var parser = resolveParser(format);
@@ -87,7 +83,7 @@ public class ImportService {
         if (format == null || format.isBlank() || "generic".equals(format)) {
             return csvParser;
         }
-        var parserName = format + "CsvParser";
+        var parserName = format + PARSER_SUFFIX;
         var parser = namedParsers.get(parserName);
         if (parser == null) {
             throw new IllegalArgumentException("Unknown CSV format: " + format);
@@ -97,7 +93,7 @@ public class ImportService {
 
     @Transactional
     public ImportJobResponse importOfx(UUID tenantId, UUID accountId, InputStream inputStream) throws IOException {
-        var ofxParser = namedParsers.get("ofxParser");
+        var ofxParser = namedParsers.get(OFX_PARSER_BEAN);
         if (ofxParser == null) {
             throw new IllegalStateException("OFX parser not available");
         }

@@ -26,6 +26,7 @@ import static com.wealthview.api.testutil.ControllerTestUtils.TENANT_ID;
 import static com.wealthview.api.testutil.ControllerTestUtils.authenticatedAdmin;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -57,7 +58,7 @@ class ImportControllerTest {
     void importCsv_validFile_returns201() throws Exception {
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "csv", "completed",
                 5, 4, 1, "1 rows had parse errors", OffsetDateTime.now());
-        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any()))
+        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any(), isNull()))
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "transactions.csv",
@@ -143,10 +144,11 @@ class ImportControllerTest {
 
     @Test
     void importCsv_blankFormat_usesAutoDetect() throws Exception {
-        // blank format string should fall through to the no-format overload (format.isBlank() is true)
+        // blank format string is passed straight through; ImportService.resolveParser treats
+        // a blank format as the generic/auto-detect case (format.isBlank() is true)
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "csv", "completed",
                 2, 2, 0, null, OffsetDateTime.now());
-        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any()))
+        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any(), eq("   ")))
                 .thenReturn(jobResponse);
 
         var file = new MockMultipartFile("file", "txns.csv",
@@ -197,7 +199,7 @@ class ImportControllerTest {
         // null content type passes the type guard (condition short-circuits on null)
         var jobResponse = new ImportJobResponse(UUID.randomUUID(), "csv", "completed",
                 1, 1, 0, null, OffsetDateTime.now());
-        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any()))
+        when(importService.importCsv(eq(TENANT_ID), eq(ACCOUNT_ID), any(), isNull()))
                 .thenReturn(jobResponse);
 
         // MockMultipartFile with no content type → getContentType() returns null

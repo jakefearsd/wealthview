@@ -54,9 +54,7 @@ public class ImportController {
         validateFileType(file);
         log.info("CSV import requested for account {} file='{}' size={}B format={}",
                 accountId, sanitize(file.getOriginalFilename()), file.getSize(), sanitize(format));
-        var result = (format != null && !format.isBlank())
-                ? importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format)
-                : importService.importCsv(principal.tenantId(), accountId, file.getInputStream());
+        var result = importService.importCsv(principal.tenantId(), accountId, file.getInputStream(), format);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 
