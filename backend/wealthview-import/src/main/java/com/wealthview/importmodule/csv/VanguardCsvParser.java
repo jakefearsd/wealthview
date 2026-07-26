@@ -1,18 +1,10 @@
 package com.wealthview.importmodule.csv;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
-import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.persistence.entity.TransactionType;
 
 @Component("vanguardCsvParser")
@@ -44,43 +36,22 @@ public class VanguardCsvParser extends AbstractBrokerCsvParser {
     }
 
     @Override
-    protected void extractRow(CSVRecord record, int rowNum,
-                              List<ParsedTransaction> transactions, List<CsvRowError> errors) {
-        var dateStr = record.get("Trade Date");
-        if (dateStr == null || dateStr.isBlank()) {
-            return;
-        }
-
-        LocalDate date;
-        try {
-            date = parseDate(dateStr);
-        } catch (DateTimeParseException e) {
-            errors.add(new CsvRowError(rowNum, "Invalid date: " + dateStr));
-            return;
-        }
-
-        var transactionType = record.get("Transaction Type");
-        var type = mapAction(transactionType);
-        if (type == null) {
-            errors.add(new CsvRowError(rowNum, "Unknown transaction type: " + transactionType));
-            return;
-        }
-
-        var quantity = parseOptionalAmount(record.get("Shares"));
-        var amount = parseOptionalAbsAmount(record.get("Net Amount"));
-        var parsedSymbol = parseOptionalSymbol(record.get("Symbol"));
-        transactions.add(new ParsedTransaction(date, type, parsedSymbol, quantity, amount));
+    protected String getActionColumn() {
+        return "Transaction Type";
     }
 
-    private BigDecimal parseOptionalAbsAmount(String value) {
-        return (value != null && !value.isBlank()) ? parseAmount(value).abs() : null;
+    @Override
+    protected String getAmountColumn() {
+        return "Net Amount";
     }
 
-    TransactionType mapAction(String transactionType) {
-        if (transactionType == null) {
-            return null;
-        }
-        var upper = transactionType.trim().toUpperCase(Locale.US);
-        return ACTION_MAP.get(upper);
+    @Override
+    protected String getQuantityColumn() {
+        return "Shares";
+    }
+
+    @Override
+    protected Map<String, TransactionType> getActionMap() {
+        return ACTION_MAP;
     }
 }

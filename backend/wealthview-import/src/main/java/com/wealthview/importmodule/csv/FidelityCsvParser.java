@@ -1,18 +1,11 @@
 package com.wealthview.importmodule.csv;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
-import org.apache.commons.csv.CSVRecord;
 import org.springframework.stereotype.Component;
 
-import com.wealthview.core.importservice.dto.CsvRowError;
-import com.wealthview.core.importservice.dto.ParsedTransaction;
 import com.wealthview.persistence.entity.TransactionType;
 
 @Component("fidelityCsvParser")
@@ -26,6 +19,7 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
             "YOU SOLD", TransactionType.SELL,
             "DIVIDEND RECEIVED", TransactionType.DIVIDEND
     );
+    private static final Set<String> SIGN_DEPENDENT_ACTIONS = Set.of("ELECTRONIC FUNDS TRANSFER");
 
     @Override
     protected String getHeaderMarker() {
@@ -38,47 +32,17 @@ public class FidelityCsvParser extends AbstractBrokerCsvParser {
     }
 
     @Override
-    protected void extractRow(CSVRecord record, int rowNum,
-                              List<ParsedTransaction> transactions, List<CsvRowError> errors) {
-        var dateStr = record.get("Run Date");
-        if (dateStr == null || dateStr.isBlank()) {
-            return;
-        }
-
-        LocalDate date;
-        try {
-            date = parseDate(dateStr);
-        } catch (DateTimeParseException e) {
-            errors.add(new CsvRowError(rowNum, "Invalid date: " + dateStr));
-            return;
-        }
-
-        var amount = parseOptionalAmount(record.get("Amount ($)"));
-        var type = mapAction(record.get("Action"), amount);
-        if (type == null) {
-            errors.add(new CsvRowError(rowNum, "Unknown action: " + record.get("Action")));
-            return;
-        }
-
-        addTransaction(date, type, amount, record, transactions);
+    protected String getAmountColumn() {
+        return "Amount ($)";
     }
 
-    TransactionType mapAction(String action, BigDecimal amount) {
-        if (action == null) {
-            return null;
-        }
-        var upper = action.trim().toUpperCase(Locale.US);
+    @Override
+    protected Map<String, TransactionType> getActionMap() {
+        return ACTION_MAP;
+    }
 
-        var mapped = ACTION_MAP.get(upper);
-        if (mapped != null) {
-            return mapped;
-        }
-
-        if ("ELECTRONIC FUNDS TRANSFER".equals(upper)) {
-            return (amount != null && amount.compareTo(BigDecimal.ZERO) < 0)
-                    ? TransactionType.WITHDRAWAL : TransactionType.DEPOSIT;
-        }
-
-        return null;
+    @Override
+    protected Set<String> getSignDependentActions() {
+        return SIGN_DEPENDENT_ACTIONS;
     }
 }
