@@ -1,7 +1,6 @@
 package com.wealthview.api.controller;
 
 import java.time.Duration;
-import java.util.Map;
 
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +29,7 @@ import com.wealthview.core.auth.dto.CurrentUserResponse;
 import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.MfaChallengeRequest;
+import com.wealthview.core.auth.dto.MfaRequiredResponse;
 import com.wealthview.core.auth.dto.RegisterRequest;
 
 /**
@@ -66,7 +66,7 @@ public class AuthController {
         var ctx = buildContext(httpRequest, AuthRequestContext.COOKIE, request.deviceLabel());
         var outcome = authService.loginInitiate(request, ctx);
         if (outcome instanceof LoginOutcome.MfaRequired m) {
-            return ResponseEntity.ok(Map.of("mfa_required", true, "mfa_token", m.mfaToken()));
+            return ResponseEntity.ok(MfaRequiredResponse.from(m));
         }
         var tokens = ((LoginOutcome.Tokens) outcome).result();
         return respondWithCookies(tokens, HttpStatus.OK);

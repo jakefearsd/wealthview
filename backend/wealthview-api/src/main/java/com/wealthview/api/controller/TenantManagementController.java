@@ -1,7 +1,6 @@
 package com.wealthview.api.controller;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
@@ -20,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.wealthview.api.security.TenantUserPrincipal;
 import com.wealthview.core.tenant.TenantService;
 import com.wealthview.core.tenant.UserManagementService;
+import com.wealthview.core.tenant.dto.DeletedCountResponse;
 import com.wealthview.core.tenant.dto.GenerateInviteRequest;
 import com.wealthview.core.tenant.dto.InviteCodeResponse;
 import com.wealthview.core.tenant.dto.UpdateRoleRequest;
@@ -65,10 +65,10 @@ public class TenantManagementController {
     }
 
     @DeleteMapping("/invite-codes/used")
-    public Map<String, Integer> deleteUsedCodes(
+    public DeletedCountResponse deleteUsedCodes(
             @AuthenticationPrincipal TenantUserPrincipal principal) {
         int deleted = tenantService.deleteUsedCodes(principal.tenantId());
-        return Map.of("deleted", deleted);
+        return new DeletedCountResponse(deleted);
     }
 
     @GetMapping("/users")

@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
  *   <li>The expiryDaysOrDefault() fallback on GenerateInviteRequest.</li>
  *   <li>Bean Validation constraints on request DTOs (PasswordResetRequest,
  *       SetActiveRequest, TenantRequest, UpdateRoleRequest).</li>
+ *   <li>DeletedCountResponse's accessor.</li>
  * </ul>
  */
 class TenantDtoTest {
@@ -318,5 +319,14 @@ class TenantDtoTest {
                 validator.validate(new UpdateRoleRequest(""));
 
         assertThat(violations).isNotEmpty();
+    }
+
+    // ───────── DeletedCountResponse ─────────
+
+    @Test
+    void deletedCountResponse_exposesDeletedCount() {
+        var response = new DeletedCountResponse(3);
+
+        assertThat(response.deleted()).isEqualTo(3);
     }
 }

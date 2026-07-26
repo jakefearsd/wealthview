@@ -1,7 +1,5 @@
 package com.wealthview.api.controller;
 
-import java.util.Map;
-
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -20,6 +18,7 @@ import com.wealthview.core.auth.dto.AuthResult;
 import com.wealthview.core.auth.dto.LoginOutcome;
 import com.wealthview.core.auth.dto.LoginRequest;
 import com.wealthview.core.auth.dto.MfaChallengeRequest;
+import com.wealthview.core.auth.dto.MfaRequiredResponse;
 import com.wealthview.core.auth.dto.MobileAuthResponse;
 import com.wealthview.core.auth.dto.MobileRefreshRequest;
 import com.wealthview.core.auth.dto.RegisterRequest;
@@ -72,7 +71,7 @@ public class AuthMobileController {
         var ctx = buildContext(httpRequest, request.deviceLabel());
         var outcome = authService.loginInitiate(request, ctx);
         if (outcome instanceof LoginOutcome.MfaRequired m) {
-            return ResponseEntity.ok(Map.of("mfa_required", true, "mfa_token", m.mfaToken()));
+            return ResponseEntity.ok(MfaRequiredResponse.from(m));
         }
         var tokens = ((LoginOutcome.Tokens) outcome).result();
         return ResponseEntity.ok(toResponse(tokens));
