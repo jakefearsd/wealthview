@@ -49,14 +49,10 @@ class MultiPoolDeepTest {
                 List.of(new HypotheticalAccountInput(bd(roth), bd(rothContrib), ZERO, "roth")));
     }
 
+    /** Byte-identical to {@link PoolFixtures#multiPool} -- see that method's javadoc. */
     private PoolStrategy.MultiPool pool(String taxable, String traditional, String roth,
                                          WithdrawalOrder order) {
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                order, null, null);
-        return new PoolStrategy.MultiPool(
-                grouped(taxable, traditional, roth, "0", "0", "0"),
-                ZERO, config);
+        return PoolFixtures.multiPool(taxable, traditional, roth, order);
     }
 
     private PoolStrategy.MultiPool poolWithConversion(String taxable, String traditional, String roth,
@@ -80,12 +76,9 @@ class MultiPoolDeepTest {
      */
     private PoolStrategy.MultiPool poolWithOrderAndTax(String taxable, String traditional, String roth,
                                                          WithdrawalOrder order, TaxCalculationStrategy taxCalc) {
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                order, taxCalc, null);
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
-                ZERO, config);
+                ZERO, PoolFixtures.singleFilerConfig(order, taxCalc));
     }
 
     /**
@@ -100,12 +93,9 @@ class MultiPoolDeepTest {
         TaxCalculationStrategy realTaxCalc = new FederalOnlyTaxStrategy(
                 new FederalTaxCalculator(taxBracketRepository, standardDeductionRepository));
 
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                order, realTaxCalc, null);
         return new PoolStrategy.MultiPool(
                 grouped(taxable, traditional, roth, "0", "0", "0"),
-                ZERO, config);
+                ZERO, PoolFixtures.singleFilerConfig(order, realTaxCalc));
     }
 
     // ---- factory method ----
@@ -120,8 +110,7 @@ class MultiPoolDeepTest {
         // consequence of routing all-taxable scenarios through real taxation.
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("100000"), bd("5000"), bd("0.07"), "taxable"));
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
 
         var strategy = PoolStrategy.create(accounts, config);
 
@@ -141,8 +130,7 @@ class MultiPoolDeepTest {
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("100000"), bd("0"), bd("0.07"), "taxable"),
                 new HypotheticalAccountInput(bd("200000"), bd("0"), bd("0.08"), "traditional"));
-        var config = new PoolStrategy.PoolConfig(FilingStatus.MARRIED_FILING_JOINTLY, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.mfjConfig(WithdrawalOrder.TAXABLE_FIRST);
 
         var strategy = PoolStrategy.create(accounts, config);
 
@@ -158,8 +146,7 @@ class MultiPoolDeepTest {
     void create_onlyNonTaxableAccount_returnsMultiPool() {
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("50000"), bd("0"), bd("0.07"), "roth"));
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
 
         var strategy = PoolStrategy.create(accounts, config);
 
@@ -170,8 +157,7 @@ class MultiPoolDeepTest {
     void create_zeroTotalBalance_weightedReturnIsZero() {
         var accounts = List.<ProjectionAccountInput>of(
                 new HypotheticalAccountInput(bd("0"), bd("0"), bd("0.07"), "taxable"));
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
 
         var strategy = PoolStrategy.create(accounts, config);
 
@@ -306,8 +292,7 @@ class MultiPoolDeepTest {
     void getWeightedReturn_returnsConfiguredRate() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "100", "100", "0", "0", "0"),
-                bd("0.075"), new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TAXABLE_FIRST, null, null));
+                bd("0.075"), PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
         assertThat(p.getWeightedReturn()).isEqualByComparingTo(bd("0.075"));
     }
@@ -318,8 +303,7 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingEarlyAge_drawsTaxableOnly() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "500", "300", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.DYNAMIC_SEQUENCING, null, bd("0.22")));
+                ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.DYNAMIC_SEQUENCING, null, bd("0.22")));
 
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_EARLY);
 
@@ -332,7 +316,7 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingFillsBracketFromTraditional() {
         var p = new PoolStrategy.MultiPool(
                 grouped("200", "500", "100", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
+                ZERO, PoolFixtures.singleFilerConfig(
                         WithdrawalOrder.DYNAMIC_SEQUENCING, FlatTaxStubs.flatTaxStrategy("0.22"), bd("0.22")));
 
         // Bracket ceiling = 100000 from flatTaxCalc; all need fits, pulls from traditional up to bracket
@@ -347,8 +331,7 @@ class MultiPoolDeepTest {
     void executeWithdrawals_dynamicSequencingNoBracketRate_fallsBackToOrderedStrategy() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "300", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.DYNAMIC_SEQUENCING, null, null));
+                ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.DYNAMIC_SEQUENCING));
 
         var r = p.executeWithdrawals(bd("150"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
@@ -364,8 +347,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_traditionalOnlyWithTaxCalc_computesTaxAndDeductsFromPools() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
 
         // need 100 from traditional; base tax = 100 * 0.20 = 20. Taxable is $0, so that $20 itself
         // must be paid from traditional -- audit C2 gross-up, warm-started (T10 review): bill0=20;
@@ -383,8 +366,8 @@ class MultiPoolDeepTest {
     void executeWithdrawals_withConversionAmount_computesMarginalTaxOnly() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "500", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
 
         // Conversion of 50 already taxed. Additional withdrawal 100 from traditional.
         // Base bill: detailed tax on (100+50)=30; base tax on (50)=10; marginal=30-10=20. Taxable is
@@ -412,8 +395,8 @@ class MultiPoolDeepTest {
         // taxable empty → tax deduction cascades to traditional, then roth
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "10", "1000", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("1.0")));
 
         // Withdrawal = 10 from traditional, tax = 10 * 1.0 = 10.
         // taxable (0) < 10 → take 0. traditional (now 0 after withdrawal) < 10 → take 0. roth: -10 (unconditional subtract).
@@ -526,8 +509,7 @@ class MultiPoolDeepTest {
         // Audit C11: an all-taxable account list is now a MultiPool with an empty traditional
         // sub-pool, so MultiPool's own override guard (traditional <= 0) short-circuits -- there is
         // no more SinglePool default-method delegation path to exercise here.
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
         var allTaxable = PoolStrategy.create(
                 List.<ProjectionAccountInput>of(
                         new HypotheticalAccountInput(bd("100000"), ZERO, ZERO, "taxable")),
@@ -544,8 +526,7 @@ class MultiPoolDeepTest {
     void applyContributions_addsToEachPool() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "50", "10", "20", "5"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TAXABLE_FIRST, null, null));
+                ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
         var total = p.applyContributions();
 
@@ -557,8 +538,7 @@ class MultiPoolDeepTest {
     void applyGrowth_producesGrowthPerPool() {
         var p = new PoolStrategy.MultiPool(
                 grouped("100", "200", "100", "0", "0", "0"),
-                bd("0.10"), new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TAXABLE_FIRST, null, null));
+                bd("0.10"), PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST));
 
         var g = p.applyGrowth(true);
 
@@ -619,8 +599,8 @@ class MultiPoolDeepTest {
     void getLastTaxBreakdown_exposesBreakdownAfterWithdrawalWithTaxCalc() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
 
@@ -637,8 +617,7 @@ class MultiPoolDeepTest {
     void buildYearDto_withTaxBreakdown_populatesFederalAndStateTaxFields() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TRADITIONAL_FIRST,
+                ZERO, PoolFixtures.singleFilerConfig(WithdrawalOrder.TRADITIONAL_FIRST,
                 new TaxCalculationStrategy() {
                     @Override
                     public BigDecimal computeTotalTax(BigDecimal g, int y, FilingStatus fs) {
@@ -654,7 +633,7 @@ class MultiPoolDeepTest {
                     public CombinedTaxResult computeDetailedTax(BigDecimal g, int y, FilingStatus fs) {
                         return new CombinedTaxResult(bd("15"), bd("5"), bd("20"), bd("3"), bd("10"), true);
                     }
-                }, null));
+                }));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO,
@@ -689,8 +668,8 @@ class MultiPoolDeepTest {
     void buildYearDto_stateTaxZero_leavesStateTaxNull() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
 
         // taxable being $0, audit C2 grosses the $100 traditional draw's own 20% tax up to the exact
         // fixed point 25 (100 need + tax = taxableIncome; tax = 0.20*(100+tax) => tax = 25) -- same
@@ -722,8 +701,8 @@ class MultiPoolDeepTest {
     void buildYearDto_taxLiabilityDisagreesWithStoredBreakdown_suppressesStaleFederalTax() {
         var p = new PoolStrategy.MultiPool(
                 grouped("0", "1000", "100", "0", "0", "0"),
-                ZERO, new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20"), null));
+                ZERO, PoolFixtures.singleFilerConfig(
+                        WithdrawalOrder.TRADITIONAL_FIRST, FlatTaxStubs.flatTaxStrategy("0.20")));
 
         p.executeWithdrawals(bd("100"), YEAR, ZERO, ZERO, ZERO, AGE_RETIRED);
         var dto = p.buildYearDto(new PoolStrategy.YearDtoContext(YEAR, AGE_RETIRED, bd("1100"), ZERO, ZERO, bd("100"), true,
@@ -744,8 +723,7 @@ class MultiPoolDeepTest {
     void allTaxableAccounts_applyContributionsGrowthWithdrawFloorDeposit() {
         // Bit-identical arithmetic to the pre-C11 SinglePool spot-check: no tax calculator is wired,
         // so this pins balance/growth/withdrawal math only, not the taxation consequence of C11.
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
         var pool = PoolStrategy.create(
                 List.<ProjectionAccountInput>of(
                         new HypotheticalAccountInput(bd("1000"), bd("100"), bd("0.10"), "taxable")),

@@ -1,16 +1,10 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
-import com.wealthview.core.projection.dto.HypotheticalAccountInput;
-import com.wealthview.core.projection.dto.PoolType;
-import com.wealthview.core.projection.dto.ProjectionAccountInput;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
-import com.wealthview.core.projection.tax.FilingStatus;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,37 +26,11 @@ class PoolStrategyTest {
     /**
      * Constructs a MultiPool with the given per-pool balances and withdrawal order.
      * Contributions and return are zeroed out so tests are isolated to withdrawal math.
+     * Byte-identical to {@link PoolFixtures#multiPool} -- see that method's javadoc.
      */
     private PoolStrategy.MultiPool multiPool(String taxable, String traditional, String roth,
                                               WithdrawalOrder order) {
-        List<ProjectionAccountInput> taxableAccounts = List.of(
-                new HypotheticalAccountInput(bd(taxable), ZERO, ZERO, "taxable"));
-        List<ProjectionAccountInput> traditionalAccounts = List.of(
-                new HypotheticalAccountInput(bd(traditional), ZERO, ZERO, "traditional"));
-        List<ProjectionAccountInput> rothAccounts = List.of(
-                new HypotheticalAccountInput(bd(roth), ZERO, ZERO, "roth"));
-
-        Map<PoolType, List<ProjectionAccountInput>> grouped = Map.of(
-                PoolType.TAXABLE, taxableAccounts,
-                PoolType.TRADITIONAL, traditionalAccounts,
-                PoolType.ROTH, rothAccounts);
-
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.SINGLE,
-                ZERO,           // otherIncome
-                ZERO,           // annualRothConversion
-                "fixed",        // rothConversionStrategy
-                null,           // targetBracketRate
-                null,           // rothConversionStartYear
-                order,
-                null,           // taxCalculator — no tax in these tests
-                null            // dynamicSequencingBracketRate
-        );
-
-        return new PoolStrategy.MultiPool(
-                grouped,
-                ZERO,           // weightedReturn — no growth under test
-                config);
+        return PoolFixtures.multiPool(taxable, traditional, roth, order);
     }
 
     // -------------------------------------------------------------------------

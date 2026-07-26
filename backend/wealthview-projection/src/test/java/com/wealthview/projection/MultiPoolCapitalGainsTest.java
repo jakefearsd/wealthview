@@ -68,15 +68,6 @@ class MultiPoolCapitalGainsTest {
         return new HypotheticalAccountInput(bd(balance), ZERO, ZERO, type);
     }
 
-    private static Map<PoolType, List<ProjectionAccountInput>> grouped(
-            HypotheticalAccountInput taxable, HypotheticalAccountInput traditional,
-            HypotheticalAccountInput roth) {
-        return Map.of(
-                PoolType.TAXABLE, List.of(taxable),
-                PoolType.TRADITIONAL, List.of(traditional),
-                PoolType.ROTH, List.of(roth));
-    }
-
     /** Threads a standard-deduction source for the LTCG-floor netting fix. */
     private static PoolStrategy.PoolConfig config(String dividendYield, WithdrawalOrder order,
                                                    CapitalGainsTaxCalculator cg,
@@ -103,7 +94,7 @@ class MultiPoolCapitalGainsTest {
                                                 WithdrawalOrder order, CapitalGainsTaxCalculator cg,
                                                 FederalTaxCalculator federalTaxCalculator) {
         return new PoolStrategy.MultiPool(
-                grouped(taxable, traditional, roth),
+                PoolFixtures.grouped(taxable, traditional, roth),
                 bd(taxableReturn), ZERO, ZERO, bd(taxableReturn),
                 config(dividendYield, order, cg, federalTaxCalculator));
     }
@@ -157,7 +148,7 @@ class MultiPoolCapitalGainsTest {
                 combinedTaxCalc, null, Map.of(), ZERO, capitalGainsCalc(), ZERO, ZERO, ZERO, BASE_YEAR,
                 federal);
         var p = new PoolStrategy.MultiPool(
-                grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
+                PoolFixtures.grouped(taxableAcct("500000", "300000"), acct("0", "traditional"), acct("0", "roth")),
                 ZERO, config);
 
         var r = p.executeWithdrawals(bd("100000"), YEAR, bd("60000"), ZERO, ZERO, AGE_RETIRED);

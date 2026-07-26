@@ -72,15 +72,6 @@ class MultiPoolInterestYieldTest {
         return new HypotheticalAccountInput(bd(balance), ZERO, ZERO, type);
     }
 
-    private static Map<PoolType, List<ProjectionAccountInput>> grouped(
-            HypotheticalAccountInput taxable, HypotheticalAccountInput traditional,
-            HypotheticalAccountInput roth) {
-        return Map.of(
-                PoolType.TAXABLE, List.of(taxable),
-                PoolType.TRADITIONAL, List.of(traditional),
-                PoolType.ROTH, List.of(roth));
-    }
-
     private static PoolStrategy.PoolConfig config(String dividendYield, String interestYield,
                                                    CapitalGainsTaxCalculator cg,
                                                    FederalTaxCalculator federalTaxCalculator,
@@ -97,7 +88,7 @@ class MultiPoolInterestYieldTest {
                                                 FederalTaxCalculator federalTaxCalculator,
                                                 com.wealthview.core.projection.tax.TaxCalculationStrategy taxCalculator) {
         return new PoolStrategy.MultiPool(
-                grouped(taxable, acct("0", "traditional"), acct("200000", "roth")),
+                PoolFixtures.grouped(taxable, acct("0", "traditional"), acct("200000", "roth")),
                 bd(taxableReturn), ZERO, ZERO, bd(taxableReturn),
                 config(dividendYield, interestYield, cg, federalTaxCalculator, taxCalculator));
     }

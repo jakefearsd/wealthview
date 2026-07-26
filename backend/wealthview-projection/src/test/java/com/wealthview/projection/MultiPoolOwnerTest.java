@@ -39,18 +39,14 @@ class MultiPoolOwnerTest {
 
     /** A MultiPool with the given traditional accounts, zero growth and no tax calculator. */
     private static PoolStrategy.MultiPool tradPool(List<ProjectionAccountInput> traditionalAccounts) {
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.SINGLE, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
         return new PoolStrategy.MultiPool(
                 Map.of(PoolType.TRADITIONAL, traditionalAccounts), ZERO, config);
     }
 
     /** A MultiPool over the given type-grouped accounts, MFJ, zero growth, no tax calculator. */
     private static PoolStrategy.MultiPool pool(Map<PoolType, List<ProjectionAccountInput>> grouped) {
-        var config = new PoolStrategy.PoolConfig(
-                FilingStatus.MARRIED_FILING_JOINTLY, ZERO, ZERO, "fixed", null, null,
-                WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.mfjConfig(WithdrawalOrder.TAXABLE_FIRST);
         return new PoolStrategy.MultiPool(grouped, ZERO, config);
     }
 

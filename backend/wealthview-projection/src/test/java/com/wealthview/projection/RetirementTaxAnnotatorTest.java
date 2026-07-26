@@ -41,8 +41,7 @@ class RetirementTaxAnnotatorTest {
      * FilingStatus.SINGLE is all {@code annotate()} needs from the pool in these tests.
      */
     private static PoolStrategy filingStatusOnlyPool() {
-        var config = new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
-                "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null);
+        var config = PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
         return new PoolStrategy.MultiPool(Map.of(), BigDecimal.ZERO, config);
     }
 

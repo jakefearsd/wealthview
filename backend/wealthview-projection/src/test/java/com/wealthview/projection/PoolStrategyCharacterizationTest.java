@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionYearDto;
 import com.wealthview.core.projection.strategy.WithdrawalOrder;
-import com.wealthview.core.projection.tax.FilingStatus;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,8 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PoolStrategyCharacterizationTest {
 
     private static PoolStrategy.PoolConfig fixedConfig() {
-        return new PoolStrategy.PoolConfig(FilingStatus.SINGLE, BigDecimal.ZERO, BigDecimal.ZERO,
-                "fixed", null, null, WithdrawalOrder.TAXABLE_FIRST, null, null);
+        return PoolFixtures.singleFilerConfig(WithdrawalOrder.TAXABLE_FIRST);
     }
 
     private static PoolStrategy allTaxablePool() {
