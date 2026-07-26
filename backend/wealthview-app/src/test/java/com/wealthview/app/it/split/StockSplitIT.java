@@ -1,7 +1,6 @@
 package com.wealthview.app.it.split;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
+import com.wealthview.app.it.testutil.SplitTestSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,6 +37,7 @@ class StockSplitIT extends AbstractApiIntegrationTest {
     private AuthHelper.Session superAdmin;
     private String memberToken;
     private String accountId;
+    private SplitTestSupport split;
 
     @BeforeEach
     @Override
@@ -47,6 +48,7 @@ class StockSplitIT extends AbstractApiIntegrationTest {
         authHelper.createUserDirectly(MEMBER_EMAIL, MEMBER_PASS, "member");
         memberToken = authHelper.loginAs(restTemplate, MEMBER_EMAIL, MEMBER_PASS);
         accountId = data.createBrokerageAccountAndGetId();
+        split = new SplitTestSupport(api);
     }
 
     @Test
@@ -55,19 +57,11 @@ class StockSplitIT extends AbstractApiIntegrationTest {
         data.createBuyTransactionOnDateAndGetId(accountId, "2020-01-01", "AAPL", 100, 8000);
 
         // Apply 4:1 split as super-admin
-        var applyResp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits",
-                Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        var applyResp = split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
         assertThat(applyResp.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         // Holdings should now show 400 shares with the same cost basis
-        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        var aaplHolding = holdings.getBody().stream()
-                .filter(h -> "AAPL".equals(h.get("symbol")))
-                .findFirst().orElseThrow();
+        var aaplHolding = split.holding(accountId, "AAPL").orElseThrow();
         assertThat(new BigDecimal(aaplHolding.get("quantity").toString()))
                 .isEqualByComparingTo("400");
         assertThat(new BigDecimal(aaplHolding.get("cost_basis").toString()))
@@ -78,12 +72,7 @@ class StockSplitIT extends AbstractApiIntegrationTest {
     void manualSplitViaAdminEndpoint_appliesAndIsListable() {
         data.createBuyTransactionOnDateAndGetId(accountId, "2020-01-01", "AAPL", 10, 1500);
 
-        api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits",
-                Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
 
         // Tenant-scoped GET should return the split (member token works)
         var listResp = api.getListForEntityAs(memberToken, "/api/v1/stock-splits");
@@ -96,37 +85,23 @@ class StockSplitIT extends AbstractApiIntegrationTest {
     void superAdminCanUnapply_revertsAdjustments() {
         data.createBuyTransactionOnDateAndGetId(accountId, "2020-01-01", "AAPL", 100, 8000);
 
-        var applyResp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits",
-                Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        var applyResp = split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
         var splitId = (String) applyResp.getBody().get("id");
 
         // Verify the split scaled the holding
-        var holdingsAfter = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new BigDecimal(holdingsAfter.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("400");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("400");
 
         // Un-apply
         var deleteResp = api.deleteForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/" + splitId);
         assertThat(deleteResp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // Holdings restored
-        var holdingsRestored = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new BigDecimal(holdingsRestored.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("100");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("100");
     }
 
     @Test
     void nonSuperAdminCannotAccessAdminEndpoints() {
-        var resp = api.postForEntityAs(memberToken, "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1))
-                .getStatusCode();
+        var resp = split.applySplit(memberToken, "AAPL", "2020-08-31", 4, 1).getStatusCode();
         assertThat(resp).isEqualTo(HttpStatus.FORBIDDEN);
     }
 
@@ -138,26 +113,15 @@ class StockSplitIT extends AbstractApiIntegrationTest {
         // Bootstrap tenant 2 with their own AAPL position
         authHelper.bootstrapSecondTenant(restTemplate);
         var t2Token = authHelper.tenant2Token();
-        // Direct API call with tenant 2 token — TestDataHelper always uses tenant 1's token and
-        // exposes no seam to swap it, so tenant 2's setup is driven through ApiClient here.
-        var t2Account = api.postForEntityAs(t2Token, "/api/v1/accounts",
-                Map.of("name", "T2 Brokerage", "type", "brokerage"));
-        var t2AccountId = (String) t2Account.getBody().get("id");
-        api.postForEntityAs(t2Token, "/api/v1/accounts/" + t2AccountId + "/transactions", Map.of(
-                        "date", "2020-02-01", "type", "buy", "symbol", "AAPL",
-                        "quantity", 30, "amount", 2400));
+        var t2 = data.as(t2Token);
+        var t2AccountId = (String) t2.createAccount("T2 Brokerage", "brokerage").get("id");
+        t2.createBuyTransactionOnDateAndGetId(t2AccountId, "2020-02-01", "AAPL", 30, 2400);
 
         // Apply split as super-admin (tenant 1)
-        api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 2,
-                        "denominator", 1));
+        split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 2, 1);
 
         // Tenant 1 holding doubled
-        var h1 = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new BigDecimal(h1.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("100");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("100");
 
         // Tenant 2 holding doubled
         var h2 = api.getListForEntityAs(t2Token, "/api/v1/accounts/" + t2AccountId + "/holdings");
@@ -170,11 +134,7 @@ class StockSplitIT extends AbstractApiIntegrationTest {
         data.createBuyTransactionOnDateAndGetId(accountId, "2020-01-01", "GOOG", 10, 2000);
 
         // Apply a split for a symbol the tenant doesn't hold
-        api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
 
         var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         // Only GOOG, untouched
@@ -188,27 +148,17 @@ class StockSplitIT extends AbstractApiIntegrationTest {
     void duplicateSplitApply_isIdempotent() {
         data.createBuyTransactionOnDateAndGetId(accountId, "2020-01-01", "AAPL", 100, 8000);
 
-        var first = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        var first = split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         var firstId = first.getBody().get("id");
 
-        var second = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        var second = split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(second.getBody().get("id")).isEqualTo(firstId);
 
         // Quantity wasn't doubled-up
-        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("400");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("400");
     }
 
     @Test
@@ -223,11 +173,7 @@ class StockSplitIT extends AbstractApiIntegrationTest {
                 """);
 
         // Apply an AAPL split via admin so the tenant is "associated"
-        api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
 
         var listResp = api.getListForEntity("/api/v1/stock-splits");
         assertThat(listResp.getStatusCode()).isEqualTo(HttpStatus.OK);

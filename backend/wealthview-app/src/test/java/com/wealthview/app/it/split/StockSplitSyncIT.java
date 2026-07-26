@@ -1,52 +1,52 @@
 package com.wealthview.app.it.split;
 
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
-import com.wealthview.core.split.SplitDetectionClient;
+import com.wealthview.app.it.testutil.QueueingSplitDetectionClient;
+import com.wealthview.app.it.testutil.QueueingSplitDetectionClientConfig;
+import com.wealthview.app.it.testutil.SplitTestSupport;
 import com.wealthview.core.split.StockSplitBackfillRunner;
 import com.wealthview.core.split.dto.DetectedSplit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Sync flow coverage. Uses a {@link TestConfiguration} to provide a stub
- * {@link SplitDetectionClient} bean so the sync service runs without needing
- * a real Finnhub key (the {@code @ConditionalOnBean} guard flips on).
+ * Sync flow coverage. Imports {@link QueueingSplitDetectionClientConfig} to
+ * provide a stub {@code SplitDetectionClient} bean so the sync service runs
+ * without needing a real Finnhub key (the {@code @ConditionalOnBean} guard
+ * flips on).
  *
  * <p>That same conditional guard also flips on {@link StockSplitBackfillRunner},
- * whose {@code ContextRefreshedEvent} auto-run raced this class's
- * {@link StubSplitClient} on slow CI runners. The auto-run is disabled in the
- * "it" profile ({@code app.stock-splits.backfill-auto-run: false}), so the stub
- * queue is only ever touched by this class's own sync-endpoint calls.
+ * whose {@code ContextRefreshedEvent} auto-run raced this class's stub client
+ * on slow CI runners. The auto-run is disabled in the "it" profile
+ * ({@code app.stock-splits.backfill-auto-run: false}), so the stub queue is
+ * only ever touched by this class's own sync-endpoint calls.
  */
-@Import(StockSplitSyncIT.StubSplitClientConfig.class)
+@Import(QueueingSplitDetectionClientConfig.class)
 class StockSplitSyncIT extends AbstractApiIntegrationTest {
 
     private static final String SUPER_ADMIN_EMAIL = "split-sync-super@wealthview.test";
     private static final String SUPER_ADMIN_PASS = "superpass123";
 
     @Autowired
-    private StubSplitClient stubSplitClient;
+    private QueueingSplitDetectionClient stubSplitClient;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
     private AuthHelper.Session superAdmin;
     private String accountId;
+    private SplitTestSupport split;
 
     @BeforeEach
     @Override
@@ -56,6 +56,7 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         authHelper.createSuperAdminDirectly(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         superAdmin = authHelper.loginAsSession(restTemplate, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         accountId = data.createBrokerageAccountAndGetId();
+        split = new SplitTestSupport(api);
     }
 
     @Test
@@ -69,9 +70,7 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat((Integer) resp.getBody().get("splits_applied")).isEqualTo(1);
 
-        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("400");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("400");
     }
 
     @Test
@@ -91,9 +90,7 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         assertThat((Integer) second.getBody().get("splits_applied")).isEqualTo(0);
 
         // Quantity wasn't doubled-up
-        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
-        assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
-                .isEqualByComparingTo("400");
+        assertThat(split.holdingQuantity(accountId)).isEqualByComparingTo("400");
     }
 
     @Test
@@ -111,48 +108,5 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         @SuppressWarnings("unchecked")
         var failed = (List<String>) resp.getBody().get("failed_symbols");
         assertThat(failed).contains("AAPL");
-    }
-
-    @TestConfiguration
-    static class StubSplitClientConfig {
-        @Bean
-        public StubSplitClient stubSplitClient() {
-            return new StubSplitClient();
-        }
-
-        @Bean
-        public SplitDetectionClient splitDetectionClient(StubSplitClient stub) {
-            return stub;
-        }
-    }
-
-    static class StubSplitClient implements SplitDetectionClient {
-        private final Map<String, List<DetectedSplit>> queued = new HashMap<>();
-        private final java.util.Set<String> failures = new java.util.HashSet<>();
-
-        // synchronized: splits are queued on the JUnit thread but fetched on the
-        // server's HTTP worker threads — a bare HashMap has no cross-thread
-        // memory-visibility guarantee.
-        synchronized void queueSplit(String symbol, DetectedSplit split) {
-            queued.computeIfAbsent(symbol, k -> new java.util.ArrayList<>()).add(split);
-        }
-
-        synchronized void queueFailure(String symbol) {
-            failures.add(symbol);
-        }
-
-        synchronized void reset() {
-            queued.clear();
-            failures.clear();
-        }
-
-        @Override
-        public synchronized List<DetectedSplit> fetch(String symbol, LocalDate from, LocalDate to) {
-            if (failures.contains(symbol)) {
-                throw new RuntimeException("simulated finnhub failure");
-            }
-            var list = queued.remove(symbol);
-            return list == null ? List.of() : list;
-        }
     }
 }

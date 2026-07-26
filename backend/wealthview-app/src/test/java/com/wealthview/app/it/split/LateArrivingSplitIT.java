@@ -1,7 +1,6 @@
 package com.wealthview.app.it.split;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
+import com.wealthview.app.it.testutil.SplitTestSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,6 +28,7 @@ class LateArrivingSplitIT extends AbstractApiIntegrationTest {
 
     private AuthHelper.Session superAdmin;
     private String accountId;
+    private SplitTestSupport split;
 
     @BeforeEach
     @Override
@@ -36,16 +37,13 @@ class LateArrivingSplitIT extends AbstractApiIntegrationTest {
         authHelper.createSuperAdminDirectly(SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         superAdmin = authHelper.loginAsSession(restTemplate, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASS);
         accountId = data.createBrokerageAccountAndGetId();
+        split = new SplitTestSupport(api);
     }
 
     @Test
     void transactionImportedAfterSplit_isAdjustedThenRestoredOnUnapply() {
         // Split applied FIRST (no transactions exist yet for AAPL).
-        var applyResp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
-                        "symbol", "AAPL",
-                        "effective_date", "2020-08-31",
-                        "numerator", 4,
-                        "denominator", 1));
+        var applyResp = split.applySplit(superAdmin.accessToken(), "AAPL", "2020-08-31", 4, 1);
         var splitId = (String) applyResp.getBody().get("id");
 
         // Transaction dated BEFORE the split arrives afterward (posts through
