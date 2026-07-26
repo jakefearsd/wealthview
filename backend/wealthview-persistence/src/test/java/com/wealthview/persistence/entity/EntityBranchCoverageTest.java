@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   - ProjectionAccountEntity(…, String accountType): null-accountType else-branch
  *   - InviteCodeEntity.isConsumed(): true and false paths
  *   - PropertyEntity.hasLoanDetails(): fully populated (true) and missing fields (false)
+ *   - ScenarioIncomeSourceEntity.effectiveAnnualAmount(): override present and absent
  */
 class EntityBranchCoverageTest {
 
@@ -261,6 +262,28 @@ class EntityBranchCoverageTest {
         // loanStartDate is null
 
         assertThat(property.hasLoanDetails()).isFalse();
+    }
+
+    // -------------------------------------------------------------------------
+    // ScenarioIncomeSourceEntity.effectiveAnnualAmount() — both branches
+    // -------------------------------------------------------------------------
+
+    @Test
+    void scenarioIncomeSourceEntity_effectiveAnnualAmount_withOverride_returnsOverride() {
+        var incomeSource = new IncomeSourceEntity(null, "Pension", "pension",
+                new BigDecimal("36000"), 65, null, BigDecimal.ZERO, false, "taxable");
+        var link = new ScenarioIncomeSourceEntity(null, incomeSource, new BigDecimal("40000"));
+
+        assertThat(link.effectiveAnnualAmount()).isEqualByComparingTo("40000");
+    }
+
+    @Test
+    void scenarioIncomeSourceEntity_effectiveAnnualAmount_withoutOverride_returnsSourceAmount() {
+        var incomeSource = new IncomeSourceEntity(null, "Pension", "pension",
+                new BigDecimal("36000"), 65, null, BigDecimal.ZERO, false, "taxable");
+        var link = new ScenarioIncomeSourceEntity(null, incomeSource, null);
+
+        assertThat(link.effectiveAnnualAmount()).isEqualByComparingTo("36000");
     }
 
     // -------------------------------------------------------------------------

@@ -48,6 +48,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -1583,6 +1584,45 @@ class ScenarioCrudServiceTest {
 
         assertThat(guardrailProfile.isStale()).isTrue();
         verify(guardrailProfileRepository).save(guardrailProfile);
+    }
+
+    // Task 7 (pattern-refactor): updateScenario used to query
+    // findWithIncomeSourceByScenarioId once inside the guardrail-staleness check
+    // (currentIncomeSourceSignatures) and again inside the response mapping
+    // (toScenarioResponse -> mapIncomeSources) -- two identical fetches per update
+    // whenever a guardrail profile exists. Both now share a single fetch.
+    @Test
+    void updateScenario_withGuardrailProfile_fetchesIncomeSourceLinksOnce() {
+        var scenario = new ProjectionScenarioEntity(
+                tenant, "Old Plan", LocalDate.of(2055, 1, 1), 90,
+                new BigDecimal("0.03"), "{\"birth_year\":1990}");
+        var guardrailProfile = new GuardrailSpendingProfileEntity(
+                tenant, scenario, "Guardrail", new BigDecimal("30000"));
+        guardrailProfile.setScenarioHash(GuardrailProfileService.computeScenarioHash(scenario, List.of()));
+        guardrailProfile.setStale(false);
+
+        when(scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId))
+                .thenReturn(Optional.of(scenario));
+        when(scenarioRepository.save(any(ProjectionScenarioEntity.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        when(guardrailProfileRepository.findByScenario_Id(scenarioId))
+                .thenReturn(Optional.of(guardrailProfile));
+
+        // Change endAge to trigger hash change so currentIncomeSourceSignatures actually runs.
+        var request = new ScenarioRequest(
+                "Old Plan", LocalDate.of(2055, 1, 1), 95,
+                new BigDecimal("0.03"), 1990, null, null, null, null,
+                null, null, null, null, null, null, null, null,
+                null, null, null,
+                null, null, List.of(), null, null, null);
+
+        service.updateScenario(tenantId, scenarioId, request);
+
+        // any(): the in-memory test scenario never gets a generated id, so the two call sites
+        // this pins (currentIncomeSourceSignatures and the response mapping) pass different
+        // arguments (scenarioId vs. scenario.getId()) pre-fix; counting by argument would hide
+        // the very duplication this test exists to catch.
+        verify(scenarioIncomeSourceRepository, times(1)).findWithIncomeSourceByScenarioId(any());
     }
 
     // A5 (2026-07-11 audit): allocation is a realism-v2 MC input (PoolReturnModel blends per-pool

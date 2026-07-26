@@ -134,20 +134,23 @@ public class ScenarioCrudService {
         meterRegistry.counter("wealthview.scenarios", "action", "create").increment();
         log.info("Scenario '{}' created with {} accounts for tenant {}",
                 request.name(), request.accounts() != null ? request.accounts().size() : 0, tenantId);
-        return toScenarioResponse(saved, tenantId);
+        return toScenarioResponse(saved, tenantId,
+                scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(saved.getId()));
     }
 
     @Transactional(readOnly = true)
     public ScenarioResponse getScenario(UUID tenantId, UUID scenarioId) {
         var scenario = scenarioRepository.findByTenant_IdAndId(tenantId, scenarioId)
                 .orElseThrow(Entities.notFound("Scenario"));
-        return toScenarioResponse(scenario, tenantId);
+        return toScenarioResponse(scenario, tenantId,
+                scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()));
     }
 
     @Transactional(readOnly = true)
     public List<ScenarioResponse> listScenarios(UUID tenantId) {
         return scenarioRepository.findByTenant_IdOrderByCreatedAtDesc(tenantId).stream()
-                .map(s -> toScenarioResponse(s, tenantId))
+                .map(s -> toScenarioResponse(s, tenantId,
+                        scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(s.getId())))
                 .toList();
     }
 
@@ -188,9 +191,13 @@ public class ScenarioCrudService {
 
         var saved = scenarioRepository.save(scenario);
 
+        // Fetched once and reused below for both the guardrail-staleness check and the response
+        // mapping, instead of querying scenarioIncomeSourceRepository twice per update.
+        var incomeLinks = scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenarioId);
+
         guardrailProfileRepository.findByScenario_Id(scenarioId).ifPresent(profile -> {
             var newHash = GuardrailProfileService.computeScenarioHash(
-                    saved, currentIncomeSourceSignatures(scenarioId));
+                    saved, currentIncomeSourceSignatures(incomeLinks));
             if (!newHash.equals(profile.getScenarioHash())) {
                 profile.setStale(true);
                 guardrailProfileRepository.save(profile);
@@ -200,7 +207,7 @@ public class ScenarioCrudService {
 
         meterRegistry.counter("wealthview.scenarios", "action", "update").increment();
         log.info("Scenario {} updated for tenant {}", scenarioId, tenantId);
-        return toScenarioResponse(saved, tenantId);
+        return toScenarioResponse(saved, tenantId, incomeLinks);
     }
 
     @Transactional
@@ -212,13 +219,20 @@ public class ScenarioCrudService {
         log.info("Scenario {} deleted for tenant {}", scenarioId, tenantId);
     }
 
-    private ScenarioResponse toScenarioResponse(ProjectionScenarioEntity scenario, UUID tenantId) {
+    /**
+     * Takes an already-fetched set of income-source links rather than querying for them itself,
+     * so every caller controls exactly when that query happens -- {@link #updateScenario} fetches
+     * once and reuses the same list for its guardrail-staleness check, instead of paying for it
+     * twice per update.
+     */
+    private ScenarioResponse toScenarioResponse(ProjectionScenarioEntity scenario, UUID tenantId,
+                                                 List<ScenarioIncomeSourceEntity> incomeLinks) {
         var accounts = mapAccounts(scenario, tenantId);
         var profile = scenario.getSpendingProfile() != null
                 ? SpendingProfileResponse.from(scenario.getSpendingProfile())
                 : null;
         var guardrail = mapGuardrailProfile(scenario);
-        var incomeSources = mapIncomeSources(scenario);
+        var incomeSources = mapIncomeSources(incomeLinks);
         return new ScenarioResponse(
                 scenario.getId(), scenario.getName(), scenario.getRetirementDate(),
                 scenario.getEndAge(), scenario.getInflationRate(), scenario.getParamsJson(),
@@ -262,12 +276,11 @@ public class ScenarioCrudService {
                 : null;
     }
 
-    private List<ScenarioIncomeSourceResponse> mapIncomeSources(ProjectionScenarioEntity scenario) {
-        return scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenario.getId()).stream()
+    private List<ScenarioIncomeSourceResponse> mapIncomeSources(List<ScenarioIncomeSourceEntity> links) {
+        return links.stream()
                 .map(link -> {
                     var src = link.getIncomeSource();
-                    var effective = link.getOverrideAnnualAmount() != null
-                            ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
+                    var effective = link.effectiveAnnualAmount();
                     var netCashFlow = computeRentalNetCashFlow(src.getIncomeType(),
                             src.getProperty(), effective);
                     return ScenarioIncomeSourceResponse.from(link, effective, netCashFlow);
@@ -281,12 +294,12 @@ public class ScenarioCrudService {
      * {@link GuardrailProfileService#computeScenarioHash}), so an income-source add, amount edit,
      * or owner/survivor-percent edit is detected the same way an account edit already is.
      */
-    private List<GuardrailProfileService.IncomeSourceSignature> currentIncomeSourceSignatures(UUID scenarioId) {
-        return scenarioIncomeSourceRepository.findWithIncomeSourceByScenarioId(scenarioId).stream()
+    private List<GuardrailProfileService.IncomeSourceSignature> currentIncomeSourceSignatures(
+            List<ScenarioIncomeSourceEntity> links) {
+        return links.stream()
                 .map(link -> {
                     var src = link.getIncomeSource();
-                    var effective = link.getOverrideAnnualAmount() != null
-                            ? link.getOverrideAnnualAmount() : src.getAnnualAmount();
+                    var effective = link.effectiveAnnualAmount();
                     return new GuardrailProfileService.IncomeSourceSignature(
                             src.getId(), effective, src.getOwner(), src.getSurvivorPercent());
                 })

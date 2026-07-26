@@ -266,12 +266,7 @@ public class ProjectionInputBuilder {
             return List.of();
         }
         return scenarioLinks.stream()
-                .map(link -> {
-                    var source = link.getIncomeSource();
-                    var amount = link.getOverrideAnnualAmount() != null
-                            ? link.getOverrideAnnualAmount() : source.getAnnualAmount();
-                    return toIncomeSourceInput(source, amount);
-                })
+                .map(link -> toIncomeSourceInput(link.getIncomeSource(), link.effectiveAnnualAmount()))
                 .toList();
     }
 

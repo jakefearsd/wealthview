@@ -71,4 +71,12 @@ public class ScenarioIncomeSourceEntity extends CreatedAtEntity {
         this.overrideAnnualAmount = overrideAnnualAmount;
     }
 
+    /**
+     * The annual amount this link actually contributes: the scenario-specific override
+     * when the user set one, otherwise the linked income source's own annual amount.
+     */
+    public BigDecimal effectiveAnnualAmount() {
+        return overrideAnnualAmount != null ? overrideAnnualAmount : incomeSource.getAnnualAmount();
+    }
+
 }
