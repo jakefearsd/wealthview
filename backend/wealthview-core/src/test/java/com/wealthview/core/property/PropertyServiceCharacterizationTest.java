@@ -6,24 +6,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Spy;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 
 import com.wealthview.core.property.dto.CostSegAllocation;
 import com.wealthview.core.property.dto.PropertyRequest;
-import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.PropertyEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.repository.IncomeSourceRepository;
-import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
-import com.wealthview.persistence.repository.PropertyRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,45 +34,7 @@ import static org.mockito.Mockito.when;
  * reconciling to the depreciable basis). These assertions are the behavior contract the
  * Phase 3 decomposition of this God-class must preserve.
  */
-@ExtendWith(MockitoExtension.class)
-class PropertyServiceCharacterizationTest {
-
-    @Mock
-    private PropertyRepository propertyRepository;
-
-    @Mock
-    private PropertyExpenseRepository expenseRepository;
-
-    @Mock
-    private PropertyIncomeRepository incomeRepository;
-
-    @Mock
-    private IncomeSourceRepository incomeSourceRepository;
-
-    @Mock
-    private TenantLookup tenantLookup;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @Spy
-    private PropertyDepreciationService depreciationService =
-            new PropertyDepreciationService(new DepreciationCalculator());
-
-    @Spy
-    private PropertyCashFlowService cashFlowService = new PropertyCashFlowService();
-
-    @InjectMocks
-    private PropertyService propertyService;
-
-    private TenantEntity tenant;
-    private UUID tenantId;
-
-    @BeforeEach
-    void setUp() {
-        tenantId = UUID.randomUUID();
-        tenant = new TenantEntity("Test");
-    }
+class PropertyServiceCharacterizationTest extends PropertyServiceTestSupport {
 
     /**
      * A realistic investment property: cost-segregated depreciation, financial fields,

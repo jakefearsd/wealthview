@@ -8,15 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.Spy;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.wealthview.core.exception.EntityNotFoundException;
@@ -25,16 +18,10 @@ import com.wealthview.core.property.dto.PropertyExpenseRequest;
 import com.wealthview.core.property.dto.PropertyExpenseResponse;
 import com.wealthview.core.property.dto.PropertyIncomeRequest;
 import com.wealthview.core.property.dto.PropertyRequest;
-import com.wealthview.core.tenant.TenantLookup;
 import com.wealthview.persistence.entity.IncomeSourceEntity;
 import com.wealthview.persistence.entity.PropertyEntity;
 import com.wealthview.persistence.entity.PropertyExpenseEntity;
 import com.wealthview.persistence.entity.PropertyIncomeEntity;
-import com.wealthview.persistence.entity.TenantEntity;
-import com.wealthview.persistence.repository.IncomeSourceRepository;
-import com.wealthview.persistence.repository.PropertyExpenseRepository;
-import com.wealthview.persistence.repository.PropertyIncomeRepository;
-import com.wealthview.persistence.repository.PropertyRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -43,44 +30,25 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
-class PropertyServiceTest {
+class PropertyServiceTest extends PropertyServiceTestSupport {
 
-    @Mock
-    private PropertyRepository propertyRepository;
+    /** The vanilla request: base fields set, every optional field null. */
+    private static PropertyRequest propertyRequest() {
+        return new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                null, null, null, null, null, null,
+                null, null, null, null,
+                null, null, null, null, null, null, null);
+    }
 
-    @Mock
-    private PropertyExpenseRepository expenseRepository;
-
-    @Mock
-    private PropertyIncomeRepository incomeRepository;
-
-    @Mock
-    private IncomeSourceRepository incomeSourceRepository;
-
-    @Mock
-    private TenantLookup tenantLookup;
-
-    @Mock
-    private ApplicationEventPublisher eventPublisher;
-
-    @Spy
-    private PropertyDepreciationService depreciationService =
-            new PropertyDepreciationService(new DepreciationCalculator());
-
-    @Spy
-    private PropertyCashFlowService cashFlowService = new PropertyCashFlowService();
-
-    @InjectMocks
-    private PropertyService propertyService;
-
-    private TenantEntity tenant;
-    private UUID tenantId;
-
-    @BeforeEach
-    void setUp() {
-        tenantId = UUID.randomUUID();
-        tenant = new TenantEntity("Test");
+    /** Same base fields as {@link #propertyRequest()} plus a full loan-detail set (computed balance). */
+    private static PropertyRequest propertyRequestWithLoan() {
+        return new PropertyRequest("123 Main St", new BigDecimal("300000"),
+                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
+                new BigDecimal("300000"), new BigDecimal("0.065"), 360,
+                LocalDate.of(2020, 1, 1), true, null,
+                null, null, null, null,
+                null, null, null, null, null, null, null);
     }
 
     @Test
@@ -88,12 +56,7 @@ class PropertyServiceTest {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.create(tenantId, request);
+        var result = propertyService.create(tenantId, propertyRequest());
 
         assertThat(result.address()).isEqualTo("123 Main St");
         assertThat(result.equity()).isEqualByComparingTo("150000");
@@ -104,13 +67,7 @@ class PropertyServiceTest {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), new BigDecimal("0.065"), 360,
-                LocalDate.of(2020, 1, 1), true, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.create(tenantId, request);
+        var result = propertyService.create(tenantId, propertyRequestWithLoan());
 
         assertThat(result.hasLoanDetails()).isTrue();
         assertThat(result.useComputedBalance()).isTrue();
@@ -148,13 +105,7 @@ class PropertyServiceTest {
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
         // Toggle to computed
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                new BigDecimal("300000"), new BigDecimal("0.065"), 360,
-                LocalDate.of(2020, 1, 1), true, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.update(tenantId, UUID.randomUUID(), request);
+        var result = propertyService.update(tenantId, UUID.randomUUID(), propertyRequestWithLoan());
 
         assertThat(result.useComputedBalance()).isTrue();
         // Should use computed balance, not manual 200000
@@ -238,12 +189,7 @@ class PropertyServiceTest {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.create(tenantId, request);
+        var result = propertyService.create(tenantId, propertyRequest());
 
         assertThat(result.propertyType()).isEqualTo("primary_residence");
     }
@@ -463,12 +409,7 @@ class PropertyServiceTest {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.create(tenantId, request);
+        var result = propertyService.create(tenantId, propertyRequest());
 
         assertThat(result.depreciationMethod()).isEqualTo("none");
     }
@@ -511,12 +452,7 @@ class PropertyServiceTest {
         when(tenantLookup.requireTenant(tenantId)).thenReturn(tenant);
         when(propertyRepository.save(any(PropertyEntity.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        var request = new PropertyRequest("123 Main St", new BigDecimal("300000"),
-                LocalDate.of(2020, 1, 1), new BigDecimal("350000"), new BigDecimal("200000"),
-                null, null, null, null, null, null,
-                null, null, null, null,
-                null, null, null, null, null, null, null);
-        var result = propertyService.create(tenantId, request);
+        var result = propertyService.create(tenantId, propertyRequest());
 
         assertThat(result.annualAppreciationRate()).isNull();
         assertThat(result.annualPropertyTax()).isNull();
