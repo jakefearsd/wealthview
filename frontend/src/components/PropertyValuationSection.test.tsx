@@ -13,15 +13,7 @@ vi.mock('../utils/styles', () => ({
     trHoverStyle: {},
 }));
 
-vi.mock('recharts', () => ({
-    LineChart: ({ children }: { children: React.ReactNode }) => <div data-testid="line-chart">{children}</div>,
-    Line: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 import PropertyValuationSection from './PropertyValuationSection';
 

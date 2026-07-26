@@ -1,25 +1,16 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { ProjectionYear, ScenarioIncomeSourceResponse } from '../types/projection';
 
-let capturedBarChartData: Record<string, number | string>[] | null = null;
-
-vi.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    BarChart: ({ data, children }: { data: Record<string, number | string>[]; children: React.ReactNode }) => {
-        capturedBarChartData = data;
-        return <div data-testid="bar-chart">{children}</div>;
-    },
-    Bar: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    CartesianGrid: () => <div />,
-    ReferenceLine: () => <div />,
-}));
+vi.mock('recharts');
 
 import IncomeStreamsChart from './IncomeStreamsChart';
+
+/** Reads the shaped rows the component handed to BarChart via the shared recharts mock. */
+function barChartData(): Record<string, number | string>[] | null {
+    const raw = screen.queryByTestId('bar-chart')?.getAttribute('data-chart-data');
+    return raw ? JSON.parse(raw) : null;
+}
 
 function makeYear(overrides: Partial<ProjectionYear> & { year: number }): ProjectionYear {
     return {
@@ -91,8 +82,6 @@ const mockIncomeSources: ScenarioIncomeSourceResponse[] = [
 
 describe('IncomeStreamsChart', () => {
     it('passes non-zero income data to chart when income_by_source is populated', () => {
-        capturedBarChartData = null;
-
         const data: ProjectionYear[] = [
             makeYear({ year: 2044, retired: false }),
             makeYear({
@@ -113,15 +102,13 @@ describe('IncomeStreamsChart', () => {
             />
         );
 
-        expect(capturedBarChartData).not.toBeNull();
-        expect(capturedBarChartData).toHaveLength(2); // only retired years
-        expect(capturedBarChartData![0]['src-pension-001']).toBe(24000);
-        expect(capturedBarChartData![1]['src-pension-001']).toBe(24480);
+        expect(barChartData()).not.toBeNull();
+        expect(barChartData()).toHaveLength(2); // only retired years
+        expect(barChartData()![0]['src-pension-001']).toBe(24000);
+        expect(barChartData()![1]['src-pension-001']).toBe(24480);
     });
 
     it('returns null when no retired years exist', () => {
-        capturedBarChartData = null;
-
         const data: ProjectionYear[] = [
             makeYear({ year: 2044, retired: false }),
         ];
@@ -138,8 +125,6 @@ describe('IncomeStreamsChart', () => {
     });
 
     it('returns null when no income sources provided', () => {
-        capturedBarChartData = null;
-
         const data: ProjectionYear[] = [
             makeYear({ year: 2045, retired: true, income_by_source: { 'src-pension-001': 24000 } }),
         ];
@@ -156,8 +141,6 @@ describe('IncomeStreamsChart', () => {
     });
 
     it('defaults to zero when income_by_source is null for a retired year', () => {
-        capturedBarChartData = null;
-
         const data: ProjectionYear[] = [
             makeYear({ year: 2045, retired: true, income_by_source: null }),
         ];
@@ -170,7 +153,7 @@ describe('IncomeStreamsChart', () => {
             />
         );
 
-        expect(capturedBarChartData).not.toBeNull();
-        expect(capturedBarChartData![0]['src-pension-001']).toBe(0);
+        expect(barChartData()).not.toBeNull();
+        expect(barChartData()![0]['src-pension-001']).toBe(0);
     });
 });

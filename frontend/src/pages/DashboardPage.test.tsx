@@ -23,13 +23,7 @@ vi.mock('../components/SummaryCard', () => ({
     ),
 }));
 
-vi.mock('recharts', () => ({
-    PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Pie: () => <div />,
-    Cell: () => <div />,
-    Tooltip: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,

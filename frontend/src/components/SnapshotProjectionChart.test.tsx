@@ -18,15 +18,7 @@ vi.mock('../utils/errorMessage', () => ({
     extractErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'unknown error'),
 }));
 
-vi.mock('recharts', () => ({
-    AreaChart: ({ children }: { children: React.ReactNode }) => <div data-testid="area-chart">{children}</div>,
-    Area: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 import { getSnapshotProjection } from '../api/dashboard';
 import SnapshotProjectionChart from './SnapshotProjectionChart';

@@ -9,15 +9,7 @@ vi.mock('../utils/styles', () => ({
     cardStyle: {},
 }));
 
-vi.mock('recharts', () => ({
-    BarChart: ({ children }: { children: React.ReactNode }) => <div data-testid="bar-chart">{children}</div>,
-    Bar: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 vi.mock('./PropertyTransactionForm', () => ({
     default: ({ title }: { title: string }) => <div data-testid="property-transaction-form">{title}</div>,

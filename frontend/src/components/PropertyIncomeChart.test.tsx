@@ -27,22 +27,7 @@ vi.mock('../utils/styles', () => ({
     cardStyle: {},
 }));
 
-// Surfaces the shaped chart rows so the bar-building logic can be asserted directly.
-vi.mock('recharts', () => ({
-    BarChart: ({ children, data }: { children: React.ReactNode; data: unknown }) => (
-        <div data-testid="bar-chart" data-rows={JSON.stringify(data)}>{children}</div>
-    ),
-    Bar: ({ dataKey, name }: { dataKey: string; name: string }) => (
-        <div data-testid="bar" data-key={dataKey} data-name={name} />
-    ),
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ReferenceLine: () => <div />,
-    CartesianGrid: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 import PropertyIncomeChart from './PropertyIncomeChart';
 
@@ -72,7 +57,7 @@ function setQuery(
 }
 
 function chartRows(): Record<string, number | string>[] {
-    const raw = screen.getByTestId('bar-chart').getAttribute('data-rows');
+    const raw = screen.getByTestId('bar-chart').getAttribute('data-chart-data');
     return JSON.parse(raw ?? '[]');
 }
 

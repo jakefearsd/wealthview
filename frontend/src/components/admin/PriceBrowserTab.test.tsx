@@ -5,15 +5,7 @@ vi.mock('../../api/client', () => ({
     default: { get: vi.fn() },
 }));
 
-vi.mock('recharts', () => ({
-    LineChart: ({ children }: { children: React.ReactNode }) => <div data-testid="line-chart">{children}</div>,
-    Line: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    CartesianGrid: () => <div />,
-}));
+vi.mock('recharts');
 
 vi.mock('../../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,

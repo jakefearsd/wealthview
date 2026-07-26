@@ -3,25 +3,13 @@ import { describe, it, expect, vi } from 'vitest';
 import TaxBreakdownChart from './TaxBreakdownChart';
 import type { ProjectionYear } from '../types/projection';
 
-let capturedChartData: Array<Record<string, unknown>> = [];
+vi.mock('recharts');
 
-vi.mock('recharts', () => ({
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-        <div data-testid="responsive-container">{children}</div>
-    ),
-    ComposedChart: ({ children, data }: { children: React.ReactNode; data: Array<Record<string, unknown>> }) => {
-        capturedChartData = data;
-        return <div data-testid="composed-chart">{children}</div>;
-    },
-    Bar: ({ name, hide }: { name: string; hide?: boolean }) => hide ? null : <div>{name}</div>,
-    Line: ({ name }: { name: string }) => <div>{name}</div>,
-    XAxis: () => null,
-    YAxis: () => null,
-    Tooltip: () => null,
-    Legend: () => <div data-testid="legend" />,
-    CartesianGrid: () => null,
-    ReferenceLine: () => null,
-}));
+/** Reads the shaped rows the component handed to ComposedChart via the shared recharts mock. */
+function chartData(): Array<Record<string, unknown>> {
+    const raw = screen.getByTestId('composed-chart').getAttribute('data-chart-data');
+    return raw ? JSON.parse(raw) : [];
+}
 
 function makeYear(overrides: Partial<ProjectionYear> & { year: number; age: number }): ProjectionYear {
     return {
@@ -138,7 +126,7 @@ describe('TaxBreakdownChart', () => {
         expect(screen.getByText('Cap-Gains Tax')).toBeDefined();
         expect(screen.getByText('Federal (Ordinary)')).toBeDefined();
 
-        const point = capturedChartData[0] as { federal_tax: number; capital_gains_tax: number; state_tax: number };
+        const point = chartData()[0] as { federal_tax: number; capital_gains_tax: number; state_tax: number };
         expect(point.capital_gains_tax).toBe(1500);
         expect(point.federal_tax).toBe(8000 - 1500);
         // Stack total (federal + cap-gains + state) must still equal the original federal_tax,

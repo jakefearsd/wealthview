@@ -7,17 +7,7 @@ vi.mock('../api/dashboard', () => ({
     getCombinedPortfolioHistory: vi.fn(),
 }));
 
-vi.mock('recharts', () => ({
-    AreaChart: ({ data }: { data: unknown[] }) => (
-        <div data-testid="area-chart" data-chart-data={JSON.stringify(data)} />
-    ),
-    Area: () => <div data-testid="area" />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div data-testid="legend" />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number) => `$${v.toLocaleString()}`,

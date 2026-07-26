@@ -2,28 +2,20 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import type { GuardrailYearlySpending, GuardrailPhase } from '../types/projection';
 
-vi.mock('recharts', () => ({
-    ComposedChart: ({ data, children }: { data: unknown[]; children: React.ReactNode }) => (
-        <div data-testid="composed-chart" data-chart-data={JSON.stringify(data)}>{children}</div>
-    ),
-    Area: ({ dataKey, name }: { dataKey: string; name: string }) => (
-        <div data-testid={`area-${dataKey}`} data-name={name} />
-    ),
-    Line: ({ dataKey, name }: { dataKey: string; name: string }) => (
-        <div data-testid={`line-${dataKey}`} data-name={name} />
-    ),
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    CartesianGrid: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ReferenceLine: ({ label }: { label: { value: string } }) => (
-        <div data-testid="reference-line" data-label={label?.value} />
-    ),
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 import SpendingCorridorChart from './SpendingCorridorChart';
+
+/**
+ * The shared recharts mock gives every Area/Line a generic `data-testid`
+ * ("area"/"line") plus a `data-key` attribute (from the real `dataKey` prop)
+ * rather than a per-series testid — select the one matching `dataKey`.
+ */
+function seriesByDataKey(testId: 'area' | 'line', dataKey: string): HTMLElement {
+    const match = screen.getAllByTestId(testId).find((el) => el.getAttribute('data-key') === dataKey);
+    if (!match) throw new Error(`No <${testId}> with data-key="${dataKey}" found`);
+    return match;
+}
 
 const sampleSpending: GuardrailYearlySpending[] = [
     { year: 2030, age: 62, recommended: 75000, corridor_low: 62000, corridor_high: 91000, essential_floor: 30000, discretionary: 45000, income_offset: 12000, portfolio_withdrawal: 63000, phase_name: 'Early', portfolio_balance_median: 480000, portfolio_balance_p10: 200000, portfolio_balance_p25: 350000 },
@@ -127,9 +119,9 @@ describe('SpendingCorridorChart', () => {
     it('renders all chart layers (corridor area, income area, recommended line, floor line)', () => {
         render(<SpendingCorridorChart yearlySpending={sampleSpending} phases={samplePhases} />);
 
-        expect(screen.getByTestId('area-corridorRange')).toBeInTheDocument();
-        expect(screen.getByTestId('area-incomeOffset')).toBeInTheDocument();
-        expect(screen.getByTestId('line-recommended')).toBeInTheDocument();
-        expect(screen.getByTestId('line-essentialFloor')).toBeInTheDocument();
+        expect(seriesByDataKey('area', 'corridorRange')).toBeInTheDocument();
+        expect(seriesByDataKey('area', 'incomeOffset')).toBeInTheDocument();
+        expect(seriesByDataKey('line', 'recommended')).toBeInTheDocument();
+        expect(seriesByDataKey('line', 'essentialFloor')).toBeInTheDocument();
     });
 });

@@ -11,17 +11,7 @@ vi.mock('../context/AuthContext', () => ({
     useAuth: () => ({ role: 'admin' }),
 }));
 
-vi.mock('recharts', () => ({
-    LineChart: ({ children }: { children: React.ReactNode }) => <div data-testid="line-chart">{children}</div>,
-    BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Bar: () => <div />,
-    Line: () => <div />,
-    XAxis: () => <div />,
-    YAxis: () => <div />,
-    Tooltip: () => <div />,
-    Legend: () => <div />,
-    ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
+vi.mock('recharts');
 
 vi.mock('../utils/format', () => ({
     formatCurrency: (v: number | null | undefined) => v != null ? `$${v.toLocaleString()}` : '$0',
