@@ -20,10 +20,10 @@ import java.util.Objects;
  */
 final class StochasticMortalityEvaluator {
 
-    private final TrialSimulator trialSimulator;
+    private final TrialPassRunner trialPassRunner;
 
     StochasticMortalityEvaluator(TrialSimulator trialSimulator) {
-        this.trialSimulator = trialSimulator;
+        this.trialPassRunner = new TrialPassRunner(trialSimulator);
     }
 
     /**
@@ -33,10 +33,10 @@ final class StochasticMortalityEvaluator {
      */
     // UseVarargs: the trailing double[] params are per-year indexed arrays, not a variable argument
     // list -- varargs would change the call contract and invite accidental misuse.
-    // NPathComplexity: the per-trial config assembly fans out over independent pool/tax guards (the
-    // same shape SustainabilitySearch.runTrials / GuardrailResponseBuilder carry a narrow suppression
-    // for) -- each branch is a trivial simPools-gated array pick, far simpler than the NPath number.
-    @SuppressWarnings({"PMD.UseVarargs", "PMD.NPathComplexity"})
+    // Task 12: the NPathComplexity suppression this method used to carry is gone -- the per-trial
+    // config assembly (the fan-out over pool/tax guards) moved into TrialPassRunner/TrialConfigFactory,
+    // so this method is now a linear sequence of guards + one builder chain, well under the threshold.
+    @SuppressWarnings("PMD.UseVarargs")
     StochasticMortalityEvaluation evaluate(OptimizationSetup ctx, double[] jointDiscretionary,
                                            double[] conversionByYear, double[] conversionTaxByYear) {
         SimulationParameters sim = ctx.sim();
@@ -54,47 +54,40 @@ final class StochasticMortalityEvaluator {
         int trialCount = sim.trialCount();
         int years = sim.years();
 
-        // Pool setup mirrors GuardrailResponseBuilder's terminal pass: with a conversion schedule or
-        // any traditional/Roth pool, simulate the fixed pool balances; otherwise the whole portfolio
-        // sits in the taxable pool. jointOrdinary/jointLtcg/... are only wired when pools are simulated.
-        boolean simPools = conversionByYear != null
-                || portfolio.initTraditional() > 0 || portfolio.initRoth() > 0;
-        double initTaxable = simPools ? portfolio.initTaxable() : portfolio.initialPortfolio();
-        double initTraditional = simPools ? portfolio.initTraditional() : 0;
-        double initRoth = simPools ? portfolio.initRoth() : 0;
-        String order = simPools && portfolio.withdrawalOrder() != null
-                ? portfolio.withdrawalOrder() : "taxable_first";
-        OrdinaryTaxTable[] ordinaryTables = simPools ? arrays.jointOrdinaryTables() : null;
-        double[] ordinaryBase = simPools ? arrays.jointOrdinaryBase() : null;
-        LtcgTaxTable[] ltcgTables = simPools ? arrays.jointLtcg() : null;
-        double[] rental = simPools ? arrays.jointRental() : null;
+        // Pool setup mirrors GuardrailResponseBuilder's terminal pass (task 12: now the SAME shared
+        // PoolSimSetup.resolve(PortfolioSetup, ...) implementation, not a hand-maintained copy): with
+        // a conversion schedule or any traditional/Roth pool, simulate the fixed pool balances;
+        // otherwise the whole portfolio sits in the taxable pool. The joint-array tax tables are only
+        // wired when pools are simulated.
+        var poolSetup = PoolSimSetup.resolve(portfolio, conversionByYear);
+        var configFactory = TrialConfigFactory.builder(poolSetup)
+                .taxTables(poolSetup.simPools() ? arrays.jointOrdinaryTables() : null,
+                        poolSetup.simPools() ? arrays.jointOrdinaryBase() : null)
+                .conversions(conversionByYear, conversionTaxByYear)
+                .ages(sim.retirementAge(), sim.rmdStartAge())
+                .dsBracketCeilingByYear(arrays.jointDsCeiling())
+                .cashReserve(portfolio.cashReserveYears(), portfolio.cashReturnRate())
+                .returns(sim.taxableReturns(), sim.traditionalReturns(), sim.rothReturns())
+                .taxableBasis(portfolio.initTaxableBasis())
+                .ltcgTaxTableByYear(poolSetup.simPools() ? arrays.jointLtcg() : null)
+                .dividendYield(sim.dividendYield())
+                .rentalIncomeByYear(poolSetup.simPools() ? arrays.jointRental() : null)
+                .interestYield(sim.interestYield())
+                .taxableEquityShare(sim.taxableEquityShare())
+                .survivorRegimes(arrays.survivorRegimes(), sim.survivorSpendingFactor())
+                // No .household(...)/.trackYearBalances(...)/.adaptation(...) here: every trial below
+                // supplies its OWN spliced household via the per-trial override (this factory's
+                // baked-in household default is never read), and this evaluation pass never tracks
+                // per-year balances or runs the guardrail-adaptation rule -- the two CRITICAL
+                // asymmetries from GuardrailResponseBuilder/SustainabilitySearch's chains (see the
+                // task-12 report) preserved by simply never varying them off their false/null default.
+                .build();
 
-        boolean[] success = new boolean[trialCount];
-        for (int t = 0; t < trialCount; t++) {
-            TrialSimulator.HouseholdSim household = baseHousehold.withTrialMortality(
-                    draws.transitionIdx()[t], draws.survivorIsPrimary()[t], draws.truncateIdx()[t]);
-            var config = TrialSimulator.SimulationConfig
-                    .builder(initTaxable, initTraditional, initRoth, order)
-                    .taxTables(ordinaryTables, ordinaryBase)
-                    .conversions(conversionByYear, conversionTaxByYear)
-                    .retirementAge(sim.retirementAge())
-                    .rmdStartAge(sim.rmdStartAge())
-                    .dsBracketCeilingByYear(arrays.jointDsCeiling())
-                    .cashReserve(portfolio.cashReserveYears(), portfolio.cashReturnRate())
-                    .returns(sim.taxableReturns()[t], sim.traditionalReturns()[t], sim.rothReturns()[t])
-                    .taxableBasis(portfolio.initTaxableBasis())
-                    .ltcgTaxTableByYear(ltcgTables)
-                    .dividendYield(sim.dividendYield())
-                    .rentalIncomeByYear(rental)
-                    .interestYield(sim.interestYield())
-                    .taxableEquityShare(sim.taxableEquityShare())
-                    .household(household)
-                    .survivorRegimes(arrays.survivorRegimes(), sim.survivorSpendingFactor())
-                    .build();
-            var result = trialSimulator.simulateTrial(arrays.jointIncome(), arrays.jointSurplusTax(),
-                    arrays.jointFloors(), jointDiscretionary, years, config);
-            success[t] = result.success();
-        }
-        return new StochasticMortalityEvaluation(success, draws.firstDeathAge(), draws.secondDeathAge());
+        var pass = trialPassRunner.run(trialCount, years, configFactory,
+                arrays.jointIncome(), arrays.jointSurplusTax(), arrays.jointFloors(), jointDiscretionary,
+                null, false,
+                t -> baseHousehold.withTrialMortality(
+                        draws.transitionIdx()[t], draws.survivorIsPrimary()[t], draws.truncateIdx()[t]));
+        return new StochasticMortalityEvaluation(pass.successFlags(), draws.firstDeathAge(), draws.secondDeathAge());
     }
 }
