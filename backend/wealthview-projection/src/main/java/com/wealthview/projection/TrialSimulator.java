@@ -52,6 +52,18 @@ final class TrialSimulator {
     static final int PRIMARY_SURVIVES = 0;
     static final int SPOUSE_SURVIVES = 1;
 
+    /**
+     * Task 17: {@link #applyTrialWithdrawals}'s per-year result -- replaces the old two
+     * single-element out-arrays the caller allocated every year ({@code realizedGainOut},
+     * {@code traditionalDrawnOut}) with a plain returned record, matching every sibling helper in
+     * this class. {@code cashBalance} is the post-withdrawal cash-reserve balance; {@code
+     * realizedGain} the FIFO long-term gain realized by this call's taxable sale(s) (spending sale
+     * only -- secondary tax/replenishment sales sell FIFO but their gain is deliberately excluded,
+     * see {@link #applyTrialWithdrawals}); {@code traditionalDrawn} the dollars actually debited
+     * from traditional for the spending draw (0 when the draw never reached traditional).
+     */
+    record WithdrawalOutcome(double cashBalance, double realizedGain, double traditionalDrawn) {}
+
     /** Per-trial simulation result. */
     record TrialResult(
             double finalBalance,
@@ -583,15 +595,14 @@ final class TrialSimulator {
             // sync but their gain is deliberately discarded (untaxed), matching the deterministic
             // MultiPool's second-order exclusion.
             double cashBeforeWithdrawals = cashBalance;
-            double[] realizedGainOut = {0.0};
-            double[] traditionalDrawnOut = {0.0};
-            cashBalance = applyTrialWithdrawals(pools, lots, realizedGainOut, traditionalDrawnOut,
+            WithdrawalOutcome outcome = applyTrialWithdrawals(pools, lots,
                     cashBalance, drawn, withdrawalTax, withdrawal, spending, hasPools,
                     config.cashReserveYears(), portfolioReturn, table,
                     baseWithInterest + rmdForced + actualConv);
+            cashBalance = outcome.cashBalance();
             double cashDrawn = Math.max(0, cashBeforeWithdrawals - cashBalance);
 
-            applyEarlyWithdrawalPenalty(pools, lots, traditionalDrawnOut[0], age);
+            applyEarlyWithdrawalPenalty(pools, lots, outcome.traditionalDrawn(), age);
 
             // The base-income-tax deduction is NOT part of drawn/cashDrawn (it drains via
             // deductTaxFromPoolsGrossedUp below, like withdrawalTax), so this metric already measures
@@ -604,7 +615,7 @@ final class TrialSimulator {
             // Full ordinary stack realized this year, in audit C1's interest -> T18a-1's
             // rmd -> conversion -> spending draw order -- the point every remaining tax bill's
             // funding draw (and the LTCG bracket floor) stacks on.
-            double ordinaryStack = baseWithInterest + rmdForced + actualConv + traditionalDrawnOut[0];
+            double ordinaryStack = baseWithInterest + rmdForced + actualConv + outcome.traditionalDrawn();
 
             settleBaseIncomeTaxAndSurplus(pools, lots, funding.grossSurplus(), funding.fundedFromSurplus(),
                     funding.unfundedBaseTax(), table, ordinaryStack);
@@ -612,7 +623,7 @@ final class TrialSimulator {
             // T18a-3: aux.rentalIncome() threads this year's net rental income into the NIIT Net
             // Investment Income base only (never the LTCG bracket tax) -- zero when no rental array
             // is configured.
-            applyLtcgTax(pools, lots, realizedGainOut[0], dividendIncome, aux.ltcgTable(), ordinaryStack, table,
+            applyLtcgTax(pools, lots, outcome.realizedGain(), dividendIncome, aux.ltcgTable(), ordinaryStack, table,
                     aux.rentalIncome());
 
             McPools.clampNonNegative(pools);
@@ -1122,17 +1133,17 @@ final class TrialSimulator {
     }
 
     /**
-     * Deducts withdrawals and tax from pools, handling cash reserve logic. Returns updated cash
-     * balance. {@code traditionalDrawnOut[0]} is set to the dollar amount actually debited from
-     * {@code pools[1]} for this year's spending draw. {@code base} is the ordinary income already
-     * realized BEFORE this call (income-source base + the year's actual Roth conversion); the
-     * withdrawal-tax drain's gross-up point additionally stacks the branch's own actual
-     * traditional spending draw on it. Package-private (mirrors {@link #splitWithdrawal}) so the
-     * cash-reserve down-year branches can be unit tested directly instead of only through the
-     * full {@link #simulateTrial} pipeline.
+     * Deducts withdrawals and tax from pools, handling cash reserve logic. Returns a
+     * {@link WithdrawalOutcome} (Task 17 -- replaces the old {@code realizedGainOut}/{@code
+     * traditionalDrawnOut} single-element out-arrays the caller allocated fresh every year).
+     * {@code traditionalDrawn} is the dollar amount actually debited from {@code pools[1]} for
+     * this year's spending draw. {@code base} is the ordinary income already realized BEFORE this
+     * call (income-source base + the year's actual Roth conversion); the withdrawal-tax drain's
+     * gross-up point additionally stacks the branch's own actual traditional spending draw on it.
+     * Package-private (mirrors {@link #splitWithdrawal}) so the cash-reserve down-year branches
+     * can be unit tested directly instead of only through the full {@link #simulateTrial} pipeline.
      */
-    static double applyTrialWithdrawals(double[] pools, TaxableLots lots, double[] realizedGainOut,
-                                         double[] traditionalDrawnOut, double cashBalance,
+    static WithdrawalOutcome applyTrialWithdrawals(double[] pools, TaxableLots lots, double cashBalance,
                                          PoolWithdrawal drawn, double withdrawalTax,
                                          double withdrawal, double spending,
                                          boolean hasPools, int cashReserveYears,
@@ -1148,6 +1159,8 @@ final class TrialSimulator {
                 double cashDraw = Math.min(withdrawal, cashBalance);
                 double equityDraw = withdrawal - cashDraw;
                 double drawnTotal = drawn.total();
+                double realizedGain = 0;
+                double traditionalDrawn = 0;
                 if (drawnTotal > 0 && equityDraw > 0) {
                     double scale = equityDraw / Math.max(drawnTotal, equityDraw);
                     double spendingSale = drawn.taxable() * scale;
@@ -1155,8 +1168,8 @@ final class TrialSimulator {
                     pools[JOINT_TAXABLE] -= spendingSale;
                     McPools.debitPair(pools, TRAD_P, TRAD_S, tradDrawn);
                     McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth() * scale);
-                    realizedGainOut[0] += lots.sellFifo(spendingSale);
-                    traditionalDrawnOut[0] = tradDrawn;
+                    realizedGain += lots.sellFifo(spendingSale);
+                    traditionalDrawn = tradDrawn;
                 }
                 // The withdrawal tax is a separate, full-amount outflow paid straight from the
                 // pools via the shared cascade (grossed up when it touches traditional -- audit
@@ -1166,19 +1179,19 @@ final class TrialSimulator {
                 // covered the draw.)
                 if (hasPools) {
                     deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, table,
-                            base + traditionalDrawnOut[0]);
+                            base + traditionalDrawn);
                 }
-                return cashBalance - cashDraw;
+                return new WithdrawalOutcome(cashBalance - cashDraw, realizedGain, traditionalDrawn);
             } else {
                 // Up market: normal withdrawal + replenish cash
                 pools[JOINT_TAXABLE] -= drawn.taxable();
-                realizedGainOut[0] += lots.sellFifo(drawn.taxable());
+                double realizedGain = lots.sellFifo(drawn.taxable());
                 McPools.debitPair(pools, TRAD_P, TRAD_S, drawn.traditional());
                 McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth());
-                traditionalDrawnOut[0] = drawn.traditional();
+                double traditionalDrawn = drawn.traditional();
                 if (hasPools) {
                     deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, table,
-                            base + traditionalDrawnOut[0]);
+                            base + traditionalDrawn);
                 }
                 double targetCash = spending * cashReserveYears;
                 double replenishment = Math.min(
@@ -1192,20 +1205,20 @@ final class TrialSimulator {
                     McPools.debitPair(pools, TRAD_P, TRAD_S, -pools[JOINT_TAXABLE]);
                     pools[JOINT_TAXABLE] = 0;
                 }
-                return cashBalance + replenishment;
+                return new WithdrawalOutcome(cashBalance + replenishment, realizedGain, traditionalDrawn);
             }
         } else {
             // No cash reserve
             pools[JOINT_TAXABLE] -= drawn.taxable();
-            realizedGainOut[0] += lots.sellFifo(drawn.taxable());
+            double realizedGain = lots.sellFifo(drawn.taxable());
             McPools.debitPair(pools, TRAD_P, TRAD_S, drawn.traditional());
             McPools.debitPair(pools, ROTH_P, ROTH_S, drawn.roth());
-            traditionalDrawnOut[0] = drawn.traditional();
+            double traditionalDrawn = drawn.traditional();
             if (hasPools) {
                 deductTaxFromPoolsGrossedUp(withdrawalTax, pools, lots, table,
-                        base + traditionalDrawnOut[0]);
+                        base + traditionalDrawn);
             }
-            return cashBalance;
+            return new WithdrawalOutcome(cashBalance, realizedGain, traditionalDrawn);
         }
     }
 

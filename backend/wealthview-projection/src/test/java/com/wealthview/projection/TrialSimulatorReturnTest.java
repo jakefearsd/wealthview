@@ -272,14 +272,12 @@ class TrialSimulatorReturnTest {
         double[] pools = {95.0, 285.0, 0.0, 285.0, 0.0};
         TaxableLots lots = new TaxableLots();
         lots.addLot(95.0, 95.0);
-        double[] realizedGainOut = {0.0};
-        double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(95.0, 285.0, 220.0);
 
         // marginalRate=0 isolates the A1 pool-scaling fix from audit C2's gross-up (pinned
         // separately below in applyTrialWithdrawals_taxDrainsTraditional_grossesUpByTMOverOneMinusM).
-        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05,
+        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+                200.0, drawn, 57.0, 600.0, 200.0, true, 1, -0.05,
                 OrdinaryTaxTable.flat(0.0), 0.0);
 
         // Spending draw: taxable -= 95*(2/3)=63.3333 -> 31.6667; traditional -= 285*(2/3)=190 ->
@@ -289,8 +287,8 @@ class TrialSimulatorReturnTest {
         assertThat(pools[0]).isEqualTo(0.0, within(1e-6));
         assertThat(pools[1] + pools[2]).isEqualTo(69.666667, within(1e-4));   // traditional total
         assertThat(pools[3] + pools[4]).isEqualTo(138.333333, within(1e-4));  // roth total
-        assertThat(cashAfter).isEqualTo(0.0, within(1e-6));
-        assertThat(traditionalDrawnOut[0]).isEqualTo(190.0, within(1e-6));
+        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-6));
+        assertThat(outcome.traditionalDrawn()).isEqualTo(190.0, within(1e-6));
     }
 
     @Test
@@ -303,21 +301,19 @@ class TrialSimulatorReturnTest {
         double[] pools = {360.0, 180.0, 0.0, 90.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(360.0, 360.0);
-        double[] realizedGainOut = {0.0};
-        double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(100.0, 0.0, 0.0);
 
         // marginalRate=0.20 (nonzero, to prove it's IRRELEVANT here): taxable ($360) fully covers
         // the $30 tax, so traditional is never touched and there is nothing to gross up (audit C2).
-        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
+        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+                100.0, drawn, 30.0, 100.0, 100.0, true, 1, -0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(330.0, within(1e-6));           // 360 - 30 tax only
         assertThat(pools[1] + pools[2]).isEqualTo(180.0, within(1e-6)); // traditional untouched
         assertThat(pools[3] + pools[4]).isEqualTo(90.0, within(1e-6));  // roth untouched
-        assertThat(cashAfter).isEqualTo(0.0, within(1e-6));    // cash drained by the $100 draw
-        assertThat(traditionalDrawnOut[0]).isEqualTo(0.0, within(1e-6));
+        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-6));    // cash drained by the $100 draw
+        assertThat(outcome.traditionalDrawn()).isEqualTo(0.0, within(1e-6));
     }
 
     // === Audit C2: tax paid FROM the traditional pool must gross up (the draw is itself taxable) ===
@@ -330,18 +326,16 @@ class TrialSimulatorReturnTest {
         // taxable-first order) -- total traditional debit for the tax = 57 + 14.25 = 71.25.
         double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
-        double[] realizedGainOut = {0.0};
-        double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0); // no spending draw this call -- isolates the tax
 
-        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
+        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(0.0, within(1e-9));
         assertThat(pools[1] + pools[2]).isEqualTo(500.0 - 57.0 - 14.25, within(1e-9)); // trad = 428.75
         assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));                  // roth
-        assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
+        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-9));
     }
 
     @Test
@@ -352,18 +346,16 @@ class TrialSimulatorReturnTest {
         double[] pools = {500.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
         lots.addLot(500.0, 500.0);
-        double[] realizedGainOut = {0.0};
-        double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
-        double cashAfter = TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
+        var outcome = TrialSimulator.applyTrialWithdrawals(pools, lots,
+                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05,
                 OrdinaryTaxTable.flat(0.20), 0.0);
 
         assertThat(pools[0]).isEqualTo(500.0 - 57.0, within(1e-9)); // = 443.0, taxable-funded, no gross-up
         assertThat(pools[1] + pools[2]).isEqualTo(500.0, within(1e-9)); // traditional untouched
         assertThat(pools[3] + pools[4]).isEqualTo(0.0, within(1e-9));   // roth
-        assertThat(cashAfter).isEqualTo(0.0, within(1e-9));
+        assertThat(outcome.cashBalance()).isEqualTo(0.0, within(1e-9));
     }
 
     // === Audit C5: gross-up "m" is the EXACT rate at the post-draw point (base + T), not a flat
@@ -383,12 +375,10 @@ class TrialSimulatorReturnTest {
         double base = 90.0;
         double[] pools = {0.0, 500.0, 0.0, 0.0, 0.0};   // household task 6: double[5], spouse slots 0
         TaxableLots lots = new TaxableLots();
-        double[] realizedGainOut = {0.0};
-        double[] traditionalDrawnOut = {0.0};
         var drawn = new PoolWithdrawal(0.0, 0.0, 0.0);
 
-        TrialSimulator.applyTrialWithdrawals(pools, lots, realizedGainOut,
-                traditionalDrawnOut, 0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
+        TrialSimulator.applyTrialWithdrawals(pools, lots,
+                0.0, drawn, 57.0, 0.0, 0.0, true, 0, 0.05, table, base);
 
         double expectedGrossUp = 57.0 * 0.30 / 0.70;
         double traditional = pools[1] + pools[2];
