@@ -255,36 +255,37 @@ public class GuardrailProfileService {
             phases = List.of();
         }
 
-        var request = new GuardrailOptimizationRequest(
-                scenarioId,
-                existing.getName(),
-                existing.getEssentialFloor(),
-                existing.getTerminalBalanceTarget(),
+        var request = GuardrailOptimizationRequest.builder()
+                .scenarioId(scenarioId)
+                .name(existing.getName())
+                .essentialFloor(existing.getEssentialFloor())
+                .terminalBalanceTarget(existing.getTerminalBalanceTarget())
                 // Audit C4: the stored return_mean is the RESOLVED REAL rate from the prior run;
                 // the request field's contract is NOMINAL (the engine Fisher-converts non-null
                 // values), so echoing it back would deflate an already-real rate a second time.
-                // Passing null re-derives the rate from the scenario's CURRENT allocation — which
-                // also picks up allocation edits, the point of reoptimizing a stale profile. An
-                // API-supplied explicit nominal override is therefore not preserved across
-                // reoptimize; it must be re-sent on a fresh optimize call.
-                null,
-                existing.getTrialCount(),
-                existing.getConfidenceLevel(),
-                phases,
-                existing.getPortfolioFloor(),
-                existing.getMaxAnnualAdjustmentRate(),
-                existing.getPhaseBlendYears(),
-                existing.getRiskTolerance(),
-                existing.getCashReserveYears(),
-                existing.getCashReturnRate(),
-                existing.getTraditionalExhaustionBuffer() != null,
-                existing.getConversionBracketRate(),
-                existing.getRmdTargetBracketRate(),
-                existing.getTraditionalExhaustionBuffer(),
-                existing.getRmdBracketHeadroom(),
-                null,
+                // LEAVING returnMean UNSET re-derives the rate from the scenario's CURRENT
+                // allocation — which also picks up allocation edits, the point of reoptimizing a
+                // stale profile. An API-supplied explicit nominal override is therefore not
+                // preserved across reoptimize; it must be re-sent on a fresh optimize call.
+                .trialCount(existing.getTrialCount())
+                .confidenceLevel(existing.getConfidenceLevel())
+                .phases(phases)
+                .portfolioFloor(existing.getPortfolioFloor())
+                .maxAnnualAdjustmentRate(existing.getMaxAnnualAdjustmentRate())
+                .phaseBlendYears(existing.getPhaseBlendYears())
+                .riskTolerance(existing.getRiskTolerance())
+                .cashReserveYears(existing.getCashReserveYears())
+                .cashReturnRate(existing.getCashReturnRate())
+                .optimizeConversions(existing.getTraditionalExhaustionBuffer() != null)
+                .conversionBracketRate(existing.getConversionBracketRate())
+                .rmdTargetBracketRate(existing.getRmdTargetBracketRate())
+                .traditionalExhaustionBuffer(existing.getTraditionalExhaustionBuffer())
+                .rmdBracketHeadroom(existing.getRmdBracketHeadroom())
+                // dynamicSequencingBracketRate is intentionally left unset (was an explicit null):
+                // it is not persisted on the profile, so a reoptimize cannot echo it back.
                 // T24: reoptimize honors the profile's stored search-gate toggle.
-                existing.isGateOnAdaptiveRules());
+                .gateOnAdaptiveRules(existing.isGateOnAdaptiveRules())
+                .build();
 
         return optimize(tenantId, scenarioId, request);
     }
@@ -492,77 +493,79 @@ public class GuardrailProfileService {
                                                                ScenarioParams params,
                                                                ResolvedDefaults resolved) {
         var incomeSourceSignatures = toIncomeSourceSignatures(projectionInput.incomeSources());
-        return new GuardrailOptimizationInput(
-                scenario.getRetirementDate(),
-                resolved.birthYear(),
-                scenario.getEndAge() != null ? scenario.getEndAge() : 90,
-                scenario.getInflationRate() != null ? scenario.getInflationRate() : DEFAULT_INFLATION_RATE,
-                projectionInput.accounts(),
-                projectionInput.incomeSources(),
-                request.essentialFloor() != null ? request.essentialFloor() : BigDecimal.ZERO,
-                request.terminalBalanceTarget() != null ? request.terminalBalanceTarget() : BigDecimal.ZERO,
+        return GuardrailOptimizationInput.builder()
+                .retirementDate(scenario.getRetirementDate())
+                .birthYear(resolved.birthYear())
+                .endAge(scenario.getEndAge() != null ? scenario.getEndAge() : 90)
+                .inflationRate(scenario.getInflationRate() != null
+                        ? scenario.getInflationRate() : DEFAULT_INFLATION_RATE)
+                .accounts(projectionInput.accounts())
+                .incomeSources(projectionInput.incomeSources())
+                .essentialFloor(request.essentialFloor() != null ? request.essentialFloor() : BigDecimal.ZERO)
+                .terminalBalanceTarget(request.terminalBalanceTarget() != null
+                        ? request.terminalBalanceTarget() : BigDecimal.ZERO)
                 // Audit C4: NO default here — an omitted return_mean flows through as null so the
                 // engine derives the scenario's fee-adjusted, allocation-blended REAL return
                 // (OptimizationContextBuilder.resolveReturnMean). Pre-filling a nominal constant
                 // would make that default branch dead code (the frontend never sends return_mean)
                 // and reintroduce the nominal-vs-constant-real-bracket frame mismatch.
-                request.returnMean(),
-                request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT,
-                resolved.confidence(),
-                request.phases() != null ? request.phases() : List.of(),
-                deriveSeed(scenarioSignature(scenario, incomeSourceSignatures)),
-                request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO,
-                request.maxAnnualAdjustmentRate() != null
-                        ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE,
-                request.phaseBlendYears() != null
-                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS,
-                request.cashReserveYears() != null
-                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS,
-                request.cashReturnRate() != null
-                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE,
-                params.filingStatus(),
-                resolved.withdrawalOrder(),
-                request.optimizeConversions() != null && request.optimizeConversions(),
-                request.conversionBracketRate(),
-                request.rmdTargetBracketRate(),
-                request.traditionalExhaustionBuffer() != null
-                        ? request.traditionalExhaustionBuffer() : 5,
-                request.rmdBracketHeadroom() != null
-                        ? request.rmdBracketHeadroom() : new BigDecimal("0.10"),
-                request.dynamicSequencingBracketRate(),
-                params.dividendYield(),
-                params.feeRate(),
-                resolved.baseYear(),
-                Boolean.TRUE.equals(params.includeDepressionYears()),
-                params.interestYield(),
+                .returnMean(request.returnMean())
+                .trialCount(request.trialCount() != null ? request.trialCount() : DEFAULT_TRIAL_COUNT)
+                .confidenceLevel(resolved.confidence())
+                .phases(request.phases() != null ? request.phases() : List.of())
+                .seed(deriveSeed(scenarioSignature(scenario, incomeSourceSignatures)))
+                .portfolioFloor(request.portfolioFloor() != null ? request.portfolioFloor() : BigDecimal.ZERO)
+                .maxAnnualAdjustmentRate(request.maxAnnualAdjustmentRate() != null
+                        ? request.maxAnnualAdjustmentRate() : DEFAULT_MAX_ADJUSTMENT_RATE)
+                .phaseBlendYears(request.phaseBlendYears() != null
+                        ? request.phaseBlendYears() : DEFAULT_PHASE_BLEND_YEARS)
+                .cashReserveYears(request.cashReserveYears() != null
+                        ? request.cashReserveYears() : DEFAULT_CASH_RESERVE_YEARS)
+                .cashReturnRate(request.cashReturnRate() != null
+                        ? request.cashReturnRate() : DEFAULT_CASH_RETURN_RATE)
+                .filingStatus(params.filingStatus())
+                .withdrawalOrder(resolved.withdrawalOrder())
+                .optimizeConversions(request.optimizeConversions() != null && request.optimizeConversions())
+                .conversionBracketRate(request.conversionBracketRate())
+                .rmdTargetBracketRate(request.rmdTargetBracketRate())
+                .traditionalExhaustionBuffer(request.traditionalExhaustionBuffer() != null
+                        ? request.traditionalExhaustionBuffer() : 5)
+                .rmdBracketHeadroom(request.rmdBracketHeadroom() != null
+                        ? request.rmdBracketHeadroom() : new BigDecimal("0.10"))
+                .dynamicSequencingBracketRate(request.dynamicSequencingBracketRate())
+                .dividendYield(params.dividendYield())
+                .feeRate(params.feeRate())
+                .baseYear(resolved.baseYear())
+                .includeDepressionYears(Boolean.TRUE.equals(params.includeDepressionYears()))
+                .interestYield(params.interestYield())
                 // T24 default-to-on (user decision, V077): an absent/null gate_on_adaptive_rules
                 // resolves TRUE -- new optimizations gate on the with-rules metric by default.
                 // Explicit false is fully honored: it is the conservative anchor and the
                 // byte-identical-to-pre-T24 no-adaptation-gate path. reoptimize() always passes
                 // the profile's STORED flag explicitly, so pre-V077 profiles keep gating on
                 // false until re-optimized with a fresh request that opts in (or omits the flag).
-                request.gateOnAdaptiveRules() == null || request.gateOnAdaptiveRules(),
+                .gateOnAdaptiveRules(request.gateOnAdaptiveRules() == null || request.gateOnAdaptiveRules())
                 // Household task 6: the first-death transition inputs for the Monte Carlo engine.
                 // spouseBirthYear present enables household modeling; death ages are resolved (explicit
                 // or SSA default) exactly like scenarioSignature does, so the MC engine truncates and
                 // transitions at the same years the deterministic engine does. Null spouseBirthYear ⇒
                 // single-person, byte-identical to pre-household. Survivor factor / community-property
                 // defaults (0.75 / statutory 0.5) are resolved engine-side.
-                params.spouseBirthYear(),
-                resolveDeathAge(params.primaryDeathAge(), params.birthYear()),
-                resolveDeathAge(params.spouseDeathAge(), params.spouseBirthYear()),
-                params.survivorSpendingFactor(),
-                Boolean.TRUE.equals(params.communityProperty()),
+                .spouseBirthYear(params.spouseBirthYear())
+                .primaryDeathAge(resolveDeathAge(params.primaryDeathAge(), params.birthYear()))
+                .spouseDeathAge(resolveDeathAge(params.spouseDeathAge(), params.spouseBirthYear()))
+                .survivorSpendingFactor(params.survivorSpendingFactor())
+                .communityProperty(Boolean.TRUE.equals(params.communityProperty()))
                 // Sub-project B: raw params, unresolved (the sampler/context builder resolve the
                 // null-default false/blended/95 downstream). Table is loaded ONLY when the toggle
                 // is on, gated in ProjectionInputBuilder so a toggle-off run never touches
                 // mortality_rates.
-                params.stochasticMortality(),
-                params.primarySex(),
-                params.spouseSex(),
-                params.longevityConditionalAge(),
-                projectionInputBuilder.resolveMortalityTable(params)
-        );
+                .stochasticMortality(params.stochasticMortality())
+                .primarySex(params.primarySex())
+                .spouseSex(params.spouseSex())
+                .longevityConditionalAge(params.longevityConditionalAge())
+                .mortalityTable(projectionInputBuilder.resolveMortalityTable(params))
+                .build();
     }
 
     /**

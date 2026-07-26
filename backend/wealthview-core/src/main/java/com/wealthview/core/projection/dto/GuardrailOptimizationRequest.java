@@ -66,4 +66,160 @@ public record GuardrailOptimizationRequest(
                 cashReturnRate, optimizeConversions, conversionBracketRate, rmdTargetBracketRate,
                 traditionalExhaustionBuffer, rmdBracketHeadroom, dynamicSequencingBracketRate, null);
     }
+
+    /**
+     * Entry point for naming components instead of counting positions. Every component is nullable
+     * ("not specified" — the service layer resolves the defaults), so nothing is required up front
+     * and an unset field arrives at the canonical constructor as {@code null}, exactly as an omitted
+     * JSON property does.
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Fluent builder over the canonical 21-component constructor. One setter per component, in
+     * component order, so a reader can diff a call chain against the record header line by line.
+     */
+    // TooManyFields: one field per record component is the nature of a builder for a 21-component
+    // record; splitting it would defeat the purpose.
+    @SuppressWarnings("PMD.TooManyFields")
+    public static final class Builder {
+        private UUID scenarioId;
+        private String name;
+        private BigDecimal essentialFloor;
+        private BigDecimal terminalBalanceTarget;
+        private BigDecimal returnMean;
+        private Integer trialCount;
+        private BigDecimal confidenceLevel;
+        private List<GuardrailPhaseInput> phases;
+        private BigDecimal portfolioFloor;
+        private BigDecimal maxAnnualAdjustmentRate;
+        private Integer phaseBlendYears;
+        private String riskTolerance;
+        private Integer cashReserveYears;
+        private BigDecimal cashReturnRate;
+        private Boolean optimizeConversions;
+        private BigDecimal conversionBracketRate;
+        private BigDecimal rmdTargetBracketRate;
+        private Integer traditionalExhaustionBuffer;
+        private BigDecimal rmdBracketHeadroom;
+        private BigDecimal dynamicSequencingBracketRate;
+        private Boolean gateOnAdaptiveRules;
+
+        private Builder() {}
+
+        public Builder scenarioId(UUID scenarioId) {
+            this.scenarioId = scenarioId;
+            return this;
+        }
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder essentialFloor(BigDecimal essentialFloor) {
+            this.essentialFloor = essentialFloor;
+            return this;
+        }
+
+        public Builder terminalBalanceTarget(BigDecimal terminalBalanceTarget) {
+            this.terminalBalanceTarget = terminalBalanceTarget;
+            return this;
+        }
+
+        public Builder returnMean(BigDecimal returnMean) {
+            this.returnMean = returnMean;
+            return this;
+        }
+
+        public Builder trialCount(Integer trialCount) {
+            this.trialCount = trialCount;
+            return this;
+        }
+
+        public Builder confidenceLevel(BigDecimal confidenceLevel) {
+            this.confidenceLevel = confidenceLevel;
+            return this;
+        }
+
+        public Builder phases(List<GuardrailPhaseInput> phases) {
+            this.phases = phases;
+            return this;
+        }
+
+        public Builder portfolioFloor(BigDecimal portfolioFloor) {
+            this.portfolioFloor = portfolioFloor;
+            return this;
+        }
+
+        public Builder maxAnnualAdjustmentRate(BigDecimal maxAnnualAdjustmentRate) {
+            this.maxAnnualAdjustmentRate = maxAnnualAdjustmentRate;
+            return this;
+        }
+
+        public Builder phaseBlendYears(Integer phaseBlendYears) {
+            this.phaseBlendYears = phaseBlendYears;
+            return this;
+        }
+
+        public Builder riskTolerance(String riskTolerance) {
+            this.riskTolerance = riskTolerance;
+            return this;
+        }
+
+        public Builder cashReserveYears(Integer cashReserveYears) {
+            this.cashReserveYears = cashReserveYears;
+            return this;
+        }
+
+        public Builder cashReturnRate(BigDecimal cashReturnRate) {
+            this.cashReturnRate = cashReturnRate;
+            return this;
+        }
+
+        public Builder optimizeConversions(Boolean optimizeConversions) {
+            this.optimizeConversions = optimizeConversions;
+            return this;
+        }
+
+        public Builder conversionBracketRate(BigDecimal conversionBracketRate) {
+            this.conversionBracketRate = conversionBracketRate;
+            return this;
+        }
+
+        public Builder rmdTargetBracketRate(BigDecimal rmdTargetBracketRate) {
+            this.rmdTargetBracketRate = rmdTargetBracketRate;
+            return this;
+        }
+
+        public Builder traditionalExhaustionBuffer(Integer traditionalExhaustionBuffer) {
+            this.traditionalExhaustionBuffer = traditionalExhaustionBuffer;
+            return this;
+        }
+
+        public Builder rmdBracketHeadroom(BigDecimal rmdBracketHeadroom) {
+            this.rmdBracketHeadroom = rmdBracketHeadroom;
+            return this;
+        }
+
+        public Builder dynamicSequencingBracketRate(BigDecimal dynamicSequencingBracketRate) {
+            this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
+            return this;
+        }
+
+        public Builder gateOnAdaptiveRules(Boolean gateOnAdaptiveRules) {
+            this.gateOnAdaptiveRules = gateOnAdaptiveRules;
+            return this;
+        }
+
+        public GuardrailOptimizationRequest build() {
+            return new GuardrailOptimizationRequest(scenarioId, name, essentialFloor, terminalBalanceTarget,
+                    returnMean, trialCount, confidenceLevel, phases, portfolioFloor, maxAnnualAdjustmentRate,
+                    phaseBlendYears, riskTolerance, cashReserveYears, cashReturnRate, optimizeConversions,
+                    conversionBracketRate, rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
+                    dynamicSequencingBracketRate, gateOnAdaptiveRules);
+        }
+    }
 }

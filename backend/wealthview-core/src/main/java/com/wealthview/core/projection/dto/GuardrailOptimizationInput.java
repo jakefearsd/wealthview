@@ -166,4 +166,293 @@ public record GuardrailOptimizationInput(
                 // Sub-project B: pre-stochastic-mortality callers keep the toggle off.
                 null, null, null, null, null);
     }
+
+    /**
+     * Entry point for naming components instead of counting positions. Only the components a run
+     * actually uses need setting; every unset component defaults to the same no-op anchor the
+     * back-compat constructor above documents -- {@code null}/{@code 0}/{@code false}, plus
+     * {@link #baseYear} defaulting to {@code retirementDate.getYear()} (the "as if retirement
+     * starts today" deflation clock).
+     */
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    /**
+     * Fluent builder over the canonical 42-component constructor. One setter per component, in
+     * component order, so a reader can diff a call chain against the record header line by line --
+     * the whole point, given how many same-typed neighbours this record has.
+     */
+    // TooManyFields: one field per record component is the nature of a builder for a 42-component
+    // record; splitting it would defeat the purpose.
+    @SuppressWarnings("PMD.TooManyFields")
+    public static final class Builder {
+        private LocalDate retirementDate;
+        private int birthYear;
+        private int endAge;
+        private BigDecimal inflationRate;
+        private List<ProjectionAccountInput> accounts;
+        private List<ProjectionIncomeSourceInput> incomeSources;
+        private BigDecimal essentialFloor;
+        private BigDecimal terminalBalanceTarget;
+        private BigDecimal returnMean;
+        private int trialCount;
+        private BigDecimal confidenceLevel;
+        private List<GuardrailPhaseInput> phases;
+        private Long seed;
+        private BigDecimal portfolioFloor;
+        private BigDecimal maxAnnualAdjustmentRate;
+        private int phaseBlendYears;
+        private int cashReserveYears;
+        private BigDecimal cashReturnRate;
+        private String filingStatus;
+        private String withdrawalOrder;
+        private boolean optimizeConversions;
+        private BigDecimal conversionBracketRate;
+        private BigDecimal rmdTargetBracketRate;
+        private int traditionalExhaustionBuffer;
+        private BigDecimal rmdBracketHeadroom;
+        private BigDecimal dynamicSequencingBracketRate;
+        private BigDecimal dividendYield;
+        private BigDecimal feeRate;
+        private Integer baseYear;
+        private boolean includeDepressionYears;
+        private BigDecimal interestYield;
+        private boolean gateOnAdaptiveRules;
+        private Integer spouseBirthYear;
+        private Integer primaryDeathAge;
+        private Integer spouseDeathAge;
+        private BigDecimal survivorSpendingFactor;
+        private boolean communityProperty;
+        private Boolean stochasticMortality;
+        private String primarySex;
+        private String spouseSex;
+        private Integer longevityConditionalAge;
+        private MortalityTable mortalityTable;
+
+        private Builder() {}
+
+        public Builder retirementDate(LocalDate retirementDate) {
+            this.retirementDate = retirementDate;
+            return this;
+        }
+
+        public Builder birthYear(int birthYear) {
+            this.birthYear = birthYear;
+            return this;
+        }
+
+        public Builder endAge(int endAge) {
+            this.endAge = endAge;
+            return this;
+        }
+
+        public Builder inflationRate(BigDecimal inflationRate) {
+            this.inflationRate = inflationRate;
+            return this;
+        }
+
+        public Builder accounts(List<ProjectionAccountInput> accounts) {
+            this.accounts = accounts;
+            return this;
+        }
+
+        public Builder incomeSources(List<ProjectionIncomeSourceInput> incomeSources) {
+            this.incomeSources = incomeSources;
+            return this;
+        }
+
+        public Builder essentialFloor(BigDecimal essentialFloor) {
+            this.essentialFloor = essentialFloor;
+            return this;
+        }
+
+        public Builder terminalBalanceTarget(BigDecimal terminalBalanceTarget) {
+            this.terminalBalanceTarget = terminalBalanceTarget;
+            return this;
+        }
+
+        public Builder returnMean(BigDecimal returnMean) {
+            this.returnMean = returnMean;
+            return this;
+        }
+
+        public Builder trialCount(int trialCount) {
+            this.trialCount = trialCount;
+            return this;
+        }
+
+        public Builder confidenceLevel(BigDecimal confidenceLevel) {
+            this.confidenceLevel = confidenceLevel;
+            return this;
+        }
+
+        public Builder phases(List<GuardrailPhaseInput> phases) {
+            this.phases = phases;
+            return this;
+        }
+
+        public Builder seed(Long seed) {
+            this.seed = seed;
+            return this;
+        }
+
+        public Builder portfolioFloor(BigDecimal portfolioFloor) {
+            this.portfolioFloor = portfolioFloor;
+            return this;
+        }
+
+        public Builder maxAnnualAdjustmentRate(BigDecimal maxAnnualAdjustmentRate) {
+            this.maxAnnualAdjustmentRate = maxAnnualAdjustmentRate;
+            return this;
+        }
+
+        public Builder phaseBlendYears(int phaseBlendYears) {
+            this.phaseBlendYears = phaseBlendYears;
+            return this;
+        }
+
+        public Builder cashReserveYears(int cashReserveYears) {
+            this.cashReserveYears = cashReserveYears;
+            return this;
+        }
+
+        public Builder cashReturnRate(BigDecimal cashReturnRate) {
+            this.cashReturnRate = cashReturnRate;
+            return this;
+        }
+
+        public Builder filingStatus(String filingStatus) {
+            this.filingStatus = filingStatus;
+            return this;
+        }
+
+        public Builder withdrawalOrder(String withdrawalOrder) {
+            this.withdrawalOrder = withdrawalOrder;
+            return this;
+        }
+
+        public Builder optimizeConversions(boolean optimizeConversions) {
+            this.optimizeConversions = optimizeConversions;
+            return this;
+        }
+
+        public Builder conversionBracketRate(BigDecimal conversionBracketRate) {
+            this.conversionBracketRate = conversionBracketRate;
+            return this;
+        }
+
+        public Builder rmdTargetBracketRate(BigDecimal rmdTargetBracketRate) {
+            this.rmdTargetBracketRate = rmdTargetBracketRate;
+            return this;
+        }
+
+        public Builder traditionalExhaustionBuffer(int traditionalExhaustionBuffer) {
+            this.traditionalExhaustionBuffer = traditionalExhaustionBuffer;
+            return this;
+        }
+
+        public Builder rmdBracketHeadroom(BigDecimal rmdBracketHeadroom) {
+            this.rmdBracketHeadroom = rmdBracketHeadroom;
+            return this;
+        }
+
+        public Builder dynamicSequencingBracketRate(BigDecimal dynamicSequencingBracketRate) {
+            this.dynamicSequencingBracketRate = dynamicSequencingBracketRate;
+            return this;
+        }
+
+        public Builder dividendYield(BigDecimal dividendYield) {
+            this.dividendYield = dividendYield;
+            return this;
+        }
+
+        public Builder feeRate(BigDecimal feeRate) {
+            this.feeRate = feeRate;
+            return this;
+        }
+
+        public Builder baseYear(int baseYear) {
+            this.baseYear = baseYear;
+            return this;
+        }
+
+        public Builder includeDepressionYears(boolean includeDepressionYears) {
+            this.includeDepressionYears = includeDepressionYears;
+            return this;
+        }
+
+        public Builder interestYield(BigDecimal interestYield) {
+            this.interestYield = interestYield;
+            return this;
+        }
+
+        public Builder gateOnAdaptiveRules(boolean gateOnAdaptiveRules) {
+            this.gateOnAdaptiveRules = gateOnAdaptiveRules;
+            return this;
+        }
+
+        public Builder spouseBirthYear(@Nullable Integer spouseBirthYear) {
+            this.spouseBirthYear = spouseBirthYear;
+            return this;
+        }
+
+        public Builder primaryDeathAge(@Nullable Integer primaryDeathAge) {
+            this.primaryDeathAge = primaryDeathAge;
+            return this;
+        }
+
+        public Builder spouseDeathAge(@Nullable Integer spouseDeathAge) {
+            this.spouseDeathAge = spouseDeathAge;
+            return this;
+        }
+
+        public Builder survivorSpendingFactor(@Nullable BigDecimal survivorSpendingFactor) {
+            this.survivorSpendingFactor = survivorSpendingFactor;
+            return this;
+        }
+
+        public Builder communityProperty(boolean communityProperty) {
+            this.communityProperty = communityProperty;
+            return this;
+        }
+
+        public Builder stochasticMortality(@Nullable Boolean stochasticMortality) {
+            this.stochasticMortality = stochasticMortality;
+            return this;
+        }
+
+        public Builder primarySex(@Nullable String primarySex) {
+            this.primarySex = primarySex;
+            return this;
+        }
+
+        public Builder spouseSex(@Nullable String spouseSex) {
+            this.spouseSex = spouseSex;
+            return this;
+        }
+
+        public Builder longevityConditionalAge(@Nullable Integer longevityConditionalAge) {
+            this.longevityConditionalAge = longevityConditionalAge;
+            return this;
+        }
+
+        public Builder mortalityTable(@Nullable MortalityTable mortalityTable) {
+            this.mortalityTable = mortalityTable;
+            return this;
+        }
+
+        public GuardrailOptimizationInput build() {
+            return new GuardrailOptimizationInput(retirementDate, birthYear, endAge, inflationRate, accounts,
+                    incomeSources, essentialFloor, terminalBalanceTarget, returnMean, trialCount, confidenceLevel,
+                    phases, seed, portfolioFloor, maxAnnualAdjustmentRate, phaseBlendYears, cashReserveYears,
+                    cashReturnRate, filingStatus, withdrawalOrder, optimizeConversions, conversionBracketRate,
+                    rmdTargetBracketRate, traditionalExhaustionBuffer, rmdBracketHeadroom,
+                    dynamicSequencingBracketRate, dividendYield, feeRate,
+                    baseYear != null ? baseYear : retirementDate.getYear(), includeDepressionYears, interestYield,
+                    gateOnAdaptiveRules, spouseBirthYear, primaryDeathAge, spouseDeathAge, survivorSpendingFactor,
+                    communityProperty, stochasticMortality, primarySex, spouseSex, longevityConditionalAge,
+                    mortalityTable);
+        }
+    }
 }
