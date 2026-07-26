@@ -4,13 +4,10 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class HoldingControllerIT extends AbstractApiIntegrationTest {
@@ -29,8 +26,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
         data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var response = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(2);
@@ -40,8 +36,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
     void manualOverride_overridesComputed_returns200() {
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
 
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         var holdingId = (String) holdings.getBody().get(0).get("id");
 
         var overrideBody = Map.of(
@@ -51,8 +46,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
                 "cost_basis", 3000
         );
 
-        var response = restTemplate.exchange("/api/v1/holdings/" + holdingId,
-                HttpMethod.PUT, authHelper.authEntity(overrideBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/holdings/" + holdingId, overrideBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -66,8 +60,7 @@ class HoldingControllerIT extends AbstractApiIntegrationTest {
                 "cost_basis", 5000
         );
 
-        var response = restTemplate.exchange("/api/v1/holdings",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/holdings", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("symbol")).isEqualTo("NVDA");

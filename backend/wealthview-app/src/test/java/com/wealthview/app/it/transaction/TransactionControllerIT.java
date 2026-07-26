@@ -4,13 +4,10 @@ import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class TransactionControllerIT extends AbstractApiIntegrationTest {
@@ -34,8 +31,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
                 "amount", 1500
         );
 
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/accounts/" + accountId + "/transactions", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("type")).isEqualTo("buy");
@@ -54,8 +50,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
                 "amount", 3000
         );
 
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.POST, authHelper.authEntity(sellBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/accounts/" + accountId + "/transactions", sellBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("type")).isEqualTo("sell");
@@ -67,9 +62,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
         data.createBuyTransaction(accountId, "AAPL", 10, 1500);
         data.createBuyTransaction(accountId, "GOOG", 5, 7000);
 
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId + "/transactions",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<Map<String, Object>>() {});
+        var response = api.getForEntity("/api/v1/accounts/" + accountId + "/transactions");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         var content = (java.util.List<Map<String, Object>>) response.getBody().get("data");
@@ -87,8 +80,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
                 "amount", 2250
         );
 
-        var response = restTemplate.exchange("/api/v1/transactions/" + txId,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/transactions/" + txId, updateBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -97,8 +89,7 @@ class TransactionControllerIT extends AbstractApiIntegrationTest {
     void delete_existingTransaction_returns204() {
         var txId = (String) data.createBuyTransaction(accountId, "MSFT", 8, 2400).get("id");
 
-        var response = restTemplate.exchange("/api/v1/transactions/" + txId,
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
+        var response = api.deleteForEntity("/api/v1/transactions/" + txId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }

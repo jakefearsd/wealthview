@@ -1,16 +1,12 @@
 package com.wealthview.app.it.exchangerate;
 
-import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
@@ -18,8 +14,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
     @Test
     void create_validRate_returns201() {
         var body = Map.of("currency_code", "EUR", "rate_to_usd", 1.08);
-        var response = restTemplate.exchange("/api/v1/exchange-rates",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/exchange-rates", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("currency_code")).isEqualTo("EUR");
@@ -30,8 +25,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
         data.createExchangeRate("GBP", 1.27);
 
         var body = Map.of("currency_code", "GBP", "rate_to_usd", 1.30);
-        var response = restTemplate.exchange("/api/v1/exchange-rates",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/exchange-rates", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -39,8 +33,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
     @Test
     void create_usdCurrency_returns400() {
         var body = Map.of("currency_code", "USD", "rate_to_usd", 1.0);
-        var response = restTemplate.exchange("/api/v1/exchange-rates",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/exchange-rates", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -51,9 +44,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
         data.createExchangeRate("EUR", 1.08);
         data.createExchangeRate("GBP", 1.27);
 
-        var response = restTemplate.exchange("/api/v1/exchange-rates",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntity("/api/v1/exchange-rates");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(2);
@@ -64,8 +55,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
         data.createExchangeRate("EUR", 1.08);
 
         var body = Map.of("currency_code", "EUR", "rate_to_usd", 1.12);
-        var response = restTemplate.exchange("/api/v1/exchange-rates/EUR",
-                HttpMethod.PUT, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/exchange-rates/EUR", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(((Number) response.getBody().get("rate_to_usd")).doubleValue()).isEqualTo(1.12);
@@ -75,8 +65,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
     void delete_noAccountsUsingCurrency_returns204() {
         data.createExchangeRate("EUR", 1.08);
 
-        var response = restTemplate.exchange("/api/v1/exchange-rates/EUR",
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
+        var response = api.deleteForEntity("/api/v1/exchange-rates/EUR");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
@@ -86,8 +75,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
         data.createExchangeRate("EUR", 1.08);
         data.createAccountWithCurrencyAndGetId("Euro Account", "brokerage", "EUR");
 
-        var response = restTemplate.exchange("/api/v1/exchange-rates/EUR",
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.deleteForEntity("/api/v1/exchange-rates/EUR");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -97,8 +85,7 @@ class ExchangeRateControllerIT extends AbstractApiIntegrationTest {
         data.createExchangeRate("EUR", 1.08);
         var accountId = data.createAccountWithCurrencyAndGetId("Euro Brokerage", "brokerage", "EUR");
 
-        var response = restTemplate.exchange("/api/v1/accounts/" + accountId,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/accounts/" + accountId);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("currency")).isEqualTo("EUR");

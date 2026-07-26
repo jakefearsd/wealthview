@@ -122,6 +122,19 @@ public class ApiClient {
         return exchange(token, url, HttpMethod.GET, null);
     }
 
+    /**
+     * Generic form for call sites that assert on a non-JSON-map body (e.g.
+     * {@code String.class} for a Prometheus text payload) rather than parsing
+     * into {@link #MAP_TYPE}.
+     */
+    public <T> ResponseEntity<T> getForEntityAs(String token, String url, Class<T> responseType) {
+        return restTemplate.exchange(url, HttpMethod.GET, authEntity(token, null), responseType);
+    }
+
+    public <T> ResponseEntity<T> getForEntity(String url, Class<T> responseType) {
+        return getForEntityAs(authHelper.adminToken(), url, responseType);
+    }
+
     public ResponseEntity<Map<String, Object>> putForEntityAs(String token, String url, Object body) {
         return exchange(token, url, HttpMethod.PUT, body);
     }
