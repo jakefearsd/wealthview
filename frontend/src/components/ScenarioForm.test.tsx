@@ -74,150 +74,19 @@ function setupMocks({ profiles = [spendingProfile], accounts = [] as Account[], 
     }) as any;
 }
 
-// The mocked FormField renders its label and children as siblings (no htmlFor), so getByLabelText
-// can't resolve it — locate the Override Return input via its unique label text's wrapper instead.
-function overrideReturnInput(): HTMLInputElement {
-    const label = screen.getByText('Override Return (%)');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Override Return input not found');
+/**
+ * Locates a form field by its (mocked) FormField label text and returns the
+ * input/select nested under that label's parent. Replaces 16 near-identical
+ * per-field helpers that differed only in the label string and the
+ * input-vs-select query — the mocked FormField renders its label and
+ * children as siblings (no htmlFor), so getByLabelText can't resolve it.
+ */
+function labeledInput<T extends HTMLElement = HTMLInputElement>(label: string): T {
+    const field = screen.getByText(label).parentElement?.querySelector('input, select');
+    if (!field) {
+        throw new Error(`Field for label "${label}" not found`);
     }
-    return input as HTMLInputElement;
-}
-
-function dividendYieldInput(): HTMLInputElement {
-    const label = screen.getByText('Dividend Yield (%)');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Dividend Yield input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function feeRateInput(): HTMLInputElement {
-    const label = screen.getByText('Investment Fees (%)');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Investment Fees input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function interestYieldInput(): HTMLInputElement {
-    const label = screen.getByText('Bond Interest Yield (%)');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Bond Interest Yield input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function includeDepressionYearsCheckbox(): HTMLInputElement {
-    const label = screen.getByText('Include 1928–1971 market history');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Include depression years checkbox not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function spouseBirthYearInput(): HTMLInputElement {
-    const label = screen.getByText('Spouse Birth Year');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Spouse Birth Year input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function primaryDeathAgeInput(): HTMLInputElement {
-    const label = screen.getByText('Primary Death Age');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Primary Death Age input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function spouseDeathAgeInput(): HTMLInputElement {
-    const label = screen.getByText('Spouse Death Age');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Spouse Death Age input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function survivorSpendingFactorInput(): HTMLInputElement {
-    const label = screen.getByText('Survivor Spending Factor (%)');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Survivor Spending Factor input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function communityPropertyCheckbox(): HTMLInputElement {
-    const label = screen.getByText('Community Property State');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Community Property checkbox not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function stochasticMortalityToggle(): HTMLInputElement {
-    const label = screen.getByText('Model Uncertain Lifespans');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Model Uncertain Lifespans toggle not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function primarySexSelect(): HTMLSelectElement {
-    const label = screen.getByText('Primary Sex');
-    const select = label.parentElement?.querySelector('select');
-    if (!select) {
-        throw new Error('Primary Sex select not found');
-    }
-    return select as HTMLSelectElement;
-}
-
-function spouseSexSelect(): HTMLSelectElement {
-    const label = screen.getByText('Spouse Sex');
-    const select = label.parentElement?.querySelector('select');
-    if (!select) {
-        throw new Error('Spouse Sex select not found');
-    }
-    return select as HTMLSelectElement;
-}
-
-function longevityAgeInput(): HTMLInputElement {
-    const label = screen.getByText('Longevity Age');
-    const input = label.parentElement?.querySelector('input');
-    if (!input) {
-        throw new Error('Longevity Age input not found');
-    }
-    return input as HTMLInputElement;
-}
-
-function ownerSelect(): HTMLSelectElement {
-    const label = screen.getByText('Owner');
-    const select = label.parentElement?.querySelector('select');
-    if (!select) {
-        throw new Error('Owner select not found');
-    }
-    return select as HTMLSelectElement;
-}
-
-function accountTypeSelect(): HTMLSelectElement {
-    const label = screen.getByText('Account Type');
-    const select = label.parentElement?.querySelector('select');
-    if (!select) {
-        throw new Error('Account Type select not found');
-    }
-    return select as HTMLSelectElement;
+    return field as T;
 }
 
 describe('ScenarioForm', () => {
@@ -306,7 +175,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        expect(overrideReturnInput().value).toBe('');
+        expect(labeledInput('Override Return (%)').value).toBe('');
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -322,7 +191,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(overrideReturnInput(), { target: { value: '5' } });
+        fireEvent.change(labeledInput('Override Return (%)'), { target: { value: '5' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
         await waitFor(() => {
@@ -338,8 +207,8 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(overrideReturnInput(), { target: { value: '9' } });
-        expect(overrideReturnInput().value).toBe('9');
+        fireEvent.change(labeledInput('Override Return (%)'), { target: { value: '9' } });
+        expect(labeledInput('Override Return (%)').value).toBe('9');
 
         const linkSelect = screen.getByText('Link Existing Account').parentElement?.querySelector('select');
         if (!linkSelect) {
@@ -347,7 +216,7 @@ describe('ScenarioForm', () => {
         }
         fireEvent.change(linkSelect, { target: { value: 'ext-1' } });
 
-        expect(overrideReturnInput().value).toBe('');
+        expect(labeledInput('Override Return (%)').value).toBe('');
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -363,7 +232,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm initialValues={makeScenario({ expected_return: null })} onSubmit={onSubmit} submitLabel="Save" />);
 
-        expect(overrideReturnInput().value).toBe('');
+        expect(labeledInput('Override Return (%)').value).toBe('');
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -379,7 +248,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(dividendYieldInput(), { target: { value: '2.1' } });
+        fireEvent.change(labeledInput('Dividend Yield (%)'), { target: { value: '2.1' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
         await waitFor(() => {
@@ -394,7 +263,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(dividendYieldInput(), { target: { value: '' } });
+        fireEvent.change(labeledInput('Dividend Yield (%)'), { target: { value: '' } });
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
         await waitFor(() => {
@@ -404,126 +273,83 @@ describe('ScenarioForm', () => {
         expect(call.dividend_yield).toBeUndefined();
     });
 
-    it('submits fee_rate converted from percent to decimal', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+    // fee_rate and interest_yield are both simple params_json percent fields sharing the exact
+    // same 5-behavior contract (default display, hydrate from params_json, submit as a decimal,
+    // omit when blank, round-trip a genuine 0% override) -- table-driven instead of two
+    // hand-duplicated copies. See the report's deleted-test -> generated-case mapping for the
+    // 10 originally-named tests this table now generates.
+    describe.each([
+        {
+            label: 'Investment Fees (%)', paramKey: 'fee_rate' as const,
+            defaultDisplay: '0.25', hydrateFraction: 0.01, hydrateDisplay: '1',
+            submitPct: '0.5', submitFraction: 0.005,
+        },
+        {
+            label: 'Bond Interest Yield (%)', paramKey: 'interest_yield' as const,
+            defaultDisplay: '4', hydrateFraction: 0.06, hydrateDisplay: '6',
+            submitPct: '5.5', submitFraction: 0.055,
+        },
+    ])('$paramKey percent field', ({ label, paramKey, defaultDisplay, hydrateFraction, hydrateDisplay, submitPct, submitFraction }) => {
+        it(`defaults to ${defaultDisplay}% when no initial value is present`, () => {
+            setupMocks();
+            render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-        fireEvent.change(feeRateInput(), { target: { value: '0.5' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
+            expect(labeledInput(label).value).toBe(defaultDisplay);
         });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.fee_rate).toBeCloseTo(0.005);
-    });
 
-    it('defaults fee_rate to 0.25% when no initial value is present', () => {
-        setupMocks();
-        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+        it('hydrates from an existing scenario\'s params_json', () => {
+            setupMocks();
+            const scenario = makeScenario({});
+            scenario.params_json = JSON.stringify({ [paramKey]: hydrateFraction });
+            render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
 
-        expect(feeRateInput().value).toBe('0.25');
-    });
-
-    it('hydrates fee_rate from an existing scenario\'s params_json', () => {
-        setupMocks();
-        const scenario = makeScenario({});
-        scenario.params_json = JSON.stringify({ fee_rate: 0.01 });
-        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
-
-        expect(feeRateInput().value).toBe('1');
-    });
-
-    it('omits fee_rate when the field is cleared to blank', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
-
-        fireEvent.change(feeRateInput(), { target: { value: '' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
+            expect(labeledInput(label).value).toBe(hydrateDisplay);
         });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.fee_rate).toBeUndefined();
-    });
 
-    it('round-trips a genuine 0% fee_rate override as 0, not dropped', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+        it('submits the value converted from percent to decimal', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(feeRateInput(), { target: { value: '0' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+            fireEvent.change(labeledInput(label), { target: { value: submitPct } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call[paramKey]).toBeCloseTo(submitFraction);
         });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.fee_rate).toBe(0);
-    });
 
-    it('defaults interest_yield to 4.0% when no initial value is present', () => {
-        setupMocks();
-        render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
+        it('omits the field when cleared to blank', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        expect(interestYieldInput().value).toBe('4');
-    });
+            fireEvent.change(labeledInput(label), { target: { value: '' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-    it('hydrates interest_yield from an existing scenario\'s params_json', () => {
-        setupMocks();
-        const scenario = makeScenario({});
-        scenario.params_json = JSON.stringify({ interest_yield: 0.06 });
-        render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
-
-        expect(interestYieldInput().value).toBe('6');
-    });
-
-    it('submits interest_yield converted from percent to decimal', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
-
-        fireEvent.change(interestYieldInput(), { target: { value: '5.5' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call[paramKey]).toBeUndefined();
         });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.interest_yield).toBeCloseTo(0.055);
-    });
 
-    it('omits interest_yield when the field is cleared to blank', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
+        it('round-trips a genuine 0% override as 0, not dropped', async () => {
+            setupMocks();
+            const onSubmit = vi.fn().mockResolvedValue(undefined);
+            render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.change(interestYieldInput(), { target: { value: '' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+            fireEvent.change(labeledInput(label), { target: { value: '0' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
+            await waitFor(() => {
+                expect(onSubmit).toHaveBeenCalled();
+            });
+            const call = onSubmit.mock.calls[0][0];
+            expect(call[paramKey]).toBe(0);
         });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.interest_yield).toBeUndefined();
-    });
-
-    it('round-trips a genuine 0% interest_yield override as 0, not dropped', async () => {
-        setupMocks();
-        const onSubmit = vi.fn().mockResolvedValue(undefined);
-        render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
-
-        fireEvent.change(interestYieldInput(), { target: { value: '0' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-        await waitFor(() => {
-            expect(onSubmit).toHaveBeenCalled();
-        });
-        const call = onSubmit.mock.calls[0][0];
-        expect(call.interest_yield).toBe(0);
     });
 
     it('submits include_depression_years as false by default', async () => {
@@ -531,7 +357,7 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        expect(includeDepressionYearsCheckbox().checked).toBe(false);
+        expect(labeledInput('Include 1928–1971 market history').checked).toBe(false);
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -547,8 +373,8 @@ describe('ScenarioForm', () => {
         const onSubmit = vi.fn().mockResolvedValue(undefined);
         render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-        fireEvent.click(includeDepressionYearsCheckbox());
-        expect(includeDepressionYearsCheckbox().checked).toBe(true);
+        fireEvent.click(labeledInput('Include 1928–1971 market history'));
+        expect(labeledInput('Include 1928–1971 market history').checked).toBe(true);
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -565,7 +391,7 @@ describe('ScenarioForm', () => {
         scenario.params_json = JSON.stringify({ include_depression_years: true });
         render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
 
-        expect(includeDepressionYearsCheckbox().checked).toBe(true);
+        expect(labeledInput('Include 1928–1971 market history').checked).toBe(true);
     });
 
     it('round-trips a genuine 0% expected_return override as 0, not dropped', async () => {
@@ -574,7 +400,7 @@ describe('ScenarioForm', () => {
         // expected_return stored as a decimal 0; toPercent(0) = 0, so the field shows "0".
         render(<ScenarioForm initialValues={makeScenario({ expected_return: 0 })} onSubmit={onSubmit} submitLabel="Save" />);
 
-        expect(overrideReturnInput().value).toBe('0');
+        expect(labeledInput('Override Return (%)').value).toBe('0');
 
         fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -620,7 +446,7 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            expect(spouseBirthYearInput().value).toBe('');
+            expect(labeledInput('Spouse Birth Year').value).toBe('');
             expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
             expect(screen.queryByText('Spouse Death Age')).not.toBeInTheDocument();
             expect(screen.queryByText('Survivor Spending Factor (%)')).not.toBeInTheDocument();
@@ -632,36 +458,36 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
 
             expect(screen.getByText('Primary Death Age')).toBeInTheDocument();
             expect(screen.getByText('Spouse Death Age')).toBeInTheDocument();
             expect(screen.getByText('Survivor Spending Factor (%)')).toBeInTheDocument();
             expect(screen.getByText('Community Property State')).toBeInTheDocument();
-            expect(survivorSpendingFactorInput().value).toBe('75');
-            expect(communityPropertyCheckbox().checked).toBe(false);
+            expect(labeledInput('Survivor Spending Factor (%)').value).toBe('75');
+            expect(labeledInput('Community Property State').checked).toBe(false);
         });
 
         it('clears (nulls) the dependent household fields, hiding them again, when spouse birth year is cleared', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.change(primaryDeathAgeInput(), { target: { value: '85' } });
-            fireEvent.change(spouseDeathAgeInput(), { target: { value: '88' } });
-            fireEvent.change(survivorSpendingFactorInput(), { target: { value: '60' } });
-            fireEvent.click(communityPropertyCheckbox());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Primary Death Age'), { target: { value: '85' } });
+            fireEvent.change(labeledInput('Spouse Death Age'), { target: { value: '88' } });
+            fireEvent.change(labeledInput('Survivor Spending Factor (%)'), { target: { value: '60' } });
+            fireEvent.click(labeledInput('Community Property State'));
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '' } });
 
             expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
 
             // Re-adding a spouse shows fresh (not stale) defaults, not the previously entered values.
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1972' } });
-            expect(primaryDeathAgeInput().value).toBe('');
-            expect(spouseDeathAgeInput().value).toBe('');
-            expect(survivorSpendingFactorInput().value).toBe('75');
-            expect(communityPropertyCheckbox().checked).toBe(false);
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1972' } });
+            expect(labeledInput('Primary Death Age').value).toBe('');
+            expect(labeledInput('Spouse Death Age').value).toBe('');
+            expect(labeledInput('Survivor Spending Factor (%)').value).toBe('75');
+            expect(labeledInput('Community Property State').checked).toBe(false);
         });
 
         it('submits every household field as null for a single-person scenario', async () => {
@@ -687,11 +513,11 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.change(primaryDeathAgeInput(), { target: { value: '85' } });
-            fireEvent.change(spouseDeathAgeInput(), { target: { value: '88' } });
-            fireEvent.change(survivorSpendingFactorInput(), { target: { value: '70' } });
-            fireEvent.click(communityPropertyCheckbox());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Primary Death Age'), { target: { value: '85' } });
+            fireEvent.change(labeledInput('Spouse Death Age'), { target: { value: '88' } });
+            fireEvent.change(labeledInput('Survivor Spending Factor (%)'), { target: { value: '70' } });
+            fireEvent.click(labeledInput('Community Property State'));
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -711,7 +537,7 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
             // Leave primary/spouse death age blank -- they must serialize as null, not 0 or undefined.
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -729,12 +555,12 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
 
-            expect(primaryDeathAgeInput().min).toBe('50');
-            expect(primaryDeathAgeInput().max).toBe('120');
-            expect(spouseDeathAgeInput().min).toBe('50');
-            expect(spouseDeathAgeInput().max).toBe('120');
+            expect(labeledInput('Primary Death Age').min).toBe('50');
+            expect(labeledInput('Primary Death Age').max).toBe('120');
+            expect(labeledInput('Spouse Death Age').min).toBe('50');
+            expect(labeledInput('Spouse Death Age').max).toBe('120');
         });
 
         it('hydrates household fields from an existing scenario\'s params_json and round-trips them unchanged', async () => {
@@ -750,11 +576,11 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
 
-            expect(spouseBirthYearInput().value).toBe('1958');
-            expect(primaryDeathAgeInput().value).toBe('85');
-            expect(spouseDeathAgeInput().value).toBe('90');
-            expect(survivorSpendingFactorInput().value).toBe('70');
-            expect(communityPropertyCheckbox().checked).toBe(true);
+            expect(labeledInput('Spouse Birth Year').value).toBe('1958');
+            expect(labeledInput('Primary Death Age').value).toBe('85');
+            expect(labeledInput('Spouse Death Age').value).toBe('90');
+            expect(labeledInput('Survivor Spending Factor (%)').value).toBe('70');
+            expect(labeledInput('Community Property State').checked).toBe(true);
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -775,7 +601,7 @@ describe('ScenarioForm', () => {
             scenario.params_json = JSON.stringify({ primary_death_age: 85 });
             render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
 
-            expect(spouseBirthYearInput().value).toBe('');
+            expect(labeledInput('Spouse Birth Year').value).toBe('');
             expect(screen.queryByText('Primary Death Age')).not.toBeInTheDocument();
         });
 
@@ -793,7 +619,7 @@ describe('ScenarioForm', () => {
             scenario.params_json = JSON.stringify({ spouse_birth_year: 1970 });
             render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
 
-            expect(ownerSelect().value).toBe('spouse');
+            expect(labeledInput<HTMLSelectElement>('Owner').value).toBe('spouse');
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -810,14 +636,14 @@ describe('ScenarioForm', () => {
             scenario.params_json = JSON.stringify({ spouse_birth_year: 1970 });
             render(<ScenarioForm initialValues={scenario} onSubmit={vi.fn()} submitLabel="Save" />);
 
-            expect(ownerSelect().value).toBe('joint');
-            const jointOptionBefore = Array.from(ownerSelect().options).find(o => o.value === 'joint');
+            expect(labeledInput<HTMLSelectElement>('Owner').value).toBe('joint');
+            const jointOptionBefore = Array.from(labeledInput<HTMLSelectElement>('Owner').options).find(o => o.value === 'joint');
             expect(jointOptionBefore?.disabled).toBe(false);
 
-            fireEvent.change(accountTypeSelect(), { target: { value: 'traditional' } });
+            fireEvent.change(labeledInput<HTMLSelectElement>('Account Type'), { target: { value: 'traditional' } });
 
-            expect(ownerSelect().value).toBe('primary');
-            const jointOptionAfter = Array.from(ownerSelect().options).find(o => o.value === 'joint');
+            expect(labeledInput<HTMLSelectElement>('Owner').value).toBe('primary');
+            const jointOptionAfter = Array.from(labeledInput<HTMLSelectElement>('Owner').options).find(o => o.value === 'joint');
             expect(jointOptionAfter?.disabled).toBe(true);
         });
     });
@@ -834,9 +660,9 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
 
-            expect(stochasticMortalityToggle().checked).toBe(false);
+            expect(labeledInput('Model Uncertain Lifespans').checked).toBe(false);
             expect(screen.queryByText('Primary Sex')).not.toBeInTheDocument();
             expect(screen.queryByText('Spouse Sex')).not.toBeInTheDocument();
             expect(screen.queryByText('Longevity Age')).not.toBeInTheDocument();
@@ -846,24 +672,24 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
 
             expect(screen.getByText('Primary Sex')).toBeInTheDocument();
             expect(screen.getByText('Spouse Sex')).toBeInTheDocument();
             expect(screen.getByText('Longevity Age')).toBeInTheDocument();
-            expect(longevityAgeInput().value).toBe('95');
+            expect(labeledInput('Longevity Age').value).toBe('95');
         });
 
         it('hides the Sex selects and longevity-age input again when the toggle is switched back off', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
             expect(screen.getByText('Primary Sex')).toBeInTheDocument();
 
-            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
 
             expect(screen.queryByText('Primary Sex')).not.toBeInTheDocument();
             expect(screen.queryByText('Spouse Sex')).not.toBeInTheDocument();
@@ -874,14 +700,14 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '' } });
 
             expect(screen.queryByText('Model Uncertain Lifespans')).not.toBeInTheDocument();
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1972' } });
-            expect(stochasticMortalityToggle().checked).toBe(false);
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1972' } });
+            expect(labeledInput('Model Uncertain Lifespans').checked).toBe(false);
         });
 
         it('round-trips a Primary Sex selection into the serialized request', async () => {
@@ -889,10 +715,10 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
-            fireEvent.change(primarySexSelect(), { target: { value: 'male' } });
-            fireEvent.change(spouseSexSelect(), { target: { value: 'female' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
+            fireEvent.change(labeledInput<HTMLSelectElement>('Primary Sex'), { target: { value: 'male' } });
+            fireEvent.change(labeledInput<HTMLSelectElement>('Spouse Sex'), { target: { value: 'female' } });
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -910,9 +736,9 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
-            fireEvent.change(longevityAgeInput(), { target: { value: '90' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
+            fireEvent.change(labeledInput('Longevity Age'), { target: { value: '90' } });
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -945,7 +771,7 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
             await waitFor(() => {
@@ -963,8 +789,8 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm onSubmit={onSubmit} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -991,10 +817,10 @@ describe('ScenarioForm', () => {
             const onSubmit = vi.fn().mockResolvedValue(undefined);
             render(<ScenarioForm initialValues={scenario} onSubmit={onSubmit} submitLabel="Save" />);
 
-            expect(stochasticMortalityToggle().checked).toBe(true);
-            expect(primarySexSelect().value).toBe('male');
-            expect(spouseSexSelect().value).toBe('female');
-            expect(longevityAgeInput().value).toBe('92');
+            expect(labeledInput('Model Uncertain Lifespans').checked).toBe(true);
+            expect(labeledInput<HTMLSelectElement>('Primary Sex').value).toBe('male');
+            expect(labeledInput<HTMLSelectElement>('Spouse Sex').value).toBe('female');
+            expect(labeledInput('Longevity Age').value).toBe('92');
 
             fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -1012,11 +838,11 @@ describe('ScenarioForm', () => {
             setupMocks();
             render(<ScenarioForm onSubmit={vi.fn()} submitLabel="Save" />);
 
-            fireEvent.change(spouseBirthYearInput(), { target: { value: '1970' } });
-            fireEvent.click(stochasticMortalityToggle());
+            fireEvent.change(labeledInput('Spouse Birth Year'), { target: { value: '1970' } });
+            fireEvent.click(labeledInput('Model Uncertain Lifespans'));
 
-            expect(longevityAgeInput().min).toBe('80');
-            expect(longevityAgeInput().max).toBe('110');
+            expect(labeledInput('Longevity Age').min).toBe('80');
+            expect(labeledInput('Longevity Age').max).toBe('110');
         });
     });
 });
