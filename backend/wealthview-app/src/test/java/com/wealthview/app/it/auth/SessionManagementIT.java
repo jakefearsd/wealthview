@@ -12,7 +12,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
@@ -141,8 +140,7 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
                 "email", ADMIN_EMAIL,
                 "password", ADMIN_PASSWORD,
                 "device_label", "iPhone 15");
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login", body);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var sessions = listSessions((String) resp.getBody().get("access_token")).getBody();
@@ -192,23 +190,14 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
     }
 
     private Map<String, Object> tokenLogin() {
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         return resp.getBody();
     }
 
     private org.springframework.http.ResponseEntity<List<Map<String, Object>>> listSessions(String accessToken) {
         return restTemplate.exchange("/api/v1/auth/sessions",
                 HttpMethod.GET, new HttpEntity<>(bearerHeaders(accessToken)), LIST_TYPE);
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        return h;
     }
 
     private HttpHeaders bearerHeaders(String accessToken) {

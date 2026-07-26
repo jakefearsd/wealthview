@@ -3,15 +3,10 @@ package com.wealthview.app.it.auth;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -33,8 +28,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "password", "validpass1",
                 "invite_code", "NOT-A-REAL-CODE");
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -47,8 +41,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "password", "validpass1",
                 "invite_code", expiredCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -60,8 +53,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "email", "first-user@test.com",
                 "password", "validpass1",
                 "invite_code", inviteCode);
-        var first = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(firstBody, jsonHeaders()), MAP_TYPE);
+        var first = api.postAnonForEntity("/api/v1/auth/token/register", firstBody);
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         // Same invite, different email — must reject.
@@ -69,8 +61,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "email", "second-user@test.com",
                 "password", "validpass1",
                 "invite_code", inviteCode);
-        var second = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(secondBody, jsonHeaders()), MAP_TYPE);
+        var second = api.postAnonForEntity("/api/v1/auth/token/register", secondBody);
 
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -82,8 +73,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "email", "dup@test.com",
                 "password", "validpass1",
                 "invite_code", firstInvite);
-        var first = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(firstBody, jsonHeaders()), MAP_TYPE);
+        var first = api.postAnonForEntity("/api/v1/auth/token/register", firstBody);
         assertThat(first.getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         var secondInvite = authHelper.createInviteCode();
@@ -91,8 +81,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "email", "dup@test.com",
                 "password", "validpass1",
                 "invite_code", secondInvite);
-        var second = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(secondBody, jsonHeaders()), MAP_TYPE);
+        var second = api.postAnonForEntity("/api/v1/auth/token/register", secondBody);
 
         assertThat(second.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -107,8 +96,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "password", "password",
                 "invite_code", inviteCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -120,8 +108,7 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "password", "validpass1",
                 "invite_code", inviteCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -136,15 +123,8 @@ class MobileRegisterIT extends AbstractApiIntegrationTest {
                 "password", "abc",
                 "invite_code", inviteCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 }

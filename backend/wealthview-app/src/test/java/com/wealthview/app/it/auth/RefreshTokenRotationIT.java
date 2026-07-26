@@ -139,11 +139,8 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     @Test
     void cookieRefresh_singleUse_secondCallWithOldCookieFails() {
         // Cookie path uses /api/v1/auth/{login,refresh}. Same single-use rule.
-        var loginResp = restTemplate.exchange("/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResp = api.postAnonForEntity("/api/v1/auth/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var refreshCookie = extractCookie(loginResp.getHeaders(), "refresh_token");
 
         var firstRefresh = cookieRefresh(refreshCookie);
@@ -160,19 +157,14 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     }
 
     private Map<String, Object> tokenLogin() {
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         return resp.getBody();
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> tokenRefresh(String refreshToken) {
-        return restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", refreshToken), jsonHeaders()),
-                MAP_TYPE);
+        return api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", refreshToken));
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> cookieRefresh(String refreshTokenCookie) {

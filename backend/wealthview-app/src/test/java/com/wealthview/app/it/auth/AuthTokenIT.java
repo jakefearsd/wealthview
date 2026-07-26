@@ -23,8 +23,7 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
     void tokenLogin_withValidCredentials_returnsTokensInBodyNoCookies() {
         var body = Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsKeys(
@@ -42,8 +41,7 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
     void tokenLogin_withInvalidCredentials_returns401() {
         var body = Map.of("email", ADMIN_EMAIL, "password", "wrongpassword");
 
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(response.getBody()).containsEntry("error", "UNAUTHORIZED");
@@ -57,8 +55,7 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
                 "password", "mytestpass",
                 "invite_code", inviteCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).containsKeys(
@@ -70,18 +67,13 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
 
     @Test
     void tokenRefresh_withValidRefreshToken_returnsNewPair() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var originalAccess = (String) loginResponse.getBody().get("access_token");
         var originalRefresh = (String) loginResponse.getBody().get("refresh_token");
 
-        var refreshResponse = restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", originalRefresh), jsonHeaders()),
-                MAP_TYPE);
+        var refreshResponse = api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", originalRefresh));
 
         assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(refreshResponse.getBody()).containsKeys("access_token", "refresh_token");
@@ -93,19 +85,13 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
     @Test
     void tokenLogout_invalidatesAllTokensForUser() {
         var inviteCode = authHelper.createInviteCode();
-        restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of(
+        api.postAnonForEntity("/api/v1/auth/token/register", Map.of(
                         "email", "logout-victim@test.com",
                         "password", "mytestpass",
-                        "invite_code", inviteCode), jsonHeaders()),
-                MAP_TYPE);
+                        "invite_code", inviteCode));
 
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", "logout-victim@test.com", "password", "mytestpass"),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", "logout-victim@test.com", "password", "mytestpass"));
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         var logoutResponse = restTemplate.exchange("/api/v1/auth/token/logout",
@@ -119,11 +105,8 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
 
     @Test
     void bearerHeader_isAcceptedByProtectedEndpoint() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         var response = restTemplate.exchange("/api/v1/auth/me",
@@ -135,11 +118,8 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
 
     @Test
     void bearerHeader_skipsCsrf_onMutatingEndpoint() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         // POST without X-XSRF-TOKEN header — would 403 on the cookie path.

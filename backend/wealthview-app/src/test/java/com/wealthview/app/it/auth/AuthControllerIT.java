@@ -3,16 +3,11 @@ package com.wealthview.app.it.auth;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AuthControllerIT extends AbstractApiIntegrationTest {
@@ -26,8 +21,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "invite_code", inviteCode
         );
 
-        var response = restTemplate.exchange("/api/v1/auth/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).containsKeys("user_id", "tenant_id");
@@ -49,8 +43,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "invite_code", expiredCode
         );
 
-        var response = restTemplate.exchange("/api/v1/auth/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -63,8 +56,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "password", "mytestpass",
                 "invite_code", inviteCode
         );
-        restTemplate.exchange("/api/v1/auth/register",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        api.postAnonForEntity("/api/v1/auth/register", body);
 
         var inviteCode2 = authHelper.createInviteCode();
         var body2 = Map.of(
@@ -73,8 +65,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "invite_code", inviteCode2
         );
 
-        var response = restTemplate.exchange("/api/v1/auth/register",
-                HttpMethod.POST, new HttpEntity<>(body2, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/register", body2);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     }
@@ -86,8 +77,7 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "password", "testpass123"
         );
 
-        var response = restTemplate.exchange("/api/v1/auth/login",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/login", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).doesNotContainKeys("access_token", "refresh_token");
@@ -104,16 +94,14 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
                 "password", "wrongpassword"
         );
 
-        var response = restTemplate.exchange("/api/v1/auth/login",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), String.class);
+        var response = api.postAnonForEntity("/api/v1/auth/login", body, String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void createInviteCode_asAdmin_returns201() {
-        var response = restTemplate.exchange("/api/v1/tenant/invite-codes",
-                HttpMethod.POST, authHelper.authEntity(null, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/tenant/invite-codes", null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody()).containsKey("code");
@@ -123,16 +111,9 @@ class AuthControllerIT extends AbstractApiIntegrationTest {
     void listInviteCodes_asAdmin_returnsAll() {
         authHelper.createInviteCode();
 
-        var response = restTemplate.exchange("/api/v1/tenant/invite-codes",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var response = api.getListForEntity("/api/v1/tenant/invite-codes");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotEmpty();
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 }

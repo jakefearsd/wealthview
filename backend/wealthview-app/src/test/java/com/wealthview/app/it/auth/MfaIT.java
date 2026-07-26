@@ -106,11 +106,8 @@ class MfaIT extends AbstractApiIntegrationTest {
         // Called for its effect only — this test asserts the challenge response, not a TOTP code.
         enableMfaOnAdmin();
 
-        var resp = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("mfa_required")).isEqualTo(true);
         assertThat(resp.getBody()).doesNotContainKey("access_token");
@@ -120,11 +117,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     void loginWithMfaEnabled_returnsMfaRequired_notTokens_cookie() {
         enableMfaOnAdmin();
 
-        var resp = restTemplate.exchange("/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var resp = api.postAnonForEntity("/api/v1/auth/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody().get("mfa_required")).isEqualTo(true);
         assertThat(resp.getBody()).doesNotContainKey("access_token");
@@ -133,11 +127,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaChallenge_withCorrectTotp_returnsTokens() {
         var secret = enableMfaOnAdmin();
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
         var totp = mfaService.generateTotpCodeForTesting(secret);
 
@@ -149,11 +140,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaChallenge_withWrongTotp_returns401() {
         enableMfaOnAdmin();
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
 
         var resp = challengeBearer(mfaToken, "000000", null);
@@ -164,11 +152,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     void mfaChallenge_withRecoveryCode_returnsTokensAndConsumesCode() {
         var setupCodes = enableMfaWithCodes();
         var firstCode = setupCodes.recoveryCodes().get(0);
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
 
         var resp = challengeBearer(mfaToken, null, firstCode);
@@ -184,18 +169,12 @@ class MfaIT extends AbstractApiIntegrationTest {
         var setupCodes = enableMfaWithCodes();
         var firstCode = setupCodes.recoveryCodes().get(0);
         // First login + challenge consumes the recovery code.
-        var login1 = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login1 = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         challengeBearer((String) login1.getBody().get("mfa_token"), null, firstCode);
 
-        var login2 = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login2 = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var resp = challengeBearer((String) login2.getBody().get("mfa_token"), null, firstCode);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -203,11 +182,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaChallenge_withReusedMfaToken_returns401() {
         var secret = enableMfaOnAdmin();
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
         var totp = mfaService.generateTotpCodeForTesting(secret);
 
@@ -221,11 +197,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaChallenge_withExpiredMfaToken_returns401() {
         enableMfaOnAdmin();
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
         // Backdate the row so the DB-side expiry trips before we even check the JWT.
         jdbc.update("UPDATE mfa_challenges SET expires_at = ? WHERE user_id = ?",
@@ -298,11 +271,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     }
 
     private Map<String, Object> loginThroughMfaWithSecret(String secret) {
-        var login = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var login = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var mfaToken = (String) login.getBody().get("mfa_token");
         var totp = mfaService.generateTotpCodeForTesting(secret);
         var resp = challengeBearer(mfaToken, totp, null);
@@ -310,11 +280,8 @@ class MfaIT extends AbstractApiIntegrationTest {
     }
 
     private Map<String, Object> tokenLogin() {
-        return restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE).getBody();
+        return api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD)).getBody();
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> mfaSetup(String access) {
@@ -343,12 +310,15 @@ class MfaIT extends AbstractApiIntegrationTest {
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> challengeBearer(
             String mfaToken, String totp, String recovery) {
+        // Despite the name (matching the mobile/Bearer transport this challenge
+        // feeds into), this call itself carries no Authorization header — the
+        // mfa_token in the body IS the credential — so it's a plain anonymous
+        // POST like the logins above.
         var body = new HashMap<String, Object>();
         body.put("mfa_token", mfaToken);
         if (totp != null) body.put("totp_code", totp);
         if (recovery != null) body.put("recovery_code", recovery);
-        return restTemplate.exchange("/api/v1/auth/token/mfa/challenge",
-                HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+        return api.postAnonForEntity("/api/v1/auth/token/mfa/challenge", body);
     }
 
     private HttpHeaders jsonHeaders() {

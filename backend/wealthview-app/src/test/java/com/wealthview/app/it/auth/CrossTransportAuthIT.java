@@ -7,7 +7,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
@@ -48,11 +47,8 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
 
     @Test
     void tokenIssuedViaTokenEndpoint_worksAsCookie() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var bearerToken = (String) loginResponse.getBody().get("access_token");
 
         var headers = new HttpHeaders();
@@ -75,8 +71,7 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
         assertThat(preLogout.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // Logout via the cookie path (uses CSRF + cookie auth via authHelper).
-        var logout = restTemplate.exchange("/api/v1/auth/logout",
-                HttpMethod.POST, authHelper.authEntity(null, session.accessToken()), Void.class);
+        var logout = api.postForEntityAs(session.accessToken(), "/api/v1/auth/logout", null, Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var postLogout = restTemplate.exchange("/api/v1/auth/me",
@@ -86,11 +81,8 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
 
     @Test
     void logoutViaTokenPath_revokesCookieToken() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var token = (String) loginResponse.getBody().get("access_token");
 
         // Confirm cookie-style use works pre-logout.
@@ -120,20 +112,12 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
         var session = authHelper.adminSession();
         assertThat(session.refreshToken()).isNotBlank();
 
-        var refresh = restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", session.refreshToken()), jsonHeaders()),
-                MAP_TYPE);
+        var refresh = api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", session.refreshToken()));
 
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(refresh.getBody()).containsKeys("access_token", "refresh_token");
         assertThat((String) refresh.getBody().get("access_token")).isNotEqualTo(session.accessToken());
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 
     private HttpHeaders bearerHeaders(String token) {

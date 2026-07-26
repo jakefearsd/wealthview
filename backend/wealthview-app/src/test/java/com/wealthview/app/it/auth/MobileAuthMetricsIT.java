@@ -8,12 +8,10 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import io.micrometer.core.instrument.MeterRegistry;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -52,11 +50,8 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
         var before = readCounter("wealthview.auth.login",
                 "result", "success", "reason", "ok", "transport", "cookie");
 
-        var response = restTemplate.exchange("/api/v1/auth/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var after = readCounter("wealthview.auth.login",
@@ -66,20 +61,15 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
 
     @Test
     void tokenRefresh_incrementsMeterWithTransportBearer() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var refresh = (String) loginResponse.getBody().get("refresh_token");
 
         var before = readCounter("wealthview.auth.refresh",
                 "result", "success", "reason", "ok", "transport", "bearer");
 
-        var refreshResponse = restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", refresh), jsonHeaders()),
-                MAP_TYPE);
+        var refreshResponse = api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", refresh));
         assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var after = readCounter("wealthview.auth.refresh",
@@ -107,8 +97,7 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
 
         var before = readCounter("wealthview.auth.logout", "transport", "cookie");
 
-        var logout = restTemplate.exchange("/api/v1/auth/logout",
-                HttpMethod.POST, authHelper.authEntity(null, session.accessToken()), Void.class);
+        var logout = api.postForEntityAs(session.accessToken(), "/api/v1/auth/logout", null, Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var after = readCounter("wealthview.auth.logout", "transport", "cookie");
@@ -125,19 +114,10 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLogin() {
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 
     private HttpHeaders bearerHeaders(String token) {

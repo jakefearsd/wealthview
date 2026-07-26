@@ -70,12 +70,12 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
     @Test
     void tokenLoginEndpoint_acceptsCsrflessRequest() {
         // No cookies, no XSRF — relying on the /api/v1/auth/token/** ignore
-        // rule in SecurityConfig.
-        var headers = jsonHeaders();
+        // rule in SecurityConfig. A plain anonymous POST carries neither, so
+        // this is request-shape identical to the raw jsonHeaders()-only entity
+        // it replaces.
         var body = Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -83,31 +83,24 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
     @Test
     void tokenRegisterEndpoint_acceptsCsrflessRequest() {
         var inviteCode = authHelper.createInviteCode();
-        var headers = jsonHeaders();
         var body = Map.of(
                 "email", "csrfless-register@test.com",
                 "password", "regpass1234",
                 "invite_code", inviteCode);
 
-        var response = restTemplate.exchange("/api/v1/auth/token/register",
-                HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/register", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
     @Test
     void tokenRefreshEndpoint_acceptsCsrflessRequest() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var refresh = (String) loginResponse.getBody().get("refresh_token");
 
-        var refreshResponse = restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", refresh), jsonHeaders()),
-                MAP_TYPE);
+        var refreshResponse = api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", refresh));
 
         assertThat(refreshResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -123,19 +116,10 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLogin() {
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 
     private HttpHeaders bearerHeaders(String token) {

@@ -118,6 +118,15 @@ public class ApiClient {
         return exchange(token, url, HttpMethod.POST, body);
     }
 
+    /**
+     * Generic form for call sites that assert on a non-JSON-map body (e.g.
+     * {@code Void.class} for a 204 logout response) rather than parsing
+     * into {@link #MAP_TYPE}.
+     */
+    public <T> ResponseEntity<T> postForEntityAs(String token, String url, Object body, Class<T> responseType) {
+        return restTemplate.exchange(url, HttpMethod.POST, authEntity(token, body), responseType);
+    }
+
     public ResponseEntity<Map<String, Object>> getForEntityAs(String token, String url) {
         return exchange(token, url, HttpMethod.GET, null);
     }
@@ -191,6 +200,16 @@ public class ApiClient {
 
     public ResponseEntity<Map<String, Object>> postAnonForEntity(String url, Object body) {
         return anonExchange(url, HttpMethod.POST, body, MAP_TYPE);
+    }
+
+    /**
+     * Generic form for call sites that assert on a non-JSON-map body (e.g.
+     * {@code String.class} for a login-failure error payload) rather than
+     * parsing into {@link #MAP_TYPE}.
+     */
+    public <T> ResponseEntity<T> postAnonForEntity(String url, Object body, Class<T> responseType) {
+        var entity = body == null ? HttpEntity.EMPTY : new HttpEntity<>(body, jsonHeaders());
+        return restTemplate.exchange(url, HttpMethod.POST, entity, responseType);
     }
 
     /**

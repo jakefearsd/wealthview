@@ -9,7 +9,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
@@ -136,11 +135,8 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
 
     @Test
     void bearerHeader_withRefreshTokenInAuthHeader_returns401() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var refreshToken = (String) loginResponse.getBody().get("refresh_token");
 
         var headers = new HttpHeaders();
@@ -223,11 +219,9 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
         authHelper.createSuperAdminDirectly("super-disable@test.com", ADMIN_PASSWORD);
         var superToken = authHelper.loginAs(restTemplate, "super-disable@test.com", ADMIN_PASSWORD);
 
-        var setActive = restTemplate.exchange(
+        var setActive = api.putForEntityAs(superToken,
                 "/api/v1/admin/tenants/" + authHelper.tenantId() + "/active",
-                HttpMethod.PUT,
-                authHelper.authEntity(Map.of("active", false), superToken),
-                Void.class);
+                Map.of("active", false), Void.class);
         assertThat(setActive.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
@@ -245,18 +239,13 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
         // refresh — so we exercise the stale-generation rejection path
         // explicitly: login, refresh (which bumps the generation), then try
         // the original access token.
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
+        var loginResponse = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
         var originalAccess = (String) loginResponse.getBody().get("access_token");
         var originalRefresh = (String) loginResponse.getBody().get("refresh_token");
 
-        var refresh = restTemplate.exchange("/api/v1/auth/token/refresh",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("refresh_token", originalRefresh), jsonHeaders()),
-                MAP_TYPE);
+        var refresh = api.postAnonForEntity("/api/v1/auth/token/refresh",
+                Map.of("refresh_token", originalRefresh));
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
@@ -269,18 +258,10 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLoginAs(String email, String password) {
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", email, "password", password), jsonHeaders()),
-                MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/login",
+                Map.of("email", email, "password", password));
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 
     private HttpHeaders bearerHeaders(String accessToken) {
