@@ -44,7 +44,6 @@ class AdminSystemControllerTest {
     @MockitoBean
     private SystemConfigService systemConfigService;
 
-
     @Test
     void getSystemStats_superAdmin_returns200() throws Exception {
         when(systemStatsService.getStats()).thenReturn(

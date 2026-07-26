@@ -33,7 +33,6 @@ class DataExportControllerTest {
     @Autowired
     private MockMvc mockMvc;
 
-
     @MockitoBean
     private DataExportService dataExportService;
 

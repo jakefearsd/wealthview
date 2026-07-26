@@ -21,7 +21,6 @@ class SecurityHeadersTest {
     @MockitoBean
     private AuthService authService;
 
-
     @Test
     void publicResponse_includesPermissionsPolicyHeaderDisablingSensitiveFeatures() throws Exception {
         // Any response through the security filter chain should carry Permissions-Policy

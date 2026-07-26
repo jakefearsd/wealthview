@@ -50,7 +50,6 @@ class TransactionControllerTest {
     @MockitoBean
     private TransactionService transactionService;
 
-
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID TXN_ID = UUID.randomUUID();
 

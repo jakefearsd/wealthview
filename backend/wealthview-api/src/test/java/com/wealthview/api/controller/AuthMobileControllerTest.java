@@ -35,7 +35,6 @@ class AuthMobileControllerTest {
     @MockitoBean
     private AuthService authService;
 
-
     private AuthResult sampleAuthResult() {
         return new AuthResult("access-jwt", "refresh-jwt",
                 UUID.randomUUID(), UUID.randomUUID(), "mobile@example.com", "member");

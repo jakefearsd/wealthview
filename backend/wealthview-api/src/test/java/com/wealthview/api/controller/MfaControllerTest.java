@@ -36,7 +36,6 @@ class MfaControllerTest {
     @MockitoBean
     private MfaService mfaService;
 
-
     @Test
     void setup_authenticated_returns200() throws Exception {
         when(mfaService.setupMfa(USER_ID)).thenReturn(

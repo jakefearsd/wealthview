@@ -51,7 +51,6 @@ class PropertyControllerAnalyticsTest {
     @MockitoBean(name = "propertyValuationSyncService")
     private PropertyValuationSyncService syncService;
 
-
     private static final UUID PROPERTY_ID = UUID.randomUUID();
 
     @Test

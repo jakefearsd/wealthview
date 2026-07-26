@@ -43,7 +43,6 @@ class SpendingProfileControllerTest {
     @MockitoBean
     private SpendingProfileService spendingProfileService;
 
-
     private static final UUID PROFILE_ID = UUID.randomUUID();
 
     private SpendingProfileResponse sampleProfile() {

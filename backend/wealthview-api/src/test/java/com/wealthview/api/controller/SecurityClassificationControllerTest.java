@@ -30,7 +30,6 @@ class SecurityClassificationControllerTest {
     @MockitoBean
     private SecurityClassificationService classificationService;
 
-
     @Test
     void setClassification_validRequest_returns200() throws Exception {
         when(classificationService.setOverride(TENANT_ID, "VXUS", AssetClass.INTL_STOCK))

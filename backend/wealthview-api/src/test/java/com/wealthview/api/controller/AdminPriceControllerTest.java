@@ -48,7 +48,6 @@ class AdminPriceControllerTest {
     @MockitoBean
     private PriceSyncService priceSyncService;
 
-
     @Test
     void triggerPriceSync_whenFinnhubConfigured_returns200() throws Exception {
         when(priceSyncService.syncDailyPrices())

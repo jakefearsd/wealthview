@@ -24,7 +24,6 @@ class SecurityConfigCsrfTest {
     @MockitoBean
     private AuthService authService;
 
-
     @Test
     void post_login_doesNotRequireCsrf() throws Exception {
         // Login is the entry point — no prior session, no XSRF-TOKEN cookie possible —

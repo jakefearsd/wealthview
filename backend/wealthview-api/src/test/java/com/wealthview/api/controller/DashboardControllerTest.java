@@ -41,7 +41,6 @@ class DashboardControllerTest {
     @MockitoBean
     private SnapshotProjectionService snapshotProjectionService;
 
-
     @Test
     void getSummary_authenticated_returns200() throws Exception {
         var summary = new DashboardSummaryResponse(

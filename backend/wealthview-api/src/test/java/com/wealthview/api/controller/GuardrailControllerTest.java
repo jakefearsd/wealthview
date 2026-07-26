@@ -50,7 +50,6 @@ class GuardrailControllerTest {
     @MockitoBean
     private GuardrailProfileService guardrailProfileService;
 
-
     private static final UUID SCENARIO_ID = UUID.randomUUID();
 
     private GuardrailProfileResponse sampleResponse() {

@@ -40,7 +40,6 @@ class PriceControllerTest {
     @MockitoBean
     private PriceService priceService;
 
-
     @Test
     void listLatestPrices_returns200WithPriceList() throws Exception {
         var prices = List.of(

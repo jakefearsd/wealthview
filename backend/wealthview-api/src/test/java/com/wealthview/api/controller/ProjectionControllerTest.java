@@ -53,7 +53,6 @@ class ProjectionControllerTest {
     @MockitoBean
     private ProjectionService projectionService;
 
-
     private static final UUID SCENARIO_ID = UUID.randomUUID();
 
     private ScenarioResponse sampleScenario() {

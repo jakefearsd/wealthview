@@ -34,7 +34,6 @@ class NotificationControllerTest {
     @Autowired
     private ObjectMapper objectMapper;
 
-
     @MockitoBean
     private NotificationPreferenceService preferenceService;
 

@@ -45,7 +45,6 @@ class IncomeSourceControllerTest {
     @MockitoBean
     private IncomeSourceService incomeSourceService;
 
-
     private static final UUID SOURCE_ID = UUID.randomUUID();
 
     private IncomeSourceResponse sampleResponse() {

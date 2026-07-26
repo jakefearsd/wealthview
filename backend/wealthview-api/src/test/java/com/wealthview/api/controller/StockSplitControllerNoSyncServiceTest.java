@@ -37,7 +37,6 @@ class StockSplitControllerNoSyncServiceTest {
     // Note: StockSplitSyncService is intentionally NOT mocked here, so the
     // controller's @Nullable field stays null → the service-unavailable branch is exercised.
 
-
     @Test
     void sync_whenServiceUnavailable_returns503WithStandardEnvelope() throws Exception {
         mockMvc.perform(post("/api/v1/admin/stock-splits/sync")

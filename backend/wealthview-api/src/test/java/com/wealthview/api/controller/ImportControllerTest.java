@@ -40,7 +40,6 @@ class ImportControllerTest {
     @MockitoBean
     private PositionImportService positionImportService;
 
-
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
 
     @Test

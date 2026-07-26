@@ -48,7 +48,6 @@ class PropertyControllerNoSyncServiceTest {
 
     // PropertyValuationSyncService intentionally NOT mocked — @Nullable → null → 503
 
-
     private static final UUID PROPERTY_ID = UUID.randomUUID();
 
     @Test

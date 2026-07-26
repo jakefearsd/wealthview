@@ -34,7 +34,6 @@ class SessionControllerTest {
     @MockitoBean
     private SessionService sessionService;
 
-
     private static final UUID SESSION_ID = UUID.randomUUID();
 
     private SessionResponse sampleSession() {

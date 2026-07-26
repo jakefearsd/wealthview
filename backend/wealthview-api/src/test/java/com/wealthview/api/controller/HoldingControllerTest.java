@@ -43,7 +43,6 @@ class HoldingControllerTest {
     @MockitoBean
     private HoldingService holdingService;
 
-
     private static final UUID ACCOUNT_ID = UUID.randomUUID();
     private static final UUID HOLDING_ID = UUID.randomUUID();
 

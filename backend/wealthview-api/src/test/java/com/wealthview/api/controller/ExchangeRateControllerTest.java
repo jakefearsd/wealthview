@@ -41,7 +41,6 @@ class ExchangeRateControllerTest {
     @MockitoBean
     private ExchangeRateService exchangeRateService;
 
-
     private ExchangeRateResponse eurResponse() {
         return new ExchangeRateResponse("EUR", new BigDecimal("1.0850"), OffsetDateTime.now());
     }

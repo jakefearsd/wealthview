@@ -51,7 +51,6 @@ class StockSplitControllerTest {
     @MockitoBean
     private StockSplitSyncService stockSplitSyncService;
 
-
     private static final UUID SPLIT_ID = UUID.randomUUID();
 
     @Test

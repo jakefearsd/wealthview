@@ -34,7 +34,6 @@ class AdminPriceControllerNoPriceSyncTest {
     @MockitoBean
     private PriceService priceService;
 
-
     @Test
     void triggerPriceSync_whenFinnhubNotConfigured_returns503() throws Exception {
         mockMvc.perform(post("/api/v1/admin/prices/sync")

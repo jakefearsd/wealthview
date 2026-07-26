@@ -35,7 +35,6 @@ class AuditLogControllerTest {
     @MockitoBean
     private AuditLogService auditLogService;
 
-
     private AuditLogResponse sampleAuditLog() {
         return new AuditLogResponse(
                 UUID.randomUUID(), TENANT_ID, USER_ID,

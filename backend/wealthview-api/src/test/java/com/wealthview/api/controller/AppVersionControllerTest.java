@@ -26,7 +26,6 @@ class AppVersionControllerTest {
     @MockitoBean
     private MobileAppVersionService service;
 
-
     private VersionCheckResponse upToDateResponse() {
         return new VersionCheckResponse("ios", "2.1.0", "2.0.0", "2.1.0",
                 false, false, "https://apps.apple.com/app", null);

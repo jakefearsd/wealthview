@@ -50,7 +50,6 @@ class TenantManagementControllerTest {
     @MockitoBean
     private UserManagementService userManagementService;
 
-
     private TenantEntity createTenantEntity() {
         var tenant = new TenantEntity("Test Tenant");
         TestEntityHelper.setId(tenant, UUID.randomUUID());
