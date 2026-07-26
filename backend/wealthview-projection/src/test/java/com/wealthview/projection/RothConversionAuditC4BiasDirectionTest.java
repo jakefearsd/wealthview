@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -11,6 +10,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -99,23 +99,26 @@ class RothConversionAuditC4BiasDirectionTest {
 
     private GuardrailOptimizationInput fixedScenario() {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1963, 90, new BigDecimal("0.03"),
-                List.of(
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1963)
+                .withAccounts(List.of(
                         new HypotheticalAccountInput(new BigDecimal("150000"),
                                 BigDecimal.ZERO, null, "taxable"),
                         new HypotheticalAccountInput(new BigDecimal("900000"),
                                 BigDecimal.ZERO, null, "traditional"),
                         new HypotheticalAccountInput(new BigDecimal("50000"),
-                                BigDecimal.ZERO, null, "roth")),
-                List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO,
-                null, // returnMean: unset -> default resolution (the seam under test)
-                500, new BigDecimal("0.95"), phases, 42L,
-                BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, "single", "dynamic_sequencing",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null, new BigDecimal("0.22"),
-                null, null);
+                                BigDecimal.ZERO, null, "roth")))
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(null) // returnMean: unset -> default resolution (the seam under test)
+                .withTrialCount(500)
+                .withPhases(phases)
+                .withFilingStatus("single")
+                .withWithdrawalOrder("dynamic_sequencing")
+                .withOptimizeConversions(true)
+                .withConversionBracketRate(new BigDecimal("0.22"))
+                .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withDynamicSequencingBracketRate(new BigDecimal("0.22"))
+                .build();
     }
 
     @Test

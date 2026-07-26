@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +14,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
@@ -63,19 +63,26 @@ class JointConversionSearchPerfTest {
     /** Pool-bearing, conversions-enabled, non-DS fixture so {@code jointSearch} actually runs. */
     private static GuardrailOptimizationInput conversionsInput(int trialCount, boolean gateOnAdaptiveRules) {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(
                         new HypotheticalAccountInput(new BigDecimal("400000"), BigDecimal.ZERO, null, "taxable"),
                         new HypotheticalAccountInput(new BigDecimal("900000"), BigDecimal.ZERO, null, "traditional"),
-                        new HypotheticalAccountInput(new BigDecimal("200000"), BigDecimal.ZERO, null, "roth")),
-                List.of(),
-                new BigDecimal("50000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), trialCount, new BigDecimal("0.90"),
-                phases, 20260712L, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
-                "single", "taxable_first", true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null, null,
-                null, null, 2030, false, null, gateOnAdaptiveRules,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
+                        new HypotheticalAccountInput(new BigDecimal("200000"), BigDecimal.ZERO, null, "roth")))
+                .withEssentialFloor(new BigDecimal("50000"))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(trialCount)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(phases)
+                .withSeed(20260712L)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10"))
+                .withFilingStatus("single")
+                .withWithdrawalOrder("taxable_first")
+                .withOptimizeConversions(true)
+                .withConversionBracketRate(new BigDecimal("0.22"))
+                .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withGateOnAdaptiveRules(gateOnAdaptiveRules)
+                .build();   // household task 6: single-person
     }
 
     private void timeOptimize(String label, GuardrailOptimizationInput input) {

@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +15,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.single2025Brackets;
@@ -75,21 +75,25 @@ class GuardrailRulesTaxDynamicsMonotonicityTest {
      */
     private static GuardrailOptimizationInput poolInput(String withdrawalOrder) {
         var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(
                         new HypotheticalAccountInput(new BigDecimal("300000"), BigDecimal.ZERO,
                                 null, "taxable"),
                         new HypotheticalAccountInput(new BigDecimal("2500000"), BigDecimal.ZERO,
                                 null, "traditional"),
                         new HypotheticalAccountInput(new BigDecimal("200000"), BigDecimal.ZERO,
-                                null, "roth")),
-                List.of(),
-                new BigDecimal("60000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), TRIALS, new BigDecimal("0.80"),
-                phases, SEED, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
-                "single", withdrawalOrder, false, null, null, 5, null, null,
-                null, null);
+                                null, "roth")))
+                .withEssentialFloor(new BigDecimal("60000"))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(TRIALS)
+                .withConfidenceLevel(new BigDecimal("0.80"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10"))
+                .withFilingStatus("single")
+                .withWithdrawalOrder(withdrawalOrder)
+                .build();
     }
 
     @ParameterizedTest

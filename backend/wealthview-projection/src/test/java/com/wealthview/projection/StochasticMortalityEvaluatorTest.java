@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +21,7 @@ import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
@@ -266,17 +266,26 @@ class StochasticMortalityEvaluatorTest {
                 account("150000", "150000", "traditional", "primary"),
                 account("100000", "100000", "traditional", "spouse"),
                 account("50000", "50000", "roth", "primary"));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1970, 90, new BigDecimal("0.03"),
-                accounts, List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("0.10"),
-                300, new BigDecimal("0.90"),
-                List.of(new GuardrailPhaseInput("Retirement", 60, null, 1)),
-                42L, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1958, 82, 90, new BigDecimal("0.75"), false,
-                Boolean.TRUE, "male", "female", null, stepTable(82, 90));
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1970)
+                .withAccounts(accounts)
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(List.of(new GuardrailPhaseInput("Retirement", 60, null, 1)))
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(1958)
+                .withPrimaryDeathAge(82)
+                .withSpouseDeathAge(90)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .withStochasticMortality(Boolean.TRUE)
+                .withPrimarySex("male")
+                .withSpouseSex("female")
+                .withMortalityTable(stepTable(82, 90))
+                .build();
     }
 
 
@@ -294,18 +303,28 @@ class StochasticMortalityEvaluatorTest {
         List<ProjectionIncomeSourceInput> income = List.of(
                 ss("30000", "primary"), ss("20000", "spouse"));
         boolean stochastic = table != null;
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1962, 90, new BigDecimal("0.03"),
-                accounts, income,
-                new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("0.10"),
-                300, new BigDecimal("0.90"),
-                List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)),
-                seed, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, primaryDeathAge, spouseDeathAge, new BigDecimal("0.75"), false,
-                stochastic ? Boolean.TRUE : null, stochastic ? "male" : null,
-                stochastic ? "female" : null, null, table);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1962)
+                .withAccounts(accounts)
+                .withIncomeSources(income)
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)))
+                .withSeed(seed)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(1968)
+                .withPrimaryDeathAge(primaryDeathAge)
+                .withSpouseDeathAge(spouseDeathAge)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .withStochasticMortality(stochastic ? Boolean.TRUE : null)
+                .withPrimarySex(stochastic ? "male" : null)
+                .withSpouseSex(stochastic ? "female" : null)
+                .withMortalityTable(table)
+                .build();
     }
 
     private static HypotheticalAccountInput account(String balance, String basis, String type, String owner) {

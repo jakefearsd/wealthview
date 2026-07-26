@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +12,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailYearlySpending;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,16 +48,23 @@ class GuardrailHouseholdReportingTest {
                 account(new BigDecimal("1500000"), "traditional", "spouse"),
                 account(new BigDecimal("1500000"), "roth", "primary"),
                 account(new BigDecimal("1000000"), "roth", "spouse"));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1962, 90, new BigDecimal("0.03"),
-                accounts, List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO, null,
-                300, new BigDecimal("0.90"),
-                List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)),
-                42L, BigDecimal.ZERO, maxAdjRate, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, 82, 90, SURVIVOR_FACTOR, false, null, null, null, null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1962)
+                .withAccounts(accounts)
+                .withReturnMean(null)
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)))
+                .withMaxAnnualAdjustmentRate(maxAdjRate)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(1968)
+                .withPrimaryDeathAge(82)
+                .withSpouseDeathAge(90)
+                .withSurvivorSpendingFactor(SURVIVOR_FACTOR)
+                .build();
     }
 
     private static HypotheticalAccountInput account(BigDecimal balance, String type, String owner) {

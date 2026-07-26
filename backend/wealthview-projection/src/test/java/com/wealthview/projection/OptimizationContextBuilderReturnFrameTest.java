@@ -2,7 +2,6 @@ package com.wealthview.projection;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -12,6 +11,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,16 +42,20 @@ class OptimizationContextBuilderReturnFrameTest {
 
     private GuardrailOptimizationInput inputWithReturnMean(BigDecimal returnMean) {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1963, 90, BigDecimal.valueOf(INFLATION_RATE),
-                accounts, List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO,
-                returnMean,
-                500, new BigDecimal("0.95"), phases, 42L,
-                BigDecimal.ZERO, null, 0,
-                0, BigDecimal.ZERO, "single", "taxable_first",
-                true, new BigDecimal("0.22"), new BigDecimal("0.12"), 5, null, null,
-                null, BigDecimal.valueOf(FEE_RATE));
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1963)
+                .withAccounts(accounts)
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(returnMean)
+                .withTrialCount(500)
+                .withPhases(phases)
+                .withFilingStatus("single")
+                .withWithdrawalOrder("taxable_first")
+                .withOptimizeConversions(true)
+                .withConversionBracketRate(new BigDecimal("0.22"))
+                .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withFeeRate(BigDecimal.valueOf(FEE_RATE))
+                .build();
     }
 
     @Test

@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -13,6 +12,7 @@ import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.tax.BracketPoint;
 import com.wealthview.core.projection.tax.FederalTaxCalculator;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -126,19 +126,25 @@ class JointConversionSearchGatedObjectiveTest {
 
     private GuardrailOptimizationInput fixture(boolean gateOnAdaptiveRules) {
         var phases = List.of(new GuardrailPhaseInput("All", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(
                         new HypotheticalAccountInput(new BigDecimal("60000"), BigDecimal.ZERO, null, "taxable"),
                         new HypotheticalAccountInput(new BigDecimal("1400000"), BigDecimal.ZERO, null,
-                                "traditional")),
-                List.of(),
-                new BigDecimal("55000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), 200, new BigDecimal("0.90"),
-                phases, SEED, BigDecimal.ZERO, new BigDecimal("0.40"), 0, 0, BigDecimal.ZERO,
-                "single", "roth_first", true, new BigDecimal("0.32"), new BigDecimal("0.10"), 5, null, null,
-                null, null, 2030, false, null, gateOnAdaptiveRules,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
+                                "traditional")))
+                .withEssentialFloor(new BigDecimal("55000"))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.40"))
+                .withFilingStatus("single")
+                .withWithdrawalOrder("roth_first")
+                .withOptimizeConversions(true)
+                .withConversionBracketRate(new BigDecimal("0.32"))
+                .withRmdTargetBracketRate(new BigDecimal("0.10"))
+                .withGateOnAdaptiveRules(gateOnAdaptiveRules)
+                .build();   // household task 6: single-person
     }
 
     private static double totalConversion(GuardrailProfileResponse r) {

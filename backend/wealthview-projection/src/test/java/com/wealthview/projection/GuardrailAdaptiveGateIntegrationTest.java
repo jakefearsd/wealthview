@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.List;
 
@@ -11,6 +10,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -35,16 +35,18 @@ class GuardrailAdaptiveGateIntegrationTest {
 
     private GuardrailOptimizationInput stressedInput(boolean gateOnAdaptiveRules) {
         var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")),
-                List.of(), new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), 2000, new BigDecimal("0.80"),
-                phases, SEED, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
-                null, null, false, null, null, 5, null, null,
-                null, null, 2030, false, null, gateOnAdaptiveRules,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(2000)
+                .withConfidenceLevel(new BigDecimal("0.80"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10"))
+                .withGateOnAdaptiveRules(gateOnAdaptiveRules)
+                .build();
     }
 
     @Test
@@ -194,16 +196,17 @@ class GuardrailAdaptiveGateIntegrationTest {
         // silently falls back to the no-adaptation gate even with the toggle on, and gated_on
         // reflects that accurately (it describes what ACTUALLY certified the run, not raw intent).
         var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 1));
-        var noRateInput = new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")),
-                List.of(), new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), 2000, new BigDecimal("0.80"),
-                phases, SEED, BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                null, null, false, null, null, 5, null, null,
-                null, null, 2030, false, null, true,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
+        var noRateInput = GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(2000)
+                .withConfidenceLevel(new BigDecimal("0.80"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withGateOnAdaptiveRules(true)
+                .build();
         var optimizer = new MonteCarloSpendingOptimizer(null, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
         GuardrailProfileResponse r = optimizer.optimize(noRateInput);

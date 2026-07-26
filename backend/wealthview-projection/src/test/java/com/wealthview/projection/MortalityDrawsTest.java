@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.mortality.MortalityTable;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -83,14 +84,27 @@ class MortalityDrawsTest {
 
     private static GuardrailOptimizationInput householdMortalityInput(int primaryBirthYear, int spouseBirthYear,
             LocalDate retirementDate, int endAge, MortalityTable table) {
-        return new GuardrailOptimizationInput(
-                retirementDate, primaryBirthYear, endAge, BigDecimal.ZERO,
-                List.of(), List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, null,
-                300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
-                0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                spouseBirthYear, null, null, new BigDecimal("0.75"), false,
-                true, "male", "female", null, table);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withRetirementDate(retirementDate)
+                .withBirthYear(primaryBirthYear)
+                .withEndAge(endAge)
+                .withInflationRate(BigDecimal.ZERO)
+                .withAccounts(List.of())
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(null)
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withMaxAnnualAdjustmentRate(BigDecimal.ZERO)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(spouseBirthYear)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .withStochasticMortality(true)
+                .withPrimarySex("male")
+                .withSpouseSex("female")
+                .withMortalityTable(table)
+                .build();
     }
 }

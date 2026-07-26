@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +21,7 @@ import com.wealthview.core.projection.tax.SocialSecurityTaxCalculator;
 import com.wealthview.persistence.entity.StandardDeductionEntity;
 import com.wealthview.persistence.repository.StandardDeductionRepository;
 import com.wealthview.persistence.repository.TaxBracketRepository;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static com.wealthview.core.testutil.TaxBracketFixtures.bd;
@@ -49,7 +49,7 @@ class OptimizationContextBuilderTest {
 
     @Test
     void build_scenarioDividendYieldSet_flowsIntoSimulationConfig() {
-        var input = inputWithDividendYield(new BigDecimal("0.03"));
+        var input = GuardrailOptimizationInputBuilder.builder().withDividendYield(new BigDecimal("0.03")).build();
 
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
@@ -58,7 +58,7 @@ class OptimizationContextBuilderTest {
 
     @Test
     void build_scenarioDividendYieldAbsent_defaultsToPoint018() {
-        var input = inputWithDividendYield(null);
+        var input = GuardrailOptimizationInputBuilder.builder().withDividendYield(null).build();
 
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
@@ -70,7 +70,7 @@ class OptimizationContextBuilderTest {
     // (0.0025) when the scenario's params_json doesn't set one.
     @Test
     void build_scenarioFeeRateSet_flowsIntoSimulationConfig() {
-        var input = inputWithFeeRate(new BigDecimal("0.01"));
+        var input = GuardrailOptimizationInputBuilder.builder().withFeeRate(new BigDecimal("0.01")).build();
 
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
@@ -79,7 +79,7 @@ class OptimizationContextBuilderTest {
 
     @Test
     void build_scenarioFeeRateAbsent_defaultsToPoint0025() {
-        var input = inputWithFeeRate(null);
+        var input = GuardrailOptimizationInputBuilder.builder().withFeeRate(null).build();
 
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
@@ -88,7 +88,7 @@ class OptimizationContextBuilderTest {
 
     @Test
     void build_scenarioFeeRateExplicitZero_isNotTreatedAsAbsent() {
-        var input = inputWithFeeRate(BigDecimal.ZERO);
+        var input = GuardrailOptimizationInputBuilder.builder().withFeeRate(BigDecimal.ZERO).build();
 
         var setup = builder.build(input, ProjectionTestFixtures.TEST_CMA_MATRIX);
 
@@ -104,8 +104,10 @@ class OptimizationContextBuilderTest {
     void build_birthYearMakesRetireeAge65Plus_ordinaryTaxTableReflectsBoostedDeduction() {
         var builderWithTax = new OptimizationContextBuilder(federalTaxCalcWithAge65Addition());
 
-        var under65 = inputWithBirthYear(1968); // age 62 at retirement (2030)
-        var over65 = inputWithBirthYear(1959);  // age 71 at retirement (2030)
+        var under65 = GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1968).withFilingStatus("single").build(); // age 62 at retirement (2030)
+        var over65 = GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1959).withFilingStatus("single").build();  // age 71 at retirement (2030)
 
         var setupUnder65 = builderWithTax.build(under65, ProjectionTestFixtures.TEST_CMA_MATRIX);
         var setupOver65 = builderWithTax.build(over65, ProjectionTestFixtures.TEST_CMA_MATRIX);
@@ -215,36 +217,14 @@ class OptimizationContextBuilderTest {
 
     private GuardrailOptimizationInput householdInputWithDeathAge(int primaryBirthYear, int spouseBirthYear,
                                                                    int primaryDeathAge) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), primaryBirthYear, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
-                List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", null,
-                false, null, null, 5, null, null,
-                null, null, 2030, false, null, false,
-                spouseBirthYear, primaryDeathAge, 95, new BigDecimal("0.75"), false, null, null, null, null, null);
-    }
-
-    private GuardrailOptimizationInput inputWithBirthYear(int birthYear) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), birthYear, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
-                List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "single", null,
-                false, null, null, 5, null, null,
-                null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(primaryBirthYear)
+                .withFilingStatus("married_filing_jointly")
+                .withSpouseBirthYear(spouseBirthYear)
+                .withPrimaryDeathAge(primaryDeathAge)
+                .withSpouseDeathAge(95)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .build();
     }
 
     // B2 (2026-07-11 audit) MC alignment: the MC income base previously treated Social Security as
@@ -323,18 +303,17 @@ class OptimizationContextBuilderTest {
     }
 
     private GuardrailOptimizationInput ssHeavyInput(ProjectionIncomeSourceInput ss) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, BigDecimal.ZERO,
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1000000"), BigDecimal.ZERO, new BigDecimal("0.05"), "taxable")),
-                List.of(ss),
-                new BigDecimal("70000"), BigDecimal.ZERO,
-                new BigDecimal("0.05"), 100, new BigDecimal("0.90"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "single", null,
-                false, null, null, 5, null, null,
-                null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withInflationRate(BigDecimal.ZERO)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO, new BigDecimal("0.05"), "taxable")))
+                .withIncomeSources(List.of(ss))
+                .withEssentialFloor(new BigDecimal("70000"))
+                .withReturnMean(new BigDecimal("0.05"))
+                .withTrialCount(100)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withFilingStatus("single")
+                .build();
     }
 
     // T7-M3 (audit C7 follow-up): the SS threshold deflator must anchor on the SAME calendar clock
@@ -342,43 +321,18 @@ class OptimizationContextBuilderTest {
     // index y -- see OptimizationContextBuilder#applySocialSecurityTaxableShare.
     private GuardrailOptimizationInput ssHeavyInputWithBaseYear(ProjectionIncomeSourceInput ss,
                                                                 BigDecimal inflationRate, int baseYear) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, inflationRate,
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1000000"), BigDecimal.ZERO, new BigDecimal("0.05"), "taxable")),
-                List.of(ss),
-                new BigDecimal("70000"), BigDecimal.ZERO,
-                new BigDecimal("0.05"), 100, new BigDecimal("0.90"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "single", null,
-                false, null, null, 5, null, null,
-                null, null, baseYear, false, null, false,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
-    }
-
-    private GuardrailOptimizationInput inputWithDividendYield(BigDecimal dividendYield) {
-        return inputWith(dividendYield, null);
-    }
-
-    private GuardrailOptimizationInput inputWithFeeRate(BigDecimal feeRate) {
-        return inputWith(null, feeRate);
-    }
-
-    private GuardrailOptimizationInput inputWith(BigDecimal dividendYield, BigDecimal feeRate) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
-                List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                null, null,
-                false, null, null, 5, null, null,
-                dividendYield, feeRate);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withInflationRate(inflationRate)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1000000"), BigDecimal.ZERO, new BigDecimal("0.05"), "taxable")))
+                .withIncomeSources(List.of(ss))
+                .withEssentialFloor(new BigDecimal("70000"))
+                .withReturnMean(new BigDecimal("0.05"))
+                .withTrialCount(100)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withFilingStatus("single")
+                .withBaseYear(baseYear)
+                .build();   // household task 6: single-person
     }
 
     // C1 (2026-07-12 audit): interest_yield must thread into SimulationParameters.interestYield()
@@ -464,37 +418,26 @@ class OptimizationContextBuilderTest {
     /** A two-person household otherwise identical between toggle states -- only stochasticMortality
      * and the (nullable) mortality table vary, so the return paths must not move. */
     private GuardrailOptimizationInput mortalityToggleInput(boolean stochastic, MortalityTable table) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1960, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("500000"), BigDecimal.ZERO,
-                        new BigDecimal("0.07"), "taxable")),
-                List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", null,
-                false, null, null, 5, null, null,
-                null, null, 2030, false, null, false,
-                1962, 85, 88, new BigDecimal("0.75"), false,
-                stochastic, "male", "female", null, table);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1960)
+                .withFilingStatus("married_filing_jointly")
+                .withSpouseBirthYear(1962)
+                .withPrimaryDeathAge(85)
+                .withSpouseDeathAge(88)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .withStochasticMortality(stochastic)
+                .withPrimarySex("male")
+                .withSpouseSex("female")
+                .withMortalityTable(table)
+                .build();
     }
 
     private GuardrailOptimizationInput inputWithInterestYield(BigDecimal interestYield, AssetAllocation allocation) {
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
+        return GuardrailOptimizationInputBuilder.builder()
+                .withAccounts(List.of(new HypotheticalAccountInput(
                         new BigDecimal("500000"), BigDecimal.ZERO, allocation,
-                        Optional.empty(), "taxable")),
-                List.of(),
-                new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.10"), 200, new BigDecimal("0.95"),
-                List.of(), 42L,
-                BigDecimal.ZERO, null, 0, 0, BigDecimal.ZERO,
-                null, null,
-                false, null, null, 5, null, null,
-                null, null, 2030, false, interestYield, false,
-                null, null, null, null, false, null, null, null, null, null);   // household task 6: single-person
+                        Optional.empty(), "taxable")))
+                .withInterestYield(interestYield)
+                .build();   // household task 6: single-person
     }
 }

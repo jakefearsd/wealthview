@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,15 +36,16 @@ class GuardrailSimulatedRulesIntegrationTest {
     /** Healthy, roomy fixture with the adjustment knob on: with-rules rescues the failing tail. */
     private GuardrailOptimizationInput healthyInput(BigDecimal maxAnnualAdjustmentRate) {
         var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 90, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("1500000"), BigDecimal.ZERO, null, "taxable")),
-                List.of(), new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), 1000, new BigDecimal("0.90"),
-                phases, SEED, BigDecimal.ZERO, maxAnnualAdjustmentRate, 0, 0, BigDecimal.ZERO,
-                null, null, false, null, null, 5, null, null,
-                null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("1500000"), BigDecimal.ZERO, null, "taxable")))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(1000)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withMaxAnnualAdjustmentRate(maxAnnualAdjustmentRate)
+                .build();
     }
 
     /**
@@ -54,15 +55,17 @@ class GuardrailSimulatedRulesIntegrationTest {
      */
     private GuardrailOptimizationInput stressedInput() {
         var phases = List.of(new GuardrailPhaseInput("Retirement", 62, null, 1));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1968, 92, new BigDecimal("0.03"),
-                List.of(new HypotheticalAccountInput(
-                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")),
-                List.of(), new BigDecimal("30000"), BigDecimal.ZERO,
-                new BigDecimal("0.06"), 2000, new BigDecimal("0.80"),
-                phases, SEED, BigDecimal.ZERO, new BigDecimal("0.10"), 0, 0, BigDecimal.ZERO,
-                null, null, false, null, null, 5, null, null,
-                null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withEndAge(92)
+                .withAccounts(List.of(new HypotheticalAccountInput(
+                        new BigDecimal("700000"), BigDecimal.ZERO, null, "taxable")))
+                .withReturnMean(new BigDecimal("0.06"))
+                .withTrialCount(2000)
+                .withConfidenceLevel(new BigDecimal("0.80"))
+                .withPhases(phases)
+                .withSeed(SEED)
+                .withMaxAnnualAdjustmentRate(new BigDecimal("0.10"))
+                .build();
     }
 
     @Test

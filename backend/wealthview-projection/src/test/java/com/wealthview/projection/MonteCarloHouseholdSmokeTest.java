@@ -1,7 +1,6 @@
 package com.wealthview.projection;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -13,6 +12,7 @@ import com.wealthview.core.projection.dto.GuardrailPhaseInput;
 import com.wealthview.core.projection.dto.GuardrailProfileResponse;
 import com.wealthview.core.projection.dto.HypotheticalAccountInput;
 import com.wealthview.core.projection.dto.ProjectionAccountInput;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 import com.wealthview.projection.testutil.ProjectionTestFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,17 +38,25 @@ class MonteCarloHouseholdSmokeTest {
                 account(new BigDecimal("100000"), new BigDecimal("100000"), "traditional", "spouse"),
                 account(new BigDecimal("50000"), new BigDecimal("50000"), "roth", "primary"),
                 account(new BigDecimal("30000"), new BigDecimal("30000"), "roth", "spouse"));
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1962, 90, new BigDecimal("0.03"),
-                accounts, List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, new BigDecimal("0.10"),
-                300, new BigDecimal("0.90"),
-                List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)),
-                seed, BigDecimal.ZERO, maxAdjRate, 0, 0, BigDecimal.ZERO,
-                "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1962)
+                .withAccounts(accounts)
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withPhases(List.of(new GuardrailPhaseInput("Retirement", 68, null, 1)))
+                .withSeed(seed)
+                .withMaxAnnualAdjustmentRate(maxAdjRate)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
                 // Household task 6 fields: spouse present, mid-horizon first death, community-property off.
-                1968, 82, 82, new BigDecimal("0.75"), false, null, null, null, null, null);
+                .withSpouseBirthYear(1968)
+                .withPrimaryDeathAge(82)
+                .withSpouseDeathAge(82)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .build();
     }
 
     private static HypotheticalAccountInput account(BigDecimal balance, BigDecimal basis,

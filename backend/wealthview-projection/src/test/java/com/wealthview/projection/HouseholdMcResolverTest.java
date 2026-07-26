@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import com.wealthview.core.projection.dto.GuardrailOptimizationInput;
 import com.wealthview.core.projection.tax.FilingStatus;
+import com.wealthview.projection.testutil.GuardrailOptimizationInputBuilder;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -59,14 +60,20 @@ class HouseholdMcResolverTest {
 
     @Test
     void resolve_singlePersonInput_returnsSingleWithNoTransition() {
-        var input = new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1962, 90, INFLATION,
-                List.of(), List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, null,
-                300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
-                0, 0, BigDecimal.ZERO, "single", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                null, null, null, null, false, null, null, null, null, null);
+        var input = GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1962)
+                .withInflationRate(INFLATION)
+                .withAccounts(List.of())
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(null)
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withMaxAnnualAdjustmentRate(BigDecimal.ZERO)
+                .withFilingStatus("single")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .build();
 
         var resolved = HouseholdMcResolver.resolve(input, 2030, 22, INFLATION.doubleValue(), FilingStatus.SINGLE);
 
@@ -104,15 +111,26 @@ class HouseholdMcResolverTest {
 
     private static GuardrailOptimizationInput householdInput(int primaryBirthYear, int primaryDeathAge,
             int spouseBirthYear, int spouseDeathAge, LocalDate retirementDate, int endAge) {
-        return new GuardrailOptimizationInput(
-                retirementDate, primaryBirthYear, endAge, INFLATION,
-                List.of(), List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, null,
-                300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
-                0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                spouseBirthYear, primaryDeathAge, spouseDeathAge, new BigDecimal("0.75"), false,
-                null, null, null, null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withRetirementDate(retirementDate)
+                .withBirthYear(primaryBirthYear)
+                .withEndAge(endAge)
+                .withInflationRate(INFLATION)
+                .withAccounts(List.of())
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(null)
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withMaxAnnualAdjustmentRate(BigDecimal.ZERO)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(spouseBirthYear)
+                .withPrimaryDeathAge(primaryDeathAge)
+                .withSpouseDeathAge(spouseDeathAge)
+                .withSurvivorSpendingFactor(new BigDecimal("0.75"))
+                .build();
     }
 
     // === HP3 Part B-2: defensive survivor_spending_factor clamp at the engine seam ===
@@ -124,14 +142,24 @@ class HouseholdMcResolverTest {
     private static GuardrailOptimizationInput householdInputWithFactor(BigDecimal survivorSpendingFactor) {
         // Same "first death inside the window" shape as resolve_firstDeathInsideRetirementWindow...
         // above (primary dies 2040, ten years into the 2030 window) -- only the factor varies.
-        return new GuardrailOptimizationInput(
-                LocalDate.of(2030, 1, 1), 1962, 90, INFLATION,
-                List.of(), List.of(),
-                new BigDecimal("40000"), BigDecimal.ZERO, null,
-                300, new BigDecimal("0.90"), List.of(), 42L, BigDecimal.ZERO, BigDecimal.ZERO,
-                0, 0, BigDecimal.ZERO, "married_filing_jointly", "taxable_first",
-                false, null, null, 5, null, null, null, null, 2025, false, null, true,
-                1968, 78, 90, survivorSpendingFactor, false, null, null, null, null, null);
+        return GuardrailOptimizationInputBuilder.builder()
+                .withBirthYear(1962)
+                .withInflationRate(INFLATION)
+                .withAccounts(List.of())
+                .withEssentialFloor(new BigDecimal("40000"))
+                .withReturnMean(null)
+                .withTrialCount(300)
+                .withConfidenceLevel(new BigDecimal("0.90"))
+                .withMaxAnnualAdjustmentRate(BigDecimal.ZERO)
+                .withFilingStatus("married_filing_jointly")
+                .withWithdrawalOrder("taxable_first")
+                .withBaseYear(2025)
+                .withGateOnAdaptiveRules(true)
+                .withSpouseBirthYear(1968)
+                .withPrimaryDeathAge(78)
+                .withSpouseDeathAge(90)
+                .withSurvivorSpendingFactor(survivorSpendingFactor)
+                .build();
     }
 
     @Test
