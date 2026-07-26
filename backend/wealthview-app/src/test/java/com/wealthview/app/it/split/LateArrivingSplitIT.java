@@ -6,13 +6,11 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -43,13 +41,11 @@ class LateArrivingSplitIT extends AbstractApiIntegrationTest {
     @Test
     void transactionImportedAfterSplit_isAdjustedThenRestoredOnUnapply() {
         // Split applied FIRST (no transactions exist yet for AAPL).
-        var applyResp = restTemplate.exchange("/api/v1/admin/stock-splits", HttpMethod.POST,
-                authHelper.authEntity(Map.of(
+        var applyResp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits", Map.of(
                         "symbol", "AAPL",
                         "effective_date", "2020-08-31",
                         "numerator", 4,
-                        "denominator", 1), superAdmin.accessToken()),
-                MAP_TYPE);
+                        "denominator", 1));
         var splitId = (String) applyResp.getBody().get("id");
 
         // Transaction dated BEFORE the split arrives afterward (posts through
@@ -66,8 +62,7 @@ class LateArrivingSplitIT extends AbstractApiIntegrationTest {
         assertThat(adjustmentRows).isEqualTo(1);
 
         // Unapply restores the raw quantity.
-        restTemplate.exchange("/api/v1/admin/stock-splits/" + splitId, HttpMethod.DELETE,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        api.deleteForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/" + splitId);
 
         var restoredQty = jdbcTemplate.queryForObject(
                 "select quantity from transactions where id = ?::uuid", BigDecimal.class, txnId);

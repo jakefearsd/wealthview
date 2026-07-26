@@ -11,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 
@@ -21,8 +20,6 @@ import com.wealthview.core.split.SplitDetectionClient;
 import com.wealthview.core.split.StockSplitBackfillRunner;
 import com.wealthview.core.split.dto.DetectedSplit;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -67,14 +64,12 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         stubSplitClient.queueSplit("AAPL",
                 new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1));
 
-        var resp = restTemplate.exchange("/api/v1/admin/stock-splits/sync", HttpMethod.POST,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        var resp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/sync", null);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat((Integer) resp.getBody().get("splits_applied")).isEqualTo(1);
 
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
                 .isEqualByComparingTo("400");
     }
@@ -86,20 +81,17 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
                 new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1));
 
         // First sync applies it.
-        var first = restTemplate.exchange("/api/v1/admin/stock-splits/sync", HttpMethod.POST,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        var first = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/sync", null);
         assertThat((Integer) first.getBody().get("splits_applied")).isEqualTo(1);
 
         // Re-queue the same split — second sync should NOT re-apply.
         stubSplitClient.queueSplit("AAPL",
                 new DetectedSplit("AAPL", LocalDate.of(2020, 8, 31), 4, 1));
-        var second = restTemplate.exchange("/api/v1/admin/stock-splits/sync", HttpMethod.POST,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        var second = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/sync", null);
         assertThat((Integer) second.getBody().get("splits_applied")).isEqualTo(0);
 
         // Quantity wasn't doubled-up
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
                 .isEqualByComparingTo("400");
     }
@@ -112,8 +104,7 @@ class StockSplitSyncIT extends AbstractApiIntegrationTest {
         stubSplitClient.queueSplit("BAR",
                 new DetectedSplit("BAR", LocalDate.of(2021, 1, 1), 2, 1));
 
-        var resp = restTemplate.exchange("/api/v1/admin/stock-splits/sync", HttpMethod.POST,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        var resp = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/sync", null);
 
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat((Integer) resp.getBody().get("splits_applied")).isEqualTo(1);

@@ -2,13 +2,11 @@ package com.wealthview.app.it.split;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -45,8 +43,7 @@ class StockSplitSyncUnavailableIT extends AbstractApiIntegrationTest {
 
     @Test
     void sync_whenSplitDetectionClientBeanAbsent_returns503WithStandardEnvelope() {
-        var response = restTemplate.exchange("/api/v1/admin/stock-splits/sync", HttpMethod.POST,
-                authHelper.authEntity(superAdmin.accessToken()), MAP_TYPE);
+        var response = api.postForEntityAs(superAdmin.accessToken(), "/api/v1/admin/stock-splits/sync", null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).containsEntry("error", "SERVICE_UNAVAILABLE");

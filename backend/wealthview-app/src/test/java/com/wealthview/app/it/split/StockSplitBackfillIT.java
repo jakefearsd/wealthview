@@ -12,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpMethod;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -26,7 +25,6 @@ import com.wealthview.core.split.SplitDetectionClient;
 import com.wealthview.core.split.StockSplitBackfillRunner;
 import com.wealthview.core.split.dto.DetectedSplit;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -84,8 +82,7 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
 
         backfillRunner.runIfNeeded();
 
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
                 .isEqualByComparingTo("400");
         assertThat(systemConfigService.get("stock_splits.backfill_completed")).isEqualTo("true");
@@ -105,8 +102,7 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
 
         backfillRunner.runIfNeeded();
 
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         // Quantity should still be 400, not 1600
         assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
                 .isEqualByComparingTo("400");
@@ -137,8 +133,7 @@ class StockSplitBackfillIT extends AbstractApiIntegrationTest {
             SecurityContextHolder.clearContext();
         }
 
-        var holdings = restTemplate.exchange("/api/v1/accounts/" + accountId + "/holdings",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), LIST_MAP_TYPE);
+        var holdings = api.getListForEntity("/api/v1/accounts/" + accountId + "/holdings");
         assertThat(new java.math.BigDecimal(holdings.getBody().get(0).get("quantity").toString()))
                 .isEqualByComparingTo("400");
     }
