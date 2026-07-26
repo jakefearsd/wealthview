@@ -5,13 +5,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
@@ -20,8 +17,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     void create_validProfile_returns201() {
         var body = data.spendingProfileBody("Comfortable");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/spending-profiles", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(response.getBody().get("name")).isEqualTo("Comfortable");
@@ -32,9 +28,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
         data.createSpendingProfile("Profile A");
         data.createSpendingProfile("Profile B");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()),
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+        var response = api.getListForEntity("/api/v1/spending-profiles");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).hasSize(2);
@@ -44,8 +38,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     void get_existingProfile_returns200() {
         var id = (String) data.createSpendingProfile("My Profile").get("id");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var response = api.getForEntity("/api/v1/spending-profiles/" + id);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("name")).isEqualTo("My Profile");
@@ -56,8 +49,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
         var id = (String) data.createSpendingProfile("Old Profile").get("id");
         var updateBody = data.spendingProfileBody("Updated Profile");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var response = api.putForEntity("/api/v1/spending-profiles/" + id, updateBody);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("name")).isEqualTo("Updated Profile");
@@ -67,8 +59,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     void delete_existingProfile_returns204() {
         var id = (String) data.createSpendingProfile("To Delete").get("id");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles/" + id,
-                HttpMethod.DELETE, authHelper.authEntity(authHelper.adminToken()), Void.class);
+        var response = api.deleteForEntity("/api/v1/spending-profiles/" + id);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
@@ -80,15 +71,13 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
     void create_withSpendingTiers_persistsAndReturns() {
         var body = profileBodyWithTiers("Tiered Profile");
 
-        var response = restTemplate.exchange("/api/v1/spending-profiles",
-                HttpMethod.POST, authHelper.authEntity(body, authHelper.adminToken()), MAP_TYPE);
+        var response = api.postForEntity("/api/v1/spending-profiles", body);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         var id = (String) response.getBody().get("id");
 
         // GET back and verify tiers
-        var getResponse = restTemplate.exchange("/api/v1/spending-profiles/" + id,
-                HttpMethod.GET, authHelper.authEntity(authHelper.adminToken()), MAP_TYPE);
+        var getResponse = api.getForEntity("/api/v1/spending-profiles/" + id);
 
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         var tiers = (List<Map<String, Object>>) getResponse.getBody().get("spending_tiers");
@@ -114,8 +103,7 @@ class SpendingProfileControllerIT extends AbstractApiIntegrationTest {
 
         // PUT with tiers
         var updateBody = profileBodyWithTiers("With Tiers");
-        var updateResponse = restTemplate.exchange("/api/v1/spending-profiles/" + id,
-                HttpMethod.PUT, authHelper.authEntity(updateBody, authHelper.adminToken()), MAP_TYPE);
+        var updateResponse = api.putForEntity("/api/v1/spending-profiles/" + id, updateBody);
 
         assertThat(updateResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         var tiers = (List<Map<String, Object>>) updateResponse.getBody().get("spending_tiers");
