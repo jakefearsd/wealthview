@@ -6,13 +6,12 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.common.Money;
+import com.wealthview.core.config.EvictExchangeRateCaches;
 import com.wealthview.core.exception.DuplicateEntityException;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exchangerate.dto.ExchangeRateRequest;
@@ -42,10 +41,7 @@ public class ExchangeRateService {
         this.exchangeRateResolver = exchangeRateResolver;
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
-            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
-    })
+    @EvictExchangeRateCaches
     @Transactional
     public ExchangeRateResponse create(UUID tenantId, ExchangeRateRequest request) {
         if ("USD".equals(request.currencyCode())) {
@@ -67,10 +63,7 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
-            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
-    })
+    @EvictExchangeRateCaches
     @Transactional
     public ExchangeRateResponse update(UUID tenantId, String currencyCode, BigDecimal rateToUsd) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)
@@ -83,10 +76,7 @@ public class ExchangeRateService {
         return ExchangeRateResponse.from(entity);
     }
 
-    @Caching(evict = {
-            @CacheEvict(value = {"exchangeRates", "accountBalances"}, key = "#tenantId"),
-            @CacheEvict(value = "exchangeRateConversions", allEntries = true)
-    })
+    @EvictExchangeRateCaches
     @Transactional
     public void delete(UUID tenantId, String currencyCode) {
         var entity = exchangeRateRepository.findByTenant_IdAndCurrencyCode(tenantId, currencyCode)

@@ -136,6 +136,8 @@ public class ImportService {
 
             var result = importTransactions(parseResult.transactions(), tenantId, accountId, account);
 
+            // Programmatic evict, not @CacheEvict: importCsv/importOfx call this method on `this`
+            // (self-invocation), which bypasses the Spring AOP proxy that @CacheEvict relies on.
             var accountBalancesCache = cacheManager.getCache("accountBalances");
             if (accountBalancesCache != null) {
                 accountBalancesCache.evict(tenantId);

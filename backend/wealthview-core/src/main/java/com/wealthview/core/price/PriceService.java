@@ -10,11 +10,11 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.wealthview.core.config.EvictPriceDerivedCaches;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.exception.ServiceUnavailableException;
 import com.wealthview.core.price.dto.BulkPriceRequest;
@@ -57,7 +57,7 @@ public class PriceService {
         return yahooPriceClient;
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public PriceResponse createPrice(PriceRequest request) {
         var price = new PriceEntity(request.symbol(), request.date(),
@@ -105,7 +105,7 @@ public class PriceService {
                 .toList();
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public YahooSyncResult syncFromYahoo(List<String> symbols) {
         var client = requireYahooClient();
@@ -157,7 +157,7 @@ public class PriceService {
         return responses;
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public int bulkUpsertPrices(List<BulkPriceRequest.PriceEntry> prices, String source) {
         int count = 0;
@@ -168,7 +168,7 @@ public class PriceService {
         return count;
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public CsvImportResult importCsv(InputStream inputStream) throws IOException {
         var parser = new PriceCsvParser();
@@ -190,7 +190,7 @@ public class PriceService {
                 .toList();
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public void deletePrice(String symbol, LocalDate date) {
         var priceId = new PriceId(symbol, date);

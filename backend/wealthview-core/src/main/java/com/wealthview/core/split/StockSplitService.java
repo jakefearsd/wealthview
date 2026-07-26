@@ -11,11 +11,11 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.wealthview.core.auth.CrossTenant;
+import com.wealthview.core.config.EvictPriceDerivedCaches;
 import com.wealthview.core.exception.EntityNotFoundException;
 import com.wealthview.core.holding.HoldingsComputationService;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -98,7 +98,7 @@ public class StockSplitService {
      * returns cross-tenant data to a caller.
      */
     @CrossTenant
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public StockSplitEntity applySplit(String symbol, LocalDate effectiveDate,
                                        int numerator, int denominator, String source) {
@@ -143,7 +143,7 @@ public class StockSplitService {
      * calling thread's Authentication.
      */
     @CrossTenant
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Transactional
     public void unapplySplit(UUID splitId) {
         var split = stockSplitRepository.findById(splitId)

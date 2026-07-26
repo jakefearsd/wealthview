@@ -10,13 +10,13 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import com.wealthview.core.config.EvictPriceDerivedCaches;
 import com.wealthview.core.pricefeed.dto.FinnhubSyncResult;
 import com.wealthview.core.pricefeed.dto.QuoteResult;
 import com.wealthview.persistence.entity.PriceEntity;
@@ -58,7 +58,7 @@ public class PriceSyncService {
                 .register(meterRegistry);
     }
 
-    @CacheEvict(value = {"latestPrices", "accountBalances"}, allEntries = true)
+    @EvictPriceDerivedCaches
     @Timed("wealthview.pricefeed.sync")
     // intentional per-symbol resilience (logs and continues loop)
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
