@@ -9,19 +9,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.AuthHelper;
 import io.micrometer.core.instrument.MeterRegistry;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.LIST_MAP_TYPE;
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -183,24 +177,17 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void adminUpdateVersion_asSuperAdmin_persists() {
-        var update = restTemplate.exchange(
+        var update = api.putForEntityAs(superAdminSession.accessToken(),
                 "/api/v1/admin/mobile-versions/android",
-                HttpMethod.PUT,
-                authHelper.authEntity(Map.of(
+                Map.of(
                         "minimum_supported_version", "1.0.0",
                         "latest_version", "1.5.0",
                         "store_url", "https://play.google.com/store/apps/details?id=com.wealthview",
-                        "message", "Required for new tax features"),
-                        superAdminSession.accessToken()),
-                MAP_TYPE);
+                        "message", "Required for new tax features"));
 
         assertThat(update.getStatusCode()).isEqualTo(HttpStatus.OK);
 
-        var list = restTemplate.exchange(
-                "/api/v1/admin/mobile-versions",
-                HttpMethod.GET,
-                authHelper.authEntity(superAdminSession.accessToken()),
-                LIST_MAP_TYPE);
+        var list = api.getListForEntityAs(superAdminSession.accessToken(), "/api/v1/admin/mobile-versions");
 
         assertThat(list.getStatusCode()).isEqualTo(HttpStatus.OK);
         var android = list.getBody().stream()
@@ -214,11 +201,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void adminUpdateVersion_asNonAdmin_returns403() {
-        var response = restTemplate.exchange(
-                "/api/v1/admin/mobile-versions/android",
-                HttpMethod.PUT,
-                authHelper.authEntity(validUpdateBody(), memberToken),
-                String.class);
+        var response = api.putForEntityAs(memberToken,
+                "/api/v1/admin/mobile-versions/android", validUpdateBody(), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
     }
@@ -229,13 +213,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
         // CSRF filter rejects with 403 BEFORE authentication runs. Either
         // 401 (no auth) or 403 (no CSRF) is an acceptable "anonymous can't
         // do this" outcome — we just need to confirm the request is blocked.
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        var response = restTemplate.exchange(
-                "/api/v1/admin/mobile-versions/android",
-                HttpMethod.PUT,
-                new HttpEntity<>(validUpdateBody(), headers),
-                String.class);
+        var response = api.putAnonForEntity(
+                "/api/v1/admin/mobile-versions/android", validUpdateBody(), String.class);
 
         assertThat(response.getStatusCode())
                 .isIn(HttpStatus.UNAUTHORIZED, HttpStatus.FORBIDDEN);
@@ -243,14 +222,12 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void adminUpdateVersion_invalidSemver_returns400() {
-        var response = restTemplate.exchange(
+        var response = api.putForEntityAs(superAdminSession.accessToken(),
                 "/api/v1/admin/mobile-versions/android",
-                HttpMethod.PUT,
-                authHelper.authEntity(Map.of(
+                Map.of(
                         "minimum_supported_version", "garbage",
                         "latest_version", "1.5.0",
                         "store_url", "https://example.com"),
-                        superAdminSession.accessToken()),
                 String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -258,11 +235,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void adminUpdateVersion_unknownPlatform_returns400() {
-        var response = restTemplate.exchange(
-                "/api/v1/admin/mobile-versions/windows",
-                HttpMethod.PUT,
-                authHelper.authEntity(validUpdateBody(), superAdminSession.accessToken()),
-                String.class);
+        var response = api.putForEntityAs(superAdminSession.accessToken(),
+                "/api/v1/admin/mobile-versions/windows", validUpdateBody(), String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -323,11 +297,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
         body.put("latest_version", latest);
         body.put("store_url", "https://play.google.com/store/apps/details?id=com.wealthview");
         body.put("message", message);
-        var response = restTemplate.exchange(
-                "/api/v1/admin/mobile-versions/android",
-                HttpMethod.PUT,
-                authHelper.authEntity(body, superAdminSession.accessToken()),
-                MAP_TYPE);
+        var response = api.putForEntityAs(superAdminSession.accessToken(),
+                "/api/v1/admin/mobile-versions/android", body);
         assertThat(response.getStatusCode())
                 .as("admin update of android row should succeed")
                 .isEqualTo(HttpStatus.OK);

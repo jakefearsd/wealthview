@@ -139,6 +139,15 @@ public class ApiClient {
         return exchange(token, url, HttpMethod.PUT, body);
     }
 
+    /**
+     * Generic form for call sites that assert on a non-JSON-map body (e.g.
+     * {@code String.class} for a validation-error payload) rather than
+     * parsing into {@link #MAP_TYPE}.
+     */
+    public <T> ResponseEntity<T> putForEntityAs(String token, String url, Object body, Class<T> responseType) {
+        return restTemplate.exchange(url, HttpMethod.PUT, authEntity(token, body), responseType);
+    }
+
     public ResponseEntity<Map<String, Object>> deleteForEntityAs(String token, String url) {
         return exchange(token, url, HttpMethod.DELETE, null);
     }
@@ -182,6 +191,16 @@ public class ApiClient {
 
     public ResponseEntity<Map<String, Object>> postAnonForEntity(String url, Object body) {
         return anonExchange(url, HttpMethod.POST, body, MAP_TYPE);
+    }
+
+    /**
+     * Anonymous PUT with a JSON body, for pinning a state-changing endpoint's
+     * "no credentials" rejection (401/403). Generic response type since these
+     * assertions typically only need the status code, not a parsed map.
+     */
+    public <T> ResponseEntity<T> putAnonForEntity(String url, Object body, Class<T> responseType) {
+        var entity = new HttpEntity<>(body, jsonHeaders());
+        return restTemplate.exchange(url, HttpMethod.PUT, entity, responseType);
     }
 
     // ── Internals ────────────────────────────────────────────────────────
