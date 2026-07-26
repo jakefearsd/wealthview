@@ -1476,6 +1476,7 @@ class MonteCarloSpendingOptimizerTest {
                         new BigDecimal("1000000"), BigDecimal.ZERO,
                         null, "taxable")))
                 .withPhases(phases)
+                .withTrialCount(500)
                 .build();
 
         var result = optimizer.optimize(zeroInflation);
@@ -1688,6 +1689,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         // All Traditional — withdrawals taxed at 20%
@@ -1700,6 +1702,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -1730,6 +1733,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxedResult = taxAwareOptimizer().optimize(input);
@@ -1805,6 +1809,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = progressiveTaxOptimizer();
@@ -1849,6 +1854,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
@@ -1869,6 +1875,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
         var result = optimizer.optimize(inputOld);
         assertThat(result.yearlySpending()).isNotEmpty();
@@ -1891,6 +1898,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
@@ -1916,6 +1924,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
         var taxOptimizer = taxAwareOptimizer();
         var result = taxOptimizer.optimize(input);
@@ -1995,6 +2004,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = progressiveTaxOptimizer();
@@ -2026,6 +2036,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var noConvResult = taxOptimizer.optimize(noConvInput);
@@ -2055,6 +2066,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = progressiveTaxOptimizer();
@@ -2165,6 +2177,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withCashReserveYears(2)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2187,6 +2200,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
         var noCashResult = taxOptimizer.optimize(noCashInput);
         // Both should produce valid, comparable results
@@ -2214,6 +2228,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2248,6 +2263,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withOptimizeConversions(true)
                 .withConversionBracketRate(new BigDecimal("0.22"))
                 .withRmdTargetBracketRate(new BigDecimal("0.12"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2286,6 +2302,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2307,6 +2324,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
         var allTaxableResult = taxOptimizer.optimize(allTaxableInput);
         double mixedSpending = result.yearlySpending().getFirst().recommended().doubleValue();
@@ -2333,6 +2351,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2366,6 +2385,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var tradInput = GuardrailOptimizationInputBuilder.builder()
@@ -2376,6 +2396,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2483,6 +2504,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withFilingStatus("single")
                 .withWithdrawalOrder("dynamic_sequencing")
                 .withDynamicSequencingBracketRate(new BigDecimal("0.22"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
@@ -2505,6 +2527,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withPhases(phases)
                 .withFilingStatus("single")
                 .withWithdrawalOrder("taxable_first")
+                .withTrialCount(500)
                 .build();
 
         var tfResult = taxOptimizer.optimize(tfInput);
@@ -2542,6 +2565,7 @@ class MonteCarloSpendingOptimizerTest {
                 .withFilingStatus("single")
                 .withWithdrawalOrder("dynamic_sequencing")
                 .withDynamicSequencingBracketRate(new BigDecimal("0.22"))
+                .withTrialCount(500)
                 .build();
 
         var taxOptimizer = taxAwareOptimizer();
