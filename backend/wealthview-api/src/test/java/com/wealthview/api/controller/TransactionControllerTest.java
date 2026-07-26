@@ -151,6 +151,40 @@ class TransactionControllerTest {
                 .andExpect(status().isNoContent());
     }
 
+    /**
+     * The closed set now lives in the {@code TransactionType} enum, not in a Bean Validation
+     * {@code @Pattern}, so an unknown token fails Jackson deserialisation instead of validation.
+     * Pins that the status stays 400 and the envelope keeps its standard shape.
+     */
+    @Test
+    void create_unknownTransactionType_returns400() throws Exception {
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-15", "type": "teleport", "symbol": "AAPL",
+                                 "quantity": 10, "amount": 1500.00}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("BAD_REQUEST"))
+                .andExpect(jsonPath("$.status").value(400));
+    }
+
+    @Test
+    void create_openingBalanceType_returns201() throws Exception {
+        when(transactionService.create(eq(TENANT_ID), eq(ACCOUNT_ID), any(TransactionRequest.class)))
+                .thenReturn(sampleResponse());
+
+        mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
+                        .with(authenticatedAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"date": "2025-01-15", "type": "opening_balance", "symbol": "AAPL",
+                                 "quantity": 10, "amount": 1500.00}
+                                """))
+                .andExpect(status().isCreated());
+    }
+
     @Test
     void create_missingDate_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/accounts/{accountId}/transactions", ACCOUNT_ID)
