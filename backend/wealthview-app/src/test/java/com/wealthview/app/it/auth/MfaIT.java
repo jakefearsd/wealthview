@@ -8,13 +8,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.AuthHelper;
+import com.wealthview.app.it.testutil.HttpFixtures;
 import com.wealthview.core.auth.mfa.MfaService;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
@@ -41,7 +41,7 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaSetup_returnsSecretAndRecoveryCodes() {
         var login = tokenLogin();
-        var resp = mfaSetup((String) login.get("access_token"));
+        var resp = mfaSetup(login.accessToken());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).containsKeys("secret", "qr_code_uri", "recovery_codes");
         @SuppressWarnings("unchecked")
@@ -52,16 +52,16 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaSetup_doesNotEnableUntilVerified() {
         var login = tokenLogin();
-        mfaSetup((String) login.get("access_token"));
+        mfaSetup(login.accessToken());
 
-        var status = mfaStatus((String) login.get("access_token"));
+        var status = mfaStatus(login.accessToken());
         assertThat(status.getBody().get("enabled")).isEqualTo(false);
     }
 
     @Test
     void mfaVerifySetup_withCorrectCode_enablesMfa() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
         var setup = mfaSetup(access);
         var secret = (String) setup.getBody().get("secret");
 
@@ -76,7 +76,7 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaVerifySetup_withWrongCode_doesNotEnable() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
         mfaSetup(access);
 
         var verify = mfaVerifySetup(access, "000000");
@@ -89,7 +89,7 @@ class MfaIT extends AbstractApiIntegrationTest {
     @Test
     void mfaSetup_secondCall_replacesPriorUnverifiedSecret() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
         var first = mfaSetup(access);
         var firstSecret = (String) first.getBody().get("secret");
 
@@ -221,7 +221,7 @@ class MfaIT extends AbstractApiIntegrationTest {
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var newTokens = tokenLogin();
-        var status = mfaStatus((String) newTokens.get("access_token"));
+        var status = mfaStatus(newTokens.accessToken());
         assertThat(status.getBody().get("enabled")).isEqualTo(false);
     }
 
@@ -241,7 +241,7 @@ class MfaIT extends AbstractApiIntegrationTest {
         var secret = enableMfaOnAdmin();
         var tokens = loginThroughMfaWithSecret(secret);
         var resp = restTemplate.exchange("/api/v1/auth/mfa/regenerate-recovery-codes",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders((String) tokens.get("access_token"))),
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders((String) tokens.get("access_token"))),
                 MAP_TYPE);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         @SuppressWarnings("unchecked")
@@ -259,7 +259,7 @@ class MfaIT extends AbstractApiIntegrationTest {
 
     private EnabledMfa enableMfaWithCodes() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
         var setup = mfaSetup(access);
         var secret = (String) setup.getBody().get("secret");
         @SuppressWarnings("unchecked")
@@ -279,33 +279,32 @@ class MfaIT extends AbstractApiIntegrationTest {
         return resp.getBody();
     }
 
-    private Map<String, Object> tokenLogin() {
-        return api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD)).getBody();
+    private AuthHelper.TokenPair tokenLogin() {
+        return authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD);
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> mfaSetup(String access) {
         return restTemplate.exchange("/api/v1/auth/mfa/setup",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(access)), MAP_TYPE);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(access)), MAP_TYPE);
     }
 
     private org.springframework.http.ResponseEntity<Void> mfaVerifySetup(String access, String code) {
         return restTemplate.exchange("/api/v1/auth/mfa/verify-setup",
                 HttpMethod.POST,
-                new HttpEntity<>(Map.of("totp_code", code), withBearer(access)),
+                new HttpEntity<>(Map.of("totp_code", code), HttpFixtures.bearerJsonHeaders(access)),
                 Void.class);
     }
 
     private org.springframework.http.ResponseEntity<Void> mfaDisable(String access, String code) {
         return restTemplate.exchange("/api/v1/auth/mfa/disable",
                 HttpMethod.POST,
-                new HttpEntity<>(Map.of("totp_code", code), withBearer(access)),
+                new HttpEntity<>(Map.of("totp_code", code), HttpFixtures.bearerJsonHeaders(access)),
                 Void.class);
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> mfaStatus(String access) {
         return restTemplate.exchange("/api/v1/auth/mfa/status",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(access)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(access)), MAP_TYPE);
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> challengeBearer(
@@ -319,23 +318,5 @@ class MfaIT extends AbstractApiIntegrationTest {
         if (totp != null) body.put("totp_code", totp);
         if (recovery != null) body.put("recovery_code", recovery);
         return api.postAnonForEntity("/api/v1/auth/token/mfa/challenge", body);
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        return h;
-    }
-
-    private HttpHeaders bearerHeaders(String access) {
-        var h = new HttpHeaders();
-        h.setBearerAuth(access);
-        return h;
-    }
-
-    private HttpHeaders withBearer(String access) {
-        var h = jsonHeaders();
-        h.setBearerAuth(access);
-        return h;
     }
 }

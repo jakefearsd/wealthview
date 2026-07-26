@@ -14,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +41,7 @@ class AuthenticationBoundaryFuzzIT extends AbstractApiIntegrationTest {
         FuzzSupport.samples(this::randomLoginBody, LOGIN_ITERATIONS, 0xA1L)
                 .forEach(body -> {
                     var resp = restTemplate.exchange("/api/v1/auth/login",
-                            HttpMethod.POST, new HttpEntity<>(body, jsonHeaders()), MAP_TYPE);
+                            HttpMethod.POST, new HttpEntity<>(body, HttpFixtures.jsonHeaders()), MAP_TYPE);
 
                     assertThat(resp.getStatusCode().is5xxServerError())
                             .as("login body=%s produced 5xx (status=%s)", body, resp.getStatusCode())
@@ -71,7 +72,7 @@ class AuthenticationBoundaryFuzzIT extends AbstractApiIntegrationTest {
 
         for (var raw : malformed) {
             var resp = restTemplate.exchange("/api/v1/auth/login",
-                    HttpMethod.POST, new HttpEntity<>(raw, jsonHeaders()), String.class);
+                    HttpMethod.POST, new HttpEntity<>(raw, HttpFixtures.jsonHeaders()), String.class);
             assertThat(resp.getStatusCode().is5xxServerError())
                     .as("malformed JSON body %s produced 5xx", raw)
                     .isFalse();
@@ -200,12 +201,6 @@ class AuthenticationBoundaryFuzzIT extends AbstractApiIntegrationTest {
             case 3 -> FuzzSupport.alnum(r, 8000) + "x";
             default -> FuzzSupport.asciiNoisy(r, 256) + "x";
         };
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
     }
 
     private String abbrev(String s) {

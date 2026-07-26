@@ -7,9 +7,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,8 +30,7 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
     void bearerWithInvalidCsrfCookie_succeeds() {
         var token = mobileLogin();
 
-        var headers = bearerHeaders(token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        var headers = HttpFixtures.bearerJsonHeaders(token);
         // Deliberately wrong XSRF-TOKEN cookie. CSRF is skipped because of
         // the Bearer header, so this must NOT cause a 403.
         headers.add(HttpHeaders.COOKIE, "XSRF-TOKEN=this-is-wrong");
@@ -47,8 +46,7 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
     void bearerWithoutAnyCookies_succeeds() {
         var token = mobileLogin();
 
-        var headers = bearerHeaders(token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        var headers = HttpFixtures.bearerJsonHeaders(token);
         var body = Map.of("name", "no-cookies brokerage", "type", "brokerage");
 
         var response = restTemplate.exchange("/api/v1/accounts",
@@ -62,7 +60,7 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
         var token = mobileLogin();
 
         var response = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(token)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -110,21 +108,12 @@ class BearerCsrfInteractionIT extends AbstractApiIntegrationTest {
         var token = mobileLogin();
 
         var response = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(token)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), Void.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }
 
     private String mobileLogin() {
-        var response = api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
+        return authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD).accessToken();
     }
 }

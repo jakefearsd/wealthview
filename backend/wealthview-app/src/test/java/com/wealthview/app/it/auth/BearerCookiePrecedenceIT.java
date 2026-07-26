@@ -1,13 +1,10 @@
 package com.wealthview.app.it.auth;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 
@@ -83,13 +80,6 @@ class BearerCookiePrecedenceIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLoginAs(String email, String password) {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", email, "password", password), headers),
-                MAP_TYPE);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return (String) response.getBody().get("access_token");
+        return authHelper.mobileLogin(restTemplate, email, password).accessToken();
     }
 }

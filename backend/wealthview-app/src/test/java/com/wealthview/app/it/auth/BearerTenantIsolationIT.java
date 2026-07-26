@@ -7,12 +7,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -52,7 +51,7 @@ class BearerTenantIsolationIT extends AbstractApiIntegrationTest {
     void bearerAuth_cannotAccessOtherTenantData() {
         var response = restTemplate.exchange(
                 "/api/v1/accounts/" + tenant2AccountId,
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(tenant1Bearer)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(tenant1Bearer)), MAP_TYPE);
 
         // Cross-tenant lookups must return 404 (not 403) so we don't leak
         // existence of the resource — same convention as the cookie path.
@@ -63,7 +62,7 @@ class BearerTenantIsolationIT extends AbstractApiIntegrationTest {
     @SuppressWarnings("unchecked")
     void bearerAuth_listAccountsReturnsOnlyOwnTenant() {
         var response = restTemplate.exchange("/api/v1/accounts",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(tenant1Bearer)),
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(tenant1Bearer)),
                 new ParameterizedTypeReference<Map<String, Object>>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -74,8 +73,7 @@ class BearerTenantIsolationIT extends AbstractApiIntegrationTest {
 
     @Test
     void bearerAuth_cannotMutateOtherTenantResource() {
-        var headers = bearerHeaders(tenant1Bearer);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        var headers = HttpFixtures.bearerJsonHeaders(tenant1Bearer);
         var body = Map.of("name", "Pwned by tenant 1", "type", "brokerage");
 
         var response = restTemplate.exchange(
@@ -86,29 +84,15 @@ class BearerTenantIsolationIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLoginAs(String email, String password) {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        var response = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", email, "password", password), headers),
-                MAP_TYPE);
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return (String) response.getBody().get("access_token");
+        return authHelper.mobileLogin(restTemplate, email, password).accessToken();
     }
 
     private String createAccountWithBearer(String bearerToken, String name) {
-        var headers = bearerHeaders(bearerToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        var headers = HttpFixtures.bearerJsonHeaders(bearerToken);
         var body = Map.of("name", name, "type", "brokerage");
         var response = restTemplate.exchange("/api/v1/accounts",
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return (String) response.getBody().get("id");
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
     }
 }

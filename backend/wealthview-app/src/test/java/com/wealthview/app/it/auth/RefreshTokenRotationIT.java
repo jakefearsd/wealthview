@@ -10,10 +10,11 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.AuthHelper;
+import com.wealthview.app.it.testutil.HttpFixtures;
 import com.wealthview.persistence.repository.RefreshTokenRepository;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
@@ -53,7 +54,7 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     @Test
     void tokenRefresh_singleUse_secondCallWithOldTokenFails() {
         var first = tokenLogin();
-        var firstRefresh = (String) first.get("refresh_token");
+        var firstRefresh = first.refreshToken();
 
         var firstRefreshResp = tokenRefresh(firstRefresh);
         assertThat(firstRefreshResp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -65,7 +66,7 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     @Test
     void tokenRefresh_reuseDetection_revokesAllUserTokens() {
         var first = tokenLogin();
-        var originalRefresh = (String) first.get("refresh_token");
+        var originalRefresh = first.refreshToken();
 
         var legit = tokenRefresh(originalRefresh);
         assertThat(legit.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -89,17 +90,17 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
 
         // The replacement access token, too.
         var meWithReplacement = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(replacementAccess)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(replacementAccess)), MAP_TYPE);
         assertThat(meWithReplacement.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
     void tokenLogout_revokesAllOutstandingRefreshTokens() {
         var login = tokenLogin();
-        var accessToken = (String) login.get("access_token");
+        var accessToken = login.accessToken();
 
         var logout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(accessToken)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         long unrevoked = jdbc.queryForObject(
@@ -115,7 +116,7 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
         // forged with a stolen signing key, or an in-flight token after the
         // row was wiped), the server must reject it.
         var login = tokenLogin();
-        var freshRt = (String) login.get("refresh_token");
+        var freshRt = login.refreshToken();
         jdbc.update("DELETE FROM refresh_tokens WHERE user_id = ?", authHelper.adminUserId());
 
         var resp = tokenRefresh(freshRt);
@@ -125,7 +126,7 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     @Test
     void tokenRefresh_dbExpiredJti_returns401() {
         var login = tokenLogin();
-        var rt = (String) login.get("refresh_token");
+        var rt = login.refreshToken();
 
         // Backdate the row's expires_at so the DB-side check fails even though
         // the JWT itself is still within its 24h expiry.
@@ -156,10 +157,8 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
                 Long.class, authHelper.adminUserId());
     }
 
-    private Map<String, Object> tokenLogin() {
-        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
-        return resp.getBody();
+    private AuthHelper.TokenPair tokenLogin() {
+        return authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD);
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> tokenRefresh(String refreshToken) {
@@ -168,7 +167,7 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
     }
 
     private org.springframework.http.ResponseEntity<Map<String, Object>> cookieRefresh(String refreshTokenCookie) {
-        var headers = jsonHeaders();
+        var headers = HttpFixtures.jsonHeaders();
         headers.add(HttpHeaders.COOKIE, "refresh_token=" + refreshTokenCookie);
         return restTemplate.exchange("/api/v1/auth/refresh",
                 HttpMethod.POST, new HttpEntity<>(headers), MAP_TYPE);
@@ -187,17 +186,5 @@ class RefreshTokenRotationIT extends AbstractApiIntegrationTest {
             }
         }
         return null;
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
     }
 }

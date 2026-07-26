@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,11 +96,11 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         var logoutResponse = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(accessToken)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), Void.class);
         assertThat(logoutResponse.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(accessToken)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), MAP_TYPE);
         assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -110,7 +111,7 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         var response = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(accessToken)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("email")).isEqualTo(ADMIN_EMAIL);
@@ -123,8 +124,7 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
         var accessToken = (String) loginResponse.getBody().get("access_token");
 
         // POST without X-XSRF-TOKEN header — would 403 on the cookie path.
-        var headers = bearerHeaders(accessToken);
-        headers.setContentType(MediaType.APPLICATION_JSON);
+        var headers = HttpFixtures.bearerJsonHeaders(accessToken);
         var body = Map.of("name", "Mobile-created brokerage", "type", "brokerage");
 
         var response = restTemplate.exchange("/api/v1/accounts",
@@ -147,18 +147,6 @@ class AuthTokenIT extends AbstractApiIntegrationTest {
                 HttpMethod.POST, new HttpEntity<>(body, headers), MAP_TYPE);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
-    private HttpHeaders bearerHeaders(String accessToken) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(accessToken);
-        return headers;
     }
 
     private void assertNoAuthTokenCookies(HttpHeaders headers) {

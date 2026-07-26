@@ -5,11 +5,11 @@ import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -94,17 +94,11 @@ class MobileRefreshIT extends AbstractApiIntegrationTest {
         var refreshToken = (String) loginResponse.getBody().get("refresh_token");
 
         var logout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(accessToken)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var refresh = api.postAnonForEntity("/api/v1/auth/token/refresh",
                 Map.of("refresh_token", refreshToken));
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
     }
 }

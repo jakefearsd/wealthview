@@ -11,6 +11,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -157,6 +158,26 @@ public class AuthHelper {
                 new HttpEntity<>(body, jsonHeaders()),
                 new ParameterizedTypeReference<Map<String, Object>>() {});
         return parseSession(response.getHeaders()).accessToken();
+    }
+
+    /**
+     * Log in through the mobile/Bearer token endpoint ({@code POST
+     * /api/v1/auth/token/login}), which returns tokens in the response body
+     * rather than as cookies. Replaces the per-file {@code mobileLogin()} /
+     * {@code tokenLogin()} reimplementations that duplicated this choreography.
+     */
+    public TokenPair mobileLogin(TestRestTemplate restTemplate, String email, String password) {
+        var body = Map.of("email", email, "password", password);
+        var response = restTemplate.exchange("/api/v1/auth/token/login",
+                HttpMethod.POST,
+                new HttpEntity<>(body, jsonHeaders()),
+                new ParameterizedTypeReference<Map<String, Object>>() {});
+        var responseBody = response.getBody();
+        if (response.getStatusCode() != HttpStatus.OK || responseBody == null) {
+            throw new IllegalStateException(
+                    "Mobile token login failed for " + email + ": status=" + response.getStatusCode());
+        }
+        return new TokenPair((String) responseBody.get("access_token"), (String) responseBody.get("refresh_token"));
     }
 
     public String adminToken() {
@@ -321,5 +342,9 @@ public class AuthHelper {
                     "refresh_token=" + (refreshToken == null ? "" : refreshToken)
             );
         }
+    }
+
+    /** Access/refresh token pair returned by the mobile token-login endpoint. */
+    public record TokenPair(String accessToken, String refreshToken) {
     }
 }

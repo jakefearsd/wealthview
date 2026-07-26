@@ -9,12 +9,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.AuthHelper;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,7 +41,7 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
         tokenLogin();
         var s3 = tokenLogin();
 
-        var resp = listSessions((String) s3.get("access_token"));
+        var resp = listSessions(s3.accessToken());
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(resp.getBody()).hasSizeGreaterThanOrEqualTo(3);
     }
@@ -50,7 +51,7 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
         // A second active session must exist so "current" is a meaningful distinction.
         tokenLogin();
         var s2 = tokenLogin();
-        var s2Access = (String) s2.get("access_token");
+        var s2Access = s2.accessToken();
 
         var resp = listSessions(s2Access);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -63,41 +64,41 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
     void revokeSession_invalidatesItsToken_otherSessionsContinue() {
         var aLogin = tokenLogin();
         var bLogin = tokenLogin();
-        var aAccess = (String) aLogin.get("access_token");
-        var bAccess = (String) bLogin.get("access_token");
+        var aAccess = aLogin.accessToken();
+        var bAccess = bLogin.accessToken();
 
         var sessions = listSessions(aAccess).getBody();
         // Revoke the OTHER session (the one we're not using to make the call).
         var idToRevoke = otherSessionId(sessions);
         var del = restTemplate.exchange("/api/v1/auth/sessions/" + idToRevoke,
-                HttpMethod.DELETE, new HttpEntity<>(bearerHeaders(aAccess)), Void.class);
+                HttpMethod.DELETE, new HttpEntity<>(HttpFixtures.bearerHeaders(aAccess)), Void.class);
         assertThat(del.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // The B token (which corresponds to the just-revoked session) is now invalid.
         var checkB = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(bAccess)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(bAccess)), MAP_TYPE);
         assertThat(checkB.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         // The A token still works.
         var checkA = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(aAccess)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(aAccess)), MAP_TYPE);
         assertThat(checkA.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
     void revokeOwnCurrentSession_logsOutCaller() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
 
         var sessions = listSessions(access).getBody();
         var currentId = currentSessionId(sessions);
 
         var del = restTemplate.exchange("/api/v1/auth/sessions/" + currentId,
-                HttpMethod.DELETE, new HttpEntity<>(bearerHeaders(access)), Void.class);
+                HttpMethod.DELETE, new HttpEntity<>(HttpFixtures.bearerHeaders(access)), Void.class);
         assertThat(del.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(access)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(access)), MAP_TYPE);
         assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -107,10 +108,10 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
         tokenLogin();
         tokenLogin();
         var current = tokenLogin();
-        var currentAccess = (String) current.get("access_token");
+        var currentAccess = current.accessToken();
 
         var del = restTemplate.exchange("/api/v1/auth/sessions",
-                HttpMethod.DELETE, new HttpEntity<>(bearerHeaders(currentAccess)), Void.class);
+                HttpMethod.DELETE, new HttpEntity<>(HttpFixtures.bearerHeaders(currentAccess)), Void.class);
         assertThat(del.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var sessions = listSessions(currentAccess).getBody();
@@ -123,14 +124,14 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
         // Tenant A (admin) tries to revoke a session id belonging to Tenant B.
         authHelper.bootstrapSecondTenant(restTemplate);
         var aLogin = tokenLogin();
-        var aAccess = (String) aLogin.get("access_token");
+        var aAccess = aLogin.accessToken();
         // A session belonging to Tenant 2's admin (created during bootstrap).
         var foreignSessionId = jdbc.queryForObject(
                 "SELECT id FROM user_sessions WHERE user_id = (SELECT id FROM users WHERE email = ?) LIMIT 1",
                 UUID.class, "it-admin2@wealthview.test");
 
         var resp = restTemplate.exchange("/api/v1/auth/sessions/" + foreignSessionId,
-                HttpMethod.DELETE, new HttpEntity<>(bearerHeaders(aAccess)), Void.class);
+                HttpMethod.DELETE, new HttpEntity<>(HttpFixtures.bearerHeaders(aAccess)), Void.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
@@ -150,16 +151,16 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
     @Test
     void lastUsedAt_throttled_doesntUpdateOnEveryRequest() {
         var login = tokenLogin();
-        var access = (String) login.get("access_token");
+        var access = login.accessToken();
 
         // First call to /me primes last_used_at; second call within throttle
         // window must not update it again.
         restTemplate.exchange("/api/v1/auth/me", HttpMethod.GET,
-                new HttpEntity<>(bearerHeaders(access)), MAP_TYPE);
+                new HttpEntity<>(HttpFixtures.bearerHeaders(access)), MAP_TYPE);
         var afterFirst = readMostRecentLastUsedAt();
 
         restTemplate.exchange("/api/v1/auth/me", HttpMethod.GET,
-                new HttpEntity<>(bearerHeaders(access)), MAP_TYPE);
+                new HttpEntity<>(HttpFixtures.bearerHeaders(access)), MAP_TYPE);
         var afterSecond = readMostRecentLastUsedAt();
 
         assertThat(afterSecond).isEqualTo(afterFirst);
@@ -189,20 +190,12 @@ class SessionManagementIT extends AbstractApiIntegrationTest {
         throw new IllegalStateException("No current session found");
     }
 
-    private Map<String, Object> tokenLogin() {
-        var resp = api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
-        return resp.getBody();
+    private AuthHelper.TokenPair tokenLogin() {
+        return authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD);
     }
 
     private org.springframework.http.ResponseEntity<List<Map<String, Object>>> listSessions(String accessToken) {
         return restTemplate.exchange("/api/v1/auth/sessions",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(accessToken)), LIST_TYPE);
-    }
-
-    private HttpHeaders bearerHeaders(String accessToken) {
-        var h = new HttpHeaders();
-        h.setBearerAuth(accessToken);
-        return h;
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(accessToken)), LIST_TYPE);
     }
 }

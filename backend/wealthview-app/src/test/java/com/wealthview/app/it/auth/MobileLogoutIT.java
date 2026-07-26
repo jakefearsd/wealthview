@@ -1,15 +1,13 @@
 package com.wealthview.app.it.auth;
 
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,15 +55,10 @@ class MobileLogoutIT extends AbstractApiIntegrationTest {
 
     @Test
     void tokenLogout_calledTwice_secondCallFails() {
-        var loginResponse = restTemplate.exchange("/api/v1/auth/token/login",
-                HttpMethod.POST,
-                new HttpEntity<>(Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD),
-                        jsonHeaders()),
-                MAP_TYPE);
-        var token = (String) loginResponse.getBody().get("access_token");
+        var token = authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD).accessToken();
 
         var firstLogout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(token)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), Void.class);
         assertThat(firstLogout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // The first logout incremented token_generation, so the same Bearer
@@ -73,19 +66,7 @@ class MobileLogoutIT extends AbstractApiIntegrationTest {
         // unauthenticated and the entry-point returns 401, never reaching
         // the controller.
         var secondLogout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(token)), MAP_TYPE);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), MAP_TYPE);
         assertThat(secondLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
-    }
-
-    private HttpHeaders jsonHeaders() {
-        var headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return headers;
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
     }
 }

@@ -5,11 +5,11 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 import io.micrometer.core.instrument.MeterRegistry;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -84,7 +84,7 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
         var before = readCounter("wealthview.auth.logout", "transport", "bearer");
 
         var logout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(token)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var after = readCounter("wealthview.auth.logout", "transport", "bearer");
@@ -114,15 +114,6 @@ class MobileAuthMetricsIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLogin() {
-        var response = api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", ADMIN_EMAIL, "password", ADMIN_PASSWORD));
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
+        return authHelper.mobileLogin(restTemplate, ADMIN_EMAIL, ADMIN_PASSWORD).accessToken();
     }
 }

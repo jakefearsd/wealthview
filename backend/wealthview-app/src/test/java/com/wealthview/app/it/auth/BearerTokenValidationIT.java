@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 import com.wealthview.core.auth.JwtTokenProvider;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
@@ -190,7 +191,7 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
 
         // Sanity: token works before deletion.
         var preCheck = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(memberToken)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(memberToken)), MAP_TYPE);
         assertThat(preCheck.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         jdbcTemplate.update("DELETE FROM audit_log WHERE user_id = ?", memberId);
@@ -199,7 +200,7 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
         assertThat(deleted).isEqualTo(1);
 
         var postCheck = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(memberToken)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(memberToken)), MAP_TYPE);
         assertThat(postCheck.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -225,7 +226,7 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
         assertThat(setActive.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(memberToken)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(memberToken)), MAP_TYPE);
         assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
 
         // Touch memberId to keep the variable used; it documents the user
@@ -249,7 +250,7 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         var followUp = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(originalAccess)), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(originalAccess)), MAP_TYPE);
         assertThat(followUp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -258,15 +259,6 @@ class BearerTokenValidationIT extends AbstractApiIntegrationTest {
     }
 
     private String mobileLoginAs(String email, String password) {
-        var response = api.postAnonForEntity("/api/v1/auth/token/login",
-                Map.of("email", email, "password", password));
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-        return (String) response.getBody().get("access_token");
-    }
-
-    private HttpHeaders bearerHeaders(String accessToken) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(accessToken);
-        return headers;
+        return authHelper.mobileLogin(restTemplate, email, password).accessToken();
     }
 }

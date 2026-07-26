@@ -9,6 +9,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
+import com.wealthview.app.it.testutil.HttpFixtures;
 
 import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -67,7 +68,7 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
 
         // Confirm the Bearer header authenticates pre-logout.
         var preLogout = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(session.accessToken())), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(session.accessToken())), MAP_TYPE);
         assertThat(preLogout.getStatusCode()).isEqualTo(HttpStatus.OK);
 
         // Logout via the cookie path (uses CSRF + cookie auth via authHelper).
@@ -75,7 +76,7 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var postLogout = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, new HttpEntity<>(bearerHeaders(session.accessToken())), MAP_TYPE);
+                HttpMethod.GET, new HttpEntity<>(HttpFixtures.bearerHeaders(session.accessToken())), MAP_TYPE);
         assertThat(postLogout.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
@@ -94,7 +95,7 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
 
         // Logout via the token (Bearer) path.
         var logout = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, new HttpEntity<>(bearerHeaders(token)), Void.class);
+                HttpMethod.POST, new HttpEntity<>(HttpFixtures.bearerHeaders(token)), Void.class);
         assertThat(logout.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         var postHeaders = new HttpHeaders();
@@ -118,11 +119,5 @@ class CrossTransportAuthIT extends AbstractApiIntegrationTest {
         assertThat(refresh.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(refresh.getBody()).containsKeys("access_token", "refresh_token");
         assertThat((String) refresh.getBody().get("access_token")).isNotEqualTo(session.accessToken());
-    }
-
-    private HttpHeaders bearerHeaders(String token) {
-        var headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        return headers;
     }
 }
