@@ -6,7 +6,9 @@ import java.util.Map;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 import com.wealthview.app.it.AuthHelper;
@@ -132,6 +134,43 @@ public class ApiClient {
         return restTemplate.exchange(url, HttpMethod.GET, authEntity(token, null), LIST_MAP_TYPE);
     }
 
+    // ── Anonymous (no auth) ──────────────────────────────────────────────
+    //
+    // For endpoints/tests that deliberately send no credentials — e.g. pinning
+    // a 401/403 rejection, or a genuinely public endpoint like version-check.
+    // These are request-shape equivalent to the raw
+    // `restTemplate.exchange(url, method, HttpEntity.EMPTY, ...)` incantation
+    // they replace: no Authorization header, no auth cookie.
+
+    public Map<String, Object> getAnon(String url) {
+        return getAnonForEntity(url).getBody();
+    }
+
+    public Map<String, Object> postAnon(String url, Object body) {
+        return postAnonForEntity(url, body).getBody();
+    }
+
+    public ResponseEntity<Map<String, Object>> getAnonForEntity(String url) {
+        return anonExchange(url, HttpMethod.GET, null, MAP_TYPE);
+    }
+
+    /**
+     * Generic form for call sites that assert on a non-JSON-map body (e.g.
+     * {@code String.class} to inspect a raw error payload) rather than parsing
+     * into {@link #MAP_TYPE}.
+     */
+    public <T> ResponseEntity<T> getAnonForEntity(String url, Class<T> responseType) {
+        return restTemplate.exchange(url, HttpMethod.GET, HttpEntity.EMPTY, responseType);
+    }
+
+    public ResponseEntity<Map<String, Object>> postAnonForEntity(String url) {
+        return anonExchange(url, HttpMethod.POST, null, MAP_TYPE);
+    }
+
+    public ResponseEntity<Map<String, Object>> postAnonForEntity(String url, Object body) {
+        return anonExchange(url, HttpMethod.POST, body, MAP_TYPE);
+    }
+
     // ── Internals ────────────────────────────────────────────────────────
 
     private ResponseEntity<Map<String, Object>> exchange(String token, String url,
@@ -141,5 +180,17 @@ public class ApiClient {
 
     private HttpEntity<?> authEntity(String token, Object body) {
         return body == null ? authHelper.authEntity(token) : authHelper.authEntity(body, token);
+    }
+
+    private <T> ResponseEntity<T> anonExchange(String url, HttpMethod method, Object body,
+                                                ParameterizedTypeReference<T> type) {
+        HttpEntity<?> entity = body == null ? HttpEntity.EMPTY : new HttpEntity<>(body, jsonHeaders());
+        return restTemplate.exchange(url, method, entity, type);
+    }
+
+    private HttpHeaders jsonHeaders() {
+        var headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return headers;
     }
 }

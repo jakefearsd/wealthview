@@ -85,9 +85,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void versionCheck_anonymousAccess_succeeds() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=0.0.1",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=0.0.1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).isNotNull();
@@ -98,9 +97,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     void versionCheck_androidOldVersion_returnsUpdateRequired() {
         bumpAndroid("1.5.0", "2.0.0", null);
 
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=1.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=1.0.0");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("update_required")).isEqualTo(true);
@@ -111,9 +109,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     void versionCheck_androidStaleButSupported_returnsUpdateRecommended() {
         bumpAndroid("1.0.0", "2.0.0", null);
 
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=1.5.0",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=1.5.0");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("update_required")).isEqualTo(false);
@@ -124,9 +121,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     void versionCheck_androidLatestVersion_returnsBothFalse() {
         bumpAndroid("1.0.0", "2.0.0", null);
 
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=2.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=2.0.0");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("update_required")).isEqualTo(false);
@@ -135,9 +131,7 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void versionCheck_iosWorks() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=ios&version=0.0.1",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity("/api/v1/app/version-check?platform=ios&version=0.0.1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().get("platform")).isEqualTo("ios");
@@ -145,9 +139,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void versionCheck_unknownPlatform_returns400() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=windows&version=1.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, String.class);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=windows&version=1.0.0", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
@@ -155,9 +148,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     @Test
     void versionCheck_malformedVersion_returns400() {
         for (var bad : List.of("not-a-version", "1.2", "1.2.3.4")) {
-            var response = restTemplate.exchange(
-                    "/api/v1/app/version-check?platform=android&version=" + bad,
-                    HttpMethod.GET, HttpEntity.EMPTY, String.class);
+            var response = api.getAnonForEntity(
+                    "/api/v1/app/version-check?platform=android&version=" + bad, String.class);
 
             assertThat(response.getStatusCode())
                     .as("malformed version %s should be rejected", bad)
@@ -167,27 +159,22 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
     @Test
     void versionCheck_missingPlatform_returns400() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?version=1.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, String.class);
+        var response = api.getAnonForEntity("/api/v1/app/version-check?version=1.0.0", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
     void versionCheck_missingVersion_returns400() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android",
-                HttpMethod.GET, HttpEntity.EMPTY, String.class);
+        var response = api.getAnonForEntity("/api/v1/app/version-check?platform=android", String.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
     void versionCheck_acceptsPreReleaseVersion() {
-        var response = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=1.0.0-beta.1",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=1.0.0-beta.1");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
@@ -286,9 +273,8 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     void versionCheckCache_repeatedCallsHitCache() {
         // First call seeds the cache; second/third should serve from it.
         for (int i = 0; i < 3; i++) {
-            var response = restTemplate.exchange(
-                    "/api/v1/app/version-check?platform=android&version=0.0.1",
-                    HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+            var response = api.getAnonForEntity(
+                    "/api/v1/app/version-check?platform=android&version=0.0.1");
             assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         }
 
@@ -301,18 +287,16 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
     @Test
     void adminUpdate_evictsCache() {
         // Prime the cache with the seed value.
-        var first = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=0.0.1",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var first = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=0.0.1");
         assertThat(first.getBody().get("minimum_supported_version")).isEqualTo("0.0.1");
 
         // Bump via admin endpoint.
         bumpAndroid("1.5.0", "1.5.0", null);
 
         // Re-query: should reflect the new floor (proves the cache was evicted).
-        var after = restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=1.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var after = api.getAnonForEntity(
+                "/api/v1/app/version-check?platform=android&version=1.0.0");
         assertThat(after.getBody().get("minimum_supported_version")).isEqualTo("1.5.0");
         assertThat(after.getBody().get("update_required")).isEqualTo(true);
     }
@@ -325,9 +309,7 @@ class AppVersionCheckIT extends AbstractApiIntegrationTest {
 
         double before = readCounter("android", "update_required");
 
-        restTemplate.exchange(
-                "/api/v1/app/version-check?platform=android&version=1.0.0",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        api.getAnonForEntity("/api/v1/app/version-check?platform=android&version=1.0.0");
 
         double after = readCounter("android", "update_required");
         assertThat(after).isGreaterThan(before);

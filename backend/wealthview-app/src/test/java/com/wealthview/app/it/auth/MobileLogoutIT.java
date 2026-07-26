@@ -29,8 +29,7 @@ class MobileLogoutIT extends AbstractApiIntegrationTest {
 
     @Test
     void tokenLogout_withoutBearerHeader_returns401() {
-        var response = restTemplate.exchange("/api/v1/auth/token/logout",
-                HttpMethod.POST, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.postAnonForEntity("/api/v1/auth/token/logout");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

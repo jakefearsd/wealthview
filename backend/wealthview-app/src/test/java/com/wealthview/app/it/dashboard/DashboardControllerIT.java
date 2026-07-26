@@ -13,14 +13,11 @@ import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 
 import com.wealthview.app.it.AbstractApiIntegrationTest;
 import com.wealthview.app.it.testutil.TestDataHelper;
 
-import static com.wealthview.app.it.testutil.TestDataHelper.MAP_TYPE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -192,8 +189,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(9)
     void getPortfolioHistory_unauthenticated_returns403() {
-        var response = restTemplate.exchange("/api/v1/dashboard/portfolio-history",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity("/api/v1/dashboard/portfolio-history");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
@@ -233,8 +229,7 @@ class DashboardControllerIT extends AbstractApiIntegrationTest {
     @Test
     @Order(11)
     void getSnapshotProjection_unauthenticated_returns401() {
-        var response = restTemplate.exchange("/api/v1/dashboard/snapshot-projection",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity("/api/v1/dashboard/snapshot-projection");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }

@@ -77,8 +77,7 @@ class BearerCookiePrecedenceIT extends AbstractApiIntegrationTest {
 
     @Test
     void noBearerOrCookie_returns401_onProtectedEndpoint() {
-        var response = restTemplate.exchange("/api/v1/auth/me",
-                HttpMethod.GET, HttpEntity.EMPTY, MAP_TYPE);
+        var response = api.getAnonForEntity("/api/v1/auth/me");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
